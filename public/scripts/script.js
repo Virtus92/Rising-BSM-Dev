@@ -1,5 +1,16 @@
 document.addEventListener("DOMContentLoaded", function() {
   "use strict";
+
+  window.ServiceModals = {};
+
+  // Am Anfang des Dokuments (nach "use strict";)
+  window.closeModal = function() {
+    const modalElement = document.getElementById('serviceModal');
+    if (modalElement) {
+      const modal = bootstrap.Modal.getInstance(modalElement);
+      if (modal) modal.hide();
+    }
+  };
   
   // Utility Functions
   function currentYear() {
@@ -44,6 +55,20 @@ document.addEventListener("DOMContentLoaded", function() {
   
   // Bootstrap-basierte Modal-Funktionen mit data-Attributen
   function initServiceModals() {
+
+    document.querySelectorAll('.modal-trigger').forEach(trigger => {
+      trigger.addEventListener('click', function(e) {
+        e.preventDefault();
+        const modalType = this.dataset.modal;
+        if (modalType === 'facility') {
+          ServiceModals.openFacilityModal();
+        } else if (modalType === 'moving') {
+          ServiceModals.openUmzugModal();
+        } else if (modalType === 'winter') {
+          ServiceModals.openWinterModal();
+        }
+      });
+    });
     // Service-Modal-Handler
     document.addEventListener('click', function(e) {
       const modalTrigger = e.target.closest('[data-modal-trigger]');
@@ -199,6 +224,36 @@ document.addEventListener("DOMContentLoaded", function() {
         </div>`
         }
       };
+
+      window.ServiceModals = {
+        openFacilityModal: function() {
+          const data = modalData.facility;
+          document.getElementById('serviceModalLabel').textContent = data.title;
+          document.getElementById('serviceModalSubtitle').textContent = data.subtitle;
+          document.getElementById('modalHeaderBg').style.backgroundImage = `url('${data.headerImage}')`;
+          document.getElementById('serviceModalBody').innerHTML = data.content;
+          const modal = new bootstrap.Modal(document.getElementById('serviceModal'));
+          modal.show();
+        },
+        openUmzugModal: function() {
+          const data = modalData.moving;
+          document.getElementById('serviceModalLabel').textContent = data.title;
+          document.getElementById('serviceModalSubtitle').textContent = data.subtitle;
+          document.getElementById('modalHeaderBg').style.backgroundImage = `url('${data.headerImage}')`;
+          document.getElementById('serviceModalBody').innerHTML = data.content;
+          const modal = new bootstrap.Modal(document.getElementById('serviceModal'));
+          modal.show();
+        },
+        openWinterModal: function() {
+          const data = modalData.winter;
+          document.getElementById('serviceModalLabel').textContent = data.title;
+          document.getElementById('serviceModalSubtitle').textContent = data.subtitle;
+          document.getElementById('modalHeaderBg').style.backgroundImage = `url('${data.headerImage}')`;
+          document.getElementById('serviceModalBody').innerHTML = data.content;
+          const modal = new bootstrap.Modal(document.getElementById('serviceModal'));
+          modal.show();
+        }
+      };
       
       const data = modalData[modalType];
       if (!data) return;
@@ -209,6 +264,13 @@ document.addEventListener("DOMContentLoaded", function() {
       document.getElementById('serviceModalBody').innerHTML = data.content;
     });
   }
+
+
+  // Am Anfang des Dokuments (nach "use strict";)
+window.startAIBeratung = function() {
+  alert('AI-Beratung wird geladen...');
+  // Hier Ihre tatsächliche Implementierung
+};
   
   // Cookie-Banner-Funktionalität (vereinfacht)
   function initCookieConsent() {
@@ -297,9 +359,8 @@ document.addEventListener("DOMContentLoaded", function() {
       applyPreferences(validPreferences);
       
       // Banner ausblenden mit Übergang
-      cookieBanner.style.opacity = '0';
-      cookieBanner.style.transform = 'translateY(20px)';
-      
+      cookieBanner.classList.add('hiding');
+
       setTimeout(() => {
         cookieBanner.style.display = 'none';
       }, 300);
@@ -417,8 +478,7 @@ document.addEventListener("DOMContentLoaded", function() {
       fetch('/contact', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'CSRF-Token': data._csrf
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(data)
       })

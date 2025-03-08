@@ -6,7 +6,6 @@ const { Pool } = require('pg');
 const axios = require('axios');
 const helmet = require('helmet');
 const validator = require('validator');
-const csrf = require('csurf');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 
@@ -42,7 +41,7 @@ app.use(helmet());
 app.use(helmet.contentSecurityPolicy({
   directives: {
     defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+    scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "'unsafe-inline'"], // unsafe-inline hinzufügen
     styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
     imgSrc: ["'self'", "data:"],
     connectSrc: ["'self'", "https://n8n.dinel.at"]
@@ -53,16 +52,6 @@ app.use(helmet.contentSecurityPolicy({
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// CSRF-Schutz Middleware initialisieren
-const csrfProtection = csrf({ cookie: true });
-app.use(csrfProtection);
-
-// CSRF-Token für alle Requests verfügbar machen
-app.use((req, res, next) => {
-  res.locals.csrfToken = req.csrfToken();
-  next();
-});
-
 // Statische Dateien bereitstellen
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -71,7 +60,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // Startseite
-app.get('/', csrfProtection, (req, res) => {
+app.get('/', (req, res) => {
   res.render('index', { 
     title: 'Rising BSM – Ihre Allround-Experten',
     csrfToken: req.csrfToken()
@@ -98,7 +87,7 @@ const contactLimiter = rateLimit({
 });
 
 // Kontaktformular-Route
-app.post('/contact', csrfProtection, contactLimiter, async (req, res) => {
+app.post('/contact', contactLimiter, async (req, res) => {
   const { name, email, phone, service, message } = req.body;
   
   // Validierung
@@ -123,7 +112,7 @@ app.post('/contact', csrfProtection, contactLimiter, async (req, res) => {
     const contactId = result.rows[0].id;
 
     // Benachrichtigung an N8N senden
-    await axios.post('https://n8n.dinel.at/webhook-test/e2b8d680-425b-44ab-94aa-55ecda267de1', {
+    await axios.post('https://n8n.dinel.at/webhook/e2b8d680-425b-44ab-94aa-55ecda267de1', {
       id: contactId,
       name,
       email,
