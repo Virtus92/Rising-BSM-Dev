@@ -1705,3 +1705,13 @@ node_modules/validator/lib/util/merge.js
 node_modules/validator/lib/util/multilineRegex.js
 node_modules/validator/lib/util/toString.js
 node_modules/validator/lib/util/typeOf.js
+node_modules/cookie-parser/HISTORY.md
+node_modules/cookie-parser/index.js
+node_modules/cookie-parser/LICENSE
+node_modules/cookie-parser/package.json
+node_modules/cookie-parser/README.md
+node_modules/cookie-parser/node_modules/cookie/index.js
+node_modules/cookie-parser/node_modules/cookie/LICENSE
+node_modules/cookie-parser/node_modules/cookie/package.json
+node_modules/cookie-parser/node_modules/cookie/README.md
+node_modules/cookie-parser/node_modules/cookie/SECURITY.md

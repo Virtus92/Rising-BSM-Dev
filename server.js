@@ -7,6 +7,8 @@ const axios = require('axios');
 const helmet = require('helmet');
 const validator = require('validator');
 const csrf = require('csurf');
+const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +32,9 @@ pool.connect((err, client, release) => {
   }
 });
 
+// Cookie-Parser Middleware
+app.use(cookieParser());
+
 // Basis-Sicherheitsheader
 app.use(helmet());
 
@@ -43,6 +48,7 @@ app.use(helmet.contentSecurityPolicy({
     connectSrc: ["'self'", "https://n8n.dinel.at"]
   }
 }));
+
 // Body-Parser Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -51,7 +57,12 @@ app.use(bodyParser.json());
 const csrfProtection = csrf({ cookie: true });
 app.use(csrfProtection);
 
-// Statische Dateien bereitstellen
+// CSRF-Token für alle Requests verfügbar machen
+app.use((req, res, next) => {
+  res.locals.csrfToken = req.csrfToken();
+  next();
+});
+
 // Statische Dateien bereitstellen
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -78,8 +89,6 @@ app.get('/datenschutz', (req, res) => {
 app.get('/agb', (req, res) => {
   res.render('agb', { title: 'Rising BSM – AGB' });
 });
-
-const rateLimit = require('express-rate-limit');
 
 // Kontakt-Formular Rate-Limiting
 const contactLimiter = rateLimit({
