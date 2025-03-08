@@ -104,6 +104,7 @@ router.get('/', isAuthenticated, async (req, res) => {
       services: { labels: [], data: [] }
     };
     
+  try {
     // Revenue Chart Daten basierend auf Filter
     let revenueQuery;
     switch(revenueFilter) {
@@ -155,7 +156,11 @@ router.get('/', isAuthenticated, async (req, res) => {
     
     charts.revenue.labels = revenueQuery.rows.map(row => row.label);
     charts.revenue.data = revenueQuery.rows.map(row => parseFloat(row.summe));
-    
+  } catch (error) {
+      console.error('Error fetching revenue chart data:', error);
+      charts.revenue.labels = [];
+      charts.revenue.data = [];
+  }
     // Services-Verteilung nach Kategorie
     let servicesPeriod;
     switch(servicesFilter) {
@@ -173,18 +178,30 @@ router.get('/', isAuthenticated, async (req, res) => {
         servicesPeriod = "AND rechnungsdatum >= DATE_TRUNC('month', CURRENT_DATE)";
     }
     
-    const servicesQuery = await pool.query(`
-      SELECT 
-        d.name as service_name,
-        SUM(p.anzahl * p.einzelpreis) as summe
-      FROM rechnungspositionen p
-      JOIN dienstleistungen d ON p.dienstleistung_id = d.id
-      JOIN rechnungen r ON p.rechnung_id = r.id
-      WHERE d.name IS NOT NULL ${servicesPeriod}
-      GROUP BY d.name
-      ORDER BY summe DESC
-      LIMIT 3
-    `);
+    // Services chart data
+    let servicesData = { labels: [], data: [] };
+    try {
+      const servicesQuery = await pool.query(`
+        SELECT 
+          d.name as service_name,
+          SUM(p.anzahl * p.einzelpreis) as summe
+        FROM rechnungspositionen p
+        JOIN dienstleistungen d ON p.dienstleistung_id = d.id
+        JOIN rechnungen r ON p.rechnung_id = r.id
+        WHERE d.name IS NOT NULL ${servicesPeriod}
+        GROUP BY d.name
+        ORDER BY summe DESC
+        LIMIT 3
+      `);
+      
+      charts.services.labels = servicesQuery.rows.map(row => row.service_name);
+      charts.services.data = servicesQuery.rows.map(row => parseFloat(row.summe));
+    } catch (error) {
+      console.error('Error fetching service chart data:', error.message);
+      // Provide default values or fallback
+      charts.services.labels = ['Facility', 'Umzüge', 'Winterdienst'];
+      charts.services.data = [0, 0, 0];
+    }
     
     charts.services.labels = servicesQuery.rows.map(row => row.service_name);
     charts.services.data = servicesQuery.rows.map(row => parseFloat(row.summe));
@@ -662,38 +679,58 @@ router.get('/kunden', isAuthenticated, async (req, res) => {
 });
 
 // Neuen Kunden anlegen
-router.get('/kunden/neu', isAuthenticated, async (req, res) => {
+// Neuen Kunden speichern
+router.post('/kunden/neu', isAuthenticated, async (req, res) => {
   try {
-    // Daten für Vorausfüllung aus Query-Parametern
-    const { name, email, phone } = req.query;
+    const { 
+      name, 
+      firma, 
+      email, 
+      telefon, 
+      adresse, 
+      plz, 
+      ort, 
+      kundentyp, 
+      status, 
+      notizen, 
+      newsletter 
+    } = req.body;
     
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
+    // Validierung
+    if (!name || !email) {
+      req.flash('error', 'Name und E-Mail sind Pflichtfelder.');
+      return res.redirect('/dashboard/kunden/neu');
+    }
     
-    res.render('dashboard/kunden/neu', {
-      title: 'Neuer Kunde - Rising BSM',
-      user: req.session.user,
-      currentPath: '/dashboard/kunden',
-      formData: {
-        name: name || '',
-        email: email || '',
-        telefon: phone || '',
-        firma: '',
-        adresse: '',
-        plz: '',
-        ort: '',
-      },
-      newRequestsCount,
-      csrfToken: req.csrfToken(),
-      messages: { success: req.flash('success'), error: req.flash('error') }
-    });
+    // In Datenbank einfügen (removed datenschutz requirement)
+    const result = await pool.query(
+      `INSERT INTO kunden (
+        name, firma, email, telefon, adresse, plz, ort, 
+        kundentyp, status, notizen, newsletter
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+      [
+        name, 
+        firma || null, 
+        email, 
+        telefon || null, 
+        adresse || null, 
+        plz || null, 
+        ort || null, 
+        kundentyp || 'privat', 
+        status || 'aktiv', 
+        notizen || null, 
+        newsletter === 'on'
+      ]
+    );
+    
+    const kundeId = result.rows[0].id;
+    
+    req.flash('success', 'Kunde erfolgreich angelegt.');
+    res.redirect(`/dashboard/kunden/${kundeId}`);
   } catch (error) {
-    console.error('Fehler beim Anzeigen des Kundenformulars:', error);
-    res.status(500).render('error', {
-      message: 'Datenbankfehler: ' + error.message,
-      error: error
-    });
+    console.error('Fehler beim Anlegen des Kunden:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect('/dashboard/kunden/neu');
   }
 });
 
@@ -1430,6 +1467,15 @@ router.post('/settings/update', isAuthenticated, async (req, res) => {
   }
 });
 
+function safeFormat(date, formatString) {
+  try {
+    return format(new Date(date), formatString);
+  } catch (error) {
+    console.error('Invalid date format:', date, error);
+    return 'Unbekannt';
+  }
+}
+
 // Profile-Seite
 router.get('/profile', isAuthenticated, async (req, res) => {
   try {
@@ -1460,7 +1506,7 @@ router.get('/profile', isAuthenticated, async (req, res) => {
         email: user.email,
         rolle: user.rolle,
         telefon: user.telefon || '',
-        erstelltAm: format(new Date(user.created_at), 'dd.MM.yyyy')
+        erstelltAm: safeFormat(user.created_at, 'dd.MM.yyyy'),
       },
       currentPath: '/dashboard/profile',
       newRequestsCount,

@@ -55,12 +55,13 @@ app.use(cookieParser());
 app.use(helmet());
 
 // Content-Security-Policy anpassen
+// Update the Content-Security-Policy in server.js
 app.use(helmet.contentSecurityPolicy({
   directives: {
     defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "'unsafe-inline'", "'unsafe-hashes'"], 
-    scriptSrcAttr: ["'unsafe-inline'"], // Add this line
-    styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+    scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "https://cdn.datatables.net", "'unsafe-inline'", "'unsafe-hashes'"],
+    scriptSrcAttr: ["'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://cdn.datatables.net"],
     imgSrc: ["'self'", "data:"],
     connectSrc: ["'self'", "https://n8n.dinel.at"]
   }

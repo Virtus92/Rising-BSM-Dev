@@ -103,14 +103,14 @@
         </ol>
       </nav>
 
-      <% if (messages.success) { %>
+      <% if (messages.success && messages.success.length > 0) { %>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
           <i class="fas fa-check-circle me-2"></i><%= messages.success %>
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
       <% } %>
-
-      <% if (messages.error) { %>
+      
+      <% if (messages.error && messages.error.length > 0) { %>
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
           <i class="fas fa-exclamation-circle me-2"></i><%= messages.error %>
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>

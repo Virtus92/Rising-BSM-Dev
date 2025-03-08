@@ -73,6 +73,35 @@ CREATE TABLE rechnungen (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE rechnungspositionen (
+  id SERIAL PRIMARY KEY,
+  rechnung_id INTEGER REFERENCES rechnungen(id),
+  dienstleistung_id INTEGER REFERENCES dienstleistungen(id),
+  anzahl INTEGER NOT NULL,
+  einzelpreis DECIMAL(10, 2) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add notizen tables for termine and anfragen
+CREATE TABLE anfragen_notizen (
+  id SERIAL PRIMARY KEY,
+  anfrage_id INTEGER REFERENCES kontaktanfragen(id),
+  benutzer_id INTEGER REFERENCES benutzer(id),
+  benutzer_name VARCHAR(100) NOT NULL,
+  text TEXT NOT NULL,
+  erstellt_am TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE termin_notizen (
+  id SERIAL PRIMARY KEY,
+  termin_id INTEGER REFERENCES termine(id),
+  benutzer_id INTEGER REFERENCES benutzer(id),
+  benutzer_name VARCHAR(100) NOT NULL,
+  text TEXT NOT NULL,
+  erstellt_am TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Termine
 CREATE TABLE termine (
   id SERIAL PRIMARY KEY,

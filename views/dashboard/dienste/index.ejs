@@ -126,7 +126,9 @@
                   <div class="row g-2 mb-3">
                     <div class="col-6">
                       <div class="small text-muted">Basis-Preis</div>
-                      <div class="fw-semibold">€ <%= service.preis_basis.toFixed(2) %></div>
+                      <div class="fw-semibold">
+                        € <%= (typeof service.preis_basis === 'number' ? service.preis_basis.toFixed(2) : '0.00') %>
+                      </div>
                     </div>
                     <div class="col-6">
                       <div class="small text-muted">Einheit</div>
