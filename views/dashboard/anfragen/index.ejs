@@ -1,0 +1,355 @@
+<%- include('../../partials/admin-header') %>
+
+<div class="dashboard-wrapper">
+  <!-- Sidebar Toggle Button (Mobile) -->
+  <button id="sidebarToggle" class="btn btn-success d-md-none position-fixed top-0 end-0 mt-2 me-2 z-10">
+    <i class="fas fa-bars"></i>
+  </button>
+
+  <!-- Sidebar -->
+  <aside class="dashboard-sidebar bg-white shadow-sm">
+    <div class="sidebar-header p-3 border-bottom">
+      <img src="/images/Logo.png" alt="Rising BSM Logo" class="img-fluid" style="max-height: 50px;">
+      <button id="sidebarClose" class="btn-close d-md-none"></button>
+    </div>
+    <div class="sidebar-user p-3 border-bottom">
+      <div class="d-flex align-items-center">
+        <div class="avatar-wrapper bg-success rounded-circle me-2">
+          <span class="text-white fw-bold"><%= user.initials %></span>
+        </div>
+        <div class="user-info">
+          <h6 class="mb-0 fw-semibold"><%= user.name %></h6>
+          <small class="text-muted"><%= user.role %></small>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav p-3">
+      <ul class="list-unstyled mb-0">
+        <li class="nav-item mb-2">
+          <a href="/dashboard" class="nav-link <%= currentPath === '/dashboard' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/anfragen" class="nav-link <%= currentPath === '/dashboard/anfragen' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-envelope me-2"></i> Anfragen
+            <% if (typeof newRequestsCount !== 'undefined' && newRequestsCount > 0) { %>
+              <span class="badge bg-success rounded-pill ms-auto"><%= newRequestsCount %></span>
+            <% } %>
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/kunden" class="nav-link <%= currentPath === '/dashboard/kunden' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-users me-2"></i> Kunden
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/termine" class="nav-link <%= currentPath === '/dashboard/termine' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-calendar-alt me-2"></i> Termine
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/dienste" class="nav-link <%= currentPath === '/dashboard/dienste' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-tools me-2"></i> Dienstleistungen
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/settings" class="nav-link <%= currentPath === '/dashboard/settings' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-cog me-2"></i> Einstellungen
+          </a>
+        </li>
+        <li class="nav-item mt-4">
+          <a href="/dashboard/logout" class="nav-link text-danger px-3 py-2 rounded">
+            <i class="fas fa-sign-out-alt me-2"></i> Abmelden
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="dashboard-main bg-light">
+    <!-- Top Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm py-2 sticky-top">
+      <div class="container-fluid">
+        <h1 class="h5 mb-0 fw-bold">Anfragen</h1>
+        <div class="d-flex align-items-center gap-3">
+          <% if (typeof notifications !== 'undefined') { %>
+          <div class="dropdown">
+            <button class="btn btn-link text-dark dropdown-toggle no-arrow" type="button" id="notificationsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="fas fa-bell position-relative">
+                <% if (notifications.unreadCount > 0) { %>
+                  <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.5rem;">
+                    <%= notifications.unreadCount %>
+                  </span>
+                <% } %>
+              </i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="notificationsDropdown" style="min-width: 280px;">
+              <li><h6 class="dropdown-header">Benachrichtigungen</h6></li>
+              <li><hr class="dropdown-divider"></li>
+              <% if (notifications.items.length === 0) { %>
+                <li><p class="dropdown-item py-2 text-muted">Keine neuen Benachrichtigungen</p></li>
+              <% } else { %>
+                <% notifications.items.forEach(function(notification) { %>
+                  <li>
+                    <a class="dropdown-item py-2" href="<%= notification.link %>">
+                      <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                          <div class="bg-<%= notification.type %> bg-opacity-10 p-2 rounded-circle">
+                            <i class="fas fa-<%= notification.icon %> text-<%= notification.type %>"></i>
+                          </div>
+                        </div>
+                        <div class="flex-grow-1 ms-2">
+                          <p class="mb-0 fw-semibold"><%= notification.title %></p>
+                          <small class="text-muted"><%= notification.time %></small>
+                        </div>
+                      </div>
+                    </a>
+                  </li>
+                <% }); %>
+              <% } %>
+              <% if (notifications.totalCount > 0) { %>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-center" href="/dashboard/notifications">Alle anzeigen</a></li>
+              <% } %>
+            </ul>
+          </div>
+          <% } %>
+          <div class="dropdown">
+            <button class="btn btn-link text-dark dropdown-toggle d-flex align-items-center gap-2" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              <div class="avatar-wrapper bg-success rounded-circle">
+                <span class="text-white fw-bold"><%= user.initials %></span>
+              </div>
+              <span class="d-none d-lg-inline"><%= user.name %></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userDropdown">
+              <li><a class="dropdown-item" href="/dashboard/profile"><i class="fas fa-user me-2"></i> Profil</a></li>
+              <li><a class="dropdown-item" href="/dashboard/settings"><i class="fas fa-cog me-2"></i> Einstellungen</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="/dashboard/logout"><i class="fas fa-sign-out-alt me-2"></i> Abmelden</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Dashboard Content -->
+    <div class="dashboard-content p-3 p-md-4">
+      <!-- Filter & Aktionen -->
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <div>
+          <h2 class="h4 mb-1">Kontaktanfragen</h2>
+          <p class="text-muted mb-md-0">Übersicht aller eingehenden Anfragen</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <div class="input-group">
+            <span class="input-group-text bg-white border-end-0">
+              <i class="fas fa-filter text-muted"></i>
+            </span>
+            <select class="form-select border-start-0" id="statusFilter">
+              <option value="all">Alle Status</option>
+              <option value="neu">Neu</option>
+              <option value="in_bearbeitung">In Bearbeitung</option>
+              <option value="beantwortet">Beantwortet</option>
+              <option value="geschlossen">Geschlossen</option>
+            </select>
+          </div>
+          <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#exportModal">
+            <i class="fas fa-download me-2"></i>Exportieren
+          </button>
+        </div>
+      </div>
+
+      <!-- Anfragen Tabelle -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover datatable mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Service</th>
+                  <th scope="col">Datum</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (typeof requests !== 'undefined' && requests.length > 0) { %>
+                  <% requests.forEach(function(request) { %>
+                    <tr>
+                      <td>
+                        <a href="/dashboard/anfragen/<%= request.id %>" class="text-decoration-none text-dark">
+                          <%= request.name %>
+                        </a>
+                      </td>
+                      <td><%= request.serviceLabel %></td>
+                      <td><%= request.formattedDate %></td>
+                      <td>
+                        <span class="badge bg-<%= request.statusClass %><%= request.status === 'Neu' ? ' text-dark' : '' %>">
+                          <%= request.status %>
+                        </span>
+                      </td>
+                      <td>
+                        <div class="btn-group btn-group-sm">
+                          <a href="/dashboard/anfragen/<%= request.id %>" class="btn btn-outline-secondary">
+                            <i class="fas fa-eye"></i>
+                          </a>
+                          <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#statusModal" data-id="<%= request.id %>">
+                            <i class="fas fa-edit"></i>
+                          </button>
+                          <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>" class="btn btn-outline-success" title="Kunde erstellen">
+                            <i class="fas fa-user-plus"></i>
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }); %>
+                <% } else { %>
+                  <tr>
+                    <td colspan="5" class="text-center py-4">
+                      <p class="text-muted mb-0">Keine Anfragen gefunden</p>
+                    </td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Status Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="statusModalLabel">Status ändern</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="statusForm" action="/dashboard/anfragen/update-status" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" id="requestId" name="id">
+          
+          <div class="mb-3">
+            <label for="status" class="form-label">Status</label>
+            <select class="form-select" id="status" name="status" required>
+              <option value="neu">Neu</option>
+              <option value="in_bearbeitung">In Bearbeitung</option>
+              <option value="beantwortet">Beantwortet</option>
+              <option value="geschlossen">Geschlossen</option>
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label for="note" class="form-label">Notiz (optional)</label>
+            <textarea class="form-control" id="note" name="note" rows="3"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="submit" form="statusForm" class="btn btn-success">Speichern</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exportModalLabel">Anfragen exportieren</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="exportForm" action="/dashboard/anfragen/export" method="GET">
+          <div class="mb-3">
+            <label for="exportFormat" class="form-label">Format</label>
+            <select class="form-select" id="exportFormat" name="format" required>
+              <option value="csv">CSV</option>
+              <option value="excel">Excel</option>
+              <option value="pdf">PDF</option>
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label for="dateFrom" class="form-label">Zeitraum von</label>
+            <input type="date" class="form-control" id="dateFrom" name="dateFrom">
+          </div>
+          
+          <div class="mb-3">
+            <label for="dateTo" class="form-label">Zeitraum bis</label>
+            <input type="date" class="form-control" id="dateTo" name="dateTo">
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="statusNeu" name="status[]" value="neu" checked>
+              <label class="form-check-label" for="statusNeu">Neu</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="statusInBearbeitung" name="status[]" value="in_bearbeitung" checked>
+              <label class="form-check-label" for="statusInBearbeitung">In Bearbeitung</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="statusBeantwortet" name="status[]" value="beantwortet" checked>
+              <label class="form-check-label" for="statusBeantwortet">Beantwortet</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="statusGeschlossen" name="status[]" value="geschlossen" checked>
+              <label class="form-check-label" for="statusGeschlossen">Geschlossen</label>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="submit" form="exportForm" class="btn btn-success">Exportieren</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Status Filter Funktionalität
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+      statusFilter.addEventListener('change', function() {
+        const url = new URL(window.location);
+        if (this.value === 'all') {
+          url.searchParams.delete('status');
+        } else {
+          url.searchParams.set('status', this.value);
+        }
+        window.location = url.toString();
+      });
+      
+      // Aktuellen Filter-Wert setzen
+      const urlParams = new URLSearchParams(window.location.search);
+      const status = urlParams.get('status');
+      if (status) {
+        statusFilter.value = status;
+      }
+    }
+    
+    // Status Modal Funktionalität
+    const statusModal = document.getElementById('statusModal');
+    if (statusModal) {
+      statusModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const requestId = button.getAttribute('data-id');
+        document.getElementById('requestId').value = requestId;
+      });
+    }
+  });
+</script>
+
+<%- include('../../partials/admin-footer-simple') %>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Fehlerseite - Rising BSM">
+  
+  <title>Fehler - Rising BSM</title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      background-color: #f8f9fa;
+    }
+    
+    .error-wrapper {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    .error-code {
+      font-size: 6rem;
+      font-weight: 700;
+      color: #dc3545;
+      line-height: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="error-wrapper text-center">
+    <div class="mb-4">
+      <img src="/images/Logo.png" alt="Rising BSM Logo" width="200" class="mb-3">
+    </div>
+    
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <div class="error-code mb-3">
+          <i class="fas fa-exclamation-triangle text-danger"></i>
+        </div>
+        
+        <h1 class="h3 mb-3 fw-bold">Ein Fehler ist aufgetreten</h1>
+        
+        <p class="lead text-muted mb-4"><%= message %></p>
+        
+        <% if (error && error.stack) { %>
+          <div class="alert alert-danger text-start mb-4">
+            <pre class="mb-0"><%= error.stack %></pre>
+          </div>
+        <% } %>
+        
+        <div class="d-flex justify-content-center gap-3">
+          <a href="/" class="btn btn-outline-secondary">
+            <i class="fas fa-home me-2"></i>Zur Startseite
+          </a>
+          
+          <a href="javascript:history.back()" class="btn btn-primary">
+            <i class="fas fa-arrow-left me-2"></i>Zurück
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap Bundle JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
