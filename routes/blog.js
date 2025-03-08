@@ -1,9 +1,9 @@
 import { Router } from 'express';
 const router = Router();
-const pool = require('../db');
-import { isAuthenticated, isAdmin, isManager } from '../middleware/auth';
+import pool from '../db.js';
+import { isAuthenticated, isAdmin, isManager } from '../middleware/auth.js';
 import slugify from 'slugify';
-import { post as _post } from 'axios';
+import axios from 'axios'; 
 import { formatDistanceToNow, format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -16,7 +16,7 @@ const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.dinel.at/web
 router.get('/', isAuthenticated, isManager, async (req, res) => {
   try {
     // Blogposts abrufen
-    const postsQuery = await _query(`
+    const postsQuery = await pool.query(`
       SELECT 
         p.id, 
         p.title, 
@@ -1228,8 +1228,6 @@ router.get('/public/search', async (req, res) => {
     });
   }
 });
-
-export default router;
 
 // Blogposts nach Kategorie anzeigen
 router.get('/public/category/:slug', async (req, res) => {

@@ -134,7 +134,7 @@ app.use('/dashboard', dashboardRoutes);
 const blogRoutes = require('./routes/blog').default;
 
 // Blog-Middleware
-app.use('/dashboard/blog', isAuthenticated, blogRoutes);
+app.use('/dashboard/blog', blogRoutes);
 
 // Öffentliche Blog-Routen
 app.use('/blog', blogRoutes.public);
