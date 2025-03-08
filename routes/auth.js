@@ -41,10 +41,10 @@ router.post('/login', async (req, res) => {
     // Dies sollte in der Produktion NICHT verwendet werden!
     // In der realen Implementierung, kommentiere die folgende Zeile aus und
     // aktiviere stattdessen den auskommentierten bcrypt-Vergleich
-    let passwordMatches = true;
+    // let passwordMatches = true;
 
     // Echter Passwortvergleich (für Produktion)
-    // const passwordMatches = await bcrypt.compare(password, user.passwort);
+    const passwordMatches = await bcrypt.compare(password, user.passwort);
     
     if (!passwordMatches) {
       console.log("Password doesn't match");

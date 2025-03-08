@@ -1,0 +1,292 @@
+<%- include('../../partials/admin-header') %>
+
+<div class="dashboard-wrapper">
+  <!-- Sidebar Toggle Button (Mobile) -->
+  <button id="sidebarToggle" class="btn btn-success d-md-none position-fixed top-0 end-0 mt-2 me-2 z-10">
+    <i class="fas fa-bars"></i>
+  </button>
+
+  <!-- Sidebar -->
+  <aside class="dashboard-sidebar bg-white shadow-sm">
+    <div class="sidebar-header p-3 border-bottom">
+      <img src="/images/Logo.png" alt="Rising BSM Logo" class="img-fluid" style="max-height: 50px;">
+      <button id="sidebarClose" class="btn-close d-md-none"></button>
+    </div>
+    <div class="sidebar-user p-3 border-bottom">
+      <div class="d-flex align-items-center">
+        <div class="avatar-wrapper bg-success rounded-circle me-2">
+          <span class="text-white fw-bold"><%= user.initials %></span>
+        </div>
+        <div class="user-info">
+          <h6 class="mb-0 fw-semibold"><%= user.name %></h6>
+          <small class="text-muted"><%= user.role %></small>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav p-3">
+      <ul class="list-unstyled mb-0">
+        <li class="nav-item mb-2">
+          <a href="/dashboard" class="nav-link <%= currentPath === '/dashboard' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/anfragen" class="nav-link <%= currentPath === '/dashboard/anfragen' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-envelope me-2"></i> Anfragen
+            <% if (typeof newRequestsCount !== 'undefined' && newRequestsCount > 0) { %>
+              <span class="badge bg-success rounded-pill ms-auto"><%= newRequestsCount %></span>
+            <% } %>
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/kunden" class="nav-link <%= currentPath === '/dashboard/kunden' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-users me-2"></i> Kunden
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/termine" class="nav-link <%= currentPath === '/dashboard/termine' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-calendar-alt me-2"></i> Termine
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/dienste" class="nav-link <%= currentPath === '/dashboard/dienste' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-tools me-2"></i> Dienstleistungen
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/settings" class="nav-link <%= currentPath === '/dashboard/settings' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-cog me-2"></i> Einstellungen
+          </a>
+        </li>
+        <li class="nav-item mt-4">
+          <a href="/dashboard/logout" class="nav-link text-danger px-3 py-2 rounded">
+            <i class="fas fa-sign-out-alt me-2"></i> Abmelden
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="dashboard-main bg-light">
+    <!-- Top Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm py-2 sticky-top">
+      <div class="container-fluid">
+        <h1 class="h5 mb-0 fw-bold">Termine</h1>
+        <div class="d-flex align-items-center gap-3">
+          <div class="dropdown">
+            <button class="btn btn-link text-dark dropdown-toggle d-flex align-items-center gap-2" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              <div class="avatar-wrapper bg-success rounded-circle">
+                <span class="text-white fw-bold"><%= user.initials %></span>
+              </div>
+              <span class="d-none d-lg-inline"><%= user.name %></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userDropdown">
+              <li><a class="dropdown-item" href="/dashboard/profile"><i class="fas fa-user me-2"></i> Profil</a></li>
+              <li><a class="dropdown-item" href="/dashboard/settings"><i class="fas fa-cog me-2"></i> Einstellungen</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="/dashboard/logout"><i class="fas fa-sign-out-alt me-2"></i> Abmelden</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Dashboard Content -->
+    <div class="dashboard-content p-3 p-md-4">
+      <!-- Filter & Aktionen -->
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <div>
+          <h2 class="h4 mb-1">Terminverwaltung</h2>
+          <p class="text-muted mb-md-0">Übersicht aller geplanten Termine</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <div class="input-group">
+            <span class="input-group-text bg-white border-end-0">
+              <i class="fas fa-filter text-muted"></i>
+            </span>
+            <select class="form-select border-start-0" id="statusFilter">
+              <option value="" <% if (statusFilter === '') { %>selected<% } %>>Alle Status</option>
+              <option value="geplant" <% if (statusFilter === 'geplant') { %>selected<% } %>>Geplant</option>
+              <option value="bestaetigt" <% if (statusFilter === 'bestaetigt') { %>selected<% } %>>Bestätigt</option>
+              <option value="abgeschlossen" <% if (statusFilter === 'abgeschlossen') { %>selected<% } %>>Abgeschlossen</option>
+              <option value="storniert" <% if (statusFilter === 'storniert') { %>selected<% } %>>Storniert</option>
+            </select>
+          </div>
+          <a href="/dashboard/termine/neu" class="btn btn-success">
+            <i class="fas fa-plus me-2"></i>Neuer Termin
+          </a>
+        </div>
+      </div>
+
+      <!-- Ansichtstabs -->
+      <ul class="nav nav-tabs mb-4" id="viewTab" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="list-tab" data-bs-toggle="tab" data-bs-target="#list-view" type="button" role="tab" aria-controls="list-view" aria-selected="true">
+            <i class="fas fa-list me-2"></i>Liste
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="calendar-tab" data-bs-toggle="tab" data-bs-target="#calendar-view" type="button" role="tab" aria-controls="calendar-view" aria-selected="false">
+            <i class="fas fa-calendar me-2"></i>Kalender
+          </button>
+        </li>
+      </ul>
+
+      <!-- Tab-Inhalte -->
+      <div class="tab-content">
+        <!-- Listen-Ansicht -->
+        <div class="tab-pane fade show active" id="list-view" role="tabpanel" aria-labelledby="list-tab">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover datatable mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th scope="col">Titel</th>
+                      <th scope="col">Kunde</th>
+                      <th scope="col">Datum</th>
+                      <th scope="col">Uhrzeit</th>
+                      <th scope="col">Ort</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% if (typeof appointments !== 'undefined' && appointments.length > 0) { %>
+                      <% appointments.forEach(function(appointment) { %>
+                        <tr>
+                          <td>
+                            <a href="/dashboard/termine/<%= appointment.id %>" class="text-decoration-none text-dark">
+                              <%= appointment.titel %>
+                            </a>
+                          </td>
+                          <td><%= appointment.kunde_name %></td>
+                          <td><%= appointment.dateFormatted %></td>
+                          <td><%= appointment.timeFormatted %> Uhr</td>
+                          <td><%= appointment.ort || '-' %></td>
+                          <td>
+                            <span class="badge bg-<%= appointment.statusClass %>">
+                              <%= appointment.statusLabel %>
+                            </span>
+                          </td>
+                          <td>
+                            <div class="btn-group btn-group-sm">
+                              <a href="/dashboard/termine/<%= appointment.id %>" class="btn btn-outline-secondary">
+                                <i class="fas fa-eye"></i>
+                              </a>
+                              <a href="/dashboard/termine/<%= appointment.id %>/edit" class="btn btn-outline-primary">
+                                <i class="fas fa-edit"></i>
+                              </a>
+                              <button class="btn btn-outline-success status-toggle" 
+                                      data-bs-toggle="modal" 
+                                      data-bs-target="#statusModal" 
+                                      data-id="<%= appointment.id %>"
+                                      data-status="<%= appointment.status %>">
+                                <i class="fas fa-check-circle"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      <% }); %>
+                    <% } else { %>
+                      <tr>
+                        <td colspan="7" class="text-center py-4">
+                          <p class="text-muted mb-0">Keine Termine gefunden</p>
+                        </td>
+                      </tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kalender-Ansicht -->
+        <div class="tab-pane fade" id="calendar-view" role="tabpanel" aria-labelledby="calendar-tab">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body p-3">
+              <div id="calendar" style="height: 600px; background-color: white; padding: 20px; border-radius: 5px;">
+                <div class="text-center py-5">
+                  <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
+                  <h3 class="h5 text-muted">Kalenderansicht wird geladen...</h3>
+                  <p class="text-muted">Bitte erstellen Sie die Kalender-Komponente in Ihrem JavaScript.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Status Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="statusModalLabel">Termin-Status ändern</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="statusForm" action="/dashboard/termine/update-status" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" id="terminId" name="id">
+          
+          <div class="mb-3">
+            <label for="status" class="form-label">Status</label>
+            <select class="form-select" id="status" name="status" required>
+              <option value="geplant">Geplant</option>
+              <option value="bestaetigt">Bestätigt</option>
+              <option value="abgeschlossen">Abgeschlossen</option>
+              <option value="storniert">Storniert</option>
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label for="statusNote" class="form-label">Notiz (optional)</label>
+            <textarea class="form-control" id="statusNote" name="note" rows="3"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="submit" form="statusForm" class="btn btn-success">Speichern</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Status Filter Funktionalität
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+      statusFilter.addEventListener('change', function() {
+        const url = new URL(window.location);
+        if (this.value === '') {
+          url.searchParams.delete('status');
+        } else {
+          url.searchParams.set('status', this.value);
+        }
+        window.location = url.toString();
+      });
+    }
+    
+    // Status Modal Funktionalität
+    const statusModal = document.getElementById('statusModal');
+    if (statusModal) {
+      statusModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const terminId = button.getAttribute('data-id');
+        const currentStatus = button.getAttribute('data-status');
+        document.getElementById('terminId').value = terminId;
+        document.getElementById('status').value = currentStatus;
+      });
+    }
+  });
+</script>
+
+<%- include('../../partials/admin-footer-simple') %>
