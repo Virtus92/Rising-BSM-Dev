@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Rising BSM – Professionelle Dienstleistungen in Facility Management, Umzügen und Winterdienst. Ihr zuverlässiger Partner in Österreich.">
+  <meta property="og:title" content="<%= title %>">
+  <meta property="og:description" content="Facility Management, Umzüge & Winterdienst aus einer Hand. Jetzt kontaktieren!">
+  <meta property="og:image" content="https://www.rising-bsm.at/images/og-image.jpg">
+  
+  <title><%= title %></title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="stylesheet" href="styles/styles.css">
+</head>
+
+<body>
+  <!-- Navigation -->
+  <nav id="mainNav" class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm">
+    <div class="container">
+      <a class="navbar-brand" href="/">
+        <img src="images/Logo.png" alt="Rising BSM Logo" width="160" loading="lazy">
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto fw-medium">
+          <li class="nav-item"><a class="nav-link" href="/#hero">Start</a></li>
+          <li class="nav-item"><a class="nav-link" href="/#services">Leistungen</a></li>
+          <li class="nav-item"><a class="nav-link" href="/#about">Über uns</a></li>
+          <li class="nav-item"><a class="nav-link" href="/#contact">Kontakt</a></li>
+          <!-- Rechtliche Links -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              Rechtliches
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+              <li><a class="dropdown-item" href="/impressum">Impressum</a></li>
+              <li><a class="dropdown-item" href="/datenschutz">Datenschutz</a></li>
+              <li><a class="dropdown-item" href="/agb">AGB</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>

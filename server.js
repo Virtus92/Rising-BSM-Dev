@@ -4,6 +4,9 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const { Pool } = require('pg');
 const axios = require('axios');
+const helmet = require('helmet');
+const validator = require('validator');
+const csrf = require('csurf');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,25 +20,89 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
+// Prüfe die Verbindung beim Start
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('Fehler bei der Datenbankverbindung:', err);
+  } else {
+    console.log('Datenbankverbindung hergestellt');
+    release();
+  }
+});
+
+// Basis-Sicherheitsheader
+app.use(helmet());
+
+// Content-Security-Policy anpassen
+app.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+    styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+    imgSrc: ["'self'", "data:"],
+    connectSrc: ["'self'", "https://n8n.dinel.at"]
+  }
+}));
 // Body-Parser Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
+// CSRF-Schutz Middleware initialisieren
+const csrfProtection = csrf({ cookie: true });
+app.use(csrfProtection);
+
+// Statische Dateien bereitstellen
 // Statische Dateien bereitstellen
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Startseite bereitstellen
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// View Engine Setup
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// Startseite
+app.get('/', csrfProtection, (req, res) => {
+  res.render('index', { 
+    title: 'Rising BSM – Ihre Allround-Experten',
+    csrfToken: req.csrfToken()
+  });
+});
+
+app.get('/impressum', (req, res) => {
+  res.render('impressum', { title: 'Rising BSM – Impressum' });
+});
+
+app.get('/datenschutz', (req, res) => {
+  res.render('datenschutz', { title: 'Rising BSM – Datenschutz' });
+});
+
+app.get('/agb', (req, res) => {
+  res.render('agb', { title: 'Rising BSM – AGB' });
+});
+
+const rateLimit = require('express-rate-limit');
+
+// Kontakt-Formular Rate-Limiting
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 Stunde
+  max: 5, // 5 Anfragen pro IP
+  message: { success: false, error: 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.' }
 });
 
 // Kontaktformular-Route
-app.post('/contact', async (req, res) => {
+app.post('/contact', csrfProtection, contactLimiter, async (req, res) => {
   const { name, email, phone, service, message } = req.body;
-
-  // Server-side validation for required fields
+  
+  // Validierung
   if (!name || !email || !message || !service) {
     return res.status(400).json({ success: false, error: 'Name, E-Mail und Nachricht sind Pflichtfelder.' });
+  }
+
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ success: false, error: 'Bitte geben Sie eine gültige E-Mail-Adresse ein.' });
+  }
+
+  if (phone && !validator.isMobilePhone(phone, 'any')) {
+    return res.status(400).json({ success: false, error: 'Bitte geben Sie eine gültige Telefonnummer ein.' });
   }
 
   try {
@@ -62,6 +129,17 @@ app.post('/contact', async (req, res) => {
     console.error('Request body:', req.body); // Log the request body for debugging
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// Globaler Error-Handler
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({ 
+    success: false, 
+    error: process.env.NODE_ENV === 'production' 
+      ? 'Ein Serverfehler ist aufgetreten' 
+      : err.message 
+  });
 });
 
 app.listen(PORT, () => {

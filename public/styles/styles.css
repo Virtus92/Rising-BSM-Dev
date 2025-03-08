@@ -1,52 +1,24 @@
 /* styles.css */
+/* Globale Variablen */
 :root {
   --bs-success: #198754;
   --bs-success-rgb: 25, 135, 84;
 }
 
-html,body{overflow-x: hidden;}
-
-/* Global Styles */
-body {
+/* Globale Stile */
+html, body {
+  overflow-x: hidden;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   line-height: 1.6;
   scroll-behavior: smooth;
 }
 
-/* Navigation */
+/* Bereinigte Navbar-Stile */
 .navbar {
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-  transition: all 0.3s ease;
-  max-width: 100%;
-}
-
-.navbar-shrink > div {
-  justify-content: center;
   transition: all 0.3s ease;
 }
 
-.navbar-toggler {
-  opacity: 1;
-  transition: opacity 0.3s ease;
-}
-
-.navbar-shrink .navbar-toggler {
-  opacity: 0;
-}
-
-.navbar-brand img {
-  transform: translateX(0);
-  transition: transform 0.3s ease;
-}
-
-.navbar-shrink .navbar-brand img {
-  transform: translateX(+75%);
-}
-
-
-/* Hero Section */
-/* Hero-Slideshow Styles */
+/* Bereinigte Hero-Stile */
 .hero-slideshow {
   position: absolute;
   top: 0;
@@ -72,7 +44,6 @@ body {
   opacity: 1;
 }
 
-/* Überlagerung für bessere Lesbarkeit des Texts */
 .hero-overlay {
   position: absolute;
   top: 0;
@@ -82,73 +53,6 @@ body {
   background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7));
   z-index: -1;
 }
-
-/* Kontaktbereich - Hintergrund, Abstände & Struktur */
-/* Verbesserter Kontaktbereich Styles */
-#contact .form-control:focus,
-#contact .form-select:focus {
-  border-color: var(--bs-success);
-  box-shadow: 0 0 0 0.25rem rgba(var(--bs-success-rgb), 0.25);
-}
-
-#contact .form-check-input:checked {
-  background-color: var(--bs-success);
-  border-color: var(--bs-success);
-}
-
-#contact .form-floating label {
-  color: #6c757d;
-}
-
-#contact .card {
-  transition: transform 0.3s ease;
-}
-
-#contact .card:hover {
-  transform: translateY(-5px);
-}
-
-#contact .bg-success.bg-opacity-10 {
-  background-color: rgba(var(--bs-success-rgb), 0.1);
-}
-
-#contact .rounded-circle {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#contact .fas {
-  font-size: 1.25rem;
-}
-
-/* Formfeedback bei Validierung */
-#contact .was-validated .form-control:valid,
-#contact .form-control.is-valid {
-  border-color: var(--bs-success);
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
-}
-
-#contact .was-validated .form-control:invalid,
-#contact .form-control.is-invalid {
-  border-color: #dc3545;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
-}
-
-/* Sichtbarkeit des Formulars korrigieren */
-#contact-form {
-  display: block !important;
-}
-
-/* Anpassungen für kleinere Bildschirme */
-@media (max-width: 991.98px) {
-  #contact .card {
-    margin-bottom: 2rem;
-  }
-}
-
 
 /* Cards */
 .hover-zoom {
@@ -180,6 +84,8 @@ body {
   aspect-ratio: 16 / 9;
 }
 
+
+/* Cookie-Banner - vereinfacht */
 .cookie-banner {
   position: fixed;
   bottom: 0;
@@ -188,10 +94,9 @@ body {
   background-color: #ffffff;
   box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
   z-index: 9999;
-  padding: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   max-height: 100vh;
   overflow-y: auto;
+  transition: opacity 0.3s, transform 0.3s;
 }
 
 .cookie-banner-content {

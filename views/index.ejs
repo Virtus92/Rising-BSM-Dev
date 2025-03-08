@@ -1,0 +1,344 @@
+<%- include('partials/header') %>
+ 
+ <!-- Hero Section mit Slideshow -->
+ <header id="hero" class="vh-100 d-flex align-items-center">
+    <div class="hero-overlay"></div> <!-- Add this line for the overlay -->
+    <div class="container position-relative z-1 text-center text-light">
+      <div class="row justify-content-center">
+        <div class="col-lg-10">
+          <h1 class="display-3 fw-bold mb-4">Rising BSM – Ihre Allround-Experten</h1>
+          <ul class="lead fs-4 mb-5 list-unstyled">
+            <li>Facility Management</li>
+            <li>Umzüge & Transporte</li>
+            <li>Winterdienst</li>
+          </ul>
+          <p class="lead fs-4 mb-5">Maßgeschneiderte Lösungen für Ihr Anliegen.</p>
+          <div class="d-flex gap-3 justify-content-center">
+            <a href="#services" class="btn btn-success btn-lg px-5 py-3">
+              <i class="fas fa-tools me-2"></i>Unsere Leistungen
+            </a>
+            <a href="tel:+491234567890" class="btn btn-outline-light btn-lg px-5 py-3">
+              <i class="fas fa-phone me-2"></i>Jetzt anrufen
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+    
+    <!-- Slideshow-Hintergrund -->
+    <div class="hero-slideshow">
+      <div class="hero-slide active" style="background-image: url('images/facility.jpg');"></div>
+      <div class="hero-slide" style="background-image: url('images/transport.jpg');"></div>
+      <div class="hero-slide" style="background-image: url('images/Gym.webp');"></div>
+      <div class="hero-slide" style="background-image: url('images/Garden.webp');"></div>
+    </div>
+    
+    <div class="hero-overlay"></div>
+  </header>
+  
+  <!-- Services Section -->
+  <section id="services" class="py-5 bg-light">
+    <div class="container py-5">
+      <div class="text-center mb-5">
+        <h2 class="display-5 fw-bold mb-3">Unsere Leistungen</h2>
+        <p class="text-muted fs-5">Ganzheitliche Lösungen – effizient, zuverlässig und individuell</p>
+      </div>
+      
+      <div class="row g-4">
+        <!-- Service Card 1: Facility Management -->
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 border-0 shadow-lg hover-zoom animate-item" data-animation="fade-up" data-delay="0">
+            <div class="card-img-top ratio ratio-16x9">
+              <img src="images/Cleaning.jpg" class="img-fluid" alt="Facility Management" loading="lazy">
+            </div>
+            <div class="card-body">
+              <h3 class="h4 card-title mb-3">Facility Management</h3>
+              <ul class="list-unstyled text-muted mb-4">
+                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Komplette Hausbetreuung</li>
+                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Pflege von Grünflächen & Außenanlagen</li>
+                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Reinigungs- und Instandhaltungsservice</li>
+              </ul>
+              <a href="javascript:void(0);" class="btn btn-link text-success text-decoration-none p-0" onclick="ServiceModals.openFacilityModal()">
+                Mehr erfahren <i class="fas fa-arrow-right ms-2"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+  
+        <!-- Service Card 2: Umzüge & Transporte -->
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 border-0 shadow-lg hover-zoom animate-item" data-animation="fade-up" data-delay="0.2">
+            <div class="card-img-top ratio ratio-16x9">
+              <img src="images/transport.jpg" class="img-fluid" alt="Umzüge & Transporte" loading="lazy">
+            </div>
+            <div class="card-body">
+              <h3 class="h4 card-title mb-3">Umzüge & Transporte</h3>
+              <ul class="list-unstyled text-muted mb-4">
+                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Privat- & Firmenumzüge</li>
+                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Möbel- & Spezialtransporte</li>
+                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Express- & Langstreckenlieferungen</li>
+              </ul>
+              <a href="javascript:void(0);" class="btn btn-link text-success text-decoration-none p-0" onclick="ServiceModals.openUmzugModal()">
+                Mehr erfahren <i class="fas fa-arrow-right ms-2"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+  
+        <!-- Service Card 3: Sommer- & Winterdienst -->
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 border-0 shadow-lg hover-zoom animate-item" data-animation="fade-up" data-delay="0.4">
+            <div class="card-img-top ratio ratio-16x9">
+              <img src="images/Path.webp" class="img-fluid" alt="Sommer- & Winterdienst" loading="lazy">
+            </div>
+            <div class="card-body">
+              <h3 class="h4 card-title mb-3">Sommer- & Winterdienst</h3>
+              <ul class="list-unstyled text-muted mb-4">
+                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Rasenpflege & Baumschnitt</li>
+                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Schnee- & Eisräumung</li>
+                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Streudienst & Präventivmaßnahmen</li>
+              </ul>
+              <a href="javascript:void(0);" class="btn btn-link text-success text-decoration-none p-0" onclick="ServiceModals.openWinterModal()">
+                Mehr erfahren <i class="fas fa-arrow-right ms-2"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+  
+      </div>
+    </div>
+  </section>
+  
+  <!-- Bootstrap-Modal -->
+  <div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="serviceModalLabel">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0">
+        <!-- Modal-Header mit Bild-Hintergrund -->
+        <div class="modal-header p-0 position-relative overflow-hidden border-0" style="height: 180px;">
+          <!-- Hintergrundbild (wird dynamisch gesetzt) -->
+          <div class="modal-header-bg position-absolute top-0 start-0 w-100 h-100" id="modalHeaderBg"></div>
+          <!-- Overlay für bessere Lesbarkeit des Titels -->
+          <div class="position-absolute top-0 start-0 w-100 h-100 bg-dark opacity-50"></div>
+          <!-- Titel -->
+          <div class="position-relative p-4 w-100">
+            <h3 class="modal-title display-6 text-white fw-bold" id="serviceModalLabel"></h3>
+            <p class="text-white-50 mb-0" id="serviceModalSubtitle"></p>
+          </div>
+          <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        
+        <!-- Modal-Body mit Icons -->
+        <div class="modal-body p-4" id="serviceModalBody">
+          <!-- Inhalt wird dynamisch via JavaScript eingesetzt -->
+        </div>
+        
+        <!-- Footer mit prominenterem CTA-Button -->
+        <!-- Footer mit prominenterem CTA-Button -->
+        <div class="modal-footer justify-content-between bg-light">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Schließen</button>
+          <a href="#contact" class="btn btn-success px-4" onclick="closeModal();">
+            <i class="fas fa-paper-plane me-2"></i>Anfrage senden
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  
+  
+    <!-- Über uns Section -->
+    <section id="about" class="py-5">
+      <div class="container py-5">
+        <div class="row g-5 align-items-center">
+          <div class="col-lg-6">
+            <img src="images/us.jpg" class="img-fluid rounded-3 shadow" alt="Unser Team" loading="lazy">
+          </div>
+          <div class="col-lg-6">
+            <h2 class="display-5 fw-bold mb-4">Über Rising BSM</h2>
+            <p class="lead text-muted mb-4">Seit 2010 bieten wir maßgeschneiderte Lösungen für Gewerbe und Privatkunden.</p>
+            <div class="d-flex gap-4 mb-4">
+              <div class="text-center">
+                <div class="fs-2 fw-bold text-success">100+</div>
+                <div class="text-muted">Zufriedene Kunden</div>
+              </div>
+              <div class="text-center">
+                <div class="fs-2 fw-bold text-success">200+</div>
+                <div class="text-muted">Abgeschlossene Projekte</div>
+              </div>
+              <div class="text-center">
+                <div class="fs-2 fw-bold text-success">100%</div>
+                <div class="text-muted">Zufriedenheit Rate</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  
+    <!-- Kontakt Section -->
+    <section id="contact" class="py-5 bg-light">
+      <div class="container py-5">
+        <div class="text-center mb-5">
+          <h2 class="display-5 fw-bold">Kontaktieren Sie uns</h2>
+          <p class="text-muted fs-5">Für Ihre individuelle Lösung sind wir nur einen Klick entfernt</p>
+        </div>
+        
+        <div class="row g-4">
+          <!-- Kontaktinformationen -->
+          <div class="col-lg-5">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body p-4">
+                <h3 class="h4 mb-4">So erreichen Sie uns</h3>
+                
+                <div class="d-flex align-items-center mb-4">
+                  <div class="flex-shrink-0 me-3">
+                    <div class="bg-success bg-opacity-10 p-3 rounded-circle">
+                      <i class="fas fa-map-marker-alt text-success"></i>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 class="h6 fw-bold mb-1">Adresse</h4>
+                    <p class="text-muted mb-0">Waldmüllergang 10a, 4020 Linz</p>
+                  </div>
+                </div>
+                
+                <div class="d-flex align-items-center mb-4">
+                  <div class="flex-shrink-0 me-3">
+                    <div class="bg-success bg-opacity-10 p-3 rounded-circle">
+                      <i class="fas fa-phone text-success"></i>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 class="h6 fw-bold mb-1">Telefon</h4>
+                    <p class="mb-0"><a href="tel:+4368184030694" class="text-muted">+43 681 840 30 694</a></p>
+                  </div>
+                </div>
+                
+                <div class="d-flex align-items-center mb-4">
+                  <div class="flex-shrink-0 me-3">
+                    <div class="bg-success bg-opacity-10 p-3 rounded-circle">
+                      <i class="fas fa-envelope text-success"></i>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 class="h6 fw-bold mb-1">E-Mail</h4>
+                    <p class="mb-0"><a href="mailto:info@rising-bsm.at" class="text-muted">info@rising-bsm.at</a></p>
+                  </div>
+                </div>
+                
+                <div class="d-flex align-items-center">
+                  <div class="flex-shrink-0 me-3">
+                    <div class="bg-success bg-opacity-10 p-3 rounded-circle">
+                      <i class="fas fa-clock text-success"></i>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 class="h6 fw-bold mb-1">Geschäftszeiten</h4>
+                    <p class="text-muted mb-0">Mo-Fr: 8:00 - 17:00 Uhr</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+  
+          <!-- Kontaktformular -->
+          <div class="col-lg-7">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body p-4">
+                <h3 class="h4 mb-4">Nachricht senden</h3>
+                
+                <form id="contact-form" class="needs-validation" action="/contact" method="POST" novalidate>
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <div class="form-floating mb-3">
+                        <input type="text" class="form-control" id="nameInput" name="name" placeholder="Name" required>
+                        <label for="nameInput">Name</label>
+                        <div class="invalid-feedback">Bitte geben Sie Ihren Namen ein.</div>
+                      </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                      <div class="form-floating mb-3">
+                        <input type="email" class="form-control" id="emailInput" name="email" placeholder="E-Mail" required>
+                        <label for="emailInput">E-Mail</label>
+                        <div class="invalid-feedback">Bitte geben Sie eine gültige E-Mail-Adresse ein.</div>
+                      </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                      <div class="form-floating mb-3">
+                        <input type="tel" class="form-control" id="phoneInput" name="phone" placeholder="Telefon">
+                        <label for="phoneInput">Telefon (optional)</label>
+                      </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                      <div class="form-floating mb-3">
+                        <select class="form-select" id="serviceSelect" name="service" required>
+                          <option value="" selected>Bitte auswählen</option>
+                          <option value="facility">Facility Management</option>
+                          <option value="moving">Umzüge & Transporte</option>
+                          <option value="winter">Sommer- & Winterdienst</option>
+                          <option value="other">Sonstiges</option>
+                        </select>
+                        <label for="serviceSelect">Gewünschte Leistung</label>
+                      </div>
+                    </div>
+                    
+                    <div class="col-12">
+                      <div class="form-floating mb-3">
+                        <textarea class="form-control" id="messageInput" name="message" placeholder="Nachricht" style="height: 150px" required></textarea>
+                        <label for="messageInput">Ihre Nachricht</label>
+                        <div class="invalid-feedback">Bitte geben Sie Ihre Nachricht ein.</div>
+                      </div>
+                    </div>
+                    
+                    <div class="col-12">
+                      <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="privacyCheck" required>
+                        <label class="form-check-label" for="privacyCheck">
+                          Ich stimme zu, dass meine Daten für die Bearbeitung meiner Anfrage verwendet werden.
+                        </label>
+                        <div class="invalid-feedback">Sie müssen den Datenschutzhinweis akzeptieren.</div>
+                      </div>
+                    </div>
+                    <div id="formFeedback"></div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-success btn-lg w-100">
+                        <i class="fas fa-paper-plane me-2"></i>Nachricht senden
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+          
+          <!-- AI-Beratung Bereich -->
+          <div class="row mt-5 justify-content-center w-100 g-4">
+            <div class="col-12">
+              <div class="card bg-success text-white border-0 shadow-sm overflow-hidden">
+                <div class="row g-0">
+                  <div class="col-lg-8">
+                    <div class="card-body p-4 p-lg-5" id="aiBeratung">
+                      <h3 class="h3 mb-3">Schnelle Beratung gewünscht?</h3>
+                      <p class="mb-4">Nutzen Sie unsere AI-Beratung für sofortige Antworten auf Ihre Fragen.</p>
+                      <button class="btn btn-light btn-lg px-4" onclick="startAIBeratung()">
+                        <i class="fas fa-robot me-2"></i>AI-Beratung starten
+                      </button>
+                    </div>
+                  </div>
+                  <div class="col-lg-4 d-none d-lg-block position-relative">
+                    <div class="position-absolute top-0 end-0 bottom-0 w-100" style="background: url('images/ai-assistant.jpg') center/cover;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<%- include('partials/footer') %>
