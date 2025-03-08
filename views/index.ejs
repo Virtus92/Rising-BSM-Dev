@@ -248,7 +248,9 @@
               <div class="card-body p-4">
                 <h3 class="h4 mb-4">Nachricht senden</h3>
                 
-                <form id="contact-form" class="needs-validation" action="/contact" method="POST" novalidate>
+                <form id="contact-form" class="needs-validation" action="/contact" method="POST">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        
                   <div class="row g-3">
                     <div class="col-md-6">
                       <div class="form-floating mb-3">

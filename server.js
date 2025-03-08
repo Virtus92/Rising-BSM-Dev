@@ -130,6 +130,15 @@ app.get('/agb', (req, res) => {
 app.use('/', authRoutes);
 app.use('/dashboard', dashboardRoutes);
 
+// Blog-Routen importieren
+const blogRoutes = require('./routes/blog').default;
+
+// Blog-Middleware
+app.use('/dashboard/blog', isAuthenticated, blogRoutes);
+
+// Öffentliche Blog-Routen
+app.use('/blog', blogRoutes.public);
+
 // Kontakt-Formular Rate-Limiting
 const contactLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 Stunde

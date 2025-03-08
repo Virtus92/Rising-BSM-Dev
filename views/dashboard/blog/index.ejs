@@ -1,0 +1,376 @@
+<%- include('../../partials/admin-header') %>
+
+<div class="dashboard-wrapper">
+  <!-- Sidebar Toggle Button (Mobile) -->
+  <button id="sidebarToggle" class="btn btn-success d-md-none position-fixed top-0 end-0 mt-2 me-2 z-10">
+    <i class="fas fa-bars"></i>
+  </button>
+
+  <!-- Sidebar -->
+  <aside class="dashboard-sidebar bg-white shadow-sm">
+    <div class="sidebar-header p-3 border-bottom">
+      <img src="/images/Logo.png" alt="Rising BSM Logo" class="img-fluid" style="max-height: 50px;">
+      <button id="sidebarClose" class="btn-close d-md-none"></button>
+    </div>
+    <div class="sidebar-user p-3 border-bottom">
+      <div class="d-flex align-items-center">
+        <div class="avatar-wrapper bg-success rounded-circle me-2">
+          <span class="text-white fw-bold"><%= user.initials %></span>
+        </div>
+        <div class="user-info">
+          <h6 class="mb-0 fw-semibold"><%= user.name %></h6>
+          <small class="text-muted"><%= user.role %></small>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav p-3">
+      <ul class="list-unstyled mb-0">
+        <li class="nav-item mb-2">
+          <a href="/dashboard" class="nav-link <%= currentPath === '/dashboard' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/anfragen" class="nav-link <%= currentPath === '/dashboard/anfragen' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-envelope me-2"></i> Anfragen
+            <% if (typeof newRequestsCount !== 'undefined' && newRequestsCount > 0) { %>
+              <span class="badge bg-success rounded-pill ms-auto"><%= newRequestsCount %></span>
+            <% } %>
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/kunden" class="nav-link <%= currentPath === '/dashboard/kunden' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-users me-2"></i> Kunden
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/termine" class="nav-link <%= currentPath === '/dashboard/termine' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-calendar-alt me-2"></i> Termine
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/dienste" class="nav-link <%= currentPath === '/dashboard/dienste' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-tools me-2"></i> Dienstleistungen
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/blog" class="nav-link <%= currentPath === '/dashboard/blog' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-blog me-2"></i> Blog
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/settings" class="nav-link <%= currentPath === '/dashboard/settings' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-cog me-2"></i> Einstellungen
+          </a>
+        </li>
+        <li class="nav-item mt-4">
+          <a href="/dashboard/logout" class="nav-link text-danger px-3 py-2 rounded">
+            <i class="fas fa-sign-out-alt me-2"></i> Abmelden
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="dashboard-main bg-light">
+    <!-- Top Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm py-2 sticky-top">
+      <div class="container-fluid">
+        <h1 class="h5 mb-0 fw-bold">Blog-Management</h1>
+        <div class="d-flex align-items-center gap-3">
+          <div class="dropdown">
+            <button class="btn btn-link text-dark dropdown-toggle d-flex align-items-center gap-2" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              <div class="avatar-wrapper bg-success rounded-circle">
+                <span class="text-white fw-bold"><%= user.initials %></span>
+              </div>
+              <span class="d-none d-lg-inline"><%= user.name %></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userDropdown">
+              <li><a class="dropdown-item" href="/dashboard/profile"><i class="fas fa-user me-2"></i> Profil</a></li>
+              <li><a class="dropdown-item" href="/dashboard/settings"><i class="fas fa-cog me-2"></i> Einstellungen</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="/dashboard/logout"><i class="fas fa-sign-out-alt me-2"></i> Abmelden</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Dashboard Content -->
+    <div class="dashboard-content p-3 p-md-4">
+      <!-- Header & Action Buttons -->
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <div>
+          <h2 class="h4 mb-1">Blog-Verwaltung</h2>
+          <p class="text-muted mb-md-0">Verwalten Sie den Firmenblog und erstellen Sie neue Inhalte</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="/dashboard/blog/neu" class="btn btn-success">
+            <i class="fas fa-edit me-2"></i>Beitrag schreiben
+          </a>
+          <a href="/dashboard/blog/generate" class="btn btn-primary">
+            <i class="fas fa-magic me-2"></i>Beitrag generieren
+          </a>
+        </div>
+      </div>
+
+      <!-- Blog Stats Row -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-6 col-lg-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h6 class="card-title mb-0 text-muted">Veröffentlicht</h6>
+                <div class="rounded-circle bg-success bg-opacity-10 p-2">
+                  <i class="fas fa-check-circle text-success"></i>
+                </div>
+              </div>
+              <h2 class="fw-bold mb-0"><%= stats.published_count || 0 %></h2>
+              <a href="/blog" target="_blank" class="btn btn-link text-success text-decoration-none p-0 mt-2">
+                <small>Auf Website anzeigen <i class="fas fa-external-link-alt ms-1"></i></small>
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h6 class="card-title mb-0 text-muted">In Prüfung</h6>
+                <div class="rounded-circle bg-warning bg-opacity-10 p-2">
+                  <i class="fas fa-hourglass-half text-warning"></i>
+                </div>
+              </div>
+              <h2 class="fw-bold mb-0"><%= stats.review_count || 0 %></h2>
+              <% if (stats.review_count > 0) { %>
+                <small class="text-warning">Warten auf Freigabe</small>
+              <% } else { %>
+                <small class="text-muted">Keine ausstehenden Prüfungen</small>
+              <% } %>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h6 class="card-title mb-0 text-muted">Entwürfe</h6>
+                <div class="rounded-circle bg-info bg-opacity-10 p-2">
+                  <i class="fas fa-pen text-info"></i>
+                </div>
+              </div>
+              <h2 class="fw-bold mb-0"><%= stats.draft_count || 0 %></h2>
+              <a href="/dashboard/blog?status=draft" class="btn btn-link text-info text-decoration-none p-0 mt-2">
+                <small>Alle Entwürfe anzeigen</small>
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h6 class="card-title mb-0 text-muted">KI-Generierungen</h6>
+                <div class="rounded-circle bg-primary bg-opacity-10 p-2">
+                  <i class="fas fa-robot text-primary"></i>
+                </div>
+              </div>
+              <h2 class="fw-bold mb-0"><%= aiRequests ? aiRequests.length : 0 %></h2>
+              <% if (aiRequests && aiRequests.length > 0) { %>
+                <small class="text-primary">Laufende Prozesse</small>
+              <% } else { %>
+                <small class="text-muted">Keine laufenden Prozesse</small>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Blog Content Row -->
+      <div class="row g-4">
+        <!-- Recent Posts -->
+        <div class="col-lg-8">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">Neueste Beiträge</h5>
+              <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                  Filter
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="filterDropdown">
+                  <li><a class="dropdown-item" href="/dashboard/blog">Alle anzeigen</a></li>
+                  <li><a class="dropdown-item" href="/dashboard/blog?status=published">Veröffentlicht</a></li>
+                  <li><a class="dropdown-item" href="/dashboard/blog?status=review">In Prüfung</a></li>
+                  <li><a class="dropdown-item" href="/dashboard/blog?status=draft">Entwürfe</a></li>
+                </ul>
+              </div>
+            </div>
+            <div class="card-body p-0">
+              <% if (!posts || posts.length === 0) { %>
+                <div class="p-4 text-center">
+                  <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                  <p class="text-muted mb-3">Keine Blogposts vorhanden.</p>
+                  <div class="d-flex gap-2 justify-content-center">
+                    <a href="/dashboard/blog/neu" class="btn btn-success">
+                      <i class="fas fa-edit me-2"></i>Beitrag schreiben
+                    </a>
+                    <a href="/dashboard/blog/generate" class="btn btn-primary">
+                      <i class="fas fa-magic me-2"></i>Beitrag generieren
+                    </a>
+                  </div>
+                </div>
+              <% } else { %>
+                <div class="table-responsive">
+                  <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th scope="col">Titel</th>
+                        <th scope="col">Autor</th>
+                        <th scope="col">Datum</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Aktionen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% posts.forEach(function(post) { %>
+                        <tr>
+                          <td>
+                            <a href="/dashboard/blog/<%= post.id %>" class="text-decoration-none text-dark fw-medium">
+                              <%= post.title %>
+                            </a>
+                          </td>
+                          <td><%= post.author || user.name %></td>
+                          <td><%= post.date %></td>
+                          <td>
+                            <span class="badge bg-<%= post.statusClass %>"><%= post.statusLabel %></span>
+                          </td>
+                          <td>
+                            <div class="btn-group btn-group-sm">
+                              <a href="/dashboard/blog/<%= post.id %>" class="btn btn-outline-secondary">
+                                <i class="fas fa-eye"></i>
+                              </a>
+                              <a href="/dashboard/blog/<%= post.id %>/edit" class="btn btn-outline-primary">
+                                <i class="fas fa-edit"></i>
+                              </a>
+                              <% if (post.status === 'published') { %>
+                                <a href="/blog/<%= post.slug %>" target="_blank" class="btn btn-outline-success">
+                                  <i class="fas fa-external-link-alt"></i>
+                                </a>
+                              <% } %>
+                            </div>
+                          </td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+          <!-- AI Generation Status -->
+          <% if (aiRequests && aiRequests.length > 0) { %>
+            <div class="card border-0 shadow-sm mb-4">
+              <div class="card-header bg-white">
+                <h5 class="mb-0">Laufende KI-Generierungen</h5>
+              </div>
+              <div class="list-group list-group-flush">
+                <% aiRequests.forEach(function(request) { %>
+                  <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <span class="fw-semibold"><%= request.topic %></span>
+                      <span class="badge bg-<%= request.status === 'processing' ? 'primary' : 'secondary' %>">
+                        <%= request.statusLabel %>
+                      </span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                      <small class="text-muted"><%= request.created %></small>
+                      <div class="progress" style="width: 60%; height: 6px;">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: <%= request.status === 'processing' ? '75%' : '25%' %>" aria-valuenow="<%= request.status === 'processing' ? '75' : '25' %>" aria-valuemin="0" aria-valuemax="100"></div>
+                      </div>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+              <div class="card-footer bg-white text-center">
+                <a href="/dashboard/blog/generate" class="btn btn-primary btn-sm">
+                  <i class="fas fa-plus me-1"></i>Neue Generierung
+                </a>
+              </div>
+            </div>
+          <% } %>
+
+          <!-- Keywords Box -->
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">Top-Keywords</h5>
+              <a href="/dashboard/blog/seo" class="btn btn-sm btn-outline-primary">SEO Dashboard</a>
+            </div>
+            <div class="card-body">
+              <% if (!keywords || keywords.length === 0) { %>
+                <p class="text-muted text-center">Keine Keywords gefunden.</p>
+              <% } else { %>
+                <div class="table-responsive">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Keyword</th>
+                        <th>Suchvolumen</th>
+                        <th>Ranking</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% keywords.forEach(function(keyword) { %>
+                        <tr>
+                          <td><%= keyword.keyword %></td>
+                          <td><%= keyword.search_volume || '-' %></td>
+                          <td>
+                            <% if (keyword.current_ranking) { %>
+                              <span class="<%= keyword.current_ranking <= 10 ? 'text-success' : 
+                                                  keyword.current_ranking <= 30 ? 'text-warning' : 'text-danger' %>">
+                                #<%= keyword.current_ranking %>
+                              </span>
+                            <% } else { %>
+                              -
+                            <% } %>
+                          </td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </div>
+              <% } %>
+            </div>
+          </div>
+
+          <!-- Quick Links -->
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+              <h5 class="mb-0">Blog-Management</h5>
+            </div>
+            <div class="list-group list-group-flush">
+              <a href="/dashboard/blog/categories" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-folder me-2"></i>Kategorien verwalten</span>
+                <i class="fas fa-chevron-right text-muted"></i>
+              </a>
+              <a href="/dashboard/blog/seo" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-search me-2"></i>SEO & Keywords</span>
+                <i class="fas fa-chevron-right text-muted"></i>
+              </a>
+              <a href="/blog" target="_blank" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-external-link-alt me-2"></i>Blog anzeigen</span>
+                <i class="fas fa-chevron-right text-muted"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<%- include('../../partials/admin-footer-simple') %>

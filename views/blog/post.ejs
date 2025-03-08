@@ -1,0 +1,235 @@
+<%- include('../partials/header', { 
+    title: title, 
+    metaDescription: metaDescription,
+    metaKeywords: metaKeywords 
+  }) %>
+  
+  <article class="py-5 mt-5">
+    <!-- Header with Featured Image -->
+    <header class="py-5 position-relative">
+      <% if (post.image) { %>
+        <div class="blog-header-image" style="background-image: url('<%= post.image %>');">
+          <div class="blog-header-overlay"></div>
+        </div>
+      <% } else { %>
+        <div class="blog-header-gradient"></div>
+      <% } %>
+      
+      <div class="container position-relative z-1">
+        <div class="row justify-content-center">
+          <div class="col-lg-8 text-center">
+            <% if (categories && categories.length > 0) { %>
+              <div class="mb-3">
+                <% categories.forEach(function(category) { %>
+                  <a href="/blog/category/<%= category.slug %>" class="badge bg-success text-decoration-none me-2"><%= category.name %></a>
+                <% }); %>
+              </div>
+            <% } %>
+            
+            <h1 class="display-5 fw-bold mb-4 <% if (post.image) { %>text-white<% } %>"><%= post.title %></h1>
+            
+            <div class="d-flex align-items-center justify-content-center gap-3 <% if (post.image) { %>text-white-50<% } else { %>text-muted<% } %> mb-3">
+              <div>
+                <i class="fas fa-user-circle me-1"></i> <%= post.author %>
+              </div>
+              <div>|</div>
+              <div>
+                <i class="far fa-calendar me-1"></i> <%= post.date %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+    
+    <!-- Blog Content -->
+    <div class="container py-5">
+      <div class="row">
+        <div class="col-lg-8 mx-auto">
+          <!-- Main Content -->
+          <div class="blog-content mb-5">
+            <%- post.content %>
+          </div>
+          
+          <!-- Tags -->
+          <% if (tags && tags.length > 0) { %>
+            <div class="blog-tags mb-5">
+              <h3 class="h6 text-muted mb-3">Tags:</h3>
+              <div>
+                <% tags.forEach(function(tag) { %>
+                  <a href="/blog/tag/<%= tag.slug %>" class="badge bg-light text-dark text-decoration-none me-2 mb-2 p-2"><%= tag.name %></a>
+                <% }); %>
+              </div>
+            </div>
+          <% } %>
+          
+          <!-- Share Buttons -->
+          <div class="blog-share mb-5">
+            <h3 class="h6 text-muted mb-3">Teilen:</h3>
+            <div class="d-flex gap-2">
+              <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(`https://www.rising-bsm.at/blog/${post.slug}`) %>" target="_blank" class="btn btn-sm btn-outline-primary">
+                <i class="fab fa-facebook-f me-1"></i> Facebook
+              </a>
+              <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(`https://www.rising-bsm.at/blog/${post.slug}`) %>&text=<%= encodeURIComponent(post.title) %>" target="_blank" class="btn btn-sm btn-outline-info">
+                <i class="fab fa-twitter me-1"></i> Twitter
+              </a>
+              <a href="https://www.linkedin.com/shareArticle?mini=true&url=<%= encodeURIComponent(`https://www.rising-bsm.at/blog/${post.slug}`) %>&title=<%= encodeURIComponent(post.title) %>" target="_blank" class="btn btn-sm btn-outline-primary">
+                <i class="fab fa-linkedin-in me-1"></i> LinkedIn
+              </a>
+              <a href="mailto:?subject=<%= encodeURIComponent(post.title) %>&body=<%= encodeURIComponent(`Interessanter Artikel auf Rising BSM: https://www.rising-bsm.at/blog/${post.slug}`) %>" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-envelope me-1"></i> E-Mail
+              </a>
+            </div>
+          </div>
+          
+          <!-- Author Box -->
+          <div class="card border-0 shadow-sm p-4 mb-5">
+            <div class="d-flex">
+              <div class="flex-shrink-0 me-3">
+                <div class="rounded-circle bg-success d-flex align-items-center justify-content-center" style="width: 64px; height: 64px;">
+                  <i class="fas fa-user text-white fa-2x"></i>
+                </div>
+              </div>
+              <div>
+                <h3 class="h5 mb-2">Autor: <%= post.author %></h3>
+                <p class="text-muted mb-0">Rising BSM Team-Mitglied mit fachlicher Expertise in Facility Management und Unternehmensdienstleistungen.</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Related Posts -->
+          <% if (relatedPosts && relatedPosts.length > 0) { %>
+            <div class="mb-5">
+              <h3 class="h4 mb-4">Das könnte Sie auch interessieren</h3>
+              <div class="row g-4">
+                <% relatedPosts.forEach(function(related) { %>
+                  <div class="col-md-4">
+                    <div class="card h-100 border-0 shadow-sm hover-shadow">
+                      <div class="card-body">
+                        <h4 class="card-title h6 fw-bold mb-2">
+                          <a href="/blog/<%= related.slug %>" class="text-decoration-none text-dark stretched-link">
+                            <%= related.title %>
+                          </a>
+                        </h4>
+                        <div class="text-muted small">
+                          <i class="far fa-calendar me-1"></i> <%= related.date %>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          <% } %>
+          
+          <!-- Call to Action -->
+          <div class="card border-0 shadow-sm bg-success text-white p-4">
+            <div class="row align-items-center">
+              <div class="col-md-8">
+                <h3 class="h4 mb-3">Benötigen Sie unsere Dienstleistungen?</h3>
+                <p class="mb-md-0">Kontaktieren Sie uns für ein unverbindliches Angebot zu unseren Services.</p>
+              </div>
+              <div class="col-md-4 text-md-end">
+                <a href="/#contact" class="btn btn-light">
+                  <i class="fas fa-paper-plane me-2"></i>Kontakt
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+  
+  <style>
+    /* Blog Header Styles */
+    .blog-header-image {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center;
+      z-index: 0;
+    }
+    
+    .blog-header-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 0;
+    }
+    
+    .blog-header-gradient {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      z-index: 0;
+    }
+    
+    /* Blog Content Styles */
+    .blog-content {
+      line-height: 1.8;
+      font-size: 1.1rem;
+    }
+    
+    .blog-content h2 {
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+    
+    .blog-content h3 {
+      margin-top: 1.75rem;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+    }
+    
+    .blog-content p {
+      margin-bottom: 1.5rem;
+    }
+    
+    .blog-content ul, .blog-content ol {
+      margin-bottom: 1.5rem;
+      padding-left: 1.5rem;
+    }
+    
+    .blog-content li {
+      margin-bottom: 0.5rem;
+    }
+    
+    .blog-content img {
+      max-width: 100%;
+      height: auto;
+      margin: 2rem 0;
+      border-radius: 0.25rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .blog-content blockquote {
+      border-left: 4px solid #198754;
+      padding-left: 1.5rem;
+      font-style: italic;
+      color: #6c757d;
+      margin: 2rem 0;
+    }
+    
+    /* Hover effects */
+    .hover-shadow {
+      transition: all 0.3s ease;
+    }
+    
+    .hover-shadow:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+    }
+  </style>
+  
+  <%- include('../partials/footer') %>

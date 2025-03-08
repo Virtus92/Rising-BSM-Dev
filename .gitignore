@@ -7108,3 +7108,9 @@ node_modules/on-headers/LICENSE
 node_modules/on-headers/package.json
 node_modules/on-headers/README.md
 .env
+node_modules/slugify/CHANGELOG.md
+node_modules/slugify/LICENSE
+node_modules/slugify/package.json
+node_modules/slugify/README.md
+node_modules/slugify/slugify.d.ts
+node_modules/slugify/slugify.js

@@ -1,0 +1,107 @@
+<%- include('../partials/header') %>
+
+<section class="py-5 mt-5 bg-light">
+  <div class="container py-5">
+    <div class="row justify-content-center mb-5 text-center">
+      <div class="col-lg-8">
+        <h1 class="display-5 fw-bold mb-3">Suchergebnisse</h1>
+        <p class="lead text-muted">Suchergebnisse für "<%= query %>"</p>
+      </div>
+    </div>
+    
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <!-- Search Form -->
+        <div class="card border-0 shadow-sm mb-5">
+          <div class="card-body p-4">
+            <form action="/blog/search" method="GET">
+              <div class="input-group">
+                <input type="text" class="form-control form-control-lg" placeholder="Suchbegriff eingeben..." name="q" value="<%= query %>" required>
+                <button class="btn btn-success" type="submit">
+                  <i class="fas fa-search me-2"></i>Suchen
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- Search Results -->
+        <% if (!results || results.length === 0) { %>
+          <div class="card border-0 shadow-sm p-5 text-center mb-4">
+            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+            <h3 class="h4 mb-3">Keine Ergebnisse gefunden</h3>
+            <p class="text-muted mb-3">Leider konnten wir keine Beiträge für "<%= query %>" finden.</p>
+            <p class="text-muted mb-4">Versuchen Sie es mit anderen Suchbegriffen oder stöbern Sie in unseren Kategorien.</p>
+            <a href="/blog" class="btn btn-success">Alle Beiträge anzeigen</a>
+          </div>
+        <% } else { %>
+          <h2 class="h5 mb-4"><%= results.length %> Ergebnis<%= results.length !== 1 ? 'se' : '' %> gefunden</h2>
+          
+          <!-- Results List -->
+          <div class="results-list">
+            <% results.forEach(function(post) { %>
+              <div class="card border-0 shadow-sm mb-4 hover-shadow">
+                <div class="row g-0">
+                  <% if (post.image) { %>
+                    <div class="col-md-3">
+                      <div class="ratio ratio-1x1 h-100">
+                        <img src="<%= post.image %>" class="rounded-start img-cover" alt="<%= post.title %>">
+                      </div>
+                    </div>
+                    <div class="col-md-9">
+                  <% } else { %>
+                    <div class="col-12">
+                  <% } %>
+                    <div class="card-body">
+                      <h3 class="card-title h5 fw-bold mb-2">
+                        <a href="/blog/<%= post.slug %>" class="text-decoration-none text-dark stretched-link">
+                          <%= post.title %>
+                        </a>
+                      </h3>
+                      <p class="card-text text-muted small mb-3"><%= post.excerpt || post.title %></p>
+                      <div class="d-flex justify-content-between align-items-center text-muted small">
+                        <span><i class="fas fa-user-circle me-1"></i> <%= post.author %></span>
+                        <span><i class="far fa-calendar me-1"></i> <%= post.date %></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+          
+          <div class="text-center mt-5">
+            <a href="/blog" class="btn btn-outline-secondary">
+              <i class="fas fa-arrow-left me-2"></i>Zurück zur Blog-Übersicht
+            </a>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hover-shadow {
+    transition: all 0.3s ease;
+  }
+  
+  .hover-shadow:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+  }
+  
+  .img-cover {
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+  }
+  
+  @media (max-width: 767.98px) {
+    .ratio-1x1 {
+      max-height: 200px;
+    }
+  }
+</style>
+
+<%- include('../partials/footer') %>
