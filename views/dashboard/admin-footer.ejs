@@ -1,0 +1,141 @@
+<!-- Bootstrap Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<!-- DataTables with Bootstrap 5 -->
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+
+<!-- jQuery (required for DataTables) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<!-- Dashboard Charts Script -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Revenue Chart
+    const revenueChartEl = document.getElementById('revenueChart');
+    if (revenueChartEl) {
+      new Chart(revenueChartEl, {
+        type: 'line',
+        data: {
+          labels: <%- JSON.stringify(charts.revenue.labels) %>,
+          datasets: [{
+            label: 'Umsatz',
+            data: <%- JSON.stringify(charts.revenue.data) %>,
+            borderColor: '#198754',
+            backgroundColor: 'rgba(25, 135, 84, 0.1)',
+            tension: 0.3,
+            fill: true,
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return '€' + value.toLocaleString('de-DE');
+                }
+              }
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return '€' + context.parsed.y.toLocaleString('de-DE');
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Services Chart
+    const servicesChartEl = document.getElementById('servicesChart');
+    if (servicesChartEl) {
+      new Chart(servicesChartEl, {
+        type: 'doughnut',
+        data: {
+          labels: <%- JSON.stringify(charts.services.labels) %>,
+          datasets: [{
+            data: <%- JSON.stringify(charts.services.data) %>,
+            backgroundColor: [
+              'rgba(25, 135, 84, 0.8)',
+              'rgba(13, 110, 253, 0.8)',
+              'rgba(255, 193, 7, 0.8)'
+            ],
+            borderColor: [
+              'rgba(25, 135, 84, 1)',
+              'rgba(13, 110, 253, 1)',
+              'rgba(255, 193, 7, 1)'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.parsed || 0;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((value / total) * 100);
+                  return `${label}: ${value} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+  });
+</script>
+
+<!-- Dashboard Layout Script -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Sidebar Toggle (Mobile)
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarClose = document.getElementById('sidebarClose');
+    const dashboardWrapper = document.querySelector('.dashboard-wrapper');
+    
+    if (sidebarToggle && dashboardWrapper) {
+      sidebarToggle.addEventListener('click', function() {
+        dashboardWrapper.classList.toggle('sidebar-open');
+      });
+    }
+    
+    if (sidebarClose && dashboardWrapper) {
+      sidebarClose.addEventListener('click', function() {
+        dashboardWrapper.classList.remove('sidebar-open');
+      });
+    }
+    
+    // Initialize DataTables if present
+    const dataTables = document.querySelectorAll('.datatable');
+    if (dataTables.length > 0 && typeof $.fn.DataTable !== 'undefined') {
+      dataTables.forEach(table => {
+        $(table).DataTable({
+          language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/de-DE.json',
+          },
+          responsive: true,
+          pageLength: 10,
+          lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, "Alle"]]
+        });
+      });
+    }
+  });
+</script>
+</body>
+</html>

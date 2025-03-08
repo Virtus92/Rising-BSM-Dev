@@ -8,18 +8,35 @@ const helmet = require('helmet');
 const validator = require('validator');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
+const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
+const flash = require('connect-flash');
+const bcrypt = require('bcryptjs');
+const csrf = require('@dr.pogodin/csurf');
+const { formatDistanceToNow, isToday, isTomorrow, format } = require('date-fns');
+const { de } = require('date-fns/locale');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+
+// Route-Importe
+const authRoutes = require('./routes/auth');
+const dashboardRoutes = require('./routes/dashboard');
+console.log(authRoutes);
+console.log(dashboardRoutes);
+
+// PostgreSQL-Pool für Sessions
+const pool = require('./db');
+
 // PostgreSQL-Verbindung einrichten
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_DATABASE,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-});
+// const pool = new Pool({
+//   user: process.env.DB_USER,
+//   host: process.env.DB_HOST,
+//   database: process.env.DB_DATABASE,
+//   password: process.env.DB_PASSWORD,
+//   port: process.env.DB_PORT,
+// });
 
 // Prüfe die Verbindung beim Start
 pool.connect((err, client, release) => {
@@ -49,6 +66,23 @@ app.use(helmet.contentSecurityPolicy({
   }
 }));
 
+// Session-Konfiguration
+app.use(session({
+  store: new pgSession({
+    pool,
+    tableName: 'user_sessions',
+    createTableIfMissing: true
+  }),
+  secret: process.env.SESSION_SECRET || 'rising-bsm-super-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', 
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 1 Tag
+  }
+}));
+
 // Body-Parser Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -60,11 +94,22 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// Flash-Messages
+app.use(flash());
+
+// CSRF-Schutz aktivieren
+app.use(csrf());
+
+// CSRF-Token als Response-Local verfügbar machen
+app.use((req, res, next) => {
+  res.locals.csrfToken = req.csrfToken();
+  next();
+});
+
 // Startseite
 app.get('/', (req, res) => {
   res.render('index', { 
-    title: 'Rising BSM – Ihre Allround-Experten',
-    csrfToken: req.csrfToken()
+    title: 'Rising BSM – Ihre Allround-Experten'
   });
 });
 
@@ -79,6 +124,10 @@ app.get('/datenschutz', (req, res) => {
 app.get('/agb', (req, res) => {
   res.render('agb', { title: 'Rising BSM – AGB' });
 });
+
+
+app.use('/', authRoutes);
+app.use('/dashboard', dashboardRoutes);
 
 // Kontakt-Formular Rate-Limiting
 const contactLimiter = rateLimit({
@@ -139,6 +188,17 @@ app.use((err, req, res, next) => {
       ? 'Ein Serverfehler ist aufgetreten' 
       : err.message 
   });
+});
+
+
+app.use((err, req, res, next) => {
+  if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).render('error', {
+      message: 'Das Formular ist abgelaufen. Bitte versuchen Sie es erneut.',
+      error: {}
+    });
+  }
+  next(err);
 });
 
 app.listen(PORT, () => {

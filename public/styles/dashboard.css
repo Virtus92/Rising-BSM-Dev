@@ -1,0 +1,116 @@
+/* Dashboard Styles */
+:root {
+    --sidebar-width: 280px;
+    --header-height: 60px;
+  }
+  
+  /* Layout */
+  .dashboard-wrapper {
+    display: flex;
+    min-height: 100vh;
+  }
+  
+  /* Sidebar */
+  .dashboard-sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1000;
+    overflow-y: auto;
+    transition: transform 0.3s ease;
+  }
+  
+  /* Avatar */
+  .avatar-wrapper {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Sidebar Navigation */
+  .sidebar-nav .nav-link {
+    color: #212529;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+  }
+  
+  .sidebar-nav .nav-link:hover {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: #198754;
+  }
+  
+  .sidebar-nav .nav-link.active {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: #198754;
+    font-weight: 500;
+  }
+  
+  /* Main Content */
+  .dashboard-main {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    transition: margin-left 0.3s ease;
+  }
+  
+  /* Responsive */
+  @media (max-width: 767.98px) {
+    .dashboard-sidebar {
+      transform: translateX(-100%);
+    }
+    
+    .dashboard-main {
+      margin-left: 0;
+    }
+    
+    .dashboard-wrapper.sidebar-open .dashboard-sidebar {
+      transform: translateX(0);
+    }
+  }
+  
+  /* Notification Badge */
+  .dropdown-toggle.no-arrow::after {
+    display: none;
+  }
+  
+  /* Card Styles */
+  .card {
+    transition: transform 0.2s;
+  }
+  
+  .card:hover {
+    transform: translateY(-3px);
+  }
+  
+  /* Chart Container Heights */
+  #revenueChart,
+  #servicesChart {
+    min-height: 300px;
+  }
+  
+  /* Status Badge Colors */
+  .bg-info {
+    background-color: #0dcaf0;
+  }
+  
+  .bg-warning {
+    background-color: #ffc107;
+  }
+  
+  .bg-success {
+    background-color: #198754;
+  }
+  
+  /* Utility Classes */
+  .z-10 {
+    z-index: 10;
+  }
+  
+  .justify-between {
+    justify-content: space-between;
+  }
