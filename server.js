@@ -41,7 +41,8 @@ app.use(helmet());
 app.use(helmet.contentSecurityPolicy({
   directives: {
     defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "'unsafe-inline'"], // unsafe-inline hinzufügen
+    scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "'unsafe-inline'", "'unsafe-hashes'"], 
+    scriptSrcAttr: ["'unsafe-inline'"], // Add this line
     styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
     imgSrc: ["'self'", "data:"],
     connectSrc: ["'self'", "https://n8n.dinel.at"]
@@ -99,7 +100,7 @@ app.post('/contact', contactLimiter, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Bitte geben Sie eine gültige E-Mail-Adresse ein.' });
   }
 
-  if (phone && !validator.isMobilePhone(phone, 'any')) {
+  if (phone && !validator.isMobilePhone(phone, 'any', { strictMode: false })) {
     return res.status(400).json({ success: false, error: 'Bitte geben Sie eine gültige Telefonnummer ein.' });
   }
 
