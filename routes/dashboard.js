@@ -104,7 +104,6 @@ router.get('/', isAuthenticated, async (req, res) => {
       services: { labels: [], data: [] }
     };
     
-  try {
     // Revenue Chart Daten basierend auf Filter
     let revenueQuery;
     switch(revenueFilter) {
@@ -156,11 +155,7 @@ router.get('/', isAuthenticated, async (req, res) => {
     
     charts.revenue.labels = revenueQuery.rows.map(row => row.label);
     charts.revenue.data = revenueQuery.rows.map(row => parseFloat(row.summe));
-  } catch (error) {
-      console.error('Error fetching revenue chart data:', error);
-      charts.revenue.labels = [];
-      charts.revenue.data = [];
-  }
+    
     // Services-Verteilung nach Kategorie
     let servicesPeriod;
     switch(servicesFilter) {
@@ -203,9 +198,6 @@ router.get('/', isAuthenticated, async (req, res) => {
       charts.services.data = [0, 0, 0];
     }
     
-    charts.services.labels = servicesQuery.rows.map(row => row.service_name);
-    charts.services.data = servicesQuery.rows.map(row => parseFloat(row.summe));
-
     // Anzahl neuer Anfragen für Badge
     const newRequestsCount = stats.newRequests.count;
 
@@ -679,58 +671,38 @@ router.get('/kunden', isAuthenticated, async (req, res) => {
 });
 
 // Neuen Kunden anlegen
-// Neuen Kunden speichern
-router.post('/kunden/neu', isAuthenticated, async (req, res) => {
+router.get('/kunden/neu', isAuthenticated, async (req, res) => {
   try {
-    const { 
-      name, 
-      firma, 
-      email, 
-      telefon, 
-      adresse, 
-      plz, 
-      ort, 
-      kundentyp, 
-      status, 
-      notizen, 
-      newsletter 
-    } = req.body;
+    // Daten für Vorausfüllung aus Query-Parametern
+    const { name, email, phone } = req.query;
     
-    // Validierung
-    if (!name || !email) {
-      req.flash('error', 'Name und E-Mail sind Pflichtfelder.');
-      return res.redirect('/dashboard/kunden/neu');
-    }
+    // Neue Anfragen für Badge zählen
+    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
     
-    // In Datenbank einfügen (removed datenschutz requirement)
-    const result = await pool.query(
-      `INSERT INTO kunden (
-        name, firma, email, telefon, adresse, plz, ort, 
-        kundentyp, status, notizen, newsletter
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-      [
-        name, 
-        firma || null, 
-        email, 
-        telefon || null, 
-        adresse || null, 
-        plz || null, 
-        ort || null, 
-        kundentyp || 'privat', 
-        status || 'aktiv', 
-        notizen || null, 
-        newsletter === 'on'
-      ]
-    );
-    
-    const kundeId = result.rows[0].id;
-    
-    req.flash('success', 'Kunde erfolgreich angelegt.');
-    res.redirect(`/dashboard/kunden/${kundeId}`);
+    res.render('dashboard/kunden/neu', {
+      title: 'Neuer Kunde - Rising BSM',
+      user: req.session.user,
+      currentPath: '/dashboard/kunden',
+      formData: {
+        name: name || '',
+        email: email || '',
+        telefon: phone || '',
+        firma: '',
+        adresse: '',
+        plz: '',
+        ort: '',
+      },
+      newRequestsCount,
+      csrfToken: req.csrfToken(),
+      messages: { success: req.flash('success'), error: req.flash('error') }
+    });
   } catch (error) {
-    console.error('Fehler beim Anlegen des Kunden:', error);
-    req.flash('error', 'Datenbankfehler: ' + error.message);
-    res.redirect('/dashboard/kunden/neu');
+    console.error('Fehler beim Anzeigen des Kundenformulars:', error);
+    res.status(500).render('error', {
+      message: 'Datenbankfehler: ' + error.message,
+      error: error
+    });
   }
 });
 
@@ -818,7 +790,7 @@ router.get('/kunden/:id', isAuthenticated, async (req, res) => {
     
     // Projekte des Kunden abrufen
     const projekteQuery = await pool.query(`
-      SELECT id, name, start_datum, status 
+      SELECT id, titel, start_datum, status 
       FROM projekte 
       WHERE kunde_id = $1 
       ORDER BY start_datum DESC
@@ -1246,6 +1218,340 @@ router.post('/termine/update-status', isAuthenticated, async (req, res) => {
     res.redirect(`/dashboard/termine/${id}`);
   } catch (error) {
     console.error('Fehler beim Aktualisieren des Termin-Status:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect(`/dashboard/termine/${req.body.id}`);
+  }
+});
+
+// Einzelnen Termin anzeigen
+router.get('/termine/:id', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Termin aus der Datenbank abrufen
+    const terminQuery = await pool.query(`
+      SELECT 
+        t.*, 
+        k.name AS kunde_name
+      FROM 
+        termine t
+        LEFT JOIN kunden k ON t.kunde_id = k.id
+      WHERE 
+        t.id = $1
+    `, [id]);
+    
+    if (terminQuery.rows.length === 0) {
+      return res.status(404).render('error', {
+        message: `Termin mit ID ${id} nicht gefunden`,
+        error: { status: 404 }
+      });
+    }
+    
+    const termin = terminQuery.rows[0];
+    
+    // Notizen zu diesem Termin abrufen (falls Sie eine entsprechende Tabelle haben)
+    const notizenQuery = await pool.query(`
+      SELECT * FROM termin_notizen WHERE termin_id = $1 ORDER BY erstellt_am DESC
+    `, [id]);
+    
+    // Neue Anfragen für Badge zählen
+    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
+    
+    res.render('dashboard/termine/detail', {
+      title: `Termin: ${termin.titel} - Rising BSM`,
+      user: req.session.user,
+      currentPath: '/dashboard/termine',
+      termin: {
+        id: termin.id,
+        titel: termin.titel,
+        kunde_id: termin.kunde_id,
+        kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
+        termin_datum: termin.termin_datum,
+        dateFormatted: format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
+        timeFormatted: format(new Date(termin.termin_datum), 'HH:mm'),
+        dauer: termin.dauer || 60,
+        ort: termin.ort || 'Nicht angegeben',
+        beschreibung: termin.beschreibung || 'Keine Beschreibung vorhanden',
+        status: termin.status,
+        statusLabel: termin.status === 'geplant' ? 'Geplant' : 
+                    termin.status === 'bestaetigt' ? 'Bestätigt' : 
+                    termin.status === 'abgeschlossen' ? 'Abgeschlossen' : 'Storniert',
+        statusClass: termin.status === 'geplant' ? 'warning' : 
+                    termin.status === 'bestaetigt' ? 'success' : 
+                    termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
+      },
+      notizen: notizenQuery.rows.map(notiz => ({
+        id: notiz.id,
+        text: notiz.text,
+        formattedDate: format(new Date(notiz.erstellt_am), 'dd.MM.yyyy, HH:mm'),
+        benutzer: notiz.benutzer_name
+      })),
+      newRequestsCount,
+      csrfToken: req.csrfToken(),
+      messages: { success: req.flash('success'), error: req.flash('error') }
+    });
+  } catch (error) {
+    console.error('Fehler beim Anzeigen des Termins:', error);
+    res.status(500).render('error', {
+      message: 'Datenbankfehler: ' + error.message,
+      error: error
+    });
+  }
+});
+
+// Einzelnen Termin anzeigen
+router.get('/termine/:id', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Termin aus der Datenbank abrufen
+    const terminQuery = await pool.query(`
+      SELECT 
+        t.*, 
+        k.name AS kunde_name
+      FROM 
+        termine t
+        LEFT JOIN kunden k ON t.kunde_id = k.id
+      WHERE 
+        t.id = $1
+    `, [id]);
+    
+    if (terminQuery.rows.length === 0) {
+      return res.status(404).render('error', {
+        message: `Termin mit ID ${id} nicht gefunden`,
+        error: { status: 404 }
+      });
+    }
+    
+    const termin = terminQuery.rows[0];
+    
+    // Notizen zu diesem Termin abrufen (falls Sie eine entsprechende Tabelle haben)
+    const notizenQuery = await pool.query(`
+      SELECT * FROM termin_notizen WHERE termin_id = $1 ORDER BY erstellt_am DESC
+    `, [id]);
+    
+    // Neue Anfragen für Badge zählen
+    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
+    
+    res.render('dashboard/termine/detail', {
+      title: `Termin: ${termin.titel} - Rising BSM`,
+      user: req.session.user,
+      currentPath: '/dashboard/termine',
+      termin: {
+        id: termin.id,
+        titel: termin.titel,
+        kunde_id: termin.kunde_id,
+        kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
+        termin_datum: termin.termin_datum,
+        dateFormatted: format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
+        timeFormatted: format(new Date(termin.termin_datum), 'HH:mm'),
+        dauer: termin.dauer || 60,
+        ort: termin.ort || 'Nicht angegeben',
+        beschreibung: termin.beschreibung || 'Keine Beschreibung vorhanden',
+        status: termin.status,
+        statusLabel: termin.status === 'geplant' ? 'Geplant' : 
+                    termin.status === 'bestaetigt' ? 'Bestätigt' : 
+                    termin.status === 'abgeschlossen' ? 'Abgeschlossen' : 'Storniert',
+        statusClass: termin.status === 'geplant' ? 'warning' : 
+                    termin.status === 'bestaetigt' ? 'success' : 
+                    termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
+      },
+      notizen: notizenQuery.rows.map(notiz => ({
+        id: notiz.id,
+        text: notiz.text,
+        formattedDate: format(new Date(notiz.erstellt_am), 'dd.MM.yyyy, HH:mm'),
+        benutzer: notiz.benutzer_name
+      })),
+      newRequestsCount,
+      csrfToken: req.csrfToken(),
+      messages: { success: req.flash('success'), error: req.flash('error') }
+    });
+  } catch (error) {
+    console.error('Fehler beim Anzeigen des Termins:', error);
+    res.status(500).render('error', {
+      message: 'Datenbankfehler: ' + error.message,
+      error: error
+    });
+  }
+});
+
+// Termin bearbeiten (Formular anzeigen)
+router.get('/termine/:id/edit', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Termin aus der Datenbank abrufen
+    const terminQuery = await pool.query(`
+      SELECT 
+        t.*, 
+        k.name AS kunde_name
+      FROM 
+        termine t
+        LEFT JOIN kunden k ON t.kunde_id = k.id
+      WHERE 
+        t.id = $1
+    `, [id]);
+    
+    if (terminQuery.rows.length === 0) {
+      return res.status(404).render('error', {
+        message: `Termin mit ID ${id} nicht gefunden`,
+        error: { status: 404 }
+      });
+    }
+    
+    const termin = terminQuery.rows[0];
+    
+    // Kunden für Dropdown abrufen
+    const kundenQuery = await pool.query(`
+      SELECT id, name FROM kunden ORDER BY name ASC
+    `);
+    
+    // Neue Anfragen für Badge zählen
+    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
+    
+    res.render('dashboard/termine/edit', {
+      title: `Termin bearbeiten: ${termin.titel} - Rising BSM`,
+      user: req.session.user,
+      currentPath: '/dashboard/termine',
+      termin: {
+        id: termin.id,
+        titel: termin.titel,
+        kunde_id: termin.kunde_id,
+        kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
+        termin_datum: termin.termin_datum,
+        dateFormatted: format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
+        timeFormatted: format(new Date(termin.termin_datum), 'HH:mm'),
+        dauer: termin.dauer || 60,
+        ort: termin.ort || 'Nicht angegeben',
+        beschreibung: termin.beschreibung || 'Keine Beschreibung vorhanden',
+        status: termin.status,
+        statusLabel: termin.status === 'geplant' ? 'Geplant' : 
+                    termin.status === 'bestaetigt' ? 'Bestätigt' : 
+                    termin.status === 'abgeschlossen' ? 'Abgeschlossen' : 'Storniert',
+        statusClass: termin.status === 'geplant' ? 'warning' : 
+                    termin.status === 'bestaetigt' ? 'success' : 
+                    termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
+      },
+      kunden: kundenQuery.rows,
+      newRequestsCount,
+      csrfToken: req.csrfToken(),
+      messages: { success: req.flash('success'), error: req.flash('error') }
+    });
+  } catch (error) {
+    console.error('Fehler beim Laden des Bearbeitungsformulars:', error);
+    res.status(500).render('error', {
+      message: 'Datenbankfehler: ' + error.message,
+      error: error
+    });
+  }
+});
+
+// Termin aktualisieren (POST)
+router.post('/termine/:id/edit', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      titel, 
+      kunde_id, 
+      termin_datum, 
+      termin_zeit, 
+      dauer, 
+      ort, 
+      beschreibung, 
+      status,
+      benachrichtigung
+    } = req.body;
+    
+    // Validierung
+    if (!titel || !termin_datum || !termin_zeit) {
+      req.flash('error', 'Titel, Datum und Uhrzeit sind Pflichtfelder.');
+      return res.redirect(`/dashboard/termine/${id}/edit`);
+    }
+    
+    // Datum und Uhrzeit kombinieren
+    const terminDatumObj = new Date(`${termin_datum}T${termin_zeit}`);
+    
+    // In Datenbank aktualisieren
+    await pool.query(
+      `UPDATE termine SET 
+        titel = $1, 
+        kunde_id = $2, 
+        termin_datum = $3, 
+        dauer = $4, 
+        ort = $5, 
+        beschreibung = $6, 
+        status = $7, 
+        updated_at = NOW() 
+      WHERE id = $8`,
+      [
+        titel, 
+        kunde_id || null, 
+        terminDatumObj, 
+        dauer || 60, 
+        ort || null, 
+        beschreibung || null, 
+        status || 'geplant',
+        id
+      ]
+    );
+    
+    // Notiz hinzufügen, dass der Termin aktualisiert wurde
+    await pool.query(`
+      INSERT INTO termin_notizen (
+        termin_id, benutzer_id, benutzer_name, text
+      ) VALUES ($1, $2, $3, $4)`,
+      [
+        id, 
+        req.session.user.id, 
+        req.session.user.name, 
+        'Termin wurde aktualisiert.'
+      ]
+    );
+    
+    // Benachrichtigung erstellen, falls gewünscht und Kunde zugewiesen
+    if (benachrichtigung && kunde_id) {
+      try {
+        // Hier Code für E-Mail-Benachrichtigung
+        console.log('Benachrichtigung für Kunden-ID:', kunde_id);
+      } catch (notifyError) {
+        console.error('Fehler bei der Benachrichtigung:', notifyError);
+      }
+    }
+    
+    req.flash('success', 'Termin erfolgreich aktualisiert.');
+    res.redirect(`/dashboard/termine/${id}`);
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren des Termins:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect(`/dashboard/termine/${req.params.id}/edit`);
+  }
+});
+
+// Termin-Notiz hinzufügen
+router.post('/termine/add-note', isAuthenticated, async (req, res) => {
+  try {
+    const { id, note } = req.body;
+    
+    if (!note || note.trim() === '') {
+      req.flash('error', 'Die Notiz darf nicht leer sein.');
+      return res.redirect(`/dashboard/termine/${id}`);
+    }
+    
+    // In Datenbank einfügen
+    await pool.query(`
+      INSERT INTO termin_notizen (
+        termin_id, benutzer_id, benutzer_name, text
+      ) VALUES ($1, $2, $3, $4)`,
+      [id, req.session.user.id, req.session.user.name, note]
+    );
+    
+    req.flash('success', 'Notiz erfolgreich hinzugefügt.');
+    res.redirect(`/dashboard/termine/${id}`);
+  } catch (error) {
+    console.error('Fehler beim Hinzufügen der Notiz:', error);
     req.flash('error', 'Datenbankfehler: ' + error.message);
     res.redirect(`/dashboard/termine/${req.body.id}`);
   }

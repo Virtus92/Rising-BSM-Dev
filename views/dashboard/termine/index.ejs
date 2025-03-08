@@ -260,6 +260,7 @@
 </div>
 
 <script>
+
   document.addEventListener('DOMContentLoaded', function() {
     // Status Filter Funktionalität
     const statusFilter = document.getElementById('statusFilter');
@@ -286,6 +287,13 @@
         document.getElementById('status').value = currentStatus;
       });
     }
+    // setTimeout(function() {
+    //   if (!$.fn.DataTable.isDataTable('.datatable')) {
+    //     $('.datatable').DataTable({
+    //       // DataTables options here (if any)
+    //     });
+    //   }
+    // }, 200); // Adjust the delay (in milliseconds) as needed
   });
 </script>
 

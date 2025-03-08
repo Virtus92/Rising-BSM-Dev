@@ -94,20 +94,18 @@
 
     <!-- Dashboard Content -->
     <div class="dashboard-content p-3 p-md-4">
-      <% if (typeof messages !== 'undefined') { %>
-        <% if (messages.success) { %>
-          <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="fas fa-check-circle me-2"></i><%= messages.success %>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        <% } %>
-
-        <% if (messages.error) { %>
-          <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fas fa-exclamation-circle me-2"></i><%= messages.error %>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        <% } %>
+      <% if (messages.success && messages.success.length > 0) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+          <i class="fas fa-check-circle me-2"></i><%= messages.success %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      <% } %>
+      
+      <% if (messages.error && messages.error.length > 0) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <i class="fas fa-exclamation-circle me-2"></i><%= messages.error %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
       <% } %>
 
       <div class="row g-4">
