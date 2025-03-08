@@ -1,13 +1,27 @@
-import { Router } from 'express';
-const router = Router();
-import pool from '../db.js';
-import { isAuthenticated, isAdmin, isManager } from '../middleware/auth.js';
-import slugify from 'slugify';
-import axios from 'axios'; 
-import { formatDistanceToNow, format } from 'date-fns';
-import { de } from 'date-fns/locale';
+// routes/blog.js - CommonJS version
+const express = require('express');
+const router = express.Router();
+const pool = require('../db');
+const { isAuthenticated, isAdmin, isManager } = require('../middleware/auth');
+const slugify = require('slugify');
+const axios = require('axios');
+const { formatDistanceToNow, format } = require('date-fns');
+const { de } = require('date-fns/locale');
 
+// Helper function for HTTP requests
+const _post = async (url, data) => {
+  return await axios.post(url, data);
+};
 
+// Helper function for database queries
+const _query = async (text, params) => {
+  return await pool.query(text, params);
+};
+
+// Helper function for DB connection
+const connect = async () => {
+  return await pool.connect();
+};
 
 // N8N Webhook-URL für Automatisierung
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.dinel.at/webhook/blog-automation';
@@ -1418,3 +1432,75 @@ router.get('/public/:slug', async (req, res) => {
     });
   }
 });
+
+// Public blog routes
+router.get('/public', async (req, res) => {
+  try {
+    // Veröffentlichte Blogposts abrufen
+    const postsQuery = await _query(`
+      SELECT 
+        p.id, 
+        p.title, 
+        p.slug,
+        p.excerpt, 
+        p.published_at,
+        p.featured_image,
+        u.name as author_name,
+        ARRAY_AGG(DISTINCT c.name) as categories
+      FROM 
+        blog_posts p
+        LEFT JOIN benutzer u ON p.author_id = u.id
+        LEFT JOIN blog_post_categories pc ON p.id = pc.post_id
+        LEFT JOIN blog_categories c ON pc.category_id = c.id
+      WHERE 
+        p.status = 'published'
+      GROUP BY
+        p.id, u.name
+      ORDER BY 
+        p.published_at DESC
+      LIMIT 10
+    `);
+    
+    // Kategorien für Seitenleiste abrufen
+    const categoriesQuery = await _query(`
+      SELECT 
+        c.id, 
+        c.name, 
+        c.slug,
+        COUNT(pc.post_id) as post_count
+      FROM 
+        blog_categories c
+        JOIN blog_post_categories pc ON c.id = pc.category_id
+        JOIN blog_posts p ON pc.post_id = p.id
+      WHERE
+        p.status = 'published'
+      GROUP BY 
+        c.id
+      ORDER BY 
+        c.name
+    `);
+    
+    res.render('blog/index', {
+      title: 'Blog - Rising BSM',
+      posts: postsQuery.rows.map(post => ({
+        title: post.title,
+        slug: post.slug,
+        excerpt: post.excerpt,
+        date: format(new Date(post.published_at), 'dd.MM.yyyy'),
+        author: post.author_name,
+        image: post.featured_image,
+        categories: post.categories.filter(c => c !== null)
+      })),
+      categories: categoriesQuery.rows
+    });
+  } catch (error) {
+    console.error('Fehler beim Laden des Blogs:', error);
+    res.status(500).render('error', {
+      message: 'Fehler beim Laden des Blogs: ' + error.message,
+      error: error
+    });
+  }
+});
+
+// Export the router using CommonJS syntax
+module.exports = router;

@@ -131,13 +131,13 @@ app.use('/', authRoutes);
 app.use('/dashboard', dashboardRoutes);
 
 // Blog-Routen importieren
-const blogRoutes = require('./routes/blog').default;
+const blogRoutes = require('./routes/blog');
 
-// Blog-Middleware
+// Blog-Middleware für Dashboard
 app.use('/dashboard/blog', blogRoutes);
 
 // Öffentliche Blog-Routen
-app.use('/blog', blogRoutes.public);
+app.use('/blog', blogRoutes);
 
 // Kontakt-Formular Rate-Limiting
 const contactLimiter = rateLimit({
