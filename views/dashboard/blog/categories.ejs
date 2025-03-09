@@ -1,0 +1,316 @@
+<%- include('../../partials/admin-header') %>
+
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Blog-Kategorien</h1>
+    <a href="/dashboard/blog" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left me-1"></i> Zurück zum Blog
+    </a>
+  </div>
+
+  <% if (messages.success && messages.success.length > 0) { %>
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <%= messages.success %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  <% } %>
+  
+  <% if (messages.error && messages.error.length > 0) { %>
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <%= messages.error %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  <% } %>
+
+  <div class="row">
+    <!-- Categories Table -->
+    <div class="col-lg-8">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Kategorien</h5>
+          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+            <i class="fas fa-plus me-1"></i> Kategorie hinzufügen
+          </button>
+        </div>
+        <div class="card-body p-0">
+          <% if (!categories || categories.length === 0) { %>
+            <div class="p-4 text-center">
+              <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+              <p class="text-muted mb-3">Keine Kategorien vorhanden</p>
+              <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                <i class="fas fa-plus me-1"></i> Kategorie hinzufügen
+              </button>
+            </div>
+          <% } else { %>
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Name</th>
+                    <th>Slug</th>
+                    <th>Anzahl Posts</th>
+                    <th>Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% categories.forEach(function(category) { %>
+                    <tr>
+                      <td><%= category.name %></td>
+                      <td><code><%= category.slug %></code></td>
+                      <td>
+                        <span class="badge bg-secondary rounded-pill"><%= category.post_count %></span>
+                      </td>
+                      <td>
+                        <div class="btn-group btn-group-sm">
+                          <button class="btn btn-outline-primary edit-category-btn" 
+                                  data-id="<%= category.id %>"
+                                  data-name="<%= category.name %>"
+                                  data-description="<%= category.description || '' %>"
+                                  data-bs-toggle="modal" 
+                                  data-bs-target="#editCategoryModal">
+                            <i class="fas fa-edit"></i>
+                          </button>
+                          <% if (category.post_count == 0) { %>
+                            <button class="btn btn-outline-danger delete-category-btn"
+                                    data-id="<%= category.id %>"
+                                    data-name="<%= category.name %>"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#deleteCategoryModal">
+                              <i class="fas fa-trash"></i>
+                            </button>
+                          <% } else { %>
+                            <button class="btn btn-outline-danger" disabled title="Kategorie enthält Artikel und kann nicht gelöscht werden">
+                              <i class="fas fa-trash"></i>
+                            </button>
+                          <% } %>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Tips & Info -->
+    <div class="col-lg-4">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Tipps zur Kategorieverwaltung</h5>
+        </div>
+        <div class="card-body">
+          <div class="d-flex mb-3">
+            <div class="flex-shrink-0 me-3">
+              <div class="bg-success bg-opacity-10 p-2 rounded-circle">
+                <i class="fas fa-check text-success"></i>
+              </div>
+            </div>
+            <div>
+              <h6 class="mb-1">Beschreibende Namen</h6>
+              <p class="text-muted small mb-0">Wählen Sie klare und eindeutige Namen für Ihre Kategorien.</p>
+            </div>
+          </div>
+          
+          <div class="d-flex mb-3">
+            <div class="flex-shrink-0 me-3">
+              <div class="bg-success bg-opacity-10 p-2 rounded-circle">
+                <i class="fas fa-check text-success"></i>
+              </div>
+            </div>
+            <div>
+              <h6 class="mb-1">Begrenzte Anzahl</h6>
+              <p class="text-muted small mb-0">Zu viele Kategorien können Besucher verwirren. Beschränken Sie sich auf 5-10 Hauptkategorien.</p>
+            </div>
+          </div>
+          
+          <div class="d-flex">
+            <div class="flex-shrink-0 me-3">
+              <div class="bg-success bg-opacity-10 p-2 rounded-circle">
+                <i class="fas fa-check text-success"></i>
+              </div>
+            </div>
+            <div>
+              <h6 class="mb-1">Beschreibungen hinzufügen</h6>
+              <p class="text-muted small mb-0">Eine Beschreibung hilft Besuchern zu verstehen, worum es in der Kategorie geht.</p>
+            </div>
+          </div>
+          
+          <hr class="my-4">
+          
+          <div class="alert alert-info mb-0">
+            <div class="d-flex">
+              <div class="flex-shrink-0 me-2">
+                <i class="fas fa-info-circle"></i>
+              </div>
+              <div>
+                <h6 class="alert-heading mb-1">Bevor Sie eine Kategorie löschen</h6>
+                <p class="small mb-0">Kategorien mit zugewiesenen Artikeln können nicht gelöscht werden. Weisen Sie diesen Artikeln zuerst eine andere Kategorie zu.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Empfohlene Kategorien</h5>
+        </div>
+        <div class="card-body">
+          <p class="text-muted small mb-3">Typische Kategorien für einen Facility Management Blog:</p>
+          
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item px-0">
+              <strong>Facility Management</strong>
+              <p class="small text-muted mb-0">Allgemeine Themen rund um Facility Management.</p>
+            </li>
+            <li class="list-group-item px-0">
+              <strong>Gebäudereinigung</strong>
+              <p class="small text-muted mb-0">Artikel über Reinigungsdienste und -methoden.</p>
+            </li>
+            <li class="list-group-item px-0">
+              <strong>Umzugsservices</strong>
+              <p class="small text-muted mb-0">Tipps und Informationen zu Umzugsdienstleistungen.</p>
+            </li>
+            <li class="list-group-item px-0">
+              <strong>Winterdienst</strong>
+              <p class="small text-muted mb-0">Informationen zu Winterdiensten und Schneeräumung.</p>
+            </li>
+            <li class="list-group-item px-0">
+              <strong>Branchennews</strong>
+              <p class="small text-muted mb-0">Aktuelle Nachrichten aus der Facility Management Branche.</p>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Category Modal -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Kategorie hinzufügen</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/dashboard/blog/categories" method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="name" class="form-label">Name *</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+            <div class="form-text">Der Name wird öffentlich angezeigt.</div>
+          </div>
+          <div class="mb-3">
+            <label for="description" class="form-label">Beschreibung</label>
+            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+            <div class="form-text">Eine kurze Beschreibung der Kategorie (optional).</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">Kategorie erstellen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Category Modal -->
+<div class="modal fade" id="editCategoryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Kategorie bearbeiten</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/dashboard/blog/categories/edit" method="POST" id="editCategoryForm">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="id" id="edit_id">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="edit_name" class="form-label">Name *</label>
+            <input type="text" class="form-control" id="edit_name" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label for="edit_description" class="form-label">Beschreibung</label>
+            <textarea class="form-control" id="edit_description" name="description" rows="3"></textarea>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="update_slug" name="update_slug">
+            <label class="form-check-label" for="update_slug">
+              Slug aktualisieren
+            </label>
+            <div class="form-text text-warning">Achtung: Dies kann bestehende Links ungültig machen!</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">Änderungen speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Category Modal -->
+<div class="modal fade" id="deleteCategoryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Kategorie löschen</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Sind Sie sicher, dass Sie die Kategorie "<span id="delete_category_name"></span>" löschen möchten?</p>
+        <p class="text-danger mb-0">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        <form action="/dashboard/blog/categories/:id/delete" method="POST" id="deleteCategoryForm">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn btn-danger">Löschen</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Handle edit category modal
+    const editCategoryButtons = document.querySelectorAll('.edit-category-btn');
+    
+    editCategoryButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const id = this.dataset.id;
+        const name = this.dataset.name;
+        const description = this.dataset.description;
+        
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_name').value = name;
+        document.getElementById('edit_description').value = description;
+      });
+    });
+    
+    // Handle delete category modal
+    const deleteCategoryButtons = document.querySelectorAll('.delete-category-btn');
+    
+    deleteCategoryButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const id = this.dataset.id;
+        const name = this.dataset.name;
+        
+        document.getElementById('delete_category_name').textContent = name;
+        
+        // Update the form action URL
+        const deleteForm = document.getElementById('deleteCategoryForm');
+        deleteForm.action = `/dashboard/blog/categories/${id}/delete`;
+      });
+    });
+  });
+</script>

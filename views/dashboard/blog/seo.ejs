@@ -1,0 +1,334 @@
+<%- include('../../partials/admin-header') %>
+
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0 text-gray-800">SEO & Keywords</h1>
+    <a href="/dashboard/blog" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left me-1"></i> Zurück zum Blog
+    </a>
+  </div>
+
+  <% if (messages.success && messages.success.length > 0) { %>
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <%= messages.success %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  <% } %>
+  
+  <% if (messages.error && messages.error.length > 0) { %>
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <%= messages.error %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  <% } %>
+
+  <div class="row">
+    <!-- Keywords Table -->
+    <div class="col-lg-8">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Ziel-Keywords</h5>
+          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addKeywordModal">
+            <i class="fas fa-plus me-1"></i> Keyword hinzufügen
+          </button>
+        </div>
+        <div class="card-body p-0">
+          <% if (!keywords || keywords.length === 0) { %>
+            <div class="p-4 text-center">
+              <i class="fas fa-search fa-3x text-muted mb-3"></i>
+              <p class="text-muted mb-3">Keine Keywords vorhanden</p>
+              <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addKeywordModal">
+                <i class="fas fa-plus me-1"></i> Keyword hinzufügen
+              </button>
+            </div>
+          <% } else { %>
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Keyword</th>
+                    <th>Suchvolumen</th>
+                    <th>Aktuelle Position</th>
+                    <th>Ziel-Artikel</th>
+                    <th>Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% keywords.forEach(function(keyword) { %>
+                    <tr>
+                      <td><%= keyword.keyword %></td>
+                      <td><%= keyword.search_volume || '-' %></td>
+                      <td>
+                        <% if (keyword.current_ranking) { %>
+                          <span class="badge bg-<%= keyword.current_ranking <= 10 ? 'success' : 
+                                              keyword.current_ranking <= 30 ? 'warning' : 'danger' %>">
+                            #<%= keyword.current_ranking %>
+                          </span>
+                        <% } else { %>
+                          <span class="badge bg-secondary">Nicht gerankt</span>
+                        <% } %>
+                      </td>
+                      <td>
+                        <% if (keyword.post_title) { %>
+                          <a href="/dashboard/blog/<%= keyword.target_post_id %>" class="text-decoration-none text-truncate d-inline-block" style="max-width: 200px;">
+                            <%= keyword.post_title %>
+                          </a>
+                        <% } else { %>
+                          <span class="text-muted">-</span>
+                        <% } %>
+                      </td>
+                      <td>
+                        <div class="btn-group btn-group-sm">
+                          <button class="btn btn-outline-primary edit-keyword-btn" 
+                                  data-keyword="<%= keyword.keyword %>"
+                                  data-id="<%= keyword.id %>"
+                                  data-search-volume="<%= keyword.search_volume || '' %>"
+                                  data-target-post-id="<%= keyword.target_post_id || '' %>"
+                                  data-bs-toggle="modal" 
+                                  data-bs-target="#editKeywordModal">
+                            <i class="fas fa-edit"></i>
+                          </button>
+                          <button class="btn btn-outline-danger delete-keyword-btn"
+                                  data-id="<%= keyword.id %>"
+                                  data-keyword="<%= keyword.keyword %>"
+                                  data-bs-toggle="modal"
+                                  data-bs-target="#deleteKeywordModal">
+                            <i class="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+    
+    <!-- SEO Tips & Info -->
+    <div class="col-lg-4">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">SEO Optimierungsschritte</h5>
+        </div>
+        <div class="card-body">
+          <div class="d-flex mb-3">
+            <div class="flex-shrink-0 me-3">
+              <div class="bg-primary bg-opacity-10 p-2 rounded-circle">
+                <i class="fas fa-search text-primary"></i>
+              </div>
+            </div>
+            <div>
+              <h6 class="mb-1">Keyword-Recherche</h6>
+              <p class="text-muted small mb-0">Identifizieren Sie relevante Keywords mit angemessenem Suchvolumen.</p>
+            </div>
+          </div>
+          
+          <div class="d-flex mb-3">
+            <div class="flex-shrink-0 me-3">
+              <div class="bg-primary bg-opacity-10 p-2 rounded-circle">
+                <i class="fas fa-file-alt text-primary"></i>
+              </div>
+            </div>
+            <div>
+              <h6 class="mb-1">Content-Optimierung</h6>
+              <p class="text-muted small mb-0">Erstellen Sie hochwertige Inhalte, die auf Ihre Ziel-Keywords ausgerichtet sind.</p>
+            </div>
+          </div>
+          
+          <div class="d-flex mb-3">
+            <div class="flex-shrink-0 me-3">
+              <div class="bg-primary bg-opacity-10 p-2 rounded-circle">
+                <i class="fas fa-code text-primary"></i>
+              </div>
+            </div>
+            <div>
+              <h6 class="mb-1">Technische Optimierung</h6>
+              <p class="text-muted small mb-0">Stellen Sie sicher, dass Meta-Titel, Beschreibungen und Überschriften optimiert sind.</p>
+            </div>
+          </div>
+          
+          <div class="d-flex">
+            <div class="flex-shrink-0 me-3">
+              <div class="bg-primary bg-opacity-10 p-2 rounded-circle">
+                <i class="fas fa-chart-line text-primary"></i>
+              </div>
+            </div>
+            <div>
+              <h6 class="mb-1">Performance-Monitoring</h6>
+              <p class="text-muted small mb-0">Überwachen Sie Ihre Rankings und optimieren Sie kontinuierlich.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h5 class="mb-0">Ressourcen</h5>
+        </div>
+        <div class="list-group list-group-flush">
+          <a href="https://search.google.com/search-console" target="_blank" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+            <span><i class="fab fa-google me-2"></i>Google Search Console</span>
+            <i class="fas fa-external-link-alt text-muted"></i>
+          </a>
+          <a href="https://ads.google.com/aw/keywordplanner" target="_blank" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-key me-2"></i>Google Keyword Planner</span>
+            <i class="fas fa-external-link-alt text-muted"></i>
+          </a>
+          <a href="https://moz.com/beginners-guide-to-seo" target="_blank" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-book me-2"></i>SEO-Leitfaden (Moz)</span>
+            <i class="fas fa-external-link-alt text-muted"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Keyword Modal -->
+<div class="modal fade" id="addKeywordModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Keyword hinzufügen</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/dashboard/blog/seo/keywords" method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="keyword" class="form-label">Keyword *</label>
+            <input type="text" class="form-control" id="keyword" name="keyword" required>
+          </div>
+          <div class="mb-3">
+            <label for="search_volume" class="form-label">Suchvolumen (monatlich)</label>
+            <input type="number" class="form-control" id="search_volume" name="search_volume" min="0">
+          </div>
+          <div class="mb-3">
+            <label for="target_post_id" class="form-label">Zugehöriger Blogpost</label>
+            <select class="form-select" id="target_post_id" name="target_post_id">
+              <option value="">-- Keiner --</option>
+              <% if (posts && posts.length > 0) { %>
+                <% posts.forEach(function(post) { %>
+                  <option value="<%= post.id %>"><%= post.title %></option>
+                <% }); %>
+              <% } %>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">Keyword hinzufügen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Keyword Modal -->
+<div class="modal fade" id="editKeywordModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Keyword bearbeiten</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/dashboard/blog/seo/keywords/edit" method="POST" id="editKeywordForm">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="id" id="edit_id">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="edit_keyword" class="form-label">Keyword *</label>
+            <input type="text" class="form-control" id="edit_keyword" name="keyword" required>
+          </div>
+          <div class="mb-3">
+            <label for="edit_search_volume" class="form-label">Suchvolumen (monatlich)</label>
+            <input type="number" class="form-control" id="edit_search_volume" name="search_volume" min="0">
+          </div>
+          <div class="mb-3">
+            <label for="edit_target_post_id" class="form-label">Zugehöriger Blogpost</label>
+            <select class="form-select" id="edit_target_post_id" name="target_post_id">
+              <option value="">-- Keiner --</option>
+              <% if (posts && posts.length > 0) { %>
+                <% posts.forEach(function(post) { %>
+                  <option value="<%= post.id %>"><%= post.title %></option>
+                <% }); %>
+              <% } %>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">Änderungen speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Keyword Modal -->
+<div class="modal fade" id="deleteKeywordModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Keyword löschen</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Sind Sie sicher, dass Sie das Keyword "<span id="delete_keyword_name"></span>" löschen möchten?</p>
+        <p class="text-danger mb-0">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        <form action="/dashboard/blog/seo/keywords/delete" method="POST" id="deleteKeywordForm">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="id" id="delete_id">
+          <button type="submit" class="btn btn-danger">Löschen</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Handle edit keyword modal
+    const editKeywordButtons = document.querySelectorAll('.edit-keyword-btn');
+    
+    editKeywordButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const id = this.dataset.id;
+        const keyword = this.dataset.keyword;
+        const searchVolume = this.dataset.searchVolume;
+        const targetPostId = this.dataset.targetPostId;
+        
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_keyword').value = keyword;
+        document.getElementById('edit_search_volume').value = searchVolume;
+        
+        if (targetPostId) {
+          document.getElementById('edit_target_post_id').value = targetPostId;
+        } else {
+          document.getElementById('edit_target_post_id').value = '';
+        }
+      });
+    });
+    
+    // Handle delete keyword modal
+    const deleteKeywordButtons = document.querySelectorAll('.delete-keyword-btn');
+    
+    deleteKeywordButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const id = this.dataset.id;
+        const keyword = this.dataset.keyword;
+        
+        document.getElementById('delete_id').value = id;
+        document.getElementById('delete_keyword_name').textContent = keyword;
+      });
+    });
+  });
+</script>
+
+<%- include('../../partials/admin-footer-simple') %>

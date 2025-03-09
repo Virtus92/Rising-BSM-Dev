@@ -1502,5 +1502,157 @@ router.get('/public', async (req, res) => {
   }
 });
 
+
+// Keyword hinzufügen
+router.post('/dashboard/blog/seo/keywords', isAuthenticated, isManager, async (req, res) => {
+  try {
+    const { keyword, search_volume, target_post_id } = req.body;
+    
+    // Validierung
+    if (!keyword) {
+      req.flash('error', 'Keyword ist ein Pflichtfeld.');
+      return res.redirect('/dashboard/blog/seo');
+    }
+    
+    // In Datenbank speichern
+    await _query(
+      `INSERT INTO blog_seo_keywords (
+        keyword, 
+        search_volume, 
+        target_post_id
+      ) VALUES ($1, $2, $3)`,
+      [
+        keyword,
+        search_volume || 0,
+        target_post_id || null
+      ]
+    );
+    
+    req.flash('success', 'Keyword erfolgreich hinzugefügt!');
+    res.redirect('/dashboard/blog/seo');
+  } catch (error) {
+    console.error('Fehler beim Speichern des Keywords:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect('/dashboard/blog/seo');
+  }
+});
+
+// Keyword bearbeiten
+router.post('/dashboard/blog/seo/keywords/edit', isAuthenticated, isManager, async (req, res) => {
+  try {
+    const { id, keyword, search_volume, target_post_id } = req.body;
+    
+    if (!id || !keyword) {
+      req.flash('error', 'ID und Keyword sind Pflichtfelder.');
+      return res.redirect('/dashboard/blog/seo');
+    }
+    
+    await _query(
+      `UPDATE blog_seo_keywords 
+       SET keyword = $1, 
+           search_volume = $2, 
+           target_post_id = $3,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
+      [
+        keyword,
+        search_volume || 0,
+        target_post_id || null,
+        id
+      ]
+    );
+    
+    req.flash('success', 'Keyword erfolgreich aktualisiert!');
+    res.redirect('/dashboard/blog/seo');
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren des Keywords:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect('/dashboard/blog/seo');
+  }
+});
+
+// Keyword löschen
+router.post('/dashboard/blog/seo/keywords/delete', isAuthenticated, isManager, async (req, res) => {
+  try {
+    const { id } = req.body;
+    
+    if (!id) {
+      req.flash('error', 'Keyword-ID ist erforderlich.');
+      return res.redirect('/dashboard/blog/seo');
+    }
+    
+    await _query('DELETE FROM blog_seo_keywords WHERE id = $1', [id]);
+    
+    req.flash('success', 'Keyword erfolgreich gelöscht!');
+    res.redirect('/dashboard/blog/seo');
+  } catch (error) {
+    console.error('Fehler beim Löschen des Keywords:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect('/dashboard/blog/seo');
+  }
+});
+
+// Kategorie bearbeiten
+router.post('/dashboard/blog/categories/edit', isAuthenticated, isManager, async (req, res) => {
+  try {
+    const { id, name, description, update_slug } = req.body;
+    
+    if (!id || !name) {
+      req.flash('error', 'ID und Name sind Pflichtfelder.');
+      return res.redirect('/dashboard/blog/categories');
+    }
+    
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      let slug = null;
+      
+      if (update_slug) {
+        const slugify = require('slugify');
+        slug = slugify(name, { lower: true, strict: true });
+        
+        // Prüfen ob Slug bereits existiert (und nicht der eigene ist)
+        const slugCheck = await client.query(
+          'SELECT COUNT(*) FROM blog_categories WHERE slug = $1 AND id != $2',
+          [slug, id]
+        );
+        
+        if (parseInt(slugCheck.rows[0].count) > 0) {
+          throw new Error(`Eine Kategorie mit dem Namen "${name}" existiert bereits.`);
+        }
+      }
+      
+      if (slug) {
+        await client.query(
+          'UPDATE blog_categories SET name = $1, description = $2, slug = $3 WHERE id = $4',
+          [name, description || null, slug, id]
+        );
+      } else {
+        await client.query(
+          'UPDATE blog_categories SET name = $1, description = $2 WHERE id = $3',
+          [name, description || null, id]
+        );
+      }
+      
+      await client.query('COMMIT');
+      req.flash('success', 'Kategorie erfolgreich aktualisiert!');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+    
+    res.redirect('/dashboard/blog/categories');
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren der Kategorie:', error);
+    req.flash('error', error.message || 'Ein Fehler ist aufgetreten.');
+    res.redirect('/dashboard/blog/categories');
+  }
+});
+
+
 // Export the router using CommonJS syntax
 module.exports = router;
