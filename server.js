@@ -62,7 +62,7 @@ app.use(helmet.contentSecurityPolicy({
     scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "https://cdn.datatables.net", "'unsafe-inline'", "'unsafe-hashes'"],
     scriptSrcAttr: ["'unsafe-inline'"],
     styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://cdn.datatables.net"],
-    imgSrc: ["'self'", "data:"],
+    imgSrc: ["'self'", "data:", "https://*", "http://*"],
     connectSrc: ["'self'", "https://n8n.dinel.at"]
   }
 }));
@@ -136,9 +136,98 @@ const blogRoutes = require('./routes/blog');
 // Blog-Middleware für Dashboard
 app.use('/dashboard/blog', blogRoutes);
 
-// Öffentliche Blog-Routen
-app.use('/blog', blogRoutes);
+app.get('/blog', async (req, res) => {
+  try {
+    // Fetch published blog posts
+    const postsQuery = await pool.query(`
+      SELECT 
+        p.id, 
+        p.title, 
+        p.slug,
+        p.excerpt, 
+        p.published_at,
+        p.featured_image,
+        u.name as author_name,
+        ARRAY_AGG(DISTINCT c.name) as categories
+      FROM 
+        blog_posts p
+        LEFT JOIN benutzer u ON p.author_id = u.id
+        LEFT JOIN blog_post_categories pc ON p.id = pc.post_id
+        LEFT JOIN blog_categories c ON pc.category_id = c.id
+      WHERE 
+        p.status = 'published'
+      GROUP BY
+        p.id, u.name
+      ORDER BY 
+        p.published_at DESC
+      LIMIT 10
+    `);
+    
+    // Fetch categories for sidebar
+    const categoriesQuery = await pool.query(`
+      SELECT 
+        c.id, 
+        c.name, 
+        c.slug,
+        COUNT(pc.post_id) as post_count
+      FROM 
+        blog_categories c
+        JOIN blog_post_categories pc ON c.id = pc.category_id
+        JOIN blog_posts p ON pc.post_id = p.id
+      WHERE
+        p.status = 'published'
+      GROUP BY 
+        c.id
+      ORDER BY 
+        c.name
+    `);
+    
+    // Render the blog index template with the required data
+    res.render('blog/index', {
+      title: 'Blog - Rising BSM',
+      posts: postsQuery.rows.map(post => ({
+        title: post.title,
+        slug: post.slug,
+        excerpt: post.excerpt,
+        date: format(new Date(post.published_at), 'dd.MM.yyyy'),
+        author: post.author_name,
+        image: post.featured_image,
+        categories: post.categories.filter(c => c !== null)
+      })),
+      categories: categoriesQuery.rows
+    });
+  } catch (error) {
+    console.error('Error loading blog index:', error);
+    res.status(500).render('error', {
+      message: 'Error loading blog: ' + error.message,
+      error: error
+    });
+  }
+});
 
+app.get('/blog/search', (req, res, next) => {
+  req.url = '/public/search' + (req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '');
+  next();
+}, blogRoutes);
+
+app.get('/blog/category/:slug', (req, res, next) => {
+  req.url = '/public/category/' + req.params.slug;
+  next();
+}, blogRoutes);
+
+// Individual blog post route - most specific route should be last
+app.get('/blog/:slug', (req, res, next) => {
+  req.url = '/public/' + req.params.slug;
+  next();
+}, blogRoutes);
+
+// Catch-all for any other /blog routes
+app.use('/blog', (req, res, next) => {
+  if (!req.url.startsWith('/public')) {
+    req.url = '/public' + req.url;
+  }
+  next();
+}, blogRoutes);
 // Kontakt-Formular Rate-Limiting
 const contactLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 Stunde

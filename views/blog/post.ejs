@@ -1,8 +1,4 @@
-<%- include('../partials/header', { 
-    title: title, 
-    metaDescription: metaDescription,
-    metaKeywords: metaKeywords 
-  }) %>
+<%- include('./header.ejs') %>
   
   <article class="py-5 mt-5">
     <!-- Header with Featured Image -->
@@ -67,16 +63,16 @@
           <div class="blog-share mb-5">
             <h3 class="h6 text-muted mb-3">Teilen:</h3>
             <div class="d-flex gap-2">
-              <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(`https://www.rising-bsm.at/blog/${post.slug}`) %>" target="_blank" class="btn btn-sm btn-outline-primary">
+              <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(`https://www.rising-bsm.at/blog/${post.slug || ''}`) %>" target="_blank" class="btn btn-sm btn-outline-primary">
                 <i class="fab fa-facebook-f me-1"></i> Facebook
               </a>
-              <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(`https://www.rising-bsm.at/blog/${post.slug}`) %>&text=<%= encodeURIComponent(post.title) %>" target="_blank" class="btn btn-sm btn-outline-info">
+              <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(`https://www.rising-bsm.at/blog/${post.slug || ''}`) %>&text=<%= encodeURIComponent(post.title) %>" target="_blank" class="btn btn-sm btn-outline-info">
                 <i class="fab fa-twitter me-1"></i> Twitter
               </a>
-              <a href="https://www.linkedin.com/shareArticle?mini=true&url=<%= encodeURIComponent(`https://www.rising-bsm.at/blog/${post.slug}`) %>&title=<%= encodeURIComponent(post.title) %>" target="_blank" class="btn btn-sm btn-outline-primary">
+              <a href="https://www.linkedin.com/shareArticle?mini=true&url=<%= encodeURIComponent(`https://www.rising-bsm.at/blog/${post.slug || ''}`) %>&title=<%= encodeURIComponent(post.title) %>" target="_blank" class="btn btn-sm btn-outline-primary">
                 <i class="fab fa-linkedin-in me-1"></i> LinkedIn
               </a>
-              <a href="mailto:?subject=<%= encodeURIComponent(post.title) %>&body=<%= encodeURIComponent(`Interessanter Artikel auf Rising BSM: https://www.rising-bsm.at/blog/${post.slug}`) %>" class="btn btn-sm btn-outline-secondary">
+              <a href="mailto:?subject=<%= encodeURIComponent(post.title) %>&body=<%= encodeURIComponent(`Interessanter Artikel auf Rising BSM: https://www.rising-bsm.at/blog/${post.slug || ''}`) %>" class="btn btn-sm btn-outline-secondary">
                 <i class="fas fa-envelope me-1"></i> E-Mail
               </a>
             </div>
@@ -232,4 +228,4 @@
     }
   </style>
   
-  <%- include('../partials/footer') %>
+  <%- include('./footer') %>
