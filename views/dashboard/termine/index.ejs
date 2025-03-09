@@ -59,6 +59,7 @@
                       <th scope="col">Uhrzeit</th>
                       <th scope="col">Ort</th>
                       <th scope="col">Status</th>
+                      <th scope="col">Projekt</th>
                       <th scope="col">Aktionen</th>
                     </tr>
                   </thead>
@@ -80,6 +81,7 @@
                               <%= appointment.statusLabel %>
                             </span>
                           </td>
+                          <td><%= appointment.projekt_name || '-' %></td>
                           <td>
                             <div class="btn-group btn-group-sm">
                               <a href="/dashboard/termine/<%= appointment.id %>" class="btn btn-outline-secondary">
@@ -101,7 +103,7 @@
                       <% }); %>
                     <% } else { %>
                       <tr>
-                        <td colspan="7" class="text-center py-4">
+                        <td colspan="8" class="text-center py-4">
                           <p class="text-muted mb-0">Keine Termine gefunden</p>
                         </td>
                       </tr>

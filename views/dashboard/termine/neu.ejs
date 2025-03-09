@@ -71,6 +71,22 @@
                   </div>
                 <% } %>
               </div>
+
+              <!-- Projekt -->
+              <div class="col-md-12">
+                <label for="projekt_id" class="form-label">Projekt (optional)</label>
+                <select class="form-select" id="projekt_id" name="projekt_id">
+                  <option value="">-- Kein Projekt zugewiesen --</option>
+                  <% if (typeof projekte !== 'undefined' && projekte.length > 0) { %>
+                    <% projekte.forEach(function(projekt) { %>
+                      <option value="<%= projekt.id %>" <%= formData.projekt_id == projekt.id ? 'selected' : '' %>><%= projekt.titel %></option>
+                    <% }); %>
+                  <% } %>
+                </select>
+                <div class="form-text">
+                  <i class="fas fa-info-circle me-1"></i> Optional: Weisen Sie dem Termin ein Projekt zu.
+                </div>
+              </div>
               
               <!-- Datum und Zeit -->
               <div class="col-md-4">

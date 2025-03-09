@@ -39,10 +39,6 @@
             <div class="card-body">
               <div class="row mb-4">
                 <div class="col-md-6">
-                  <h3 class="h6 text-muted mb-2">Titel</h3>
-                  <p class="mb-0 fw-semibold"><%= termin.titel %></p>
-                </div>
-                <div class="col-md-6">
                   <h3 class="h6 text-muted mb-2">Kunde</h3>
                   <p class="mb-0">
                     <% if (termin.kunde_id) { %>
@@ -52,6 +48,17 @@
                     <% } %>
                   </p>
                 </div>
+                <div class="col-md-6">
+                  <h3 class="h6 text-muted mb-2">Projekt</h3>
+                  <p class="mb-0">
+                    <% if (termin.projekt_id) { %>
+                      <a href="/dashboard/projekte/<%= termin.projekt_id %>" class="text-decoration-none"><%= termin.projekt_titel %></a>
+                    <% } else { %>
+                      Kein Projekt zugewiesen
+                    <% } %>
+                  </p>
+                </div>
+              </div>
               </div>
               
               <div class="row mb-4">

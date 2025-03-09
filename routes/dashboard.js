@@ -1535,8 +1535,16 @@ router.get('/termine/neu', isAuthenticated, async (req, res) => {
       SELECT id, name FROM kunden ORDER BY name ASC
     `);
     
+    // Projekte für Dropdown abrufen
+    const projekteQuery = await pool.query(`
+      SELECT id, titel FROM projekte 
+      WHERE status IN ('neu', 'in_bearbeitung') 
+      ORDER BY titel ASC
+    `);
+    
     // Vorausgefüllte Daten aus Query-Parametern
     const kunde_id = req.query.kunde_id || '';
+    const projekt_id = req.query.projekt_id || '';
     const kunde_name = req.query.kunde_name || '';
     
     res.render('dashboard/termine/neu', {
@@ -1544,9 +1552,11 @@ router.get('/termine/neu', isAuthenticated, async (req, res) => {
       user: req.session.user,
       currentPath: '/dashboard/termine',
       kunden: kundenQuery.rows,
+      projekte: projekteQuery.rows,
       formData: {
         kunde_id,
         kunde_name,
+        projekt_id,
         titel: '',
         termin_datum: format(new Date(), 'yyyy-MM-dd'),
         termin_zeit: format(new Date(), 'HH:mm'),
@@ -1574,6 +1584,7 @@ router.post('/termine/neu', isAuthenticated, async (req, res) => {
     const { 
       titel, 
       kunde_id, 
+      projekt_id,
       termin_datum, 
       termin_zeit, 
       dauer, 
@@ -1595,13 +1606,14 @@ router.post('/termine/neu', isAuthenticated, async (req, res) => {
     const result = await pool.query({
       text: `
         INSERT INTO termine (
-          titel, kunde_id, termin_datum, dauer, ort, 
+          titel, kunde_id, projekt_id, termin_datum, dauer, ort, 
           beschreibung, status, erstellt_von
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
       `,
       values: [
         titel, 
-        kunde_id || null, 
+        kunde_id || null,
+        projekt_id || null, 
         terminDatumObj, 
         dauer || 60, 
         ort || null, 
@@ -1687,10 +1699,13 @@ router.get('/termine/:id', isAuthenticated, async (req, res) => {
       text: `
         SELECT 
           t.*, 
-          k.name AS kunde_name
+          k.name AS kunde_name,
+          p.titel AS projekt_titel,
+          p.id AS projekt_id
         FROM 
           termine t
           LEFT JOIN kunden k ON t.kunde_id = k.id
+          LEFT JOIN projekte p ON t.projekt_id = p.id
         WHERE 
           t.id = $1
       `,
@@ -1722,6 +1737,8 @@ router.get('/termine/:id', isAuthenticated, async (req, res) => {
         titel: termin.titel,
         kunde_id: termin.kunde_id,
         kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
+        projekt_id: termin.projekt_id,
+        projekt_titel: termin.projekt_titel || 'Kein Projekt zugewiesen',
         termin_datum: termin.termin_datum,
         dateFormatted: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy'),
         timeFormatted: formatDateSafely(termin.termin_datum, 'HH:mm'),
@@ -1785,6 +1802,11 @@ router.get('/termine/:id/edit', isAuthenticated, async (req, res) => {
       SELECT id, name FROM kunden ORDER BY name ASC
     `);
     
+    // Projekte für Dropdown abrufen
+    const projekteQuery = await pool.query(`
+      SELECT id, titel FROM projekte ORDER BY titel ASC
+    `);
+    
     res.render('dashboard/termine/edit', {
       title: `Termin bearbeiten: ${termin.titel} - Rising BSM`,
       user: req.session.user,
@@ -1794,6 +1816,7 @@ router.get('/termine/:id/edit', isAuthenticated, async (req, res) => {
         titel: termin.titel,
         kunde_id: termin.kunde_id,
         kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
+        projekt_id: termin.projekt_id,
         termin_datum: termin.termin_datum,
         dateFormatted: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy'),
         timeFormatted: formatDateSafely(termin.termin_datum, 'HH:mm'),
@@ -1809,6 +1832,7 @@ router.get('/termine/:id/edit', isAuthenticated, async (req, res) => {
                     termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
       },
       kunden: kundenQuery.rows,
+      projekte: projekteQuery.rows,
       newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
@@ -1829,6 +1853,7 @@ router.post('/termine/:id/edit', isAuthenticated, async (req, res) => {
     const { 
       titel, 
       kunde_id, 
+      projekt_id,
       termin_datum, 
       termin_zeit, 
       dauer, 
@@ -1853,17 +1878,19 @@ router.post('/termine/:id/edit', isAuthenticated, async (req, res) => {
         UPDATE termine SET 
           titel = $1, 
           kunde_id = $2, 
-          termin_datum = $3, 
-          dauer = $4, 
-          ort = $5, 
-          beschreibung = $6, 
-          status = $7, 
+          projekt_id = $3, 
+          termin_datum = $4, 
+          dauer = $5, 
+          ort = $6, 
+          beschreibung = $7, 
+          status = $8, 
           updated_at = NOW() 
-        WHERE id = $8
+        WHERE id = $9
       `,
       values: [
         titel, 
         kunde_id || null, 
+        projekt_id || null,
         terminDatumObj, 
         dauer || 60, 
         ort || null, 

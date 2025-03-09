@@ -1,0 +1,172 @@
+<%- include('../../partials/admin-header') %>
+
+<div class="dashboard-wrapper">
+    <!-- Dashboard Content -->
+    <div class="dashboard-content p-3 p-md-4">
+      <!-- Breadcrumb -->
+      <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="/dashboard/kunden">Kunden</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Kunde bearbeiten</li>
+        </ol>
+      </nav>
+
+      <% if (messages.success && messages.success.length > 0) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+          <i class="fas fa-check-circle me-2"></i><%= messages.success %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      <% } %>
+      
+      <% if (messages.error && messages.error.length > 0) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <i class="fas fa-exclamation-circle me-2"></i><%= messages.error %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      <% } %>
+
+      <!-- Kundenformular -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+          <h2 class="h5 mb-0">Kundendaten bearbeiten</h2>
+        </div>
+        <div class="card-body">
+          <form action="/dashboard/kunden/<%= kunde.id %>/edit" method="POST" class="needs-validation" novalidate>
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            
+            <div class="row g-3">
+              <!-- Persönliche Daten -->
+              <div class="col-md-6">
+                <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="name" name="name" value="<%= kunde.name %>" required>
+                <div class="invalid-feedback">
+                  Bitte geben Sie einen Namen ein.
+                </div>
+              </div>
+              
+              <div class="col-md-6">
+                <label for="firma" class="form-label">Firma</label>
+                <input type="text" class="form-control" id="firma" name="firma" value="<%= kunde.firma %>">
+              </div>
+              
+              <div class="col-md-6">
+                <label for="email" class="form-label">E-Mail <span class="text-danger">*</span></label>
+                <input type="email" class="form-control" id="email" name="email" value="<%= kunde.email %>" required>
+                <div class="invalid-feedback">
+                  Bitte geben Sie eine gültige E-Mail-Adresse ein.
+                </div>
+              </div>
+              
+              <div class="col-md-6">
+                <label for="telefon" class="form-label">Telefon</label>
+                <input type="tel" class="form-control" id="telefon" name="telefon" value="<%= kunde.telefon %>">
+              </div>
+              
+              <!-- Adresse -->
+              <div class="col-12">
+                <h3 class="h6 mt-4 mb-3">Adresse</h3>
+              </div>
+              
+              <div class="col-12">
+                <label for="adresse" class="form-label">Straße, Hausnummer</label>
+                <input type="text" class="form-control" id="adresse" name="adresse" value="<%= kunde.adresse %>">
+              </div>
+              
+              <div class="col-md-4">
+                <label for="plz" class="form-label">PLZ</label>
+                <input type="text" class="form-control" id="plz" name="plz" value="<%= kunde.plz %>">
+              </div>
+              
+              <div class="col-md-8">
+                <label for="ort" class="form-label">Ort</label>
+                <input type="text" class="form-control" id="ort" name="ort" value="<%= kunde.ort %>">
+              </div>
+              
+              <!-- Zusätzliche Optionen -->
+              <div class="col-12">
+                <h3 class="h6 mt-4 mb-3">Weitere Informationen</h3>
+              </div>
+              
+              <div class="col-md-6">
+                <label for="kundentyp" class="form-label">Kundentyp</label>
+                <select class="form-select" id="kundentyp" name="kundentyp">
+                  <option value="privat" <%= kunde.kundentyp === 'privat' ? 'selected' : '' %>>Privatkunde</option>
+                  <option value="geschaeft" <%= kunde.kundentyp === 'geschaeft' ? 'selected' : '' %>>Geschäftskunde</option>
+                </select>
+              </div>
+              
+              <div class="col-md-6">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status">
+                  <option value="aktiv" <%= kunde.status === 'aktiv' ? 'selected' : '' %>>Aktiv</option>
+                  <option value="inaktiv" <%= kunde.status === 'inaktiv' ? 'selected' : '' %>>Inaktiv</option>
+                </select>
+              </div>
+              
+              <div class="col-12">
+                <label for="notizen" class="form-label">Notizen</label>
+                <textarea class="form-control" id="notizen" name="notizen" rows="3"><%= kunde.notizen %></textarea>
+              </div>
+              
+              <div class="col-12 mt-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="newsletter" name="newsletter" <%= kunde.newsletter ? 'checked' : '' %>>
+                  <label class="form-check-label" for="newsletter">
+                    Newsletter abonnieren
+                  </label>
+                </div>
+              </div>
+              
+              <div class="col-12 d-flex justify-content-between mt-4">
+                <a href="/dashboard/kunden/<%= kunde.id %>" class="btn btn-outline-secondary">
+                  <i class="fas fa-arrow-left me-2"></i>Zurück
+                </a>
+                <button type="submit" class="btn btn-success">
+                  <i class="fas fa-save me-2"></i>Änderungen speichern
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Form Validation
+document.addEventListener('DOMContentLoaded', function() {
+  const forms = document.querySelectorAll('.needs-validation');
+  
+  Array.from(forms).forEach(form => {
+    form.addEventListener('submit', event => {
+      if (!form.checkValidity()) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      
+      form.classList.add('was-validated');
+    }, false);
+    
+    // Also validate email field specifically
+    const emailField = form.querySelector('input[type="email"]');
+    if (emailField) {
+      emailField.addEventListener('blur', function() {
+        if (this.value && !isValidEmail(this.value)) {
+          this.setCustomValidity('Bitte geben Sie eine gültige E-Mail-Adresse ein.');
+        } else {
+          this.setCustomValidity('');
+        }
+      });
+    }
+  });
+  
+  function isValidEmail(email) {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  }
+});
+</script>
+
+<%- include('../../partials/admin-footer-simple') %>
