@@ -170,40 +170,92 @@
 </div>
 
 <script>
-
   document.addEventListener('DOMContentLoaded', function() {
-    // Status Filter Funktionalität
-    const statusFilter = document.getElementById('statusFilter');
-    if (statusFilter) {
-      statusFilter.addEventListener('change', function() {
-        const url = new URL(window.location);
-        if (this.value === '') {
-          url.searchParams.delete('status');
-        } else {
-          url.searchParams.set('status', this.value);
+  // Status Filter Funktionalität
+  const statusFilter = document.getElementById('statusFilter');
+  if (statusFilter) {
+    statusFilter.addEventListener('change', function() {
+      const url = new URL(window.location);
+      if (this.value === '') {
+        url.searchParams.delete('status');
+      } else {
+        url.searchParams.set('status', this.value);
+      }
+      window.location = url.toString();
+    });
+  }
+  
+  // Status Modal Funktionalität
+  const statusModal = document.getElementById('statusModal');
+  if (statusModal) {
+    statusModal.addEventListener('show.bs.modal', function(event) {
+      const button = event.relatedTarget;
+      const terminId = button.getAttribute('data-id');
+      const currentStatus = button.getAttribute('data-status');
+      document.getElementById('terminId').value = terminId;
+      document.getElementById('status').value = currentStatus;
+    });
+  }
+  
+  // Initialize DataTables with a slight delay to ensure DOM is ready
+  setTimeout(function() {
+    const datatableElements = document.querySelectorAll('.datatable');
+    if (datatableElements.length > 0 && typeof $.fn.DataTable !== 'undefined') {
+      datatableElements.forEach(function(table) {
+        if (!$.fn.DataTable.isDataTable(table)) {
+          $(table).DataTable({
+            language: {
+              url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/de-DE.json'
+            },
+            responsive: true
+          });
         }
-        window.location = url.toString();
       });
     }
-    
-    // Status Modal Funktionalität
-    const statusModal = document.getElementById('statusModal');
-    if (statusModal) {
-      statusModal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        const terminId = button.getAttribute('data-id');
-        const currentStatus = button.getAttribute('data-status');
-        document.getElementById('terminId').value = terminId;
-        document.getElementById('status').value = currentStatus;
-      });
+  }, 200);
+  // Calendar View Initialization (add to the script section in termine/index.ejs)
+const calendarTab = document.getElementById('calendar-tab');
+const calendarContainer = document.getElementById('calendar');
+
+if (calendarTab && calendarContainer) {
+  calendarTab.addEventListener('shown.bs.tab', function() {
+    if (typeof FullCalendar === 'undefined') {
+      // Dynamically load FullCalendar if not already loaded
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js';
+      script.onload = initializeCalendar;
+      
+      const style = document.createElement('link');
+      style.rel = 'stylesheet';
+      style.href = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css';
+      
+      document.head.appendChild(style);
+      document.head.appendChild(script);
+    } else {
+      initializeCalendar();
     }
-    // setTimeout(function() {
-    //   if (!$.fn.DataTable.isDataTable('.datatable')) {
-    //     $('.datatable').DataTable({
-    //       // DataTables options here (if any)
-    //     });
-    //   }
-    // }, 200); // Adjust the delay (in milliseconds) as needed
+  });
+  
+  function initializeCalendar() {
+    if (!window.calendar) {
+      const calendarEl = document.getElementById('calendar');
+      window.calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        locale: 'de',
+        events: '/dashboard/termine/api/events',
+        eventClick: function(info) {
+          window.location.href = '/dashboard/termine/' + info.event.id;
+        }
+      });
+      window.calendar.render();
+    }
+  }
+}
   });
 </script>
 

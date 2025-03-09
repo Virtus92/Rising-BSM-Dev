@@ -381,12 +381,13 @@ router.post('/neu', isAuthenticated, isManager, async (req, res) => {
     
     const postId = result.rows[0].id;
     
-    // Kategorien zuweisen
-    if (categories && Array.isArray(categories)) {
+    await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [id]);
+
+    if (categories && Array.isArray(categories) && categories.length > 0) {
       for (const categoryId of categories) {
         await client.query(
           'INSERT INTO blog_post_categories (post_id, category_id) VALUES ($1, $2)',
-          [postId, categoryId]
+          [id, categoryId]
         );
       }
     }
@@ -693,6 +694,9 @@ router.post('/:id/edit', isAuthenticated, isManager, async (req, res) => {
     let published_at = currentPost.published_at;
     if (status === 'published' && currentPost.status !== 'published') {
       published_at = new Date();
+    } else if (status !== 'published' && currentPost.status === 'published') {
+      // Keep the original publish date if unpublishing
+      // This preserves the original date when re-publishing
     }
     
     // Blogpost aktualisieren
@@ -828,10 +832,12 @@ router.post('/:id/status', isAuthenticated, isManager, async (req, res) => {
     
     const currentPost = currentPostQuery.rows[0];
     
-    // Nur Status-Änderung
     let published_at = currentPost.published_at;
     if (status === 'published' && currentPost.status !== 'published') {
       published_at = new Date();
+    } else if (status !== 'published' && currentPost.status === 'published') {
+      // Keep the original publish date if unpublishing
+      // This preserves the original date when re-publishing
     }
     
     // Status aktualisieren
@@ -952,7 +958,18 @@ router.post('/categories/:id/delete', isAuthenticated, isManager, async (req, re
   try {
     const { id } = req.params;
     
-    // Kategorie löschen
+    // First check if category has associated posts
+    const postCheckQuery = await _query(
+      'SELECT COUNT(*) FROM blog_post_categories WHERE category_id = $1',
+      [id]
+    );
+    
+    if (parseInt(postCheckQuery.rows[0].count) > 0) {
+      req.flash('error', 'Diese Kategorie hat zugeordnete Beiträge und kann nicht gelöscht werden.');
+      return res.redirect('/dashboard/blog/categories');
+    }
+    
+    // Now we can safely delete the category
     await _query('DELETE FROM blog_categories WHERE id = $1', [id]);
     
     req.flash('success', 'Kategorie erfolgreich gelöscht!');
@@ -1604,7 +1621,6 @@ router.post('/dashboard/blog/categories/edit', isAuthenticated, isManager, async
       let slug = null;
       
       if (update_slug) {
-        const slugify = require('slugify');
         slug = slugify(name, { lower: true, strict: true });
         
         // Prüfen ob Slug bereits existiert (und nicht der eigene ist)
@@ -1646,7 +1662,6 @@ router.post('/dashboard/blog/categories/edit', isAuthenticated, isManager, async
     res.redirect('/dashboard/blog/categories');
   }
 });
-
 
 // Export the router using CommonJS syntax
 module.exports = router;

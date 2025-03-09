@@ -140,18 +140,27 @@
 <script>
   // Initialize rich text editor for content
   document.addEventListener('DOMContentLoaded', function() {
-    // If you have a WYSIWYG editor, initialize it here
-    // For example, if using TinyMCE:
-    // tinymce.init({
-    //   selector: '#content',
-    //   height: 500,
-    //   plugins: [
-    //     'advlist autolink lists link image charmap print preview anchor',
-    //     'searchreplace visualblocks code fullscreen',
-    //     'insertdatetime media table paste code help wordcount'
-    //   ],
-    //   toolbar: 'undo redo | formatselect | bold italic backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help'
-    // });
-  });
+    // Check if ClassicEditor is available
+    if (typeof ClassicEditor !== 'undefined') {
+      ClassicEditor
+        .create(document.querySelector('#content'), {
+          toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo']
+        })
+        .catch(error => {
+          console.error('Error initializing CKEditor:', error);
+        });
+    } else {
+      console.warn('ClassicEditor not loaded. Using textarea instead.');
+      // Add this script tag to the page if ClassicEditor is not available
+      const script = document.createElement('script');
+      script.src = '/libs/ckeditor/ckeditor.js';
+      script.onload = function() {
+        ClassicEditor
+          .create(document.querySelector('#content'))
+          .catch(error => console.error(error));
+      };
+      document.head.appendChild(script);
+    }
+});
 </script>
 <%- include('../../partials/admin-footer-simple') %>

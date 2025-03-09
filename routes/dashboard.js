@@ -8,8 +8,6 @@ const pool = require('../db');
 
 // Auth Middleware
 const isAuthenticated = (req, res, next) => {
-  console.log("Session check:", req.session);
-  console.log("User in session:", req.session.user);
   
   if (req.session && req.session.user) {
     return next();
@@ -22,7 +20,6 @@ const isAuthenticated = (req, res, next) => {
 // Dashboard Hauptseite
 router.get('/', isAuthenticated, async (req, res) => {
   try {
-    console.log("Dashboard route reached with user:", req.session.user);
     
     // Benutzerinformationen
     const user = req.session.user;
@@ -1554,6 +1551,56 @@ router.post('/termine/add-note', isAuthenticated, async (req, res) => {
     console.error('Fehler beim Hinzufügen der Notiz:', error);
     req.flash('error', 'Datenbankfehler: ' + error.message);
     res.redirect(`/dashboard/termine/${req.body.id}`);
+  }
+});
+
+// API Endpoint für Termine im Kalender
+router.get('/termine/api/events', isAuthenticated, async (req, res) => {
+  try {
+    // Termine aus der Datenbank abrufen
+    const termineQuery = await pool.query(`
+      SELECT 
+        t.id, 
+        t.titel, 
+        t.termin_datum,
+        t.dauer,
+        t.status,
+        k.name AS kunde_name
+      FROM 
+        termine t
+        LEFT JOIN kunden k ON t.kunde_id = k.id
+      ORDER BY 
+        t.termin_datum ASC
+    `);
+    
+    // Termine in FullCalendar-Event-Format umwandeln
+    const events = termineQuery.rows.map(termin => {
+      const startDate = new Date(termin.termin_datum);
+      const endDate = new Date(startDate.getTime() + (termin.dauer * 60 * 1000));
+      
+      let backgroundColor;
+      switch(termin.status) {
+        case 'geplant': backgroundColor = '#ffc107'; break; // warning
+        case 'bestaetigt': backgroundColor = '#28a745'; break; // success
+        case 'abgeschlossen': backgroundColor = '#0d6efd'; break; // primary
+        case 'storniert': backgroundColor = '#6c757d'; break; // secondary
+        default: backgroundColor = '#6c757d'; // default gray
+      }
+      
+      return {
+        id: termin.id,
+        title: termin.titel + (termin.kunde_name ? ` (${termin.kunde_name})` : ''),
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        backgroundColor: backgroundColor,
+        borderColor: backgroundColor
+      };
+    });
+    
+    res.json(events);
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Termine für den Kalender:', error);
+    res.status(500).json({ error: 'Datenbankfehler' });
   }
 });
 

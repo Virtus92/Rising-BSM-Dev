@@ -137,20 +137,37 @@
 
 <script>
   // Form Validation
-  document.addEventListener('DOMContentLoaded', function() {
-    const forms = document.querySelectorAll('.needs-validation');
+document.addEventListener('DOMContentLoaded', function() {
+  const forms = document.querySelectorAll('.needs-validation');
+  
+  Array.from(forms).forEach(form => {
+    form.addEventListener('submit', event => {
+      if (!form.checkValidity()) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      
+      form.classList.add('was-validated');
+    }, false);
     
-    Array.from(forms).forEach(form => {
-      form.addEventListener('submit', event => {
-        if (!form.checkValidity()) {
-          event.preventDefault();
-          event.stopPropagation();
+    // Also validate email field specifically
+    const emailField = form.querySelector('input[type="email"]');
+    if (emailField) {
+      emailField.addEventListener('blur', function() {
+        if (this.value && !isValidEmail(this.value)) {
+          this.setCustomValidity('Bitte geben Sie eine gültige E-Mail-Adresse ein.');
+        } else {
+          this.setCustomValidity('');
         }
-        
-        form.classList.add('was-validated');
-      }, false);
-    });
+      });
+    }
   });
+  
+  function isValidEmail(email) {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  }
+});
 </script>
 
 <%- include('../../partials/admin-footer-simple') %>

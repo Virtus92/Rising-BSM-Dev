@@ -302,53 +302,89 @@
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     // Content Improvement form
-    const improveContentForm = document.getElementById('improveContentForm');
-    const improvementResult = document.getElementById('improvementResult');
-    const improvementContent = document.getElementById('improvementContent');
-    const applyImprovementBtn = document.getElementById('applyImprovementBtn');
-    const cancelImprovementBtn = document.getElementById('cancelImprovementBtn');
+const improveContentForm = document.getElementById('improveContentForm');
+const improvementResult = document.getElementById('improvementResult');
+const improvementContent = document.getElementById('improvementContent');
+const applyImprovementBtn = document.getElementById('applyImprovementBtn');
+const cancelImprovementBtn = document.getElementById('cancelImprovementBtn');
+
+if (improveContentForm) {
+  improveContentForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
     
-    improveContentForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
+    // Show the results area and loading state
+    improvementResult.classList.remove('d-none');
+    improvementContent.innerHTML = `
+      <div class="d-flex align-items-center">
+        <div class="spinner-border spinner-border-sm me-2" role="status">
+          <span class="visually-hidden">Wird geladen...</span>
+        </div>
+        <span>Verbesserungsvorschläge werden generiert...</span>
+      </div>
+    `;
+    applyImprovementBtn.disabled = true;
+    
+    const formData = new FormData(improveContentForm);
+    const csrfToken = formData.get('_csrf');
+    
+    try {
+      const response = await fetch('/dashboard/blog/improve-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({
+          post_id: formData.get('post_id'),
+          focus: formData.get('focus')
+        })
+      });
       
-      // Show the results area
-      improvementResult.classList.remove('d-none');
-      improvementContent.innerHTML = '';
-      applyImprovementBtn.disabled = true;
-      
-      const formData = new FormData(improveContentForm);
-      const data = {
-        post_id: formData.get('post_id'),
-        focus: formData.get('focus')
-      };
-      
-      try {
-        const response = await fetch('/dashboard/blog/improve-content', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'CSRF-Token': formData.get('_csrf')
-          },
-          body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-          improvementContent.innerHTML = result.data.content || 'Keine Verbesserungsvorschläge verfügbar.';
-          applyImprovementBtn.disabled = false;
-        } else {
-          improvementContent.innerHTML = `<div class="alert alert-danger">Fehler: ${result.error}</div>`;
-        }
-      } catch (error) {
-        improvementContent.innerHTML = `<div class="alert alert-danger">Fehler bei der Anfrage: ${error.message}</div>`;
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
       }
-    });
-    
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        improvementContent.innerHTML = result.data.content || 'Keine Verbesserungsvorschläge verfügbar.';
+        applyImprovementBtn.disabled = false;
+      } else {
+        improvementContent.innerHTML = `<div class="alert alert-danger">Fehler: ${result.error || 'Unbekannter Fehler'}</div>`;
+      }
+    } catch (error) {
+      console.error('Fehler bei der Content-Verbesserung:', error);
+      improvementContent.innerHTML = `<div class="alert alert-danger">Fehler bei der Anfrage: ${error.message}</div>`;
+    }
+  });
+  
+  if (cancelImprovementBtn) {
     cancelImprovementBtn.addEventListener('click', function() {
       improvementResult.classList.add('d-none');
     });
-  });
+  }
+  
+  if (applyImprovementBtn) {
+    applyImprovementBtn.addEventListener('click', function() {
+      const improvedContent = improvementContent.innerHTML;
+      const contentEditor = document.querySelector('#content');
+      
+      if (contentEditor && improvedContent) {
+        // If using CKEditor
+        if (typeof ClassicEditor !== 'undefined' && ClassicEditor.instances && ClassicEditor.instances.content) {
+          ClassicEditor.instances.content.setData(improvedContent);
+        } else {
+          // Fallback to textarea
+          document.querySelector('#content').value = improvedContent;
+        }
+        
+        // Hide the improvement result and show success message
+        improvementResult.classList.add('d-none');
+        alert('Verbesserungsvorschläge wurden übernommen!');
+      }
+    });
+  }
+}
 </script>
 
 <%- include('../../partials/admin-footer-simple') %>

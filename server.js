@@ -23,8 +23,6 @@ const PORT = process.env.PORT || 3000;
 // Route-Importe
 const authRoutes = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboard');
-console.log(authRoutes);
-console.log(dashboardRoutes);
 
 // PostgreSQL-Pool für Sessions
 const pool = require('./db');
@@ -54,17 +52,22 @@ app.use(cookieParser());
 // Basis-Sicherheitsheader
 app.use(helmet());
 
-// Content-Security-Policy anpassen
 // Update the Content-Security-Policy in server.js
-app.use(helmet.contentSecurityPolicy({
-  directives: {
-    defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "https://cdn.datatables.net", "'unsafe-inline'", "'unsafe-hashes'"],
-    scriptSrcAttr: ["'unsafe-inline'"],
-    styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://cdn.datatables.net"],
-    imgSrc: ["'self'", "data:", "https://*", "http://*"],
-    connectSrc: ["'self'", "https://n8n.dinel.at"]
-  }
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "https://cdn.datatables.net", "'unsafe-inline'", "'unsafe-hashes'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://cdn.datatables.net"],
+      imgSrc: ["'self'", "data:", "https://*"],
+      connectSrc: ["'self'", "https://n8n.dinel.at"]
+    }
+  },
+  crossOriginEmbedderPolicy: false, // May need to be enabled in production
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" }
 }));
 
 // Session-Konfiguration
@@ -252,6 +255,12 @@ app.post('/contact', contactLimiter, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Bitte geben Sie eine gültige Telefonnummer ein.' });
   }
 
+  // XSS-Schutz durch Escape von HTML
+  const sanitizedName = validator.escape(name);
+  const sanitizedMessage = validator.escape(message);
+  const sanitizedPhone = phone ? validator.escape(phone) : '';
+  
+
   try {
     // Daten in PostgreSQL speichern
     const result = await pool.query(
@@ -260,15 +269,19 @@ app.post('/contact', contactLimiter, async (req, res) => {
     );
     const contactId = result.rows[0].id;
 
-    // Benachrichtigung an N8N senden
-    await axios.post('https://n8n.dinel.at/webhook/e2b8d680-425b-44ab-94aa-55ecda267de1', {
-      id: contactId,
-      name,
-      email,
-      phone,
-      service,
-      message,
-    });
+    try {
+      await axios.post(process.env.N8N_WEBHOOK_URL || 'https://n8n.dinel.at/webhook/e2b8d680-425b-44ab-94aa-55ecda267de1', {
+        id: contactId,
+        name: sanitizedName,
+        email,
+        phone: sanitizedPhone,
+        service,
+        message: sanitizedMessage,
+      });
+    } catch (webhookError) {
+      console.error('Error notifying N8N webhook:', webhookError);
+      // Continue even if webhook fails - we already saved to database
+    }
 
     res.status(200).json({ success: true, id: contactId });
   } catch (error) {
@@ -289,8 +302,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-
-// Ersetzen Sie Ihren bestehenden CSRF-Fehlerhandler in server.js mit diesem
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
     console.error('CSRF-Fehler beim Request von:', req.headers.referer || 'Unbekannt');

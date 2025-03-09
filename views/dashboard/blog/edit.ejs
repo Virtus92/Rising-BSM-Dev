@@ -173,6 +173,17 @@
         placeholder: "Tags auswählen oder neue Tags eingeben..."
       });
     }
+
+    // Initialize the rich text editor for the content field
+    if (typeof ClassicEditor !== 'undefined') {
+      ClassicEditor
+        .create(document.querySelector('#content'), {
+          toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo']
+        })
+        .catch(error => {
+          console.error('Error initializing CKEditor:', error);
+        });
+    }
   });
 </script>
 

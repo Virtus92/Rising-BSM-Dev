@@ -267,3 +267,42 @@
 </div>
 
 <%- include('../partials/admin-footer') %>
+
+<script>
+  // Initialize Chart.js if present
+  if (typeof Chart !== 'undefined') {
+    // Revenue Chart
+    const revenueChartEl = document.getElementById('revenueChart');
+    if (revenueChartEl && typeof revenueChartData !== 'undefined') {
+      new Chart(revenueChartEl, {
+        type: 'line',
+        data: {
+          labels: revenueChartData.labels || [],
+          datasets: [{
+            label: 'Umsatz',
+            data: revenueChartData.data || [],
+            borderColor: '#198754',
+            backgroundColor: 'rgba(25, 135, 84, 0.1)',
+            tension: 0.3,
+            fill: true,
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return '€' + value.toLocaleString('de-DE');
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+</script>

@@ -294,7 +294,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     const applyPreferences = (preferences) => {
-      console.log('Angewandte Cookie-Präferenzen:', preferences);
       if (preferences.analytics) {
         console.log('Analytics würde hier geladen werden');
       }

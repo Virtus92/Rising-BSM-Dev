@@ -20,7 +20,6 @@ router.get('/login', (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password, remember } = req.body;
-    console.log("Login attempt for:", email);
 
     // Benutzer in der Datenbank suchen
     const result = await pool.query(
@@ -29,20 +28,16 @@ router.post('/login', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      console.log("User not found");
       req.flash('error', 'Ungültige E-Mail-Adresse oder Passwort');
       return res.redirect('/login');
     }
 
     const user = result.rows[0];
-    console.log("User found:", user.name);
 
-    // FIXED: Removed debug code that bypassed password verification
     // Always perform password verification
     const passwordMatches = await bcrypt.compare(password, user.passwort);
     
     if (!passwordMatches) {
-      console.log("Password doesn't match");
       req.flash('error', 'Ungültige E-Mail-Adresse oder Passwort');
       return res.redirect('/login');
     }
@@ -56,9 +51,7 @@ router.post('/login', async (req, res) => {
       initials: user.name.split(' ').map(n => n[0]).join('')
     };
 
-    console.log("Session created:", req.session.user);
-
-    // Cookie-Lebensdauer bei "Angemeldet bleiben" verlängern
+   // Cookie-Lebensdauer bei "Angemeldet bleiben" verlängern
     if (remember) {
       req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 Tage
     } else {
@@ -125,7 +118,6 @@ router.post('/forgot-password', async (req, res) => {
 
     // Hier würde Code zum Versenden einer E-Mail mit dem Reset-Link folgen
     // TODO: Implement actual password reset email functionality
-    console.log('Password reset requested for:', user.email);
 
     req.flash('success', 'Falls ein Konto mit dieser E-Mail existiert, haben wir Ihnen eine Anleitung zum Zurücksetzen Ihres Passworts geschickt.');
     res.redirect('/login');
