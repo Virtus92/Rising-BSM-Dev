@@ -24,6 +24,18 @@
         </div>
       </div>
     </div>
+    
+    <script>
+      function closeModal() {
+        var modal = document.getElementById('serviceModal');
+        if (modal) {
+          var modalInstance = bootstrap.Modal.getInstance(modal);
+          if (modalInstance) {
+            modalInstance.hide();
+          }
+        }
+      }
+    </script>
   </header>
     
     <!-- Slideshow-Hintergrund -->
@@ -133,7 +145,6 @@
           <!-- Inhalt wird dynamisch via JavaScript eingesetzt -->
         </div>
         
-        <!-- Footer mit prominenterem CTA-Button -->
         <!-- Footer mit prominenterem CTA-Button -->
         <div class="modal-footer justify-content-between bg-light">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Schließen</button>
