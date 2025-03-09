@@ -182,10 +182,10 @@ router.get('/generate', isAuthenticated, isManager, async (req, res) => {
       error: error
     });
   }
-});
-
-// KI-Generierung starten
-router.post('/generate', isAuthenticated, isManager, async (req, res) => {
+    if (!topic || typeof topic !== 'string' || topic.trim() === '') {
+      req.flash('error', 'Bitte geben Sie ein gültiges Thema an.');
+      return res.redirect('/dashboard/blog/generate');
+    }
   try {
     const { 
       topic, 

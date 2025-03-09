@@ -18,11 +18,158 @@ const isAuthenticated = (req, res, next) => {
   }
 };
 
-// Middleware to get new requests count
-const getNewRequestsCount = async (req, res, next) => {
+// Hilfsfunktionen
+
+/**
+ * Führt eine Datenbankabfrage aus und gibt die Anzahl zurück.
+ * @param {string} query - Die SQL-Abfrage.
+ * @param {array} params - Parameter für die SQL-Abfrage.
+ * @returns {number} - Die Anzahl aus der Datenbank.
+ */
+async function getCountFromDB(query, params = []) {
   try {
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    req.newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0, 10);
+    const result = await pool.query(query, params);
+    return parseInt(result.rows[0].count || 0, 10);
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Anzahl aus der Datenbank:', error);
+    return 0;
+  }
+}
+
+/**
+ * Formatiert ein Datum sicher in ein lesbares Format.
+ * @param {string|Date} date - Das zu formatierende Datum.
+ * @param {string} formatString - Das Format, in das das Datum umgewandelt werden soll.
+ * @returns {string} - Das formatierte Datum oder 'Unbekannt', wenn ein Fehler auftritt.
+ */
+function formatDateSafely(date, formatString) {
+  try {
+    if (!date) return 'Unbekannt';
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate)) {
+      console.error(`Ungültiges Datumsformat für Datum: ${date} mit Format: ${formatString}`);
+      return 'Ungültiges Datum';
+    }
+    return format(parsedDate, formatString);
+  } catch (error) {
+    console.error('Fehler beim Formatieren des Datums:', error);
+    return 'Unbekannt';
+  }
+}
+
+/**
+ * Generiert Statusinformationen für eine Anfrage.
+ * @param {string} status - Der Status der Anfrage.
+ * @returns {object} - Ein Objekt mit Statuslabel und -klasse.
+ */
+function getAnfrageStatusInfo(status) {
+  switch (status) {
+    case 'neu':
+      return { label: 'Neu', className: 'warning' };
+    case 'in_bearbeitung':
+      return { label: 'In Bearbeitung', className: 'info' };
+    case 'beantwortet':
+      return { label: 'Beantwortet', className: 'success' };
+    default:
+      return { label: 'Geschlossen', className: 'secondary' };
+  }
+}
+
+/**
+ * Generiert Statusinformationen für einen Termin.
+ * @param {string} status - Der Status des Termins.
+ * @returns {object} - Ein Objekt mit Statuslabel und -klasse.
+ */
+function getTerminStatusInfo(status) {
+  switch (status) {
+    case 'geplant':
+      return { label: 'Geplant', className: 'warning' };
+    case 'bestaetigt':
+      return { label: 'Bestätigt', className: 'success' };
+    case 'abgeschlossen':
+      return { label: 'Abgeschlossen', className: 'primary' };
+    default:
+      return { label: 'Storniert', className: 'secondary' };
+  }
+}
+
+/**
+ * Generiert Statusinformationen für ein Projekt.
+ * @param {string} status - Der Status des Projekts.
+ * @returns {object} - Ein Objekt mit Statuslabel und -klasse.
+ */
+function getProjektStatusInfo(status) {
+  switch (status) {
+    case 'neu':
+      return { label: 'Neu', className: 'info' };
+    case 'in_bearbeitung':
+      return { label: 'In Bearbeitung', className: 'primary' };
+    case 'abgeschlossen':
+      return { label: 'Abgeschlossen', className: 'success' };
+    default:
+      return { label: 'Storniert', className: 'secondary' };
+  }
+}
+
+/**
+ * Ruft Benachrichtigungen aus der Datenbank ab.
+ * @param {object} req - Das Request-Objekt von Express.
+ * @returns {object} - Ein Objekt mit Benachrichtigungselementen, ungelesener Anzahl und Gesamtanzahl.
+ */
+async function getNotifications(req) {
+  try {
+    const notificationsQuery = await pool.query(`
+      SELECT
+        id,
+        typ,
+        titel,
+        erstellt_am,
+        gelesen,
+        referenz_id
+      FROM
+        benachrichtigungen
+      WHERE
+        benutzer_id = $1
+      ORDER BY
+        erstellt_am DESC
+      LIMIT 5
+    `, [req.session.user.id]);
+
+    const unreadCount = await getCountFromDB(
+      `SELECT COUNT(*) FROM benachrichtigungen WHERE benutzer_id = $1 AND gelesen = false`,
+      [req.session.user.id]
+    );
+
+    const totalCount = await getCountFromDB(
+      `SELECT COUNT(*) FROM benachrichtigungen WHERE benutzer_id = $1`,
+      [req.session.user.id]
+    );
+
+    return {
+      items: notificationsQuery.rows.map(n => ({
+        id: n.id,
+        title: n.titel,
+        type: n.typ === 'anfrage' ? 'success' : n.typ === 'termin' ? 'primary' : n.typ === 'warnung' ? 'warning' : 'info',
+        icon: n.typ === 'anfrage' ? 'envelope' : n.typ === 'termin' ? 'calendar-check' : n.typ === 'warnung' ? 'exclamation-triangle' : 'bell',
+        time: formatDistanceToNow(new Date(n.erstellt_am), { addSuffix: true, locale: de }),
+        link: n.typ === 'anfrage' ? `/dashboard/anfragen/${n.referenz_id}` :
+          n.typ === 'termin' ? `/dashboard/termine/${n.referenz_id}` :
+            n.typ === 'auftrag' ? `/dashboard/projekte/${n.referenz_id}` :
+              '/dashboard/notifications'
+      })),
+      unreadCount: unreadCount,
+      totalCount: totalCount
+    };
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Benachrichtigungen:', error);
+    return { items: [], unreadCount: 0, totalCount: 0 };
+  }
+}
+
+// Middleware to get new requests count
+const getNewRequestsCountMiddleware = async (req, res, next) => {
+  try {
+    req.newRequestsCount = await getCountFromDB("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
     next();
   } catch (error) {
     console.error('Error fetching new requests count:', error);
@@ -32,7 +179,7 @@ const getNewRequestsCount = async (req, res, next) => {
 };
 
 // Apply middleware to all routes that need it
-router.use(getNewRequestsCount);
+router.use(getNewRequestsCountMiddleware);
 
 // Dashboard Hauptseite
 router.get('/', isAuthenticated, async (req, res) => {
@@ -75,39 +222,33 @@ router.get('/', isAuthenticated, async (req, res) => {
     };
     
     // Neue Anfragen zählen
-    const newRequestsQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    stats.newRequests.count = parseInt(newRequestsQuery.rows[0].count || 0, 10);
-    
+    stats.newRequests.count = await getCountFromDB("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+
     // Trend: Anzahl neue Anfragen letzte Woche im Vergleich zur Vorwoche
-    const lastWeekRequestsQuery = await pool.query(`
-      SELECT COUNT(*) FROM kontaktanfragen 
+    const lastWeekRequestsCount = await getCountFromDB(`
+      SELECT COUNT(*) FROM kontaktanfragen
       WHERE created_at >= NOW() - INTERVAL '7 days'
     `);
-    const previousWeekRequestsQuery = await pool.query(`
-      SELECT COUNT(*) FROM kontaktanfragen 
+    const previousWeekRequestsCount = await getCountFromDB(`
+      SELECT COUNT(*) FROM kontaktanfragen
       WHERE created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days'
     `);
-    
-    const lastWeekCount = parseInt(lastWeekRequestsQuery.rows[0].count || 0, 10);
-    const previousWeekCount = parseInt(previousWeekRequestsQuery.rows[0].count || 0, 10);
-    
-    if (previousWeekCount > 0) {
-      stats.newRequests.trend = Math.round(((lastWeekCount - previousWeekCount) / previousWeekCount) * 100);
+
+    if (previousWeekRequestsCount > 0) {
+      stats.newRequests.trend = Math.round(((lastWeekRequestsCount - previousWeekRequestsCount) / previousWeekRequestsCount) * 100);
     }
-    
+
     // Aktive Aufträge zählen
-    const activeProjectsQuery = await pool.query(`
+    stats.activeProjects.count = await getCountFromDB(`
       SELECT COUNT(*) FROM projekte WHERE status IN ('aktiv', 'in_bearbeitung')
     `);
-    stats.activeProjects.count = parseInt(activeProjectsQuery.rows[0].count || 0, 10);
-    
+
     // Gesamtkunden zählen
-    const customersQuery = await pool.query("SELECT COUNT(*) FROM kunden");
-    stats.totalCustomers.count = parseInt(customersQuery.rows[0].count || 0, 10);
-    
+    stats.totalCustomers.count = await getCountFromDB("SELECT COUNT(*) FROM kunden");
+
     // Monatlicher Umsatz
     const monthlyRevenueQuery = await pool.query(`
-      SELECT COALESCE(SUM(betrag), 0) as summe FROM rechnungen 
+      SELECT COALESCE(SUM(betrag), 0) as summe FROM rechnungen
       WHERE rechnungsdatum >= DATE_TRUNC('month', CURRENT_DATE)
     `);
     stats.monthlyRevenue.amount = parseFloat(monthlyRevenueQuery.rows[0].summe || 0);
@@ -224,54 +365,7 @@ router.get('/', isAuthenticated, async (req, res) => {
     const newRequestsCount = req.newRequestsCount;
 
     // Benachrichtigungen aus der Datenbank abrufen
-    let notifications = {
-      items: [],
-      unreadCount: 0,
-      totalCount: 0
-    };
-
-    const notificationsQuery = await pool.query(`
-      SELECT 
-        id, 
-        typ, 
-        titel, 
-        erstellt_am, 
-        gelesen,
-        referenz_id
-      FROM 
-        benachrichtigungen
-      WHERE 
-        benutzer_id = $1
-      ORDER BY 
-        erstellt_am DESC
-      LIMIT 5
-    `, [req.session.user.id]);
-    
-    const unreadCountQuery = await pool.query(`
-      SELECT COUNT(*) FROM benachrichtigungen 
-      WHERE benutzer_id = $1 AND gelesen = false
-    `, [req.session.user.id]);
-    
-    const totalCountQuery = await pool.query(`
-      SELECT COUNT(*) FROM benachrichtigungen 
-      WHERE benutzer_id = $1
-    `, [req.session.user.id]);
-    
-    notifications = {
-      items: notificationsQuery.rows.map(n => ({
-        id: n.id,
-        title: n.titel,
-        type: n.typ === 'anfrage' ? 'success' : n.typ === 'termin' ? 'primary' : n.typ === 'warnung' ? 'warning' : 'info',
-        icon: n.typ === 'anfrage' ? 'envelope' : n.typ === 'termin' ? 'calendar-check' : n.typ === 'warnung' ? 'exclamation-triangle' : 'bell',
-        time: formatDistanceToNow(new Date(n.erstellt_am), { addSuffix: true, locale: de }),
-        link: n.typ === 'anfrage' ? `/dashboard/anfragen/${n.referenz_id}` : 
-              n.typ === 'termin' ? `/dashboard/termine/${n.referenz_id}` : 
-              n.typ === 'auftrag' ? `/dashboard/projekte/${n.referenz_id}` : 
-              '/dashboard/notifications'
-      })),
-      unreadCount: parseInt(unreadCountQuery.rows[0].count || 0, 10),
-      totalCount: parseInt(totalCountQuery.rows[0].count || 0, 10)
-    };
+    const notifications = await getNotifications(req);
 
     // Aktuelle Anfragen aus der Datenbank
     const recentRequestsQuery = await pool.query(`
@@ -290,6 +384,7 @@ router.get('/', isAuthenticated, async (req, res) => {
     `);
     
     const recentRequests = recentRequestsQuery.rows.map(anfrage => {
+      const statusInfo = getAnfrageStatusInfo(anfrage.status);
       return {
         id: anfrage.id,
         name: anfrage.name,
@@ -297,13 +392,9 @@ router.get('/', isAuthenticated, async (req, res) => {
         serviceLabel: anfrage.service === 'facility' ? 'Facility Management' : 
                      anfrage.service === 'moving' ? 'Umzüge & Transporte' : 
                      anfrage.service === 'winter' ? 'Winterdienst' : 'Sonstiges',
-        formattedDate: format(new Date(anfrage.created_at), 'dd.MM.yyyy'),
-        status: anfrage.status === 'neu' ? 'Neu' : 
-               anfrage.status === 'in_bearbeitung' ? 'In Bearbeitung' : 
-               anfrage.status === 'beantwortet' ? 'Beantwortet' : 'Geschlossen',
-        statusClass: anfrage.status === 'neu' ? 'warning' : 
-                    anfrage.status === 'in_bearbeitung' ? 'info' : 
-                    anfrage.status === 'beantwortet' ? 'success' : 'secondary'
+        formattedDate: formatDateSafely(anfrage.created_at, 'dd.MM.yyyy'),
+        status: statusInfo.label,
+        statusClass: statusInfo.className
       };
     });
 
@@ -409,6 +500,7 @@ router.get('/anfragen', isAuthenticated, async (req, res) => {
     
     // Abfrageergebnisse formatieren
     const requests = anfragenQuery.rows.map(anfrage => {
+      const statusInfo = getAnfrageStatusInfo(anfrage.status);
       return {
         id: anfrage.id,
         name: anfrage.name,
@@ -416,61 +508,14 @@ router.get('/anfragen', isAuthenticated, async (req, res) => {
         serviceLabel: anfrage.service === 'facility' ? 'Facility Management' : 
                      anfrage.service === 'moving' ? 'Umzüge & Transporte' : 
                      anfrage.service === 'winter' ? 'Winterdienst' : 'Sonstiges',
-        formattedDate: format(new Date(anfrage.created_at), 'dd.MM.yyyy'),
-        status: anfrage.status === 'neu' ? 'Neu' : 
-               anfrage.status === 'in_bearbeitung' ? 'In Bearbeitung' : 
-               anfrage.status === 'beantwortet' ? 'Beantwortet' : 'Geschlossen',
-        statusClass: anfrage.status === 'neu' ? 'warning' : 
-                    anfrage.status === 'in_bearbeitung' ? 'info' : 
-                    anfrage.status === 'beantwortet' ? 'success' : 'secondary'
+        formattedDate: formatDateSafely(anfrage.created_at, 'dd.MM.yyyy'),
+        status: statusInfo.label,
+        statusClass: statusInfo.className
       };
     });
     
     // Benachrichtigungen abrufen (falls vorhanden)
-    let notifications = {
-      items: [],
-      unreadCount: 0,
-      totalCount: 0
-    };
-    
-    const notificationsQuery = await pool.query(`
-      SELECT 
-        id, 
-        typ, 
-        titel, 
-        erstellt_am, 
-        gelesen,
-        referenz_id
-      FROM 
-        benachrichtigungen
-      WHERE 
-        benutzer_id = $1
-      ORDER BY 
-        erstellt_am DESC
-      LIMIT 5
-    `, [req.session.user.id]);
-    
-    const unreadCountQuery = await pool.query(`
-      SELECT COUNT(*) FROM benachrichtigungen 
-      WHERE benutzer_id = $1 AND gelesen = false
-    `, [req.session.user.id]);
-    
-    notifications = {
-      items: notificationsQuery.rows.map(n => ({
-        id: n.id,
-        title: n.titel,
-        type: n.typ === 'anfrage' ? 'success' : n.typ === 'termin' ? 'primary' : n.typ === 'warnung' ? 'warning' : 'info',
-        icon: n.typ === 'anfrage' ? 'envelope' : n.typ === 'termin' ? 'calendar-check' : n.typ === 'warnung' ? 'exclamation-triangle' : 'bell',
-        time: formatDistanceToNow(new Date(n.erstellt_am), { addSuffix: true, locale: de }),
-        link: n.typ === 'anfrage' ? `/dashboard/anfragen/${n.referenz_id}` : 
-              n.typ === 'termin' ? `/dashboard/termine/${n.referenz_id}` : 
-              n.typ === 'auftrag' ? `/dashboard/projekte/${n.referenz_id}` : 
-              '/dashboard/notifications',
-        read: n.gelesen
-      })),
-      unreadCount: parseInt(unreadCountQuery.rows[0].count || 0, 10),
-      totalCount: notificationsQuery.rowCount
-    };
+    const notifications = await getNotifications(req);
 
     res.render('dashboard/anfragen/index', { 
       title: 'Anfragen - Rising BSM',
@@ -509,7 +554,8 @@ router.get('/anfragen/:id', isAuthenticated, async (req, res) => {
     }
     
     const anfrage = anfrageQuery.rows[0];
-    
+    const statusInfo = getAnfrageStatusInfo(anfrage.status);
+
     // Notizen zu dieser Anfrage abrufen
     const notizenQuery = await pool.query({
       text: `SELECT * FROM anfragen_notizen WHERE anfrage_id = $1 ORDER BY erstellt_am DESC`,
@@ -529,18 +575,14 @@ router.get('/anfragen/:id', isAuthenticated, async (req, res) => {
                      anfrage.service === 'moving' ? 'Umzüge & Transporte' : 
                      anfrage.service === 'winter' ? 'Winterdienst' : 'Sonstiges',
         message: anfrage.message,
-        formattedDate: format(new Date(anfrage.created_at), 'dd.MM.yyyy, HH:mm'),
-        status: anfrage.status === 'neu' ? 'Neu' : 
-               anfrage.status === 'in_bearbeitung' ? 'In Bearbeitung' : 
-               anfrage.status === 'beantwortet' ? 'Beantwortet' : 'Geschlossen',
-        statusClass: anfrage.status === 'neu' ? 'warning' : 
-                    anfrage.status === 'in_bearbeitung' ? 'info' : 
-                    anfrage.status === 'beantwortet' ? 'success' : 'secondary'
+        formattedDate: formatDateSafely(anfrage.created_at, 'dd.MM.yyyy, HH:mm'),
+        status: statusInfo.label,
+        statusClass: statusInfo.className
       },
       notizen: notizenQuery.rows.map(notiz => ({
         id: notiz.id,
         text: notiz.text,
-        formattedDate: format(new Date(notiz.erstellt_am), 'dd.MM.yyyy, HH:mm'),
+        formattedDate: formatDateSafely(notiz.erstellt_am, 'dd.MM.yyyy, HH:mm'),
         benutzer: notiz.benutzer_name
       })),
       newRequestsCount: req.newRequestsCount,
@@ -650,7 +692,7 @@ router.get('/kunden', isAuthenticated, async (req, res) => {
       plz: kunde.plz,
       ort: kunde.ort,
       status: kunde.status,
-      created_at: format(new Date(kunde.created_at), 'dd.MM.yyyy')
+      created_at: formatDateSafely(kunde.created_at, 'dd.MM.yyyy')
     }));
 
     res.render('dashboard/kunden/index', { 
@@ -819,32 +861,30 @@ router.get('/kunden/:id', isAuthenticated, async (req, res) => {
         statusClass: kunde.status === 'aktiv' ? 'success' : 'secondary',
         notizen: kunde.notizen || 'Keine Notizen vorhanden',
         newsletter: kunde.newsletter,
-        created_at: format(new Date(kunde.created_at), 'dd.MM.yyyy')
+        created_at: formatDateSafely(kunde.created_at, 'dd.MM.yyyy')
       },
-      termine: termineQuery.rows.map(termin => ({
-        id: termin.id,
-        titel: termin.titel,
-        datum: format(new Date(termin.termin_datum), 'dd.MM.yyyy, HH:mm'),
-        status: termin.status,
-        statusLabel: termin.status === 'geplant' ? 'Geplant' : 
-                    termin.status === 'bestaetigt' ? 'Bestätigt' : 
-                    termin.status === 'abgeschlossen' ? 'Abgeschlossen' : 'Storniert',
-        statusClass: termin.status === 'geplant' ? 'warning' : 
-                    termin.status === 'bestaetigt' ? 'success' : 
-                    termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
-      })),
-      projekte: projekteQuery.rows.map(projekt => ({
-        id: projekt.id,
-        name: projekt.name,
-        datum: format(new Date(projekt.start_datum), 'dd.MM.yyyy'),
-        status: projekt.status,
-        statusLabel: projekt.status === 'neu' ? 'Neu' : 
-                    projekt.status === 'in_bearbeitung' ? 'In Bearbeitung' : 
-                    projekt.status === 'abgeschlossen' ? 'Abgeschlossen' : 'Storniert',
-        statusClass: projekt.status === 'neu' ? 'info' : 
-                    projekt.status === 'in_bearbeitung' ? 'primary' : 
-                    projekt.status === 'abgeschlossen' ? 'success' : 'secondary'
-      })),
+      termine: termineQuery.rows.map(termin => {
+        const terminStatusInfo = getTerminStatusInfo(termin.status);
+        return {
+          id: termin.id,
+          titel: termin.titel,
+          datum: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy, HH:mm'),
+          status: termin.status,
+          statusLabel: terminStatusInfo.label,
+          statusClass: terminStatusInfo.className
+        };
+      }),
+      projekte: projekteQuery.rows.map(projekt => {
+        const projektStatusInfo = getProjektStatusInfo(projekt.status);
+        return {
+          id: projekt.id,
+          name: projekt.name,
+          datum: formatDateSafely(projekt.start_datum, 'dd.MM.yyyy'),
+          status: projekt.status,
+          statusLabel: projektStatusInfo.label,
+          statusClass: projektStatusInfo.className
+        };
+      }),
       newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
@@ -1001,10 +1041,7 @@ router.get('/termine', isAuthenticated, async (req, res) => {
     
     // Abfrageergebnisse formatieren
     const appointments = termineQuery.rows.map(termin => {
-      const datumObj = new Date(termin.termin_datum);
-      const formattedDate = format(datumObj, 'dd.MM.yyyy');
-      const formattedTime = format(datumObj, 'HH:mm');
-      
+      const terminStatusInfo = getTerminStatusInfo(termin.status);
       return {
         id: termin.id,
         titel: termin.titel,
@@ -1012,17 +1049,13 @@ router.get('/termine', isAuthenticated, async (req, res) => {
         kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
         projekt_id: termin.projekt_id,
         termin_datum: termin.termin_datum,
-        dateFormatted: formattedDate,
-        timeFormatted: formattedTime,
+        dateFormatted: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy'),
+        timeFormatted: formatDateSafely(termin.termin_datum, 'HH:mm'),
         dauer: termin.dauer,
         ort: termin.ort,
         status: termin.status,
-        statusLabel: termin.status === 'geplant' ? 'Geplant' : 
-                    termin.status === 'bestaetigt' ? 'Bestätigt' : 
-                    termin.status === 'abgeschlossen' ? 'Abgeschlossen' : 'Storniert',
-        statusClass: termin.status === 'geplant' ? 'warning' : 
-                    termin.status === 'bestaetigt' ? 'success' : 
-                    termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
+        statusLabel: terminStatusInfo.label,
+        statusClass: terminStatusInfo.className
       };
     });
 
@@ -1222,7 +1255,8 @@ router.get('/termine/:id', isAuthenticated, async (req, res) => {
     }
     
     const termin = terminQuery.rows[0];
-    
+    const terminStatusInfo = getTerminStatusInfo(termin.status);
+
     // Notizen zu diesem Termin abrufen (falls Sie eine entsprechende Tabelle haben)
     const notizenQuery = await pool.query({
       text: `SELECT * FROM termin_notizen WHERE termin_id = $1 ORDER BY erstellt_am DESC`,
@@ -1239,23 +1273,19 @@ router.get('/termine/:id', isAuthenticated, async (req, res) => {
         kunde_id: termin.kunde_id,
         kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
         termin_datum: termin.termin_datum,
-        dateFormatted: format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
-        timeFormatted: format(new Date(termin.termin_datum), 'HH:mm'),
+        dateFormatted: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy'),
+        timeFormatted: formatDateSafely(termin.termin_datum, 'HH:mm'),
         dauer: termin.dauer || 60,
         ort: termin.ort || 'Nicht angegeben',
         beschreibung: termin.beschreibung || 'Keine Beschreibung vorhanden',
         status: termin.status,
-        statusLabel: termin.status === 'geplant' ? 'Geplant' : 
-                    termin.status === 'bestaetigt' ? 'Bestätigt' : 
-                    termin.status === 'abgeschlossen' ? 'Abgeschlossen' : 'Storniert',
-        statusClass: termin.status === 'geplant' ? 'warning' : 
-                    termin.status === 'bestaetigt' ? 'success' : 
-                    termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
+        statusLabel: terminStatusInfo.label,
+        statusClass: terminStatusInfo.className
       },
       notizen: notizenQuery.rows.map(notiz => ({
         id: notiz.id,
         text: notiz.text,
-        formattedDate: format(new Date(notiz.erstellt_am), 'dd.MM.yyyy, HH:mm'),
+        formattedDate: formatDateSafely(notiz.erstellt_am, 'dd.MM.yyyy, HH:mm'),
         benutzer: notiz.benutzer_name
       })),
       newRequestsCount: req.newRequestsCount,
@@ -1315,8 +1345,8 @@ router.get('/termine/:id/edit', isAuthenticated, async (req, res) => {
         kunde_id: termin.kunde_id,
         kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
         termin_datum: termin.termin_datum,
-        dateFormatted: format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
-        timeFormatted: format(new Date(termin.termin_datum), 'HH:mm'),
+        dateFormatted: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy'),
+        timeFormatted: formatDateSafely(termin.termin_datum, 'HH:mm'),
         dauer: termin.dauer || 60,
         ort: termin.ort || 'Nicht angegeben',
         beschreibung: termin.beschreibung || 'Keine Beschreibung vorhanden',
@@ -1572,10 +1602,10 @@ router.post('/dienste/neu', isAuthenticated, async (req, res) => {
     }
     
     // In Datenbank einfügen
-    await pool.query(
-      'INSERT INTO dienstleistungen (name, beschreibung, preis_basis, einheit, mwst_satz, aktiv) VALUES ($1, $2, $3, $4, $5, $6)',
-      [name, beschreibung, preis_basis, einheit, mwst_satz, aktiv === 'on']
-    );
+    await pool.query({
+      text: 'INSERT INTO dienstleistungen (name, beschreibung, preis_basis, einheit, mwst_satz, aktiv) VALUES ($1, $2, $3, $4, $5, $6)',
+      values: [name, beschreibung, preis_basis, einheit, mwst_satz, aktiv === 'on']
+    });
     
     req.flash('success', 'Dienstleistung erfolgreich erstellt.');
     res.redirect('/dashboard/dienste');
@@ -1618,10 +1648,10 @@ router.post('/dienste/toggle-status/:id', isAuthenticated, async (req, res) => {
     const id = req.params.id;
     const { aktiv } = req.body;
     
-    await pool.query(
-      'UPDATE dienstleistungen SET aktiv = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [aktiv, id]
-    );
+    await pool.query({
+      text: 'UPDATE dienstleistungen SET aktiv = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      values: [aktiv, id]
+    });
     
     res.json({ success: true });
   } catch (error) {
@@ -1714,20 +1744,6 @@ router.post('/settings/update', isAuthenticated, async (req, res) => {
   }
 });
 
-function formatDateSafely(date, formatString) {
-  try {
-    const parsedDate = new Date(date);
-    if (isNaN(parsedDate)) {
-    console.error(`Invalid date format for date: ${date} with format: ${formatString}`, error);
-        return 'Invalid date';
-    }
-    return format(parsedDate, formatString);
-  } catch (error) {
-    console.error('Invalid date format:', date, error);
-    return 'Unbekannt';
-  }
-}
-
 // Profile-Seite
 router.get('/profile', isAuthenticated, async (req, res) => {
   try {
@@ -1790,9 +1806,11 @@ router.post('/profile/update', isAuthenticated, async (req, res) => {
       }
       
       // Prüfen, ob aktuelles Passwort korrekt ist
-      const userQuery = await pool.query('SELECT passwort FROM benutzer WHERE id = $1', [req.session.user.id]);
+      const userQuery = await pool.query({
+        text: 'SELECT passwort FROM benutzer WHERE id = $1',
+        values: [req.session.user.id]
+      });
       const currentHashedPassword = userQuery.rows[0].passwort;
-      
       const passwordMatches = await bcrypt.compare(current_password, currentHashedPassword);
       if (!passwordMatches) {
         req.flash('error', 'Das aktuelle Passwort ist nicht korrekt.');

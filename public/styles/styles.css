@@ -648,3 +648,28 @@ html, body {
   color: white;
   transform: translateY(-2px);
 }
+
+@media (max-width: 768px) {
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Vertikale Kartenansicht für Mobilgeräte */
+  .mobile-card-view tbody tr {
+    display: block;
+    border: 1px solid #dee2e6;
+    margin-bottom: 1rem;
+  }
+  
+  .mobile-card-view td {
+    display: block;
+    text-align: right;
+  }
+  
+  .mobile-card-view td:before {
+    content: attr(data-label);
+    float: left;
+    font-weight: bold;
+  }
+}
