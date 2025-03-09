@@ -19,6 +19,8 @@ const { de } = require('date-fns/locale');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
 // Route-Importe
 const authRoutes = require('./routes/auth');
@@ -53,9 +55,6 @@ app.use(cookieParser());
 // Basis-Sicherheitsheader
 app.use(helmet());
 
-// Projekte-Routen importieren
-app.use('/dashboard/projekte', projectRoutes);
-
 // Update the Content-Security-Policy in server.js
 app.use(helmet({
   contentSecurityPolicy: {
@@ -73,6 +72,13 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   referrerPolicy: { policy: "strict-origin-when-cross-origin" }
 }));
+
+// Body-Parser Middleware
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+
+// Statische Dateien bereitstellen
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Session-Konfiguration
 app.use(session({
@@ -92,17 +98,6 @@ app.use(session({
   }
 }));
 
-// Body-Parser Middleware
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-
-// Statische Dateien bereitstellen
-app.use(express.static(path.join(__dirname, 'public')));
-
-// View Engine Setup
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-
 // Flash-Messages
 app.use(flash());
 
@@ -114,6 +109,15 @@ app.use((req, res, next) => {
   res.locals.csrfToken = req.csrfToken();
   next();
 });
+
+// Routen verwenden
+app.use('/', authRoutes);
+app.use('/dashboard', dashboardRoutes);
+// Projekte-Routen importieren
+app.use('/dashboard/projekte', projectRoutes);
+
+// Blog-Routen importieren
+const blogRoutes = require('./routes/blog');
 
 // Startseite
 app.get('/', (req, res) => {
@@ -133,13 +137,6 @@ app.get('/datenschutz', (req, res) => {
 app.get('/agb', (req, res) => {
   res.render('agb', { title: 'Rising BSM – AGB' });
 });
-
-
-app.use('/', authRoutes);
-app.use('/dashboard', dashboardRoutes);
-
-// Blog-Routen importieren
-const blogRoutes = require('./routes/blog');
 
 // Blog-Middleware für Dashboard
 app.use('/dashboard/blog', blogRoutes);

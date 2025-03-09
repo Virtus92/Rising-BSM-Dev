@@ -7,6 +7,7 @@ const pool = require('../db');
 
 // Auth Middleware
 const isAuthenticated = (req, res, next) => {
+  
   if (req.session && req.session.user) {
     return next();
   } else {
@@ -49,7 +50,7 @@ router.get('/', isAuthenticated, async (req, res) => {
           p.start_datum,
           p.end_datum,
           p.status,
-          p.budget,
+          p.betrag,
           k.name AS kunde_name
         FROM 
           projekte p
@@ -67,12 +68,15 @@ router.get('/', isAuthenticated, async (req, res) => {
       return {
         id: projekt.id,
         titel: projekt.titel,
+        kunde_id: projekt.kunde_id,
         kunde_name: projekt.kunde_name || 'Kein Kunde zugewiesen',
-        startDatum: format(new Date(projekt.start_datum), 'dd.MM.yyyy'),
-        endDatum: projekt.end_datum ? format(new Date(projekt.end_datum), 'dd.MM.yyyy') : '-',
-        status: statusInfo.label,
+        dienstleistung: projekt.dienstleistung,
+        start_datum: format(new Date(projekt.start_datum), 'dd.MM.yyyy'),
+        end_datum: projekt.end_datum ? format(new Date(projekt.end_datum), 'dd.MM.yyyy') : '-',
+        status: projekt.status,
+        statusLabel: statusInfo.label,
         statusClass: statusInfo.className,
-        budget: projekt.budget ? parseFloat(projekt.budget).toLocaleString('de-DE', {style: 'currency', currency: 'EUR'}) : '-'
+        betrag: projekt.betrag ? parseFloat(projekt.betrag) : null
       };
     });
     
@@ -91,10 +95,12 @@ router.get('/', isAuthenticated, async (req, res) => {
     });
   } catch (error) {
     console.error('Fehler beim Laden der Projekte:', error);
-    res.status(500).render('error', { 
-      message: 'Datenbankfehler: ' + error.message, 
-      error: error
-    });
+    // Try this instead:
+    return res.status(500).send(`
+      <h1>Database Error</h1>
+      <p>${error.message}</p>
+      <a href="/dashboard">Return to Dashboard</a>
+    `);
   }
 });
 
@@ -124,7 +130,7 @@ router.get('/neu', isAuthenticated, async (req, res) => {
         start_datum: format(new Date(), 'yyyy-MM-dd'),
         end_datum: '',
         beschreibung: '',
-        budget: '',
+        betrag: '',
         status: 'neu'
       },
       newRequestsCount,
@@ -148,7 +154,7 @@ router.post('/neu', isAuthenticated, async (req, res) => {
       kunde_id, 
       start_datum, 
       end_datum, 
-      budget, 
+      betrag, 
       beschreibung, 
       status 
     } = req.body;
@@ -163,7 +169,7 @@ router.post('/neu', isAuthenticated, async (req, res) => {
     const result = await pool.query({
       text: `
         INSERT INTO projekte (
-          titel, kunde_id, start_datum, end_datum, budget, 
+          titel, kunde_id, start_datum, end_datum, betrag, 
           beschreibung, status, erstellt_von
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
       `,
@@ -172,7 +178,7 @@ router.post('/neu', isAuthenticated, async (req, res) => {
         kunde_id || null, 
         start_datum, 
         end_datum || null, 
-        budget || null, 
+        betrag || null, 
         beschreibung || null, 
         status || 'neu',
         req.session.user.id
@@ -256,7 +262,7 @@ router.get('/:id', isAuthenticated, async (req, res) => {
         kunde_name: projekt.kunde_name || 'Kein Kunde zugewiesen',
         start_datum: format(new Date(projekt.start_datum), 'dd.MM.yyyy'),
         end_datum: projekt.end_datum ? format(new Date(projekt.end_datum), 'dd.MM.yyyy') : 'Nicht festgelegt',
-        budget: projekt.budget ? parseFloat(projekt.budget).toLocaleString('de-DE', {style: 'currency', currency: 'EUR'}) : 'Nicht festgelegt',
+        betrag: projekt.betrag ? parseFloat(projekt.betrag).toLocaleString('de-DE', {style: 'currency', currency: 'EUR'}) : 'Nicht festgelegt',
         beschreibung: projekt.beschreibung || 'Keine Beschreibung vorhanden',
         status: projekt.status,
         statusLabel: statusInfo.label,
