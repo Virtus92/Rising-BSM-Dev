@@ -23,6 +23,7 @@ const PORT = process.env.PORT || 3000;
 // Route-Importe
 const authRoutes = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboard');
+const projectRoutes = require('./routes/projects.js');
 
 // PostgreSQL-Pool für Sessions
 const pool = require('./db');
@@ -51,6 +52,9 @@ app.use(cookieParser());
 
 // Basis-Sicherheitsheader
 app.use(helmet());
+
+// Projekte-Routen importieren
+app.use('/dashboard/projekte', projectRoutes);
 
 // Update the Content-Security-Policy in server.js
 app.use(helmet({

@@ -1,0 +1,529 @@
+/**
+ * Dashboard Core JavaScript
+ * Optimized for performance and mobile support
+ */
+document.addEventListener("DOMContentLoaded", function() {
+    "use strict";
+    
+    // DOM-Cache für häufig verwendete Elemente
+    const dashboardWrapper = document.querySelector('.dashboard-wrapper');
+    const sidebarToggler = document.querySelector('.sidebar-toggler');
+    const desktopSidebarToggle = document.querySelector('.desktop-sidebar-toggle');
+    const searchInput = document.getElementById('searchInput');
+    const navDropdowns = document.querySelectorAll('.nav-dropdown');
+    const statusFilters = document.querySelectorAll('.status-filter');
+  
+    // Sidebar-Funktionalität
+    function initSidebar() {
+      // Mobile Sidebar-Toggle
+      if (sidebarToggler) {
+        sidebarToggler.addEventListener('click', function() {
+          dashboardWrapper.classList.toggle('sidebar-open');
+          
+          // Aria-Expanded für Barrierefreiheit
+          const isOpen = dashboardWrapper.classList.contains('sidebar-open');
+          this.setAttribute('aria-expanded', isOpen);
+        });
+      }
+      
+      // Desktop Sidebar-Toggle
+      if (desktopSidebarToggle) {
+        desktopSidebarToggle.addEventListener('click', function() {
+          dashboardWrapper.classList.toggle('sidebar-closed');
+          
+          // Local Storage speichern, damit Einstellung erhalten bleibt
+          const isClosed = dashboardWrapper.classList.contains('sidebar-closed');
+          localStorage.setItem('sidebarClosed', isClosed);
+        });
+      }
+      
+      // Sidebar-Status aus localStorage abrufen
+      const savedSidebarState = localStorage.getItem('sidebarClosed');
+      if (savedSidebarState === 'true' && window.innerWidth >= 992) {
+        dashboardWrapper.classList.add('sidebar-closed');
+      }
+      
+      // Sidebar schließen bei Klick außerhalb auf mobilen Geräten
+      document.addEventListener('click', function(event) {
+        if (window.innerWidth < 992 && 
+            dashboardWrapper.classList.contains('sidebar-open') && 
+            !event.target.closest('.dashboard-sidebar') && 
+            !event.target.closest('.sidebar-toggler')) {
+          dashboardWrapper.classList.remove('sidebar-open');
+          if (sidebarToggler) sidebarToggler.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+  
+    // Dropdown-Verhalten
+    function initDropdowns() {
+      navDropdowns.forEach(dropdown => {
+        const trigger = dropdown.querySelector('.dropdown-toggle');
+        const menu = dropdown.querySelector('.dropdown-menu');
+        
+        if (trigger && menu) {
+          trigger.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Alle anderen Dropdowns schließen
+            navDropdowns.forEach(otherDropdown => {
+              if (otherDropdown !== dropdown && otherDropdown.classList.contains('show')) {
+                otherDropdown.classList.remove('show');
+                otherDropdown.querySelector('.dropdown-menu').classList.remove('show');
+              }
+            });
+            
+            dropdown.classList.toggle('show');
+            menu.classList.toggle('show');
+          });
+        }
+      });
+      
+      // Dropdown bei Klick außerhalb schließen
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('.nav-dropdown')) {
+          navDropdowns.forEach(dropdown => {
+            dropdown.classList.remove('show');
+            const menu = dropdown.querySelector('.dropdown-menu');
+            if (menu) menu.classList.remove('show');
+          });
+        }
+      });
+    }
+  
+    // Status-Filter-Funktionalität
+    function initStatusFilters() {
+      statusFilters.forEach(filter => {
+        filter.addEventListener('change', function() {
+          const url = new URL(window.location);
+          
+          if (this.value === '' || this.value === 'all') {
+            url.searchParams.delete('status');
+          } else {
+            url.searchParams.set('status', this.value);
+          }
+          
+          window.location = url.toString();
+        });
+        
+        // Aktuellen Filter-Wert setzen
+        const urlParams = new URLSearchParams(window.location.search);
+        const status = urlParams.get('status');
+        if (status) {
+          filter.value = status;
+        }
+      });
+    }
+  
+    // Suchfunktionalität
+    function initSearch() {
+      if (searchInput) {
+        const searchForm = searchInput.closest('form') || document.createElement('form');
+        const searchButton = document.getElementById('searchButton');
+        
+        if (searchButton) {
+          searchButton.addEventListener('click', function() {
+            if (searchInput.value.trim()) {
+              performSearch(searchInput.value);
+            }
+          });
+        }
+        
+        searchInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            if (this.value.trim()) {
+              performSearch(this.value);
+            }
+          }
+        });
+      }
+      
+      function performSearch(query) {
+        // Implementiere hier die Suchlogik - entweder clientseitige Filterung 
+        // oder Umleitung zur Suchseite
+        const url = new URL(window.location);
+        url.searchParams.set('search', query);
+        window.location = url.toString();
+      }
+    }
+  
+    // DataTables Initialisierung mit verzögertem Laden
+    function initDataTables() {
+      // Prüfen, ob DataTables vorhanden ist und Tabellen existieren
+      if (typeof $.fn !== 'undefined' && typeof $.fn.DataTable !== 'undefined') {
+        const tables = document.querySelectorAll('.datatable');
+        
+        if (tables.length > 0) {
+          // Gemeinsame Optionen für alle Tabellen
+          const options = {
+            language: {
+              url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/de-DE.json'
+            },
+            responsive: true,
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Alle"]],
+            pageLength: 10,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"table-responsive"t><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            // Spaltenspezifische Rendering-Optionen können hier definiert werden
+          };
+          
+          // Initialisierung mit verzögertem Laden für bessere Gesamtleistung
+          setTimeout(() => {
+            tables.forEach(table => {
+              // Nur initialisieren, wenn noch nicht initialisiert
+              if (!$.fn.DataTable.isDataTable(table)) {
+                $(table).DataTable(options);
+              }
+            });
+          }, 100);
+        }
+      }
+    }
+  
+    // Charts Initialisierung
+    function initCharts() {
+      // Revenue Chart
+      const revenueChartEl = document.getElementById('revenueChart');
+      if (revenueChartEl && typeof Chart !== 'undefined' && typeof revenueChartData !== 'undefined') {
+        new Chart(revenueChartEl, {
+          type: 'line',
+          data: {
+            labels: revenueChartData.labels || [],
+            datasets: [{
+              label: 'Umsatz',
+              data: revenueChartData.data || [],
+              borderColor: '#198754',
+              backgroundColor: 'rgba(25, 135, 84, 0.1)',
+              tension: 0.3,
+              fill: true,
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) {
+                    return '€' + value.toLocaleString('de-DE');
+                  }
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return '€' + context.parsed.y.toLocaleString('de-DE');
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+      
+      // Services Chart
+      const servicesChartEl = document.getElementById('servicesChart');
+      if (servicesChartEl && typeof Chart !== 'undefined' && typeof servicesChartData !== 'undefined') {
+        new Chart(servicesChartEl, {
+          type: 'doughnut',
+          data: {
+            labels: servicesChartData.labels || [],
+            datasets: [{
+              data: servicesChartData.data || [],
+              backgroundColor: [
+                'rgba(25, 135, 84, 0.8)',
+                'rgba(13, 110, 253, 0.8)',
+                'rgba(255, 193, 7, 0.8)',
+                'rgba(108, 117, 125, 0.8)'
+              ],
+              borderColor: '#ffffff',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const label = context.label || '';
+                    const value = context.parsed || 0;
+                    const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                    return `${label}: €${value.toLocaleString('de-DE')} (${percentage}%)`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+  
+    // Kalender-Initialisierung (für die Termineseite)
+    function initCalendar() {
+      const calendarTab = document.getElementById('calendar-tab');
+      const calendarContainer = document.getElementById('calendar');
+      
+      if (calendarTab && calendarContainer) {
+        calendarTab.addEventListener('shown.bs.tab', function() {
+          if (typeof FullCalendar === 'undefined') {
+            // Dynamisches Laden der FullCalendar-Bibliothek, wenn nicht bereits geladen
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js';
+            script.onload = initializeCalendarInstance;
+            
+            const style = document.createElement('link');
+            style.rel = 'stylesheet';
+            style.href = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css';
+            
+            document.head.appendChild(style);
+            document.head.appendChild(script);
+          } else {
+            initializeCalendarInstance();
+          }
+        });
+      }
+      
+      function initializeCalendarInstance() {
+        if (!window.calendar) {
+          const calendarEl = document.getElementById('calendar');
+          window.calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
+            headerToolbar: {
+              left: 'prev,next today',
+              center: 'title',
+              right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+            },
+            locale: 'de',
+            events: '/dashboard/termine/api/events',
+            eventClick: function(info) {
+              window.location.href = '/dashboard/termine/' + info.event.id;
+            },
+            // Für mobile Geräte optimierte Optionen
+            height: 'auto',
+            windowResize: function(view) {
+              if (window.innerWidth < 768) {
+                window.calendar.changeView('listWeek');
+              } else {
+                window.calendar.changeView('dayGridMonth');
+              }
+            }
+          });
+          window.calendar.render();
+        }
+      }
+    }
+  
+    // Formularvalidierung
+    function initFormValidation() {
+      const forms = document.querySelectorAll('.needs-validation');
+      
+      forms.forEach(form => {
+        form.addEventListener('submit', event => {
+          if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          
+          form.classList.add('was-validated');
+        }, false);
+        
+        // E-Mail-Feldvalidierung
+        const emailField = form.querySelector('input[type="email"]');
+        if (emailField) {
+          emailField.addEventListener('blur', function() {
+            const value = this.value.trim();
+            if (value && !isValidEmail(value)) {
+              this.setCustomValidity('Bitte geben Sie eine gültige E-Mail-Adresse ein.');
+            } else {
+              this.setCustomValidity('');
+            }
+          });
+        }
+        
+        // Telefonfeldvalidierung
+        const phoneField = form.querySelector('input[type="tel"]');
+        if (phoneField) {
+          phoneField.addEventListener('blur', function() {
+            const value = this.value.trim();
+            if (value && !isValidPhone(value)) {
+              this.setCustomValidity('Bitte geben Sie eine gültige Telefonnummer ein.');
+            } else {
+              this.setCustomValidity('');
+            }
+          });
+        }
+      });
+      
+      function isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      }
+      
+      function isValidPhone(phone) {
+        return /^[+\d\s\-()]{6,20}$/.test(phone);
+      }
+    }
+  
+    // Modals Funktionalität
+    function initModals() {
+      // Status-Modal
+      const statusModal = document.getElementById('statusModal');
+      if (statusModal) {
+        statusModal.addEventListener('show.bs.modal', function(event) {
+          const button = event.relatedTarget;
+          if (button) {
+            const id = button.getAttribute('data-id');
+            const status = button.getAttribute('data-status');
+            
+            const idInput = statusModal.querySelector('input[name="id"]');
+            const statusSelect = statusModal.querySelector('select[name="status"]');
+            
+            if (idInput) idInput.value = id || '';
+            if (statusSelect && status) statusSelect.value = status;
+          }
+        });
+      }
+      
+      // Service-Edit-Modal für Dienstleistungen
+      document.querySelectorAll('.edit-service').forEach(button => {
+        button.addEventListener('click', function() {
+          const serviceId = this.getAttribute('data-id');
+          if (serviceId) {
+            fetchServiceDetails(serviceId);
+          }
+        });
+      });
+      
+      function fetchServiceDetails(id) {
+        fetch(`/dashboard/dienste/${id}`)
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const service = data.service;
+              const form = document.getElementById('editServiceForm');
+              
+              if (form) {
+                form.querySelector('#edit_id').value = service.id;
+                form.querySelector('#edit_name').value = service.name;
+                form.querySelector('#edit_beschreibung').value = service.beschreibung || '';
+                form.querySelector('#edit_preis_basis').value = service.preis_basis;
+                form.querySelector('#edit_einheit').value = service.einheit;
+                form.querySelector('#edit_mwst_satz').value = service.mwst_satz;
+                form.querySelector('#edit_aktiv').checked = service.aktiv;
+              }
+            } else {
+              showNotification('error', 'Fehler beim Laden der Dienstleistung: ' + data.error);
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            showNotification('error', 'Fehler beim Laden der Dienstleistung');
+          });
+      }
+    }
+  
+    // Notifikationen
+    function showNotification(type, message) {
+      const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+      const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+      
+      const alert = document.createElement('div');
+      alert.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+      alert.style.top = '1rem';
+      alert.style.right = '1rem';
+      alert.style.zIndex = '9999';
+      alert.style.maxWidth = '400px';
+      
+      alert.innerHTML = `
+        <i class="fas ${icon} me-2"></i>${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      `;
+      
+      document.body.appendChild(alert);
+      
+      // Auto-close nach 5 Sekunden
+      setTimeout(() => {
+        alert.classList.remove('show');
+        setTimeout(() => alert.remove(), 150);
+      }, 5000);
+    }
+  
+    // Verhinderung von Form-Resubmission
+    function preventFormResubmission() {
+      if (window.history.replaceState) {
+        window.history.replaceState(null, null, window.location.href);
+      }
+    }
+  
+    // Service-Status-Toggle
+    function initServiceToggle() {
+      document.querySelectorAll('.service-toggle').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+          const serviceId = this.dataset.id;
+          const isActive = this.checked;
+          
+          // CSRF-Token aus dem Meta-Tag abrufen
+          const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+          
+          fetch(`/dashboard/dienste/toggle-status/${serviceId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({ aktiv: isActive })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (!data.success) {
+              // Status zurücksetzen bei Fehler
+              this.checked = !isActive;
+              showNotification('error', 'Fehler beim Aktualisieren des Status');
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            this.checked = !isActive;
+            showNotification('error', 'Fehler beim Aktualisieren des Status');
+          });
+        });
+      });
+    }
+  
+    // Alle Funktionen initialisieren
+    function init() {
+      initSidebar();
+      initDropdowns();
+      initStatusFilters();
+      initSearch();
+      initDataTables();
+      initCharts();
+      initCalendar();
+      initFormValidation();
+      initModals();
+      initServiceToggle();
+      preventFormResubmission();
+      
+      // Aktiven Navigationslink markieren
+      const currentPath = window.location.pathname;
+      document.querySelectorAll('.sidebar-nav .nav-link').forEach(link => {
+        if (link.getAttribute('href') === currentPath || 
+            (link.getAttribute('href') !== '/dashboard' && currentPath.startsWith(link.getAttribute('href')))) {
+          link.classList.add('active');
+        }
+      });
+    }
+  
+    // Initialisierung starten
+    init();
+  });

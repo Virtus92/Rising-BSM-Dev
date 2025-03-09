@@ -1,0 +1,299 @@
+// routes/projects.js
+const express = require('express');
+const router = express.Router();
+const { formatDistanceToNow, isToday, isTomorrow, format } = require('date-fns');
+const { de } = require('date-fns/locale');
+const pool = require('../db');
+
+// Auth Middleware
+const isAuthenticated = (req, res, next) => {
+  if (req.session && req.session.user) {
+    return next();
+  } else {
+    console.log("Auth failed, redirecting to login");
+    return res.redirect('/login');
+  }
+};
+
+// Hilfsfunktion
+function getProjektStatusInfo(status) {
+  const statusMap = {
+    'neu': { label: 'Neu', className: 'info' },
+    'in_bearbeitung': { label: 'In Bearbeitung', className: 'primary' },
+    'abgeschlossen': { label: 'Abgeschlossen', className: 'success' },
+    'storniert': { label: 'Storniert', className: 'secondary' }
+  };
+  return statusMap[status] || { label: 'Unbekannt', className: 'secondary' };
+}
+
+// Projekte-Liste anzeigen
+router.get('/', isAuthenticated, async (req, res) => {
+  try {
+    // Status-Filter anwenden (falls vorhanden)
+    const statusFilter = req.query.status;
+    let statusCondition = '';
+    let params = [];
+    
+    if (statusFilter) {
+      statusCondition = 'WHERE p.status = $1';
+      params.push(statusFilter);
+    }
+    
+    // Projekte aus der Datenbank abrufen
+    const projekteQuery = await pool.query({
+      text: `
+        SELECT 
+          p.id, 
+          p.titel, 
+          p.kunde_id,
+          p.start_datum,
+          p.end_datum,
+          p.status,
+          p.budget,
+          k.name AS kunde_name
+        FROM 
+          projekte p
+          LEFT JOIN kunden k ON p.kunde_id = k.id
+        ${statusCondition}
+        ORDER BY 
+          p.start_datum DESC
+      `,
+      values: params
+    });
+    
+    // Abfrageergebnisse formatieren
+    const projects = projekteQuery.rows.map(projekt => {
+      const statusInfo = getProjektStatusInfo(projekt.status);
+      return {
+        id: projekt.id,
+        titel: projekt.titel,
+        kunde_name: projekt.kunde_name || 'Kein Kunde zugewiesen',
+        startDatum: format(new Date(projekt.start_datum), 'dd.MM.yyyy'),
+        endDatum: projekt.end_datum ? format(new Date(projekt.end_datum), 'dd.MM.yyyy') : '-',
+        status: statusInfo.label,
+        statusClass: statusInfo.className,
+        budget: projekt.budget ? parseFloat(projekt.budget).toLocaleString('de-DE', {style: 'currency', currency: 'EUR'}) : '-'
+      };
+    });
+    
+    // Neue Anfragen für Badge zählen
+    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
+
+    res.render('dashboard/projekte/index', { 
+      title: 'Projekte - Rising BSM',
+      user: req.session.user,
+      currentPath: req.path,
+      projects,
+      newRequestsCount,
+      statusFilter: statusFilter || '',
+      csrfToken: req.csrfToken()
+    });
+  } catch (error) {
+    console.error('Fehler beim Laden der Projekte:', error);
+    res.status(500).render('error', { 
+      message: 'Datenbankfehler: ' + error.message, 
+      error: error
+    });
+  }
+});
+
+// Neues Projekt-Formular anzeigen
+router.get('/neu', isAuthenticated, async (req, res) => {
+  try {
+    // Kunden für Dropdown abrufen
+    const kundenQuery = await pool.query(`
+      SELECT id, name FROM kunden ORDER BY name ASC
+    `);
+    
+    // Vorausgefüllte Daten aus Query-Parametern
+    const kunde_id = req.query.kunde_id || '';
+    
+    // Neue Anfragen für Badge zählen
+    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
+    
+    res.render('dashboard/projekte/neu', {
+      title: 'Neues Projekt - Rising BSM',
+      user: req.session.user,
+      currentPath: '/dashboard/projekte',
+      kunden: kundenQuery.rows,
+      formData: {
+        kunde_id,
+        titel: '',
+        start_datum: format(new Date(), 'yyyy-MM-dd'),
+        end_datum: '',
+        beschreibung: '',
+        budget: '',
+        status: 'neu'
+      },
+      newRequestsCount,
+      csrfToken: req.csrfToken(),
+      messages: { success: req.flash('success'), error: req.flash('error') }
+    });
+  } catch (error) {
+    console.error('Fehler beim Laden des Projektformulars:', error);
+    res.status(500).render('error', {
+      message: 'Datenbankfehler: ' + error.message,
+      error: error
+    });
+  }
+});
+
+// Neues Projekt speichern
+router.post('/neu', isAuthenticated, async (req, res) => {
+  try {
+    const { 
+      titel, 
+      kunde_id, 
+      start_datum, 
+      end_datum, 
+      budget, 
+      beschreibung, 
+      status 
+    } = req.body;
+    
+    // Validierung
+    if (!titel || !start_datum) {
+      req.flash('error', 'Titel und Start-Datum sind Pflichtfelder.');
+      return res.redirect('/dashboard/projekte/neu');
+    }
+    
+    // In Datenbank einfügen
+    const result = await pool.query({
+      text: `
+        INSERT INTO projekte (
+          titel, kunde_id, start_datum, end_datum, budget, 
+          beschreibung, status, erstellt_von
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
+      `,
+      values: [
+        titel, 
+        kunde_id || null, 
+        start_datum, 
+        end_datum || null, 
+        budget || null, 
+        beschreibung || null, 
+        status || 'neu',
+        req.session.user.id
+      ]
+    });
+    
+    const projektId = result.rows[0].id;
+    
+    req.flash('success', 'Projekt erfolgreich angelegt.');
+    res.redirect(`/dashboard/projekte/${projektId}`);
+  } catch (error) {
+    console.error('Fehler beim Anlegen des Projekts:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect('/dashboard/projekte/neu');
+  }
+});
+
+// Einzelnes Projekt anzeigen
+router.get('/:id', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Projekt aus der Datenbank abrufen
+    const projektQuery = await pool.query({
+      text: `
+        SELECT 
+          p.*, 
+          k.name AS kunde_name
+        FROM 
+          projekte p
+          LEFT JOIN kunden k ON p.kunde_id = k.id
+        WHERE 
+          p.id = $1
+      `,
+      values: [id]
+    });
+    
+    if (projektQuery.rows.length === 0) {
+      return res.status(404).render('error', {
+        message: `Projekt mit ID ${id} nicht gefunden`,
+        error: { status: 404 }
+      });
+    }
+    
+    const projekt = projektQuery.rows[0];
+    const statusInfo = getProjektStatusInfo(projekt.status);
+    
+    // Termine des Projekts abrufen
+    const termineQuery = await pool.query({
+      text: `
+        SELECT id, titel, termin_datum, status 
+        FROM termine 
+        WHERE projekt_id = $1 
+        ORDER BY termin_datum ASC
+      `,
+      values: [id]
+    });
+    
+    // Notizen zu diesem Projekt abrufen
+    const notizenQuery = await pool.query({
+      text: `
+        SELECT * FROM projekt_notizen 
+        WHERE projekt_id = $1 
+        ORDER BY erstellt_am DESC
+      `,
+      values: [id]
+    });
+    
+    // Neue Anfragen für Badge zählen
+    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
+    
+    res.render('dashboard/projekte/detail', {
+      title: `Projekt: ${projekt.titel} - Rising BSM`,
+      user: req.session.user,
+      currentPath: '/dashboard/projekte',
+      projekt: {
+        id: projekt.id,
+        titel: projekt.titel,
+        kunde_id: projekt.kunde_id,
+        kunde_name: projekt.kunde_name || 'Kein Kunde zugewiesen',
+        start_datum: format(new Date(projekt.start_datum), 'dd.MM.yyyy'),
+        end_datum: projekt.end_datum ? format(new Date(projekt.end_datum), 'dd.MM.yyyy') : 'Nicht festgelegt',
+        budget: projekt.budget ? parseFloat(projekt.budget).toLocaleString('de-DE', {style: 'currency', currency: 'EUR'}) : 'Nicht festgelegt',
+        beschreibung: projekt.beschreibung || 'Keine Beschreibung vorhanden',
+        status: projekt.status,
+        statusLabel: statusInfo.label,
+        statusClass: statusInfo.className
+      },
+      termine: termineQuery.rows.map(termin => {
+        const terminStatus = termin.status === 'geplant' ? { label: 'Geplant', className: 'warning' } :
+                          termin.status === 'bestaetigt' ? { label: 'Bestätigt', className: 'success' } :
+                          termin.status === 'abgeschlossen' ? { label: 'Abgeschlossen', className: 'primary' } :
+                          { label: 'Storniert', className: 'secondary' };
+        return {
+          id: termin.id,
+          titel: termin.titel,
+          datum: format(new Date(termin.termin_datum), 'dd.MM.yyyy, HH:mm'),
+          statusLabel: terminStatus.label,
+          statusClass: terminStatus.className
+        };
+      }),
+      notizen: notizenQuery.rows.map(notiz => ({
+        id: notiz.id,
+        text: notiz.text,
+        formattedDate: format(new Date(notiz.erstellt_am), 'dd.MM.yyyy, HH:mm'),
+        benutzer: notiz.benutzer_name
+      })),
+      newRequestsCount,
+      csrfToken: req.csrfToken(),
+      messages: { success: req.flash('success'), error: req.flash('error') }
+    });
+  } catch (error) {
+    console.error('Fehler beim Anzeigen des Projekts:', error);
+    res.status(500).render('error', {
+      message: 'Datenbankfehler: ' + error.message,
+      error: error
+    });
+  }
+});
+
+// Weitere Routen für Projektbearbeitung, Statusänderung usw. ...
+
+module.exports = router;

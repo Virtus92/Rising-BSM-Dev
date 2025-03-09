@@ -535,6 +535,412 @@ router.get('/anfragen', isAuthenticated, async (req, res) => {
   }
 });
 
+// Projekt Status aktualisieren
+router.post('/projekte/:id/update-status', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, note } = req.body;
+    
+    // Status in der Datenbank aktualisieren
+    await pool.query({
+      text: `UPDATE projekte SET status = $1, updated_at = NOW() WHERE id = $2`,
+      values: [status, id]
+    });
+    
+    // Notiz hinzufügen, falls vorhanden
+    if (note && note.trim() !== '') {
+      await pool.query({
+        text: `
+          INSERT INTO projekt_notizen (projekt_id, benutzer_id, benutzer_name, text)
+          VALUES ($1, $2, $3, $4)
+        `,
+        values: [id, req.session.user.id, req.session.user.name, note]
+      });
+    }
+    
+    req.flash('success', 'Projekt-Status erfolgreich aktualisiert.');
+    res.redirect(`/dashboard/projekte/${id}`);
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren des Projekt-Status:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect(`/dashboard/projekte/${req.params.id}`);
+  }
+});
+
+// Projekt-Notiz hinzufügen
+router.post('/projekte/:id/add-note', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { note } = req.body;
+    
+    if (!note || note.trim() === '') {
+      req.flash('error', 'Die Notiz darf nicht leer sein.');
+      return res.redirect(`/dashboard/projekte/${id}`);
+    }
+    
+    // In Datenbank einfügen
+    await pool.query({
+      text: `
+        INSERT INTO projekt_notizen (
+          projekt_id, benutzer_id, benutzer_name, text
+        ) VALUES ($1, $2, $3, $4)
+      `,
+      values: [id, req.session.user.id, req.session.user.name, note]
+    });
+    
+    req.flash('success', 'Notiz erfolgreich hinzugefügt.');
+    res.redirect(`/dashboard/projekte/${id}`);
+  } catch (error) {
+    console.error('Fehler beim Hinzufügen der Notiz:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect(`/dashboard/projekte/${req.params.id}`);
+  }
+});
+
+// In routes/dashboard.js
+router.get('/anfragen/export', isAuthenticated, async (req, res) => {
+  try {
+    const { format: exportFormat, dateFrom, dateTo, status } = req.query;
+    
+    // Filterbedingungen aufbauen
+    let conditions = [];
+    let params = [];
+    let paramCounter = 1;
+    
+    if (dateFrom) {
+      conditions.push(`created_at >= $${paramCounter++}`);
+      params.push(dateFrom);
+    }
+    
+    if (dateTo) {
+      conditions.push(`created_at <= $${paramCounter++}`);
+      params.push(dateTo);
+    }
+    
+    if (status && Array.isArray(status)) {
+      conditions.push(`status IN (${status.map((_, i) => `$${paramCounter + i}`).join(', ')})`);
+      params.push(...status);
+      paramCounter += status.length;
+    } else if (status) {
+      conditions.push(`status = $${paramCounter++}`);
+      params.push(status);
+    }
+    
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    
+    // Daten abrufen
+    const query = {
+      text: `
+        SELECT 
+          id, 
+          name, 
+          email, 
+          phone, 
+          service, 
+          message, 
+          status, 
+          created_at
+        FROM 
+          kontaktanfragen
+        ${whereClause}
+        ORDER BY 
+          created_at DESC
+      `,
+      values: params
+    };
+    
+    const result = await pool.query(query);
+    
+    // Format basierte Verarbeitung
+    if (exportFormat === 'csv') {
+      // CSV-Export
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=anfragen-export.csv');
+      
+      // CSV-Header
+      res.write('ID,Name,Email,Telefon,Service,Nachricht,Status,Datum\n');
+      
+      // CSV-Zeilen
+      result.rows.forEach(row => {
+        const csvLine = [
+          row.id,
+          `"${row.name.replace(/"/g, '""')}"`,
+          `"${row.email.replace(/"/g, '""')}"`,
+          `"${row.phone || ''}"`,
+          `"${row.service}"`,
+          `"${(row.message || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+          `"${row.status}"`,
+          `"${format(new Date(row.created_at), 'dd.MM.yyyy HH:mm')}"`
+        ].join(',');
+        
+        res.write(csvLine + '\n');
+      });
+      
+      res.end();
+    } else if (exportFormat === 'pdf') {
+      // PDF-Export mit PDFKit
+      const PDFDocument = require('pdfkit');
+      
+      // Erstellen eines neuen PDF-Dokuments
+      const doc = new PDFDocument({
+        margins: { top: 50, bottom: 50, left: 50, right: 50 },
+        size: 'A4'
+      });
+      
+      // PDF-Header-Metadaten setzen
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=anfragen-export.pdf');
+      
+      // PDF als Stream an die Response weiterleiten
+      doc.pipe(res);
+      
+      // PDF-Inhalt erstellen
+      doc.fontSize(16).text('Anfragen-Export', { align: 'center' });
+      doc.moveDown();
+      
+      // Filter-Informationen
+      doc.fontSize(10).text(`Exportiert am: ${format(new Date(), 'dd.MM.yyyy HH:mm')}`);
+      if (dateFrom) doc.text(`Von: ${dateFrom}`);
+      if (dateTo) doc.text(`Bis: ${dateTo}`);
+      if (status) {
+        const statusLabels = Array.isArray(status) 
+          ? status.map(s => getAnfrageStatusInfo(s).label).join(', ')
+          : getAnfrageStatusInfo(status).label;
+        doc.text(`Status: ${statusLabels}`);
+      }
+      
+      doc.moveDown();
+      
+      // Tabellen-Header
+      doc.fontSize(12);
+      const tableHeaders = ['ID', 'Name', 'E-Mail', 'Datum', 'Service', 'Status'];
+      let currentY = doc.y;
+      
+      // Header-Hintergrund
+      doc.rect(50, currentY, 500, 20).fill('#f0f0f0');
+      doc.fillColor('#000000');
+      
+      // Header-Texte
+      let currentX = 50;
+      const columnWidths = [40, 100, 120, 80, 80, 80];
+      
+      tableHeaders.forEach((header, i) => {
+        doc.text(header, currentX, currentY + 5, { width: columnWidths[i], align: 'left' });
+        currentX += columnWidths[i];
+      });
+      
+      currentY += 25;
+      
+      // Zeilen
+      result.rows.forEach((row, rowIndex) => {
+        // Zeilen abwechselnd einfärben
+        if (rowIndex % 2 === 0) {
+          doc.rect(50, currentY - 5, 500, 20).fill('#f9f9f9');
+          doc.fillColor('#000000');
+        }
+        
+        // Seitenumbruch prüfen
+        if (currentY > 700) {
+          doc.addPage();
+          currentY = 50;
+        }
+        
+        currentX = 50;
+        doc.fontSize(10);
+        
+        // Zellen-Inhalte
+        doc.text(row.id.toString(), currentX, currentY, { width: columnWidths[0] });
+        currentX += columnWidths[0];
+        
+        doc.text(row.name, currentX, currentY, { width: columnWidths[1] });
+        currentX += columnWidths[1];
+        
+        doc.text(row.email, currentX, currentY, { width: columnWidths[2] });
+        currentX += columnWidths[2];
+        
+        doc.text(format(new Date(row.created_at), 'dd.MM.yyyy'), currentX, currentY, { width: columnWidths[3] });
+        currentX += columnWidths[3];
+        
+        let serviceLabel = '';
+        switch(row.service) {
+          case 'facility': serviceLabel = 'Facility'; break;
+          case 'moving': serviceLabel = 'Umzüge'; break;
+          case 'winter': serviceLabel = 'Winterdienst'; break;
+          default: serviceLabel = row.service;
+        }
+        doc.text(serviceLabel, currentX, currentY, { width: columnWidths[4] });
+        currentX += columnWidths[4];
+        
+        const statusInfo = getAnfrageStatusInfo(row.status);
+        doc.text(statusInfo.label, currentX, currentY, { width: columnWidths[5] });
+        
+        currentY += 20;
+      });
+      
+      // PDF finalisieren
+      doc.end();
+    } else if (exportFormat === 'excel') {
+      // Excel-Export
+      const Excel = require('exceljs');
+      const workbook = new Excel.Workbook();
+      const worksheet = workbook.addWorksheet('Anfragen');
+      
+      // Spalten definieren
+      worksheet.columns = [
+        { header: 'ID', key: 'id', width: 10 },
+        { header: 'Name', key: 'name', width: 20 },
+        { header: 'E-Mail', key: 'email', width: 30 },
+        { header: 'Telefon', key: 'phone', width: 15 },
+        { header: 'Service', key: 'service', width: 15 },
+        { header: 'Nachricht', key: 'message', width: 50 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Datum', key: 'date', width: 15 }
+      ];
+      
+      // Zeilen hinzufügen
+      result.rows.forEach(row => {
+        worksheet.addRow({
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          phone: row.phone || '',
+          service: row.service,
+          message: row.message || '',
+          status: getAnfrageStatusInfo(row.status).label,
+          date: format(new Date(row.created_at), 'dd.MM.yyyy HH:mm')
+        });
+      });
+      
+      // Header-Stil
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+      
+      // Excel-Datei an Browser senden
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=anfragen-export.xlsx');
+      
+      await workbook.xlsx.write(res);
+      res.end();
+    } else {
+      // Standard-Antwort bei unbekanntem Format
+      res.json({ 
+        success: true, 
+        message: 'Export verfügbar', 
+        format: exportFormat,
+        count: result.rows.length
+      });
+    }
+  } catch (error) {
+    console.error('Fehler beim Exportieren der Anfragen:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Datenbankfehler: ' + error.message 
+    });
+  }
+});
+
+// In routes/dashboard.js
+router.get('/anfragen/export', isAuthenticated, async (req, res) => {
+  try {
+    const { format: exportFormat, dateFrom, dateTo, status } = req.query;
+    
+    // Filterbedingungen aufbauen
+    let conditions = [];
+    let params = [];
+    let paramCounter = 1;
+    
+    if (dateFrom) {
+      conditions.push(`created_at >= $${paramCounter++}`);
+      params.push(dateFrom);
+    }
+    
+    if (dateTo) {
+      conditions.push(`created_at <= $${paramCounter++}`);
+      params.push(dateTo);
+    }
+    
+    if (status && Array.isArray(status)) {
+      conditions.push(`status IN (${status.map((_, i) => `$${paramCounter + i}`).join(', ')})`);
+      params.push(...status);
+      paramCounter += status.length;
+    } else if (status) {
+      conditions.push(`status = $${paramCounter++}`);
+      params.push(status);
+    }
+    
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    
+    // Daten abrufen
+    const query = {
+      text: `
+        SELECT 
+          id, 
+          name, 
+          email, 
+          phone, 
+          service, 
+          message, 
+          status, 
+          created_at
+        FROM 
+          kontaktanfragen
+        ${whereClause}
+        ORDER BY 
+          created_at DESC
+      `,
+      values: params
+    };
+    
+    const result = await pool.query(query);
+    
+    // Format basierte Verarbeitung
+    if (exportFormat === 'csv') {
+      // CSV-Export
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=anfragen-export.csv');
+      
+      // CSV-Header
+      res.write('ID,Name,Email,Telefon,Service,Nachricht,Status,Datum\n');
+      
+      // CSV-Zeilen
+      result.rows.forEach(row => {
+        const csvLine = [
+          row.id,
+          `"${row.name.replace(/"/g, '""')}"`,
+          `"${row.email.replace(/"/g, '""')}"`,
+          `"${row.phone || ''}"`,
+          `"${row.service}"`,
+          `"${(row.message || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+          `"${row.status}"`,
+          `"${format(new Date(row.created_at), 'dd.MM.yyyy HH:mm')}"`
+        ].join(',');
+        
+        res.write(csvLine + '\n');
+      });
+      
+      res.end();
+    } else {
+      // Standard-Antwort bei unbekanntem Format
+      res.json({ 
+        success: true, 
+        message: 'Export verfügbar', 
+        format: exportFormat,
+        count: result.rows.length
+      });
+    }
+  } catch (error) {
+    console.error('Fehler beim Exportieren der Anfragen:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Datenbankfehler: ' + error.message 
+    });
+  }
+});
+
 // Einzelne Anfrage anzeigen
 router.get('/anfragen/:id', isAuthenticated, async (req, res) => {
   try {
@@ -1000,6 +1406,50 @@ router.post('/kunden/:id/edit', isAuthenticated, async (req, res) => {
     console.error('Fehler beim Aktualisieren des Kunden:', error);
     req.flash('error', 'Datenbankfehler: ' + error.message);
     res.redirect(`/dashboard/kunden/${req.params.id}/edit`);
+  }
+});
+
+// Kunden-Notiz hinzufügen
+router.post('/kunden/:id/add-note', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notiz } = req.body;
+    
+    if (!notiz || notiz.trim() === '') {
+      req.flash('error', 'Die Notiz darf nicht leer sein.');
+      return res.redirect(`/dashboard/kunden/${id}`);
+    }
+    
+    // Aktuelle Notizen abrufen
+    const kundeQuery = await pool.query({
+      text: `SELECT notizen FROM kunden WHERE id = $1`,
+      values: [id]
+    });
+    
+    if (kundeQuery.rows.length === 0) {
+      req.flash('error', 'Kunde nicht gefunden.');
+      return res.redirect('/dashboard/kunden');
+    }
+    
+    const alteNotizen = kundeQuery.rows[0].notizen || '';
+    const zeitstempel = format(new Date(), 'dd.MM.yyyy, HH:mm');
+    const benutzerName = req.session.user.name;
+    
+    // Neue Notiz mit Datum und Benutzer
+    const neueNotiz = `${zeitstempel} - ${benutzerName}:\n${notiz}\n\n${alteNotizen}`;
+    
+    // In Datenbank aktualisieren
+    await pool.query({
+      text: `UPDATE kunden SET notizen = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      values: [neueNotiz, id]
+    });
+    
+    req.flash('success', 'Notiz erfolgreich hinzugefügt.');
+    res.redirect(`/dashboard/kunden/${id}`);
+  } catch (error) {
+    console.error('Fehler beim Hinzufügen der Notiz:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect(`/dashboard/kunden/${req.params.id}`);
   }
 });
 
@@ -1486,9 +1936,26 @@ router.post('/termine/add-note', isAuthenticated, async (req, res) => {
   }
 });
 
-// API Endpoint für Termine im Kalender
+/**
+ * API Routes für AJAX-Anfragen
+ * Ergänzung zu routes/dashboard.js
+ */
+
+// API-Endpunkt für Termine im Kalender
 router.get('/termine/api/events', isAuthenticated, async (req, res) => {
   try {
+    // Filter für Zeitraum (falls vorhanden)
+    const start = req.query.start;
+    const end = req.query.end;
+    
+    let timeCondition = '';
+    let params = [];
+    
+    if (start && end) {
+      timeCondition = 'WHERE t.termin_datum BETWEEN $1 AND $2';
+      params = [start, end];
+    }
+    
     // Termine aus der Datenbank abrufen
     const termineQuery = await pool.query(`
       SELECT 
@@ -1497,42 +1964,248 @@ router.get('/termine/api/events', isAuthenticated, async (req, res) => {
         t.termin_datum,
         t.dauer,
         t.status,
-        k.name AS kunde_name
+        t.ort,
+        k.name AS kunde_name,
+        k.id AS kunde_id
       FROM 
         termine t
         LEFT JOIN kunden k ON t.kunde_id = k.id
+      ${timeCondition}
       ORDER BY 
         t.termin_datum ASC
-    `);
+    `, params);
     
     // Termine in FullCalendar-Event-Format umwandeln
     const events = termineQuery.rows.map(termin => {
       const startDate = new Date(termin.termin_datum);
       const endDate = new Date(startDate.getTime() + (termin.dauer * 60 * 1000));
       
-      let backgroundColor;
+      let backgroundColor, textColor;
       switch(termin.status) {
-        case 'geplant': backgroundColor = '#ffc107'; break; // warning
-        case 'bestaetigt': backgroundColor = '#28a745'; break; // success
-        case 'abgeschlossen': backgroundColor = '#0d6efd'; break; // primary
-        case 'storniert': backgroundColor = '#6c757d'; break; // secondary
-        default: backgroundColor = '#6c757d'; // default gray
+        case 'geplant': 
+          backgroundColor = '#ffc107'; 
+          textColor = '#000000';
+          break;
+        case 'bestaetigt': 
+          backgroundColor = '#198754'; 
+          textColor = '#ffffff';
+          break;
+        case 'abgeschlossen': 
+          backgroundColor = '#0d6efd'; 
+          textColor = '#ffffff';
+          break;
+        case 'storniert': 
+          backgroundColor = '#6c757d'; 
+          textColor = '#ffffff';
+          break;
+        default: 
+          backgroundColor = '#6c757d';
+          textColor = '#ffffff';
       }
       
       return {
         id: termin.id,
-        title: termin.titel + (termin.kunde_name ? ` (${termin.kunde_name})` : ''),
+        title: termin.titel,
+        description: termin.kunde_name ? `Kunde: ${termin.kunde_name}` : '',
         start: startDate.toISOString(),
         end: endDate.toISOString(),
+        location: termin.ort || '',
         backgroundColor: backgroundColor,
-        borderColor: backgroundColor
+        borderColor: backgroundColor,
+        textColor: textColor,
+        extendedProps: {
+          kunde_id: termin.kunde_id,
+          status: termin.status
+        }
       };
     });
     
     res.json(events);
   } catch (error) {
     console.error('Fehler beim Abrufen der Termine für den Kalender:', error);
-    res.status(500).json({ error: 'Datenbankfehler' });
+    res.status(500).json({ error: 'Datenbankfehler', details: error.message });
+  }
+});
+
+// API-Endpunkt für Kunden-Suche (Autocomplete)
+router.get('/kunden/api/search', isAuthenticated, async (req, res) => {
+  try {
+    const searchTerm = req.query.term;
+    
+    if (!searchTerm || searchTerm.length < 2) {
+      return res.json([]);
+    }
+    
+    const kundenQuery = await pool.query(`
+      SELECT 
+        id, 
+        name, 
+        firma,
+        email,
+        telefon
+      FROM 
+        kunden
+      WHERE 
+        LOWER(name) LIKE LOWER($1) OR
+        LOWER(firma) LIKE LOWER($1) OR
+        LOWER(email) LIKE LOWER($1)
+      ORDER BY 
+        name ASC
+      LIMIT 10
+    `, [`%${searchTerm}%`]);
+    
+    const results = kundenQuery.rows.map(kunde => ({
+      id: kunde.id,
+      label: kunde.name + (kunde.firma ? ` (${kunde.firma})` : ''),
+      value: kunde.id,
+      name: kunde.name,
+      email: kunde.email,
+      telefon: kunde.telefon
+    }));
+    
+    res.json(results);
+  } catch (error) {
+    console.error('Fehler bei der Kundensuche:', error);
+    res.status(500).json({ error: 'Datenbankfehler', details: error.message });
+  }
+});
+
+// API-Endpunkt für Kunden-Details
+router.get('/kunden/api/:id', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const kundeQuery = await pool.query(`
+      SELECT 
+        id, 
+        name, 
+        firma,
+        email,
+        telefon,
+        adresse,
+        plz,
+        ort,
+        status
+      FROM 
+        kunden
+      WHERE 
+        id = $1
+    `, [id]);
+    
+    if (kundeQuery.rows.length === 0) {
+      return res.status(404).json({ error: 'Kunde nicht gefunden' });
+    }
+    
+    res.json({ success: true, kunde: kundeQuery.rows[0] });
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Kundendetails:', error);
+    res.status(500).json({ error: 'Datenbankfehler', details: error.message });
+  }
+});
+
+// API-Endpunkt für Dashboard-Statistiken
+router.get('/api/dashboard-stats', isAuthenticated, async (req, res) => {
+  try {
+    // Datenzeitraum aus Query-Parametern ermitteln
+    const period = req.query.period || 'month'; // week, month, quarter, year
+    
+    let timeFrame, format, groupBy;
+    switch(period) {
+      case 'week':
+        timeFrame = "CURRENT_DATE - INTERVAL '7 days'";
+        format = 'dy';
+        groupBy = "DATE_TRUNC('day', date)";
+        break;
+      case 'month':
+        timeFrame = "DATE_TRUNC('month', CURRENT_DATE)";
+        format = 'DD';
+        groupBy = "DATE_TRUNC('day', date)";
+        break;
+      case 'quarter':
+        timeFrame = "DATE_TRUNC('quarter', CURRENT_DATE)";
+        format = 'Mon';
+        groupBy = "DATE_TRUNC('month', date)";
+        break;
+      case 'year':
+        timeFrame = "DATE_TRUNC('year', CURRENT_DATE)";
+        format = 'Mon';
+        groupBy = "DATE_TRUNC('month', date)";
+        break;
+      default:
+        timeFrame = "DATE_TRUNC('month', CURRENT_DATE)";
+        format = 'DD';
+        groupBy = "DATE_TRUNC('day', date)";
+    }
+    
+    // Umsatzentwicklung abrufen
+    const revenueQuery = await pool.query(`
+      SELECT 
+        TO_CHAR(${groupBy}, '${format}') as label,
+        SUM(betrag) as summe
+      FROM 
+        rechnungen 
+      WHERE 
+        rechnungsdatum >= ${timeFrame}
+      GROUP BY 
+        ${groupBy}
+      ORDER BY 
+        ${groupBy}
+    `);
+    
+    // Services-Verteilung nach Kategorie
+    const servicesQuery = await pool.query(`
+      SELECT 
+        d.name as service_name,
+        SUM(p.anzahl * p.einzelpreis) as summe
+      FROM 
+        rechnungspositionen p
+        JOIN dienstleistungen d ON p.dienstleistung_id = d.id
+        JOIN rechnungen r ON p.rechnung_id = r.id
+      WHERE 
+        d.name IS NOT NULL 
+        AND r.rechnungsdatum >= ${timeFrame}
+      GROUP BY 
+        d.name
+      ORDER BY 
+        summe DESC
+      LIMIT 3
+    `);
+    
+    // Aktuelle Anfragen
+    const newRequestsCount = await getCountFromDB("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    
+    // Anstehende Termine
+    const upcomingAppointmentsQuery = await pool.query(`
+      SELECT COUNT(*) FROM termine WHERE termin_datum >= CURRENT_DATE
+    `);
+    
+    // Offene Rechnungen
+    const openInvoicesQuery = await pool.query(`
+      SELECT COUNT(*), SUM(gesamtbetrag) FROM rechnungen WHERE status = 'offen'
+    `);
+    
+    // Response zusammenstellen
+    const stats = {
+      revenue: {
+        labels: revenueQuery.rows.map(row => row.label),
+        data: revenueQuery.rows.map(row => parseFloat(row.summe))
+      },
+      services: {
+        labels: servicesQuery.rows.map(row => row.service_name),
+        data: servicesQuery.rows.map(row => parseFloat(row.summe))
+      },
+      counts: {
+        newRequests: newRequestsCount,
+        upcomingAppointments: parseInt(upcomingAppointmentsQuery.rows[0].count || 0),
+        openInvoices: parseInt(openInvoicesQuery.rows[0].count || 0),
+        openInvoicesAmount: parseFloat(openInvoicesQuery.rows[0].sum || 0)
+      }
+    };
+    
+    res.json(stats);
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Dashboard-Statistiken:', error);
+    res.status(500).json({ error: 'Datenbankfehler', details: error.message });
   }
 });
 

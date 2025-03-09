@@ -1,48 +1,72 @@
-<!-- Bootstrap Bundle JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</main>
+</div>
 
-<!-- jQuery (required for DataTables) -->
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-<!-- DataTables with Bootstrap 5 -->
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<!-- Bootstrap Bundle mit Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Dashboard Layout Script -->
+<!-- DataTables JS - nur laden, wenn Tabellen vorhanden sind -->
+<% if (typeof dataTablesNeeded === 'undefined' || dataTablesNeeded !== false) { %>
+  <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+  <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<% } %>
+
+<!-- Dashboard Core JS - mit Lazy Loading -->
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    // Sidebar Toggle (Mobile)
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebarClose = document.getElementById('sidebarClose');
+  // Minimale Skript-Version für einfache Seiten
+  document.addEventListener("DOMContentLoaded", function() {
+    // Sidebar Toggle
+    const sidebarToggler = document.querySelector('.sidebar-toggler');
     const dashboardWrapper = document.querySelector('.dashboard-wrapper');
     
-    if (sidebarToggle && dashboardWrapper) {
-      sidebarToggle.addEventListener('click', function() {
+    if (sidebarToggler && dashboardWrapper) {
+      sidebarToggler.addEventListener('click', function() {
         dashboardWrapper.classList.toggle('sidebar-open');
       });
     }
     
-    if (sidebarClose && dashboardWrapper) {
-      sidebarClose.addEventListener('click', function() {
-        dashboardWrapper.classList.remove('sidebar-open');
+    // Dropdown Toggle
+    const dropdowns = document.querySelectorAll('.nav-dropdown');
+    dropdowns.forEach(dropdown => {
+      const toggle = dropdown.querySelector('.dropdown-toggle');
+      if (toggle) {
+        toggle.addEventListener('click', function(e) {
+          e.preventDefault();
+          dropdown.classList.toggle('show');
+          dropdown.querySelector('.dropdown-menu').classList.toggle('show');
+        });
+      }
+    });
+    
+    // Tabellen-Initialisierung
+    if (typeof $.fn !== 'undefined' && $.fn.DataTable && document.querySelector('.datatable')) {
+      $('.datatable').DataTable({
+        language: {
+          url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/de-DE.json'
+        },
+        responsive: true,
+        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Alle"]],
+        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"table-responsive"t><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
       });
     }
     
-    // Initialize DataTables if present
-    const dataTables = document.querySelectorAll('.datatable');
-    if (dataTables.length > 0 && typeof $.fn.DataTable !== 'undefined') {
-      dataTables.forEach(table => {
-        $(table).DataTable({
-          language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/de-DE.json',
-          },
-          responsive: true,
-          pageLength: 10,
-          lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, "Alle"]]
-        });
-      });
+    // Load full dashboard.js only if needed
+    if (document.querySelector('.service-toggle') || 
+        document.querySelector('#calendar') ||
+        document.querySelector('#revenueChart')) {
+      const script = document.createElement('script');
+      script.src = '/scripts/dashboard.js';
+      document.body.appendChild(script);
     }
   });
 </script>
+
+<!-- Page Specific Scripts -->
+<% if (typeof pageScripts !== 'undefined') { %>
+  <%= pageScripts %>
+<% } %>
 </body>
 </html>
