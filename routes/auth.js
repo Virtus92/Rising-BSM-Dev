@@ -37,13 +37,8 @@ router.post('/login', async (req, res) => {
     const user = result.rows[0];
     console.log("User found:", user.name);
 
-    // Temporär direktes Login ohne Passwortprüfung zu Debugging-Zwecken
-    // Dies sollte in der Produktion NICHT verwendet werden!
-    // In der realen Implementierung, kommentiere die folgende Zeile aus und
-    // aktiviere stattdessen den auskommentierten bcrypt-Vergleich
-    // let passwordMatches = true;
-
-    // Echter Passwortvergleich (für Produktion)
+    // FIXED: Removed debug code that bypassed password verification
+    // Always perform password verification
     const passwordMatches = await bcrypt.compare(password, user.passwort);
     
     if (!passwordMatches) {
@@ -52,7 +47,7 @@ router.post('/login', async (req, res) => {
       return res.redirect('/login');
     }
 
-    // Sitzung erstellen
+    // Sitzung erstellen - FIXED: Don't store password hash in session
     req.session.user = {
       id: user.id,
       name: user.name,
@@ -66,6 +61,9 @@ router.post('/login', async (req, res) => {
     // Cookie-Lebensdauer bei "Angemeldet bleiben" verlängern
     if (remember) {
       req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 Tage
+    } else {
+      // Set a default session timeout for normal login
+      req.session.cookie.maxAge = 8 * 60 * 60 * 1000; // 8 hours
     }
 
     // Auf Dashboard weiterleiten
@@ -92,7 +90,8 @@ router.get('/forgot-password', (req, res) => {
   res.render('forgot-password', {
     title: 'Passwort vergessen - Rising BSM',
     error: req.flash('error')[0] || null,
-    success: req.flash('success')[0] || null
+    success: req.flash('success')[0] || null,
+    csrfToken: req.csrfToken() // FIXED: Added CSRF token
   });
 });
 
@@ -101,10 +100,19 @@ router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
 
+    // Input validation
+    if (!email || typeof email !== 'string') {
+      req.flash('error', 'Bitte geben Sie eine gültige E-Mail-Adresse ein.');
+      return res.redirect('/forgot-password');
+    }
+
+    // Sanitize input
+    const sanitizedEmail = email.trim().toLowerCase();
+
     // Prüfen, ob Benutzer existiert
     const result = await pool.query(
       'SELECT * FROM benutzer WHERE email = $1',
-      [email]
+      [sanitizedEmail]
     );
 
     if (result.rows.length === 0) {
@@ -116,7 +124,8 @@ router.post('/forgot-password', async (req, res) => {
     const user = result.rows[0];
 
     // Hier würde Code zum Versenden einer E-Mail mit dem Reset-Link folgen
-    // Für dieses Beispiel überspringen wir diesen Teil
+    // TODO: Implement actual password reset email functionality
+    console.log('Password reset requested for:', user.email);
 
     req.flash('success', 'Falls ein Konto mit dieser E-Mail existiert, haben wir Ihnen eine Anleitung zum Zurücksetzen Ihres Passworts geschickt.');
     res.redirect('/login');

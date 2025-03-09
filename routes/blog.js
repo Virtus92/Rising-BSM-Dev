@@ -217,12 +217,6 @@ router.post('/generate', isAuthenticated, isManager, async (req, res) => {
         user_id: req.session.user.id
       });
       
-      // Status auf "processing" setzen
-      await _query(
-        'UPDATE blog_ai_requests SET status = $1 WHERE id = $2',
-        ['processing', requestId]
-      );
-      
       req.flash('success', 'Die Generierung wurde gestartet! Sie werden benachrichtigt, sobald der Beitrag fertig ist.');
     } catch (webhookError) {
       console.error('Fehler beim Auslösen des N8N Webhooks:', webhookError);

@@ -1,229 +1,269 @@
 <%- include('../partials/admin-header') %>
 
-<div class="dashboard-wrapper">
-
-    <!-- Dashboard Content -->
-    <div class="dashboard-content p-3 p-md-4">
-      <!-- Analytics Summary Cards -->
-      <div class="row g-3 mb-4">
-        <div class="col-12 col-md-6 col-lg-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center justify-content-between mb-3">
-                <h6 class="card-title mb-0 text-muted">Neue Anfragen</h6>
-                <div class="rounded-circle bg-primary bg-opacity-10 p-2">
-                  <i class="fas fa-envelope text-primary"></i>
-                </div>
-              </div>
-              <h2 class="fw-bold mb-1"><%= stats.newRequests.count %></h2>
-              <p class="<%= stats.newRequests.trend > 0 ? 'text-success' : 'text-danger' %> mb-0">
-                <i class="fas fa-arrow-<%= stats.newRequests.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.newRequests.trend) %>% seit letzter Woche</p>
-            </div>
+<!-- Analytics Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h6 class="card-title mb-0 text-muted">Neue Anfragen</h6>
+          <div class="rounded-circle bg-primary bg-opacity-10 p-2">
+            <i class="fas fa-envelope text-primary"></i>
           </div>
         </div>
-        <div class="col-12 col-md-6 col-lg-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center justify-content-between mb-3">
-                <h6 class="card-title mb-0 text-muted">Aktive Aufträge</h6>
-                <div class="rounded-circle bg-success bg-opacity-10 p-2">
-                  <i class="fas fa-tasks text-success"></i>
-                </div>
-              </div>
-              <h2 class="fw-bold mb-1"><%= stats.activeProjects.count %></h2>
-              <p class="<%= stats.activeProjects.trend > 0 ? 'text-success' : 'text-danger' %> mb-0">
-                <i class="fas fa-arrow-<%= stats.activeProjects.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.activeProjects.trend) %>% seit letztem Monat</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-md-6 col-lg-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center justify-content-between mb-3">
-                <h6 class="card-title mb-0 text-muted">Gesamtkunden</h6>
-                <div class="rounded-circle bg-info bg-opacity-10 p-2">
-                  <i class="fas fa-users text-info"></i>
-                </div>
-              </div>
-              <h2 class="fw-bold mb-1"><%= stats.totalCustomers.count %></h2>
-              <p class="<%= stats.totalCustomers.trend > 0 ? 'text-success' : 'text-danger' %> mb-0">
-                <i class="fas fa-arrow-<%= stats.totalCustomers.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.totalCustomers.trend) %>% im Jahresvergleich</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-md-6 col-lg-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center justify-content-between mb-3">
-                <h6 class="card-title mb-0 text-muted">Umsatz (Monat)</h6>
-                <div class="rounded-circle bg-warning bg-opacity-10 p-2">
-                  <i class="fas fa-euro-sign text-warning"></i>
-                </div>
-              </div>
-              <h2 class="fw-bold mb-1">€<%= stats.monthlyRevenue.amount.toLocaleString('de-DE') %></h2>
-              <p class="<%= stats.monthlyRevenue.trend > 0 ? 'text-success' : 'text-danger' %> mb-0">
-                <i class="fas fa-arrow-<%= stats.monthlyRevenue.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.monthlyRevenue.trend) %>% seit letztem Monat</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Charts Row -->
-      <div class="row g-3 mb-4">
-        <div class="col-12 col-lg-8">
-          <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white">
-              <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Umsatzentwicklung</h5>
-                <div class="dropdown">
-                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="revenueTimeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                    <%= chartFilters.revenue.selected %>
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="revenueTimeDropdown">
-                    <% chartFilters.revenue.options.forEach(function(option) { %>
-                      <li><a class="dropdown-item <%= option === chartFilters.revenue.selected ? 'active' : '' %>" 
-                             href="/dashboard?revenueFilter=<%= encodeURIComponent(option) %>"><%= option %></a></li>
-                    <% }); %>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <% if (charts.revenue.data.length === 0) { %>
-                <div class="d-flex justify-content-center align-items-center h-100">
-                  <p class="text-muted">Keine Daten verfügbar</p>
-                </div>
-              <% } else { %>
-                <canvas id="revenueChart" style="width:100%; height: 300px;"></canvas>
-              <% } %>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white">
-              <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Aufträge nach Service</h5>
-                <div class="dropdown">
-                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="servicesTimeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                    <%= chartFilters.services.selected %>
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="servicesTimeDropdown">
-                    <% chartFilters.services.options.forEach(function(option) { %>
-                      <li><a class="dropdown-item <%= option === chartFilters.services.selected ? 'active' : '' %>"
-                             href="/dashboard?servicesFilter=<%= encodeURIComponent(option) %>"><%= option %></a></li>
-                    <% }); %>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <% if (charts.services.data.length === 0) { %>
-                <div class="d-flex justify-content-center align-items-center h-100">
-                  <p class="text-muted">Keine Daten verfügbar</p>
-                </div>
-              <% } else { %>
-                <canvas id="servicesChart" style="width:100%; height: 300px;"></canvas>
-              <% } %>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Recent Activity and Tasks -->
-      <div class="row g-3">
-        <!-- Recent Inquiries -->
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white">
-              <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Neue Anfragen</h5>
-                <a href="/dashboard/anfragen" class="btn btn-sm btn-outline-success">Alle anzeigen</a>
-              </div>
-            </div>
-            <div class="card-body p-0">
-              <% if (recentRequests.length === 0) { %>
-                <div class="p-4 text-center">
-                  <p class="text-muted mb-0">Keine neuen Anfragen</p>
-                </div>
-              <% } else { %>
-                <div class="table-responsive">
-                  <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                      <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Service</th>
-                        <th scope="col">Datum</th>
-                        <th scope="col">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <% recentRequests.forEach(function(request) { %>
-                        <tr>
-                          <td>
-                            <a href="/dashboard/anfragen/<%= request.id %>" class="text-decoration-none text-dark">
-                              <%= request.name %>
-                            </a>
-                          </td>
-                          <td><%= request.serviceLabel %></td>
-                          <td><%= request.formattedDate %></td>
-                          <td>
-                            <span class="badge bg-<%= request.statusClass %><%= request.status === 'Neu' ? ' text-dark' : '' %>">
-                              <%= request.status %>
-                            </span>
-                          </td>
-                        </tr>
-                      <% }); %>
-                    </tbody>
-                  </table>
-                </div>
-              <% } %>
-            </div>
-          </div>
-        </div>
-
-        <!-- Upcoming Tasks/Appointments -->
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white">
-              <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Anstehende Termine</h5>
-                <a href="/dashboard/termine" class="btn btn-sm btn-outline-success">Alle anzeigen</a>
-              </div>
-            </div>
-            <div class="card-body p-0">
-              <% if (upcomingAppointments.length === 0) { %>
-                <div class="p-4 text-center">
-                  <p class="text-muted mb-0">Keine anstehenden Termine</p>
-                </div>
-              <% } else { %>
-                <div class="list-group list-group-flush">
-                  <% upcomingAppointments.forEach(function(appointment) { %>
-                    <div class="list-group-item">
-                      <div class="d-flex w-100 justify-content-between align-items-center">
-                        <div>
-                          <h6 class="mb-1">
-                            <a href="/dashboard/termine/<%= appointment.id %>" class="text-decoration-none text-dark">
-                              <%= appointment.title %>
-                            </a>
-                          </h6>
-                          <p class="mb-1 text-muted"><%= appointment.customer %></p>
-                        </div>
-                        <div class="text-end">
-                          <span class="badge bg-<%= appointment.dateClass %>"><%= appointment.dateLabel %></span>
-                          <small class="d-block"><%= appointment.time %> Uhr</small>
-                        </div>
-                      </div>
-                    </div>
-                  <% }); %>
-                </div>
-              <% } %>
-            </div>
-          </div>
-        </div>
+        <h2 class="fw-bold mb-1"><%= stats.newRequests.count %></h2>
+        <p class="<%= stats.newRequests.trend > 0 ? 'text-success' : (stats.newRequests.trend < 0 ? 'text-danger' : 'text-muted') %> mb-0">
+          <% if (stats.newRequests.trend !== 0) { %>
+            <i class="fas fa-arrow-<%= stats.newRequests.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.newRequests.trend) %>% seit letzter Woche
+          <% } else { %>
+            <i class="fas fa-minus me-1"></i> Keine Änderung
+          <% } %>
+        </p>
       </div>
     </div>
-  </main>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h6 class="card-title mb-0 text-muted">Aktive Aufträge</h6>
+          <div class="rounded-circle bg-success bg-opacity-10 p-2">
+            <i class="fas fa-tasks text-success"></i>
+          </div>
+        </div>
+        <h2 class="fw-bold mb-1"><%= stats.activeProjects.count %></h2>
+        <p class="<%= stats.activeProjects.trend > 0 ? 'text-success' : (stats.activeProjects.trend < 0 ? 'text-danger' : 'text-muted') %> mb-0">
+          <% if (stats.activeProjects.trend !== 0) { %>
+            <i class="fas fa-arrow-<%= stats.activeProjects.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.activeProjects.trend) %>% seit letztem Monat
+          <% } else { %>
+            <i class="fas fa-minus me-1"></i> Keine Änderung
+          <% } %>
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h6 class="card-title mb-0 text-muted">Gesamtkunden</h6>
+          <div class="rounded-circle bg-info bg-opacity-10 p-2">
+            <i class="fas fa-users text-info"></i>
+          </div>
+        </div>
+        <h2 class="fw-bold mb-1"><%= stats.totalCustomers.count %></h2>
+        <p class="<%= stats.totalCustomers.trend > 0 ? 'text-success' : (stats.totalCustomers.trend < 0 ? 'text-danger' : 'text-muted') %> mb-0">
+          <% if (stats.totalCustomers.trend !== 0) { %>
+            <i class="fas fa-arrow-<%= stats.totalCustomers.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.totalCustomers.trend) %>% im Jahresvergleich
+          <% } else { %>
+            <i class="fas fa-minus me-1"></i> Keine Änderung
+          <% } %>
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h6 class="card-title mb-0 text-muted">Umsatz (Monat)</h6>
+          <div class="rounded-circle bg-warning bg-opacity-10 p-2">
+            <i class="fas fa-euro-sign text-warning"></i>
+          </div>
+        </div>
+        <h2 class="fw-bold mb-1">€<%= stats.monthlyRevenue.amount.toLocaleString('de-DE') %></h2>
+        <p class="<%= stats.monthlyRevenue.trend > 0 ? 'text-success' : (stats.monthlyRevenue.trend < 0 ? 'text-danger' : 'text-muted') %> mb-0">
+          <% if (stats.monthlyRevenue.trend !== 0) { %>
+            <i class="fas fa-arrow-<%= stats.monthlyRevenue.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.monthlyRevenue.trend) %>% seit letztem Monat
+          <% } else { %>
+            <i class="fas fa-minus me-1"></i> Keine Änderung
+          <% } %>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-3 mb-4">
+  <div class="col-12 col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Umsatzentwicklung</h5>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="revenueTimeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              <%= chartFilters.revenue.selected %>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="revenueTimeDropdown">
+              <% chartFilters.revenue.options.forEach(function(option) { %>
+                <li><a class="dropdown-item <%= option === chartFilters.revenue.selected ? 'active' : '' %>" 
+                       href="/dashboard?revenueFilter=<%= encodeURIComponent(option) %>"><%= option %></a></li>
+              <% }); %>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <% if (charts.revenue.data.length === 0) { %>
+          <div class="d-flex justify-content-center align-items-center py-5">
+            <div class="text-center">
+              <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+              <p class="text-muted">Keine Umsatzdaten verfügbar</p>
+            </div>
+          </div>
+        <% } else { %>
+          <canvas id="revenueChart" style="width:100%; height: 300px;"></canvas>
+          
+          <!-- Make chart data available to the JavaScript -->
+          <script>
+            const revenueChartData = {
+              labels: <%- JSON.stringify(charts.revenue.labels) %>,
+              data: <%- JSON.stringify(charts.revenue.data) %>
+            };
+          </script>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Aufträge nach Service</h5>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="servicesTimeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              <%= chartFilters.services.selected %>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="servicesTimeDropdown">
+              <% chartFilters.services.options.forEach(function(option) { %>
+                <li><a class="dropdown-item <%= option === chartFilters.services.selected ? 'active' : '' %>"
+                       href="/dashboard?servicesFilter=<%= encodeURIComponent(option) %>"><%= option %></a></li>
+              <% }); %>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <% if (charts.services.data.length === 0) { %>
+          <div class="d-flex justify-content-center align-items-center py-5">
+            <div class="text-center">
+              <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+              <p class="text-muted">Keine Service-Daten verfügbar</p>
+            </div>
+          </div>
+        <% } else { %>
+          <canvas id="servicesChart" style="width:100%; height: 300px;"></canvas>
+          
+          <!-- Make chart data available to the JavaScript -->
+          <script>
+            const servicesChartData = {
+              labels: <%- JSON.stringify(charts.services.labels) %>,
+              data: <%- JSON.stringify(charts.services.data) %>
+            };
+          </script>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Activity and Tasks -->
+<div class="row g-3">
+  <!-- Recent Inquiries -->
+  <div class="col-12 col-lg-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Neue Anfragen</h5>
+          <a href="/dashboard/anfragen" class="btn btn-sm btn-outline-success">Alle anzeigen</a>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <% if (!recentRequests || recentRequests.length === 0) { %>
+          <div class="p-4 text-center">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <p class="text-muted mb-0">Keine neuen Anfragen</p>
+          </div>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Service</th>
+                  <th scope="col">Datum</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% recentRequests.forEach(function(request) { %>
+                  <tr>
+                    <td>
+                      <a href="/dashboard/anfragen/<%= request.id %>" class="text-decoration-none text-dark">
+                        <%= request.name %>
+                      </a>
+                    </td>
+                    <td><%= request.serviceLabel %></td>
+                    <td><%= request.formattedDate %></td>
+                    <td>
+                      <span class="badge bg-<%= request.statusClass %><%= request.status === 'Neu' ? ' text-dark' : '' %>">
+                        <%= request.status %>
+                      </span>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upcoming Tasks/Appointments -->
+  <div class="col-12 col-lg-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Anstehende Termine</h5>
+          <a href="/dashboard/termine" class="btn btn-sm btn-outline-success">Alle anzeigen</a>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <% if (!upcomingAppointments || upcomingAppointments.length === 0) { %>
+          <div class="p-4 text-center">
+            <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
+            <p class="text-muted mb-0">Keine anstehenden Termine</p>
+            <a href="/dashboard/termine/neu" class="btn btn-sm btn-success mt-3">
+              <i class="fas fa-plus me-1"></i> Termin erstellen
+            </a>
+          </div>
+        <% } else { %>
+          <div class="list-group list-group-flush">
+            <% upcomingAppointments.forEach(function(appointment) { %>
+              <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                  <div>
+                    <h6 class="mb-1">
+                      <a href="/dashboard/termine/<%= appointment.id %>" class="text-decoration-none text-dark">
+                        <%= appointment.title %>
+                      </a>
+                    </h6>
+                    <p class="mb-1 text-muted"><%= appointment.customer %></p>
+                  </div>
+                  <div class="text-end">
+                    <span class="badge bg-<%= appointment.dateClass %>"><%= appointment.dateLabel %></span>
+                    <small class="d-block"><%= appointment.time %> Uhr</small>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
 </div>
 
 <%- include('../partials/admin-footer') %>
