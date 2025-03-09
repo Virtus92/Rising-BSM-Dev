@@ -21,6 +21,248 @@
   
   <!-- Custom Dashboard Styles -->
   <link rel="stylesheet" href="/styles/dashboard.css">
+  
+  <style>
+    /* Base layout */
+    body {
+      display: flex;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    
+    /* Sidebar styling */
+    .dashboard-sidebar {
+      width: 280px;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1030;
+      transition: all 0.3s ease;
+    }
+    
+    /* Main content area */
+    .dashboard-main {
+      flex: 1;
+      margin-left: 280px;
+      width: calc(100% - 280px);
+      transition: all 0.3s ease;
+    }
+    
+    /* Avatar styling */
+    .avatar-wrapper {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* Active navigation styling */
+    .nav-link.active {
+      background-color: rgba(25, 135, 84, 0.1);
+      color: #198754;
+      font-weight: 500;
+    }
+    
+    /* Badge positioning */
+    .nav-badge {
+      float: right;
+    }
+    
+    /* Sidebar header */
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    /* Mobile adjustments */
+    @media (max-width: 767.98px) {
+      .dashboard-sidebar {
+        transform: translateX(-100%);
+        box-shadow: none;
+      }
+      
+      .dashboard-sidebar.show {
+        transform: translateX(0);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+      }
+      
+      .dashboard-main {
+        margin-left: 0;
+        width: 100%;
+      }
+      
+      body.sidebar-open {
+        overflow: hidden;
+      }
+      
+      .overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1025;
+      }
+      
+      .overlay.show {
+        display: block;
+      }
+    }
+  </style>
+  
+  
+  <!-- Bootstrap JS with Popper -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Mobile Navigation Script -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const sidebar = document.getElementById('sidebar');
+      const sidebarToggle = document.getElementById('sidebarToggle');
+      const sidebarClose = document.getElementById('sidebarClose');
+      const overlay = document.getElementById('sidebarOverlay');
+      
+      // Toggle sidebar
+      sidebarToggle.addEventListener('click', function() {
+        sidebar.classList.add('show');
+        overlay.classList.add('show');
+        document.body.classList.add('sidebar-open');
+      });
+      
+      // Close sidebar
+      function closeSidebar() {
+        sidebar.classList.remove('show');
+        overlay.classList.remove('show');
+        document.body.classList.remove('sidebar-open');
+      }
+      
+      sidebarClose.addEventListener('click', closeSidebar);
+      overlay.addEventListener('click', closeSidebar);
+      
+      // Close sidebar when clicking on a menu item (mobile)
+      document.querySelectorAll('.sidebar-nav .nav-link').forEach(link => {
+        link.addEventListener('click', function() {
+          if (window.innerWidth < 768) {
+            closeSidebar();
+          }
+        });
+      });
+      
+      // Reset sidebar on window resize
+      window.addEventListener('resize', function() {
+        if (window.innerWidth >= 768) {
+          sidebar.classList.remove('show');
+          overlay.classList.remove('show');
+          document.body.classList.remove('sidebar-open');
+        }
+      });
+    });
+  </script>
 </head>
 
 <body class="bg-light">
+  <!-- Mobile Overlay -->
+  <div id="sidebarOverlay" class="overlay"></div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="dashboard-sidebar bg-white shadow-sm">
+    <div class="sidebar-header p-3 border-bottom">
+      <img src="/images/Logo.png" alt="Rising BSM Logo" class="img-fluid" style="max-height: 50px;">
+      <button id="sidebarClose" class="btn-close d-md-none"></button>
+    </div>
+    
+    <div class="sidebar-user p-3 border-bottom">
+      <div class="d-flex align-items-center">
+        <div class="avatar-wrapper bg-success rounded-circle me-2">
+          <span class="text-white fw-bold"><%= user.initials %></span>
+        </div>
+        <div class="user-info">
+          <h6 class="mb-0 fw-semibold"><%= user.name %></h6>
+          <small class="text-muted"><%= user.role %></small>
+        </div>
+      </div>
+    </div>
+    
+    <nav class="sidebar-nav p-3">
+      <ul class="list-unstyled mb-0">
+        <li class="nav-item mb-2">
+          <a href="/dashboard" class="nav-link <%= currentPath === '/dashboard' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/anfragen" class="nav-link <%= currentPath === '/dashboard/anfragen' ? 'active' : '' %> px-3 py-2 rounded d-flex justify-content-between align-items-center">
+            <div><i class="fas fa-envelope me-2"></i> Anfragen</div>
+            <% if (newRequestsCount > 0) { %>
+              <span class="badge bg-success rounded-pill"><%= newRequestsCount %></span>
+            <% } %>
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/kunden" class="nav-link <%= currentPath === '/dashboard/kunden' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-users me-2"></i> Kunden
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/termine" class="nav-link <%= currentPath === '/dashboard/termine' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-calendar-alt me-2"></i> Termine
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/dienste" class="nav-link <%= currentPath === '/dashboard/dienste' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-tools me-2"></i> Dienstleistungen
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/blog" class="nav-link <%= currentPath === '/dashboard/blog' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-newspaper me-2"></i> Blog Einstellungen
+          </a>
+        </li>
+        <li class="nav-item mb-2">
+          <a href="/dashboard/settings" class="nav-link <%= currentPath === '/dashboard/settings' ? 'active' : '' %> px-3 py-2 rounded">
+            <i class="fas fa-cog me-2"></i> Einstellungen
+          </a>
+        </li>
+        <li class="nav-item mt-4">
+          <a href="/dashboard/logout" class="nav-link text-danger px-3 py-2 rounded">
+            <i class="fas fa-sign-out-alt me-2"></i> Abmelden
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="dashboard-main">
+    <!-- Sidebar Toggle Button (Mobile) -->
+    <button id="sidebarToggle" class="btn btn-success d-md-none position-fixed top-0 end-0 mt-2 me-2" style="z-index: 1031;">
+      <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- Top Navbar -->
+    <nav class="navbar navbar-expand navbar-light bg-white shadow-sm py-2 sticky-top">
+      <div class="container-fluid">
+        <h1 class="h5 mb-0 fw-bold"><%= title %></h1>
+        <div class="d-flex align-items-center">
+          <div class="dropdown">
+            <button class="btn btn-link text-dark dropdown-toggle d-flex align-items-center gap-2" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              <div class="avatar-wrapper bg-success rounded-circle">
+                <span class="text-white fw-bold"><%= user.initials %></span>
+              </div>
+              <span class="d-none d-lg-inline"><%= user.name %></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userDropdown">
+              <li><a class="dropdown-item" href="/dashboard/profile"><i class="fas fa-user me-2"></i> Profil</a></li>
+              <li><a class="dropdown-item" href="/dashboard/settings"><i class="fas fa-cog me-2"></i> Einstellungen</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="/dashboard/logout"><i class="fas fa-sign-out-alt me-2"></i> Abmelden</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </nav>

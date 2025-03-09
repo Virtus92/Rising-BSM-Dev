@@ -25,7 +25,9 @@
             <div class="row g-0">
               <div class="col-md-6">
                 <% if (featuredPost.image) { %>
-                  <img src="<%= featuredPost.image %>" class="img-fluid h-100 object-cover" alt="<%= featuredPost.title %>" style="object-fit: cover;">
+                  <div class="ratio ratio-16x9">
+                  <img src="<%= featuredPost.image %>" class="img-fluid object-cover" alt="<%= featuredPost.title %>" style="object-fit: cover;">
+                  </div>
                 <% } else { %>
                   <div class="bg-primary bg-opacity-10 h-100 d-flex align-items-center justify-content-center">
                     <i class="fas fa-blog fa-4x text-primary opacity-50"></i>

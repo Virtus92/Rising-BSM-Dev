@@ -290,8 +290,22 @@ app.use((err, req, res, next) => {
 });
 
 
+// Ersetzen Sie Ihren bestehenden CSRF-Fehlerhandler in server.js mit diesem
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
+    console.error('CSRF-Fehler beim Request von:', req.headers.referer || 'Unbekannt');
+    
+    // Für AJAX-Anfragen JSON zurückgeben
+    if (req.xhr || req.headers.accept && req.headers.accept.includes('json') || 
+        req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'invalid csrf token',
+        message: 'Sicherheitstoken ungültig oder abgelaufen. Bitte laden Sie die Seite neu und versuchen Sie es erneut.'
+      });
+    }
+    
+    // Für normale Anfragen die Fehlerseite anzeigen
     return res.status(403).render('error', {
       message: 'Das Formular ist abgelaufen. Bitte versuchen Sie es erneut.',
       error: {}

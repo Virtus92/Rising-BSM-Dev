@@ -29,7 +29,7 @@
                 <div class="card h-100 border-0 shadow-sm hover-shadow">
                   <% if (post.image) { %>
                     <div class="ratio ratio-16x9">
-                      <img src="<%= post.image %>" class="card-img-top" alt="<%= post.title %>">
+                        <img src="<%= post.image %>" class="card-img-top object-fit-cover" style="height: 200px;" alt="<%= post.title %>">
                     </div>
                   <% } else { %>
                     <div class="ratio ratio-16x9 bg-light d-flex align-items-center justify-content-center">

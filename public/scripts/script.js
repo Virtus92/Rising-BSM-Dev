@@ -1,6 +1,38 @@
 document.addEventListener("DOMContentLoaded", function() {
   "use strict";
 
+  // CSRF-Token für alle Fetch-Anfragen automatisch einrichten
+  const setupCSRF = () => {
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    if (csrfMeta) {
+      const csrfToken = csrfMeta.getAttribute('content');
+      
+      // Originale fetch()-Funktion sichern
+      const originalFetch = window.fetch;
+      
+      // fetch() überschreiben, um CSRF-Token hinzuzufügen
+      window.fetch = function(url, options = {}) {
+        // Wenn es sich um eine POST/PUT/DELETE-Anfrage handelt
+        if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase())) {
+          // Headers vorbereiten
+          options.headers = options.headers || {};
+          
+          // CSRF-Token in Header setzen
+          options.headers['CSRF-Token'] = csrfToken;
+        }
+        
+        return originalFetch.call(this, url, options);
+      };
+      
+      console.log('CSRF-Schutz für AJAX-Anfragen konfiguriert');
+    } else {
+      console.warn('CSRF-Meta-Tag nicht gefunden!');
+    }
+  };
+  
+  // CSRF-Setup ausführen
+  setupCSRF();
+
   window.ServiceModals = {};
 
   // Utility Functions
@@ -331,12 +363,15 @@ document.addEventListener("DOMContentLoaded", function() {
       const formElements = this.querySelectorAll('input, textarea, select, button');
       formElements.forEach(element => element.disabled = true);
 
+      const csrfToken = this.querySelector('[name="_csrf"]').value;
+
       const formData = {
         name: this.querySelector('[name="name"]').value.trim(),
         email: this.querySelector('[name="email"]').value.trim(),
         phone: this.querySelector('[name="phone"]').value.trim(),
         service: this.querySelector('[name="service"]').value,
         message: this.querySelector('[name="message"]').value.trim(),
+        _csrf: csrfToken, // CSRF-TOKEN HINZUFÜGEN!
         timestamp: new Date().toISOString()
       };
 
@@ -357,7 +392,7 @@ document.addEventListener("DOMContentLoaded", function() {
       const sendFormData = (data, retryCount = 0) => {
         fetch('/contact', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
           body: JSON.stringify(data)
         })
         .then(response => {
