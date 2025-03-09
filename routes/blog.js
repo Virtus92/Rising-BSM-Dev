@@ -1,4 +1,3 @@
-// routes/blog.js - CommonJS version
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
@@ -10,18 +9,49 @@ const { de } = require('date-fns/locale');
 
 // Helper function for HTTP requests
 const _post = async (url, data) => {
-  return await axios.post(url, data);
+  try {
+    return await axios.post(url, data);
+  } catch (error) {
+    console.error(`Error in _post to ${url}:`, error);
+    throw error; // Re-throw to be handled by the route
+  }
 };
 
 // Helper function for database queries
 const _query = async (text, params) => {
-  return await pool.query(text, params);
+  try {
+    return await pool.query(text, params);
+  } catch (error) {
+    console.error(`Error in _query with text ${text}:`, error);
+    throw error; // Re-throw to be handled by the route
+  }
 };
 
 // Helper function for DB connection
 const connect = async () => {
-  return await pool.connect();
+  try {
+    return await pool.connect();
+  } catch (error) {
+    console.error("Error connecting to the database:", error);
+    throw error; // Re-throw to be handled by the route
+  }
 };
+
+// Middleware to get new requests count
+const getNewRequestsCount = async (req, res, next) => {
+  try {
+    const newRequestsCountQuery = await _query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    req.newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0, 10);
+    next();
+  } catch (error) {
+    console.error('Error fetching new requests count:', error);
+    req.newRequestsCount = 0; // Default value in case of error
+    next();
+  }
+};
+
+// Apply middleware to all routes that need it
+router.use(getNewRequestsCount);
 
 // N8N Webhook-URL für Automatisierung
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.dinel.at/webhook/blog-automation';
@@ -30,7 +60,7 @@ const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.dinel.at/web
 router.get('/', isAuthenticated, isManager, async (req, res) => {
   try {
     // Blogposts abrufen
-    const postsQuery = await pool.query(`
+    const postsQuery = await _query(`
       SELECT 
         p.id, 
         p.title, 
@@ -82,10 +112,6 @@ router.get('/', isAuthenticated, isManager, async (req, res) => {
       LIMIT 5
     `);
     
-    // Aktuelle Anfragen (wie in der Dashboard-Route)
-    const newRequestsCountQuery = await _query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/blog/index', {
       title: 'Blog-Management - Rising BSM',
       user: req.session.user,
@@ -113,7 +139,7 @@ router.get('/', isAuthenticated, isManager, async (req, res) => {
         created: formatDistanceToNow(new Date(req.created_at), { addSuffix: true, locale: de })
       })),
       keywords: keywordsQuery.rows,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken()
     });
   } catch (error) {
@@ -139,16 +165,13 @@ router.get('/generate', isAuthenticated, isManager, async (req, res) => {
       LIMIT 15
     `);
     
-    const newRequestsCountQuery = await _query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/blog/generate', {
       title: 'Blog-Beitrag generieren - Rising BSM',
       user: req.session.user,
       currentPath: '/dashboard/blog',
       categories: categoriesQuery.rows,
       keywords: keywordsQuery.rows,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -283,9 +306,6 @@ router.get('/neu', isAuthenticated, isManager, async (req, res) => {
       LIMIT 10
     `);
     
-    const newRequestsCountQuery = await _query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/blog/neu', {
       title: 'Neuer Blogpost - Rising BSM',
       user: req.session.user,
@@ -293,7 +313,7 @@ router.get('/neu', isAuthenticated, isManager, async (req, res) => {
       categories: categoriesQuery.rows,
       tags: tagsQuery.rows,
       keywords: keywordsQuery.rows,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       formData: {
         title: '',
@@ -342,7 +362,7 @@ router.post('/neu', isAuthenticated, isManager, async (req, res) => {
     );
     
     // Wenn Slug existiert, Suffix hinzufügen
-    if (parseInt(slugCheck.rows[0].count) > 0) {
+    if (parseInt(slugCheck.rows[0].count, 10) > 0) {
       slug = `${slug}-${Date.now().toString().slice(-4)}`;
     }
     
@@ -381,7 +401,7 @@ router.post('/neu', isAuthenticated, isManager, async (req, res) => {
     
     const postId = result.rows[0].id;
     
-    await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [id]);
+await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [postId]);
 
     if (categories && Array.isArray(categories) && categories.length > 0) {
       for (const categoryId of categories) {
@@ -526,10 +546,6 @@ router.get('/:id', isAuthenticated, isManager, async (req, res) => {
       ORDER BY search_volume DESC
     `, [id]);
     
-    // Neue Anfragen zählen für Badge
-    const newRequestsCountQuery = await _query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/blog/detail', {
       title: `Blog: ${post.title} - Rising BSM`,
       user: req.session.user,
@@ -560,7 +576,7 @@ router.get('/:id', isAuthenticated, isManager, async (req, res) => {
         visitors: analytics.total_visitors || 0
       },
       keywords: keywordsQuery.rows,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -613,10 +629,6 @@ router.get('/:id/edit', isAuthenticated, isManager, async (req, res) => {
       WHERE pt.post_id = $1
     `, [id]);
     
-    // Neue Anfragen zählen für Badge
-    const newRequestsCountQuery = await _query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/blog/edit', {
       title: `Blog bearbeiten: ${post.title} - Rising BSM`,
       user: req.session.user,
@@ -626,7 +638,7 @@ router.get('/:id/edit', isAuthenticated, isManager, async (req, res) => {
       assignedCategories: assignedCategoryIds,
       tags: tagsQuery.rows,
       assignedTags: assignedTagsQuery.rows,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -685,7 +697,7 @@ router.post('/:id/edit', isAuthenticated, isManager, async (req, res) => {
       );
       
       // Wenn Slug existiert, Suffix hinzufügen
-      if (parseInt(slugCheck.rows[0].count) > 0) {
+      if (parseInt(slugCheck.rows[0].count, 10) > 0) {
         slug = `${slug}-${Date.now().toString().slice(-4)}`;
       }
     }
@@ -730,8 +742,8 @@ router.post('/:id/edit', isAuthenticated, isManager, async (req, res) => {
     );
     
     // Kategorien zurücksetzen und neu zuweisen
-    await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [id]);
     
+await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [postId]);
     if (categories && Array.isArray(categories) && categories.length > 0) {
       for (const categoryId of categories) {
         await client.query(
@@ -891,16 +903,12 @@ router.get('/categories', isAuthenticated, isManager, async (req, res) => {
         c.name
     `);
     
-    // Neue Anfragen zählen für Badge
-    const newRequestsCountQuery = await _query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/blog/categories', {
       title: 'Blog Kategorien - Rising BSM',
       user: req.session.user,
       currentPath: '/dashboard/blog',
       categories: categoriesQuery.rows,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -925,7 +933,14 @@ router.post('/categories', isAuthenticated, isManager, async (req, res) => {
     }
     
     // Slug erstellen
-    const slug = slugify(name, { lower: true, strict: true });
+    // Umlaut-Behandlung hinzufügen
+    const slug = slugify(title, {
+      lower: true,
+      strict: true,
+      remove: /[*+~.()'"!:@]/g,
+      replacement: '-',
+      locale: 'de'
+    });
     
     // Prüfen ob Slug bereits existiert
     const slugCheck = await _query(
@@ -933,7 +948,7 @@ router.post('/categories', isAuthenticated, isManager, async (req, res) => {
       [slug]
     );
     
-    if (parseInt(slugCheck.rows[0].count) > 0) {
+    if (parseInt(slugCheck.rows[0].count, 10) > 0) {
       req.flash('error', `Eine Kategorie mit dem Namen "${name}" existiert bereits.`);
       return res.redirect('/dashboard/blog/categories');
     }
@@ -964,7 +979,7 @@ router.post('/categories/:id/delete', isAuthenticated, isManager, async (req, re
       [id]
     );
     
-    if (parseInt(postCheckQuery.rows[0].count) > 0) {
+    if (parseInt(postCheckQuery.rows[0].count, 10) > 0) {
       req.flash('error', 'Diese Kategorie hat zugeordnete Beiträge und kann nicht gelöscht werden.');
       return res.redirect('/dashboard/blog/categories');
     }
@@ -1011,10 +1026,6 @@ router.get('/seo', isAuthenticated, isManager, async (req, res) => {
       postsMap[post.id] = post.title;
     });
     
-    // Neue Anfragen zählen für Badge
-    const newRequestsCountQuery = await _query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/blog/seo', {
       title: 'Blog SEO - Rising BSM',
       user: req.session.user,
@@ -1023,7 +1034,7 @@ router.get('/seo', isAuthenticated, isManager, async (req, res) => {
         ...keyword,
         post_title: keyword.target_post_id ? postsMap[keyword.target_post_id] : null
       })),
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -1046,18 +1057,40 @@ router.post('/seo/keywords', isAuthenticated, isManager, async (req, res) => {
       req.flash('error', 'Keyword ist ein Pflichtfeld.');
       return res.redirect('/dashboard/blog/seo');
     }
+
     
+    if (target_post_id) {
+      const postExists = await _query('SELECT id FROM blog_posts WHERE id = $1', [target_post_id]);
+      if (!postExists.rows.length) {
+        req.flash('error', 'Ungültige Post-ID');
+        return res.redirect('/dashboard/blog/seo');
+      }
+    }
+
+    let parsedTargetPostId = target_post_id;
+
+    // Überprüfen, ob target_post_id eine gültige Zahl ist oder leer
+    if (target_post_id && !/^\d+$/.test(target_post_id)) {
+      req.flash('error', 'Ziel-Post-ID muss eine gültige Zahl sein.');
+      return res.redirect('/dashboard/blog/seo');
+    }
+
+    // Wenn es leer ist, setze es auf null
+    if (!target_post_id) {
+      parsedTargetPostId = null;
+    }
+
     // In Datenbank speichern
     await _query(
       `INSERT INTO blog_seo_keywords (
-        keyword, 
-        search_volume, 
+        keyword,
+        search_volume,
         target_post_id
       ) VALUES ($1, $2, $3)`,
       [
         keyword,
         search_volume || 0,
-        target_post_id || null
+        parsedTargetPostId
       ]
     );
     
@@ -1214,6 +1247,7 @@ router.get('/public/search', async (req, res) => {
     }
     
     // Suche in Posts
+    const sanitizedQuery = q.replace(/%/g, '\\%');
     const searchQuery = await _query(`
       SELECT 
         p.id, 
@@ -1231,7 +1265,7 @@ router.get('/public/search', async (req, res) => {
         AND p.status = 'published'
       ORDER BY
         p.published_at DESC
-    `, [`%${q}%`]);
+    `, [`%${sanitizedQuery}%`]);
     
     res.render('blog/search', {
       title: `Suchergebnisse für "${q}" - Blog - Rising BSM`,
@@ -1444,76 +1478,6 @@ router.get('/public/:slug', async (req, res) => {
   }
 });
 
-// Public blog routes
-router.get('/public', async (req, res) => {
-  try {
-    // Veröffentlichte Blogposts abrufen
-    const postsQuery = await _query(`
-      SELECT 
-        p.id, 
-        p.title, 
-        p.slug,
-        p.excerpt, 
-        p.published_at,
-        p.featured_image,
-        u.name as author_name,
-        ARRAY_AGG(DISTINCT c.name) as categories
-      FROM 
-        blog_posts p
-        LEFT JOIN benutzer u ON p.author_id = u.id
-        LEFT JOIN blog_post_categories pc ON p.id = pc.post_id
-        LEFT JOIN blog_categories c ON pc.category_id = c.id
-      WHERE 
-        p.status = 'published'
-      GROUP BY
-        p.id, u.name
-      ORDER BY 
-        p.published_at DESC
-      LIMIT 10
-    `);
-    
-    // Kategorien für Seitenleiste abrufen
-    const categoriesQuery = await _query(`
-      SELECT 
-        c.id, 
-        c.name, 
-        c.slug,
-        COUNT(pc.post_id) as post_count
-      FROM 
-        blog_categories c
-        JOIN blog_post_categories pc ON c.id = pc.category_id
-        JOIN blog_posts p ON pc.post_id = p.id
-      WHERE
-        p.status = 'published'
-      GROUP BY 
-        c.id
-      ORDER BY 
-        c.name
-    `);
-    
-    res.render('blog/index', {
-      title: 'Blog - Rising BSM',
-      posts: postsQuery.rows.map(post => ({
-        title: post.title,
-        slug: post.slug,
-        excerpt: post.excerpt,
-        date: format(new Date(post.published_at), 'dd.MM.yyyy'),
-        author: post.author_name,
-        image: post.featured_image,
-        categories: post.categories.filter(c => c !== null)
-      })),
-      categories: categoriesQuery.rows
-    });
-  } catch (error) {
-    console.error('Fehler beim Laden des Blogs:', error);
-    res.status(500).render('error', {
-      message: 'Fehler beim Laden des Blogs: ' + error.message,
-      error: error
-    });
-  }
-});
-
-
 // Keyword hinzufügen
 router.post('/dashboard/blog/seo/keywords', isAuthenticated, isManager, async (req, res) => {
   try {
@@ -1629,7 +1593,7 @@ router.post('/dashboard/blog/categories/edit', isAuthenticated, isManager, async
           [slug, id]
         );
         
-        if (parseInt(slugCheck.rows[0].count) > 0) {
+        if (parseInt(slugCheck.rows[0].count, 10) > 0) {
           throw new Error(`Eine Kategorie mit dem Namen "${name}" existiert bereits.`);
         }
       }

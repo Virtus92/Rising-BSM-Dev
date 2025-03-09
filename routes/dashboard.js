@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { formatDistanceToNow, isToday, isTomorrow, format } = require('date-fns');
 const { de } = require('date-fns/locale');
+const bcrypt = require('bcrypt'); // Import bcrypt
 
 // PostgreSQL-Verbindung importieren
 const pool = require('../db');
@@ -16,6 +17,22 @@ const isAuthenticated = (req, res, next) => {
     return res.redirect('/login');
   }
 };
+
+// Middleware to get new requests count
+const getNewRequestsCount = async (req, res, next) => {
+  try {
+    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    req.newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0, 10);
+    next();
+  } catch (error) {
+    console.error('Error fetching new requests count:', error);
+    req.newRequestsCount = 0; // Default value in case of error
+    next();
+  }
+};
+
+// Apply middleware to all routes that need it
+router.use(getNewRequestsCount);
 
 // Dashboard Hauptseite
 router.get('/', isAuthenticated, async (req, res) => {
@@ -59,7 +76,7 @@ router.get('/', isAuthenticated, async (req, res) => {
     
     // Neue Anfragen zählen
     const newRequestsQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    stats.newRequests.count = parseInt(newRequestsQuery.rows[0].count || 0);
+    stats.newRequests.count = parseInt(newRequestsQuery.rows[0].count || 0, 10);
     
     // Trend: Anzahl neue Anfragen letzte Woche im Vergleich zur Vorwoche
     const lastWeekRequestsQuery = await pool.query(`
@@ -71,8 +88,8 @@ router.get('/', isAuthenticated, async (req, res) => {
       WHERE created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days'
     `);
     
-    const lastWeekCount = parseInt(lastWeekRequestsQuery.rows[0].count || 0);
-    const previousWeekCount = parseInt(previousWeekRequestsQuery.rows[0].count || 0);
+    const lastWeekCount = parseInt(lastWeekRequestsQuery.rows[0].count || 0, 10);
+    const previousWeekCount = parseInt(previousWeekRequestsQuery.rows[0].count || 0, 10);
     
     if (previousWeekCount > 0) {
       stats.newRequests.trend = Math.round(((lastWeekCount - previousWeekCount) / previousWeekCount) * 100);
@@ -82,11 +99,11 @@ router.get('/', isAuthenticated, async (req, res) => {
     const activeProjectsQuery = await pool.query(`
       SELECT COUNT(*) FROM projekte WHERE status IN ('aktiv', 'in_bearbeitung')
     `);
-    stats.activeProjects.count = parseInt(activeProjectsQuery.rows[0].count || 0);
+    stats.activeProjects.count = parseInt(activeProjectsQuery.rows[0].count || 0, 10);
     
     // Gesamtkunden zählen
     const customersQuery = await pool.query("SELECT COUNT(*) FROM kunden");
-    stats.totalCustomers.count = parseInt(customersQuery.rows[0].count || 0);
+    stats.totalCustomers.count = parseInt(customersQuery.rows[0].count || 0, 10);
     
     // Monatlicher Umsatz
     const monthlyRevenueQuery = await pool.query(`
@@ -105,49 +122,57 @@ router.get('/', isAuthenticated, async (req, res) => {
     let revenueQuery;
     switch(revenueFilter) {
       case 'Letzten 30 Tage':
-        revenueQuery = await pool.query(`
-          SELECT 
-            TO_CHAR(DATE_TRUNC('day', rechnungsdatum), 'DD.MM.YY') as label,
-            SUM(betrag) as summe
-          FROM rechnungen 
-          WHERE rechnungsdatum >= CURRENT_DATE - INTERVAL '30 days'
-          GROUP BY DATE_TRUNC('day', rechnungsdatum)
-          ORDER BY DATE_TRUNC('day', rechnungsdatum)
-        `);
+        revenueQuery = await pool.query({
+          text: `
+            SELECT 
+              TO_CHAR(DATE_TRUNC('day', rechnungsdatum), 'DD.MM.YY') as label,
+              SUM(betrag) as summe
+            FROM rechnungen 
+            WHERE rechnungsdatum >= CURRENT_DATE - INTERVAL '30 days'
+            GROUP BY DATE_TRUNC('day', rechnungsdatum)
+            ORDER BY DATE_TRUNC('day', rechnungsdatum)
+          `
+        });
         break;
       case 'Letzten 3 Monate':
-        revenueQuery = await pool.query(`
-          SELECT 
-            TO_CHAR(DATE_TRUNC('week', rechnungsdatum), 'DD.MM.YY') as label,
-            SUM(betrag) as summe
-          FROM rechnungen 
-          WHERE rechnungsdatum >= CURRENT_DATE - INTERVAL '3 months'
-          GROUP BY DATE_TRUNC('week', rechnungsdatum)
-          ORDER BY DATE_TRUNC('week', rechnungsdatum)
-        `);
+        revenueQuery = await pool.query({
+          text: `
+            SELECT 
+              TO_CHAR(DATE_TRUNC('week', rechnungsdatum), 'DD.MM.YY') as label,
+              SUM(betrag) as summe
+            FROM rechnungen 
+            WHERE rechnungsdatum >= CURRENT_DATE - INTERVAL '3 months'
+            GROUP BY DATE_TRUNC('week', rechnungsdatum)
+            ORDER BY DATE_TRUNC('week', rechnungsdatum)
+          `
+        });
         break;
       case 'Dieses Jahr':
-        revenueQuery = await pool.query(`
-          SELECT 
-            TO_CHAR(DATE_TRUNC('month', rechnungsdatum), 'Mon YY') as label,
-            SUM(betrag) as summe
-          FROM rechnungen 
-          WHERE rechnungsdatum >= DATE_TRUNC('year', CURRENT_DATE)
-          GROUP BY DATE_TRUNC('month', rechnungsdatum)
-          ORDER BY DATE_TRUNC('month', rechnungsdatum)
-        `);
+        revenueQuery = await pool.query({
+          text: `
+            SELECT 
+              TO_CHAR(DATE_TRUNC('month', rechnungsdatum), 'Mon YY') as label,
+              SUM(betrag) as summe
+            FROM rechnungen 
+            WHERE rechnungsdatum >= DATE_TRUNC('year', CURRENT_DATE)
+            GROUP BY DATE_TRUNC('month', rechnungsdatum)
+            ORDER BY DATE_TRUNC('month', rechnungsdatum)
+          `
+        });
         break;
       case 'Letzten 6 Monate':
       default:
-        revenueQuery = await pool.query(`
-          SELECT 
-            TO_CHAR(DATE_TRUNC('month', rechnungsdatum), 'Mon YY') as label,
-            SUM(betrag) as summe
-          FROM rechnungen 
-          WHERE rechnungsdatum >= CURRENT_DATE - INTERVAL '6 months'
-          GROUP BY DATE_TRUNC('month', rechnungsdatum)
-          ORDER BY DATE_TRUNC('month', rechnungsdatum)
-        `);
+        revenueQuery = await pool.query({
+          text: `
+            SELECT 
+              TO_CHAR(DATE_TRUNC('month', rechnungsdatum), 'Mon YY') as label,
+              SUM(betrag) as summe
+            FROM rechnungen 
+            WHERE rechnungsdatum >= CURRENT_DATE - INTERVAL '6 months'
+            GROUP BY DATE_TRUNC('month', rechnungsdatum)
+            ORDER BY DATE_TRUNC('month', rechnungsdatum)
+          `
+        });
     }
     
     charts.revenue.labels = revenueQuery.rows.map(row => row.label);
@@ -196,7 +221,7 @@ router.get('/', isAuthenticated, async (req, res) => {
     }
     
     // Anzahl neuer Anfragen für Badge
-    const newRequestsCount = stats.newRequests.count;
+    const newRequestsCount = req.newRequestsCount;
 
     // Benachrichtigungen aus der Datenbank abrufen
     let notifications = {
@@ -205,59 +230,48 @@ router.get('/', isAuthenticated, async (req, res) => {
       totalCount: 0
     };
 
-    // Prüfen, ob die Tabelle existiert
-    const tableExists = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'benachrichtigungen'
-      );
-    `);
+    const notificationsQuery = await pool.query(`
+      SELECT 
+        id, 
+        typ, 
+        titel, 
+        erstellt_am, 
+        gelesen,
+        referenz_id
+      FROM 
+        benachrichtigungen
+      WHERE 
+        benutzer_id = $1
+      ORDER BY 
+        erstellt_am DESC
+      LIMIT 5
+    `, [req.session.user.id]);
     
-    if (tableExists.rows[0].exists) {
-      const notificationsQuery = await pool.query(`
-        SELECT 
-          id, 
-          typ, 
-          titel, 
-          erstellt_am, 
-          gelesen,
-          referenz_id
-        FROM 
-          benachrichtigungen
-        WHERE 
-          benutzer_id = $1
-        ORDER BY 
-          erstellt_am DESC
-        LIMIT 5
-      `, [req.session.user.id]);
-      
-      const unreadCountQuery = await pool.query(`
-        SELECT COUNT(*) FROM benachrichtigungen 
-        WHERE benutzer_id = $1 AND gelesen = false
-      `, [req.session.user.id]);
-      
-      const totalCountQuery = await pool.query(`
-        SELECT COUNT(*) FROM benachrichtigungen 
-        WHERE benutzer_id = $1
-      `, [req.session.user.id]);
-      
-      notifications = {
-        items: notificationsQuery.rows.map(n => ({
-          id: n.id,
-          title: n.titel,
-          type: n.typ === 'anfrage' ? 'success' : n.typ === 'termin' ? 'primary' : n.typ === 'warnung' ? 'warning' : 'info',
-          icon: n.typ === 'anfrage' ? 'envelope' : n.typ === 'termin' ? 'calendar-check' : n.typ === 'warnung' ? 'exclamation-triangle' : 'bell',
-          time: formatDistanceToNow(new Date(n.erstellt_am), { addSuffix: true, locale: de }),
-          link: n.typ === 'anfrage' ? `/dashboard/anfragen/${n.referenz_id}` : 
-                n.typ === 'termin' ? `/dashboard/termine/${n.referenz_id}` : 
-                n.typ === 'auftrag' ? `/dashboard/projekte/${n.referenz_id}` : 
-                '/dashboard/notifications'
-        })),
-        unreadCount: parseInt(unreadCountQuery.rows[0].count || 0),
-        totalCount: parseInt(totalCountQuery.rows[0].count || 0)
-      };
-    }
+    const unreadCountQuery = await pool.query(`
+      SELECT COUNT(*) FROM benachrichtigungen 
+      WHERE benutzer_id = $1 AND gelesen = false
+    `, [req.session.user.id]);
+    
+    const totalCountQuery = await pool.query(`
+      SELECT COUNT(*) FROM benachrichtigungen 
+      WHERE benutzer_id = $1
+    `, [req.session.user.id]);
+    
+    notifications = {
+      items: notificationsQuery.rows.map(n => ({
+        id: n.id,
+        title: n.titel,
+        type: n.typ === 'anfrage' ? 'success' : n.typ === 'termin' ? 'primary' : n.typ === 'warnung' ? 'warning' : 'info',
+        icon: n.typ === 'anfrage' ? 'envelope' : n.typ === 'termin' ? 'calendar-check' : n.typ === 'warnung' ? 'exclamation-triangle' : 'bell',
+        time: formatDistanceToNow(new Date(n.erstellt_am), { addSuffix: true, locale: de }),
+        link: n.typ === 'anfrage' ? `/dashboard/anfragen/${n.referenz_id}` : 
+              n.typ === 'termin' ? `/dashboard/termine/${n.referenz_id}` : 
+              n.typ === 'auftrag' ? `/dashboard/projekte/${n.referenz_id}` : 
+              '/dashboard/notifications'
+      })),
+      unreadCount: parseInt(unreadCountQuery.rows[0].count || 0, 10),
+      totalCount: parseInt(totalCountQuery.rows[0].count || 0, 10)
+    };
 
     // Aktuelle Anfragen aus der Datenbank
     const recentRequestsQuery = await pool.query(`
@@ -347,7 +361,7 @@ router.get('/', isAuthenticated, async (req, res) => {
       stats,
       chartFilters,
       charts,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       notifications,
       recentRequests,
       upcomingAppointments
@@ -375,20 +389,23 @@ router.get('/anfragen', isAuthenticated, async (req, res) => {
     }
     
     // Anfragen aus der Datenbank abrufen
-    const anfragenQuery = await pool.query(`
-      SELECT 
-        id, 
-        name, 
-        email, 
-        service, 
-        status, 
-        created_at
-      FROM 
-        kontaktanfragen
-      ${statusCondition}
-      ORDER BY 
-        created_at DESC
-    `, params);
+    const anfragenQuery = await pool.query({
+      text: `
+        SELECT 
+          id, 
+          name, 
+          email, 
+          service, 
+          status, 
+          created_at
+        FROM 
+          kontaktanfragen
+        ${statusCondition}
+        ORDER BY 
+          created_at DESC
+      `,
+      values: params
+    });
     
     // Abfrageergebnisse formatieren
     const requests = anfragenQuery.rows.map(anfrage => {
@@ -409,10 +426,6 @@ router.get('/anfragen', isAuthenticated, async (req, res) => {
       };
     });
     
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count);
-    
     // Benachrichtigungen abrufen (falls vorhanden)
     let notifications = {
       items: [],
@@ -420,55 +433,44 @@ router.get('/anfragen', isAuthenticated, async (req, res) => {
       totalCount: 0
     };
     
-    // Prüfen, ob die Tabelle existiert
-    const tableExists = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'benachrichtigungen'
-      );
-    `);
+    const notificationsQuery = await pool.query(`
+      SELECT 
+        id, 
+        typ, 
+        titel, 
+        erstellt_am, 
+        gelesen,
+        referenz_id
+      FROM 
+        benachrichtigungen
+      WHERE 
+        benutzer_id = $1
+      ORDER BY 
+        erstellt_am DESC
+      LIMIT 5
+    `, [req.session.user.id]);
     
-    if (tableExists.rows[0].exists) {
-      const notificationsQuery = await pool.query(`
-        SELECT 
-          id, 
-          typ, 
-          titel, 
-          erstellt_am, 
-          gelesen,
-          referenz_id
-        FROM 
-          benachrichtigungen
-        WHERE 
-          benutzer_id = $1
-        ORDER BY 
-          erstellt_am DESC
-        LIMIT 5
-      `, [req.session.user.id]);
-      
-      const unreadCountQuery = await pool.query(`
-        SELECT COUNT(*) FROM benachrichtigungen 
-        WHERE benutzer_id = $1 AND gelesen = false
-      `, [req.session.user.id]);
-      
-      notifications = {
-        items: notificationsQuery.rows.map(n => ({
-          id: n.id,
-          title: n.titel,
-          type: n.typ === 'anfrage' ? 'success' : n.typ === 'termin' ? 'primary' : n.typ === 'warnung' ? 'warning' : 'info',
-          icon: n.typ === 'anfrage' ? 'envelope' : n.typ === 'termin' ? 'calendar-check' : n.typ === 'warnung' ? 'exclamation-triangle' : 'bell',
-          time: formatDistanceToNow(new Date(n.erstellt_am), { addSuffix: true, locale: de }),
-          link: n.typ === 'anfrage' ? `/dashboard/anfragen/${n.referenz_id}` : 
-                n.typ === 'termin' ? `/dashboard/termine/${n.referenz_id}` : 
-                n.typ === 'auftrag' ? `/dashboard/projekte/${n.referenz_id}` : 
-                '/dashboard/notifications',
-          read: n.gelesen
-        })),
-        unreadCount: parseInt(unreadCountQuery.rows[0].count),
-        totalCount: notificationsQuery.rowCount
-      };
-    }
+    const unreadCountQuery = await pool.query(`
+      SELECT COUNT(*) FROM benachrichtigungen 
+      WHERE benutzer_id = $1 AND gelesen = false
+    `, [req.session.user.id]);
+    
+    notifications = {
+      items: notificationsQuery.rows.map(n => ({
+        id: n.id,
+        title: n.titel,
+        type: n.typ === 'anfrage' ? 'success' : n.typ === 'termin' ? 'primary' : n.typ === 'warnung' ? 'warning' : 'info',
+        icon: n.typ === 'anfrage' ? 'envelope' : n.typ === 'termin' ? 'calendar-check' : n.typ === 'warnung' ? 'exclamation-triangle' : 'bell',
+        time: formatDistanceToNow(new Date(n.erstellt_am), { addSuffix: true, locale: de }),
+        link: n.typ === 'anfrage' ? `/dashboard/anfragen/${n.referenz_id}` : 
+              n.typ === 'termin' ? `/dashboard/termine/${n.referenz_id}` : 
+              n.typ === 'auftrag' ? `/dashboard/projekte/${n.referenz_id}` : 
+              '/dashboard/notifications',
+        read: n.gelesen
+      })),
+      unreadCount: parseInt(unreadCountQuery.rows[0].count || 0, 10),
+      totalCount: notificationsQuery.rowCount
+    };
 
     res.render('dashboard/anfragen/index', { 
       title: 'Anfragen - Rising BSM',
@@ -476,7 +478,7 @@ router.get('/anfragen', isAuthenticated, async (req, res) => {
       currentPath: req.path,
       requests,
       notifications,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken()
     });
   } catch (error) {
@@ -494,9 +496,10 @@ router.get('/anfragen/:id', isAuthenticated, async (req, res) => {
     const { id } = req.params;
     
     // Anfrage aus der Datenbank abrufen
-    const anfrageQuery = await pool.query(`
-      SELECT * FROM kontaktanfragen WHERE id = $1
-    `, [id]);
+    const anfrageQuery = await pool.query({
+      text: `SELECT * FROM kontaktanfragen WHERE id = $1`,
+      values: [id]
+    });
     
     if (anfrageQuery.rows.length === 0) {
       return res.status(404).render('error', {
@@ -508,13 +511,10 @@ router.get('/anfragen/:id', isAuthenticated, async (req, res) => {
     const anfrage = anfrageQuery.rows[0];
     
     // Notizen zu dieser Anfrage abrufen
-    const notizenQuery = await pool.query(`
-      SELECT * FROM anfragen_notizen WHERE anfrage_id = $1 ORDER BY erstellt_am DESC
-    `, [id]);
-    
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
+    const notizenQuery = await pool.query({
+      text: `SELECT * FROM anfragen_notizen WHERE anfrage_id = $1 ORDER BY erstellt_am DESC`,
+      values: [id]
+    });
     
     res.render('dashboard/anfragen/detail', {
       title: `Anfrage: ${anfrage.name} - Rising BSM`,
@@ -543,7 +543,7 @@ router.get('/anfragen/:id', isAuthenticated, async (req, res) => {
         formattedDate: format(new Date(notiz.erstellt_am), 'dd.MM.yyyy, HH:mm'),
         benutzer: notiz.benutzer_name
       })),
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -562,16 +562,20 @@ router.post('/anfragen/update-status', isAuthenticated, async (req, res) => {
     const { id, status, note } = req.body;
     
     // Status in der Datenbank aktualisieren
-    await pool.query(`
-      UPDATE kontaktanfragen SET status = $1, updated_at = NOW() WHERE id = $2
-    `, [status, id]);
+    await pool.query({
+      text: `UPDATE kontaktanfragen SET status = $1, updated_at = NOW() WHERE id = $2`,
+      values: [status, id]
+    });
     
     // Notiz hinzufügen, falls vorhanden
     if (note && note.trim() !== '') {
-      await pool.query(`
-        INSERT INTO anfragen_notizen (anfrage_id, benutzer_id, benutzer_name, text)
-        VALUES ($1, $2, $3, $4)
-      `, [id, req.session.user.id, req.session.user.name, note]);
+      await pool.query({
+        text: `
+          INSERT INTO anfragen_notizen (anfrage_id, benutzer_id, benutzer_name, text)
+          VALUES ($1, $2, $3, $4)
+        `,
+        values: [id, req.session.user.id, req.session.user.name, note]
+      });
     }
     
     // Erfolgsmeldung und Weiterleitung
@@ -595,12 +599,14 @@ router.post('/anfragen/add-note', isAuthenticated, async (req, res) => {
     }
     
     // In Datenbank einfügen
-    await pool.query(`
-      INSERT INTO anfragen_notizen (
-        anfrage_id, benutzer_id, benutzer_name, text
-      ) VALUES ($1, $2, $3, $4)`,
-      [id, req.session.user.id, req.session.user.name, note]
-    );
+    await pool.query({
+      text: `
+        INSERT INTO anfragen_notizen (
+          anfrage_id, benutzer_id, benutzer_name, text
+        ) VALUES ($1, $2, $3, $4)
+      `,
+      values: [id, req.session.user.id, req.session.user.name, note]
+    });
     
     req.flash('success', 'Notiz erfolgreich hinzugefügt.');
     res.redirect(`/dashboard/anfragen/${id}`);
@@ -646,17 +652,13 @@ router.get('/kunden', isAuthenticated, async (req, res) => {
       status: kunde.status,
       created_at: format(new Date(kunde.created_at), 'dd.MM.yyyy')
     }));
-    
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
 
     res.render('dashboard/kunden/index', { 
       title: 'Kunden - Rising BSM',
       user: req.session.user,
       currentPath: req.path,
       customers,
-      newRequestsCount
+      newRequestsCount: req.newRequestsCount
     });
   } catch (error) {
     console.error('Fehler beim Laden der Kunden:', error);
@@ -673,10 +675,6 @@ router.get('/kunden/neu', isAuthenticated, async (req, res) => {
     // Daten für Vorausfüllung aus Query-Parametern
     const { name, email, phone } = req.query;
     
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/kunden/neu', {
       title: 'Neuer Kunde - Rising BSM',
       user: req.session.user,
@@ -690,7 +688,7 @@ router.get('/kunden/neu', isAuthenticated, async (req, res) => {
         plz: '',
         ort: '',
       },
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -727,12 +725,14 @@ router.post('/kunden/neu', isAuthenticated, async (req, res) => {
     }
     
     // In Datenbank einfügen
-    const result = await pool.query(
-      `INSERT INTO kunden (
-        name, firma, email, telefon, adresse, plz, ort, 
-        kundentyp, status, notizen, newsletter
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-      [
+    const result = await pool.query({
+      text: `
+        INSERT INTO kunden (
+          name, firma, email, telefon, adresse, plz, ort, 
+          kundentyp, status, notizen, newsletter
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id
+      `,
+      values: [
         name, 
         firma || null, 
         email, 
@@ -745,7 +745,7 @@ router.post('/kunden/neu', isAuthenticated, async (req, res) => {
         notizen || null, 
         newsletter === 'on'
       ]
-    );
+    });
     
     const kundeId = result.rows[0].id;
     
@@ -764,9 +764,10 @@ router.get('/kunden/:id', isAuthenticated, async (req, res) => {
     const { id } = req.params;
     
     // Kunde aus der Datenbank abrufen
-    const kundeQuery = await pool.query(`
-      SELECT * FROM kunden WHERE id = $1
-    `, [id]);
+    const kundeQuery = await pool.query({
+      text: `SELECT * FROM kunden WHERE id = $1`,
+      values: [id]
+    });
     
     if (kundeQuery.rows.length === 0) {
       return res.status(404).render('error', {
@@ -778,24 +779,26 @@ router.get('/kunden/:id', isAuthenticated, async (req, res) => {
     const kunde = kundeQuery.rows[0];
     
     // Termine des Kunden abrufen
-    const termineQuery = await pool.query(`
-      SELECT id, titel, termin_datum, status 
-      FROM termine 
-      WHERE kunde_id = $1 
-      ORDER BY termin_datum DESC
-    `, [id]);
+    const termineQuery = await pool.query({
+      text: `
+        SELECT id, titel, termin_datum, status 
+        FROM termine 
+        WHERE kunde_id = $1 
+        ORDER BY termin_datum DESC
+      `,
+      values: [id]
+    });
     
     // Projekte des Kunden abrufen
-    const projekteQuery = await pool.query(`
-      SELECT id, titel, start_datum, status 
-      FROM projekte 
-      WHERE kunde_id = $1 
-      ORDER BY start_datum DESC
-    `, [id]);
-    
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
+    const projekteQuery = await pool.query({
+      text: `
+        SELECT id, titel, start_datum, status 
+        FROM projekte 
+        WHERE kunde_id = $1 
+        ORDER BY start_datum DESC
+      `,
+      values: [id]
+    });
     
     res.render('dashboard/kunden/detail', {
       title: `Kunde: ${kunde.name} - Rising BSM`,
@@ -842,7 +845,7 @@ router.get('/kunden/:id', isAuthenticated, async (req, res) => {
                     projekt.status === 'in_bearbeitung' ? 'primary' : 
                     projekt.status === 'abgeschlossen' ? 'success' : 'secondary'
       })),
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -861,9 +864,10 @@ router.get('/kunden/:id/edit', isAuthenticated, async (req, res) => {
     const { id } = req.params;
     
     // Kunde aus der Datenbank abrufen
-    const kundeQuery = await pool.query(`
-      SELECT * FROM kunden WHERE id = $1
-    `, [id]);
+    const kundeQuery = await pool.query({
+      text: `SELECT * FROM kunden WHERE id = $1`,
+      values: [id]
+    });
     
     if (kundeQuery.rows.length === 0) {
       return res.status(404).render('error', {
@@ -874,16 +878,12 @@ router.get('/kunden/:id/edit', isAuthenticated, async (req, res) => {
     
     const kunde = kundeQuery.rows[0];
     
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/kunden/edit', {
       title: `Kunde bearbeiten: ${kunde.name} - Rising BSM`,
       user: req.session.user,
       currentPath: '/dashboard/kunden',
       kunde: kunde,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -921,22 +921,24 @@ router.post('/kunden/:id/edit', isAuthenticated, async (req, res) => {
     }
     
     // In Datenbank aktualisieren
-    await pool.query(
-      `UPDATE kunden SET 
-        name = $1, 
-        firma = $2, 
-        email = $3, 
-        telefon = $4, 
-        adresse = $5, 
-        plz = $6, 
-        ort = $7, 
-        kundentyp = $8, 
-        status = $9, 
-        notizen = $10, 
-        newsletter = $11, 
-        updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $12`,
-      [
+    await pool.query({
+      text: `
+        UPDATE kunden SET 
+          name = $1, 
+          firma = $2, 
+          email = $3, 
+          telefon = $4, 
+          adresse = $5, 
+          plz = $6, 
+          ort = $7, 
+          kundentyp = $8, 
+          status = $9, 
+          notizen = $10, 
+          newsletter = $11, 
+          updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $12
+      `,
+      values: [
         name, 
         firma || null, 
         email, 
@@ -950,7 +952,7 @@ router.post('/kunden/:id/edit', isAuthenticated, async (req, res) => {
         newsletter === 'on',
         id
       ]
-    );
+    });
     
     req.flash('success', 'Kunde erfolgreich aktualisiert.');
     res.redirect(`/dashboard/kunden/${id}`);
@@ -975,24 +977,27 @@ router.get('/termine', isAuthenticated, async (req, res) => {
     }
     
     // Termine aus der Datenbank abrufen
-    const termineQuery = await pool.query(`
-      SELECT 
-        t.id, 
-        t.titel, 
-        t.kunde_id, 
-        t.projekt_id,
-        t.termin_datum,
-        t.dauer,
-        t.ort,
-        t.status,
-        k.name AS kunde_name
-      FROM 
-        termine t
-        LEFT JOIN kunden k ON t.kunde_id = k.id
-      ${statusCondition}
-      ORDER BY 
-        t.termin_datum ASC
-    `, params);
+    const termineQuery = await pool.query({
+      text: `
+        SELECT 
+          t.id, 
+          t.titel, 
+          t.kunde_id, 
+          t.projekt_id,
+          t.termin_datum,
+          t.dauer,
+          t.ort,
+          t.status,
+          k.name AS kunde_name
+        FROM 
+          termine t
+          LEFT JOIN kunden k ON t.kunde_id = k.id
+        ${statusCondition}
+        ORDER BY 
+          t.termin_datum ASC
+      `,
+      values: params
+    });
     
     // Abfrageergebnisse formatieren
     const appointments = termineQuery.rows.map(termin => {
@@ -1020,17 +1025,13 @@ router.get('/termine', isAuthenticated, async (req, res) => {
                     termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
       };
     });
-    
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
 
     res.render('dashboard/termine/index', { 
       title: 'Termine - Rising BSM',
       user: req.session.user,
       currentPath: req.path,
       appointments,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       statusFilter: statusFilter || '',
       csrfToken: req.csrfToken()
     });
@@ -1050,10 +1051,6 @@ router.get('/termine/neu', isAuthenticated, async (req, res) => {
     const kundenQuery = await pool.query(`
       SELECT id, name FROM kunden ORDER BY name ASC
     `);
-    
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
     
     // Vorausgefüllte Daten aus Query-Parametern
     const kunde_id = req.query.kunde_id || '';
@@ -1075,7 +1072,7 @@ router.get('/termine/neu', isAuthenticated, async (req, res) => {
         beschreibung: '',
         status: 'geplant'
       },
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -1112,12 +1109,14 @@ router.post('/termine/neu', isAuthenticated, async (req, res) => {
     const terminDatumObj = new Date(`${termin_datum}T${termin_zeit}`);
     
     // In Datenbank einfügen
-    const result = await pool.query(
-      `INSERT INTO termine (
-        titel, kunde_id, termin_datum, dauer, ort, 
-        beschreibung, status, erstellt_von
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [
+    const result = await pool.query({
+      text: `
+        INSERT INTO termine (
+          titel, kunde_id, termin_datum, dauer, ort, 
+          beschreibung, status, erstellt_von
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
+      `,
+      values: [
         titel, 
         kunde_id || null, 
         terminDatumObj, 
@@ -1127,7 +1126,7 @@ router.post('/termine/neu', isAuthenticated, async (req, res) => {
         status || 'geplant',
         req.session.user.id
       ]
-    );
+    });
     
     const terminId = result.rows[0].id;
     
@@ -1143,16 +1142,15 @@ router.post('/termine/neu', isAuthenticated, async (req, res) => {
         await pool.query(`
           INSERT INTO benachrichtigungen (
             benutzer_id, typ, titel, beschreibung, referenz_id, gelesen
-          ) VALUES ($1, $2, $3, $4, $5, $6)`,
-          [
-            req.session.user.id,
-            'termin',
-            'Neuer Termin erstellt',
-            `Termin "${titel}" am ${format(terminDatumObj, 'dd.MM.yyyy')} um ${format(terminDatumObj, 'HH:mm')} Uhr`,
-            terminId,
-            false
-          ]
-        );
+          ) VALUES ($1, $2, $3, $4, $5, $6)
+        `, [
+          req.session.user.id,
+          'termin',
+          'Neuer Termin erstellt',
+          `Termin "${titel}" am ${format(terminDatumObj, 'dd.MM.yyyy')} um ${format(terminDatumObj, 'HH:mm')} Uhr`,
+          terminId,
+          false
+        ]);
       }
     }
     
@@ -1171,44 +1169,20 @@ router.post('/termine/update-status', isAuthenticated, async (req, res) => {
     const { id, status, note } = req.body;
     
     // Status in der Datenbank aktualisieren
-    await pool.query(`
-      UPDATE termine SET status = $1, updated_at = NOW() WHERE id = $2
-    `, [status, id]);
+    await pool.query({
+      text: `UPDATE termine SET status = $1, updated_at = NOW() WHERE id = $2`,
+      values: [status, id]
+    });
     
     // Notiz hinzufügen, falls vorhanden
     if (note && note.trim() !== '') {
-      await pool.query(`
-        INSERT INTO termin_notizen (termin_id, benutzer_id, benutzer_name, text)
-        VALUES ($1, $2, $3, $4)
-      `, [id, req.session.user.id, req.session.user.name, note]);
-    }
-    
-    req.flash('success', 'Termin-Status erfolgreich aktualisiert.');
-    res.redirect(`/dashboard/termine/${id}`);
-  } catch (error) {
-    console.error('Fehler beim Aktualisieren des Termin-Status:', error);
-    req.flash('error', 'Datenbankfehler: ' + error.message);
-    res.redirect(`/dashboard/termine/${req.body.id}`);
-  }
-});
-
-
-// Termin Status aktualisieren
-router.post('/termine/update-status', isAuthenticated, async (req, res) => {
-  try {
-    const { id, status, note } = req.body;
-    
-    // Status in der Datenbank aktualisieren
-    await pool.query(`
-      UPDATE termine SET status = $1, updated_at = NOW() WHERE id = $2
-    `, [status, id]);
-    
-    // Notiz hinzufügen, falls vorhanden
-    if (note && note.trim() !== '') {
-      await pool.query(`
-        INSERT INTO termin_notizen (termin_id, benutzer_id, benutzer_name, text)
-        VALUES ($1, $2, $3, $4)
-      `, [id, req.session.user.id, req.session.user.name, note]);
+      await pool.query({
+        text: `
+          INSERT INTO termin_notizen (termin_id, benutzer_id, benutzer_name, text)
+          VALUES ($1, $2, $3, $4)
+        `,
+        values: [id, req.session.user.id, req.session.user.name, note]
+      });
     }
     
     req.flash('success', 'Termin-Status erfolgreich aktualisiert.');
@@ -1226,16 +1200,19 @@ router.get('/termine/:id', isAuthenticated, async (req, res) => {
     const { id } = req.params;
     
     // Termin aus der Datenbank abrufen
-    const terminQuery = await pool.query(`
-      SELECT 
-        t.*, 
-        k.name AS kunde_name
-      FROM 
-        termine t
-        LEFT JOIN kunden k ON t.kunde_id = k.id
-      WHERE 
-        t.id = $1
-    `, [id]);
+    const terminQuery = await pool.query({
+      text: `
+        SELECT 
+          t.*, 
+          k.name AS kunde_name
+        FROM 
+          termine t
+          LEFT JOIN kunden k ON t.kunde_id = k.id
+        WHERE 
+          t.id = $1
+      `,
+      values: [id]
+    });
     
     if (terminQuery.rows.length === 0) {
       return res.status(404).render('error', {
@@ -1247,13 +1224,10 @@ router.get('/termine/:id', isAuthenticated, async (req, res) => {
     const termin = terminQuery.rows[0];
     
     // Notizen zu diesem Termin abrufen (falls Sie eine entsprechende Tabelle haben)
-    const notizenQuery = await pool.query(`
-      SELECT * FROM termin_notizen WHERE termin_id = $1 ORDER BY erstellt_am DESC
-    `, [id]);
-    
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
+    const notizenQuery = await pool.query({
+      text: `SELECT * FROM termin_notizen WHERE termin_id = $1 ORDER BY erstellt_am DESC`,
+      values: [id]
+    });
     
     res.render('dashboard/termine/detail', {
       title: `Termin: ${termin.titel} - Rising BSM`,
@@ -1284,84 +1258,7 @@ router.get('/termine/:id', isAuthenticated, async (req, res) => {
         formattedDate: format(new Date(notiz.erstellt_am), 'dd.MM.yyyy, HH:mm'),
         benutzer: notiz.benutzer_name
       })),
-      newRequestsCount,
-      csrfToken: req.csrfToken(),
-      messages: { success: req.flash('success'), error: req.flash('error') }
-    });
-  } catch (error) {
-    console.error('Fehler beim Anzeigen des Termins:', error);
-    res.status(500).render('error', {
-      message: 'Datenbankfehler: ' + error.message,
-      error: error
-    });
-  }
-});
-
-// Einzelnen Termin anzeigen
-router.get('/termine/:id', isAuthenticated, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Termin aus der Datenbank abrufen
-    const terminQuery = await pool.query(`
-      SELECT 
-        t.*, 
-        k.name AS kunde_name
-      FROM 
-        termine t
-        LEFT JOIN kunden k ON t.kunde_id = k.id
-      WHERE 
-        t.id = $1
-    `, [id]);
-    
-    if (terminQuery.rows.length === 0) {
-      return res.status(404).render('error', {
-        message: `Termin mit ID ${id} nicht gefunden`,
-        error: { status: 404 }
-      });
-    }
-    
-    const termin = terminQuery.rows[0];
-    
-    // Notizen zu diesem Termin abrufen (falls Sie eine entsprechende Tabelle haben)
-    const notizenQuery = await pool.query(`
-      SELECT * FROM termin_notizen WHERE termin_id = $1 ORDER BY erstellt_am DESC
-    `, [id]);
-    
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
-    res.render('dashboard/termine/detail', {
-      title: `Termin: ${termin.titel} - Rising BSM`,
-      user: req.session.user,
-      currentPath: '/dashboard/termine',
-      termin: {
-        id: termin.id,
-        titel: termin.titel,
-        kunde_id: termin.kunde_id,
-        kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
-        termin_datum: termin.termin_datum,
-        dateFormatted: format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
-        timeFormatted: format(new Date(termin.termin_datum), 'HH:mm'),
-        dauer: termin.dauer || 60,
-        ort: termin.ort || 'Nicht angegeben',
-        beschreibung: termin.beschreibung || 'Keine Beschreibung vorhanden',
-        status: termin.status,
-        statusLabel: termin.status === 'geplant' ? 'Geplant' : 
-                    termin.status === 'bestaetigt' ? 'Bestätigt' : 
-                    termin.status === 'abgeschlossen' ? 'Abgeschlossen' : 'Storniert',
-        statusClass: termin.status === 'geplant' ? 'warning' : 
-                    termin.status === 'bestaetigt' ? 'success' : 
-                    termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
-      },
-      notizen: notizenQuery.rows.map(notiz => ({
-        id: notiz.id,
-        text: notiz.text,
-        formattedDate: format(new Date(notiz.erstellt_am), 'dd.MM.yyyy, HH:mm'),
-        benutzer: notiz.benutzer_name
-      })),
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -1380,16 +1277,19 @@ router.get('/termine/:id/edit', isAuthenticated, async (req, res) => {
     const { id } = req.params;
     
     // Termin aus der Datenbank abrufen
-    const terminQuery = await pool.query(`
-      SELECT 
-        t.*, 
-        k.name AS kunde_name
-      FROM 
-        termine t
-        LEFT JOIN kunden k ON t.kunde_id = k.id
-      WHERE 
-        t.id = $1
-    `, [id]);
+    const terminQuery = await pool.query({
+      text: `
+        SELECT 
+          t.*, 
+          k.name AS kunde_name
+        FROM 
+          termine t
+          LEFT JOIN kunden k ON t.kunde_id = k.id
+        WHERE 
+          t.id = $1
+      `,
+      values: [id]
+    });
     
     if (terminQuery.rows.length === 0) {
       return res.status(404).render('error', {
@@ -1404,10 +1304,6 @@ router.get('/termine/:id/edit', isAuthenticated, async (req, res) => {
     const kundenQuery = await pool.query(`
       SELECT id, name FROM kunden ORDER BY name ASC
     `);
-    
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
     
     res.render('dashboard/termine/edit', {
       title: `Termin bearbeiten: ${termin.titel} - Rising BSM`,
@@ -1433,7 +1329,7 @@ router.get('/termine/:id/edit', isAuthenticated, async (req, res) => {
                     termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
       },
       kunden: kundenQuery.rows,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -1472,18 +1368,20 @@ router.post('/termine/:id/edit', isAuthenticated, async (req, res) => {
     const terminDatumObj = new Date(`${termin_datum}T${termin_zeit}`);
     
     // In Datenbank aktualisieren
-    await pool.query(
-      `UPDATE termine SET 
-        titel = $1, 
-        kunde_id = $2, 
-        termin_datum = $3, 
-        dauer = $4, 
-        ort = $5, 
-        beschreibung = $6, 
-        status = $7, 
-        updated_at = NOW() 
-      WHERE id = $8`,
-      [
+    await pool.query({
+      text: `
+        UPDATE termine SET 
+          titel = $1, 
+          kunde_id = $2, 
+          termin_datum = $3, 
+          dauer = $4, 
+          ort = $5, 
+          beschreibung = $6, 
+          status = $7, 
+          updated_at = NOW() 
+        WHERE id = $8
+      `,
+      values: [
         titel, 
         kunde_id || null, 
         terminDatumObj, 
@@ -1493,20 +1391,22 @@ router.post('/termine/:id/edit', isAuthenticated, async (req, res) => {
         status || 'geplant',
         id
       ]
-    );
+    });
     
     // Notiz hinzufügen, dass der Termin aktualisiert wurde
-    await pool.query(`
-      INSERT INTO termin_notizen (
-        termin_id, benutzer_id, benutzer_name, text
-      ) VALUES ($1, $2, $3, $4)`,
-      [
+    await pool.query({
+      text: `
+        INSERT INTO termin_notizen (
+          termin_id, benutzer_id, benutzer_name, text
+        ) VALUES ($1, $2, $3, $4)
+      `,
+      values: [
         id, 
         req.session.user.id, 
         req.session.user.name, 
         'Termin wurde aktualisiert.'
       ]
-    );
+    });
     
     // Benachrichtigung erstellen, falls gewünscht und Kunde zugewiesen
     if (benachrichtigung && kunde_id) {
@@ -1538,12 +1438,14 @@ router.post('/termine/add-note', isAuthenticated, async (req, res) => {
     }
     
     // In Datenbank einfügen
-    await pool.query(`
-      INSERT INTO termin_notizen (
-        termin_id, benutzer_id, benutzer_name, text
-      ) VALUES ($1, $2, $3, $4)`,
-      [id, req.session.user.id, req.session.user.name, note]
-    );
+    await pool.query({
+      text: `
+        INSERT INTO termin_notizen (
+          termin_id, benutzer_id, benutzer_name, text
+        ) VALUES ($1, $2, $3, $4)
+      `,
+      values: [id, req.session.user.id, req.session.user.name, note]
+    });
     
     req.flash('success', 'Notiz erfolgreich hinzugefügt.');
     res.redirect(`/dashboard/termine/${id}`);
@@ -1622,17 +1524,13 @@ router.get('/dienste', isAuthenticated, async (req, res) => {
       ORDER BY 
         name ASC
     `);
-    
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
 
     res.render('dashboard/dienste/index', { 
       title: 'Dienstleistungen - Rising BSM',
       user: req.session.user,
       currentPath: req.path,
       services: diensteQuery.rows,
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -1740,10 +1638,6 @@ router.get('/settings', isAuthenticated, async (req, res) => {
       SELECT * FROM benutzer_einstellungen WHERE benutzer_id = $1
     `, [req.session.user.id]);
     
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/settings', {
       title: 'Einstellungen - Rising BSM',
       user: req.session.user,
@@ -1753,7 +1647,7 @@ router.get('/settings', isAuthenticated, async (req, res) => {
         sprache: 'de'
       },
       currentPath: '/dashboard/settings',
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
@@ -1820,9 +1714,14 @@ router.post('/settings/update', isAuthenticated, async (req, res) => {
   }
 });
 
-function safeFormat(date, formatString) {
+function formatDateSafely(date, formatString) {
   try {
-    return format(new Date(date), formatString);
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate)) {
+    console.error(`Invalid date format for date: ${date} with format: ${formatString}`, error);
+        return 'Invalid date';
+    }
+    return format(parsedDate, formatString);
   } catch (error) {
     console.error('Invalid date format:', date, error);
     return 'Unbekannt';
@@ -1846,10 +1745,6 @@ router.get('/profile', isAuthenticated, async (req, res) => {
     
     const user = userQuery.rows[0];
     
-    // Neue Anfragen für Badge zählen
-    const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
-    const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
-    
     res.render('dashboard/profile', {
       title: 'Mein Profil - Rising BSM',
       user: req.session.user,
@@ -1859,10 +1754,10 @@ router.get('/profile', isAuthenticated, async (req, res) => {
         email: user.email,
         rolle: user.rolle,
         telefon: user.telefon || '',
-        erstelltAm: safeFormat(user.created_at, 'dd.MM.yyyy'),
+        erstelltAm: formatDateSafely(user.created_at, 'dd.MM.yyyy'),
       },
       currentPath: '/dashboard/profile',
-      newRequestsCount,
+      newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
       messages: { success: req.flash('success'), error: req.flash('error') }
     });
