@@ -755,3 +755,93 @@ document.addEventListener("DOMContentLoaded", function() {
     // Initialisierung starten
     init();
   });
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // Alternative to DataTables for better mobile support
+    const customerTable = document.getElementById('customerTable');
+    const searchInput = document.getElementById('searchInput');
+    
+    // Client-side search function
+    function performSearch() {
+      const searchTerm = searchInput.value.toLowerCase().trim();
+      
+      // Handle desktop table view
+      if (customerTable) {
+        const rows = customerTable.querySelectorAll('tbody tr');
+        
+        rows.forEach(row => {
+          const text = row.textContent.toLowerCase();
+          row.style.display = text.includes(searchTerm) ? '' : 'none';
+        });
+      }
+      
+      // Handle mobile card view
+      const mobileCards = document.querySelectorAll('.list-group-item');
+      mobileCards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        card.style.display = text.includes(searchTerm) ? '' : 'none';
+      });
+    }
+    
+    // Search input event listener
+    if (searchInput) {
+      // Real-time search as user types
+      searchInput.addEventListener('keyup', performSearch);
+      
+      // Handle Enter key for server-side search
+      searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          if (this.value.trim()) {
+            window.location.href = `/dashboard/kunden?search=${encodeURIComponent(this.value.trim())}`;
+          }
+        }
+      });
+    }
+    
+    // Handle status filter dropdown items
+    const statusFilterItems = document.querySelectorAll('[data-status-filter]');
+    statusFilterItems.forEach(item => {
+      item.addEventListener('click', function(e) {
+        e.preventDefault();
+        const status = this.getAttribute('data-status-filter');
+        window.location.href = status ? `/dashboard/kunden?status=${status}` : '/dashboard/kunden';
+      });
+    });
+    
+    // Handle customer type filter dropdown items
+    const typeFilterItems = document.querySelectorAll('[data-type-filter]');
+    typeFilterItems.forEach(item => {
+      item.addEventListener('click', function(e) {
+        e.preventDefault();
+        const type = this.getAttribute('data-type-filter');
+        window.location.href = type ? `/dashboard/kunden?type=${type}` : '/dashboard/kunden';
+      });
+    });
+    
+    // The rest of your existing delete modal and status modal functionality
+    const deleteCustomerModal = document.getElementById('deleteCustomerModal');
+    if (deleteCustomerModal) {
+      deleteCustomerModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const customerId = button.getAttribute('data-id');
+        const customerName = button.getAttribute('data-name');
+        
+        document.getElementById('customerIdToDelete').value = customerId;
+        document.getElementById('customerNameToDelete').textContent = customerName;
+      });
+    }
+    
+    const changeStatusModal = document.getElementById('changeStatusModal');
+    if (changeStatusModal) {
+      changeStatusModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const customerId = button.getAttribute('data-id');
+        const customerName = button.getAttribute('data-name');
+        const currentStatus = button.getAttribute('data-status');
+        
+        document.getElementById('customerIdToChange').value = customerId;
+        document.getElementById('customerNameToChange').textContent = customerName;
+        document.getElementById('statusSelect').value = currentStatus;
+      });
+    }
+  });

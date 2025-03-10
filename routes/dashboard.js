@@ -1791,7 +1791,7 @@ router.get('/kunden/:id', isAuthenticated, async (req, res) => {
         const projektStatusInfo = getProjektStatusInfo(projekt.status);
         return {
           id: projekt.id,
-          name: projekt.name,
+          titel: projekt.titel,
           datum: formatDateSafely(projekt.start_datum, 'dd.MM.yyyy'),
           status: projekt.status,
           statusLabel: projektStatusInfo.label,

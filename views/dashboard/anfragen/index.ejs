@@ -33,7 +33,8 @@
       <!-- Anfragen Tabelle -->
       <div class="card border-0 shadow-sm">
         <div class="card-body p-0">
-          <div class="table-responsive">
+          <!-- Desktop Table View - Hidden on Small Screens -->
+          <div class="d-none d-md-block table-responsive">
             <table class="table table-hover datatable mb-0">
               <thead class="table-light">
                 <tr>
@@ -84,6 +85,51 @@
                 <% } %>
               </tbody>
             </table>
+          </div>
+          
+          <!-- Mobile Card View - Shown Only on Small Screens -->
+          <div class="d-md-none">
+            <% if (typeof requests !== 'undefined' && requests.length > 0) { %>
+              <div class="list-group list-group-flush">
+                <% requests.forEach(function(request) { %>
+                  <div class="list-group-item p-3">
+                    <div class="d-flex flex-column gap-2">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <h6 class="mb-0">
+                          <a href="/dashboard/anfragen/<%= request.id %>" class="text-decoration-none text-dark">
+                            <%= request.name %>
+                          </a>
+                        </h6>
+                        <span class="badge bg-<%= request.statusClass %><%= request.status === 'Neu' ? ' text-dark' : '' %>">
+                          <%= request.status %>
+                        </span>
+                      </div>
+                      <div>
+                        <small class="text-muted">Service: <%= request.serviceLabel %></small>
+                      </div>
+                      <div>
+                        <small class="text-muted">Datum: <%= request.formattedDate %></small>
+                      </div>
+                      <div class="d-flex justify-content-end gap-2 mt-2">
+                        <a href="/dashboard/anfragen/<%= request.id %>" class="btn btn-sm btn-outline-secondary">
+                          <i class="fas fa-eye"></i>
+                        </a>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#statusModal" data-id="<%= request.id %>">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>" class="btn btn-sm btn-outline-success" title="Kunde erstellen">
+                          <i class="fas fa-user-plus"></i>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            <% } else { %>
+              <div class="text-center py-4">
+                <p class="text-muted mb-0">Keine Anfragen gefunden</p>
+              </div>
+            <% } %>
           </div>
         </div>
       </div>

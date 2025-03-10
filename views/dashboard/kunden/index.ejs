@@ -70,14 +70,15 @@
         <div class="tab-pane fade show active" id="list-view" role="tabpanel" aria-labelledby="list-tab">
           <div class="card border-0 shadow-sm">
             <div class="card-body p-0">
-              <div class="table-responsive">
+              <!-- Desktop Table View - Hidden on Small Screens -->
+              <div class="d-none d-md-block table-responsive">
                 <table class="table table-hover customer-table mb-0" id="customerTable">
                   <thead class="table-light">
                     <tr>
                       <th scope="col">Name</th>
-                      <th scope="col" class="d-none d-md-table-cell">Firma</th>
+                      <th scope="col">Firma</th>
                       <th scope="col">Kontakt</th>
-                      <th scope="col" class="d-none d-lg-table-cell">Adresse</th>
+                      <th scope="col">Adresse</th>
                       <th scope="col">Status</th>
                       <th scope="col">Aktionen</th>
                     </tr>
@@ -95,11 +96,10 @@
                                 <a href="/dashboard/kunden/<%= customer.id %>" class="text-decoration-none text-dark fw-medium">
                                   <%= customer.name %>
                                 </a>
-                                <small class="d-block d-md-none text-muted"><%= customer.firma || 'Privatkunde' %></small>
                               </div>
                             </div>
                           </td>
-                          <td class="d-none d-md-table-cell"><%= customer.firma || '–' %></td>
+                          <td><%= customer.firma || '–' %></td>
                           <td>
                             <% if (customer.email) { %>
                               <div><a href="mailto:<%= customer.email %>" class="text-decoration-none text-primary"><i class="fas fa-envelope me-1"></i><%= customer.email %></a></div>
@@ -108,7 +108,7 @@
                               <div><a href="tel:<%= customer.telefon %>" class="text-decoration-none text-success"><i class="fas fa-phone me-1"></i><%= customer.telefon %></a></div>
                             <% } %>
                           </td>
-                          <td class="d-none d-lg-table-cell">
+                          <td>
                             <% if (customer.adresse) { %>
                               <%= customer.adresse %><br>
                               <%= customer.plz %> <%= customer.ort %>
@@ -152,6 +152,70 @@
                     <% } %>
                   </tbody>
                 </table>
+              </div>
+
+              <!-- Mobile Card View - Shown Only on Small Screens -->
+              <div class="d-md-none">
+                <% if (typeof customers !== 'undefined' && customers.length > 0) { %>
+                  <div class="list-group list-group-flush">
+                    <% customers.forEach(function(customer) { %>
+                      <div class="list-group-item p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                          <div class="d-flex align-items-center">
+                            <div class="avatar-wrapper bg-light rounded-circle me-2 text-center" style="min-width: 32px; height: 32px; line-height: 32px;">
+                              <span><%= customer.name.charAt(0) %></span>
+                            </div>
+                            <div>
+                              <a href="/dashboard/kunden/<%= customer.id %>" class="text-decoration-none text-dark fw-medium">
+                                <%= customer.name %>
+                              </a>
+                              <div class="small text-muted"><%= customer.firma || 'Privatkunde' %></div>
+                            </div>
+                          </div>
+                          <span class="badge bg-<%= customer.status === 'aktiv' ? 'success' : 'secondary' %>">
+                            <%= customer.status === 'aktiv' ? 'Aktiv' : 'Inaktiv' %>
+                          </span>
+                        </div>
+
+                        <div class="mb-2">
+                          <% if (customer.email) { %>
+                            <div><a href="mailto:<%= customer.email %>" class="text-decoration-none text-primary small"><i class="fas fa-envelope me-1"></i><%= customer.email %></a></div>
+                          <% } %>
+                          <% if (customer.telefon) { %>
+                            <div><a href="tel:<%= customer.telefon %>" class="text-decoration-none text-success small"><i class="fas fa-phone me-1"></i><%= customer.telefon %></a></div>
+                          <% } %>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                          <div class="btn-group btn-group-sm">
+                            <a href="/dashboard/kunden/<%= customer.id %>" class="btn btn-outline-secondary">
+                              <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="/dashboard/kunden/<%= customer.id %>/edit" class="btn btn-outline-primary">
+                              <i class="fas fa-edit"></i>
+                            </a>
+                          </div>
+                          <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="customerActionsDropdown<%= customer.id %>" data-bs-toggle="dropdown" aria-expanded="false">
+                              Mehr
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="customerActionsDropdown<%= customer.id %>">
+                              <li><a class="dropdown-item" href="/dashboard/termine/neu?kunde=<%= customer.id %>"><i class="fas fa-calendar-plus me-2"></i>Termin erstellen</a></li>
+                              <li><a class="dropdown-item" href="/dashboard/projekte/neu?kunde_id=<%= customer.id %>"><i class="fas fa-project-diagram me-2"></i>Projekt erstellen</a></li>
+                              <li><hr class="dropdown-divider"></li>
+                              <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changeStatusModal" data-id="<%= customer.id %>" data-name="<%= customer.name %>" data-status="<%= customer.status %>"><i class="fas fa-toggle-on me-2"></i>Status ändern</a></li>
+                              <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#deleteCustomerModal" data-id="<%= customer.id %>" data-name="<%= customer.name %>"><i class="fas fa-trash-alt me-2"></i>Löschen</a></li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    <% }); %>
+                  </div>
+                <% } else { %>
+                  <div class="text-center py-4">
+                    <p class="text-muted mb-0">Keine Kunden gefunden</p>
+                  </div>
+                <% } %>
               </div>
             </div>
           </div>

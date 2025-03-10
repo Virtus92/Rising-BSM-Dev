@@ -28,8 +28,8 @@
       <% } %>
 
       <div class="row g-4">
-        <!-- Kundendaten -->
-        <div class="col-lg-4">
+        <!-- Kundendaten - Full width on mobile, sidebar on desktop -->
+        <div class="col-12 col-lg-4 order-1">
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
               <h2 class="h5 mb-0">Kundendaten</h2>
@@ -54,7 +54,7 @@
                 
                 <div>
                   <h3 class="h6 text-muted mb-1">E-Mail</h3>
-                  <p class="mb-0"><a href="mailto:<%= kunde.email %>" class="text-decoration-none"><%= kunde.email %></a></p>
+                  <p class="mb-0"><a href="mailto:<%= kunde.email %>" class="text-decoration-none text-break"><%= kunde.email %></a></p>
                 </div>
                 
                 <div>
@@ -95,22 +95,23 @@
                 </div>
               </div>
               
-              <div class="d-grid gap-2 mt-4">
-                <a href="/dashboard/kunden/<%= kunde.id %>/edit" class="btn btn-primary">
+              <!-- Action buttons - responsive flexbox layout -->
+              <div class="d-flex flex-column flex-sm-row gap-2 mt-4">
+                <a href="/dashboard/kunden/<%= kunde.id %>/edit" class="btn btn-primary flex-fill">
                   <i class="fas fa-edit me-2"></i>Bearbeiten
                 </a>
-                <a href="/dashboard/termine/neu?kunde_id=<%= kunde.id %>" class="btn btn-success">
-                  <i class="fas fa-calendar-plus me-2"></i>Termin vereinbaren
+                <a href="/dashboard/termine/neu?kunde_id=<%= kunde.id %>" class="btn btn-success flex-fill">
+                  <i class="fas fa-calendar-plus me-2"></i>Termin
                 </a>
-                <a href="/dashboard/projekte/neu?kunde_id=<%= kunde.id %>" class="btn btn-info text-white">
-                  <i class="fas fa-project-diagram me-2"></i>Projekt erstellen
+                <a href="/dashboard/projekte/neu?kunde_id=<%= kunde.id %>" class="btn btn-info text-white flex-fill">
+                  <i class="fas fa-project-diagram me-2"></i>Projekt
                 </a>
               </div>
             </div>
           </div>
-          
-          <!-- Notizen -->
-          <div class="card border-0 shadow-sm">
+
+          <!-- Notizen Card - Moved to top on mobile for easy access -->
+          <div class="card border-0 shadow-sm d-lg-none mb-4 order-2">
             <div class="card-header bg-white">
               <h2 class="h5 mb-0">Notizen</h2>
             </div>
@@ -119,7 +120,41 @@
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 
                 <div class="mb-3">
-                  <textarea class="form-control" id="notiz" name="notiz" rows="4" placeholder="Neue Notiz hinzufügen..."></textarea>
+                  <textarea class="form-control" id="notiz" name="notiz" rows="3" placeholder="Neue Notiz hinzufügen..."></textarea>
+                </div>
+                
+                <div class="d-grid">
+                  <button type="submit" class="btn btn-success">
+                    <i class="fas fa-plus me-2"></i>Notiz hinzufügen
+                  </button>
+                </div>
+              </form>
+              
+              <hr class="my-3">
+              
+              <div class="notizen-container">
+                <% if (kunde.notizen && kunde.notizen !== 'Keine Notizen vorhanden') { %>
+                  <div class="mb-3 bg-light p-3 rounded">
+                    <p class="mb-0 small"><%= kunde.notizen %></p>
+                  </div>
+                <% } else { %>
+                  <p class="text-muted text-center mb-0">Keine Notizen vorhanden</p>
+                <% } %>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Notizen Card - Only visible on desktop -->
+          <div class="card border-0 shadow-sm d-none d-lg-block">
+            <div class="card-header bg-white">
+              <h2 class="h5 mb-0">Notizen</h2>
+            </div>
+            <div class="card-body">
+              <form action="/dashboard/kunden/<%= kunde.id %>/add-note" method="POST">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                
+                <div class="mb-3">
+                  <textarea class="form-control" id="notiz-desktop" name="notiz" rows="4" placeholder="Neue Notiz hinzufügen..."></textarea>
                 </div>
                 
                 <div class="d-grid">
@@ -144,8 +179,8 @@
           </div>
         </div>
         
-        <!-- Termine und Projekte -->
-        <div class="col-lg-8">
+        <!-- Termine und Projekte - Full width on mobile -->
+        <div class="col-12 col-lg-8 order-3">
           <!-- Termine -->
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -156,7 +191,8 @@
             </div>
             <div class="card-body p-0">
               <% if (termine && termine.length > 0) { %>
-                <div class="table-responsive">
+                <!-- Desktop view -->
+                <div class="d-none d-md-block table-responsive">
                   <table class="table table-hover mb-0">
                     <thead class="table-light">
                       <tr>
@@ -195,6 +231,35 @@
                     </tbody>
                   </table>
                 </div>
+                
+                <!-- Mobile view -->
+                <div class="d-md-none">
+                  <div class="list-group list-group-flush">
+                    <% termine.forEach(function(termin) { %>
+                      <div class="list-group-item p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                          <h6 class="mb-0">
+                            <a href="/dashboard/termine/<%= termin.id %>" class="text-decoration-none text-dark">
+                              <%= termin.titel %>
+                            </a>
+                          </h6>
+                          <span class="badge bg-<%= termin.statusClass %>">
+                            <%= termin.statusLabel %>
+                          </span>
+                        </div>
+                        <div class="small text-muted mb-2"><%= termin.datum %></div>
+                        <div class="d-flex justify-content-end gap-2">
+                          <a href="/dashboard/termine/<%= termin.id %>" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-eye"></i>
+                          </a>
+                          <a href="/dashboard/termine/<%= termin.id %>/edit" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-edit"></i>
+                          </a>
+                        </div>
+                      </div>
+                    <% }); %>
+                  </div>
+                </div>
               <% } else { %>
                 <div class="p-4 text-center">
                   <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
@@ -217,7 +282,8 @@
             </div>
             <div class="card-body p-0">
               <% if (projekte && projekte.length > 0) { %>
-                <div class="table-responsive">
+                <!-- Desktop view -->
+                <div class="d-none d-md-block table-responsive">
                   <table class="table table-hover mb-0">
                     <thead class="table-light">
                       <tr>
@@ -232,7 +298,7 @@
                         <tr>
                           <td>
                             <a href="/dashboard/projekte/<%= projekt.id %>" class="text-decoration-none text-dark">
-                              <%= projekt.name %>
+                              <%= projekt.name || projekt.titel || "Projekt #" + projekt.id %>
                             </a>
                           </td>
                           <td><%= projekt.datum %></td>
@@ -256,6 +322,35 @@
                     </tbody>
                   </table>
                 </div>
+                
+                <!-- Mobile view -->
+                <div class="d-md-none">
+                  <div class="list-group list-group-flush">
+                    <% projekte.forEach(function(projekt) { %>
+                      <div class="list-group-item p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                          <h6 class="mb-0">
+                            <a href="/dashboard/projekte/<%= projekt.id %>" class="text-decoration-none text-dark">
+                              <%=  projekt.titel || " - " %>
+                            </a>
+                          </h6>
+                          <span class="badge bg-<%= projekt.statusClass %>">
+                            <%= projekt.statusLabel %>
+                          </span>
+                        </div>
+                        <div class="small text-muted mb-2">Start: <%= projekt.datum %></div>
+                        <div class="d-flex justify-content-end gap-2">
+                          <a href="/dashboard/projekte/<%= projekt.id %>" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-eye"></i>
+                          </a>
+                          <a href="/dashboard/projekte/<%= projekt.id %>/edit" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-edit"></i>
+                          </a>
+                        </div>
+                      </div>
+                    <% }); %>
+                  </div>
+                </div>
               <% } else { %>
                 <div class="p-4 text-center">
                   <i class="fas fa-project-diagram fa-3x text-muted mb-3"></i>
@@ -268,7 +363,7 @@
             </div>
           </div>
           
-          <!-- Aktivitätshistorie -->
+          <!-- Aktivitätshistorie - more compact on mobile -->
           <div class="card border-0 shadow-sm">
             <div class="card-header bg-white">
               <h2 class="h5 mb-0">Aktivitätshistorie</h2>
@@ -311,5 +406,46 @@
     </div>
   </main>
 </div>
+
+<style>
+  /* Mobile-specific adjustments */
+  @media (max-width: 767.98px) {
+    /* Smaller padding for better content use of space */
+    .card-body {
+      padding: 1rem;
+    }
+    
+    /* Order control for mobile layout */
+    .order-1 {
+      order: 1;
+    }
+    .order-2 {
+      order: 2;
+    }
+    .order-3 {
+      order: 3;
+    }
+    
+    /* Smaller text for mobile */
+    .small {
+      font-size: 0.85rem;
+    }
+    
+    /* Better button sizes for touch */
+    .btn-sm {
+      padding: 0.375rem 0.5rem;
+    }
+    
+    /* Ensure email doesn't overflow */
+    .text-break {
+      word-break: break-word;
+    }
+    
+    /* More compact list items */
+    .list-group-item {
+      padding: 0.75rem 1rem;
+    }
+  }
+</style>
 
 <%- include('../../partials/admin-footer-simple') %>

@@ -12,8 +12,8 @@
             <i class="fas fa-envelope text-primary"></i>
           </div>
         </div>
-        <h2 class="fw-bold mb-1" id="newRequestsCounter"><%= stats.newRequests.count %></h2>
-        <p class="<%= stats.newRequests.trend > 0 ? 'text-success' : (stats.newRequests.trend < 0 ? 'text-danger' : 'text-muted') %> mb-0">
+        <h2 class="fw-bold mb-1 fs-4" id="newRequestsCounter"><%= stats.newRequests.count %></h2>
+        <p class="<%= stats.newRequests.trend > 0 ? 'text-success' : (stats.newRequests.trend < 0 ? 'text-danger' : 'text-muted') %> small mb-0">
           <% if (stats.newRequests.trend !== 0) { %>
             <i class="fas fa-arrow-<%= stats.newRequests.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.newRequests.trend) %>% seit letzter Woche
           <% } else { %>
@@ -27,6 +27,7 @@
     </div>
   </div>
   
+  <!-- Remaining cards with the same pattern -->
   <div class="col-12 col-md-6 col-lg-3">
     <div class="card border-0 shadow-sm h-100">
       <div class="card-body">
@@ -36,8 +37,8 @@
             <i class="fas fa-tasks text-success"></i>
           </div>
         </div>
-        <h2 class="fw-bold mb-1" id="activeProjectsCounter"><%= stats.activeProjects.count %></h2>
-        <p class="<%= stats.activeProjects.trend > 0 ? 'text-success' : (stats.activeProjects.trend < 0 ? 'text-danger' : 'text-muted') %> mb-0">
+        <h2 class="fw-bold mb-1 fs-4" id="activeProjectsCounter"><%= stats.activeProjects.count %></h2>
+        <p class="<%= stats.activeProjects.trend > 0 ? 'text-success' : (stats.activeProjects.trend < 0 ? 'text-danger' : 'text-muted') %> small mb-0">
           <% if (stats.activeProjects.trend !== 0) { %>
             <i class="fas fa-arrow-<%= stats.activeProjects.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.activeProjects.trend) %>% seit letztem Monat
           <% } else { %>
@@ -60,8 +61,8 @@
             <i class="fas fa-users text-info"></i>
           </div>
         </div>
-        <h2 class="fw-bold mb-1" id="activeCustomersCounter"><%= stats.totalCustomers.count %></h2>
-        <p class="<%= stats.totalCustomers.trend > 0 ? 'text-success' : (stats.totalCustomers.trend < 0 ? 'text-danger' : 'text-muted') %> mb-0">
+        <h2 class="fw-bold mb-1 fs-4" id="activeCustomersCounter"><%= stats.totalCustomers.count %></h2>
+        <p class="<%= stats.totalCustomers.trend > 0 ? 'text-success' : (stats.totalCustomers.trend < 0 ? 'text-danger' : 'text-muted') %> small mb-0">
           <% if (stats.totalCustomers.trend !== 0) { %>
             <i class="fas fa-arrow-<%= stats.totalCustomers.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.totalCustomers.trend) %>% im Jahresvergleich
           <% } else { %>
@@ -84,8 +85,8 @@
             <i class="fas fa-euro-sign text-warning"></i>
           </div>
         </div>
-        <h2 class="fw-bold mb-1">€<span id="monthlyRevenueCounter"><%= stats.monthlyRevenue.amount.toLocaleString('de-DE') %></span></h2>
-        <p class="<%= stats.monthlyRevenue.trend > 0 ? 'text-success' : (stats.monthlyRevenue.trend < 0 ? 'text-danger' : 'text-muted') %> mb-0">
+        <h2 class="fw-bold mb-1 fs-4">€<span id="monthlyRevenueCounter"><%= stats.monthlyRevenue.amount.toLocaleString('de-DE') %></span></h2>
+        <p class="<%= stats.monthlyRevenue.trend > 0 ? 'text-success' : (stats.monthlyRevenue.trend < 0 ? 'text-danger' : 'text-muted') %> small mb-0">
           <% if (stats.monthlyRevenue.trend !== 0) { %>
             <i class="fas fa-arrow-<%= stats.monthlyRevenue.trend > 0 ? 'up' : 'down' %> me-1"></i> <%= Math.abs(stats.monthlyRevenue.trend) %>% seit letztem Monat
           <% } else { %>
@@ -219,70 +220,98 @@
         </div>
       </div>
       <div class="card-body p-0">
-        <% if (!recentRequests || recentRequests.length === 0) { %>
-          <div class="p-4 text-center">
-            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-            <p class="text-muted mb-0">Keine neuen Anfragen</p>
+        <!-- Desktop Table View - Hidden on Small Screens -->
+        <div class="d-none d-md-block table-responsive">
+      <table class="table table-hover datatable mb-0">
+        <thead class="table-light">
+          <tr>
+        <th scope="col">Name</th>
+        <th scope="col">Service</th>
+        <th scope="col">Datum</th>
+        <th scope="col">Status</th>
+        <th scope="col">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (typeof recentRequests !== 'undefined' && recentRequests.length > 0) { %>
+        <% recentRequests.forEach(function(request) { %>
+          <tr>
+            <td>
+          <a href="/dashboard/anfragen/<%= request.id %>" class="text-decoration-none text-dark">
+            <%= request.name %>
+          </a>
+            </td>
+            <td><%= request.serviceLabel %></td>
+            <td><%= request.formattedDate %></td>
+            <td>
+          <span class="badge bg-<%= request.statusClass %><%= request.status === 'Neu' ? ' text-dark' : '' %>">
+            <%= request.status %>
+          </span>
+            </td>
+            <td>
+          <div class="btn-group btn-group-sm">
+            <a href="/dashboard/anfragen/<%= request.id %>" class="btn btn-outline-secondary">
+              <i class="fas fa-eye"></i>
+            </a>
+            <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>" class="btn btn-outline-success" title="Kunde erstellen">
+              <i class="fas fa-user-plus"></i>
+            </a>
           </div>
-        <% } else { %>
-          <!-- Korrigierte Anfragen-Tabelle mit funktionierenden Dropdowns -->
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Service</th>
-                  <th scope="col">Datum</th>
-                  <th scope="col">Status</th>
-                  <th scope="col" class="text-end">Aktionen</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% if (recentRequests && recentRequests.length > 0) { %>
-                  <% recentRequests.forEach(function(request) { %>
-                    <tr>
-                      <td>
-                        <a href="/dashboard/anfragen/<%= request.id %>" class="text-decoration-none text-dark fw-medium">
-                          <%= request.name %>
-                        </a>
-                      </td>
-                      <td><span class="badge bg-light text-dark"><%= request.serviceLabel %></span></td>
-                      <td><%= request.formattedDate %></td>
-                      <td>
-                        <span class="badge bg-<%= request.statusClass %><%= request.status === 'Neu' ? ' text-dark' : '' %>">
-                          <%= request.status %>
-                        </span>
-                      </td>
-                      <td class="text-end">
-                        <div class="dropdown">
-                          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="requestActionDropdown<%= request.id %>" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-ellipsis-v"></i>
-                          </button>
-                          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="requestActionDropdown<%= request.id %>">
-                            <li><a class="dropdown-item" href="/dashboard/anfragen/<%= request.id %>"><i class="fas fa-eye me-2"></i>Details</a></li>
-                            <li><a class="dropdown-item" href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>"><i class="fas fa-user-plus me-2"></i>Als Kunde anlegen</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                              <a class="dropdown-item text-success" href="/dashboard/anfragen/<%= request.id %>?mark_as=answered">
-                                <i class="fas fa-check-circle me-2"></i>Als beantwortet markieren
-                              </a>
-                            </li>
-                          </ul>
-                        </div>
-                      </td>
-                    </tr>
-                  <% }); %>
-                <% } else { %>
-                  <tr>
-                    <td colspan="5" class="text-center py-4">
-                      <p class="text-muted mb-0">Keine neuen Anfragen</p>
-                    </td>
-                  </tr>
-                <% } %>
-              </tbody>
-            </table>
+            </td>
+          </tr>
+        <% }); %>
+          <% } else { %>
+        <tr>
+          <td colspan="5" class="text-center py-4">
+            <p class="text-muted mb-0">Keine Anfragen gefunden</p>
+          </td>
+        </tr>
+          <% } %>
+        </tbody>
+      </table>
+        </div>
+        
+        <!-- Mobile Card View - Shown Only on Small Screens -->
+        <div class="d-md-none">
+      <% if (typeof recentRequests !== 'undefined' && recentRequests.length > 0) { %>
+        <div class="list-group list-group-flush">
+          <% recentRequests.forEach(function(request) { %>
+        <div class="list-group-item p-3">
+          <div class="d-flex flex-column gap-2">
+            <div class="d-flex justify-content-between align-items-start">
+          <h6 class="mb-0">
+            <a href="/dashboard/anfragen/<%= request.id %>" class="text-decoration-none text-dark">
+              <%= request.name %>
+            </a>
+          </h6>
+          <span class="badge bg-<%= request.statusClass %><%= request.status === 'Neu' ? ' text-dark' : '' %>">
+            <%= request.status %>
+          </span>
+            </div>
+            <div>
+          <small class="text-muted">Service: <%= request.serviceLabel %></small>
+            </div>
+            <div>
+          <small class="text-muted">Datum: <%= request.formattedDate %></small>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-2">
+          <a href="/dashboard/anfragen/<%= request.id %>" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-eye"></i>
+          </a>
+          <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>" class="btn btn-sm btn-outline-success" title="Kunde erstellen">
+            <i class="fas fa-user-plus"></i>
+          </a>
+            </div>
           </div>
-        <% } %>
+        </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <div class="text-center py-4">
+          <p class="text-muted mb-0">Keine Anfragen gefunden</p>
+        </div>
+      <% } %>
+        </div>
       </div>
     </div>
   </div>
