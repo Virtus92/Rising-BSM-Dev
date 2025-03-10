@@ -14,134 +14,8 @@
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
 <!-- Dashboard Core JS -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  // DOM-Cache für häufig verwendete Elemente
-  const dashboardWrapper = document.querySelector('.dashboard-wrapper');
-  const sidebarToggle = document.querySelector('.sidebar-toggle');
-  const closeSidebar = document.getElementById('closeSidebar');
-  const desktopSidebarToggle = document.querySelector('.desktop-sidebar-toggle');
-  const searchToggle = document.getElementById('searchToggle');
-  const closeSearch = document.getElementById('closeSearch');
-  const searchModal = document.getElementById('searchModal');
-  const notificationDropdown = document.getElementById('notificationDropdown');
-  const userDropdown = document.getElementById('userDropdown');
-  
-  // Mobile Sidebar Toggle
-  if (sidebarToggle) {
-    sidebarToggle.addEventListener('click', function() {
-      dashboardWrapper.classList.toggle('sidebar-open');
-    });
-  }
-  
-  // Close Sidebar
-  if (closeSidebar) {
-    closeSidebar.addEventListener('click', function() {
-      dashboardWrapper.classList.remove('sidebar-open');
-    });
-  }
-  
-  // Desktop Sidebar Toggle
-  if (desktopSidebarToggle) {
-    desktopSidebarToggle.addEventListener('click', function() {
-      dashboardWrapper.classList.toggle('sidebar-closed');
-      
-      // Speichern des Status im localStorage
-      const isClosed = dashboardWrapper.classList.contains('sidebar-closed');
-      localStorage.setItem('sidebarClosed', isClosed);
-    });
-  }
-  
-  // Status aus localStorage wiederherstellen
-  const savedSidebarState = localStorage.getItem('sidebarClosed');
-  if (savedSidebarState === 'true' && window.innerWidth >= 1024) {
-    dashboardWrapper.classList.add('sidebar-closed');
-  }
-  
-  // Search Modal
-  if (searchToggle && searchModal) {
-    searchToggle.addEventListener('click', function() {
-      searchModal.classList.add('active');
-      setTimeout(() => {
-        searchModal.querySelector('.search-input').focus();
-      }, 100);
-    });
-  }
-  
-  if (closeSearch && searchModal) {
-    closeSearch.addEventListener('click', function() {
-      searchModal.classList.remove('active');
-    });
-    
-    // Auch mit ESC-Taste schließen
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && searchModal.classList.contains('active')) {
-        searchModal.classList.remove('active');
-      }
-    });
-  }
-  
-  // Dropdown-Toggles
-  if (notificationDropdown) {
-    notificationDropdown.addEventListener('click', function(e) {
-      e.stopPropagation();
-      this.closest('.notifications-dropdown').classList.toggle('show');
-      
-      // Andere Dropdowns schließen
-      document.querySelectorAll('.notifications-dropdown.show').forEach(dropdown => {
-        if (dropdown !== this.closest('.notifications-dropdown')) {
-          dropdown.classList.remove('show');
-        }
-      });
-    });
-  }
-  
-  if (userDropdown) {
-    userDropdown.addEventListener('click', function(e) {
-      e.stopPropagation();
-      this.closest('.notifications-dropdown').classList.toggle('show');
-      
-      // Andere Dropdowns schließen
-      document.querySelectorAll('.notifications-dropdown.show').forEach(dropdown => {
-        if (dropdown !== this.closest('.notifications-dropdown')) {
-          dropdown.classList.remove('show');
-        }
-      });
-    });
-  }
-  
-  // Dropdowns bei Klick außerhalb schließen
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.notifications-dropdown')) {
-      document.querySelectorAll('.notifications-dropdown.show').forEach(dropdown => {
-        dropdown.classList.remove('show');
-      });
-    }
-  });
-  
-  // Aktiven Navigationslink markieren
-  const currentPath = window.location.pathname;
-  document.querySelectorAll('.nav-link').forEach(link => {
-    const href = link.getAttribute('href');
-    
-    if (currentPath === href || 
-        (href !== '/dashboard' && currentPath.startsWith(href))) {
-      link.classList.add('active');
-    }
-  });
-  
-  // Animationen für Seitenelemente
-  const animateElements = document.querySelectorAll('.animate-fadeIn, .animate-slideInUp');
-  if (animateElements.length > 0) {
-    animateElements.forEach((element, index) => {
-      setTimeout(() => {
-        element.style.opacity = '1';
-        element.style.transform = 'translateY(0)';
-      }, index * 100);
-    });
-  }
-});
-</script>
+
+<script src="/scripts/dashboard.js" defer></script>
 
 <!-- Dark Theme Charts Configuration -->
 <script>
@@ -165,6 +39,9 @@ if (typeof Chart !== 'undefined') {
 
 // ApexCharts Globale Konfiguration für Dark Mode
 if (typeof ApexCharts !== 'undefined') {
+  // Ensure ApexCharts.defaultOptions exists
+  ApexCharts.defaultOptions = ApexCharts.defaultOptions || {};
+
   const apexDarkTheme = {
     mode: 'dark',
     background: 'transparent',

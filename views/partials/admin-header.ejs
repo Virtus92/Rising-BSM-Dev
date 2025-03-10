@@ -20,125 +20,6 @@
   <!-- Custom Dashboard Styles -->
   <link rel="stylesheet" href="/styles/dashboard.css">
   
-  <style>
-    /* Base layout */
-    body {
-      overflow-x: hidden;
-    }
-    
-    /* Dashboard layout container */
-    .dashboard-wrapper {
-      display: flex;
-      min-height: 100vh;
-      width: 100%;
-      position: relative;
-    }
-    
-    /* Sidebar styling */
-    .dashboard-sidebar {
-      width: var(--sidebar-width, 280px);
-      height: 100vh;
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 1030;
-      transition: transform 0.3s ease;
-      overflow-y: auto;
-      background-color: #fff;
-      border-right: 1px solid rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Main content area */
-    .dashboard-main {
-      flex: 1;
-      margin-left: var(--sidebar-width, 280px);
-      width: calc(100% - var(--sidebar-width, 280px));
-      transition: margin-left 0.3s ease, width 0.3s ease;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .dashboard-content {
-      flex: 1;
-    }
-    
-    /* Avatar styling */
-    .avatar-wrapper {
-      width: 36px;
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    /* Navigation styling */
-    .nav-link {
-      color: #212529;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-    }
-    
-    .nav-link:hover {
-      background-color: rgba(25, 135, 84, 0.1);
-      color: #198754;
-    }
-    
-    .nav-link.active {
-      background-color: rgba(25, 135, 84, 0.1);
-      color: #198754;
-      font-weight: 500;
-    }
-    
-    /* Badge positioning */
-    .nav-badge {
-      float: right;
-    }
-    
-    /* Sidebar header */
-    .sidebar-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    /* Mobile adjustments */
-    @media (max-width: 767.98px) {
-      :root {
-        --sidebar-width: 280px;
-      }
-      
-      .dashboard-sidebar {
-        transform: translateX(-100%);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-      }
-      
-      .dashboard-main {
-        margin-left: 0;
-        width: 100%;
-      }
-      
-      .sidebar-open .dashboard-sidebar {
-        transform: translateX(0);
-      }
-      
-      .sidebar-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: 1025;
-        display: none;
-      }
-      
-      .sidebar-open .sidebar-overlay {
-        display: block;
-      }
-    }
-  </style>
 </head>
 
 <body class="bg-light">
@@ -232,7 +113,7 @@
       <nav class="navbar navbar-expand navbar-light bg-white shadow-sm py-2 sticky-top">
         <div class="container-fluid">
           <!-- Mobile Sidebar Toggle -->
-          <button id="sidebarToggle" class="btn btn-outline-secondary d-md-none me-2">
+          <button id="sidebarToggle" class="btn btn-outline-secondary d-md-none me-2" type="button">
             <i class="fas fa-bars"></i>
           </button>
           
@@ -242,7 +123,7 @@
             <!-- Notifications Dropdown (if needed) -->
             <% if (typeof notifications !== 'undefined' && notifications.unreadCount > 0) { %>
             <div class="dropdown me-3">
-              <button class="btn btn-link position-relative text-dark" type="button" id="notificationsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              <button class="btn btn-link position-relative text-dark dropdown-toggle" type="button" id="notificationsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="fas fa-bell"></i>
                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
                   <%= notifications.unreadCount %>

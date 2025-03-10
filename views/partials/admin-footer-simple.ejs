@@ -15,54 +15,8 @@
 <% } %>
 
 <!-- Dashboard Core JS - mit Lazy Loading -->
-<script>
-  // Minimale Skript-Version für einfache Seiten
-  document.addEventListener("DOMContentLoaded", function() {
-    // Sidebar Toggle
-    const sidebarToggler = document.querySelector('.sidebar-toggler');
-    const dashboardWrapper = document.querySelector('.dashboard-wrapper');
-    
-    if (sidebarToggler && dashboardWrapper) {
-      sidebarToggler.addEventListener('click', function() {
-        dashboardWrapper.classList.toggle('sidebar-open');
-      });
-    }
-    
-    // Dropdown Toggle
-    const dropdowns = document.querySelectorAll('.nav-dropdown');
-    dropdowns.forEach(dropdown => {
-      const toggle = dropdown.querySelector('.dropdown-toggle');
-      if (toggle) {
-        toggle.addEventListener('click', function(e) {
-          e.preventDefault();
-          dropdown.classList.toggle('show');
-          dropdown.querySelector('.dropdown-menu').classList.toggle('show');
-        });
-      }
-    });
-    
-    // Tabellen-Initialisierung
-    if (typeof $.fn !== 'undefined' && $.fn.DataTable && document.querySelector('.datatable')) {
-      $('.datatable').DataTable({
-        language: {
-          url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/de-DE.json'
-        },
-        responsive: true,
-        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Alle"]],
-        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"table-responsive"t><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-      });
-    }
-    
-    // Load full dashboard.js only if needed
-    if (document.querySelector('.service-toggle') || 
-        document.querySelector('#calendar') ||
-        document.querySelector('#revenueChart')) {
-      const script = document.createElement('script');
-      script.src = '/scripts/dashboard.js';
-      document.body.appendChild(script);
-    }
-  });
-</script>
+
+<script src="/scripts/dashboard.js" defer></script>
 
 <!-- Page Specific Scripts -->
 <% if (typeof pageScripts !== 'undefined') { %>

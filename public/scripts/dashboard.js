@@ -7,12 +7,14 @@ document.addEventListener("DOMContentLoaded", function() {
     
     // DOM-Cache für häufig verwendete Elemente
     const dashboardWrapper = document.querySelector('.dashboard-wrapper');
-    const sidebarToggler = document.querySelector('.sidebar-toggler');
+    const sidebarToggler = document.getElementById('sidebarToggle'); // Use ID instead of class
     const desktopSidebarToggle = document.querySelector('.desktop-sidebar-toggle');
     const searchInput = document.getElementById('searchInput');
     const navDropdowns = document.querySelectorAll('.nav-dropdown');
     const statusFilters = document.querySelectorAll('.status-filter');
-  
+    const sidebarOverlay = document.getElementById('sidebarOverlay'); // Get the overlay
+    const sidebarClose = document.getElementById('sidebarClose'); // Get the close button
+
     // Sidebar-Funktionalität
     function initSidebar() {
       // Mobile Sidebar-Toggle
@@ -23,6 +25,20 @@ document.addEventListener("DOMContentLoaded", function() {
           // Aria-Expanded für Barrierefreiheit
           const isOpen = dashboardWrapper.classList.contains('sidebar-open');
           this.setAttribute('aria-expanded', isOpen);
+
+          // Show/hide the overlay
+          if (sidebarOverlay) {
+            sidebarOverlay.style.display = isOpen ? 'block' : 'none';
+          }
+        });
+      }
+
+      // Sidebar close button functionality
+      if (sidebarClose) {
+        sidebarClose.addEventListener('click', function() {
+          dashboardWrapper.classList.remove('sidebar-open');
+          if (sidebarToggler) sidebarToggler.setAttribute('aria-expanded', 'false');
+          if (sidebarOverlay) sidebarOverlay.style.display = 'none';
         });
       }
       
@@ -48,9 +64,10 @@ document.addEventListener("DOMContentLoaded", function() {
         if (window.innerWidth < 992 && 
             dashboardWrapper.classList.contains('sidebar-open') && 
             !event.target.closest('.dashboard-sidebar') && 
-            !event.target.closest('.sidebar-toggler')) {
+            !event.target.closest('#sidebarToggle')) { // Use ID
           dashboardWrapper.classList.remove('sidebar-open');
           if (sidebarToggler) sidebarToggler.setAttribute('aria-expanded', 'false');
+          if (sidebarOverlay) sidebarOverlay.style.display = 'none'; // Hide overlay
         }
       });
     }
@@ -149,6 +166,156 @@ document.addEventListener("DOMContentLoaded", function() {
       }
     }
   
+  
+  /**
+   * Dropdown-Fehlerbehebung für Dashboard
+   * Dieses Script behebt Probleme mit nicht funktionierenden Bootstrap-Dropdowns
+   */
+  
+  // Funktion zur Initialisierung aller Dropdowns
+  function initializeDropdowns() {
+    // Manuelle Initialisierung der Dropdowns
+    document.querySelectorAll('.dropdown-toggle').forEach(function(dropdownToggle) {
+      if (!dropdownToggle.initialized) {
+        dropdownToggle.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Schließe alle anderen Dropdowns
+          document.querySelectorAll('.dropdown-menu.show').forEach(function(openMenu) {
+            // Prüfen, ob das Menu nicht zum aktuellen Toggle gehört
+            if (openMenu !== this.nextElementSibling) {
+              openMenu.classList.remove('show');
+              openMenu.parentElement.classList.remove('show');
+            }
+          });
+          
+          // Toggle des aktuellen Dropdown-Menüs
+          const parent = this.parentElement;
+          parent.classList.toggle('show');
+          
+          const menu = this.nextElementSibling;
+          if (menu && menu.classList.contains('dropdown-menu')) {
+            menu.classList.toggle('show');
+          }
+        });
+        
+        // Markiere als initialisiert, um doppelte Initialisierung zu vermeiden
+        dropdownToggle.initialized = true;
+      }
+    });
+    
+    // Außerhalb klicken schließt alle Dropdowns
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.dropdown')) {
+        document.querySelectorAll('.dropdown-menu.show').forEach(function(menu) {
+          menu.classList.remove('show');
+          if (menu.parentElement) {
+            menu.parentElement.classList.remove('show');
+          }
+        });
+      }
+    });
+    
+    // Für "dropdown-toggle-split" Buttons, die als Split-Buttons fungieren
+    document.querySelectorAll('.dropdown-toggle-split').forEach(function(splitButton) {
+      if (!splitButton.initialized) {
+        splitButton.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const parent = this.parentElement.parentElement;
+          parent.classList.toggle('show');
+          
+          const menu = this.parentElement.nextElementSibling;
+          if (menu && menu.classList.contains('dropdown-menu')) {
+            menu.classList.toggle('show');
+          }
+        });
+        
+        // Markiere als initialisiert
+        splitButton.initialized = true;
+      }
+    });
+  }
+  
+  // Initialisiere Dropdowns beim Laden der Seite
+  initializeDropdowns();
+  
+  // Für dynamisch hinzugefügte Elemente, z.B. in Tabs
+  const observer = new MutationObserver(function(mutations) {
+    let shouldReinitialize = false;
+    
+    mutations.forEach(function(mutation) {
+      if (mutation.addedNodes.length > 0) {
+        for (let i = 0; i < mutation.addedNodes.length; i++) {
+          const node = mutation.addedNodes[i];
+          if (node.nodeType === 1 && (
+              node.classList?.contains('dropdown') || 
+              node.querySelector?.('.dropdown')
+          )) {
+            shouldReinitialize = true;
+            break;
+          }
+        }
+      }
+    });
+    
+    if (shouldReinitialize) {
+      initializeDropdowns();
+      initCharts(); // Ensure charts are re-initialized after dynamic content is added
+    }
+  });
+  
+  // Observer starten - beobachte den gesamten Body auf Änderungen
+  observer.observe(document.body, { 
+    childList: true, 
+    subtree: true 
+  });
+  
+  // Fix für Bootstrap Dropdown in DataTables
+  if (typeof $.fn !== 'undefined' && typeof $.fn.dataTable !== 'undefined') {
+    $.fn.dataTable.ext.errMode = 'throw';
+    
+    // Überschreibe die DataTables-Initialisierung
+    const originalDataTable = $.fn.dataTable;
+    $.fn.dataTable = function(options) {
+      const result = originalDataTable.apply(this, arguments);
+      
+      // Nach der Initialisierung Dropdowns neu initialisieren
+      setTimeout(initializeDropdowns, 100);
+      
+      return result;
+    };
+    
+    // Kopiere alle originalen Eigenschaften
+    Object.keys(originalDataTable).forEach(key => {
+      $.fn.dataTable[key] = originalDataTable[key];
+    });
+  }
+  
+  // Fix für Bootstrap-Modal-Events
+  document.querySelectorAll('.modal').forEach(function(modal) {
+    modal.addEventListener('shown.bs.modal', function() {
+      // Dropdowns innerhalb von Modals neu initialisieren
+      const modalDropdowns = this.querySelectorAll('.dropdown-toggle');
+      modalDropdowns.forEach(function(dropdown) {
+        dropdown.initialized = false;  // Reset, um Neuzuweisung zu ermöglichen
+      });
+      
+      initializeDropdowns();
+    });
+  });
+  
+  // Fix für Tab-Wechsel-Events
+  document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(function(tab) {
+    tab.addEventListener('shown.bs.tab', function() {
+      // Kurze Verzögerung, um sicherzustellen, dass der Tab-Inhalt geladen ist
+      setTimeout(initializeDropdowns, 100);
+      initCharts(); // Ensure charts are re-initialized on tab change
+    });
+  });
+  
     // DataTables Initialisierung mit verzögertem Laden
     function initDataTables() {
       // Prüfen, ob DataTables vorhanden ist und Tabellen existieren
@@ -180,150 +347,211 @@ document.addEventListener("DOMContentLoaded", function() {
         }
       }
     }
-  
-    // Charts Initialisierung
+    
+    // Optimierte Chart-Initialisierung mit besserer Konfiguration
+    let revenueChart = null;
+    let servicesChart = null;
     function initCharts() {
       // Revenue Chart
       const revenueChartEl = document.getElementById('revenueChart');
       if (revenueChartEl && typeof Chart !== 'undefined' && typeof revenueChartData !== 'undefined') {
-        new Chart(revenueChartEl, {
-          type: 'line',
-          data: {
-            labels: revenueChartData.labels || [],
-            datasets: [{
-              label: 'Umsatz',
-              data: revenueChartData.data || [],
-              borderColor: '#198754',
-              backgroundColor: 'rgba(25, 135, 84, 0.1)',
-              tension: 0.3,
-              fill: true,
-              borderWidth: 2
-            }]
+        // Destroy existing chart if it exists
+        if (revenueChart) {
+          revenueChart.destroy();
+        }
+      revenueChart = new Chart(revenueChartEl, {
+        type: 'line',
+        data: {
+        labels: revenueChartData.labels || [],
+        datasets: [{
+          label: 'Umsatz',
+          data: revenueChartData.data || [],
+          borderColor: '#198754',
+          backgroundColor: 'rgba(25, 135, 84, 0.1)',
+          tension: 0.3,
+          fill: true,
+          borderWidth: 2,
+          pointBackgroundColor: '#198754',
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+          display: false
           },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  callback: function(value) {
-                    return '€' + value.toLocaleString('de-DE');
-                  }
-                }
-              }
+          tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+            return '€' + context.parsed.y.toLocaleString('de-DE', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            });
+            }
+          },
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          titleFont: {
+            size: 13
+          },
+          bodyFont: {
+            size: 12
+          },
+          padding: 10,
+          cornerRadius: 4
+          }
+        },
+        hover: {
+          mode: 'nearest',
+          intersect: false
+        },
+        scales: {
+          y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) {
+            return '€' + value.toLocaleString('de-DE');
             },
-            plugins: {
-              legend: {
-                display: false
-              },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    return '€' + context.parsed.y.toLocaleString('de-DE');
-                  }
-                }
-              }
+            font: {
+            size: 11
+            }
+          },
+          grid: {
+            color: 'rgba(0, 0, 0, 0.05)',
+            drawBorder: false
+          }
+          },
+          x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            font: {
+            size: 11
             }
           }
-        });
+          }
+        }
+        }
+      });
       }
-      
-      // Services Chart
+    
+      // Services Chart - Doughnut Chart
       const servicesChartEl = document.getElementById('servicesChart');
       if (servicesChartEl && typeof Chart !== 'undefined' && typeof servicesChartData !== 'undefined') {
-        new Chart(servicesChartEl, {
-          type: 'doughnut',
-          data: {
-            labels: servicesChartData.labels || [],
-            datasets: [{
-              data: servicesChartData.data || [],
-              backgroundColor: [
-                'rgba(25, 135, 84, 0.8)',
-                'rgba(13, 110, 253, 0.8)',
-                'rgba(255, 193, 7, 0.8)',
-                'rgba(108, 117, 125, 0.8)'
-              ],
-              borderColor: '#ffffff',
-              borderWidth: 1
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    const label = context.label || '';
-                    const value = context.parsed || 0;
-                    const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
-                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-                    return `${label}: €${value.toLocaleString('de-DE')} (${percentage}%)`;
-                  }
-                }
-              }
+        // Destroy existing chart if it exists
+        if (servicesChart) {
+          servicesChart.destroy();
+        }
+      servicesChart = new Chart(servicesChartEl, {
+        type: 'doughnut',
+        data: {
+        labels: servicesChartData.labels || [],
+        datasets: [{
+          data: servicesChartData.data || [],
+          backgroundColor: [
+          'rgba(25, 135, 84, 0.8)',
+          'rgba(13, 110, 253, 0.8)',
+          'rgba(255, 193, 7, 0.8)',
+          'rgba(108, 117, 125, 0.8)'
+          ],
+          borderColor: '#ffffff',
+          borderWidth: 1,
+          hoverOffset: 6
+        }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '70%',
+        plugins: {
+          legend: {
+          position: 'bottom',
+          labels: {
+            padding: 15,
+            usePointStyle: true,
+            pointStyle: 'circle',
+            font: {
+            size: 11
             }
           }
-        });
+          },
+          tooltip: {
+          callbacks: {
+            label: function(context) {
+            const label = context.label || '';
+            const value = context.raw || 0;
+            const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+            const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+            return `${label}: €${value.toLocaleString('de-DE')} (${percentage}%)`;
+            }
+          }
+          }
+        }
+        }
+      });
       }
     }
-  
+    
     // Kalender-Initialisierung (für die Termineseite)
     function initCalendar() {
       const calendarTab = document.getElementById('calendar-tab');
       const calendarContainer = document.getElementById('calendar');
       
       if (calendarTab && calendarContainer) {
-        calendarTab.addEventListener('shown.bs.tab', function() {
-          if (typeof FullCalendar === 'undefined') {
-            // Dynamisches Laden der FullCalendar-Bibliothek, wenn nicht bereits geladen
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js';
-            script.onload = initializeCalendarInstance;
-            
-            const style = document.createElement('link');
-            style.rel = 'stylesheet';
-            style.href = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css';
-            
-            document.head.appendChild(style);
-            document.head.appendChild(script);
-          } else {
-            initializeCalendarInstance();
-          }
-        });
+      calendarTab.addEventListener('shown.bs.tab', function() {
+        if (typeof FullCalendar === 'undefined') {
+        // Dynamisches Laden der FullCalendar-Bibliothek, wenn nicht bereits geladen
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js';
+        script.onload = initializeCalendarInstance;
+        
+        const style = document.createElement('link');
+        style.rel = 'stylesheet';
+        style.href = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css';
+        
+        document.head.appendChild(style);
+        document.head.appendChild(script);
+        } else {
+        initializeCalendarInstance();
+        }
+      });
       }
       
       function initializeCalendarInstance() {
-        if (!window.calendar) {
-          const calendarEl = document.getElementById('calendar');
-          window.calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
-            headerToolbar: {
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
-            },
-            locale: 'de',
-            events: '/dashboard/termine/api/events',
-            eventClick: function(info) {
-              window.location.href = '/dashboard/termine/' + info.event.id;
-            },
-            // Für mobile Geräte optimierte Optionen
-            height: 'auto',
-            windowResize: function(view) {
-              if (window.innerWidth < 768) {
-                window.calendar.changeView('listWeek');
-              } else {
-                window.calendar.changeView('dayGridMonth');
-              }
-            }
-          });
-          window.calendar.render();
+      if (!window.calendar) {
+        const calendarEl = document.getElementById('calendar');
+        window.calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+        },
+        locale: 'de',
+        events: '/dashboard/termine/api/events',
+        eventClick: function(info) {
+          window.location.href = '/dashboard/termine/' + info.event.id;
+        },
+        // Für mobile Geräte optimierte Optionen
+        height: 'auto',
+        windowResize: function(view) {
+          if (window.innerWidth < 768) {
+          window.calendar.changeView('listWeek');
+          } else {
+          window.calendar.changeView('dayGridMonth');
+          }
         }
+        });
+        window.calendar.render();
+      }
       }
     }
-  
+    
     // Formularvalidierung
     function initFormValidation() {
       const forms = document.querySelectorAll('.needs-validation');

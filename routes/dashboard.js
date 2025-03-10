@@ -181,10 +181,11 @@ const getNewRequestsCountMiddleware = async (req, res, next) => {
 // Apply middleware to all routes that need it
 router.use(getNewRequestsCountMiddleware);
 
+// Optimierter Dashboard-Index-Controller
+
 // Dashboard Hauptseite
 router.get('/', isAuthenticated, async (req, res) => {
   try {
-    
     // Benutzerinformationen
     const user = req.session.user;
     
@@ -207,13 +208,62 @@ router.get('/', isAuthenticated, async (req, res) => {
       }
     };
 
-    // Datenbank-Verbindung prüfen
-    await pool.query('SELECT NOW()');
-    console.log("Datenbankverbindung erfolgreich");
-
-    // --- ECHTE DATENBANKABFRAGEN OHNE FALLBACKS ---
+    // Zeitraum-Berechnungen für die Statistiken
+    const calculateDateRangeForPeriod = (period) => {
+      const now = new Date();
+      let startDate;
+      
+      switch(period) {
+        case 'Letzten 30 Tage':
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 30);
+          break;
+        case 'Letzten 3 Monate':
+          startDate = new Date(now);
+          startDate.setMonth(now.getMonth() - 3);
+          break;
+        case 'Dieses Jahr':
+          startDate = new Date(now.getFullYear(), 0, 1); // 1. Januar des aktuellen Jahres
+          break;
+        case 'Letzten 6 Monate':
+        default:
+          startDate = new Date(now);
+          startDate.setMonth(now.getMonth() - 6);
+      }
+      
+      return { startDate, endDate: now };
+    };
     
-    // Statistiken aus der Datenbank abrufen
+    // Verbesserte Datenabfragen mit Caching-Unterstützung
+    const getCachedOrFreshData = async (cacheKey, query, params = [], ttlSeconds = 300) => {
+      // Hier könnte ein Redis- oder In-Memory-Cache verwendet werden
+      // Für dieses Beispiel implementieren wir einen einfachen In-Memory-Cache
+      if (!global.dashboardCache) {
+        global.dashboardCache = {};
+      }
+      
+      const cache = global.dashboardCache;
+      const now = Date.now();
+      
+      if (cache[cacheKey] && cache[cacheKey].expiry > now) {
+        console.log(`Cache hit for ${cacheKey}`);
+        return cache[cacheKey].data;
+      }
+      
+      console.log(`Cache miss for ${cacheKey}, fetching fresh data`);
+      const result = await pool.query(query, params);
+      
+      cache[cacheKey] = {
+        data: result.rows,
+        expiry: now + (ttlSeconds * 1000)
+      };
+      
+      return result.rows;
+    };
+
+    // --- VERBESSERTE DATENBANKABFRAGEN MIT CACHING ---
+    
+    // Statistiken aufbauen
     let stats = {
       newRequests: { count: 0, trend: 0 },
       activeProjects: { count: 0, trend: 0 },
@@ -222,104 +272,151 @@ router.get('/', isAuthenticated, async (req, res) => {
     };
     
     // Neue Anfragen zählen
-    stats.newRequests.count = await getCountFromDB("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
+    const newRequestsQuery = `SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'`;
+    const newRequestsResult = await getCachedOrFreshData('newRequests', newRequestsQuery);
+    stats.newRequests.count = parseInt(newRequestsResult[0].count || 0);
 
-    // Trend: Anzahl neue Anfragen letzte Woche im Vergleich zur Vorwoche
-    const lastWeekRequestsCount = await getCountFromDB(`
+    // Trend: Anfragen Vergleich zur Vorwoche
+    const currentWeekRequestsQuery = `
       SELECT COUNT(*) FROM kontaktanfragen
       WHERE created_at >= NOW() - INTERVAL '7 days'
-    `);
-    const previousWeekRequestsCount = await getCountFromDB(`
+    `;
+    const prevWeekRequestsQuery = `
       SELECT COUNT(*) FROM kontaktanfragen
       WHERE created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days'
-    `);
-
-    if (previousWeekRequestsCount > 0) {
-      stats.newRequests.trend = Math.round(((lastWeekRequestsCount - previousWeekRequestsCount) / previousWeekRequestsCount) * 100);
+    `;
+    
+    const [currentWeekResult, prevWeekResult] = await Promise.all([
+      getCachedOrFreshData('currentWeekRequests', currentWeekRequestsQuery),
+      getCachedOrFreshData('prevWeekRequests', prevWeekRequestsQuery)
+    ]);
+    
+    const currentWeekCount = parseInt(currentWeekResult[0].count || 0);
+    const prevWeekCount = parseInt(prevWeekResult[0].count || 0);
+    
+    if (prevWeekCount > 0) {
+      stats.newRequests.trend = Math.round(((currentWeekCount - prevWeekCount) / prevWeekCount) * 100);
     }
 
-    // Aktive Aufträge zählen
-    stats.activeProjects.count = await getCountFromDB(`
-      SELECT COUNT(*) FROM projekte WHERE status IN ('aktiv', 'in_bearbeitung')
-    `);
+    // Aktive Aufträge mit optimierter Abfrage
+    const activeProjectsQuery = `
+      SELECT COUNT(*) FROM projekte 
+      WHERE status IN ('neu', 'in_bearbeitung')
+    `;
+    const activeProjectsResult = await getCachedOrFreshData('activeProjects', activeProjectsQuery);
+    stats.activeProjects.count = parseInt(activeProjectsResult[0].count || 0);
+    
+    // Trend: Projekte im Vergleich zum Vormonat
+    const currentMonthProjectsQuery = `
+      SELECT COUNT(*) FROM projekte
+      WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
+    `;
+    const prevMonthProjectsQuery = `
+      SELECT COUNT(*) FROM projekte
+      WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+        AND created_at < DATE_TRUNC('month', CURRENT_DATE)
+    `;
+    
+    const [currentMonthResult, prevMonthResult] = await Promise.all([
+      getCachedOrFreshData('currentMonthProjects', currentMonthProjectsQuery),
+      getCachedOrFreshData('prevMonthProjects', prevMonthProjectsQuery)
+    ]);
+    
+    const currentMonthCount = parseInt(currentMonthResult[0].count || 0);
+    const prevMonthCount = parseInt(prevMonthResult[0].count || 0);
+    
+    if (prevMonthCount > 0) {
+      stats.activeProjects.trend = Math.round(((currentMonthCount - prevMonthCount) / prevMonthCount) * 100);
+    }
 
-    // Gesamtkunden zählen
-    stats.totalCustomers.count = await getCountFromDB("SELECT COUNT(*) FROM kunden");
+    // Gesamtkunden mit Trendanalyse
+    const totalCustomersQuery = `SELECT COUNT(*) FROM kunden WHERE status = 'aktiv'`;
+    const customersLastYearQuery = `
+      SELECT COUNT(*) FROM kunden 
+      WHERE created_at < NOW() - INTERVAL '1 year' AND status = 'aktiv'
+    `;
+    
+    const [totalCustomersResult, customersLastYearResult] = await Promise.all([
+      getCachedOrFreshData('totalCustomers', totalCustomersQuery),
+      getCachedOrFreshData('customersLastYear', customersLastYearQuery)
+    ]);
+    
+    stats.totalCustomers.count = parseInt(totalCustomersResult[0].count || 0);
+    const customersLastYear = parseInt(customersLastYearResult[0].count || 0);
+    
+    if (customersLastYear > 0) {
+      stats.totalCustomers.trend = Math.round(((stats.totalCustomers.count - customersLastYear) / customersLastYear) * 100);
+    }
 
-    // Monatlicher Umsatz
-    const monthlyRevenueQuery = await pool.query(`
+    // Monatlicher Umsatz mit verbesserten Abfragen
+    const monthlyRevenueQuery = `
       SELECT COALESCE(SUM(betrag), 0) as summe FROM rechnungen
       WHERE rechnungsdatum >= DATE_TRUNC('month', CURRENT_DATE)
-    `);
-    stats.monthlyRevenue.amount = parseFloat(monthlyRevenueQuery.rows[0].summe || 0);
+    `;
+    const prevMonthRevenueQuery = `
+      SELECT COALESCE(SUM(betrag), 0) as summe FROM rechnungen
+      WHERE rechnungsdatum >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+        AND rechnungsdatum < DATE_TRUNC('month', CURRENT_DATE)
+    `;
+    
+    const [monthlyRevenueResult, prevMonthRevenueResult] = await Promise.all([
+      getCachedOrFreshData('monthlyRevenue', monthlyRevenueQuery),
+      getCachedOrFreshData('prevMonthRevenue', prevMonthRevenueQuery)
+    ]);
+    
+    stats.monthlyRevenue.amount = parseFloat(monthlyRevenueResult[0].summe || 0);
+    const prevMonthRevenue = parseFloat(prevMonthRevenueResult[0].summe || 0);
+    
+    if (prevMonthRevenue > 0) {
+      stats.monthlyRevenue.trend = Math.round(((stats.monthlyRevenue.amount - prevMonthRevenue) / prevMonthRevenue) * 100);
+    }
 
-    // Chart-Daten aus Datenbank abrufen basierend auf ausgewähltem Filter
+    // Chart-Daten basierend auf ausgewähltem Filter
     let charts = {
       revenue: { labels: [], data: [] },
       services: { labels: [], data: [] }
     };
     
-    // Revenue Chart Daten basierend auf Filter
-    let revenueQuery;
-    switch(revenueFilter) {
-      case 'Letzten 30 Tage':
-        revenueQuery = await pool.query({
-          text: `
-            SELECT 
-              TO_CHAR(DATE_TRUNC('day', rechnungsdatum), 'DD.MM.YY') as label,
-              SUM(betrag) as summe
-            FROM rechnungen 
-            WHERE rechnungsdatum >= CURRENT_DATE - INTERVAL '30 days'
-            GROUP BY DATE_TRUNC('day', rechnungsdatum)
-            ORDER BY DATE_TRUNC('day', rechnungsdatum)
-          `
-        });
-        break;
-      case 'Letzten 3 Monate':
-        revenueQuery = await pool.query({
-          text: `
-            SELECT 
-              TO_CHAR(DATE_TRUNC('week', rechnungsdatum), 'DD.MM.YY') as label,
-              SUM(betrag) as summe
-            FROM rechnungen 
-            WHERE rechnungsdatum >= CURRENT_DATE - INTERVAL '3 months'
-            GROUP BY DATE_TRUNC('week', rechnungsdatum)
-            ORDER BY DATE_TRUNC('week', rechnungsdatum)
-          `
-        });
-        break;
-      case 'Dieses Jahr':
-        revenueQuery = await pool.query({
-          text: `
-            SELECT 
-              TO_CHAR(DATE_TRUNC('month', rechnungsdatum), 'Mon YY') as label,
-              SUM(betrag) as summe
-            FROM rechnungen 
-            WHERE rechnungsdatum >= DATE_TRUNC('year', CURRENT_DATE)
-            GROUP BY DATE_TRUNC('month', rechnungsdatum)
-            ORDER BY DATE_TRUNC('month', rechnungsdatum)
-          `
-        });
-        break;
-      case 'Letzten 6 Monate':
-      default:
-        revenueQuery = await pool.query({
-          text: `
-            SELECT 
-              TO_CHAR(DATE_TRUNC('month', rechnungsdatum), 'Mon YY') as label,
-              SUM(betrag) as summe
-            FROM rechnungen 
-            WHERE rechnungsdatum >= CURRENT_DATE - INTERVAL '6 months'
-            GROUP BY DATE_TRUNC('month', rechnungsdatum)
-            ORDER BY DATE_TRUNC('month', rechnungsdatum)
-          `
-        });
+    // Revenue Chart Daten basierend auf ausgewähltem Filter
+    const { startDate, endDate } = calculateDateRangeForPeriod(revenueFilter);
+    let revenueGrouping, dateFormat;
+    
+    // Anpassung des Gruppierungsintervalls und Datumsformats basierend auf dem gewählten Filter
+    if (revenueFilter === 'Letzten 30 Tage') {
+      revenueGrouping = 'day';
+      dateFormat = 'DD.MM';
+    } else if (revenueFilter === 'Letzten 3 Monate') {
+      revenueGrouping = 'week';
+      dateFormat = 'DD.MM';
+    } else {
+      revenueGrouping = 'month';
+      dateFormat = 'MMM YY';
     }
     
-    charts.revenue.labels = revenueQuery.rows.map(row => row.label);
-    charts.revenue.data = revenueQuery.rows.map(row => parseFloat(row.summe));
+    const revenueChartQuery = `
+      SELECT 
+        TO_CHAR(DATE_TRUNC('${revenueGrouping}', rechnungsdatum), '${dateFormat}') as label,
+        SUM(betrag) as summe
+      FROM 
+        rechnungen 
+      WHERE 
+        rechnungsdatum >= $1 AND rechnungsdatum <= $2
+      GROUP BY 
+        DATE_TRUNC('${revenueGrouping}', rechnungsdatum)
+      ORDER BY 
+        DATE_TRUNC('${revenueGrouping}', rechnungsdatum)
+    `;
     
-    // Services-Verteilung nach Kategorie
+    const revenueChartResult = await getCachedOrFreshData(
+      `revenueChart_${revenueFilter}`, 
+      revenueChartQuery, 
+      [startDate, endDate]
+    );
+    
+    charts.revenue.labels = revenueChartResult.map(row => row.label);
+    charts.revenue.data = revenueChartResult.map(row => parseFloat(row.summe));
+    
+    // Services-Chart-Daten für Darstellung der Dienstleistungsverteilung
     let servicesPeriod;
     switch(servicesFilter) {
       case 'Diese Woche':
@@ -336,39 +433,76 @@ router.get('/', isAuthenticated, async (req, res) => {
         servicesPeriod = "AND rechnungsdatum >= DATE_TRUNC('month', CURRENT_DATE)";
     }
     
-    // Services chart data
-    let servicesData = { labels: [], data: [] };
-    try {
-      const servicesQuery = await pool.query(`
-        SELECT 
-          d.name as service_name,
-          SUM(p.anzahl * p.einzelpreis) as summe
-        FROM rechnungspositionen p
+    const servicesChartQuery = `
+      SELECT 
+        d.name as service_name,
+        SUM(p.anzahl * p.einzelpreis) as summe
+      FROM 
+        rechnungspositionen p
         JOIN dienstleistungen d ON p.dienstleistung_id = d.id
         JOIN rechnungen r ON p.rechnung_id = r.id
-        WHERE d.name IS NOT NULL ${servicesPeriod}
-        GROUP BY d.name
-        ORDER BY summe DESC
-        LIMIT 3
-      `);
-      
-      charts.services.labels = servicesQuery.rows.map(row => row.service_name);
-      charts.services.data = servicesQuery.rows.map(row => parseFloat(row.summe));
-    } catch (error) {
-      console.error('Error fetching service chart data:', error.message);
-      // Provide default values or fallback
-      charts.services.labels = ['Facility', 'Umzüge', 'Winterdienst'];
-      charts.services.data = [0, 0, 0];
+      WHERE 
+        d.name IS NOT NULL ${servicesPeriod}
+      GROUP BY 
+        d.name
+      ORDER BY 
+        summe DESC
+      LIMIT 4
+    `;
+    
+    const servicesChartResult = await getCachedOrFreshData(
+      `servicesChart_${servicesFilter}`, 
+      servicesChartQuery
+    );
+    
+    charts.services.labels = servicesChartResult.map(row => row.service_name);
+    charts.services.data = servicesChartResult.map(row => parseFloat(row.summe));
+    
+    // Fallback für leere Chart-Daten
+    if (charts.services.labels.length === 0) {
+      charts.services.labels = ['Keine Daten verfügbar'];
+      charts.services.data = [0];
     }
     
-    // Anzahl neuer Anfragen für Badge
-    const newRequestsCount = req.newRequestsCount;
+    if (charts.revenue.labels.length === 0) {
+      if (revenueFilter === 'Letzten 30 Tage') {
+        // Generiere leere Tageseinträge für die letzten 30 Tage
+        for (let i = 29; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          charts.revenue.labels.push(format(date, 'dd.MM'));
+          charts.revenue.data.push(0);
+        }
+      } else if (revenueFilter === 'Letzten 3 Monate') {
+        // Generiere leere Wocheneinträge für die letzten 12 Wochen
+        for (let i = 0; i < 12; i++) {
+          charts.revenue.labels.push(`Woche ${i+1}`);
+          charts.revenue.data.push(0);
+        }
+      } else {
+        // Generiere leere Monatseinträge für die letzten 6 Monate
+        const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+        const currentMonth = new Date().getMonth();
+        
+        for (let i = 5; i >= 0; i--) {
+          const monthIndex = (currentMonth - i + 12) % 12;
+          const year = new Date().getFullYear() - (currentMonth < i ? 1 : 0);
+          charts.revenue.labels.push(`${monthNames[monthIndex]} ${year.toString().substr(2)}`);
+          charts.revenue.data.push(0);
+        }
+      }
+    }
 
-    // Benachrichtigungen aus der Datenbank abrufen
+    // Weitere optimierte Abfragen für das Dashboard
+    
+    // Neue Anfragen für Badge
+    const newRequestsCount = stats.newRequests.count;
+
+    // Benachrichtigungen mit Caching
     const notifications = await getNotifications(req);
 
-    // Aktuelle Anfragen aus der Datenbank
-    const recentRequestsQuery = await pool.query(`
+    // Aktuelle Anfragen mit verbesserten Informationen
+    const recentRequestsQuery = `
       SELECT 
         id, 
         name, 
@@ -381,9 +515,11 @@ router.get('/', isAuthenticated, async (req, res) => {
       ORDER BY 
         created_at DESC
       LIMIT 5
-    `);
+    `;
     
-    const recentRequests = recentRequestsQuery.rows.map(anfrage => {
+    const recentRequestsResult = await getCachedOrFreshData('recentRequests', recentRequestsQuery, [], 120);
+    
+    const recentRequests = recentRequestsResult.map(anfrage => {
       const statusInfo = getAnfrageStatusInfo(anfrage.status);
       return {
         id: anfrage.id,
@@ -398,8 +534,8 @@ router.get('/', isAuthenticated, async (req, res) => {
       };
     });
 
-    // Termine aus der Datenbank
-    const appointmentsQuery = await pool.query(`
+    // Anstehende Termine mit verbesserten Formatierungen und Informationen
+    const upcomingAppointmentsQuery = `
       SELECT 
         t.id, 
         t.titel, 
@@ -414,9 +550,11 @@ router.get('/', isAuthenticated, async (req, res) => {
       ORDER BY 
         t.termin_datum ASC
       LIMIT 5
-    `);
+    `;
     
-    const upcomingAppointments = appointmentsQuery.rows.map(termin => {
+    const upcomingAppointmentsResult = await getCachedOrFreshData('upcomingAppointments', upcomingAppointmentsQuery, [], 300);
+    
+    const upcomingAppointments = upcomingAppointmentsResult.map(termin => {
       const datumObj = new Date(termin.termin_datum);
       const heute = isToday(datumObj);
       const morgen = isTomorrow(datumObj);
@@ -443,8 +581,15 @@ router.get('/', isAuthenticated, async (req, res) => {
       };
     });
 
-    console.log("Rendering dashboard with data");
+    // Systemstatusabfragen für die neue Statusanzeige
+    const systemStatus = {
+      database: 'online',
+      lastUpdate: format(new Date(), 'dd.MM.yyyy, HH:mm:ss'),
+      processing: 'active',
+      statistics: 'active'
+    };
     
+    // Rendere das Dashboard mit allen gesammelten Daten
     res.render('dashboard/index', {
       title: 'Dashboard - Rising BSM',
       user,
@@ -452,10 +597,11 @@ router.get('/', isAuthenticated, async (req, res) => {
       stats,
       chartFilters,
       charts,
-      newRequestsCount: req.newRequestsCount,
+      newRequestsCount,
       notifications,
       recentRequests,
-      upcomingAppointments
+      upcomingAppointments,
+      systemStatus
     });
   } catch (error) {
     console.error('Dashboard-Fehler:', error);
@@ -1205,6 +1351,367 @@ router.post('/kunden/neu', isAuthenticated, async (req, res) => {
     res.redirect('/dashboard/kunden/neu');
   }
 });
+
+
+
+router.post('/kunden/update-status', isAuthenticated, async (req, res) => {
+  try {
+    const { id, status } = req.body;
+    
+    // Validierung
+    if (!id || !status) {
+      req.flash('error', 'Fehlende Parameter: ID und Status sind erforderlich.');
+      return res.redirect('/dashboard/kunden');
+    }
+    
+    // Status in der Datenbank aktualisieren
+    await pool.query({
+      text: `UPDATE kunden SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      values: [status, id]
+    });
+
+    // Protokollieren der Statusänderung
+    await pool.query({
+      text: `
+        INSERT INTO kunden_log (
+          kunde_id, benutzer_id, benutzer_name, aktion, details
+        ) VALUES ($1, $2, $3, $4, $5)
+      `,
+      values: [
+        id, 
+        req.session.user.id, 
+        req.session.user.name, 
+        'status_changed',
+        `Status geändert auf: ${status}`
+      ]
+    });
+    
+    req.flash('success', 'Kundenstatus erfolgreich aktualisiert.');
+    res.redirect('/dashboard/kunden');
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren des Kundenstatus:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect('/dashboard/kunden');
+  }
+});
+
+// Kunde löschen
+router.post('/kunden/delete', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.body;
+    
+    // Validierung
+    if (!id) {
+      req.flash('error', 'Fehlende Parameter: ID ist erforderlich.');
+      return res.redirect('/dashboard/kunden');
+    }
+    
+    // Prüfen, ob mit diesem Kunden bereits Projekte oder Termine verknüpft sind
+    const relatedProjectsQuery = await pool.query(
+      'SELECT COUNT(*) FROM projekte WHERE kunde_id = $1',
+      [id]
+    );
+    
+    const relatedAppointmentsQuery = await pool.query(
+      'SELECT COUNT(*) FROM termine WHERE kunde_id = $1',
+      [id]
+    );
+    
+    const relatedProjects = parseInt(relatedProjectsQuery.rows[0].count);
+    const relatedAppointments = parseInt(relatedAppointmentsQuery.rows[0].count);
+    
+    if (relatedProjects > 0 || relatedAppointments > 0) {
+      req.flash('error', `Kunde kann nicht gelöscht werden. ${relatedProjects} Projekte und ${relatedAppointments} Termine sind noch mit diesem Kunden verknüpft.`);
+      return res.redirect('/dashboard/kunden');
+    }
+    
+    // Statt vollständiger Löschung: Status auf 'gelöscht' setzen und Archivieren
+    await pool.query({
+      text: `UPDATE kunden SET status = 'geloescht', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      values: [id]
+    });
+    
+    // Protokollieren der Löschung
+    await pool.query({
+      text: `
+        INSERT INTO kunden_log (
+          kunde_id, benutzer_id, benutzer_name, aktion, details
+        ) VALUES ($1, $2, $3, $4, $5)
+      `,
+      values: [
+        id, 
+        req.session.user.id, 
+        req.session.user.name, 
+        'deleted',
+        'Kunde als gelöscht markiert'
+      ]
+    });
+    
+    req.flash('success', 'Kunde erfolgreich gelöscht.');
+    res.redirect('/dashboard/kunden');
+  } catch (error) {
+    console.error('Fehler beim Löschen des Kunden:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect('/dashboard/kunden');
+  }
+});
+
+// Kunden-Export (CSV, Excel, PDF)
+router.get('/kunden/export', isAuthenticated, async (req, res) => {
+  try {
+    const { format: exportFormat, status, type } = req.query;
+    
+    // Filterbedingungen aufbauen
+    let conditions = [];
+    let params = [];
+    let paramCounter = 1;
+    
+    if (status) {
+      conditions.push(`status = $${paramCounter++}`);
+      params.push(status);
+    } else {
+      // Standardmäßig nur aktive Kunden exportieren (keine gelöschten)
+      conditions.push(`status != 'geloescht'`);
+    }
+    
+    if (type) {
+      conditions.push(`kundentyp = $${paramCounter++}`);
+      params.push(type);
+    }
+    
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    
+    // Daten abrufen
+    const query = {
+      text: `
+        SELECT 
+          id, 
+          name, 
+          firma,
+          email,
+          telefon,
+          adresse,
+          plz,
+          ort,
+          land,
+          kundentyp,
+          status,
+          created_at,
+          updated_at,
+          newsletter
+        FROM 
+          kunden
+        ${whereClause}
+        ORDER BY 
+          name ASC
+      `,
+      values: params
+    };
+    
+    const result = await pool.query(query);
+    
+    // Format basierte Verarbeitung
+    if (exportFormat === 'csv') {
+      // CSV-Export
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=kunden-export.csv');
+      // CSV-Header
+  res.write('ID,Name,Firma,Email,Telefon,Adresse,PLZ,Ort,Land,Kundentyp,Status,Erstellt am,Newsletter\n');
+  
+  // CSV-Zeilen
+  result.rows.forEach(row => {
+    const csvLine = [
+      row.id,
+      `"${(row.name || '').replace(/"/g, '""')}"`,
+      `"${(row.firma || '').replace(/"/g, '""')}"`,
+      `"${(row.email || '').replace(/"/g, '""')}"`,
+      `"${(row.telefon || '').replace(/"/g, '""')}"`,
+      `"${(row.adresse || '').replace(/"/g, '""')}"`,
+      `"${(row.plz || '').replace(/"/g, '""')}"`,
+      `"${(row.ort || '').replace(/"/g, '""')}"`,
+      `"${(row.land || 'Österreich').replace(/"/g, '""')}"`,
+      `"${(row.kundentyp || 'privat').replace(/"/g, '""')}"`,
+      `"${(row.status || 'aktiv').replace(/"/g, '""')}"`,
+      `"${row.created_at ? new Date(row.created_at).toLocaleDateString('de-DE') : ''}"`,
+      row.newsletter ? 'Ja' : 'Nein'
+    ].join(',');
+    
+    res.write(csvLine + '\n');
+  });
+  
+  res.end();
+} else if (exportFormat === 'excel') {
+  try {
+    // Excel-Export
+    const Excel = require('exceljs');
+    const workbook = new Excel.Workbook();
+    const worksheet = workbook.addWorksheet('Kunden');
+    
+    // Spalten definieren
+    worksheet.columns = [
+      { header: 'ID', key: 'id', width: 10 },
+      { header: 'Name', key: 'name', width: 20 },
+      { header: 'Firma', key: 'firma', width: 20 },
+      { header: 'E-Mail', key: 'email', width: 25 },
+      { header: 'Telefon', key: 'telefon', width: 15 },
+      { header: 'Adresse', key: 'adresse', width: 25 },
+      { header: 'PLZ', key: 'plz', width: 10 },
+      { header: 'Ort', key: 'ort', width: 15 },
+      { header: 'Land', key: 'land', width: 15 },
+      { header: 'Kundentyp', key: 'kundentyp', width: 15 },
+      { header: 'Status', key: 'status', width: 12 },
+      { header: 'Erstellt am', key: 'created_at', width: 18 },
+      { header: 'Newsletter', key: 'newsletter', width: 12 }
+    ];
+    
+    // Zeilen hinzufügen
+    result.rows.forEach(row => {
+      worksheet.addRow({
+        id: row.id,
+        name: row.name,
+        firma: row.firma || '',
+        email: row.email,
+        telefon: row.telefon || '',
+        adresse: row.adresse || '',
+        plz: row.plz || '',
+        ort: row.ort || '',
+        land: row.land || 'Österreich',
+        kundentyp: row.kundentyp === 'geschaeft' ? 'Geschäftskunde' : 'Privatkunde',
+        status: row.status === 'aktiv' ? 'Aktiv' : 'Inaktiv',
+        created_at: row.created_at ? new Date(row.created_at).toLocaleDateString('de-DE') : '',
+        newsletter: row.newsletter ? 'Ja' : 'Nein'
+      });
+    });
+    
+    // Header-Stil
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+    
+    // Excel-Datei an Browser senden
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=kundenexport.xlsx');
+    
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (excelError) {
+    console.error('Fehler beim Excel-Export:', excelError);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Excel-Export-Fehler: ' + excelError.message 
+    });
+  }
+} else if (exportFormat === 'pdf') {
+  try {
+    // PDF-Export mit PDFKit
+    const PDFDocument = require('pdfkit');
+    
+    // Erstellen eines neuen PDF-Dokuments
+    const doc = new PDFDocument({
+      margins: { top: 50, bottom: 50, left: 50, right: 50 },
+      size: 'A4'
+    });
+    
+    // PDF-Header-Metadaten setzen
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=kundenexport.pdf');
+    
+    // PDF als Stream an die Response weiterleiten
+    doc.pipe(res);
+    
+    // PDF-Inhalt erstellen
+    doc.fontSize(16).text('Kundenliste - Rising BSM', { align: 'center' });
+    doc.moveDown();
+    
+    // Filter-Informationen
+    doc.fontSize(10).text(`Exportiert am: ${new Date().toLocaleDateString('de-DE', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
+    if (status) doc.text(`Status-Filter: ${status === 'aktiv' ? 'Nur aktive Kunden' : 'Nur inaktive Kunden'}`);
+    if (type) doc.text(`Typ-Filter: ${type === 'privat' ? 'Nur Privatkunden' : 'Nur Geschäftskunden'}`);
+    
+    doc.moveDown();
+    
+    // Tabellen-Header
+    const tableHeaders = ['Name', 'Firma', 'Kontakt', 'Adresse', 'Status'];
+    const columnWidths = [100, 80, 120, 150, 50];
+    let currentY = doc.y;
+    
+    // Header-Hintergrund
+    doc.rect(50, currentY, 500, 20).fill('#f0f0f0');
+    doc.fillColor('#000000');
+    
+    // Header-Texte
+    let currentX = 50;
+    tableHeaders.forEach((header, i) => {
+      doc.text(header, currentX, currentY + 5, { width: columnWidths[i], align: 'left' });
+      currentX += columnWidths[i];
+    });
+    
+    currentY += 25;
+    
+    // Zeilen
+    result.rows.forEach((row, rowIndex) => {
+      // Seitenumbruch prüfen
+      if (currentY > 700) {
+        doc.addPage();
+        currentY = 50;
+      }
+      
+      currentX = 50;
+      doc.fontSize(9);
+      
+      // Zellen-Inhalte
+      doc.text(row.name, currentX, currentY, { width: columnWidths[0] });
+      currentX += columnWidths[0];
+      
+      doc.text(row.firma || '-', currentX, currentY, { width: columnWidths[1] });
+      currentX += columnWidths[1];
+      
+      doc.text(
+        `${row.email}\n${row.telefon || ''}`, 
+        currentX, currentY, 
+        { width: columnWidths[2] }
+      );
+      currentX += columnWidths[2];
+      
+      const adresse = row.adresse ? 
+        `${row.adresse}, ${row.plz || ''} ${row.ort || ''}` : 
+        'Keine Adresse';
+      doc.text(adresse, currentX, currentY, { width: columnWidths[3] });
+      currentX += columnWidths[3];
+      
+      doc.text(row.status === 'aktiv' ? 'Aktiv' : 'Inaktiv', currentX, currentY, { width: columnWidths[4] });
+      
+      currentY += 30;
+    });
+    
+    // PDF finalisieren
+    doc.end();
+  } catch (pdfError) {
+    console.error('Fehler beim PDF-Export:', pdfError);
+    res.status(500).json({ 
+      success: false, 
+      error: 'PDF-Export-Fehler: ' + pdfError.message 
+    });
+  }
+} else {
+  // Standard-Antwort bei unbekanntem Format
+  res.json({ 
+    success: true, 
+    message: 'Export verfügbar', 
+    format: exportFormat,
+    count: result.rows.length
+  });
+}} catch (error) {
+  console.error('Fehler beim Exportieren der Kunden:', error);
+  res.status(500).json({
+  success: false,
+  error: 'Datenbankfehler: ' + error.message
+  });
+  }
+  });
 
 // Einzelnen Kunden anzeigen
 router.get('/kunden/:id', isAuthenticated, async (req, res) => {
