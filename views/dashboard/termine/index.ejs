@@ -81,7 +81,7 @@
                               <%= appointment.statusLabel %>
                             </span>
                           </td>
-                          <td><%= appointment.projekt_name || '-' %></td>
+                          <td><%- appointment.projekt_name || '-' %></td>
                           <td>
                             <div class="btn-group btn-group-sm">
                               <a href="/dashboard/termine/<%= appointment.id %>" class="btn btn-outline-secondary">

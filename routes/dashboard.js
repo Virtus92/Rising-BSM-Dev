@@ -1478,10 +1478,12 @@ router.get('/termine', isAuthenticated, async (req, res) => {
           t.dauer,
           t.ort,
           t.status,
-          k.name AS kunde_name
+          k.name AS kunde_name,
+          p.titel AS projekt_name
         FROM 
           termine t
           LEFT JOIN kunden k ON t.kunde_id = k.id
+          LEFT JOIN projekte p ON t.projekt_id = p.id
         ${statusCondition}
         ORDER BY 
           t.termin_datum ASC
@@ -1496,8 +1498,9 @@ router.get('/termine', isAuthenticated, async (req, res) => {
         id: termin.id,
         titel: termin.titel,
         kunde_id: termin.kunde_id,
-        kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
+        kunde_name: termin.kunde_name || ' - ',
         projekt_id: termin.projekt_id,
+        projekt_name: termin.projekt_name || ' - ',
         termin_datum: termin.termin_datum,
         dateFormatted: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy'),
         timeFormatted: formatDateSafely(termin.termin_datum, 'HH:mm'),
