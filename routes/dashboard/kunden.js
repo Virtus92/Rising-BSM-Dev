@@ -596,105 +596,105 @@ router.get('/export', async (req, res) => {
   });
 
   // Einzelnen Kunden anzeigen
-router.get('/kunden/:id', isAuthenticated, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Kunde aus der Datenbank abrufen
-    const kundeQuery = await pool.query({
-      text: `SELECT * FROM kunden WHERE id = $1`,
-      values: [id]
-    });
-    
-    if (kundeQuery.rows.length === 0) {
-      return res.status(404).render('error', {
-        message: `Kunde mit ID ${id} nicht gefunden`,
-        error: { status: 404 }
+  router.get('/:id', isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Kunde aus der Datenbank abrufen
+      const kundeQuery = await pool.query({
+        text: `SELECT * FROM kunden WHERE id = $1`,
+        values: [id]
+      });
+      
+      if (kundeQuery.rows.length === 0) {
+        return res.status(404).render('error', {
+          message: `Kunde mit ID ${id} nicht gefunden`,
+          error: { status: 404 }
+        });
+      }
+      
+      const kunde = kundeQuery.rows[0];
+      
+      // Termine des Kunden abrufen
+      const termineQuery = await pool.query({
+        text: `
+          SELECT id, titel, termin_datum, status 
+          FROM termine 
+          WHERE kunde_id = $1 
+          ORDER BY termin_datum DESC
+        `,
+        values: [id]
+      });
+      
+      // Projekte des Kunden abrufen
+      const projekteQuery = await pool.query({
+        text: `
+          SELECT id, titel, start_datum, status 
+          FROM projekte 
+          WHERE kunde_id = $1 
+          ORDER BY start_datum DESC
+        `,
+        values: [id]
+      });
+      
+      res.render('dashboard/kunden/detail', {
+        title: `Kunde: ${kunde.name} - Rising BSM`,
+        user: req.session.user,
+        currentPath: '/dashboard/kunden',
+        kunde: {
+          id: kunde.id,
+          name: kunde.name,
+          firma: kunde.firma || 'Nicht angegeben',
+          email: kunde.email,
+          telefon: kunde.telefon || 'Nicht angegeben',
+          adresse: kunde.adresse || 'Nicht angegeben',
+          plz: kunde.plz || '',
+          ort: kunde.ort || '',
+          kundentyp: kunde.kundentyp === 'privat' ? 'Privatkunde' : 'Geschäftskunde',
+          status: kunde.status,
+          statusLabel: kunde.status === 'aktiv' ? 'Aktiv' : 'Inaktiv',
+          statusClass: kunde.status === 'aktiv' ? 'success' : 'secondary',
+          notizen: kunde.notizen || 'Keine Notizen vorhanden',
+          newsletter: kunde.newsletter,
+          created_at: formatDateSafely(kunde.created_at, 'dd.MM.yyyy')
+        },
+        termine: termineQuery.rows.map(termin => {
+          const terminStatusInfo = getTerminStatusInfo(termin.status);
+          return {
+            id: termin.id,
+            titel: termin.titel,
+            datum: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy, HH:mm'),
+            status: termin.status,
+            statusLabel: terminStatusInfo.label,
+            statusClass: terminStatusInfo.className
+          };
+        }),
+        projekte: projekteQuery.rows.map(projekt => {
+          const projektStatusInfo = getProjektStatusInfo(projekt.status);
+          return {
+            id: projekt.id,
+            titel: projekt.titel,
+            datum: formatDateSafely(projekt.start_datum, 'dd.MM.yyyy'),
+            status: projekt.status,
+            statusLabel: projektStatusInfo.label,
+            statusClass: projektStatusInfo.className
+          };
+        }),
+        newRequestsCount: req.newRequestsCount,
+        csrfToken: req.csrfToken(),
+        messages: { success: req.flash('success'), error: req.flash('error') }
+      });
+    } catch (error) {
+      console.error('Fehler beim Anzeigen des Kunden:', error);
+      res.status(500).render('error', {
+        message: 'Datenbankfehler: ' + error.message,
+        error: error
       });
     }
-    
-    const kunde = kundeQuery.rows[0];
-    
-    // Termine des Kunden abrufen
-    const termineQuery = await pool.query({
-      text: `
-        SELECT id, titel, termin_datum, status 
-        FROM termine 
-        WHERE kunde_id = $1 
-        ORDER BY termin_datum DESC
-      `,
-      values: [id]
-    });
-    
-    // Projekte des Kunden abrufen
-    const projekteQuery = await pool.query({
-      text: `
-        SELECT id, titel, start_datum, status 
-        FROM projekte 
-        WHERE kunde_id = $1 
-        ORDER BY start_datum DESC
-      `,
-      values: [id]
-    });
-    
-    res.render('dashboard/kunden/detail', {
-      title: `Kunde: ${kunde.name} - Rising BSM`,
-      user: req.session.user,
-      currentPath: '/dashboard/kunden',
-      kunde: {
-        id: kunde.id,
-        name: kunde.name,
-        firma: kunde.firma || 'Nicht angegeben',
-        email: kunde.email,
-        telefon: kunde.telefon || 'Nicht angegeben',
-        adresse: kunde.adresse || 'Nicht angegeben',
-        plz: kunde.plz || '',
-        ort: kunde.ort || '',
-        kundentyp: kunde.kundentyp === 'privat' ? 'Privatkunde' : 'Geschäftskunde',
-        status: kunde.status,
-        statusLabel: kunde.status === 'aktiv' ? 'Aktiv' : 'Inaktiv',
-        statusClass: kunde.status === 'aktiv' ? 'success' : 'secondary',
-        notizen: kunde.notizen || 'Keine Notizen vorhanden',
-        newsletter: kunde.newsletter,
-        created_at: formatDateSafely(kunde.created_at, 'dd.MM.yyyy')
-      },
-      termine: termineQuery.rows.map(termin => {
-        const terminStatusInfo = getTerminStatusInfo(termin.status);
-        return {
-          id: termin.id,
-          titel: termin.titel,
-          datum: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy, HH:mm'),
-          status: termin.status,
-          statusLabel: terminStatusInfo.label,
-          statusClass: terminStatusInfo.className
-        };
-      }),
-      projekte: projekteQuery.rows.map(projekt => {
-        const projektStatusInfo = getProjektStatusInfo(projekt.status);
-        return {
-          id: projekt.id,
-          titel: projekt.titel,
-          datum: formatDateSafely(projekt.start_datum, 'dd.MM.yyyy'),
-          status: projekt.status,
-          statusLabel: projektStatusInfo.label,
-          statusClass: projektStatusInfo.className
-        };
-      }),
-      newRequestsCount: req.newRequestsCount,
-      csrfToken: req.csrfToken(),
-      messages: { success: req.flash('success'), error: req.flash('error') }
-    });
-  } catch (error) {
-    console.error('Fehler beim Anzeigen des Kunden:', error);
-    res.status(500).render('error', {
-      message: 'Datenbankfehler: ' + error.message,
-      error: error
-    });
-  }
-});
+  });
 
 // Kunden bearbeiten
-router.get('/kunden/:id/edit', isAuthenticated, async (req, res) => {
+router.get('/:id/edit', isAuthenticated, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -732,7 +732,7 @@ router.get('/kunden/:id/edit', isAuthenticated, async (req, res) => {
 });
 
 // Kunden aktualisieren
-router.post('/kunden/:id/edit', isAuthenticated, async (req, res) => {
+router.post('/:id/edit', isAuthenticated, async (req, res) => {
   try {
     const { id } = req.params;
     const { 
@@ -799,7 +799,7 @@ router.post('/kunden/:id/edit', isAuthenticated, async (req, res) => {
 });
 
 // Kunden-Notiz hinzufügen
-router.post('/kunden/:id/add-note', isAuthenticated, async (req, res) => {
+router.post('/:id/add-note', isAuthenticated, async (req, res) => {
   try {
     const { id } = req.params;
     const { notiz } = req.body;

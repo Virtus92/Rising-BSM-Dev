@@ -17,8 +17,8 @@ router.get('/', isAuthenticated, async (req, res) => {
   try {
     const userQuery = await pool.query(`
       SELECT 
-        id, name, email, telefon, rolle, 
-        created_at 
+        id, name, email, telefonnummer, rolle, 
+        erstellt_am 
       FROM benutzer 
       WHERE id = $1
     `, [req.session.user.id]);

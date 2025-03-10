@@ -206,6 +206,12 @@ router.post('/neu', isAuthenticated, async (req, res) => {
   router.post('/update-status', isAuthenticated, async (req, res) => {
     try {
       const { id, status, note } = req.body;
+
+      // Validierung der ID
+      if (!id || isNaN(parseInt(id))) {
+        req.flash('error', 'Ungültige Termin-ID');
+        return res.redirect('/dashboard/termine');
+      }
       
       // Status in der Datenbank aktualisieren
       await pool.query({
