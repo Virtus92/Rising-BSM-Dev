@@ -2,10 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
-const { Pool } = require('pg');
-const axios = require('axios');
 const helmet = require('helmet');
-const validator = require('validator');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
@@ -13,71 +10,58 @@ const pgSession = require('connect-pg-simple')(session);
 const flash = require('connect-flash');
 const bcrypt = require('bcryptjs');
 const csrf = require('@dr.pogodin/csurf');
-const { formatDistanceToNow, isToday, isTomorrow, format } = require('date-fns');
+const { format, formatDistanceToNow } = require('date-fns');
 const { de } = require('date-fns/locale');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Datenbankverbindung
+const pool = require('./db');
+
+// Route-Importe mit neuer Struktur
+const authRoutes = require('./routes/auth');
+const dashboardRoutes = require('./routes/dashboard/index');
+const anfragenRoutes = require('./routes/dashboard/anfragen');
+const projectRoutes = require('./routes/dashboard/projekte');
+const kundenRoutes = require('./routes/dashboard/kunden');
+const termineRoutes = require('./routes/dashboard/termine');
+const dienstleistungenRoutes = require('./routes/dashboard/dienste');
+const settingsRoutes = require('./routes/dashboard/settings');
+const profileRoutes = require('./routes/dashboard/profile');
+const apiRoutes = require('./routes/dashboard/api');
+
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Route-Importe
-const authRoutes = require('./routes/auth');
-const dashboardRoutes = require('./routes/dashboard');
-const projectRoutes = require('./routes/projects.js');
-
-// PostgreSQL-Pool für Sessions
-const pool = require('./db');
-
-// PostgreSQL-Verbindung einrichten
-// const pool = new Pool({
-//   user: process.env.DB_USER,
-//   host: process.env.DB_HOST,
-//   database: process.env.DB_DATABASE,
-//   password: process.env.DB_PASSWORD,
-//   port: process.env.DB_PORT,
-// });
-
-// Prüfe die Verbindung beim Start
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('Fehler bei der Datenbankverbindung:', err);
-  } else {
-    console.log('Datenbankverbindung hergestellt');
-    release();
-  }
-});
-
-// Cookie-Parser Middleware
-app.use(cookieParser());
-
-// Basis-Sicherheitsheader
-app.use(helmet());
-
-// Update the Content-Security-Policy in server.js
+// Middleware-Konfigurationen bleiben größtenteils unverändert
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "https://cdn.datatables.net", "'unsafe-inline'", "'unsafe-hashes'"],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://cdn.datatables.net"],
-      imgSrc: ["'self'", "data:", "https://*"],
-      connectSrc: ["'self'", "https://n8n.dinel.at", "https://cdn.datatables.net"]
+      scriptSrc: [
+        "'self'", 
+        "https://cdn.jsdelivr.net", 
+        "https://cdnjs.cloudflare.com", 
+        "https://code.jquery.com", 
+        "https://cdn.datatables.net", 
+        "'unsafe-inline'", 
+        "'unsafe-hashes'"
+      ],
+      styleSrc: [
+        "'self'", 
+        "'unsafe-inline'", 
+        "https://cdn.jsdelivr.net", 
+        "https://cdnjs.cloudflare.com", 
+        "https://cdn.datatables.net"
+      ]
     }
-  },
-  crossOriginEmbedderPolicy: false, // May need to be enabled in production
-  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  referrerPolicy: { policy: "strict-origin-when-cross-origin" }
+  }
 }));
 
-// Body-Parser Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-
-// Statische Dateien bereitstellen
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Session-Konfiguration
@@ -98,10 +82,9 @@ app.use(session({
   }
 }));
 
-// Flash-Messages
 app.use(flash());
 
-// CSRF-Schutz aktivieren
+// CSRF-Schutz
 app.use(csrf());
 
 // CSRF-Token als Response-Local verfügbar machen
@@ -110,11 +93,23 @@ app.use((req, res, next) => {
   next();
 });
 
+// Globale Middleware für Benutzerinformationen
+app.use((req, res, next) => {
+  res.locals.user = req.session.user || null;
+  next();
+});
+
 // Routen verwenden
 app.use('/', authRoutes);
 app.use('/dashboard', dashboardRoutes);
-// Projekte-Routen importieren
 app.use('/dashboard/projekte', projectRoutes);
+app.use('/dashboard/anfragen', anfragenRoutes);
+app.use('/dashboard/kunden', kundenRoutes);
+app.use('/dashboard/termine', termineRoutes);
+app.use('/dashboard/dienste', dienstleistungenRoutes);
+app.use('/dashboard/settings', settingsRoutes);
+app.use('/dashboard/profile', profileRoutes);
+app.use('/dashboard/api', apiRoutes);
 
 // Blog-Routen importieren
 const blogRoutes = require('./routes/blog');

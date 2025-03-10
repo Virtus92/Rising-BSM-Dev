@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { isAuthenticated, isAdmin, isManager } = require('../middleware/auth');
+const { isAuthenticated, isAdmin, isManager } = require('./middleware/auth');
 const slugify = require('slugify');
 const axios = require('axios');
 const { formatDistanceToNow, format } = require('date-fns');
