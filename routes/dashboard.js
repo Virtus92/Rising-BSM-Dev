@@ -1150,15 +1150,23 @@ router.get('/anfragen/:id', isAuthenticated, async (req, res) => {
   }
 });
 
-// Anfrage Status aktualisieren
+// In routes/dashboard.js
 router.post('/anfragen/update-status', isAuthenticated, async (req, res) => {
   try {
     const { id, status, note } = req.body;
 
-    // if (!id || isNaN(parseInt(id, 10))) {
-    //   req.flash('error', 'Ungültige Anfrage-ID.');
-    //   return res.redirect('/dashboard/anfragen');
-    // }
+    // Robust validation to prevent empty ID
+    if (!id) {
+      req.flash('error', 'Ungültige Anfrage-ID.');
+      return res.redirect('/dashboard/anfragen');
+    }
+
+    // Validate status
+    const validStatuses = ['neu', 'in_bearbeitung', 'beantwortet', 'geschlossen'];
+    if (!validStatuses.includes(status)) {
+      req.flash('error', 'Ungültiger Status.');
+      return res.redirect(`/dashboard/anfragen/${id}`);
+    }
 
     // Prüfen, ob die Anfrage mit der gegebenen ID existiert
     const checkAnfrageQuery = await pool.query({
@@ -1166,10 +1174,10 @@ router.post('/anfragen/update-status', isAuthenticated, async (req, res) => {
       values: [id]
     });
 
-    // if (checkAnfrageQuery.rows.length === 0) {
-    //   req.flash('error', `Anfrage mit ID ${id} nicht gefunden.`);
-    //   return res.redirect('/dashboard/anfragen');
-    // }
+    if (checkAnfrageQuery.rows.length === 0) {
+      req.flash('error', `Anfrage mit ID ${id} nicht gefunden.`);
+      return res.redirect('/dashboard/anfragen');
+    }
     
     // Status in der Datenbank aktualisieren
     await pool.query({
@@ -1194,7 +1202,13 @@ router.post('/anfragen/update-status', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error('Fehler beim Aktualisieren des Status:', error);
     req.flash('error', 'Fehler: ' + error.message);
-    res.redirect(`/dashboard/anfragen/${id}`);
+    
+    // In case `id` is not defined in the catch block
+    if (req.body && req.body.id) {
+      return res.redirect(`/dashboard/anfragen/${req.body.id}`);
+    } else {
+      return res.redirect('/dashboard/anfragen');
+    }
   }
 });
 

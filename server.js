@@ -64,7 +64,7 @@ app.use(helmet({
       scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://cdn.datatables.net"],
       imgSrc: ["'self'", "data:", "https://*"],
-      connectSrc: ["'self'", "https://n8n.dinel.at"]
+      connectSrc: ["'self'", "https://n8n.dinel.at", "https://cdn.datatables.net"]
     }
   },
   crossOriginEmbedderPolicy: false, // May need to be enabled in production
