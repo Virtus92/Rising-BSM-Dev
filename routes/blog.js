@@ -59,7 +59,22 @@ const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.dinel.at/web
 // Blog Dashboard - Übersicht (nur für Geschäftsführer)
 router.get('/', isAuthenticated, isManager, async (req, res) => {
   try {
-    // Blogposts abrufen
+    // Pagination Parameter
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const offset = (page - 1) * limit;
+    const status = req.query.status || null;
+    
+    // Status-Filter aufbauen
+    let statusFilter = '';
+    let queryParams = [limit, offset];
+    
+    if (status && ['published', 'draft', 'review'].includes(status)) {
+      statusFilter = 'WHERE p.status = $3';
+      queryParams.push(status);
+    }
+    
+    // Blogposts abrufen mit Pagination
     const postsQuery = await _query(`
       SELECT 
         p.id, 
@@ -72,13 +87,25 @@ router.get('/', isAuthenticated, isManager, async (req, res) => {
       FROM 
         blog_posts p
         LEFT JOIN benutzer u ON p.author_id = u.id
+      ${statusFilter}
       ORDER BY 
         CASE WHEN p.status = 'published' THEN 0
              WHEN p.status = 'review' THEN 1
              ELSE 2 END,
         COALESCE(p.published_at, p.created_at) DESC
-      LIMIT 10
-    `);
+      LIMIT $1 OFFSET $2
+    `, queryParams);
+    
+    // Gesamtanzahl der Posts für Pagination
+    const countParams = status ? [status] : [];
+    const countQuery = await _query(`
+      SELECT COUNT(*) as total 
+      FROM blog_posts 
+      ${status ? 'WHERE status = $1' : ''}
+    `, countParams);
+    
+    const totalPosts = parseInt(countQuery.rows[0].total, 10);
+    const totalPages = Math.ceil(totalPosts / limit);
     
     // Statistiken abrufen
     const statsQuery = await _query(`
@@ -139,6 +166,13 @@ router.get('/', isAuthenticated, isManager, async (req, res) => {
         created: formatDistanceToNow(new Date(req.created_at), { addSuffix: true, locale: de })
       })),
       keywords: keywordsQuery.rows,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        limit: limit,
+        totalItems: totalPosts,
+        status: status
+      },
       newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken()
     });
@@ -182,10 +216,9 @@ router.get('/generate', isAuthenticated, isManager, async (req, res) => {
       error: error
     });
   }
-    if (!topic || typeof topic !== 'string' || topic.trim() === '') {
-      req.flash('error', 'Bitte geben Sie ein gültiges Thema an.');
-      return res.redirect('/dashboard/blog/generate');
-    }
+});
+
+router.post('/generate', isAuthenticated, isManager, async (req, res) => {
   try {
     const { 
       topic, 
@@ -198,10 +231,19 @@ router.get('/generate', isAuthenticated, isManager, async (req, res) => {
       include_images
     } = req.body;
     
-    // Validierung
-    if (!topic) {
-      req.flash('error', 'Bitte geben Sie ein Thema an.');
+    // Verbesserte Validierung
+    if (!topic || typeof topic !== 'string' || topic.trim() === '') {
+      req.flash('error', 'Bitte geben Sie ein gültiges Thema an.');
       return res.redirect('/dashboard/blog/generate');
+    }
+    
+    // Validiere category_ids
+    let cleanCategoryIds = [];
+    if (category_ids) {
+      // Stelle sicher, dass category_ids immer ein Array ist
+      const categoryArray = Array.isArray(category_ids) ? category_ids : [category_ids];
+      // Validiere, dass jede ID eine Zahl ist
+      cleanCategoryIds = categoryArray.filter(id => /^\d+$/.test(id));
     }
     
     // In Datenbank speichern
@@ -214,7 +256,7 @@ router.get('/generate', isAuthenticated, isManager, async (req, res) => {
         requested_by
       ) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
       [
-        topic,
+        topic.trim(),
         keywords || null,
         target_audience || null,
         'pending',
@@ -229,11 +271,11 @@ router.get('/generate', isAuthenticated, isManager, async (req, res) => {
       await _post(N8N_WEBHOOK_URL, {
         action: 'generate_post',
         request_id: requestId,
-        topic,
+        topic: topic.trim(),
         keywords: keywords ? keywords.split(',').map(k => k.trim()) : [],
         target_audience,
         tone,
-        category_ids: category_ids ? (Array.isArray(category_ids) ? category_ids : [category_ids]) : [],
+        category_ids: cleanCategoryIds,
         min_length: min_length || 500,
         max_length: max_length || 1500,
         include_images: include_images === 'on',
@@ -401,7 +443,7 @@ router.post('/neu', isAuthenticated, isManager, async (req, res) => {
     
     const postId = result.rows[0].id;
     
-await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [postId]);
+    await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [id]);
 
     if (categories && Array.isArray(categories) && categories.length > 0) {
       for (const categoryId of categories) {
@@ -413,7 +455,7 @@ await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [postI
     }
     
     // Tags zuweisen und ggf. neue Tags erstellen
-    if (tags && tags.length > 0) {
+    if (tags && Array.isArray(tags) && tags.length > 0) {
       // Tags können als Array von IDs oder als Komma-separierter String kommen
       const tagList = Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim());
       
@@ -742,8 +784,8 @@ router.post('/:id/edit', isAuthenticated, isManager, async (req, res) => {
     );
     
     // Kategorien zurücksetzen und neu zuweisen
+    await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [id]);
     
-await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [postId]);
     if (categories && Array.isArray(categories) && categories.length > 0) {
       for (const categoryId of categories) {
         await client.query(
@@ -934,7 +976,7 @@ router.post('/categories', isAuthenticated, isManager, async (req, res) => {
     
     // Slug erstellen
     // Umlaut-Behandlung hinzufügen
-    const slug = slugify(title, {
+    const slug = slugify(name, {
       lower: true,
       strict: true,
       remove: /[*+~.()'"!:@]/g,

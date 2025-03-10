@@ -1154,10 +1154,26 @@ router.get('/anfragen/:id', isAuthenticated, async (req, res) => {
 router.post('/anfragen/update-status', isAuthenticated, async (req, res) => {
   try {
     const { id, status, note } = req.body;
+
+    // if (!id || isNaN(parseInt(id, 10))) {
+    //   req.flash('error', 'Ungültige Anfrage-ID.');
+    //   return res.redirect('/dashboard/anfragen');
+    // }
+
+    // Prüfen, ob die Anfrage mit der gegebenen ID existiert
+    const checkAnfrageQuery = await pool.query({
+      text: `SELECT id FROM kontaktanfragen WHERE id = $1`,
+      values: [id]
+    });
+
+    // if (checkAnfrageQuery.rows.length === 0) {
+    //   req.flash('error', `Anfrage mit ID ${id} nicht gefunden.`);
+    //   return res.redirect('/dashboard/anfragen');
+    // }
     
     // Status in der Datenbank aktualisieren
     await pool.query({
-      text: `UPDATE kontaktanfragen SET status = $1, updated_at = NOW() WHERE id = $2`,
+      text: `UPDATE kontaktanfragen SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
       values: [status, id]
     });
     
@@ -1178,7 +1194,7 @@ router.post('/anfragen/update-status', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error('Fehler beim Aktualisieren des Status:', error);
     req.flash('error', 'Fehler: ' + error.message);
-    res.redirect(`/dashboard/anfragen/${req.body.id}`);
+    res.redirect(`/dashboard/anfragen/${id}`);
   }
 });
 

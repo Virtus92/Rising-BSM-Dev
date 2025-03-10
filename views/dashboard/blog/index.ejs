@@ -274,6 +274,56 @@
         </div>
       </div>
     </div>
+    <% if (typeof pagination !== 'undefined' && pagination && pagination.totalPages > 1) { %>
+      <nav aria-label="Blog-Pagination">
+        <ul class="pagination justify-content-center">
+          <!-- Pfeil zurück -->
+          <li class="page-item <%= pagination.currentPage === 1 ? 'disabled' : '' %>">
+            <a class="page-link" href="?page=<%= pagination.currentPage - 1 %><%= pagination.status ? '&status=' + pagination.status : '' %>" aria-label="Zurück">
+              <span aria-hidden="true">&laquo;</span>
+            </a>
+          </li>
+          
+          <!-- Erste Seite anzeigen, wenn aktuelle Seite > 3 -->
+          <% if (pagination.currentPage > 3) { %>
+            <li class="page-item">
+              <a class="page-link" href="?page=1<%= pagination.status ? '&status=' + pagination.status : '' %>">1</a>
+            </li>
+            <% if (pagination.currentPage > 4) { %>
+              <li class="page-item disabled">
+                <span class="page-link">...</span>
+              </li>
+            <% } %>
+          <% } %>
+          
+          <!-- Seitennummern -->
+          <% for (let i = Math.max(1, pagination.currentPage - 2); i <= Math.min(pagination.totalPages, pagination.currentPage + 2); i++) { %>
+            <li class="page-item <%= pagination.currentPage === i ? 'active' : '' %>">
+              <a class="page-link" href="?page=<%= i %><%= pagination.status ? '&status=' + pagination.status : '' %>"><%= i %></a>
+            </li>
+          <% } %>
+          
+          <!-- Letzte Seite anzeigen, wenn aktuelle Seite < totalPages - 2 -->
+          <% if (pagination.currentPage < pagination.totalPages - 2) { %>
+            <% if (pagination.currentPage < pagination.totalPages - 3) { %>
+              <li class="page-item disabled">
+                <span class="page-link">...</span>
+              </li>
+            <% } %>
+            <li class="page-item">
+              <a class="page-link" href="?page=<%= pagination.totalPages %><%= pagination.status ? '&status=' + pagination.status : '' %>"><%= pagination.totalPages %></a>
+            </li>
+          <% } %>
+          
+          <!-- Pfeil vor -->
+          <li class="page-item <%= pagination.currentPage === pagination.totalPages ? 'disabled' : '' %>">
+            <a class="page-link" href="?page=<%= pagination.currentPage + 1 %><%= pagination.status ? '&status=' + pagination.status : '' %>" aria-label="Vor">
+              <span aria-hidden="true">&raquo;</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    <% } %>
   </main>
 </div>
 

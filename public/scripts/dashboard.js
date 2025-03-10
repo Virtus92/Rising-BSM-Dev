@@ -3,327 +3,96 @@
  * Optimized for performance and mobile support
  */
 document.addEventListener("DOMContentLoaded", function() {
-    "use strict";
-    
-    // DOM-Cache für häufig verwendete Elemente
-    const dashboardWrapper = document.querySelector('.dashboard-wrapper');
-    const sidebarToggler = document.getElementById('sidebarToggle'); // Use ID instead of class
-    const desktopSidebarToggle = document.querySelector('.desktop-sidebar-toggle');
-    const searchInput = document.getElementById('searchInput');
-    const navDropdowns = document.querySelectorAll('.nav-dropdown');
-    const statusFilters = document.querySelectorAll('.status-filter');
-    const sidebarOverlay = document.getElementById('sidebarOverlay'); // Get the overlay
-    const sidebarClose = document.getElementById('sidebarClose'); // Get the close button
+  "use strict";
+  
+  // DOM-Cache für oft verwendete Elemente
+  const dashboardWrapper = document.querySelector('.dashboard-wrapper');
+  const sidebarToggler = document.getElementById('sidebarToggle');
+  const desktopSidebarToggle = document.querySelector('.desktop-sidebar-toggle');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  const sidebarClose = document.getElementById('sidebarClose');
 
-    // Sidebar-Funktionalität
-    function initSidebar() {
-      // Mobile Sidebar-Toggle
-      if (sidebarToggler) {
-        sidebarToggler.addEventListener('click', function() {
-          dashboardWrapper.classList.toggle('sidebar-open');
-          
-          // Aria-Expanded für Barrierefreiheit
-          const isOpen = dashboardWrapper.classList.contains('sidebar-open');
-          this.setAttribute('aria-expanded', isOpen);
-
-          // Show/hide the overlay
-          if (sidebarOverlay) {
-            sidebarOverlay.style.display = isOpen ? 'block' : 'none';
-          }
-        });
-      }
-
-      // Sidebar close button functionality
-      if (sidebarClose) {
-        sidebarClose.addEventListener('click', function() {
-          dashboardWrapper.classList.remove('sidebar-open');
-          if (sidebarToggler) sidebarToggler.setAttribute('aria-expanded', 'false');
-          if (sidebarOverlay) sidebarOverlay.style.display = 'none';
-        });
-      }
-      
-      // Desktop Sidebar-Toggle
-      if (desktopSidebarToggle) {
-        desktopSidebarToggle.addEventListener('click', function() {
-          dashboardWrapper.classList.toggle('sidebar-closed');
-          
-          // Local Storage speichern, damit Einstellung erhalten bleibt
-          const isClosed = dashboardWrapper.classList.contains('sidebar-closed');
-          localStorage.setItem('sidebarClosed', isClosed);
-        });
-      }
-      
-      // Sidebar-Status aus localStorage abrufen
-      const savedSidebarState = localStorage.getItem('sidebarClosed');
-      if (savedSidebarState === 'true' && window.innerWidth >= 992) {
-        dashboardWrapper.classList.add('sidebar-closed');
-      }
-      
-      // Sidebar schließen bei Klick außerhalb auf mobilen Geräten
-      document.addEventListener('click', function(event) {
-        if (window.innerWidth < 992 && 
-            dashboardWrapper.classList.contains('sidebar-open') && 
-            !event.target.closest('.dashboard-sidebar') && 
-            !event.target.closest('#sidebarToggle')) { // Use ID
-          dashboardWrapper.classList.remove('sidebar-open');
-          if (sidebarToggler) sidebarToggler.setAttribute('aria-expanded', 'false');
-          if (sidebarOverlay) sidebarOverlay.style.display = 'none'; // Hide overlay
-        }
-      });
-    }
-  
-    // Dropdown-Verhalten
-    function initDropdowns() {
-      navDropdowns.forEach(dropdown => {
-        const trigger = dropdown.querySelector('.dropdown-toggle');
-        const menu = dropdown.querySelector('.dropdown-menu');
-        
-        if (trigger && menu) {
-          trigger.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Alle anderen Dropdowns schließen
-            navDropdowns.forEach(otherDropdown => {
-              if (otherDropdown !== dropdown && otherDropdown.classList.contains('show')) {
-                otherDropdown.classList.remove('show');
-                otherDropdown.querySelector('.dropdown-menu').classList.remove('show');
-              }
-            });
-            
-            dropdown.classList.toggle('show');
-            menu.classList.toggle('show');
-          });
-        }
-      });
-      
-      // Dropdown bei Klick außerhalb schließen
-      document.addEventListener('click', function(e) {
-        if (!e.target.closest('.nav-dropdown')) {
-          navDropdowns.forEach(dropdown => {
-            dropdown.classList.remove('show');
-            const menu = dropdown.querySelector('.dropdown-menu');
-            if (menu) menu.classList.remove('show');
-          });
-        }
-      });
-    }
-  
-    // Status-Filter-Funktionalität
-    function initStatusFilters() {
-      statusFilters.forEach(filter => {
-        filter.addEventListener('change', function() {
-          const url = new URL(window.location);
-          
-          if (this.value === '' || this.value === 'all') {
-            url.searchParams.delete('status');
-          } else {
-            url.searchParams.set('status', this.value);
-          }
-          
-          window.location = url.toString();
-        });
-        
-        // Aktuellen Filter-Wert setzen
-        const urlParams = new URLSearchParams(window.location.search);
-        const status = urlParams.get('status');
-        if (status) {
-          filter.value = status;
-        }
-      });
-    }
-  
-    // Suchfunktionalität
-    function initSearch() {
-      if (searchInput) {
-        const searchForm = searchInput.closest('form') || document.createElement('form');
-        const searchButton = document.getElementById('searchButton');
-        
-        if (searchButton) {
-          searchButton.addEventListener('click', function() {
-            if (searchInput.value.trim()) {
-              performSearch(searchInput.value);
-            }
-          });
-        }
-        
-        searchInput.addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            if (this.value.trim()) {
-              performSearch(this.value);
-            }
-          }
-        });
-      }
-      
-      function performSearch(query) {
-        // Implementiere hier die Suchlogik - entweder clientseitige Filterung 
-        // oder Umleitung zur Suchseite
-        const url = new URL(window.location);
-        url.searchParams.set('search', query);
-        window.location = url.toString();
-      }
-    }
-  
-  
-  /**
-   * Dropdown-Fehlerbehebung für Dashboard
-   * Dieses Script behebt Probleme mit nicht funktionierenden Bootstrap-Dropdowns
-   */
-  
-  // Funktion zur Initialisierung aller Dropdowns
-  function initializeDropdowns() {
-    // Manuelle Initialisierung der Dropdowns
-    document.querySelectorAll('.dropdown-toggle').forEach(function(dropdownToggle) {
-      if (!dropdownToggle.initialized) {
-        dropdownToggle.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          // Schließe alle anderen Dropdowns
-          document.querySelectorAll('.dropdown-menu.show').forEach(function(openMenu) {
-            // Prüfen, ob das Menu nicht zum aktuellen Toggle gehört
-            if (openMenu !== this.nextElementSibling) {
-              openMenu.classList.remove('show');
-              openMenu.parentElement.classList.remove('show');
-            }
-          });
-          
-          // Toggle des aktuellen Dropdown-Menüs
-          const parent = this.parentElement;
-          parent.classList.toggle('show');
-          
-          const menu = this.nextElementSibling;
-          if (menu && menu.classList.contains('dropdown-menu')) {
-            menu.classList.toggle('show');
-          }
-        });
-        
-        // Markiere als initialisiert, um doppelte Initialisierung zu vermeiden
-        dropdownToggle.initialized = true;
-      }
-    });
-    
-    // Außerhalb klicken schließt alle Dropdowns
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('.dropdown')) {
-        document.querySelectorAll('.dropdown-menu.show').forEach(function(menu) {
-          menu.classList.remove('show');
-          if (menu.parentElement) {
-            menu.parentElement.classList.remove('show');
-          }
-        });
-      }
-    });
-    
-    // Für "dropdown-toggle-split" Buttons, die als Split-Buttons fungieren
-    document.querySelectorAll('.dropdown-toggle-split').forEach(function(splitButton) {
-      if (!splitButton.initialized) {
-        splitButton.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          const parent = this.parentElement.parentElement;
-          parent.classList.toggle('show');
-          
-          const menu = this.parentElement.nextElementSibling;
-          if (menu && menu.classList.contains('dropdown-menu')) {
-            menu.classList.toggle('show');
-          }
-        });
-        
-        // Markiere als initialisiert
-        splitButton.initialized = true;
-      }
-    });
-  }
-  
-  // Initialisiere Dropdowns beim Laden der Seite
-  initializeDropdowns();
-  
-  // Für dynamisch hinzugefügte Elemente, z.B. in Tabs
-  const observer = new MutationObserver(function(mutations) {
-    let shouldReinitialize = false;
-    
-    mutations.forEach(function(mutation) {
-      if (mutation.addedNodes.length > 0) {
-        for (let i = 0; i < mutation.addedNodes.length; i++) {
-          const node = mutation.addedNodes[i];
-          if (node.nodeType === 1 && (
-              node.classList?.contains('dropdown') || 
-              node.querySelector?.('.dropdown')
-          )) {
-            shouldReinitialize = true;
-            break;
-          }
-        }
-      }
-    });
-    
-    if (shouldReinitialize) {
-      initializeDropdowns();
-      initCharts(); // Ensure charts are re-initialized after dynamic content is added
-    }
-  });
-  
-  // Observer starten - beobachte den gesamten Body auf Änderungen
-  observer.observe(document.body, { 
-    childList: true, 
-    subtree: true 
-  });
-  
-  // Fix für Bootstrap Dropdown in DataTables
-  if (typeof $.fn !== 'undefined' && typeof $.fn.dataTable !== 'undefined') {
-    $.fn.dataTable.ext.errMode = 'throw';
-    
-    // Überschreibe die DataTables-Initialisierung
-    const originalDataTable = $.fn.dataTable;
-    $.fn.dataTable = function(options) {
-      const result = originalDataTable.apply(this, arguments);
-      
-      // Nach der Initialisierung Dropdowns neu initialisieren
-      setTimeout(initializeDropdowns, 100);
-      
-      return result;
+  // Performance-Optimierung: Debounce-Funktion für Event-Handler
+  function debounce(func, wait, immediate) {
+    let timeout;
+    return function() {
+      const context = this, args = arguments;
+      const later = function() {
+        timeout = null;
+        if (!immediate) func.apply(context, args);
+      };
+      const callNow = immediate && !timeout;
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+      if (callNow) func.apply(context, args);
     };
+  }
+
+  // Sidebar-Funktionalität
+  function initSidebar() {
+    if (sidebarToggler) {
+      sidebarToggler.addEventListener('click', function() {
+        dashboardWrapper.classList.toggle('sidebar-open');
+        
+        // Aria-Attribute für Barrierefreiheit
+        const isOpen = dashboardWrapper.classList.contains('sidebar-open');
+        this.setAttribute('aria-expanded', isOpen);
+
+        // Overlay anzeigen/ausblenden
+        if (sidebarOverlay) {
+          sidebarOverlay.style.display = isOpen ? 'block' : 'none';
+        }
+      });
+    }
+
+    // Sidebar schließen über Button
+    if (sidebarClose) {
+      sidebarClose.addEventListener('click', function() {
+        dashboardWrapper.classList.remove('sidebar-open');
+        if (sidebarToggler) sidebarToggler.setAttribute('aria-expanded', 'false');
+        if (sidebarOverlay) sidebarOverlay.style.display = 'none';
+      });
+    }
     
-    // Kopiere alle originalen Eigenschaften
-    Object.keys(originalDataTable).forEach(key => {
-      $.fn.dataTable[key] = originalDataTable[key];
+    // Desktop Sidebar-Toggle
+    if (desktopSidebarToggle) {
+      desktopSidebarToggle.addEventListener('click', function() {
+        dashboardWrapper.classList.toggle('sidebar-closed');
+        
+        // Local Storage speichern, damit Einstellung erhalten bleibt
+        const isClosed = dashboardWrapper.classList.contains('sidebar-closed');
+        localStorage.setItem('sidebarClosed', isClosed);
+      });
+    }
+    
+    // Sidebar-Status aus localStorage abrufen
+    const savedSidebarState = localStorage.getItem('sidebarClosed');
+    if (savedSidebarState === 'true' && window.innerWidth >= 992) {
+      dashboardWrapper.classList.add('sidebar-closed');
+    }
+    
+    // Optimierte Version: Klick außerhalb der Sidebar auf mobilen Geräten
+    // Mit Event-Delegation und nur wenn nötig
+    document.addEventListener('click', function(event) {
+      if (window.innerWidth < 992 && 
+          dashboardWrapper.classList.contains('sidebar-open') && 
+          !event.target.closest('.dashboard-sidebar') && 
+          !event.target.closest('#sidebarToggle')) {
+        dashboardWrapper.classList.remove('sidebar-open');
+        if (sidebarToggler) sidebarToggler.setAttribute('aria-expanded', 'false');
+        if (sidebarOverlay) sidebarOverlay.style.display = 'none';
+      }
     });
   }
-  
-  // Fix für Bootstrap-Modal-Events
-  document.querySelectorAll('.modal').forEach(function(modal) {
-    modal.addEventListener('shown.bs.modal', function() {
-      // Dropdowns innerhalb von Modals neu initialisieren
-      const modalDropdowns = this.querySelectorAll('.dropdown-toggle');
-      modalDropdowns.forEach(function(dropdown) {
-        dropdown.initialized = false;  // Reset, um Neuzuweisung zu ermöglichen
-      });
+
+  // Optimierte DataTables-Initialisierung
+  function initDataTables() {
+    if (typeof $.fn !== 'undefined' && typeof $.fn.DataTable !== 'undefined') {
+      const tables = document.querySelectorAll('.datatable:not(.initialized)');
       
-      initializeDropdowns();
-    });
-  });
-  
-  // Fix für Tab-Wechsel-Events
-  document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(function(tab) {
-    tab.addEventListener('shown.bs.tab', function() {
-      // Kurze Verzögerung, um sicherzustellen, dass der Tab-Inhalt geladen ist
-      setTimeout(initializeDropdowns, 100);
-      initCharts(); // Ensure charts are re-initialized on tab change
-    });
-  });
-  
-    // DataTables Initialisierung mit verzögertem Laden
-    function initDataTables() {
-      // Prüfen, ob DataTables vorhanden ist und Tabellen existieren
-      if (typeof $.fn !== 'undefined' && typeof $.fn.DataTable !== 'undefined') {
-        const tables = document.querySelectorAll('.datatable');
-        
-        if (tables.length > 0) {
-          // Gemeinsame Optionen für alle Tabellen
+      if (tables.length > 0) {
+        // Verbesserte Performance: Lazy loading
+        requestAnimationFrame(() => {
           const options = {
             language: {
               url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/de-DE.json'
@@ -332,417 +101,504 @@ document.addEventListener("DOMContentLoaded", function() {
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Alle"]],
             pageLength: 10,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"table-responsive"t><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
-            // Spaltenspezifische Rendering-Optionen können hier definiert werden
+            // Reduzierte Rendering-Häufigkeit für bessere Performance
+            deferRender: true,
+            processing: true,
+            stateSave: true,
+            stateDuration: 60 * 60 * 24 // 1 Tag
           };
           
-          // Initialisierung mit verzögertem Laden für bessere Gesamtleistung
-          setTimeout(() => {
-            tables.forEach(table => {
-              // Nur initialisieren, wenn noch nicht initialisiert
-              if (!$.fn.DataTable.isDataTable(table)) {
-                $(table).DataTable(options);
-              }
-            });
-          }, 100);
-        }
+          tables.forEach(table => {
+            // Nur initialisieren, wenn noch nicht initialisiert
+            if (!$.fn.DataTable.isDataTable(table)) {
+              $(table).addClass('initialized').DataTable(options);
+            }
+          });
+        });
       }
     }
-    
-    // Optimierte Chart-Initialisierung mit besserer Konfiguration
-    let revenueChart = null;
-    let servicesChart = null;
-    function initCharts() {
-      // Revenue Chart
-      const revenueChartEl = document.getElementById('revenueChart');
-      if (revenueChartEl && typeof Chart !== 'undefined' && typeof revenueChartData !== 'undefined') {
-        // Destroy existing chart if it exists
-        if (revenueChart) {
-          revenueChart.destroy();
-        }
-      revenueChart = new Chart(revenueChartEl, {
+  }
+  
+  // Optimierte Chart-Initialisierung
+  let charts = {};
+  function initCharts() {
+    // Revenue Chart
+    initChart('revenueChart', chart => {
+      if (!chart || !window.Chart || !window.revenueChartData) return null;
+      
+      return new Chart(chart, {
         type: 'line',
         data: {
-        labels: revenueChartData.labels || [],
-        datasets: [{
-          label: 'Umsatz',
-          data: revenueChartData.data || [],
-          borderColor: '#198754',
-          backgroundColor: 'rgba(25, 135, 84, 0.1)',
-          tension: 0.3,
-          fill: true,
-          borderWidth: 2,
-          pointBackgroundColor: '#198754',
-          pointRadius: 4,
-          pointHoverRadius: 6
-        }]
+          labels: revenueChartData.labels || [],
+          datasets: [{
+            label: 'Umsatz',
+            data: revenueChartData.data || [],
+            borderColor: '#198754',
+            backgroundColor: 'rgba(25, 135, 84, 0.1)',
+            tension: 0.3,
+            fill: true,
+            borderWidth: 2,
+            pointBackgroundColor: '#198754',
+            pointRadius: 4,
+            pointHoverRadius: 6
+          }]
         },
         options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-          display: false
-          },
-          tooltip: {
-          mode: 'index',
-          intersect: false,
-          callbacks: {
-            label: function(context) {
-            return '€' + context.parsed.y.toLocaleString('de-DE', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2
-            });
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                label: function(context) {
+                  return '€' + context.parsed.y.toLocaleString('de-DE', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  });
+                }
+              },
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              titleFont: { size: 13 },
+              bodyFont: { size: 12 },
+              padding: 10,
+              cornerRadius: 4
             }
           },
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          titleFont: {
-            size: 13
+          hover: {
+            mode: 'nearest',
+            intersect: false
           },
-          bodyFont: {
-            size: 12
-          },
-          padding: 10,
-          cornerRadius: 4
-          }
-        },
-        hover: {
-          mode: 'nearest',
-          intersect: false
-        },
-        scales: {
-          y: {
-          beginAtZero: true,
-          ticks: {
-            callback: function(value) {
-            return '€' + value.toLocaleString('de-DE');
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return '€' + value.toLocaleString('de-DE');
+                },
+                font: { size: 11 }
+              },
+              grid: {
+                color: 'rgba(0, 0, 0, 0.05)',
+                drawBorder: false
+              }
             },
-            font: {
-            size: 11
-            }
-          },
-          grid: {
-            color: 'rgba(0, 0, 0, 0.05)',
-            drawBorder: false
-          }
-          },
-          x: {
-          grid: {
-            display: false
-          },
-          ticks: {
-            font: {
-            size: 11
+            x: {
+              grid: { display: false },
+              ticks: { font: { size: 11 } }
             }
           }
-          }
-        }
         }
       });
-      }
+    });
     
-      // Services Chart - Doughnut Chart
-      const servicesChartEl = document.getElementById('servicesChart');
-      if (servicesChartEl && typeof Chart !== 'undefined' && typeof servicesChartData !== 'undefined') {
-        // Destroy existing chart if it exists
-        if (servicesChart) {
-          servicesChart.destroy();
-        }
-      servicesChart = new Chart(servicesChartEl, {
+    // Services Chart
+    initChart('servicesChart', chart => {
+      if (!chart || !window.Chart || !window.servicesChartData) return null;
+      
+      return new Chart(chart, {
         type: 'doughnut',
         data: {
-        labels: servicesChartData.labels || [],
-        datasets: [{
-          data: servicesChartData.data || [],
-          backgroundColor: [
-          'rgba(25, 135, 84, 0.8)',
-          'rgba(13, 110, 253, 0.8)',
-          'rgba(255, 193, 7, 0.8)',
-          'rgba(108, 117, 125, 0.8)'
-          ],
-          borderColor: '#ffffff',
-          borderWidth: 1,
-          hoverOffset: 6
-        }]
+          labels: servicesChartData.labels || [],
+          datasets: [{
+            data: servicesChartData.data || [],
+            backgroundColor: [
+              'rgba(25, 135, 84, 0.8)',
+              'rgba(13, 110, 253, 0.8)',
+              'rgba(255, 193, 7, 0.8)',
+              'rgba(108, 117, 125, 0.8)'
+            ],
+            borderColor: '#ffffff',
+            borderWidth: 1,
+            hoverOffset: 6
+          }]
         },
         options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '70%',
-        plugins: {
-          legend: {
-          position: 'bottom',
-          labels: {
-            padding: 15,
-            usePointStyle: true,
-            pointStyle: 'circle',
-            font: {
-            size: 11
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                padding: 15,
+                usePointStyle: true,
+                pointStyle: 'circle',
+                font: { size: 11 }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.raw || 0;
+                  const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+                  const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                  return `${label}: €${value.toLocaleString('de-DE')} (${percentage}%)`;
+                }
+              }
             }
           }
-          },
-          tooltip: {
-          callbacks: {
-            label: function(context) {
-            const label = context.label || '';
-            const value = context.raw || 0;
-            const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
-            const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-            return `${label}: €${value.toLocaleString('de-DE')} (${percentage}%)`;
-            }
-          }
-          }
-        }
         }
       });
+    });
+  }
+  
+  // Helper-Funktion für Chart-Initialisierung
+  function initChart(chartId, createFn) {
+    const chartEl = document.getElementById(chartId);
+    
+    if (chartEl) {
+      // Destroy existing chart if it exists
+      if (charts[chartId]) {
+        charts[chartId].destroy();
+      }
+      
+      // Create a new chart
+      charts[chartId] = createFn(chartEl);
+    }
+  }
+  
+  // Kalender-Lazy-Loading
+  function initCalendar() {
+    const calendarTab = document.getElementById('calendar-tab');
+    const calendarContainer = document.getElementById('calendar');
+    
+    if (calendarTab && calendarContainer) {
+      // Nur binden, wenn nicht bereits initialisiert
+      if (!calendarTab.hasAttribute('data-calendar-init')) {
+        calendarTab.setAttribute('data-calendar-init', 'true');
+        
+        calendarTab.addEventListener('shown.bs.tab', function() {
+          if (!window.calendar) {
+            // Dynamisch laden
+            if (typeof FullCalendar === 'undefined') {
+              const script = document.createElement('script');
+              script.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js';
+              script.onload = initializeCalendarInstance;
+              
+              const style = document.createElement('link');
+              style.rel = 'stylesheet';
+              style.href = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css';
+              
+              document.head.appendChild(style);
+              document.head.appendChild(script);
+            } else {
+              initializeCalendarInstance();
+            }
+          }
+        });
       }
     }
     
-    // Kalender-Initialisierung (für die Termineseite)
-    function initCalendar() {
-      const calendarTab = document.getElementById('calendar-tab');
-      const calendarContainer = document.getElementById('calendar');
-      
-      if (calendarTab && calendarContainer) {
-      calendarTab.addEventListener('shown.bs.tab', function() {
-        if (typeof FullCalendar === 'undefined') {
-        // Dynamisches Laden der FullCalendar-Bibliothek, wenn nicht bereits geladen
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js';
-        script.onload = initializeCalendarInstance;
-        
-        const style = document.createElement('link');
-        style.rel = 'stylesheet';
-        style.href = 'https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css';
-        
-        document.head.appendChild(style);
-        document.head.appendChild(script);
-        } else {
-        initializeCalendarInstance();
-        }
-      });
-      }
-      
-      function initializeCalendarInstance() {
+    // Kalendar-Initialisierung
+    function initializeCalendarInstance() {
       if (!window.calendar) {
         const calendarEl = document.getElementById('calendar');
+        if (!calendarEl) return;
+        
         window.calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
-        headerToolbar: {
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
-        },
-        locale: 'de',
-        events: '/dashboard/termine/api/events',
-        eventClick: function(info) {
-          window.location.href = '/dashboard/termine/' + info.event.id;
-        },
-        // Für mobile Geräte optimierte Optionen
-        height: 'auto',
-        windowResize: function(view) {
-          if (window.innerWidth < 768) {
-          window.calendar.changeView('listWeek');
-          } else {
-          window.calendar.changeView('dayGridMonth');
-          }
-        }
+          initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
+          headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+          },
+          locale: 'de',
+          events: '/dashboard/termine/api/events',
+          eventClick: function(info) {
+            window.location.href = '/dashboard/termine/' + info.event.id;
+          },
+          // Für mobile Geräte optimierte Optionen
+          height: 'auto',
+          windowResize: debounce(function() {
+            if (window.innerWidth < 768) {
+              window.calendar.changeView('listWeek');
+            } else {
+              window.calendar.changeView('dayGridMonth');
+            }
+          }, 250)
         });
         window.calendar.render();
       }
+    }
+  }
+  
+  // Verbesserte Formularvalidierung
+  function initFormValidation() {
+    const forms = document.querySelectorAll('.needs-validation');
+    
+    forms.forEach(form => {
+      // Verhindere mehrfache Eventbindung
+      if (form.getAttribute('data-validation-init') === 'true') return;
+      form.setAttribute('data-validation-init', 'true');
+      
+      form.addEventListener('submit', event => {
+        if (!form.checkValidity()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        
+        form.classList.add('was-validated');
+      }, false);
+      
+      // Verbesserte Feldvalidierung mit Debounce
+      const emailField = form.querySelector('input[type="email"]');
+      if (emailField) {
+        emailField.addEventListener('blur', function() {
+          const value = this.value.trim();
+          if (value && !isValidEmail(value)) {
+            this.setCustomValidity('Bitte geben Sie eine gültige E-Mail-Adresse ein.');
+          } else {
+            this.setCustomValidity('');
+          }
+        });
+      }
+      
+      const phoneField = form.querySelector('input[type="tel"]');
+      if (phoneField) {
+        phoneField.addEventListener('blur', function() {
+          const value = this.value.trim();
+          if (value && !isValidPhone(value)) {
+            this.setCustomValidity('Bitte geben Sie eine gültige Telefonnummer ein.');
+          } else {
+            this.setCustomValidity('');
+          }
+        });
+      }
+    });
+    
+    function isValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+    
+    function isValidPhone(phone) {
+      return /^[+\d\s\-()]{6,20}$/.test(phone);
+    }
+  }
+  
+  // Effizientere Modal-Initialisierung mit Event-Delegation
+  function initModals() {
+    // Globaler Event-Listener für Modals statt individueller Listener
+    document.addEventListener('show.bs.modal', function(event) {
+      const modal = event.target;
+      const button = event.relatedTarget;
+      
+      // Status-Modal-Handler
+      if (modal.id === 'statusModal' && button) {
+        const id = button.getAttribute('data-id');
+        const status = button.getAttribute('data-status');
+        
+        const idInput = modal.querySelector('input[name="id"]');
+        const statusSelect = modal.querySelector('select[name="status"]');
+        
+        if (idInput) idInput.value = id || '';
+        if (statusSelect && status) statusSelect.value = status;
+      }
+      
+      // Delete-Modal-Handler
+      if (modal.id === 'deleteCustomerModal' && button) {
+        const customerId = button.getAttribute('data-id');
+        const customerName = button.getAttribute('data-name');
+        
+        const idInput = modal.querySelector('#customerIdToDelete');
+        const nameElement = modal.querySelector('#customerNameToDelete');
+        
+        if (idInput) idInput.value = customerId || '';
+        if (nameElement) nameElement.textContent = customerName || '';
+      }
+      
+      // Weitere Modal-Handler können hier hinzugefügt werden...
+    });
+    
+    // Service-Edit-Modal mit optimiertem Event-Handling
+    document.addEventListener('click', function(event) {
+      const target = event.target.closest('.edit-service');
+      if (!target) return;
+      
+      const serviceId = target.getAttribute('data-id');
+      if (serviceId) {
+        fetchServiceDetails(serviceId);
+      }
+    });
+    
+    function fetchServiceDetails(id) {
+      fetch(`/dashboard/dienste/${id}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const service = data.service;
+            const form = document.getElementById('editServiceForm');
+            
+            if (form) {
+              form.querySelector('#edit_id').value = service.id;
+              form.querySelector('#edit_name').value = service.name;
+              form.querySelector('#edit_beschreibung').value = service.beschreibung || '';
+              form.querySelector('#edit_preis_basis').value = service.preis_basis;
+              form.querySelector('#edit_einheit').value = service.einheit;
+              form.querySelector('#edit_mwst_satz').value = service.mwst_satz;
+              form.querySelector('#edit_aktiv').checked = service.aktiv;
+            }
+          } else {
+            showNotification('error', 'Fehler beim Laden der Dienstleistung: ' + data.error);
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          showNotification('error', 'Fehler beim Laden der Dienstleistung');
+        });
+    }
+  }
+  
+  // Optimierte Notifications mit automatischem Entfernen aus DOM
+  function showNotification(type, message) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+    
+    // Prüfen, ob bereits eine ähnliche Benachrichtigung existiert
+    const existingNotifications = document.querySelectorAll('.notification-toast');
+    for (let i = 0; i < existingNotifications.length; i++) {
+      if (existingNotifications[i].textContent.includes(message)) {
+        // Verhindere Duplikate, stattdessen bestehende Benachrichtigung erneuern
+        clearTimeout(existingNotifications[i].dataset.timeoutId);
+        existingNotifications[i].remove();
+        break;
       }
     }
     
-    // Formularvalidierung
-    function initFormValidation() {
-      const forms = document.querySelectorAll('.needs-validation');
+    const alert = document.createElement('div');
+    alert.className = `alert ${alertClass} alert-dismissible fade show position-fixed notification-toast`;
+    alert.style.top = '1rem';
+    alert.style.right = '1rem';
+    alert.style.zIndex = '9999';
+    alert.style.maxWidth = '400px';
+    alert.style.boxShadow = '0 0.25rem 0.75rem rgba(0, 0, 0, 0.1)';
+    
+    alert.innerHTML = `
+      <i class="fas ${icon} me-2"></i>${message}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    document.body.appendChild(alert);
+    
+    // Auto-close nach 5 Sekunden mit ordentlichem Entfernen aus DOM
+    const timeoutId = setTimeout(() => {
+      alert.classList.remove('show');
       
-      forms.forEach(form => {
-        form.addEventListener('submit', event => {
-          if (!form.checkValidity()) {
-            event.preventDefault();
-            event.stopPropagation();
-          }
-          
-          form.classList.add('was-validated');
-        }, false);
-        
-        // E-Mail-Feldvalidierung
-        const emailField = form.querySelector('input[type="email"]');
-        if (emailField) {
-          emailField.addEventListener('blur', function() {
-            const value = this.value.trim();
-            if (value && !isValidEmail(value)) {
-              this.setCustomValidity('Bitte geben Sie eine gültige E-Mail-Adresse ein.');
-            } else {
-              this.setCustomValidity('');
-            }
-          });
-        }
-        
-        // Telefonfeldvalidierung
-        const phoneField = form.querySelector('input[type="tel"]');
-        if (phoneField) {
-          phoneField.addEventListener('blur', function() {
-            const value = this.value.trim();
-            if (value && !isValidPhone(value)) {
-              this.setCustomValidity('Bitte geben Sie eine gültige Telefonnummer ein.');
-            } else {
-              this.setCustomValidity('');
-            }
-          });
-        }
-      });
+      // Nach dem Fade-Out vollständig aus DOM entfernen
+      alert.addEventListener('transitionend', () => {
+        alert.remove();
+      }, { once: true });
       
-      function isValidEmail(email) {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-      }
-      
-      function isValidPhone(phone) {
-        return /^[+\d\s\-()]{6,20}$/.test(phone);
-      }
-    }
-  
-    // Modals Funktionalität
-    function initModals() {
-      // Status-Modal
-      const statusModal = document.getElementById('statusModal');
-      if (statusModal) {
-        statusModal.addEventListener('show.bs.modal', function(event) {
-          const button = event.relatedTarget;
-          if (button) {
-            const id = button.getAttribute('data-id');
-            const status = button.getAttribute('data-status');
-            
-            const idInput = statusModal.querySelector('input[name="id"]');
-            const statusSelect = statusModal.querySelector('select[name="status"]');
-            
-            if (idInput) idInput.value = id || '';
-            if (statusSelect && status) statusSelect.value = status;
-          }
-        });
-      }
-      
-      // Service-Edit-Modal für Dienstleistungen
-      document.querySelectorAll('.edit-service').forEach(button => {
-        button.addEventListener('click', function() {
-          const serviceId = this.getAttribute('data-id');
-          if (serviceId) {
-            fetchServiceDetails(serviceId);
-          }
-        });
-      });
-      
-      function fetchServiceDetails(id) {
-        fetch(`/dashboard/dienste/${id}`)
-          .then(response => response.json())
-          .then(data => {
-            if (data.success) {
-              const service = data.service;
-              const form = document.getElementById('editServiceForm');
-              
-              if (form) {
-                form.querySelector('#edit_id').value = service.id;
-                form.querySelector('#edit_name').value = service.name;
-                form.querySelector('#edit_beschreibung').value = service.beschreibung || '';
-                form.querySelector('#edit_preis_basis').value = service.preis_basis;
-                form.querySelector('#edit_einheit').value = service.einheit;
-                form.querySelector('#edit_mwst_satz').value = service.mwst_satz;
-                form.querySelector('#edit_aktiv').checked = service.aktiv;
-              }
-            } else {
-              showNotification('error', 'Fehler beim Laden der Dienstleistung: ' + data.error);
-            }
-          })
-          .catch(error => {
-            console.error('Error:', error);
-            showNotification('error', 'Fehler beim Laden der Dienstleistung');
-          });
-      }
-    }
-  
-    // Notifikationen
-    function showNotification(type, message) {
-      const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
-      const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
-      
-      const alert = document.createElement('div');
-      alert.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
-      alert.style.top = '1rem';
-      alert.style.right = '1rem';
-      alert.style.zIndex = '9999';
-      alert.style.maxWidth = '400px';
-      
-      alert.innerHTML = `
-        <i class="fas ${icon} me-2"></i>${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      `;
-      
-      document.body.appendChild(alert);
-      
-      // Auto-close nach 5 Sekunden
+      // Fallback für Browser, die transitionend nicht unterstützen
       setTimeout(() => {
-        alert.classList.remove('show');
-        setTimeout(() => alert.remove(), 150);
-      }, 5000);
-    }
-  
-    // Verhinderung von Form-Resubmission
-    function preventFormResubmission() {
-      if (window.history.replaceState) {
-        window.history.replaceState(null, null, window.location.href);
-      }
-    }
-  
-    // Service-Status-Toggle
-    function initServiceToggle() {
-      document.querySelectorAll('.service-toggle').forEach(toggle => {
-        toggle.addEventListener('change', function() {
-          const serviceId = this.dataset.id;
-          const isActive = this.checked;
-          
-          // CSRF-Token aus dem Meta-Tag abrufen
-          const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-          
-          fetch(`/dashboard/dienste/toggle-status/${serviceId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'CSRF-Token': csrfToken
-            },
-            body: JSON.stringify({ aktiv: isActive })
-          })
-          .then(response => response.json())
-          .then(data => {
-            if (!data.success) {
-              // Status zurücksetzen bei Fehler
-              this.checked = !isActive;
-              showNotification('error', 'Fehler beim Aktualisieren des Status');
-            }
-          })
-          .catch(error => {
-            console.error('Error:', error);
-            this.checked = !isActive;
-            showNotification('error', 'Fehler beim Aktualisieren des Status');
-          });
-        });
+        if (document.body.contains(alert)) {
+          alert.remove();
+        }
+      }, 150);
+    }, 5000);
+    
+    // Speichere Timeout-ID für mögliche Erneuerung
+    alert.dataset.timeoutId = timeoutId;
+    
+    // Button-Event-Handler für manuelles Schließen
+    const closeButton = alert.querySelector('.btn-close');
+    if (closeButton) {
+      closeButton.addEventListener('click', () => {
+        clearTimeout(timeoutId);
       });
     }
+  }
   
-    // Alle Funktionen initialisieren
-    function init() {
-      initSidebar();
-      initDropdowns();
-      initStatusFilters();
-      initSearch();
-      initDataTables();
-      initCharts();
-      initCalendar();
+  // Optimiertes Toggle für Service-Status
+  function initServiceToggle() {
+    // Verwende Event-Delegation statt individueller Event-Listener
+    document.addEventListener('change', function(event) {
+      const toggle = event.target.closest('.service-toggle');
+      if (!toggle) return;
+      
+      const serviceId = toggle.dataset.id;
+      const isActive = toggle.checked;
+      
+      // CSRF-Token aus dem Meta-Tag abrufen
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      
+      // Optimierter Fetch-Call mit Timeout und Fehlerverwaltung
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 Sekunden Timeout
+      
+      fetch(`/dashboard/dienste/toggle-status/${serviceId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ aktiv: isActive }),
+        signal: controller.signal
+      })
+      .then(response => {
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+          throw new Error('Netzwerkantwort war nicht ok');
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (!data.success) {
+          // Status zurücksetzen bei Fehler
+          toggle.checked = !isActive;
+          showNotification('error', 'Fehler beim Aktualisieren des Status');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        toggle.checked = !isActive;
+        showNotification('error', error.name === 'AbortError' 
+          ? 'Zeitüberschreitung bei der Anfrage' 
+          : 'Fehler beim Aktualisieren des Status');
+      });
+    });
+  }
+  
+  // Verhindere Form-Resubmission
+  function preventFormResubmission() {
+    if (window.history.replaceState) {
+      window.history.replaceState(null, null, window.location.href);
+    }
+    
+    // Zusätzlich: Deaktiviere Submit-Buttons nach Klick, um Doppelklicks zu verhindern
+    document.addEventListener('submit', function(event) {
+      const form = event.target;
+      
+      // Nur für Formulare, die nicht explizit ausgenommen sind
+      if (!form.classList.contains('no-disable-on-submit')) {
+        const submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+        submitButtons.forEach(button => {
+          button.disabled = true;
+          
+          // Optional: Lade-Text und Spinner hinzufügen
+          if (button.tagName === 'BUTTON' && !button.querySelector('.spinner-border')) {
+            const originalHTML = button.innerHTML;
+            button.dataset.originalHTML = originalHTML;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Wird geladen...';
+          }
+        });
+      }
+    });
+  }
+  
+  // Initialisiere alle Funktionen
+  function init() {
+    initSidebar();
+    
+    // Verwende requestAnimationFrame und Verzögerungen für nicht-kritische Komponenten
+    requestAnimationFrame(() => {
       initFormValidation();
       initModals();
-      initServiceToggle();
       preventFormResubmission();
       
-      // Aktiven Navigationslink markieren
+      // Markiere aktiven Navigationslink
       const currentPath = window.location.pathname;
       document.querySelectorAll('.sidebar-nav .nav-link').forEach(link => {
         if (link.getAttribute('href') === currentPath || 
@@ -750,22 +606,46 @@ document.addEventListener("DOMContentLoaded", function() {
           link.classList.add('active');
         }
       });
-    }
+      
+      // Verzögere nicht-kritische Komponenten
+      setTimeout(() => {
+        initDataTables();
+        initCharts();
+        initServiceToggle();
+      }, 100);
+      
+      // Lazy-load des Kalenders nur bei Bedarf
+      setTimeout(() => {
+        initCalendar();
+      }, 200);
+    });
+  }
   
-    // Initialisierung starten
-    init();
-  });
+  // Starte Initialisierung
+  init();
+  
+  // Export von Funktionen für externe Nutzung
+  window.DashboardUtils = {
+    showNotification,
+    refreshCharts: initCharts,
+    refreshTables: initDataTables
+  };
+});
 
-  document.addEventListener('DOMContentLoaded', function() {
-    // Alternative to DataTables for better mobile support
-    const customerTable = document.getElementById('customerTable');
-    const searchInput = document.getElementById('searchInput');
+// Optimierter Suchcode für Kundenübersicht 
+document.addEventListener('DOMContentLoaded', function() {
+  const customerTable = document.getElementById('customerTable');
+  const searchInput = document.getElementById('searchInput');
+  
+  // Client-seitige Suche mit Debounce
+  let searchTimeout;
+  function performSearch() {
+    clearTimeout(searchTimeout);
     
-    // Client-side search function
-    function performSearch() {
+    searchTimeout = setTimeout(() => {
       const searchTerm = searchInput.value.toLowerCase().trim();
       
-      // Handle desktop table view
+      // Desktop-Tabellen-Ansicht
       if (customerTable) {
         const rows = customerTable.querySelectorAll('tbody tr');
         
@@ -775,73 +655,115 @@ document.addEventListener("DOMContentLoaded", function() {
         });
       }
       
-      // Handle mobile card view
+      // Mobile-Karten-Ansicht
       const mobileCards = document.querySelectorAll('.list-group-item');
       mobileCards.forEach(card => {
         const text = card.textContent.toLowerCase();
         card.style.display = text.includes(searchTerm) ? '' : 'none';
       });
-    }
-    
-    // Search input event listener
-    if (searchInput) {
-      // Real-time search as user types
-      searchInput.addEventListener('keyup', performSearch);
       
-      // Handle Enter key for server-side search
-      searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-          if (this.value.trim()) {
-            window.location.href = `/dashboard/kunden?search=${encodeURIComponent(this.value.trim())}`;
-          }
+      // Aktualisiere "keine Ergebnisse" Nachricht
+      updateNoResultsMessage(searchTerm);
+    }, 300);
+  }
+  
+  // "Keine Ergebnisse" Nachricht anzeigen/ausblenden
+  function updateNoResultsMessage(searchTerm) {
+    let visibleItems = 0;
+    
+    if (customerTable) {
+      visibleItems = customerTable.querySelectorAll('tbody tr[style="display: ;"]').length;
+    } else {
+      visibleItems = document.querySelectorAll('.list-group-item[style="display: ;"]').length;
+    }
+    
+    // Bestehende Nachricht entfernen
+    const existingMessage = document.getElementById('noResultsMessage');
+    if (existingMessage) {
+      existingMessage.remove();
+    }
+    
+    // Wenn keine Ergebnisse und Suchbegriff nicht leer, Nachricht anzeigen
+    if (visibleItems === 0 && searchTerm) {
+      const noResultsMessage = document.createElement('div');
+      noResultsMessage.id = 'noResultsMessage';
+      noResultsMessage.className = 'alert alert-info text-center my-3';
+      noResultsMessage.innerHTML = `
+        <i class="fas fa-search me-2"></i>
+        Keine Ergebnisse für "<strong>${searchTerm}</strong>".
+      `;
+      
+      const container = customerTable 
+        ? customerTable.parentNode 
+        : document.querySelector('.list-group');
+      
+      if (container) {
+        container.parentNode.insertBefore(noResultsMessage, container.nextSibling);
+      }
+    }
+  }
+  
+  // Suchfeld-Event-Listener
+  if (searchInput) {
+    // Echtzeitsuche mit Debounce
+    searchInput.addEventListener('input', performSearch);
+    
+    // Server-seitige Suche bei Enter
+    searchInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault(); // Verhindere Standardverhalten
+        
+        if (this.value.trim()) {
+          window.location.href = `/dashboard/kunden?search=${encodeURIComponent(this.value.trim())}`;
         }
-      });
+      }
+    });
+  }
+  
+  // Event-Delegation für Filter
+  document.addEventListener('click', function(e) {
+    // Status-Filter
+    const statusFilter = e.target.closest('[data-status-filter]');
+    if (statusFilter) {
+      e.preventDefault();
+      const status = statusFilter.getAttribute('data-status-filter');
+      window.location.href = status ? `/dashboard/kunden?status=${status}` : '/dashboard/kunden';
     }
     
-    // Handle status filter dropdown items
-    const statusFilterItems = document.querySelectorAll('[data-status-filter]');
-    statusFilterItems.forEach(item => {
-      item.addEventListener('click', function(e) {
-        e.preventDefault();
-        const status = this.getAttribute('data-status-filter');
-        window.location.href = status ? `/dashboard/kunden?status=${status}` : '/dashboard/kunden';
-      });
-    });
-    
-    // Handle customer type filter dropdown items
-    const typeFilterItems = document.querySelectorAll('[data-type-filter]');
-    typeFilterItems.forEach(item => {
-      item.addEventListener('click', function(e) {
-        e.preventDefault();
-        const type = this.getAttribute('data-type-filter');
-        window.location.href = type ? `/dashboard/kunden?type=${type}` : '/dashboard/kunden';
-      });
-    });
-    
-    // The rest of your existing delete modal and status modal functionality
-    const deleteCustomerModal = document.getElementById('deleteCustomerModal');
-    if (deleteCustomerModal) {
-      deleteCustomerModal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        const customerId = button.getAttribute('data-id');
-        const customerName = button.getAttribute('data-name');
-        
-        document.getElementById('customerIdToDelete').value = customerId;
-        document.getElementById('customerNameToDelete').textContent = customerName;
-      });
-    }
-    
-    const changeStatusModal = document.getElementById('changeStatusModal');
-    if (changeStatusModal) {
-      changeStatusModal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        const customerId = button.getAttribute('data-id');
-        const customerName = button.getAttribute('data-name');
-        const currentStatus = button.getAttribute('data-status');
-        
-        document.getElementById('customerIdToChange').value = customerId;
-        document.getElementById('customerNameToChange').textContent = customerName;
-        document.getElementById('statusSelect').value = currentStatus;
-      });
+    // Typ-Filter
+    const typeFilter = e.target.closest('[data-type-filter]');
+    if (typeFilter) {
+      e.preventDefault();
+      const type = typeFilter.getAttribute('data-type-filter');
+      window.location.href = type ? `/dashboard/kunden?type=${type}` : '/dashboard/kunden';
     }
   });
+  
+  // Modal-Event-Handler mit Event-Delegation
+  document.addEventListener('show.bs.modal', function(event) {
+    const modal = event.target;
+    const button = event.relatedTarget;
+    
+    if (!button) return;
+    
+    // Delete-Modal
+    if (modal.id === 'deleteCustomerModal') {
+      const customerId = button.getAttribute('data-id');
+      const customerName = button.getAttribute('data-name');
+      
+      document.getElementById('customerIdToDelete').value = customerId;
+      document.getElementById('customerNameToDelete').textContent = customerName;
+    }
+    
+    // Status-Modal
+    if (modal.id === 'changeStatusModal') {
+      const customerId = button.getAttribute('data-id');
+      const customerName = button.getAttribute('data-name');
+      const currentStatus = button.getAttribute('data-status');
+      
+      document.getElementById('customerIdToChange').value = customerId;
+      document.getElementById('customerNameToChange').textContent = customerName;
+      document.getElementById('statusSelect').value = currentStatus;
+    }
+  });
+});
