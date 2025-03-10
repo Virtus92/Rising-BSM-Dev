@@ -10,25 +10,27 @@
           <p class="text-muted mb-md-0">Alle Kunden von Rising BSM</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
-          <div class="input-group">
-            <span class="input-group-text bg-white">
-              <i class="fas fa-search text-muted"></i>
-            </span>
-            <input type="text" class="form-control" id="searchInput" placeholder="Name, Email oder Firma suchen...">
-            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Filter</button>
-            <ul class="dropdown-menu dropdown-menu-end">
-              <li><h6 class="dropdown-header">Status</h6></li>
-              <li><a class="dropdown-item" href="?status=aktiv">Nur aktive Kunden</a></li>
-              <li><a class="dropdown-item" href="?status=inaktiv">Nur inaktive Kunden</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <li><h6 class="dropdown-header">Kundentyp</h6></li>
-              <li><a class="dropdown-item" href="?type=privat">Privatkunden</a></li>
-              <li><a class="dropdown-item" href="?type=geschaeft">Geschäftskunden</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="?sort=newest">Neueste zuerst</a></li>
-              <li><a class="dropdown-item" href="?sort=name">Nach Name sortieren</a></li>
-            </ul>
-          </div>
+          <!-- Search Form -->
+          <form action="/dashboard/kunden" method="GET" id="searchForm">
+            <div class="input-group">
+              <span class="input-group-text bg-white">
+                <i class="fas fa-search text-muted"></i>
+              </span>
+              <input type="text" class="form-control" id="searchInput" name="search" value="<%= filters && filters.search || '' %>" placeholder="Name, Email oder Firma suchen..." autocomplete="off">
+              <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Filter</button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><h6 class="dropdown-header">Status</h6></li>
+                <li><a class="dropdown-item <%= filters && filters.status === 'aktiv' ? 'active' : '' %>" href="?status=aktiv<%= filters && filters.search ? '&search='+filters.search : '' %>">Nur aktive Kunden</a></li>
+                <li><a class="dropdown-item <%= filters && filters.status === 'inaktiv' ? 'active' : '' %>" href="?status=inaktiv<%= filters && filters.search ? '&search='+filters.search : '' %>">Nur inaktive Kunden</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Kundentyp</h6></li>
+                <li><a class="dropdown-item <%= filters.type === 'privat' ? 'active' : '' %>" href="?type=privat<%= filters.search ? '&search='+filters.search : '' %>">Privatkunden</a></li>
+                <li><a class="dropdown-item <%= filters.type === 'geschaeft' ? 'active' : '' %>" href="?type=geschaeft<%= filters.search ? '&search='+filters.search : '' %>">Geschäftskunden</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="/dashboard/kunden">Filter zurücksetzen</a></li>
+              </ul>
+            </div>
+          </form>
           <a href="/dashboard/kunden/neu" class="btn btn-success">
             <i class="fas fa-plus me-2"></i>Neuer Kunde
           </a>
@@ -41,6 +43,53 @@
               <li><a class="dropdown-item" href="/dashboard/kunden/export?format=excel">Excel-Export</a></li>
               <li><a class="dropdown-item" href="/dashboard/kunden/export?format=pdf">PDF-Export</a></li>
             </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kundenstatistiken -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white">
+          <h5 class="card-title mb-0">Kundenstatistiken</h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-6 col-md-3">
+              <div class="statistic-card bg-primary text-white rounded p-3 d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="h5 mb-0"><%= stats.total %></div>
+                  <p class="mb-0 small">Kunden insgesamt</p>
+                </div>
+                <i class="fas fa-users fa-2x opacity-50"></i>
+              </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+              <div class="statistic-card bg-info text-white rounded p-3 d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="h5 mb-0"><%= stats.privat %></div>
+                  <p class="mb-0 small">Privatkunden</p>
+                </div>
+                <i class="fas fa-user fa-2x opacity-50"></i>
+              </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+              <div class="statistic-card bg-success text-white rounded p-3 d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="h5 mb-0"><%= stats.geschaeft %></div>
+                  <p class="mb-0 small">Geschäftskunden</p>
+                </div>
+                <i class="fas fa-building fa-2x opacity-50"></i>
+              </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+              <div class="statistic-card bg-warning text-white rounded p-3 d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="h5 mb-0"><%= stats.aktiv %></div>
+                  <p class="mb-0 small">Aktive Kunden</p>
+                </div>
+                <i class="fas fa-check-circle fa-2x opacity-50"></i>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -326,6 +375,39 @@
           </div>
         </div>
       </div>
+
+      <!-- Pagination -->
+      <% if (pagination.total > 1) { %>
+        <nav aria-label="Kunden Pagination" class="mt-4">
+          <ul class="pagination justify-content-center">
+            <% if (pagination.current > 1) { %>
+              <li class="page-item">
+                <a class="page-link" href="?page=<%= pagination.current-1 %><%= filters && filters.status ? '&status='+filters.status : '' %><%= filters && filters.type ? '&type='+filters.type : '' %><%= filters && filters.search ? '&search='+filters.search : '' %>">Zurück</a>
+              </li>
+            <% } else { %>
+              <li class="page-item disabled">
+                <span class="page-link">Zurück</span>
+              </li>
+            <% } %>
+            
+            <% for(let i = Math.max(1, pagination.current-2); i <= Math.min(pagination.total, pagination.current+2); i++) { %>
+              <li class="page-item <%= pagination.current == i ? 'active' : '' %>">
+                <a class="page-link" href="?page=<%= i %><%= filters && filters.status ? '&status='+filters.status : '' %><%= filters && filters.type ? '&type='+filters.type : '' %><%= filters && filters.search ? '&search='+filters.search : '' %>"><%= i %></a>
+              </li>
+            <% } %>
+            
+            <% if (pagination.current < pagination.total) { %>
+              <li class="page-item">
+                <a class="page-link" href="?page=<%= pagination.current+1 %><%= filters.status ? '&status='+filters.status : '' %><%= filters.type ? '&type='+filters.type : '' %><%= filters.search ? '&search='+filters.search : '' %>">Weiter</a>
+              </li>
+            <% } else { %>
+              <li class="page-item disabled">
+                <span class="page-link">Weiter</span>
+              </li>
+            <% } %>
+          </ul>
+        </nav>
+      <% } %>
     </div>
   </main>
 </div>
@@ -413,11 +495,25 @@
     }
     
     // Suchfeld-Funktionalität für Serversuche
-    const searchForm = document.getElementById('searchInput');
+    const searchForm = document.getElementById('searchForm');
     if (searchForm) {
-      searchForm.addEventListener('keyup', function(e) {
+      searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const searchValue = document.getElementById('searchInput').value.trim();
+        let url = `/dashboard/kunden?search=${encodeURIComponent(searchValue)}`;
+        if (filters.status) {
+          url += `&status=${filters.status}`;
+        }
+        if (filters.type) {
+          url += `&type=${filters.type}`;
+        }
+        window.location.href = url;
+      });
+
+      document.getElementById('searchInput').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
-          window.location.href = `/dashboard/kunden?search=${encodeURIComponent(this.value)}`;
+          e.preventDefault();
+          document.getElementById('searchForm').dispatchEvent(new Event('submit'));
         }
       });
     }
@@ -449,102 +545,103 @@
         document.getElementById('statusSelect').value = currentStatus;
       });
     }
-    
-    // Charts für die Statistik-Ansicht initialisieren
-    if (document.getElementById('stats-tab')) {
-      document.getElementById('stats-tab').addEventListener('shown.bs.tab', initCharts);
+  });
+
+  // Chart-Konfigurationen und -Initialisierung
+  const customerTypeChartCanvas = document.getElementById('customerTypeChart').getContext('2d');
+  const customerStatusChartCanvas = document.getElementById('customerStatusChart').getContext('2d');
+  const customerGrowthChartCanvas = document.getElementById('customerGrowthChart').getContext('2d');
+  
+  // Kundentyp Chart
+  new Chart(customerTypeChartCanvas, {
+    type: 'pie',
+    data: {
+      labels: ['Privatkunden', 'Geschäftskunden'],
+      datasets: [{
+        label: 'Kundentypen',
+        data: [<%= stats.privat %>, <%= stats.geschaeft %>],
+        backgroundColor: [
+          'rgba(54, 162, 235, 0.8)',
+          'rgba(255, 99, 132, 0.8)'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+        },
+        title: {
+          display: false,
+          text: 'Kundentypen'
+        }
+      }
     }
-    
-    function initCharts() {
-      // Nur Charts initialisieren, wenn die Statistik-Ansicht aktiv ist
-      if (!document.getElementById('stats-view').classList.contains('active')) return;
-      
-      // Kundentypen-Chart
-      const customerTypeChart = new Chart(
-        document.getElementById('customerTypeChart'),
-        {
-          type: 'pie',
-          data: {
-            labels: ['Privatkunden', 'Geschäftskunden'],
-            datasets: [{
-              data: [
-                <%= typeof customers !== 'undefined' ? customers.filter(c => !c.kundentyp || c.kundentyp === 'privat').length : 0 %>,
-                <%= typeof customers !== 'undefined' ? customers.filter(c => c.kundentyp === 'geschaeft').length : 0 %>
-              ],
-              backgroundColor: ['#0d6efd', '#6c757d']
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                position: 'bottom'
-              }
-            }
-          }
+  });
+
+  // Kundenstatus Chart
+  new Chart(customerStatusChartCanvas, {
+    type: 'pie',
+    data: {
+      labels: ['Aktiv', 'Inaktiv'],
+      datasets: [{
+        label: 'Kundenstatus',
+        data: [<%= stats.aktiv %>, <%= stats.total - stats.aktiv %>],
+        backgroundColor: [
+          'rgba(75, 192, 192, 0.8)',
+          'rgba(201, 203, 207, 0.8)'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+        },
+        title: {
+          display: false,
+          text: 'Kundenstatus'
         }
-      );
-      
-      // Kundenstatus-Chart
-      const customerStatusChart = new Chart(
-        document.getElementById('customerStatusChart'),
-        {
-          type: 'pie',
-          data: {
-            labels: ['Aktiv', 'Inaktiv'],
-            datasets: [{
-              data: [
-                <%= typeof customers !== 'undefined' ? customers.filter(c => !c.status || c.status === 'aktiv').length : 0 %>,
-                <%= typeof customers !== 'undefined' ? customers.filter(c => c.status === 'inaktiv').length : 0 %>
-              ],
-              backgroundColor: ['#198754', '#dc3545']
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                position: 'bottom'
-              }
-            }
-          }
+      }
+    }
+  });
+
+  // Kundenwachstums Chart
+  new Chart(customerGrowthChartCanvas, {
+    type: 'line',
+    data: {
+      labels: <%- JSON.stringify(customerGrowthData.map(item => item.month)) %>,
+      datasets: [{
+        label: 'Neue Kunden',
+        data: <%- JSON.stringify(customerGrowthData.map(item => item.customer_count)) %>,
+        fill: false,
+        borderColor: 'rgba(255, 205, 86, 0.8)',
+        tension: 0.1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true
         }
-      );
-      
-      // Kundenentwicklung-Chart (mit Demo-Daten, diese sollten in der Produktionsumgebung vom Server kommen)
-      const customerGrowthChart = new Chart(
-        document.getElementById('customerGrowthChart'),
-        {
-          type: 'line',
-          data: {
-            labels: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun'],
-            datasets: [{
-              label: 'Neue Kunden',
-              data: [5, 8, 12, 7, 10, 15],
-              borderColor: '#198754',
-              backgroundColor: 'rgba(25, 135, 84, 0.1)',
-              tension: 0.4,
-              fill: true
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                display: false
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  precision: 0
-                }
-              }
-            }
-          }
+      },
+      plugins: {
+        legend: {
+          position: 'bottom',
+        },
+        title: {
+          display: false,
+          text: 'Kundenwachstum'
         }
-      );
+      }
     }
   });
 </script>

@@ -1244,8 +1244,18 @@ router.post('/anfragen/add-note', isAuthenticated, async (req, res) => {
 // Kunden-Liste anzeigen
 router.get('/kunden', isAuthenticated, async (req, res) => {
   try {
-    // Kunden aus der Datenbank abrufen
-    const kundenQuery = await pool.query(`
+    // Filterwerte aus der Query entgegennehmen
+    const { status, type, search } = req.query;
+
+    // Filter-Objekt erstellen
+    const filters = {
+      status: status || '',
+      type: type || '',
+      search: search || ''
+    };
+
+    // SQL-Abfrage basierend auf Filtern erstellen
+    let queryText = `
       SELECT 
         id, 
         name, 
@@ -1259,9 +1269,41 @@ router.get('/kunden', isAuthenticated, async (req, res) => {
         created_at
       FROM 
         kunden
-      ORDER BY 
-        name ASC
-    `);
+    `;
+    let whereClauses = [];
+    let queryParams = [];
+
+    if (status) {
+      whereClauses.push(`status = $${queryParams.length + 1}`);
+      queryParams.push(status);
+    }
+
+    if (type) {
+      whereClauses.push(`kundentyp = $${queryParams.length + 1}`);
+      queryParams.push(type);
+    }
+
+    if (search) {
+      const searchTerm = `%${search}%`;
+      whereClauses.push(`
+        (LOWER(name) LIKE $${queryParams.length + 1} OR 
+         LOWER(firma) LIKE $${queryParams.length + 1} OR 
+         LOWER(email) LIKE $${queryParams.length + 1})
+      `);
+      queryParams.push(searchTerm);
+    }
+
+    if (whereClauses.length > 0) {
+      queryText += ` WHERE ${whereClauses.join(' AND ')}`;
+    }
+
+    queryText += ` ORDER BY name ASC`;
+
+    // Kunden aus der Datenbank abrufen
+    const kundenQuery = await pool.query({
+      text: queryText,
+      values: queryParams
+    });
     
     // Abfrageergebnisse formatieren
     const customers = kundenQuery.rows.map(kunde => ({
@@ -1277,12 +1319,48 @@ router.get('/kunden', isAuthenticated, async (req, res) => {
       created_at: formatDateSafely(kunde.created_at, 'dd.MM.yyyy')
     }));
 
+    // Kundenstatistiken abrufen
+    const statsQuery = await pool.query(`
+      SELECT
+        COUNT(*) AS total,
+        COUNT(CASE WHEN kundentyp = 'privat' THEN 1 END) AS privat,
+        COUNT(CASE WHEN kundentyp = 'geschaeft' THEN 1 END) AS geschaeft,
+        COUNT(CASE WHEN status = 'aktiv' THEN 1 END) AS aktiv
+      FROM kunden
+    `);
+
+    const stats = statsQuery.rows[0];
+
+    // Kundenwachstumsdaten abrufen (monatlich)
+    const customerGrowthQuery = await pool.query(`
+      SELECT
+        DATE_TRUNC('day', created_at) AS day,
+        COUNT(*) AS customer_count
+      FROM kunden
+      WHERE status != 'geloescht' AND created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY DATE_TRUNC('day', created_at)
+      ORDER BY day
+    `);
+
+    const customerGrowthData = customerGrowthQuery.rows.map(row => ({
+      month: format(new Date(row.day), 'dd.MM'),
+      customer_count: parseInt(row.customer_count)
+    }));
+
     res.render('dashboard/kunden/index', { 
       title: 'Kunden - Rising BSM',
       user: req.session.user,
       currentPath: req.path,
       customers,
-      newRequestsCount: req.newRequestsCount
+      newRequestsCount: req.newRequestsCount,
+      filters: filters, 
+      stats: stats,
+      customerGrowthData: customerGrowthData,
+      pagination: {
+        current: 1,
+        total: 1
+      },
+      csrfToken: req.csrfToken()
     });
   } catch (error) {
     console.error('Fehler beim Laden der Kunden:', error);
@@ -2229,6 +2307,120 @@ router.post('/termine/update-status', isAuthenticated, async (req, res) => {
   }
 });
 
+// Route for Calendar events
+router.get('/termine/calendar-events', isAuthenticated, async (req, res) => {
+  try {
+    // Parse query parameters for date filtering
+    const { start, end } = req.query;
+    
+    let whereClause = '';
+    let params = [];
+    let paramCounter = 1;
+    
+    // Add date range filtering if provided
+    if (start && end) {
+      whereClause = `WHERE termin_datum >= $${paramCounter++} AND termin_datum <= $${paramCounter++}`;
+      params = [new Date(start), new Date(end)];
+    }
+    
+    // Query for appointments with all necessary data
+    const termineQuery = await pool.query({
+      text: `
+        SELECT 
+          t.id, 
+          t.titel, 
+          t.termin_datum,
+          t.dauer,
+          t.status,
+          t.ort,
+          t.beschreibung,
+          k.name AS kunde_name,
+          k.id AS kunde_id,
+          p.titel AS projekt_titel,
+          p.id AS projekt_id
+        FROM 
+          termine t
+          LEFT JOIN kunden k ON t.kunde_id = k.id
+          LEFT JOIN projekte p ON t.projekt_id = p.id
+        ${whereClause}
+        ORDER BY 
+          t.termin_datum ASC
+      `,
+      values: params
+    });
+    
+    // Transform database rows into FullCalendar event objects
+    const events = termineQuery.rows.map(termin => {
+      // Calculate start and end time
+      const startDate = new Date(termin.termin_datum);
+      const endDate = new Date(startDate.getTime() + (termin.dauer || 60) * 60000); // Default to 60 mins if not specified
+      
+      // Determine event color based on status
+      let backgroundColor, borderColor, textColor;
+      switch(termin.status) {
+        case 'geplant': 
+          backgroundColor = '#ffc107'; 
+          borderColor = '#e0a800';
+          textColor = '#000000';
+          break;
+        case 'bestaetigt': 
+          backgroundColor = '#28a745'; 
+          borderColor = '#218838';
+          textColor = '#ffffff';
+          break;
+        case 'abgeschlossen': 
+          backgroundColor = '#0d6efd'; 
+          borderColor = '#0a58ca';
+          textColor = '#ffffff';
+          break;
+        case 'storniert': 
+          backgroundColor = '#6c757d'; 
+          borderColor = '#5a6268';
+          textColor = '#ffffff';
+          break;
+        default: 
+          backgroundColor = '#6c757d';
+          borderColor = '#5a6268';
+          textColor = '#ffffff';
+      }
+      
+      // Build and return the event object
+      return {
+        id: termin.id,
+        title: termin.titel,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        allDay: false,
+        backgroundColor,
+        borderColor,
+        textColor,
+        extendedProps: {
+          kunde: termin.kunde_name,
+          kunde_id: termin.kunde_id,
+          projekt: termin.projekt_titel,
+          projekt_id: termin.projekt_id,
+          ort: termin.ort,
+          beschreibung: termin.beschreibung,
+          status: termin.status,
+          statusText: getTerminStatusInfo(termin.status).label
+        },
+        // Additional properties for event rendering
+        description: termin.kunde_name ? `Kunde: ${termin.kunde_name}` : '',
+        location: termin.ort || '',
+        url: `/dashboard/termine/${termin.id}`
+      };
+    });
+    
+    res.json(events);
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Kalender-Events:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Datenbankfehler: ' + error.message
+    });
+  }
+});
+
 // Einzelnen Termin anzeigen
 router.get('/termine/:id', isAuthenticated, async (req, res) => {
   try {
@@ -2502,6 +2694,7 @@ router.post('/termine/add-note', isAuthenticated, async (req, res) => {
     res.redirect(`/dashboard/termine/${req.body.id}`);
   }
 });
+
 
 /**
  * API Routes für AJAX-Anfragen

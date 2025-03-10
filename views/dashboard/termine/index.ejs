@@ -242,51 +242,66 @@
 </div>
 
 <style>
+  .fc {
+    --fc-border-color: rgba(0, 0, 0, 0.1);
+    --fc-page-bg-color: #fff;
+    --fc-neutral-bg-color: rgba(0, 0, 0, 0.05);
+    --fc-list-event-hover-bg-color: rgba(0, 0, 0, 0.05);
+    --fc-today-bg-color: rgba(25, 135, 84, 0.1);
+  }
+  
+  .fc .fc-toolbar-title {
+    font-size: 1.25rem;
+    margin-bottom: 0;
+  }
+  
+  .fc-event {
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 0.85rem;
+  }
+  
+  .fc-list-event-dot {
+    display: none;
+  }
+  
+  .fc-list-event-title {
+    font-weight: 500;
+  }
+  
+  /* Tooltip styling */
+  .fc-tooltip-header {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+  
+  .fc-tooltip-time {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+  }
+  
+  .fc-tooltip-customer,
+  .fc-tooltip-location,
+  .fc-tooltip-status {
+    font-size: 0.85rem;
+    margin-bottom: 0.1rem;
+  }
+  
   /* Mobile optimizations */
   @media (max-width: 767.98px) {
-    .list-group-item {
-      padding: 0.75rem 1rem;
-    }
-    
-    .btn-sm {
-      padding: 0.375rem 0.5rem;
-    }
-    
-    #calendar {
-      height: 500px;
-    }
-    
-    .page-header h1 {
-      font-size: 1.5rem;
-    }
-    
-    .fc-toolbar-title {
-      font-size: 1.2rem !important;
-    }
-    
     .fc .fc-toolbar {
       flex-direction: column;
       gap: 0.5rem;
     }
     
     .fc .fc-toolbar-title {
-      margin: 0;
+      font-size: 1.1rem;
     }
-  }
-  
-  /* Calendar optimizations */
-  #calendar {
-    background-color: white;
-    padding: 10px;
-    border-radius: 5px;
-  }
-  
-  .fc-event {
-    cursor: pointer;
-  }
-  
-  .fc-event:hover {
-    opacity: 0.9;
+    
+    .fc-header-toolbar {
+      margin-bottom: 0.75rem !important;
+    }
   }
   
   /* Badge styling */
@@ -335,6 +350,83 @@
           statusNote.value = '';
         }
       });
+    }
+
+  // Calendar initialization
+  document.getElementById('calendar-tab').addEventListener('shown.bs.tab', function() {
+      initializeCalendar();
+    });
+    
+    function initializeCalendar() {
+      const calendarEl = document.getElementById('calendar');
+      if (!calendarEl._calendar) {
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+          initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
+          locale: 'de',
+          headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,listWeek'
+          },
+          // Use the new endpoint
+          events: '/dashboard/termine/calendar-events',
+          eventTimeFormat: {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          },
+          // Enhanced event rendering
+          eventDidMount: function(info) {
+            // Add tooltips to events
+            if (info.event.extendedProps) {
+              const props = info.event.extendedProps;
+              let tooltipContent = `
+                <div class="fc-tooltip-header">${info.event.title}</div>
+                <div class="fc-tooltip-time">${info.timeText}</div>
+              `;
+              
+              if (props.kunde) {
+                tooltipContent += `<div class="fc-tooltip-customer">Kunde: ${props.kunde}</div>`;
+              }
+              
+              if (props.ort) {
+                tooltipContent += `<div class="fc-tooltip-location">Ort: ${props.ort}</div>`;
+              }
+              
+              if (props.statusText) {
+                tooltipContent += `<div class="fc-tooltip-status">Status: ${props.statusText}</div>`;
+              }
+              
+              // Initialize tooltip (using Bootstrap's tooltip if available)
+              if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                new bootstrap.Tooltip(info.el, {
+                  title: tooltipContent,
+                  html: true,
+                  placement: 'top',
+                  container: 'body'
+                });
+              }
+            }
+          },
+          eventClick: function(info) {
+            info.jsEvent.preventDefault(); // Prevent default browser behavior
+            window.location.href = `/dashboard/termine/${info.event.id}`;
+          },
+          dayMaxEvents: true, // Allow "more" link when too many events
+          height: 'auto',
+          // Handle window resize - better responsive behavior
+          windowResize: function(view) {
+            if (window.innerWidth < 768) {
+              calendar.changeView('listWeek');
+            } else {
+              calendar.changeView('dayGridMonth');
+            }
+          }
+        });
+        
+        calendarEl._calendar = calendar;
+        calendar.render();
+      }
     }
   });
 </script>
