@@ -33,7 +33,7 @@ exports.getDashboardData = async (req) => {
     };
 
     // Get dashboard data from cache or database
-    const stats = await getDashboardStats();
+    const stats = await exports.getDashboardStats();
     const recentRequests = await getRecentRequests();
     const upcomingAppointments = await getUpcomingAppointments();
     const charts = await getChartData(revenueFilter, servicesFilter);
@@ -508,7 +508,7 @@ exports.globalSearch = async (query) => {
         status: request.status,
         date: formatDateSafely(request.created_at, 'dd.MM.yyyy'),
         type: 'Anfrage',
-        url: `/dashboard/anfragen/${request.id}`
+        url: `/dashboard/requests/${request.id}`
       })),
       
       services: serviceResults.rows.map(service => ({
@@ -576,7 +576,7 @@ exports.getNotifications = async (userId) => {
       let link;
       switch (notification.typ) {
         case 'anfrage':
-          link = `/dashboard/anfragen/${notification.referenz_id}`;
+          link = `/dashboard/requests/${notification.referenz_id}`;
           break;
         case 'termin':
           link = `/dashboard/termine/${notification.referenz_id}`;

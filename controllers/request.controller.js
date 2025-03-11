@@ -77,10 +77,30 @@ exports.getAllRequests = async (req, res, next) => {
       ${whereClause}
     `;
 
+    let countQueryParams = [];
+    let countParamCounter = 1;
+
+    if (status) {
+      countQueryParams.push(status);
+    }
+
+    if (service) {
+      countQueryParams.push(service);
+    }
+
+    if (date) {
+      countQueryParams.push(date);
+    }
+
+    if (search) {
+      const searchTerm = `%${search}%`;
+      countQueryParams.push(searchTerm);
+    }
+
     // Execute both queries in parallel
     const [requestsResult, countResult] = await Promise.all([
       pool.query(query, queryParams),
-      pool.query(countQuery, queryParams.slice(0, paramCounter - 2)) // Exclude LIMIT and OFFSET parameters
+      pool.query(countQuery, countQueryParams)
     ]);
 
     // Format request data

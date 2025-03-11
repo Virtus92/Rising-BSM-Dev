@@ -9,7 +9,7 @@ const { isAuthenticated, getNewRequestsCountMiddleware } = require('./utils/help
 
 // Subrouten importieren
 const indexRoutes = require('./dashboard/index');
-const anfragenRoutes = require('./dashboard/anfragen');
+const anfragenRoutes = require('./dashboard/requests');
 const kundenRoutes = require('./dashboard/kunden');
 const termineRoutes = require('./dashboard/termine');
 const diensteRoutes = require('./dashboard/dienste');
@@ -24,7 +24,7 @@ router.use(getNewRequestsCountMiddleware);
 
 // Subrouten einbinden
 router.use('/', indexRoutes);
-router.use('/anfragen', anfragenRoutes);
+router.use('requests', anfragenRoutes);
 router.use('/kunden', kundenRoutes);
 router.use('/termine', termineRoutes);
 router.use('/dienste', diensteRoutes);

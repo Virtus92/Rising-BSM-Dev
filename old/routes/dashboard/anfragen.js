@@ -64,7 +64,7 @@ router.get('/', async (req, res) => {
     // Benachrichtigungen abrufen
     const notifications = await getNotifications(req);
 
-    res.render('dashboard/anfragen/index', { 
+    res.render('dashboard/requests/index', { 
       title: 'Anfragen - Rising BSM',
       user: req.session.user,
       currentPath: req.path,
@@ -92,14 +92,14 @@ router.post('/update-status', async (req, res) => {
     // Robust validation to prevent empty ID
     if (!id) {
       req.flash('error', 'Ungültige Anfrage-ID.');
-      return res.redirect('/dashboard/anfragen');
+      return res.redirect('/dashboard/requests');
     }
 
     // Validate status
     const validStatuses = ['neu', 'in_bearbeitung', 'beantwortet', 'geschlossen'];
     if (!validStatuses.includes(status)) {
       req.flash('error', 'Ungültiger Status.');
-      return res.redirect(`/dashboard/anfragen/${id}`);
+      return res.redirect(`/dashboard/requests/${id}`);
     }
 
     // Prüfen, ob die Anfrage mit der gegebenen ID existiert
@@ -110,7 +110,7 @@ router.post('/update-status', async (req, res) => {
 
     if (checkAnfrageQuery.rows.length === 0) {
       req.flash('error', `Anfrage mit ID ${id} nicht gefunden.`);
-      return res.redirect('/dashboard/anfragen');
+      return res.redirect('/dashboard/requests');
     }
     
     // Status in der Datenbank aktualisieren
@@ -132,16 +132,16 @@ router.post('/update-status', async (req, res) => {
     
     // Erfolgsmeldung und Weiterleitung
     req.flash('success', 'Status erfolgreich aktualisiert');
-    res.redirect(`/dashboard/anfragen/${id}`);
+    res.redirect(`/dashboard/requests/${id}`);
   } catch (error) {
     console.error('Fehler beim Aktualisieren des Status:', error);
     req.flash('error', 'Fehler: ' + error.message);
     
     // In case `id` is not defined in the catch block
     if (req.body && req.body.id) {
-      return res.redirect(`/dashboard/anfragen/${req.body.id}`);
+      return res.redirect(`/dashboard/requests/${req.body.id}`);
     } else {
-      return res.redirect('/dashboard/anfragen');
+      return res.redirect('/dashboard/requests');
     }
   }
 });
@@ -153,7 +153,7 @@ router.post('/add-note', async (req, res) => {
     
     if (!note || note.trim() === '') {
       req.flash('error', 'Die Notiz darf nicht leer sein.');
-      return res.redirect(`/dashboard/anfragen/${id}`);
+      return res.redirect(`/dashboard/requests/${id}`);
     }
     
     // In Datenbank einfügen
@@ -167,11 +167,11 @@ router.post('/add-note', async (req, res) => {
     });
     
     req.flash('success', 'Notiz erfolgreich hinzugefügt.');
-    res.redirect(`/dashboard/anfragen/${id}`);
+    res.redirect(`/dashboard/requests/${id}`);
   } catch (error) {
     console.error('Fehler beim Hinzufügen der Notiz:', error);
     req.flash('error', 'Datenbankfehler: ' + error.message);
-    res.redirect(`/dashboard/anfragen/${req.body.id}`);
+    res.redirect(`/dashboard/requests/${req.body.id}`);
   }
 });
 
@@ -448,10 +448,10 @@ router.get('/:id', async (req, res) => {
       values: [id]
     });
     
-    res.render('dashboard/anfragen/detail', {
+    res.render('dashboard/requests/detail', {
       title: `Anfrage: ${anfrage.name} - Rising BSM`,
       user: req.session.user,
-      currentPath: '/dashboard/anfragen',
+      currentPath: '/dashboard/requests',
       anfrage: {
         id: anfrage.id,
         name: anfrage.name,

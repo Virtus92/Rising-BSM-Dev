@@ -8,8 +8,8 @@
       <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
           <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-          <li class="breadcrumb-item"><a href="/dashboard/anfragen">Anfragen</a></li>
-          <li class="breadcrumb-item active" aria-current="page">Anfrage #<%= anfrage.id %></li>
+          <li class="breadcrumb-item"><a href="/dashboard/requests">Anfragen</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Anfrage #<%= request.id %></li>
         </ol>
       </nav>
 
@@ -33,37 +33,37 @@
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
               <h2 class="h5 mb-0">Anfrage Details</h2>
-              <span class="badge bg-<%= anfrage.statusClass %><%= anfrage.status === 'Neu' ? ' text-dark' : '' %>">
-                <%= anfrage.status %>
+              <span class="badge bg-<%= request.statusClass %><%= request.status === 'Neu' ? ' text-dark' : '' %>">
+                <%= request.status %>
               </span>
             </div>
             <div class="card-body">
               <div class="row mb-4">
                 <div class="col-md-6">
                   <h3 class="h6 text-muted mb-2">Name</h3>
-                  <p class="mb-0 fw-semibold"><%= anfrage.name %></p>
+                  <p class="mb-0 fw-semibold"><%= request.name %></p>
                 </div>
                 <div class="col-md-6">
                   <h3 class="h6 text-muted mb-2">Datum</h3>
-                  <p class="mb-0"><%= anfrage.formattedDate %></p>
+                  <p class="mb-0"><%= request.formattedDate %></p>
                 </div>
               </div>
               
               <div class="row mb-4">
                 <div class="col-md-6">
                   <h3 class="h6 text-muted mb-2">E-Mail</h3>
-                  <p class="mb-0"><a href="mailto:<%= anfrage.email %>" class="text-decoration-none"><%= anfrage.email %></a></p>
+                  <p class="mb-0"><a href="mailto:<%= request.email %>" class="text-decoration-none"><%= request.email %></a></p>
                 </div>
                 <div class="col-md-6">
                   <h3 class="h6 text-muted mb-2">Telefon</h3>
-                  <p class="mb-0"><%= anfrage.phone %></p>
+                  <p class="mb-0"><%= request.phone %></p>
                 </div>
               </div>
               
               <div class="row mb-4">
                 <div class="col-12">
                   <h3 class="h6 text-muted mb-2">Gewünschte Leistung</h3>
-                  <p class="mb-0"><%= anfrage.serviceLabel %></p>
+                  <p class="mb-0"><%= request.serviceLabel %></p>
                 </div>
               </div>
               
@@ -71,7 +71,7 @@
                 <div class="col-12">
                   <h3 class="h6 text-muted mb-2">Nachricht</h3>
                   <div class="p-3 bg-light rounded">
-                    <%= anfrage.message %>
+                    <%= request.message %>
                   </div>
                 </div>
               </div>
@@ -84,11 +84,11 @@
               <h2 class="h5 mb-0">Notizen</h2>
             </div>
             <div class="card-body">
-              <% if (notizen.length === 0) { %>
+              <% if (notes.length === 0) { %>
                 <p class="text-muted">Keine Notizen vorhanden.</p>
               <% } else { %>
                 <div class="timeline">
-                  <% notizen.forEach(function(notiz) { %>
+                  <% notes.forEach(function(notiz) { %>
                     <div class="timeline-item">
                       <div class="timeline-marker bg-success"></div>
                       <div class="timeline-content">
@@ -104,9 +104,9 @@
               <% } %>
               
               <!-- Neue Notiz Form -->
-              <form action="/dashboard/anfragen/add-note" method="POST" class="mt-4">
+              <form action="/dashboard/requests/<%= request.id %>/add-note" method="POST" class="mt-4">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="id" value="<%= anfrage.id %>">
+                <input type="hidden" name="id" value="<%= request.id %>">
                 
                 <div class="mb-3">
                   <label for="noteText" class="form-label">Neue Notiz</label>
@@ -128,19 +128,19 @@
               <h2 class="h5 mb-0">Aktionen</h2>
             </div>
             <div class="card-body">
-              <button class="btn btn-primary w-100 mb-3" data-bs-toggle="modal" data-bs-target="#statusModal" data-id="<%= anfrage.id %>" data-status="<%= anfrage.status %>">
+              <button class="btn btn-primary w-100 mb-3" data-bs-toggle="modal" data-bs-target="#statusModal" data-id="<%= request.id %>" data-status="<%= request.status %>">
                 <i class="fas fa-edit me-2"></i>Status ändern
               </button>
               
-              <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(anfrage.name) %>&email=<%= encodeURIComponent(anfrage.email) %>&phone=<%= encodeURIComponent(anfrage.phone) %>" class="btn btn-success w-100 mb-3">
+              <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>&phone=<%= encodeURIComponent(request.phone) %>" class="btn btn-success w-100 mb-3">
                 <i class="fas fa-user-plus me-2"></i>Als Kunde anlegen
               </a>
               
-              <a href="/dashboard/termine/neu?kunde_name=<%= encodeURIComponent(anfrage.name) %>" class="btn btn-info w-100 mb-3 text-white">
+              <a href="/dashboard/termine/neu?kunde_name=<%= encodeURIComponent(request.name) %>" class="btn btn-info w-100 mb-3 text-white">
                 <i class="fas fa-calendar-plus me-2"></i>Termin vereinbaren
               </a>
               
-              <a href="mailto:<%= anfrage.email %>" class="btn btn-outline-secondary w-100">
+              <a href="mailto:<%= request.email %>" class="btn btn-outline-secondary w-100">
                 <i class="fas fa-reply me-2"></i>E-Mail antworten
               </a>
             </div>
@@ -161,7 +161,7 @@
                   </div>
                   <div>
                     <h6 class="mb-0">E-Mail</h6>
-                    <a href="mailto:<%= anfrage.email %>" class="text-decoration-none"><%= anfrage.email %></a>
+                    <a href="mailto:<%= request.email %>" class="text-decoration-none"><%= request.email %></a>
                   </div>
                 </div>
               </div>
@@ -175,10 +175,10 @@
                   </div>
                   <div>
                     <h6 class="mb-0">Telefon</h6>
-                    <% if (anfrage.phone !== 'Nicht angegeben') { %>
-                      <a href="tel:<%= anfrage.phone %>" class="text-decoration-none"><%= anfrage.phone %></a>
+                    <% if (request.phone !== 'Nicht angegeben') { %>
+                      <a href="tel:<%= request.phone %>" class="text-decoration-none"><%= request.phone %></a>
                     <% } else { %>
-                      <span class="text-muted"><%= anfrage.phone %></span>
+                      <span class="text-muted"><%= request.phone %></span>
                     <% } %>
                   </div>
                 </div>
@@ -200,17 +200,17 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="statusForm" action="/dashboard/anfragen/update-status" method="POST">
+        <form id="statusForm" action="/dashboard/requests/update-status" method="POST">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <input type="hidden" name="id" value="<%= anfrage.id %>">
+          <input type="hidden" name="id" value="<%= request.id %>">
           
           <div class="mb-3">
             <label for="status" class="form-label">Status</label>
             <select class="form-select" id="status" name="status" required>
-              <option value="neu" <%= anfrage.status === 'Neu' ? 'selected' : '' %>>Neu</option>
-              <option value="in_bearbeitung" <%= anfrage.status === 'In Bearbeitung' ? 'selected' : '' %>>In Bearbeitung</option>
-              <option value="beantwortet" <%= anfrage.status === 'Beantwortet' ? 'selected' : '' %>>Beantwortet</option>
-              <option value="geschlossen" <%= anfrage.status === 'Geschlossen' ? 'selected' : '' %>>Geschlossen</option>
+              <option value="neu" <%= request.status === 'Neu' ? 'selected' : '' %>>Neu</option>
+              <option value="in_bearbeitung" <%= request.status === 'In Bearbeitung' ? 'selected' : '' %>>In Bearbeitung</option>
+              <option value="beantwortet" <%= request.status === 'Beantwortet' ? 'selected' : '' %>>Beantwortet</option>
+              <option value="geschlossen" <%= request.status === 'Geschlossen' ? 'selected' : '' %>>Geschlossen</option>
             </select>
           </div>
           

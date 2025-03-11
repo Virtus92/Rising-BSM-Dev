@@ -124,7 +124,7 @@ app.use('/dashboard/kunden', customerRoutes);
 app.use('/dashboard/projekte', projectRoutes);
 app.use('/dashboard/termine', appointmentRoutes);
 app.use('/dashboard/dienste', serviceRoutes);
-app.use('/dashboard/anfragen', requestRoutes);
+app.use('/dashboard/requests', requestRoutes);
 app.use('/dashboard/profile', profileRoutes);
 app.use('/dashboard/settings', settingsRoutes);
 //app.use('/dashboard/blog', blogRoutes);

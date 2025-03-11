@@ -61,9 +61,9 @@ exports.errorHandler = (err, req, res, next) => {
    * Handles routes that don't match any defined routes
    */
   exports.notFoundHandler = (req, res, next) => {
-    const err = new Error('Seite nicht gefunden');
-    err.statusCode = 404;
-    next(err);
+    const error = new Error(`Seite nicht gefunden - ${req.originalUrl}`);
+    res.status(404);
+    next(error);
   };
   
   /**

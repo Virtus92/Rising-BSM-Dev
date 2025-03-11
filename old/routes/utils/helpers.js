@@ -138,7 +138,7 @@ async function getNotifications(req) {
         type: n.typ === 'anfrage' ? 'success' : n.typ === 'termin' ? 'primary' : n.typ === 'warnung' ? 'warning' : 'info',
         icon: n.typ === 'anfrage' ? 'envelope' : n.typ === 'termin' ? 'calendar-check' : n.typ === 'warnung' ? 'exclamation-triangle' : 'bell',
         time: formatDistanceToNow(new Date(n.erstellt_am), { addSuffix: true, locale: de }),
-        link: n.typ === 'anfrage' ? `/dashboard/anfragen/${n.referenz_id}` :
+        link: n.typ === 'anfrage' ? `/dashboard/requests/${n.referenz_id}` :
           n.typ === 'termin' ? `/dashboard/termine/${n.referenz_id}` :
             n.typ === 'auftrag' ? `/dashboard/projekte/${n.referenz_id}` :
               '/dashboard/notifications'

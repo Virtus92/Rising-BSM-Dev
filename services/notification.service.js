@@ -221,7 +221,7 @@ class NotificationService {
   static generateNotificationLink(notification) {
     switch (notification.typ) {
       case 'anfrage':
-        return `/dashboard/anfragen/${notification.referenz_id}`;
+        return `/dashboard/requests/${notification.referenz_id}`;
       case 'termin':
         return `/dashboard/termine/${notification.referenz_id}`;
       case 'projekt':

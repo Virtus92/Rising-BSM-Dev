@@ -101,10 +101,10 @@ router.get('/:id', async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/requests/:id/update-status
+ * @route   POST /dashboard/requests/update-status
  * @desc    Update request status
  */
-router.post('/:id/update-status', async (req, res, next) => {
+router.post('/update-status', async (req, res, next) => {
   try {
     const result = await requestController.updateRequestStatus(req, res, next);
     
@@ -115,11 +115,11 @@ router.post('/:id/update-status', async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Anfrage-Status erfolgreich aktualisiert.');
-    res.redirect(`/dashboard/requests/${req.params.id}`);
+    res.redirect(`/dashboard/requests/${req.body.id}`);
   } catch (error) {
     if (error.statusCode === 400) {
       req.flash('error', error.message);
-      return res.redirect(`/dashboard/requests/${req.params.id}`);
+      return res.redirect(`/dashboard/requests/${req.body.id}`);
     }
     next(error);
   }
