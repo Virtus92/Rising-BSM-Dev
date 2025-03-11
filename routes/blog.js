@@ -1,11 +1,11 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const pool = require('../db');
-const { isAuthenticated, isAdmin, isManager } = require('./middleware/auth');
-const slugify = require('slugify');
-const axios = require('axios');
-const { formatDistanceToNow, format } = require('date-fns');
-const { de } = require('date-fns/locale');
+import pool from '../db.js';
+import { isAuthenticated, isManager } from './middleware/auth.js';
+import slugify from 'slugify';
+import axios from 'axios';
+import { formatDistanceToNow, format } from 'date-fns';
+import { de } from 'date-fns/locale';
 
 // Helper function for HTTP requests
 const _post = async (url, data) => {
@@ -55,6 +55,13 @@ router.use(getNewRequestsCount);
 
 // N8N Webhook-URL für Automatisierung
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.dinel.at/webhook/blog-automation';
+
+// Zentrale Fehlerbehandlung
+const handleError = (error, req, res, redirectUrl) => {
+  console.error('Fehler:', error);
+  req.flash('error', 'Datenbankfehler: ' + error.message);
+  res.redirect(redirectUrl);
+};
 
 // Blog Dashboard - Übersicht (nur für Geschäftsführer)
 router.get('/', isAuthenticated, isManager, async (req, res) => {
@@ -442,16 +449,15 @@ router.post('/neu', isAuthenticated, isManager, async (req, res) => {
     );
     
     const postId = result.rows[0].id;
-    
-    await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [id]);
 
     if (categories && Array.isArray(categories) && categories.length > 0) {
-      for (const categoryId of categories) {
-        await client.query(
+      const insertPromises = categories.map(categoryId => 
+        client.query(
           'INSERT INTO blog_post_categories (post_id, category_id) VALUES ($1, $2)',
-          [id, categoryId]
-        );
-      }
+          [postId, categoryId]
+        )
+      );
+      await Promise.all(insertPromises);
     }
     
     // Tags zuweisen und ggf. neue Tags erstellen
@@ -522,406 +528,6 @@ router.post('/neu', isAuthenticated, isManager, async (req, res) => {
     res.redirect('/dashboard/blog/neu');
   } finally {
     client.release();
-  }
-});
-
-// Blogpost anzeigen
-router.get('/:id', isAuthenticated, isManager, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Blogpost abrufen
-    const postQuery = await _query(`
-      SELECT 
-        p.*,
-        u.name as author_name
-      FROM 
-        blog_posts p
-        LEFT JOIN benutzer u ON p.author_id = u.id
-      WHERE 
-        p.id = $1
-    `, [id]);
-    
-    if (postQuery.rows.length === 0) {
-      return res.status(404).render('error', {
-        message: `Blogpost mit ID ${id} nicht gefunden`,
-        error: { status: 404 }
-      });
-    }
-    
-    const post = postQuery.rows[0];
-    
-    // Kategorien des Posts abrufen
-    const categoriesQuery = await _query(`
-      SELECT c.id, c.name
-      FROM blog_categories c
-      JOIN blog_post_categories pc ON c.id = pc.category_id
-      WHERE pc.post_id = $1
-    `, [id]);
-    
-    // Tags des Posts abrufen
-    const tagsQuery = await _query(`
-      SELECT t.id, t.name
-      FROM blog_tags t
-      JOIN blog_post_tags pt ON t.id = pt.tag_id
-      WHERE pt.post_id = $1
-    `, [id]);
-    
-    // Analytics-Daten abrufen
-    const analyticsQuery = await _query(`
-      SELECT 
-        SUM(views) as total_views,
-        SUM(unique_visitors) as total_visitors
-      FROM 
-        blog_analytics
-      WHERE 
-        post_id = $1
-    `, [id]);
-    
-    const analytics = analyticsQuery.rows[0];
-    
-    // SEO-Keywords für diesen Post abrufen
-    const keywordsQuery = await _query(`
-      SELECT keyword, search_volume, current_ranking
-      FROM blog_seo_keywords
-      WHERE target_post_id = $1
-      ORDER BY search_volume DESC
-    `, [id]);
-    
-    res.render('dashboard/blog/detail', {
-      title: `Blog: ${post.title} - Rising BSM`,
-      user: req.session.user,
-      currentPath: '/dashboard/blog',
-      post: {
-        id: post.id,
-        title: post.title,
-        content: post.content,
-        excerpt: post.excerpt,
-        slug: post.slug,
-        status: post.status,
-        statusLabel: post.status === 'published' ? 'Veröffentlicht' :
-                   post.status === 'review' ? 'In Prüfung' : 'Entwurf',
-        statusClass: post.status === 'published' ? 'success' :
-                    post.status === 'review' ? 'warning' : 'secondary',
-        author: post.author_name,
-        featuredImage: post.featured_image,
-        createdAt: format(new Date(post.created_at), 'dd.MM.yyyy'),
-        publishedAt: post.published_at ? format(new Date(post.published_at), 'dd.MM.yyyy') : null,
-        seoTitle: post.seo_title,
-        seoDescription: post.seo_description,
-        seoKeywords: post.seo_keywords
-      },
-      categories: categoriesQuery.rows,
-      tags: tagsQuery.rows,
-      analytics: {
-        views: analytics.total_views || 0,
-        visitors: analytics.total_visitors || 0
-      },
-      keywords: keywordsQuery.rows,
-      newRequestsCount: req.newRequestsCount,
-      csrfToken: req.csrfToken(),
-      messages: { success: req.flash('success'), error: req.flash('error') }
-    });
-  } catch (error) {
-    console.error('Fehler beim Anzeigen des Blogposts:', error);
-    res.status(500).render('error', {
-      message: 'Datenbankfehler: ' + error.message,
-      error: error
-    });
-  }
-});
-
-// Blogpost bearbeiten - Formular
-router.get('/:id/edit', isAuthenticated, isManager, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Blogpost abrufen
-    const postQuery = await _query('SELECT * FROM blog_posts WHERE id = $1', [id]);
-    
-    if (postQuery.rows.length === 0) {
-      return res.status(404).render('error', {
-        message: `Blogpost mit ID ${id} nicht gefunden`,
-        error: { status: 404 }
-      });
-    }
-    
-    const post = postQuery.rows[0];
-    
-    // Kategorien für Dropdown abrufen
-    const categoriesQuery = await _query('SELECT id, name FROM blog_categories ORDER BY name');
-    
-    // Zugewiesene Kategorien abrufen
-    const assignedCategoriesQuery = await _query(`
-      SELECT category_id
-      FROM blog_post_categories
-      WHERE post_id = $1
-    `, [id]);
-    
-    const assignedCategoryIds = assignedCategoriesQuery.rows.map(row => row.category_id);
-    
-    // Alle Tags abrufen
-    const tagsQuery = await _query('SELECT id, name FROM blog_tags ORDER BY name');
-    
-    // Zugewiesene Tags abrufen
-    const assignedTagsQuery = await _query(`
-      SELECT t.id, t.name
-      FROM blog_tags t
-      JOIN blog_post_tags pt ON t.id = pt.tag_id
-      WHERE pt.post_id = $1
-    `, [id]);
-    
-    res.render('dashboard/blog/edit', {
-      title: `Blog bearbeiten: ${post.title} - Rising BSM`,
-      user: req.session.user,
-      currentPath: '/dashboard/blog',
-      post: post,
-      categories: categoriesQuery.rows,
-      assignedCategories: assignedCategoryIds,
-      tags: tagsQuery.rows,
-      assignedTags: assignedTagsQuery.rows,
-      newRequestsCount: req.newRequestsCount,
-      csrfToken: req.csrfToken(),
-      messages: { success: req.flash('success'), error: req.flash('error') }
-    });
-  } catch (error) {
-    console.error('Fehler beim Laden des Bearbeitungsformulars:', error);
-    res.status(500).render('error', {
-      message: 'Datenbankfehler: ' + error.message,
-      error: error
-    });
-  }
-});
-
-// Blogpost aktualisieren
-router.post('/:id/edit', isAuthenticated, isManager, async (req, res) => {
-  const client = await connect();
-  
-  try {
-    await client.query('BEGIN');
-    
-    const { id } = req.params;
-    const { 
-      title, 
-      content, 
-      excerpt, 
-      status, 
-      categories, 
-      tags, 
-      featured_image,
-      seo_title,
-      seo_description,
-      seo_keywords,
-      update_slug
-    } = req.body;
-    
-    // Aktuellen Post abrufen
-    const currentPostQuery = await client.query(
-      'SELECT * FROM blog_posts WHERE id = $1',
-      [id]
-    );
-    
-    if (currentPostQuery.rows.length === 0) {
-      throw new Error(`Blogpost mit ID ${id} nicht gefunden`);
-    }
-    
-    const currentPost = currentPostQuery.rows[0];
-    
-    // Slug aktualisieren, falls gewünscht
-    let slug = currentPost.slug;
-    if (update_slug) {
-      slug = slugify(title, { lower: true, strict: true });
-      
-      // Prüfen ob Slug bereits existiert (und nicht der eigene ist)
-      const slugCheck = await client.query(
-        'SELECT COUNT(*) FROM blog_posts WHERE slug = $1 AND id != $2',
-        [slug, id]
-      );
-      
-      // Wenn Slug existiert, Suffix hinzufügen
-      if (parseInt(slugCheck.rows[0].count, 10) > 0) {
-        slug = `${slug}-${Date.now().toString().slice(-4)}`;
-      }
-    }
-    
-    // Veröffentlichungsdatum setzen, wenn Status sich auf "published" ändert
-    let published_at = currentPost.published_at;
-    if (status === 'published' && currentPost.status !== 'published') {
-      published_at = new Date();
-    } else if (status !== 'published' && currentPost.status === 'published') {
-      // Keep the original publish date if unpublishing
-      // This preserves the original date when re-publishing
-    }
-    
-    // Blogpost aktualisieren
-    await client.query(
-      `UPDATE blog_posts SET
-        title = $1,
-        slug = $2,
-        content = $3,
-        excerpt = $4,
-        status = $5,
-        featured_image = $6,
-        published_at = $7,
-        seo_title = $8,
-        seo_description = $9,
-        seo_keywords = $10,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $11`,
-      [
-        title,
-        slug,
-        content,
-        excerpt || null,
-        status,
-        featured_image || currentPost.featured_image,
-        published_at,
-        seo_title || title,
-        seo_description || excerpt,
-        seo_keywords || null,
-        id
-      ]
-    );
-    
-    // Kategorien zurücksetzen und neu zuweisen
-    await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [id]);
-    
-    if (categories && Array.isArray(categories) && categories.length > 0) {
-      for (const categoryId of categories) {
-        await client.query(
-          'INSERT INTO blog_post_categories (post_id, category_id) VALUES ($1, $2)',
-          [id, categoryId]
-        );
-      }
-    }
-    
-    // Tags zurücksetzen und neu zuweisen
-    await client.query('DELETE FROM blog_post_tags WHERE post_id = $1', [id]);
-    
-    if (tags && tags.length > 0) {
-      // Tags können als Array von IDs oder als Komma-separierter String kommen
-      const tagList = Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim());
-      
-      for (const tag of tagList) {
-        let tagId;
-        
-        // Prüfen ob es eine numerische ID ist
-        if (/^\d+$/.test(tag)) {
-          tagId = tag;
-        } else {
-          // Tag anlegen, falls es nicht existiert
-          const tagSlug = slugify(tag, { lower: true, strict: true });
-          
-          const existingTag = await client.query(
-            'SELECT id FROM blog_tags WHERE slug = $1',
-            [tagSlug]
-          );
-          
-          if (existingTag.rows.length > 0) {
-            tagId = existingTag.rows[0].id;
-          } else {
-            const newTag = await client.query(
-              'INSERT INTO blog_tags (name, slug) VALUES ($1, $2) RETURNING id',
-              [tag, tagSlug]
-            );
-            tagId = newTag.rows[0].id;
-          }
-        }
-        
-        // Tag zum Post hinzufügen
-        await client.query(
-          'INSERT INTO blog_post_tags (post_id, tag_id) VALUES ($1, $2)',
-          [id, tagId]
-        );
-      }
-    }
-    
-    await client.query('COMMIT');
-    
-    // N8N Webhook triggern für SEO-Analyse, wenn der Status sich ändert
-    if ((status === 'published' && currentPost.status !== 'published')) {
-      try {
-        await _post(N8N_WEBHOOK_URL, {
-          action: 'analyze_seo',
-          post_id: id,
-          title,
-          content,
-          excerpt,
-          keywords: seo_keywords ? seo_keywords.split(',').map(k => k.trim()) : []
-        });
-        console.log(`N8N Webhook für Post ${id} ausgelöst`);
-      } catch (webhookError) {
-        console.error('Fehler beim Auslösen des N8N Webhooks:', webhookError);
-      }
-    }
-    
-    req.flash('success', 'Blogpost erfolgreich aktualisiert!');
-    res.redirect(`/dashboard/blog/${id}`);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Fehler beim Aktualisieren des Blogposts:', error);
-    req.flash('error', 'Datenbankfehler: ' + error.message);
-    res.redirect(`/dashboard/blog/${req.params.id}/edit`);
-  } finally {
-    client.release();
-  }
-});
-
-// Blogpost Status ändern
-router.post('/:id/status', isAuthenticated, isManager, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-    
-    // Aktuellen Post abrufen
-    const currentPostQuery = await _query(
-      'SELECT * FROM blog_posts WHERE id = $1',
-      [id]
-    );
-    
-    if (currentPostQuery.rows.length === 0) {
-      req.flash('error', `Blogpost mit ID ${id} nicht gefunden`);
-      return res.redirect('/dashboard/blog');
-    }
-    
-    const currentPost = currentPostQuery.rows[0];
-    
-    let published_at = currentPost.published_at;
-    if (status === 'published' && currentPost.status !== 'published') {
-      published_at = new Date();
-    } else if (status !== 'published' && currentPost.status === 'published') {
-      // Keep the original publish date if unpublishing
-      // This preserves the original date when re-publishing
-    }
-    
-    // Status aktualisieren
-    await _query(
-      `UPDATE blog_posts SET
-        status = $1,
-        published_at = $2,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $3`,
-      [status, published_at, id]
-    );
-    
-    // N8N Webhook triggern wenn veröffentlicht
-    if (status === 'published' && currentPost.status !== 'published') {
-      try {
-        await _post(N8N_WEBHOOK_URL, {
-          action: 'analyze_seo',
-          post_id: id
-        });
-      } catch (webhookError) {
-        console.error('Fehler beim Auslösen des N8N Webhooks:', webhookError);
-      }
-    }
-    
-    req.flash('success', `Blogpost-Status wurde auf "${status}" geändert.`);
-    res.redirect(`/dashboard/blog/${id}`);
-  } catch (error) {
-    console.error('Fehler beim Ändern des Blogpost-Status:', error);
-    req.flash('error', 'Datenbankfehler: ' + error.message);
-    res.redirect(`/dashboard/blog/${req.params.id}`);
   }
 });
 
@@ -1669,5 +1275,424 @@ router.post('/dashboard/blog/categories/edit', isAuthenticated, isManager, async
   }
 });
 
-// Export the router using CommonJS syntax
-module.exports = router;
+
+// Blogpost anzeigen
+router.get('/:id', isAuthenticated, isManager, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Blogpost abrufen
+    const postQuery = await _query(`
+      SELECT 
+        p.*,
+        u.name as author_name
+      FROM 
+        blog_posts p
+        LEFT JOIN benutzer u ON p.author_id = u.id
+      WHERE 
+        p.id = $1
+    `, [id]);
+    
+    if (postQuery.rows.length === 0) {
+      return res.status(404).render('error', {
+        message: `Blogpost mit ID ${id} nicht gefunden`,
+        error: { status: 404 }
+      });
+    }
+    
+    const post = postQuery.rows[0];
+    
+    // Kategorien des Posts abrufen
+    const categoriesQuery = await _query(`
+      SELECT c.id, c.name
+      FROM blog_categories c
+      JOIN blog_post_categories pc ON c.id = pc.category_id
+      WHERE pc.post_id = $1
+    `, [id]);
+    
+    // Tags des Posts abrufen
+    const tagsQuery = await _query(`
+      SELECT t.id, t.name
+      FROM blog_tags t
+      JOIN blog_post_tags pt ON t.id = pt.tag_id
+      WHERE pt.post_id = $1
+    `, [id]);
+    
+    // Analytics-Daten abrufen
+    const analyticsQuery = await _query(`
+      SELECT 
+        SUM(views) as total_views,
+        SUM(unique_visitors) as total_visitors
+      FROM 
+        blog_analytics
+      WHERE 
+        post_id = $1
+    `, [id]);
+    
+    const analytics = analyticsQuery.rows[0];
+    
+    // SEO-Keywords für diesen Post abrufen
+    const keywordsQuery = await _query(`
+      SELECT keyword, search_volume, current_ranking
+      FROM blog_seo_keywords
+      WHERE target_post_id = $1
+      ORDER BY search_volume DESC
+    `, [id]);
+    
+    res.render('dashboard/blog/detail', {
+      title: `Blog: ${post.title} - Rising BSM`,
+      user: req.session.user,
+      currentPath: '/dashboard/blog',
+      post: {
+        id: post.id,
+        title: post.title,
+        content: post.content,
+        excerpt: post.excerpt,
+        slug: post.slug,
+        status: post.status,
+        statusLabel: post.status === 'published' ? 'Veröffentlicht' :
+                   post.status === 'review' ? 'In Prüfung' : 'Entwurf',
+        statusClass: post.status === 'published' ? 'success' :
+                    post.status === 'review' ? 'warning' : 'secondary',
+        author: post.author_name,
+        featuredImage: post.featured_image,
+        createdAt: format(new Date(post.created_at), 'dd.MM.yyyy'),
+        publishedAt: post.published_at ? format(new Date(post.published_at), 'dd.MM.yyyy') : null,
+        seoTitle: post.seo_title,
+        seoDescription: post.seo_description,
+        seoKeywords: post.seo_keywords
+      },
+      categories: categoriesQuery.rows,
+      tags: tagsQuery.rows,
+      analytics: {
+        views: analytics.total_views || 0,
+        visitors: analytics.total_visitors || 0
+      },
+      keywords: keywordsQuery.rows,
+      newRequestsCount: req.newRequestsCount,
+      csrfToken: req.csrfToken(),
+      messages: { success: req.flash('success'), error: req.flash('error') }
+    });
+  } catch (error) {
+    console.error('Fehler beim Anzeigen des Blogposts:', error);
+    res.status(500).render('error', {
+      message: 'Datenbankfehler: ' + error.message,
+      error: error
+    });
+  }
+});
+
+// Blogpost bearbeiten - Formular
+router.get('/:id/edit', isAuthenticated, isManager, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Blogpost abrufen
+    const postQuery = await _query('SELECT * FROM blog_posts WHERE id = $1', [id]);
+    
+    if (postQuery.rows.length === 0) {
+      return res.status(404).render('error', {
+        message: `Blogpost mit ID ${id} nicht gefunden`,
+        error: { status: 404 }
+      });
+    }
+    
+    const post = postQuery.rows[0];
+    
+    // Kategorien für Dropdown abrufen
+    const categoriesQuery = await _query('SELECT id, name FROM blog_categories ORDER BY name');
+    
+    // Zugewiesene Kategorien abrufen
+    const assignedCategoriesQuery = await _query(`
+      SELECT category_id
+      FROM blog_post_categories
+      WHERE post_id = $1
+    `, [id]);
+    
+    const assignedCategoryIds = assignedCategoriesQuery.rows.map(row => row.category_id);
+    
+    // Alle Tags abrufen
+    const tagsQuery = await _query('SELECT id, name FROM blog_tags ORDER BY name');
+    
+    // Zugewiesene Tags abrufen
+    const assignedTagsQuery = await _query(`
+      SELECT t.id, t.name
+      FROM blog_tags t
+      JOIN blog_post_tags pt ON t.id = pt.tag_id
+      WHERE pt.post_id = $1
+    `, [id]);
+    
+    res.render('dashboard/blog/edit', {
+      title: `Blog bearbeiten: ${post.title} - Rising BSM`,
+      user: req.session.user,
+      currentPath: '/dashboard/blog',
+      post: post,
+      categories: categoriesQuery.rows,
+      assignedCategories: assignedCategoryIds,
+      tags: tagsQuery.rows,
+      assignedTags: assignedTagsQuery.rows,
+      newRequestsCount: req.newRequestsCount,
+      csrfToken: req.csrfToken(),
+      messages: { success: req.flash('success'), error: req.flash('error') }
+    });
+  } catch (error) {
+    console.error('Fehler beim Laden des Bearbeitungsformulars:', error);
+    res.status(500).render('error', {
+      message: 'Datenbankfehler: ' + error.message,
+      error: error
+    });
+  }
+});
+
+// Blogpost aktualisieren
+router.post('/:id/edit', isAuthenticated, isManager, async (req, res) => {
+  const client = await connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { id } = req.params;
+    const { 
+      title, 
+      content, 
+      excerpt, 
+      status, 
+      categories, 
+      tags, 
+      featured_image,
+      seo_title,
+      seo_description,
+      seo_keywords,
+      update_slug
+    } = req.body;
+    
+    // Aktuellen Post abrufen
+    const currentPostQuery = await client.query(
+      'SELECT * FROM blog_posts WHERE id = $1',
+      [id]
+    );
+    
+    if (currentPostQuery.rows.length === 0) {
+      throw new Error(`Blogpost mit ID ${id} nicht gefunden`);
+    }
+    
+    const currentPost = currentPostQuery.rows[0];
+    
+    // Slug aktualisieren, falls gewünscht
+    let slug = currentPost.slug;
+    if (update_slug) {
+      slug = slugify(title, { lower: true, strict: true });
+      
+      // Prüfen ob Slug bereits existiert (und nicht der eigene ist)
+      const slugCheck = await client.query(
+        'SELECT COUNT(*) FROM blog_posts WHERE slug = $1 AND id != $2',
+        [slug, id]
+      );
+      
+      // Wenn Slug existiert, Suffix hinzufügen
+      if (parseInt(slugCheck.rows[0].count, 10) > 0) {
+        slug = `${slug}-${Date.now().toString().slice(-4)}`;
+      }
+    }
+    
+    // Veröffentlichungsdatum setzen, wenn Status sich auf "published" ändert
+    let published_at = currentPost.published_at;
+    if (status === 'published' && currentPost.status !== 'published') {
+      published_at = new Date();
+    } else if (status !== 'published' && currentPost.status === 'published') {
+      // Keep the original publish date if unpublishing
+      // This preserves the original date when re-publishing
+    }
+    
+    // Blogpost aktualisieren
+    await client.query(
+      `UPDATE blog_posts SET
+        title = $1,
+        slug = $2,
+        content = $3,
+        excerpt = $4,
+        status = $5,
+        featured_image = $6,
+        published_at = $7,
+        seo_title = $8,
+        seo_description = $9,
+        seo_keywords = $10,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $11`,
+      [
+        title,
+        slug,
+        content,
+        excerpt || null,
+        status,
+        featured_image || currentPost.featured_image,
+        published_at,
+        seo_title || title,
+        seo_description || excerpt,
+        seo_keywords || null,
+        id
+      ]
+    );
+    
+    // Kategorien zurücksetzen und neu zuweisen
+    await client.query('DELETE FROM blog_post_categories WHERE post_id = $1', [id]);
+
+    if (categories && Array.isArray(categories) && categories.length > 0) {
+      for (const categoryId of categories) {
+        await client.query(
+          'INSERT INTO blog_post_categories (post_id, category_id) VALUES ($1, $2)',
+          [id, categoryId]
+        );
+      }
+    }
+    
+    // Tags zurücksetzen und neu zuweisen
+    await client.query('DELETE FROM blog_post_tags WHERE post_id = $1', [id]);
+    
+    if (tags && tags.length > 0) {
+      // Tags können als Array von IDs oder als Komma-separierter String kommen
+      const tagList = Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim());
+      
+      for (const tag of tagList) {
+        let tagId;
+        
+        // Prüfen ob es eine numerische ID ist
+        if (/^\d+$/.test(tag)) {
+          tagId = tag;
+        } else {
+          // Tag anlegen, falls es nicht existiert
+          const tagSlug = slugify(tag, { lower: true, strict: true });
+          
+          const existingTag = await client.query(
+            'SELECT id FROM blog_tags WHERE slug = $1',
+            [tagSlug]
+          );
+          
+          if (existingTag.rows.length > 0) {
+            tagId = existingTag.rows[0].id;
+          } else {
+            const newTag = await client.query(
+              'INSERT INTO blog_tags (name, slug) VALUES ($1, $2) RETURNING id',
+              [tag, tagSlug]
+            );
+            tagId = newTag.rows[0].id;
+          }
+        }
+        
+        // Tag zum Post hinzufügen
+        await client.query(
+          'INSERT INTO blog_post_tags (post_id, tag_id) VALUES ($1, $2)',
+          [id, tagId]
+        );
+      }
+    }
+    
+    await client.query('COMMIT');
+    
+    // N8N Webhook triggern für SEO-Analyse, wenn der Status sich ändert
+    if ((status === 'published' && currentPost.status !== 'published')) {
+      try {
+        await _post(N8N_WEBHOOK_URL, {
+          action: 'analyze_seo',
+          post_id: id,
+          title,
+          content,
+          excerpt,
+          keywords: seo_keywords ? seo_keywords.split(',').map(k => k.trim()) : []
+        });
+        console.log(`N8N Webhook für Post ${id} ausgelöst`);
+      } catch (webhookError) {
+        console.error('Fehler beim Auslösen des N8N Webhooks:', webhookError);
+      }
+    }
+    
+    req.flash('success', 'Blogpost erfolgreich aktualisiert!');
+    res.redirect(`/dashboard/blog/${id}`);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Fehler beim Aktualisieren des Blogposts:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect(`/dashboard/blog/${req.params.id}/edit`);
+  } finally {
+    client.release();
+  }
+});
+
+// Blogpost Status ändern
+router.post('/:id/status', isAuthenticated, isManager, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    // Aktuellen Post abrufen
+    const currentPostQuery = await _query(
+      'SELECT * FROM blog_posts WHERE id = $1',
+      [id]
+    );
+    
+    if (currentPostQuery.rows.length === 0) {
+      req.flash('error', `Blogpost mit ID ${id} nicht gefunden`);
+      return res.redirect('/dashboard/blog');
+    }
+    
+    const currentPost = currentPostQuery.rows[0];
+    
+    let published_at = currentPost.published_at;
+    if (status === 'published' && currentPost.status !== 'published') {
+      published_at = new Date();
+    } else if (status !== 'published' && currentPost.status === 'published') {
+      // Keep the original publish date if unpublishing
+      // This preserves the original date when re-publishing
+    }
+    
+    // Status aktualisieren
+    await _query(
+      `UPDATE blog_posts SET
+        status = $1,
+        published_at = $2,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3`,
+      [status, published_at, id]
+    );
+    
+    // N8N Webhook triggern wenn veröffentlicht
+    if (status === 'published' && currentPost.status !== 'published') {
+      try {
+        await _post(N8N_WEBHOOK_URL, {
+          action: 'analyze_seo',
+          post_id: id
+        });
+      } catch (webhookError) {
+        console.error('Fehler beim Auslösen des N8N Webhooks:', webhookError);
+      }
+    }
+    
+    req.flash('success', `Blogpost-Status wurde auf "${status}" geändert.`);
+    res.redirect(`/dashboard/blog/${id}`);
+  } catch (error) {
+    console.error('Fehler beim Ändern des Blogpost-Status:', error);
+    req.flash('error', 'Datenbankfehler: ' + error.message);
+    res.redirect(`/dashboard/blog/${req.params.id}`);
+  }
+});
+
+// Füge diesen Endpunkt zu blog.js hinzu
+router.post('/:id/apply-improvement', isAuthenticated, isManager, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+    
+    // Aktualisiere den Blogpost-Inhalt
+    await _query(
+      'UPDATE blog_posts SET content = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [content, id]
+    );
+    
+    res.json({ success: true, message: 'Verbesserungen wurden übernommen!' });
+  } catch (error) {
+    console.error('Fehler beim Anwenden der Verbesserungen:', error);
+    res.status(500).json({ success: false, error: 'Datenbankfehler: ' + error.message });
+  }
+});
+
+export default router;

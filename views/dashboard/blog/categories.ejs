@@ -312,5 +312,17 @@
         deleteForm.action = `/dashboard/blog/categories/${id}/delete`;
       });
     });
+
+    // Beim Klick auf Löschen-Button
+    deleteCategoryButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const id = this.dataset.id;
+        const name = this.dataset.name;
+        
+        document.getElementById('delete_category_name').textContent = name;
+        document.getElementById('deleteCategoryForm').action = `/dashboard/blog/categories/${id}/delete`;
+      });
+    });
+
   });
 </script>

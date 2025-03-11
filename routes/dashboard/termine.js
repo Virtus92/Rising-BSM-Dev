@@ -840,4 +840,4 @@ router.post('/:id/edit', isAuthenticated, async (req, res) => {
     }
   });
   
-  module.exports = router;
+export default router;

@@ -19,4 +19,4 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
-module.exports = pool;
+export default pool;

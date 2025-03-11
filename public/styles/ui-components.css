@@ -1,0 +1,178 @@
+/* UI-Komponenten Styles */
+
+/* Toolbar und Filter */
+.filter-toolbar {
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .filter-dropdown {
+    min-width: 250px;
+  }
+  
+  /* Tabellen-Optimierungen */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .data-table th, 
+  .data-table td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+  }
+  
+  .check-column {
+    width: 40px;
+    text-align: center;
+  }
+  
+  .actions-column {
+    width: 120px;
+    text-align: right;
+  }
+  
+  .action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.25rem;
+  }
+  
+  /* Hover-Effekte für bessere UX */
+  .action-buttons .btn {
+    opacity: 0.85;
+    transition: opacity 0.2s;
+  }
+  
+  .action-buttons .btn:hover {
+    opacity: 1;
+  }
+  
+  tr:hover .action-buttons .btn {
+    opacity: 1;
+  }
+  
+  /* Status-Badges */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4em 0.65em;
+    font-size: 0.85em;
+    font-weight: 500;
+    border-radius: 30px;
+  }
+  
+  .status-icon {
+    margin-right: 0.4em;
+    font-size: 0.9em;
+  }
+  
+  /* Status-Farben */
+  .status-badge.status-new, 
+  .status-badge.status-neu, 
+  .status-badge.status-geplant {
+    background-color: #e9ecef;
+    color: #495057;
+  }
+  
+  .status-badge.status-active, 
+  .status-badge.status-aktiv, 
+  .status-badge.status-bestaetigt {
+    background-color: #d1e7dd;
+    color: #0f5132;
+  }
+  
+  .status-badge.status-processing, 
+  .status-badge.status-in_bearbeitung {
+    background-color: #cff4fc;
+    color: #055160;
+  }
+  
+  .status-badge.status-completed, 
+  .status-badge.status-abgeschlossen, 
+  .status-badge.status-beantwortet {
+    background-color: #d1e7dd;
+    color: #0f5132;
+  }
+  
+  .status-badge.status-canceled, 
+  .status-badge.status-storniert, 
+  .status-badge.status-geschlossen {
+    background-color: #f8d7da;
+    color: #842029;
+  }
+  
+  /* Bulk Actions Bar */
+  .bulk-actions {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  
+  .bulk-actions:not(.d-none) {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  /* Verbesserte Card-Styles */
+  .card {
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+  
+  .card-header {
+    background-color: #fff;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Bessere mobile Darstellung */
+  @media (max-width: 767.98px) {
+    .filter-toolbar {
+      flex-direction: column;
+      align-items: stretch !important;
+    }
+    
+    .filter-toolbar > div:first-child {
+      margin-bottom: 0.5rem;
+    }
+    
+    .search-wrapper {
+      width: 100%;
+    }
+    
+    .action-buttons .btn {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .card-body {
+      padding: 0.75rem;
+    }
+    
+    /* Größere Touch-Ziele für mobile Geräte */
+    .btn {
+      min-height: 38px;
+    }
+    
+    th, td {
+      padding: 0.75rem 0.5rem !important;
+    }
+  }
+  
+  /* AI-Anruf-Button */
+  .ai-call-btn {
+    background-color: #6f42c1;
+    border-color: #6f42c1;
+    transition: all 0.2s ease;
+  }
+  
+  .ai-call-btn:hover {
+    background-color: #5a32a3;
+    border-color: #5a32a3;
+  }
+  
+  /* Toast Notifications */
+  .toast {
+    min-width: 250px;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  }

@@ -1,148 +1,365 @@
 <%- include('../../partials/admin-header') %>
 
 <div class="dashboard-wrapper">
+  <!-- Dashboard Content -->
+  <div class="dashboard-content p-3 p-md-4">
+    <!-- Page Header -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+      <div>
+        <h2 class="h4 mb-1">Kontaktanfragen</h2>
+        <p class="text-muted mb-md-0">Übersicht aller eingehenden Anfragen</p>
+      </div>
+    </div>
 
-
-    <!-- Dashboard Content -->
-    <div class="dashboard-content p-3 p-md-4">
-      <!-- Filter & Aktionen -->
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-        <div>
-          <h2 class="h4 mb-1">Kontaktanfragen</h2>
-          <p class="text-muted mb-md-0">Übersicht aller eingehenden Anfragen</p>
-        </div>
-        <div class="d-flex flex-wrap gap-2">
-          <div class="input-group">
-            <span class="input-group-text bg-white border-end-0">
-              <i class="fas fa-filter text-muted"></i>
-            </span>
-            <select class="form-select border-start-0" id="statusFilter">
-              <option value="all">Alle Status</option>
-              <option value="neu">Neu</option>
-              <option value="in_bearbeitung">In Bearbeitung</option>
-              <option value="beantwortet">Beantwortet</option>
-              <option value="geschlossen">Geschlossen</option>
-            </select>
+    <!-- Statistik-Karten -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="text-muted mb-1 small">Gesamt</h6>
+                <h3 class="mb-0 h5"><%= stats.total %></h3>
+              </div>
+              <div class="bg-light p-2 rounded">
+                <i class="fas fa-envelope-open text-primary"></i>
+              </div>
+            </div>
           </div>
-          <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#exportModal">
-            <i class="fas fa-download me-2"></i>Exportieren
-          </button>
         </div>
       </div>
-
-      <!-- Anfragen Tabelle -->
-      <div class="card border-0 shadow-sm">
-        <div class="card-body p-0">
-          <!-- Desktop Table View - Hidden on Small Screens -->
-          <div class="d-none d-md-block table-responsive">
-            <table class="table table-hover datatable mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Service</th>
-                  <th scope="col">Datum</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Aktionen</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% if (typeof requests !== 'undefined' && requests.length > 0) { %>
-                  <% requests.forEach(function(request) { %>
-                    <tr>
-                      <td>
-                        <a href="/dashboard/anfragen/<%= request.id %>" class="text-decoration-none text-dark">
-                          <%= request.name %>
-                        </a>
-                      </td>
-                      <td><%= request.serviceLabel %></td>
-                      <td><%= request.formattedDate %></td>
-                      <td>
-                        <span class="badge bg-<%= request.statusClass %><%= request.status === 'Neu' ? ' text-dark' : '' %>">
-                          <%= request.status %>
-                        </span>
-                      </td>
-                      <td>
-                        <div class="btn-group btn-group-sm">
-                          <a href="/dashboard/anfragen/<%= request.id %>" class="btn btn-outline-secondary">
-                            <i class="fas fa-eye"></i>
-                          </a>
-                          <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#statusModal" data-id="<%= request.id %>">
-                            <i class="fas fa-edit"></i>
-                          </button>
-                          <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>" class="btn btn-outline-success" title="Kunde erstellen">
-                            <i class="fas fa-user-plus"></i>
-                          </a>
-                        </div>
-                      </td>
-                    </tr>
-                  <% }); %>
-                <% } else { %>
-                  <tr>
-                    <td colspan="5" class="text-center py-4">
-                      <p class="text-muted mb-0">Keine Anfragen gefunden</p>
-                    </td>
-                  </tr>
-                <% } %>
-              </tbody>
-            </table>
+      
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="text-muted mb-1 small">Neu</h6>
+                <h3 class="mb-0 h5"><%= stats.neu %></h3>
+              </div>
+              <div class="bg-warning bg-opacity-25 p-2 rounded">
+                <i class="fas fa-envelope text-warning"></i>
+              </div>
+            </div>
           </div>
-          
-          <!-- Mobile Card View - Shown Only on Small Screens -->
-          <div class="d-md-none">
-            <% if (typeof requests !== 'undefined' && requests.length > 0) { %>
-              <div class="list-group list-group-flush">
-                <% requests.forEach(function(request) { %>
-                  <div class="list-group-item p-3">
-                    <div class="d-flex flex-column gap-2">
-                      <div class="d-flex justify-content-between align-items-start">
-                        <h6 class="mb-0">
-                          <a href="/dashboard/anfragen/<%= request.id %>" class="text-decoration-none text-dark">
-                            <%= request.name %>
-                          </a>
-                        </h6>
-                        <span class="badge bg-<%= request.statusClass %><%= request.status === 'Neu' ? ' text-dark' : '' %>">
-                          <%= request.status %>
-                        </span>
-                      </div>
-                      <div>
-                        <small class="text-muted">Service: <%= request.serviceLabel %></small>
-                      </div>
-                      <div>
-                        <small class="text-muted">Datum: <%= request.formattedDate %></small>
-                      </div>
-                      <div class="d-flex justify-content-end gap-2 mt-2">
-                        <a href="/dashboard/anfragen/<%= request.id %>" class="btn btn-sm btn-outline-secondary">
-                          <i class="fas fa-eye"></i>
-                        </a>
-                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#statusModal" data-id="<%= request.id %>">
-                          <i class="fas fa-edit"></i>
-                        </button>
-                        <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>" class="btn btn-sm btn-outline-success" title="Kunde erstellen">
-                          <i class="fas fa-user-plus"></i>
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                <% }); %>
+        </div>
+      </div>
+      
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="text-muted mb-1 small">In Bearbeitung</h6>
+                <h3 class="mb-0 h5"><%= stats.in_bearbeitung %></h3>
               </div>
-            <% } else { %>
-              <div class="text-center py-4">
-                <p class="text-muted mb-0">Keine Anfragen gefunden</p>
+              <div class="bg-info bg-opacity-25 p-2 rounded">
+                <i class="fas fa-spinner text-info"></i>
               </div>
-            <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="text-muted mb-1 small">Abgeschlossen</h6>
+                <h3 class="mb-0 h5"><%= stats.beantwortet + stats.geschlossen %></h3>
+              </div>
+              <div class="bg-success bg-opacity-25 p-2 rounded">
+                <i class="fas fa-check-circle text-success"></i>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </main>
+
+    <!-- Gemeinsame UI-Komponenten einbinden -->
+    <%- include('../../partials/shared-ui-components') %>
+
+    <!-- Massenaktions-Leiste (wird durch JavaScript eingeblendet) -->
+    <div class="bulk-actions mb-3 d-none">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body d-flex align-items-center justify-content-between py-2">
+          <div>
+            <span class="me-2"><span id="selectedCount">0</span> Einträge ausgewählt</span>
+            <div class="btn-group ms-2">
+              <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                Aktionen <span class="caret"></span>
+              </button>
+              <ul class="dropdown-menu">
+                <% if (typeof bulkActions !== 'undefined' && bulkActions.length > 0) { %>
+                  <% bulkActions.forEach(function(action) { %>
+                    <li><a class="dropdown-item <%= action.class %>" href="#" data-action="<%= action.action %>" data-value="<%= action.value %>"><i class="fas fa-<%= action.icon %> me-2"></i><%= action.label %></a></li>
+                  <% }); %>
+                  <% if (bulkActions.length > 0) { %>
+                    <li><hr class="dropdown-divider"></li>
+                  <% } %>
+                <% } %>
+                <li><a class="dropdown-item text-danger bulk-delete" href="#"><i class="fas fa-trash-alt me-2"></i>Löschen</a></li>
+              </ul>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary cancel-selection">Auswahl aufheben</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab-Inhalte -->
+    <div class="tab-content">
+      <!-- Listen-Ansicht -->
+      <div class="tab-pane fade show active" id="list-view" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-0">
+            <!-- Desktop Table View - Optimierte Tabelle -->
+            <div class="table-responsive">
+              <table class="table table-hover data-table mb-0" id="requestsTable">
+                <thead class="table-light">
+                  <tr>
+                    <th class="check-column">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="selectAll">
+                      </div>
+                    </th>
+                    <th>Name</th>
+                    <th>E-Mail</th>
+                    <th>Service</th>
+                    <th>Datum</th>
+                    <th>Status</th>
+                    <th class="actions-column">Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% if (typeof requests !== 'undefined' && requests.length > 0) { %>
+                    <% requests.forEach(function(request) { %>
+                      <tr>
+                        <td class="check-column">
+                          <div class="form-check">
+                            <input class="form-check-input item-select" type="checkbox" name="selected[]" value="<%= request.id %>">
+                          </div>
+                        </td>
+                        <td>
+                          <a href="/dashboard/anfragen/<%= request.id %>" class="text-decoration-none text-dark">
+                            <%= request.name %>
+                          </a>
+                        </td>
+                        <td>
+                          <a href="mailto:<%= request.email %>" class="text-decoration-none">
+                            <%= request.email %>
+                          </a>
+                        </td>
+                        <td><%= request.serviceLabel %></td>
+                        <td><%= request.formattedDate %></td>
+                        <td>
+                          <span class="status-badge status-<%= request.statusValue %>" data-status="<%= request.statusValue %>">
+                            <i class="status-icon fas fa-<%= 
+                              request.statusValue === 'neu' ? 'circle' : 
+                              request.statusValue === 'in_bearbeitung' ? 'spinner' : 
+                              request.statusValue === 'beantwortet' ? 'check-circle' : 
+                              'times-circle' 
+                            %>"></i>
+                            <%= request.status %>
+                          </span>
+                        </td>
+                        <td class="actions-column">
+                          <div class="action-buttons">
+                            <a href="/dashboard/anfragen/<%= request.id %>" class="btn btn-sm btn-outline-secondary" title="Details anzeigen">
+                              <i class="fas fa-eye"></i>
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-primary status-toggle" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#statusModal" 
+                                    data-id="<%= request.id %>"
+                                    data-status="<%= request.statusValue %>"
+                                    title="Status ändern">
+                              <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger delete-item" 
+                                    data-id="<%= request.id %>" 
+                                    data-name="<%= request.name %>"
+                                    data-type="Anfrage"
+                                    title="Löschen">
+                              <i class="fas fa-trash-alt"></i>
+                            </button>
+                            <% if (request.phone && request.phone !== 'Nicht angegeben') { %>
+                              <button type="button" class="btn btn-sm ai-call-btn text-white" 
+                                      data-id="<%= request.id %>" 
+                                      data-phone="<%= request.phone %>"
+                                      title="AI-Anruf">
+                                <i class="fas fa-phone-alt"></i>
+                              </button>
+                            <% } %>
+                          </div>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  <% } else { %>
+                    <tr>
+                      <td colspan="7" class="text-center py-4">
+                        <p class="text-muted mb-0">Keine Anfragen gefunden</p>
+                      </td>
+                    </tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Karten-Ansicht -->
+      <div class="tab-pane fade" id="card-view" role="tabpanel">
+        <div class="row g-3">
+          <% if (typeof requests !== 'undefined' && requests.length > 0) { %>
+            <% requests.forEach(function(request) { %>
+              <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm">
+                  <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <h3 class="h6 mb-0 text-truncate">
+                      <span class="me-2">#<%= request.id %></span>
+                      <%= request.name %>
+                    </h3>
+                    <span class="status-badge status-<%= request.statusValue %>" data-status="<%= request.statusValue %>">
+                      <i class="status-icon fas fa-<%= 
+                        request.statusValue === 'neu' ? 'circle' : 
+                        request.statusValue === 'in_bearbeitung' ? 'spinner' : 
+                        request.statusValue === 'beantwortet' ? 'check-circle' : 
+                        'times-circle' 
+                      %>"></i>
+                      <%= request.status %>
+                    </span>
+                  </div>
+                  <div class="card-body">
+                    <div class="mb-3">
+                      <div class="small text-muted">E-Mail</div>
+                      <div>
+                        <a href="mailto:<%= request.email %>" class="text-decoration-none">
+                          <%= request.email %>
+                        </a>
+                      </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                      <div class="small text-muted">Telefon</div>
+                      <div>
+                        <% if (request.phone && request.phone !== 'Nicht angegeben') { %>
+                          <a href="tel:<%= request.phone %>" class="text-decoration-none">
+                            <%= request.phone %>
+                          </a>
+                        <% } else { %>
+                          <span class="text-muted">Nicht angegeben</span>
+                        <% } %>
+                      </div>
+                    </div>
+                    
+                    <div class="row g-2 mb-3">
+                      <div class="col-6">
+                        <div class="small text-muted">Service</div>
+                        <div><%= request.serviceLabel %></div>
+                      </div>
+                      <div class="col-6">
+                        <div class="small text-muted">Datum</div>
+                        <div><%= request.formattedDate %></div>
+                      </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between gap-2 mt-4">
+                      <a href="/dashboard/anfragen/<%= request.id %>" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-eye me-1"></i>Details
+                      </a>
+                      <% if (request.phone && request.phone !== 'Nicht angegeben') { %>
+                        <button class="btn btn-sm ai-call-btn text-white" data-id="<%= request.id %>" data-phone="<%= request.phone %>">
+                          <i class="fas fa-phone-alt me-1"></i>AI-Anruf
+                        </button>
+                      <% } %>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          <% } else { %>
+            <div class="col-12">
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i> Keine Anfragen gefunden.
+              </div>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Statistik-Ansicht -->
+      <div class="tab-pane fade" id="stats-view" role="tabpanel">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Anfragen nach Status</h5>
+              </div>
+              <div class="card-body">
+                <canvas id="statusChart" height="250"></canvas>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Anfragen nach Service</h5>
+              </div>
+              <div class="card-body">
+                <canvas id="serviceChart" height="250"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <% if (pagination && pagination.total > 1) { %>
+      <nav aria-label="Anfragen Pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+          <% if (pagination.hasPrev) { %>
+            <li class="page-item">
+              <a class="page-link" href="?page=<%= pagination.prevPage %><%= filters.status ? '&status='+filters.status : '' %>">Zurück</a>
+            </li>
+          <% } else { %>
+            <li class="page-item disabled">
+              <span class="page-link">Zurück</span>
+            </li>
+          <% } %>
+          
+          <% for(let i = Math.max(1, pagination.current-2); i <= Math.min(pagination.total, pagination.current+2); i++) { %>
+            <li class="page-item <%= pagination.current == i ? 'active' : '' %>">
+              <a class="page-link" href="?page=<%= i %><%= filters.status ? '&status='+filters.status : '' %>"><%= i %></a>
+            </li>
+          <% } %>
+          
+          <% if (pagination.hasNext) { %>
+            <li class="page-item">
+              <a class="page-link" href="?page=<%= pagination.nextPage %><%= filters.status ? '&status='+filters.status : '' %>">Weiter</a>
+            </li>
+          <% } else { %>
+            <li class="page-item disabled">
+              <span class="page-link">Weiter</span>
+            </li>
+          <% } %>
+        </ul>
+      </nav>
+    <% } %>
+  </div>
 </div>
 
-<!-- Status Modal -->
-<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+<!-- Status-Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="statusModalLabel">Status ändern</h5>
+        <h5 class="modal-title">Status ändern</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -174,94 +391,69 @@
   </div>
 </div>
 
-<!-- Export Modal -->
-<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="exportModalLabel">Anfragen exportieren</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <form id="exportForm" action="/dashboard/anfragen/export" method="GET">
-          <div class="mb-3">
-            <label for="exportFormat" class="form-label">Format</label>
-            <select class="form-select" id="exportFormat" name="format" required>
-              <option value="csv">CSV</option>
-              <option value="excel">Excel</option>
-              <option value="pdf">PDF</option>
-            </select>
-          </div>
-          
-          <div class="mb-3">
-            <label for="dateFrom" class="form-label">Zeitraum von</label>
-            <input type="date" class="form-control" id="dateFrom" name="dateFrom">
-          </div>
-          
-          <div class="mb-3">
-            <label for="dateTo" class="form-label">Zeitraum bis</label>
-            <input type="date" class="form-control" id="dateTo" name="dateTo">
-          </div>
-          
-          <div class="mb-3">
-            <label class="form-label">Status</label>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="statusNeu" name="status[]" value="neu" checked>
-              <label class="form-check-label" for="statusNeu">Neu</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="statusInBearbeitung" name="status[]" value="in_bearbeitung" checked>
-              <label class="form-check-label" for="statusInBearbeitung">In Bearbeitung</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="statusBeantwortet" name="status[]" value="beantwortet" checked>
-              <label class="form-check-label" for="statusBeantwortet">Beantwortet</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="statusGeschlossen" name="status[]" value="geschlossen" checked>
-              <label class="form-check-label" for="statusGeschlossen">Geschlossen</label>
-            </div>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
-        <button type="submit" form="exportForm" class="btn btn-success">Exportieren</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    // Status Filter Funktionalität
-    const statusFilter = document.getElementById('statusFilter');
-    if (statusFilter) {
-      statusFilter.addEventListener('change', function() {
-        const url = new URL(window.location);
-        if (this.value === 'all') {
-          url.searchParams.delete('status');
-        } else {
-          url.searchParams.set('status', this.value);
+    // Statistik-Charts initialisieren wenn Tab angezeigt wird
+    document.querySelectorAll('button[data-bs-target="#stats-view"]').forEach(btn => {
+      btn.addEventListener('shown.bs.tab', function() {
+        initializeCharts();
+      });
+    });
+    
+    function initializeCharts() {
+      // Status-Chart
+      new Chart(document.getElementById('statusChart'), {
+        type: 'pie',
+        data: {
+          labels: ['Neu', 'In Bearbeitung', 'Beantwortet', 'Geschlossen'],
+          datasets: [{
+            data: [<%= stats.neu %>, <%= stats.in_bearbeitung %>, <%= stats.beantwortet %>, <%= stats.geschlossen %>],
+            backgroundColor: [
+              'rgba(255, 193, 7, 0.8)',
+              'rgba(13, 202, 240, 0.8)',
+              'rgba(25, 135, 84, 0.8)',
+              'rgba(108, 117, 125, 0.8)'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            }
+          }
         }
-        window.location = url.toString();
       });
       
-      // Aktuellen Filter-Wert setzen
-      const urlParams = new URLSearchParams(window.location.search);
-      const status = urlParams.get('status');
-      if (status) {
-        statusFilter.value = status;
-      }
-    }
-    
-    // Status Modal Funktionalität
-    const statusModal = document.getElementById('statusModal');
-    if (statusModal) {
-      statusModal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        const requestId = button.getAttribute('data-id');
-        document.getElementById('requestId').value = requestId;
+      // Service-Chart (Beispieldaten, sollten eigentlich vom Backend kommen)
+      // Diese Daten könnten in einer zweiten Query vom Backend geholt werden
+      new Chart(document.getElementById('serviceChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Facility Management', 'Umzüge & Transporte', 'Winterdienst', 'Sonstiges'],
+          datasets: [{
+            data: [35, 25, 20, 20], // Beispielwerte
+            backgroundColor: [
+              'rgba(25, 135, 84, 0.8)',
+              'rgba(13, 110, 253, 0.8)',
+              'rgba(255, 193, 7, 0.8)',
+              'rgba(108, 117, 125, 0.8)'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            }
+          }
+        }
       });
     }
   });

@@ -6,7 +6,7 @@
  * Prüft, ob der Benutzer authentifiziert ist
  * Wenn nicht, wird zur Login-Seite weitergeleitet
  */
-exports.isAuthenticated = (req, res, next) => {
+module.exports.isAuthenticated = (req, res, next) => {
   console.log('isAuthenticated middleware called', req.session.user); // Debugging line
   if (req.session && req.session.user) {
     return next();
@@ -19,7 +19,7 @@ exports.isAuthenticated = (req, res, next) => {
  * Prüft, ob der authentifizierte Benutzer Admin-Rechte hat
  * Wenn nicht, wird zur Dashboard-Seite weitergeleitet
  */
-exports.isAdmin = (req, res, next) => {
+module.exports.isAdmin = (req, res, next) => {
   if (req.session && req.session.user && req.session.user.role === 'admin') {
     return next();
   } else {
@@ -32,7 +32,7 @@ exports.isAdmin = (req, res, next) => {
  * Prüft, ob der authentifizierte Benutzer Manager-Rechte hat (Manager oder Admin)
  * Wenn nicht, wird zur Dashboard-Seite weitergeleitet
  */
-exports.isManager = (req, res, next) => {
+module.exports.isManager = (req, res, next) => {
   if (req.session && req.session.user && 
      (req.session.user.role === 'admin' || req.session.user.role === 'manager')) {
     return next();
@@ -46,7 +46,7 @@ exports.isManager = (req, res, next) => {
  * Prüft, ob der authentifizierte Benutzer Mitarbeiter-Rechte hat (oder höher)
  * Wenn nicht, wird zur Dashboard-Seite weitergeleitet
  */
-exports.isEmployee = (req, res, next) => {
+module.exports.isEmployee = (req, res, next) => {
   if (req.session && req.session.user && 
      (req.session.user.role === 'admin' || req.session.user.role === 'manager' || req.session.user.role === 'employee')) {
     return next();

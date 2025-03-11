@@ -1,0 +1,229 @@
+<!-- Gemeinsame UI-Komponenten für alle Dashboard-Ansichten -->
+
+<!-- Filter- und Suchleiste -->
+<div class="filter-toolbar d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
+    <div class="d-flex flex-grow-1 gap-2">
+      <div class="search-wrapper flex-grow-1">
+        <form action="" method="GET" class="search-form" id="searchForm">
+          <div class="input-group">
+            <span class="input-group-text bg-white border-end-0">
+              <i class="fas fa-search text-muted"></i>
+            </span>
+            <input type="text" class="form-control border-start-0 search-input" 
+                  id="searchInput" name="search" 
+                  value="<%= typeof filters !== 'undefined' && filters.search ? filters.search : '' %>" 
+                  placeholder="Suchen..." autocomplete="off">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              <i class="fas fa-filter"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end filter-dropdown p-3" style="width: 250px;">
+              <% if (typeof filterOptions !== 'undefined' && filterOptions.status) { %>
+                <li>
+                  <div class="mb-3">
+                    <h6 class="dropdown-header px-0 fw-bold">Status</h6>
+                    <% filterOptions.status.forEach(function(status) { %>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="filter<%= status.value %>" 
+                            name="status[]" value="<%= status.value %>" 
+                            <%= (typeof activeFilters !== 'undefined' && activeFilters.status && activeFilters.status.includes(status.value)) ? 'checked' : '' %>>
+                        <label class="form-check-label" for="filter<%= status.value %>"><%= status.label %></label>
+                      </div>
+                    <% }); %>
+                  </div>
+                </li>
+              <% } %>
+              
+              <% if (typeof filterOptions !== 'undefined' && filterOptions.type) { %>
+                <li>
+                  <div class="mb-3">
+                    <h6 class="dropdown-header px-0 fw-bold">Typ</h6>
+                    <% filterOptions.type.forEach(function(type) { %>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="filterType<%= type.value %>" 
+                            name="type[]" value="<%= type.value %>"
+                            <%= (typeof activeFilters !== 'undefined' && activeFilters.type && activeFilters.type.includes(type.value)) ? 'checked' : '' %>>
+                        <label class="form-check-label" for="filterType<%= type.value %>"><%= type.label %></label>
+                      </div>
+                    <% }); %>
+                  </div>
+                </li>
+              <% } %>
+              
+              <li>
+                <div class="d-flex justify-content-between">
+                  <button type="reset" class="btn btn-sm btn-outline-secondary">Zurücksetzen</button>
+                  <button type="submit" class="btn btn-sm btn-primary">Anwenden</button>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </form>
+      </div>
+      
+      <!-- Weitere Filteroptionen -->
+      <% if (typeof viewTypes !== 'undefined' && viewTypes.length > 0) { %>
+        <div class="btn-group view-toggle" role="group">
+          <% viewTypes.forEach(function(view, index) { %>
+            <button type="button" class="btn btn-outline-secondary <%= index === 0 ? 'active' : '' %>" data-bs-toggle="tab" data-bs-target="#<%= view.id %>">
+              <i class="fas fa-<%= view.icon %>"></i>
+            </button>
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+    
+    <div class="d-flex gap-2">
+      <!-- Aktionsbuttons -->
+      <% if (typeof showNewButton !== 'undefined' && showNewButton) { %>
+        <a href="<%= baseUrl %>/neu" class="btn btn-success">
+          <i class="fas fa-plus me-1"></i>Neu
+        </a>
+      <% } %>
+      
+      <% if (typeof showExportButton !== 'undefined' && showExportButton) { %>
+        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#exportModal">
+          <i class="fas fa-download me-1"></i>Export
+        </button>
+      <% } %>
+      
+      <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+          <i class="fas fa-ellipsis-v"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="#" id="refreshData"><i class="fas fa-sync-alt me-2"></i>Aktualisieren</a></li>
+          <% if (typeof extraActions !== 'undefined' && extraActions.length > 0) { %>
+            <% extraActions.forEach(function(action) { %>
+              <li><a class="dropdown-item" href="<%= action.url %>"><i class="fas fa-<%= action.icon %> me-2"></i><%= action.label %></a></li>
+            <% }); %>
+          <% } %>
+        </ul>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Massenaktions-Leiste (wird durch JavaScript eingeblendet) -->
+  <div class="bulk-actions mb-3 d-none">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body d-flex align-items-center justify-content-between py-2">
+        <div>
+          <span class="me-2"><span id="selectedCount">0</span> Einträge ausgewählt</span>
+          <div class="btn-group ms-2">
+            <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+              Aktionen <span class="caret"></span>
+            </button>
+            <ul class="dropdown-menu">
+              <% if (typeof bulkActions !== 'undefined' && bulkActions.length > 0) { %>
+                <% bulkActions.forEach(function(action) { %>
+                  <li><a class="dropdown-item <%= action.class %>" href="#" data-action="<%= action.action %>" data-value="<%= action.value %>"><i class="fas fa-<%= action.icon %> me-2"></i><%= action.label %></a></li>
+                <% }); %>
+                <% if (bulkActions.length > 0) { %>
+                  <li><hr class="dropdown-divider"></li>
+                <% } %>
+              <% } %>
+              <li><a class="dropdown-item text-danger bulk-delete" href="#"><i class="fas fa-trash-alt me-2"></i>Löschen</a></li>
+            </ul>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary cancel-selection">Auswahl aufheben</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Standard Lösch-Modal -->
+  <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><span class="delete-item-type">Eintrag</span> löschen</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Sind Sie sicher, dass Sie <strong><span class="delete-item-name"></span></strong> löschen möchten?</p>
+          <p class="text-danger mb-0">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+          <form id="deleteForm" action="" method="POST">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" id="deleteItemId" name="id">
+            <button type="submit" class="btn btn-danger">Löschen</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Standard Export-Modal -->
+  <div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Daten exportieren</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="exportForm" action="<%= baseUrl %>/export" method="GET">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Format</label>
+              <div class="d-flex gap-2">
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="format" id="formatCSV" value="csv" checked>
+                  <label class="form-check-label" for="formatCSV">CSV</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="format" id="formatExcel" value="excel">
+                  <label class="form-check-label" for="formatExcel">Excel</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="format" id="formatPDF" value="pdf">
+                  <label class="form-check-label" for="formatPDF">PDF</label>
+                </div>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label fw-bold">Zeitraum</label>
+              <div class="row">
+                <div class="col-6">
+                  <label for="dateFrom" class="form-label small">Von</label>
+                  <input type="date" class="form-control" id="dateFrom" name="dateFrom">
+                </div>
+                <div class="col-6">
+                  <label for="dateTo" class="form-label small">Bis</label>
+                  <input type="date" class="form-control" id="dateTo" name="dateTo">
+                </div>
+              </div>
+            </div>
+            
+            <% if (typeof exportOptions !== 'undefined' && exportOptions.length > 0) { %>
+              <div class="mb-3">
+                <label class="form-label fw-bold">Status einschließen</label>
+                <% exportOptions.forEach(function(option) { %>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="export<%= option.value %>" 
+                        name="status[]" value="<%= option.value %>" checked>
+                    <label class="form-check-label" for="export<%= option.value %>"><%= option.label %></label>
+                  </div>
+                <% }); %>
+              </div>
+            <% } %>
+            
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="exportCurrent" name="exportCurrent" checked>
+              <label class="form-check-label" for="exportCurrent">Nur aktuelle Filter exportieren</label>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+          <button type="submit" form="exportForm" class="btn btn-primary">
+            <i class="fas fa-download me-1"></i>Exportieren
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Toast-Container für Benachrichtigungen -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>

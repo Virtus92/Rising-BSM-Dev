@@ -842,4 +842,4 @@ router.post('/:id/add-note', isAuthenticated, async (req, res) => {
   }
 });
   
-  module.exports = router;
+export default router;

@@ -1,44 +1,106 @@
-require('dotenv').config();
-const express = require('express');
-const path = require('path');
-const bodyParser = require('body-parser');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const cookieParser = require('cookie-parser');
-const session = require('express-session');
-const pgSession = require('connect-pg-simple')(session);
-const flash = require('connect-flash');
-const bcrypt = require('bcryptjs');
-const csrf = require('@dr.pogodin/csurf');
-const { format, formatDistanceToNow } = require('date-fns');
-const { de } = require('date-fns/locale');
+import express from 'express';
+import path from 'path';
+import bodyParser from 'body-parser';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
+import flash from 'connect-flash';
+import bcrypt from 'bcryptjs';
+import csrf from '@dr.pogodin/csurf';
+import { format, formatDistanceToNow } from 'date-fns';
+import { de } from 'date-fns/locale';
+import validator from 'validator';
+import multer from 'multer';
+import blogRoutes from './routes/blog.js';
+import axios from 'axios';
+import pool from './db.js';
+import env from 'dotenv';
+env.config();
+
+const pgSession = connectPgSimple(session);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Datenbankverbindung
-const pool = require('./db');
 
 // Route-Importe mit neuer Struktur
-const authRoutes = require('./routes/auth');
-const dashboardRoutes = require('./routes/dashboard/index');
-const anfragenRoutes = require('./routes/dashboard/anfragen');
-const projectRoutes = require('./routes/dashboard/projekte');
-const kundenRoutes = require('./routes/dashboard/kunden');
-const termineRoutes = require('./routes/dashboard/termine');
-const dienstleistungenRoutes = require('./routes/dashboard/dienste');
-const settingsRoutes = require('./routes/dashboard/settings');
-const profileRoutes = require('./routes/dashboard/profile');
-const apiRoutes = require('./routes/dashboard/api');
+import authRoutes from './routes/auth.js';
+import dashboardRoutes from './routes/dashboard/index.js';
+import anfragenRoutes from './routes/dashboard/anfragen.js';
+import projectRoutes from './routes/dashboard/projekte.js';
+import kundenRoutes from './routes/dashboard/kunden.js';
+import termineRoutes from './routes/dashboard/termine.js';
+import dienstleistungenRoutes from './routes/dashboard/dienste.js';
+import settingsRoutes from './routes/dashboard/settings.js';
+import profileRoutes from './routes/dashboard/profile.js';
+import apiRoutes from './routes/dashboard/api.js';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Middleware-Konfigurationen bleiben größtenteils unverändert
+// Session-Konfiguration
+app.use(session({
+  store: new pgSession({
+    pool,
+    tableName: 'user_sessions',
+    createTableIfMissing: true
+  }),
+  secret: process.env.SESSION_SECRET || 'rising-bsm-super-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', 
+    httpOnly: true,
+    sameSite: 'strict',
+    maxAge: 24 * 60 * 60 * 1000 // 1 Tag
+  }
+}));
+
+// Globale Variablen für die Views
+app.use((req, res, next) => {
+  res.locals.isAuthenticated = req.session.isLoggedIn;
+  res.locals.isManager = req.session.isManager;
+  res.locals.successMessages = req.flash('success');
+  res.locals.errorMessages = req.flash('error');
+  next();
+});
+
+// XSS-Schutz für alle POST-Requests
+app.use((req, res, next) => {
+  if (req.method === 'POST' && req.body) {
+    for (const key in req.body) {
+      req.body[key] = validator.escape(req.body[key]);
+    }
+  }
+  next();
+});
+
+// Middleware-Konfigurationen 
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d'
+}));
+app.use(flash());
+// Globale Middleware für Benutzerinformationen
+app.use((req, res, next) => {
+  res.locals.user = req.session.user || null;
+  next();
+});
+
+// Helmet für Sicherheits-Header
 app.use(helmet({
   contentSecurityPolicy: {
+    useDefaults: true,
     directives: {
-      defaultSrc: ["'self'"],
       scriptSrc: [
         "'self'", 
         "https://cdn.jsdelivr.net", 
@@ -59,45 +121,40 @@ app.use(helmet({
   }
 }));
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Session-Konfiguration
-app.use(session({
-  store: new pgSession({
-    pool,
-    tableName: 'user_sessions',
-    createTableIfMissing: true
-  }),
-  secret: process.env.SESSION_SECRET || 'rising-bsm-super-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production', 
-    httpOnly: true,
-    sameSite: 'strict',
-    maxAge: 24 * 60 * 60 * 1000 // 1 Tag
+// Konfiguration von Multer für Bild-Uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'public/uploads/blog')
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname))
   }
-}));
+});
 
-app.use(flash());
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: function (req, file, cb) {
+    // Prüfe erlaubte Dateitypen
+    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+      return cb(new Error('Nur Bildformate sind erlaubt!'), false);
+    }
+    cb(null, true);
+  }
+});
 
-// CSRF-Schutz
+// Apply CSRF middleware before state-changing routes
+// Routen verwenden
+// app.use('/', authRoutes);
+// app.use('/dashboard', dashboardRoutes);
+// app.use('/dashboard/projekte', projectRoutes);
+// app.use('/dashboard/anfragen', anfragenRoutes);
+// app.use('/dashboard/kunden', kundenRoutes);
+// app.use('/dashboard/termine', termineRoutes);
+// app.use('/dashboard/dienste', dienstleistungenRoutes);
+// app.use('/dashboard/settings', settingsRoutes);
+// Apply CSRF middleware before state-changing routes
 app.use(csrf());
-
-// CSRF-Token als Response-Local verfügbar machen
-app.use((req, res, next) => {
-  res.locals.csrfToken = req.csrfToken();
-  next();
-});
-
-// Globale Middleware für Benutzerinformationen
-app.use((req, res, next) => {
-  res.locals.user = req.session.user || null;
-  next();
-});
 
 // Routen verwenden
 app.use('/', authRoutes);
@@ -110,32 +167,36 @@ app.use('/dashboard/dienste', dienstleistungenRoutes);
 app.use('/dashboard/settings', settingsRoutes);
 app.use('/dashboard/profile', profileRoutes);
 app.use('/dashboard/api', apiRoutes);
+app.use('/dashboard/blog', blogRoutes);
 
-// Blog-Routen importieren
-const blogRoutes = require('./routes/blog');
-
-// Startseite
-app.get('/', (req, res) => {
-  res.render('index', { 
-    title: 'Rising BSM – Ihre Allround-Experten'
+// Generisches Error-Handler-Middleware für API-Routen
+app.use('/dashboard/api', (err, req, res, next) => {
+  console.error('API-Fehler:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    error: err.message
   });
 });
 
-app.get('/impressum', (req, res) => {
+app.get('/', (req, res) => {
+  res.render('index', { 
+    title: 'Rising BSM'
+  });
+});
+
+app.get('/impressum', (_, res) => {
   res.render('impressum', { title: 'Rising BSM – Impressum' });
 });
 
-app.get('/datenschutz', (req, res) => {
+app.get('/datenschutz', (_, res) => {
   res.render('datenschutz', { title: 'Rising BSM – Datenschutz' });
 });
 
-app.get('/agb', (req, res) => {
+app.get('/agb', (_, res) => {
   res.render('agb', { title: 'Rising BSM – AGB' });
 });
 
 // Blog-Middleware für Dashboard
-app.use('/dashboard/blog', blogRoutes);
-
 app.get('/blog', async (req, res) => {
   try {
     // Fetch published blog posts
@@ -153,7 +214,7 @@ app.get('/blog', async (req, res) => {
         blog_posts p
         LEFT JOIN benutzer u ON p.author_id = u.id
         LEFT JOIN blog_post_categories pc ON p.id = pc.post_id
-        LEFT JOIN blog_categories c ON pc.category_id = c.id
+        LEFT JOIN blog_categories c ON pc.id = pc.category_id
       WHERE 
         p.status = 'published'
       GROUP BY
@@ -228,6 +289,18 @@ app.use('/blog', (req, res, next) => {
   }
   next();
 }, blogRoutes);
+
+// Route für Bild-Uploads
+app.post('/dashboard/api/upload', upload.single('image'), (req, res) => {
+  try {
+    const filePath = '/uploads/blog/' + req.file.filename;
+    res.json({ success: true, filePath });
+  } catch (error) {
+    console.error('Fehler beim Bildupload:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Kontakt-Formular Rate-Limiting
 const contactLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 Stunde
@@ -267,7 +340,11 @@ app.post('/contact', contactLimiter, async (req, res) => {
     const contactId = result.rows[0].id;
 
     try {
-      await axios.post(process.env.N8N_WEBHOOK_URL || 'https://n8n.dinel.at/webhook/e2b8d680-425b-44ab-94aa-55ecda267de1', {
+      const webhookUrl = process.env.N8N_WEBHOOK_URL;
+      if (!webhookUrl) {
+        throw new Error('N8N_WEBHOOK_URL environment variable is not set');
+      }
+      await axios.post(webhookUrl, {
         id: contactId,
         name: sanitizedName,
         email,
@@ -275,30 +352,25 @@ app.post('/contact', contactLimiter, async (req, res) => {
         service,
         message: sanitizedMessage,
       });
-    } catch (webhookError) {
-      console.error('Error notifying N8N webhook:', webhookError);
-      // Continue even if webhook fails - we already saved to database
-    }
+      res.status(200).json({ success: true, message: 'Formular erfolgreich gesendet!' });
 
-    res.status(200).json({ success: true, id: contactId });
-  } catch (error) {
-    console.error('Error saving contact or notifying N8N:', error);
-    console.error('Request body:', req.body); // Log the request body for debugging
-    res.status(500).json({ success: false, error: error.message });
+    } catch (axiosError) {
+      console.error('Error notifying N8N:', axiosError);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Request body:', req.body); // Log the request body for debugging
+      }
+      return res.status(500).json({ success: false, error: 'Fehler beim Benachrichtigen des Webhooks.' });
+    }
+  } catch (dbError) {
+    console.error('Error saving contact form:', dbError);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Request body:', req.body); // Log the request body for debugging
+    }
+    return res.status(500).json({ success: false, error: 'Ein Fehler ist beim Speichern des Formulars aufgetreten.' });
   }
 });
 
 // Globaler Error-Handler
-app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({ 
-    success: false, 
-    error: process.env.NODE_ENV === 'production' 
-      ? 'Ein Serverfehler ist aufgetreten' 
-      : err.message 
-  });
-});
-
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
     console.error('CSRF-Fehler beim Request von:', req.headers.referer || 'Unbekannt');
@@ -319,9 +391,11 @@ app.use((err, req, res, next) => {
       error: {}
     });
   }
-  next(err);
-});
-
-app.listen(PORT, () => {
-  console.log(`Server läuft auf http://localhost:${PORT}`);
+  console.error('Server error:', err);
+  res.status(500).json({ 
+    success: false, 
+    error: process.env.NODE_ENV === 'production' 
+      ? 'Ein Serverfehler ist aufgetreten' 
+      : err.message 
+  });
 });
