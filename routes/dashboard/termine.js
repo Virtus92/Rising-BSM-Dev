@@ -1,8 +1,8 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const { formatDistanceToNow, isToday, isTomorrow, format } = require('date-fns');
-const { de } = require('date-fns/locale');
-const pool = require('../../db');
+import { formatDistanceToNow, isToday, isTomorrow, format } from 'date-fns';
+import { de } from 'date-fns/locale';
+import pool from '../../db.js';
 
 // Helper-Funktionen
 function getTerminStatusInfo(status) {
@@ -350,7 +350,7 @@ router.post('/neu', isAuthenticated, async (req, res) => {
   // Export-Funktionen
     router.get('/export', isAuthenticated, async (req, res) => {
         try {
-        const { format, start_date, end_date, status } = req.query;
+        const { format: exportFormat, start_date, end_date, status } = req.query;
         
         let conditions = [];
         let params = [];
@@ -397,8 +397,8 @@ router.post('/neu', isAuthenticated, async (req, res) => {
             values: params
         });
 
-        // CSV-Export
-        if (format === 'csv') {
+        switch (exportFormat) {
+          case 'csv':
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', 'attachment; filename=termine-export.csv');
             
@@ -407,7 +407,7 @@ router.post('/neu', isAuthenticated, async (req, res) => {
             
             // CSV-Zeilen
             termineQuery.rows.forEach(termin => {
-            const csvLine = [
+              const csvLine = [
                 termin.id,
                 `"${(termin.titel || '').replace(/"/g, '""')}"`,
                 format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
@@ -418,36 +418,35 @@ router.post('/neu', isAuthenticated, async (req, res) => {
                 `"${(termin.projekt_titel || '').replace(/"/g, '""')}"`,
                 `"${(termin.ort || '').replace(/"/g, '""')}"`,
                 `"${(termin.beschreibung || '').replace(/"/g, '""').replace(/\n/g, ' ')}"` 
-            ].join(',');
-            
-            res.write(csvLine + '\n');
+              ].join(',');
+              
+              res.write(csvLine + '\n');
             });
             
             res.end();
-        } 
-        // Excel-Export
-        else if (format === 'excel') {
+            break;
+          case 'excel':
             const Excel = require('exceljs');
             const workbook = new Excel.Workbook();
             const worksheet = workbook.addWorksheet('Termine');
             
             // Spalten definieren
             worksheet.columns = [
-            { header: 'ID', key: 'id', width: 10 },
-            { header: 'Titel', key: 'titel', width: 30 },
-            { header: 'Datum', key: 'datum', width: 15 },
-            { header: 'Uhrzeit', key: 'uhrzeit', width: 10 },
-            { header: 'Dauer (Min)', key: 'dauer', width: 10 },
-            { header: 'Status', key: 'status', width: 15 },
-            { header: 'Kunde', key: 'kunde', width: 25 },
-            { header: 'Projekt', key: 'projekt', width: 25 },
-            { header: 'Ort', key: 'ort', width: 20 },
-            { header: 'Beschreibung', key: 'beschreibung', width: 50 }
+              { header: 'ID', key: 'id', width: 10 },
+              { header: 'Titel', key: 'titel', width: 30 },
+              { header: 'Datum', key: 'datum', width: 15 },
+              { header: 'Uhrzeit', key: 'uhrzeit', width: 10 },
+              { header: 'Dauer (Min)', key: 'dauer', width: 10 },
+              { header: 'Status', key: 'status', width: 15 },
+              { header: 'Kunde', key: 'kunde', width: 25 },
+              { header: 'Projekt', key: 'projekt', width: 25 },
+              { header: 'Ort', key: 'ort', width: 20 },
+              { header: 'Beschreibung', key: 'beschreibung', width: 50 }
             ];
             
             // Zeilen hinzufügen
             termineQuery.rows.forEach(termin => {
-            worksheet.addRow({
+              worksheet.addRow({
                 id: termin.id,
                 titel: termin.titel,
                 datum: format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
@@ -458,16 +457,16 @@ router.post('/neu', isAuthenticated, async (req, res) => {
                 projekt: termin.projekt_titel || 'Kein Projekt',
                 ort: termin.ort || '',
                 beschreibung: termin.beschreibung || ''
-            });
+              });
             });
             
             // Styling
             const headerRow = worksheet.getRow(1);
             headerRow.font = { bold: true };
             headerRow.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF0F0F0' }
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFF0F0F0' }
             };
             
             // Excel-Datei an Browser senden
@@ -476,14 +475,13 @@ router.post('/neu', isAuthenticated, async (req, res) => {
             
             await workbook.xlsx.write(res);
             res.end();
-        } 
-        // PDF-Export
-        else if (format === 'pdf') {
+            break;
+          case 'pdf':
             const PDFDocument = require('pdfkit');
             
             const doc = new PDFDocument({
-            margins: { top: 50, bottom: 50, left: 50, right: 50 },
-            size: 'A4'
+              margins: { top: 50, bottom: 50, left: 50, right: 50 },
+              size: 'A4'
             });
             
             res.setHeader('Content-Type', 'application/pdf');
@@ -497,10 +495,10 @@ router.post('/neu', isAuthenticated, async (req, res) => {
             
             // Filter-Informationen
             doc.fontSize(10)
-            .text(`Exportiert am: ${format(new Date(), 'dd.MM.yyyy HH:mm')}`)
-            .text(`Zeitraum: ${start_date ? format(new Date(start_date), 'dd.MM.yyyy') : 'Alle'} - ${end_date ? format(new Date(end_date), 'dd.MM.yyyy') : 'Aktuell'}`)
-            .text(`Status: ${status || 'Alle'}`)
-            .moveDown();
+              .text(`Exportiert am: ${format(new Date(), 'dd.MM.yyyy HH:mm')}`)
+              .text(`Zeitraum: ${start_date ? format(new Date(start_date), 'dd.MM.yyyy') : 'Alle'} - ${end_date ? format(new Date(end_date), 'dd.MM.yyyy') : 'Aktuell'}`)
+              .text(`Status: ${status || 'Alle'}`)
+              .moveDown();
             
             // Tabelle vorbereiten
             const tableTop = doc.y;
@@ -509,35 +507,35 @@ router.post('/neu', isAuthenticated, async (req, res) => {
             
             // Header zeichnen
             doc.fillColor('#000')
-            .fontSize(10)
-            .font('Helvetica-Bold');
+              .fontSize(10)
+              .font('Helvetica-Bold');
             
             headers.forEach((header, i) => {
-            doc.text(header, 50 + columnWidths.slice(0, i).reduce((a, b) => a + b, 0), tableTop, { 
+              doc.text(header, 50 + columnWidths.slice(0, i).reduce((a, b) => a + b, 0), tableTop, { 
                 width: columnWidths[i], 
                 align: 'left' 
-            });
+              });
             });
             
             // Trennlinie
             doc.moveDown()
-            .strokeColor('#ccc')
-            .lineWidth(0.5)
-            .moveTo(50, doc.y)
-            .lineTo(550, doc.y)
-            .stroke();
+              .strokeColor('#ccc')
+              .lineWidth(0.5)
+              .moveTo(50, doc.y)
+              .lineTo(550, doc.y)
+              .stroke();
             
             // Daten
             doc.font('Helvetica')
-            .fontSize(8);
+              .fontSize(8);
             
             termineQuery.rows.forEach((termin, rowIndex) => {
-            // Neue Seite, wenn Platz knapp wird
-            if (doc.y > 700) {
+              // Neue Seite, wenn Platz knapp wird
+              if (doc.y > 700) {
                 doc.addPage();
-            }
-            
-            const rowData = [
+              }
+              
+              const rowData = [
                 termin.id.toString(),
                 termin.titel,
                 format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
@@ -547,27 +545,27 @@ router.post('/neu', isAuthenticated, async (req, res) => {
                 termin.kunde_name || '-',
                 termin.projekt_titel || '-',
                 termin.ort || '-'
-            ];
-            
-            rowData.forEach((cell, colIndex) => {
+              ];
+              
+              rowData.forEach((cell, colIndex) => {
                 doc.text(cell, 50 + columnWidths.slice(0, colIndex).reduce((a, b) => a + b, 0), doc.y, { 
-                width: columnWidths[colIndex], 
-                align: 'left' 
+                  width: columnWidths[colIndex], 
+                  align: 'left' 
                 });
-            });
-            
-            doc.moveDown();
+              });
+              
+              doc.moveDown();
             });
             
             doc.end();
-        } 
-        else {
+            break;
+          default:
             // Standard-Antwort für unbekanntes Format
             res.json({ 
-            success: true, 
-            message: 'Export nicht unterstützt', 
-            format: format,
-            count: termineQuery.rows.length
+              success: true, 
+              message: 'Export nicht unterstützt', 
+              format: exportFormat,
+              count: termineQuery.rows.length
             });
         }
         } catch (error) {

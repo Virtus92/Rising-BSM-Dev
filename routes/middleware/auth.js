@@ -6,8 +6,7 @@
  * Prüft, ob der Benutzer authentifiziert ist
  * Wenn nicht, wird zur Login-Seite weitergeleitet
  */
-module.exports.isAuthenticated = (req, res, next) => {
-  console.log('isAuthenticated middleware called', req.session.user); // Debugging line
+export const isAuthenticated = (req, res, next) => {
   if (req.session && req.session.user) {
     return next();
   } else {
@@ -19,7 +18,7 @@ module.exports.isAuthenticated = (req, res, next) => {
  * Prüft, ob der authentifizierte Benutzer Admin-Rechte hat
  * Wenn nicht, wird zur Dashboard-Seite weitergeleitet
  */
-module.exports.isAdmin = (req, res, next) => {
+export const isAdmin = (req, res, next) => {
   if (req.session && req.session.user && req.session.user.role === 'admin') {
     return next();
   } else {
@@ -32,7 +31,7 @@ module.exports.isAdmin = (req, res, next) => {
  * Prüft, ob der authentifizierte Benutzer Manager-Rechte hat (Manager oder Admin)
  * Wenn nicht, wird zur Dashboard-Seite weitergeleitet
  */
-module.exports.isManager = (req, res, next) => {
+export const isManager = (req, res, next) => {
   if (req.session && req.session.user && 
      (req.session.user.role === 'admin' || req.session.user.role === 'manager')) {
     return next();
@@ -46,7 +45,7 @@ module.exports.isManager = (req, res, next) => {
  * Prüft, ob der authentifizierte Benutzer Mitarbeiter-Rechte hat (oder höher)
  * Wenn nicht, wird zur Dashboard-Seite weitergeleitet
  */
-module.exports.isEmployee = (req, res, next) => {
+export const isEmployee = (req, res, next) => {
   if (req.session && req.session.user && 
      (req.session.user.role === 'admin' || req.session.user.role === 'manager' || req.session.user.role === 'employee')) {
     return next();
@@ -54,4 +53,21 @@ module.exports.isEmployee = (req, res, next) => {
     req.flash('error', 'Sie haben keine Berechtigung für diesen Bereich.');
     return res.redirect('/dashboard');
   }
+};
+
+/**
+ * CSRF-Schutz-Middleware für API-Anfragen
+ */
+export const csrfProtection = (req, res, next) => {
+  // Prüft CSRF-Token in Header für API-Anfragen
+  const csrfToken = req.headers['csrf-token'] || req.body._csrf;
+  
+  if (!csrfToken || csrfToken !== req.csrfToken()) {
+    return res.status(403).json({
+      success: false,
+      error: 'CSRF Token ungültig oder abgelaufen'
+    });
+  }
+  
+  next();
 };

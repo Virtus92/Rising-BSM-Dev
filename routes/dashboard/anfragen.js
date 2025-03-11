@@ -2,10 +2,10 @@
  * Anfragen-Router
  * Zuständig für die Verwaltung von Kontaktanfragen
  */
-
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const anfrageController = require('../../controllers/anfragen.controller');
+import anfrageController from '../../controllers/anfragen.controller.js';
+
 
 // Anfragen-Liste anzeigen
 router.get('/', anfrageController.getAnfragen);

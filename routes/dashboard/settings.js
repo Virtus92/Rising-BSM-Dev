@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const pool = require('../../db');
+import pool from '../../db.js';
 
 // Authentifizierungs-Middleware
 const isAuthenticated = (req, res, next) => {
@@ -88,6 +88,7 @@ router.post('/update', isAuthenticated, async (req, res) => {
            benachrichtigungen_email, 
            benachrichtigungen_intervall
          ) VALUES ($1, $2, $3, $4, $5)`,
+
         [
           req.session.user.id,
           sprache || 'de', 

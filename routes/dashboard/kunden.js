@@ -11,7 +11,7 @@ const {
   formatDateSafely,
   getTerminStatusInfo,
   getProjektStatusInfo
-} = require('../utils/helpers');
+} = require('../../utils/helpers');
 const { isAuthenticated } = require('../middleware/auth');
 
 // Kunden-Liste anzeigen

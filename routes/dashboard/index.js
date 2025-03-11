@@ -3,18 +3,18 @@
  * Zuständig für die Hauptseite des Dashboards
  */
 
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const { format, isToday, isTomorrow } = require('date-fns');
-const pool = require('../../db');
-const {
+import { format, isToday, isTomorrow } from 'date-fns';
+import pool from '../../db.js';
+import {
   getNotifications,
   getCachedOrFreshData,
   getCountFromDB,
   formatDateSafely,
   getAnfrageStatusInfo,
   getTerminStatusInfo
-} = require('../utils/helpers');
+} from '../../utils/helpers.js';
 
 // Dashboard Hauptseite
 router.get('/', async (req, res) => {

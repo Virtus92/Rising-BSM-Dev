@@ -3,23 +3,23 @@
  * Zuständig für die Verwaltung von Kontaktanfragen mit optimierter UI
  */
 
-const { format } = require('date-fns');
-const { de } = require('date-fns/locale');
-const pool = require('../db');
-const Excel = require('exceljs');
-const PDFDocument = require('pdfkit');
+import { format } from 'date-fns';
+import { de } from 'date-fns/locale';
+import pool from '../db.js';
+import Excel from 'exceljs';
+import PDFDocument from 'pdfkit';
 
 // Hilfsfunktionen direkt im Controller definieren, um Abhängigkeiten zu reduzieren
-function formatDateSafely(date, formatString) {
+const formatDateSafely = (date, formatString) => {
   try {
     return format(new Date(date), formatString);
   } catch (error) {
     console.error('Fehler beim Formatieren des Datums:', error);
     return 'Ungültiges Datum';
   }
-}
+};
 
-function getAnfrageStatusInfo(status) {
+const getAnfrageStatusInfo = (status) => {
   const statusMap = {
     'neu': { label: 'Neu', className: 'warning' },
     'in_bearbeitung': { label: 'In Bearbeitung', className: 'info' },
@@ -27,17 +27,17 @@ function getAnfrageStatusInfo(status) {
     'geschlossen': { label: 'Geschlossen', className: 'secondary' }
   };
   return statusMap[status] || { label: 'Unbekannt', className: 'secondary' };
-}
+};
 
 // Mock für getNotifications, bis wir Zugriff auf den echten Code haben
-async function getNotifications(req) {
+const getNotifications = async (req) => {
   return [];
-}
+};
 
 /**
  * Anfragen-Liste anzeigen mit optimierter UI
  */
-exports.getAnfragen = async (req, res) => {
+export const getAnfragen = async (req, res) => {
   try {
     // Status-Filter anwenden (falls vorhanden)
     const statusFilter = req.query.status;
@@ -202,7 +202,7 @@ exports.getAnfragen = async (req, res) => {
 /**
  * Einzelne Anfrage anzeigen
  */
-exports.getAnfrageDetails = async (req, res) => {
+export const getAnfrageDetails = async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -277,7 +277,7 @@ exports.getAnfrageDetails = async (req, res) => {
 /**
  * Anfrage Status aktualisieren
  */
-exports.updateStatus = async (req, res) => {
+export const updateStatus = async (req, res) => {
   try {
     const { id, status, note } = req.body;
 
@@ -339,7 +339,7 @@ exports.updateStatus = async (req, res) => {
 /**
  * Mehrere Anfragen Status aktualisieren
  */
-exports.updateBulkStatus = async (req, res) => {
+export const updateBulkStatus = async (req, res) => {
   try {
     const { ids, status } = req.body;
     
@@ -401,7 +401,7 @@ exports.updateBulkStatus = async (req, res) => {
 /**
  * Mehrere Anfragen löschen
  */
-exports.deleteBulk = async (req, res) => {
+export const deleteBulk = async (req, res) => {
   try {
     const { ids } = req.body;
     
@@ -443,7 +443,7 @@ exports.deleteBulk = async (req, res) => {
 /**
  * Anfragen-Notiz hinzufügen
  */
-exports.addNote = async (req, res) => {
+export const addNote = async (req, res) => {
   try {
     const { id, note } = req.body;
     
@@ -474,7 +474,7 @@ exports.addNote = async (req, res) => {
 /**
  * Export-Funktionalität
  */
-exports.exportAnfragen = async (req, res) => {
+export const exportAnfragen = async (req, res) => {
   try {
     const { format: exportFormat, dateFrom, dateTo, status } = req.query;
     
@@ -711,11 +711,22 @@ exports.exportAnfragen = async (req, res) => {
 /**
  * Hilfsfunktion zur Konvertierung des Service-Labels
  */
-function convertServiceLabel(service) {
+const convertServiceLabel = (service) => {
   switch(service) {
     case 'facility': return 'Facility Management';
     case 'moving': return 'Umzüge & Transporte';
     case 'winter': return 'Winterdienst';
     default: return service;
   }
-}
+};
+
+// Export aller Controller-Funktionen
+export default {
+  getAnfragen,
+  getAnfrageDetails,
+  updateStatus,
+  updateBulkStatus,
+  deleteBulk,
+  addNote,
+  exportAnfragen
+};
