@@ -8,33 +8,35 @@ const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const flash = require('connect-flash');
-const bcrypt = require('bcryptjs');
 const csrf = require('@dr.pogodin/csurf');
-const { format, formatDistanceToNow } = require('date-fns');
-const { de } = require('date-fns/locale');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Datenbankverbindung
-const pool = require('./db');
+// Database connection
+const pool = require('./services/db.service').pool;
 
-// Route-Importe mit neuer Struktur
-const authRoutes = require('./routes/auth');
-const dashboardRoutes = require('./routes/dashboard/index');
-const anfragenRoutes = require('./routes/dashboard/anfragen');
-const projectRoutes = require('./routes/dashboard/projekte');
-const kundenRoutes = require('./routes/dashboard/kunden');
-const termineRoutes = require('./routes/dashboard/termine');
-const dienstleistungenRoutes = require('./routes/dashboard/dienste');
-const settingsRoutes = require('./routes/dashboard/settings');
-const profileRoutes = require('./routes/dashboard/profile');
-const apiRoutes = require('./routes/dashboard/api');
+// Middleware imports
+const errorMiddleware = require('./middleware/error.middleware');
 
+// Routes imports
+const indexRoutes = require('./routes/index');
+const authRoutes = require('./routes/auth.routes');
+const dashboardRoutes = require('./routes/dashboard.routes');
+const customerRoutes = require('./routes/customer.routes');
+const projectRoutes = require('./routes/project.routes');
+const appointmentRoutes = require('./routes/appointment.routes');
+const serviceRoutes = require('./routes/service.routes');
+const requestRoutes = require('./routes/request.routes');
+const profileRoutes = require('./routes/profile.routes');
+const settingsRoutes = require('./routes/settings.routes');
+const blogRoutes = require('./routes/blog.routes');
+
+// Configure view engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Middleware-Konfigurationen bleiben größtenteils unverändert
+// Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -59,12 +61,15 @@ app.use(helmet({
   }
 }));
 
+// Parse request body
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
+
+// Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Session-Konfiguration
+// Configure session
 app.use(session({
   store: new pgSession({
     pool,
@@ -78,250 +83,75 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', 
     httpOnly: true,
     sameSite: 'strict',
-    maxAge: 24 * 60 * 60 * 1000 // 1 Tag
+    maxAge: 24 * 60 * 60 * 1000 // 1 day
   }
 }));
 
+// Flash messages
 app.use(flash());
 
-// CSRF-Schutz
+// Rate limiters
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // 5 requests per IP
+  message: { success: false, error: 'Too many requests. Please try again later.' }
+});
+
+// CSRF protection
 app.use(csrf());
 
-// CSRF-Token als Response-Local verfügbar machen
+// Make CSRF token available to views
 app.use((req, res, next) => {
   res.locals.csrfToken = req.csrfToken();
   next();
 });
 
-// Globale Middleware für Benutzerinformationen
+// Make user information available to views
 app.use((req, res, next) => {
   res.locals.user = req.session.user || null;
   next();
 });
 
-// Routen verwenden
+// New requests count middleware for dashboard
+const { getNewRequestsCountMiddleware } = require('./middleware/dashboard.middleware');
+app.use('/dashboard', getNewRequestsCountMiddleware);
+
+// Apply routes
+app.use('/', indexRoutes);
 app.use('/', authRoutes);
 app.use('/dashboard', dashboardRoutes);
+app.use('/dashboard/kunden', customerRoutes);
 app.use('/dashboard/projekte', projectRoutes);
-app.use('/dashboard/anfragen', anfragenRoutes);
-app.use('/dashboard/kunden', kundenRoutes);
-app.use('/dashboard/termine', termineRoutes);
-app.use('/dashboard/dienste', dienstleistungenRoutes);
-app.use('/dashboard/settings', settingsRoutes);
+app.use('/dashboard/termine', appointmentRoutes);
+app.use('/dashboard/dienste', serviceRoutes);
+app.use('/dashboard/anfragen', requestRoutes);
 app.use('/dashboard/profile', profileRoutes);
-app.use('/dashboard/api', apiRoutes);
-
-// Blog-Routen importieren
-const blogRoutes = require('./routes/blog');
-
-// Startseite
-app.get('/', (req, res) => {
-  res.render('index', { 
-    title: 'Rising BSM – Ihre Allround-Experten'
-  });
-});
-
-app.get('/impressum', (req, res) => {
-  res.render('impressum', { title: 'Rising BSM – Impressum' });
-});
-
-app.get('/datenschutz', (req, res) => {
-  res.render('datenschutz', { title: 'Rising BSM – Datenschutz' });
-});
-
-app.get('/agb', (req, res) => {
-  res.render('agb', { title: 'Rising BSM – AGB' });
-});
-
-// Blog-Middleware für Dashboard
+app.use('/dashboard/settings', settingsRoutes);
 app.use('/dashboard/blog', blogRoutes);
+app.use('/blog', blogRoutes);
 
-app.get('/blog', async (req, res) => {
-  try {
-    // Fetch published blog posts
-    const postsQuery = await pool.query(`
-      SELECT 
-        p.id, 
-        p.title, 
-        p.slug,
-        p.excerpt, 
-        p.published_at,
-        p.featured_image,
-        u.name as author_name,
-        ARRAY_AGG(DISTINCT c.name) as categories
-      FROM 
-        blog_posts p
-        LEFT JOIN benutzer u ON p.author_id = u.id
-        LEFT JOIN blog_post_categories pc ON p.id = pc.post_id
-        LEFT JOIN blog_categories c ON pc.category_id = c.id
-      WHERE 
-        p.status = 'published'
-      GROUP BY
-        p.id, u.name
-      ORDER BY 
-        p.published_at DESC
-      LIMIT 10
-    `);
-    
-    // Fetch categories for sidebar
-    const categoriesQuery = await pool.query(`
-      SELECT 
-        c.id, 
-        c.name, 
-        c.slug,
-        COUNT(pc.post_id) as post_count
-      FROM 
-        blog_categories c
-        JOIN blog_post_categories pc ON c.id = pc.category_id
-        JOIN blog_posts p ON pc.post_id = p.id
-      WHERE
-        p.status = 'published'
-      GROUP BY 
-        c.id
-      ORDER BY 
-        c.name
-    `);
-    
-    // Render the blog index template with the required data
-    res.render('blog/index', {
-      title: 'Blog - Rising BSM',
-      posts: postsQuery.rows.map(post => ({
-        title: post.title,
-        slug: post.slug,
-        excerpt: post.excerpt,
-        date: format(new Date(post.published_at), 'dd.MM.yyyy'),
-        author: post.author_name,
-        image: post.featured_image,
-        categories: post.categories.filter(c => c !== null)
-      })),
-      categories: categoriesQuery.rows
-    });
-  } catch (error) {
-    console.error('Error loading blog index:', error);
-    res.status(500).render('error', {
-      message: 'Error loading blog: ' + error.message,
-      error: error
-    });
-  }
-});
+// Contact form route with rate limiting
+app.post('/contact', contactLimiter, require('./controllers/contact.controller').submitContact);
 
-app.get('/blog/search', (req, res, next) => {
-  req.url = '/public/search' + (req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '');
-  next();
-}, blogRoutes);
+// Error handling middleware
+app.use(errorMiddleware.notFoundHandler);
+app.use(errorMiddleware.csrfErrorHandler);
+app.use(errorMiddleware.errorHandler);
 
-app.get('/blog/category/:slug', (req, res, next) => {
-  req.url = '/public/category/' + req.params.slug;
-  next();
-}, blogRoutes);
-
-// Individual blog post route - most specific route should be last
-app.get('/blog/:slug', (req, res, next) => {
-  req.url = '/public/' + req.params.slug;
-  next();
-}, blogRoutes);
-
-// Catch-all for any other /blog routes
-app.use('/blog', (req, res, next) => {
-  if (!req.url.startsWith('/public')) {
-    req.url = '/public' + req.url;
-  }
-  next();
-}, blogRoutes);
-// Kontakt-Formular Rate-Limiting
-const contactLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 Stunde
-  max: 5, // 5 Anfragen pro IP
-  message: { success: false, error: 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.' }
-});
-
-// Kontaktformular-Route
-app.post('/contact', contactLimiter, async (req, res) => {
-  const { name, email, phone, service, message } = req.body;
-  
-  // Validierung
-  if (!name || !email || !message || !service) {
-    return res.status(400).json({ success: false, error: 'Name, E-Mail und Nachricht sind Pflichtfelder.' });
-  }
-
-  if (!validator.isEmail(email)) {
-    return res.status(400).json({ success: false, error: 'Bitte geben Sie eine gültige E-Mail-Adresse ein.' });
-  }
-
-  if (phone && !validator.isMobilePhone(phone, 'any', { strictMode: false })) {
-    return res.status(400).json({ success: false, error: 'Bitte geben Sie eine gültige Telefonnummer ein.' });
-  }
-
-  // XSS-Schutz durch Escape von HTML
-  const sanitizedName = validator.escape(name);
-  const sanitizedMessage = validator.escape(message);
-  const sanitizedPhone = phone ? validator.escape(phone) : '';
-  
-
-  try {
-    // Daten in PostgreSQL speichern
-    const result = await pool.query(
-      'INSERT INTO kontaktanfragen (name, email, phone, service, message) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [name, email, phone, service, message]
-    );
-    const contactId = result.rows[0].id;
-
-    try {
-      await axios.post(process.env.N8N_WEBHOOK_URL || 'https://n8n.dinel.at/webhook/e2b8d680-425b-44ab-94aa-55ecda267de1', {
-        id: contactId,
-        name: sanitizedName,
-        email,
-        phone: sanitizedPhone,
-        service,
-        message: sanitizedMessage,
-      });
-    } catch (webhookError) {
-      console.error('Error notifying N8N webhook:', webhookError);
-      // Continue even if webhook fails - we already saved to database
-    }
-
-    res.status(200).json({ success: true, id: contactId });
-  } catch (error) {
-    console.error('Error saving contact or notifying N8N:', error);
-    console.error('Request body:', req.body); // Log the request body for debugging
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Globaler Error-Handler
-app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({ 
-    success: false, 
-    error: process.env.NODE_ENV === 'production' 
-      ? 'Ein Serverfehler ist aufgetreten' 
-      : err.message 
-  });
-});
-
-app.use((err, req, res, next) => {
-  if (err.code === 'EBADCSRFTOKEN') {
-    console.error('CSRF-Fehler beim Request von:', req.headers.referer || 'Unbekannt');
-    
-    // Für AJAX-Anfragen JSON zurückgeben
-    if (req.xhr || req.headers.accept && req.headers.accept.includes('json') || 
-        req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'invalid csrf token',
-        message: 'Sicherheitstoken ungültig oder abgelaufen. Bitte laden Sie die Seite neu und versuchen Sie es erneut.'
-      });
-    }
-    
-    // Für normale Anfragen die Fehlerseite anzeigen
-    return res.status(403).render('error', {
-      message: 'Das Formular ist abgelaufen. Bitte versuchen Sie es erneut.',
-      error: {}
-    });
-  }
-  next(err);
-});
-
+// Start server
 app.listen(PORT, () => {
-  console.log(`Server läuft auf http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
+});
+
+// Process error handling
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Give the server time to log the error before shutting down
+  setTimeout(() => {
+    process.exit(1);
+  }, 1000);
 });
