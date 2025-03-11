@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { format } = require('date-fns');
-const pool = require('../../db');
+const pool = require('../../../db');
 const {
   formatDateSafely,
   getTerminStatusInfo,

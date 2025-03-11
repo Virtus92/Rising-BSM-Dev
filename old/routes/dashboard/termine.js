@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { formatDistanceToNow, isToday, isTomorrow, format } = require('date-fns');
 const { de } = require('date-fns/locale');
-const pool = require('../../db');
+const pool = require('../../../db');
 
 // Helper-Funktionen
 function getTerminStatusInfo(status) {

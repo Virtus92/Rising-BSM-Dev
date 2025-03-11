@@ -1,0 +1,1 @@
+// This file is intentionally left blank as the functionality has been moved to project/routes/settings.routes.js

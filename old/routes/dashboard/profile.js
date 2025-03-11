@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
-const pool = require('../../db');
+const pool = require('../../../db');
 
 // Authentifizierungs-Middleware
 const isAuthenticated = (req, res, next) => {

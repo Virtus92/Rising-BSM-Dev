@@ -4,7 +4,7 @@
 
 const { formatDistanceToNow, isToday, isTomorrow, format } = require('date-fns');
 const { de } = require('date-fns/locale');
-const pool = require('../../db');
+const pool = require('../../../db');
 
 /**
  * Führt eine Datenbankabfrage aus und gibt die Anzahl zurück.

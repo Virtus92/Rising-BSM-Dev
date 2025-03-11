@@ -30,7 +30,7 @@ const serviceRoutes = require('./routes/service.routes');
 const requestRoutes = require('./routes/request.routes');
 const profileRoutes = require('./routes/profile.routes');
 const settingsRoutes = require('./routes/settings.routes');
-const blogRoutes = require('./routes/blog.routes');
+// const blogRoutes = require('./routes/blog.routes');
 
 // Configure view engine
 app.set('view engine', 'ejs');
@@ -127,8 +127,8 @@ app.use('/dashboard/dienste', serviceRoutes);
 app.use('/dashboard/anfragen', requestRoutes);
 app.use('/dashboard/profile', profileRoutes);
 app.use('/dashboard/settings', settingsRoutes);
-app.use('/dashboard/blog', blogRoutes);
-app.use('/blog', blogRoutes);
+//app.use('/dashboard/blog', blogRoutes);
+//app.use('/blog', blogRoutes);
 
 // Contact form route with rate limiting
 app.post('/contact', contactLimiter, require('./controllers/contact.controller').submitContact);
