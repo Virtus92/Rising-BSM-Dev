@@ -5,8 +5,8 @@ import { useAuth } from './context/AuthContext';
 import './App.css';
 
 // Layout components
-import DashboardLayout from './components/layouts/DashboardLayout';
-import PublicLayout from './components/layouts/PublicLayout';
+import DashboardLayout from './components/layout/DashboardLayout';
+import PublicLayout from './components/layout/PublicLayout';
 
 // Pages
 import Dashboard from './pages/Dashboard';
@@ -34,7 +34,7 @@ import RequestDetail from './pages/requests/RequestDetail';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import SystemSettings from './pages/SystemSettings';
-import BackupSettings from './pages/BackupSettings';
+import BackupSettings from './pages/backupSettings';
 import NotFound from './pages/NotFound';
 
 // Protected Route component

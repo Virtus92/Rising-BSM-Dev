@@ -6,3 +6,4 @@ export * from './projectService';
 export * from './serviceService';
 export * from './profileService';
 export * from './settingsService';
+export * from './requestService';
