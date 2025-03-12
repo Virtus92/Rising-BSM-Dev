@@ -1,6 +1,4 @@
-// src/context/AuthContext.tsx
-import * as React from 'react';
-import { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService } from '../api/services/authService';
 import { User } from '../types';
 
@@ -15,7 +13,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(currentUser);
       } catch (err) {
         console.error('Fehler beim Abrufen des Benutzers:', err);
-        // Wenn wir nicht eingeloggt sind, setzen wir den User auf null, aber es ist kein "Fehler"
+        // If we're not logged in, we set the user to null but it's not an "error"
       } finally {
         setLoading(false);
       }

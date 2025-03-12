@@ -54,24 +54,6 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-/* Termine-Status */
-.status-geplant { @apply bg-yellow-100 text-yellow-800; } /* warning */
-.status-bestaetigt { @apply bg-green-100 text-green-800; } /* success */
-.status-abgeschlossen { @apply bg-blue-100 text-blue-800; } /* primary */
-.status-storniert { @apply bg-gray-100 text-gray-800; } /* secondary */
-
-/* Projekte-Status */
-.status-neu { @apply bg-blue-100 text-blue-800; } /* info */
-.status-in_bearbeitung { @apply bg-indigo-100 text-indigo-800; } /* primary */
-.status-abgeschlossen { @apply bg-green-100 text-green-800; } /* success */
-.status-storniert { @apply bg-gray-100 text-gray-800; } /* secondary */
-
-/* Anfragen-Status */
-.status-neu { @apply bg-yellow-100 text-yellow-800; } /* warning */
-.status-in_bearbeitung { @apply bg-blue-100 text-blue-800; } /* info */
-.status-beantwortet { @apply bg-green-100 text-green-800; } /* success */
-.status-geschlossen { @apply bg-gray-100 text-gray-800; } /* secondary */
-
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

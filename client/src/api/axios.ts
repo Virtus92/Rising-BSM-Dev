@@ -1,4 +1,3 @@
-// src/api/axios.ts
 import axios from 'axios';
 
 const api = axios.create({
@@ -6,10 +5,10 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true // Wichtig für session-basierte Auth
+  withCredentials: true // Important for session-based auth
 });
 
-// Interceptor für CSRF-Token
+// CSRF token interceptor
 api.interceptors.request.use((config) => {
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
   if (csrfToken) {
@@ -18,13 +17,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Fehlerbehandlung
+// Error handling
 api.interceptors.response.use(
   response => response,
   error => {
     const { response } = error;
     
-    // Auth-Fehler -> Weiterleitung zum Login
+    // Auth errors redirect to login
     if (response && response.status === 401) {
       window.location.href = '/login';
     }
