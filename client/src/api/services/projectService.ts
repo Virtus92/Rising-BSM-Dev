@@ -1,4 +1,5 @@
 import api from '../axios';
+import { Project, ApiResponse } from '../../types';
 
 export const projectService = {
     async getAll(filters: any = {}) {
@@ -11,13 +12,18 @@ export const projectService = {
         return response.data;
     },
 
-    async create(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) {
+    async create(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'statusLabel' | 'statusClass' | 'customer_name' | 'service_name'>) {
         const response = await api.post<Project>('/projekte', data);
         return response.data;
     },
 
     async update(id: number, data: Partial<Project>) {
         const response = await api.put<Project>(`/projekte/${id}`, data);
+        return response.data;
+    },
+
+    async updateStatus(id: number, status: 'neu' | 'in_bearbeitung' | 'abgeschlossen' | 'storniert') {
+        const response = await api.patch<Project>(`/projekte/${id}/status`, { status });
         return response.data;
     },
 
