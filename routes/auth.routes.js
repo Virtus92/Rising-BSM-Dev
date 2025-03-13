@@ -21,11 +21,14 @@ router.get('/login', isNotAuthenticated, (req, res) => {
 });
 
 /**
- * @route   POST /login
+ * @route   POST /auth/login
  * @desc    Process login
  */
-router.post('/login', isNotAuthenticated, async (req, res, next) => {
+router.post('/login', async (req, res, next) => {
   try {
+    // Log the request for debugging
+    console.log('Login request received:', req.body);
+    
     const result = await authController.login(req, res, next);
     
     // Create session with user data
@@ -38,11 +41,11 @@ router.post('/login', isNotAuthenticated, async (req, res, next) => {
       req.session.cookie.maxAge = 8 * 60 * 60 * 1000; // 8 hours
     }
     
-    // Redirect to dashboard
-    res.redirect('/dashboard');
+    // Return success response
+    return res.json({ success: true, user: result.user });
   } catch (error) {
-    req.flash('error', error.message || 'Login failed. Please try again.');
-    res.redirect('/login');
+    console.error('Login error:', error);
+    return res.status(401).json({ success: false, message: error.message || 'Login failed' });
   }
 });
 
@@ -139,6 +142,18 @@ router.post('/reset-password/:token', isNotAuthenticated, async (req, res, next)
   } catch (error) {
     req.flash('error', error.message || 'Password reset failed. Please try again.');
     res.redirect(`/reset-password/${req.params.token}`);
+  }
+});
+
+/**
+ * @route   GET /me
+ * @desc    Get current user info
+ */
+router.get('/me', isNotAuthenticated, (req, res) => {
+  if (req.session && req.session.user) {
+    return res.json(req.session.user);
+  } else {
+    return res.status(401).json({ message: 'Not authenticated' });
   }
 });
 

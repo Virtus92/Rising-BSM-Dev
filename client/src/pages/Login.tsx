@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import React from 'react';
+import { generateCsrfToken } from '../utils/csrf';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -9,6 +10,7 @@ const Login = () => {
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [csrfToken, setCsrfToken] = useState(generateCsrfToken());
   
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -41,6 +43,7 @@ const Login = () => {
       )}
       
       <form className="space-y-6" onSubmit={handleSubmit}>
+        <input type="hidden" name="csrfToken" value={csrfToken} />
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
             Email

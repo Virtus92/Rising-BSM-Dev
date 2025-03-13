@@ -15,24 +15,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Set to false initially
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const currentUser = await authService.getCurrentUser();
-        setUser(currentUser);
-      } catch (err) {
-        console.error('Fehler beim Abrufen des Benutzers:', err);
-        // If we're not logged in, we set the user to null but it's not an "error"
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initAuth();
-  }, []);
+  // IMPORTANT: Removed the problematic useEffect hook completely
+  // We'll handle authentication only through explicit login/logout
 
   const login = async (username: string, password: string) => {
     try {

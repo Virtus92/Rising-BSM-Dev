@@ -9,9 +9,20 @@ const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const flash = require('connect-flash');
 const csrf = require('@dr.pogodin/csurf');
+const cors = require('cors');
+
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+
+app.use(cors({
+  origin: 'http://localhost:5173', // Your frontend URL
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
+}));
 
 // Database connection
 const pool = require('./services/db.service').pool;
@@ -119,6 +130,7 @@ app.use('/dashboard', getNewRequestsCountMiddleware);
 // Apply routes
 app.use('/', indexRoutes);
 app.use('/', authRoutes);
+app.use('/auth', authRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/dashboard/kunden', customerRoutes);
 app.use('/dashboard/projekte', projectRoutes);

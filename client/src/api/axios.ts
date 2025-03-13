@@ -1,11 +1,11 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: 'http://localhost:9295',  // Direct connection to backend
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true // Important for session-based auth
+  withCredentials: true
 });
 
 // CSRF token interceptor
