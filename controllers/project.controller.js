@@ -44,7 +44,7 @@ class ProjectController extends BaseController {
       }
 
       // Create WHERE clause if filters exist
-      const { whereClause, paramIndex: newParamIndex } = this.buildWhereClause(conditions, params);
+      let { whereClause, paramIndex: newParamIndex } = this.buildWhereClause(conditions, params);
 
       // Calculate pagination
       const offset = (page - 1) * limit;
@@ -556,7 +556,7 @@ class ProjectController extends BaseController {
       }
       
       // Create WHERE clause
-      const { whereClause } = this.buildWhereClause(conditions, params);
+      let { whereClause } = this.buildWhereClause(conditions, params);
       
       // Query data
       const query = {

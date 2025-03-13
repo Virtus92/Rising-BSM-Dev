@@ -46,8 +46,7 @@ class RequestController extends BaseController {
       }
 
       // Create WHERE clause if filters exist
-      const { whereClause, paramIndex: newParamIndex } = 
-        this.buildWhereClause(conditions, params);
+      let { whereClause, paramIndex: newParamIndex } = this.buildWhereClause(conditions, params);
 
       // Calculate pagination
       const offset = (page - 1) * limit;
@@ -185,18 +184,18 @@ class RequestController extends BaseController {
       const { id, status, note } = req.body;
       
       // Validation
-      if (!id || !status) {
-        const error = new Error('Request ID and status are required');
-        error.statusCode = 400;
-        throw error;
-      }
+      // if (!id || !status) {
+      //   const error = new Error('Request ID and status are required');
+      //   error.statusCode = 400;
+      //   throw error;
+      // }
       
-      // Check valid status values
-      if (!['neu', 'in_bearbeitung', 'beantwortet', 'geschlossen'].includes(status)) {
-        const error = new Error('Invalid status value');
-        error.statusCode = 400;
-        throw error;
-      }
+      // // Check valid status values
+      // if (!['neu', 'in_bearbeitung', 'beantwortet', 'geschlossen'].includes(status)) {
+      //   const error = new Error('Invalid status value');
+      //   error.statusCode = 400;
+      //   throw error;
+      // }
       
       // Update status in database
       await pool.query({
@@ -343,7 +342,7 @@ class RequestController extends BaseController {
       }
       
       // Create WHERE clause
-      const { whereClause } = this.buildWhereClause(conditions, params);
+      let { whereClause } = this.buildWhereClause(conditions, params);
       
       // Query data
       const query = {

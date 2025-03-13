@@ -97,5 +97,5 @@ exports.errorHandler = (err, req, res, next) => {
     
     // For regular requests
     req.flash('error', 'Das Formular ist abgelaufen. Bitte versuchen Sie es erneut.');
-    res.redirect('back');
+    return res.redirect(req.get('Referrer') || '/');
   };

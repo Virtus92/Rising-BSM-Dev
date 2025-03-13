@@ -1,32 +1,44 @@
-import api from '../axios';
-import { Inquiry, ApiResponse } from '../../types';
+import axios from 'axios';
+import { Inquiry } from '../../types';
+
+const API_BASE_URL = '/dashboard/requests';
 
 export const requestService = {
-  async getAll(filters: any = {}) {
-    const response = await api.get<ApiResponse<Inquiry[]>>('/requests', { params: filters });
-    return response.data;
+  getAll: async (params: any) => {
+    try {
+      const response = await axios.get(API_BASE_URL, { params });
+      console.log('Raw API response (getAll):', response.data);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
   },
-  
-  async getById(id: number) {
-    const response = await api.get<{request: Inquiry, notes: any[]}>(`/requests/${id}`);
-    return response.data;
+
+  getById: async (id: number) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/${id}`);
+      console.log('Raw API response (getById):', response.data);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
   },
-  
-  async updateStatus(id: number, status: 'neu' | 'in_bearbeitung' | 'beantwortet' | 'geschlossen') {
-    const response = await api.patch<Inquiry>(`/requests/${id}/status`, { status });
-    return response.data;
+
+  updateStatus: async (id: number, status: string) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/update-status`, { id, status });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
   },
-  
-  async addNote(id: number, content: string) {
-    const response = await api.post<{success: boolean}>(`/requests/${id}/add-note`, { content });
-    return response.data;
-  },
-  
-  async export(format: 'csv' | 'excel' | 'pdf', filters: any = {}) {
-    const response = await api.get(`/requests/export/${format}`, {
-      params: filters,
-      responseType: 'blob'
-    });
-    return response.data;
+
+  addNote: async (id: number, note: string) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/${id}/add-note`, { note });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
   }
 };

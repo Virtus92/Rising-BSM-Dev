@@ -46,13 +46,23 @@ router.post('/login', async (req, res, next) => {
       req.session.cookie.maxAge = 8 * 60 * 60 * 1000; // 8 hours
     }
     
-    // Return success response
-    return res.json({ success: true, user: result.user });
+    // For non-API requests, redirect
+    if (!(req.xhr || req.headers.accept.includes('application/json'))) {
+      return res.redirect('/dashboard');
+    }
+    
+    // Return success response for API requests
+    return res.json({ success: true, user: result.user, redirect: '/dashboard' });
   } catch (error) {
     console.error('Login error:', error);
     // Make sure we don't try to send a response if one has already been sent
     if (!res.headersSent) {
-      return res.status(401).json({ success: false, message: error.message || 'Login failed' });
+      if (req.xhr || req.headers.accept.includes('application/json')) {
+        return res.status(401).json({ success: false, message: error.message || 'Login failed' });
+      } else {
+        req.flash('error', error.message || 'Login failed');
+        return res.redirect('/login');
+      }
     }
   }
 });

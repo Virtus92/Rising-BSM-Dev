@@ -13,6 +13,9 @@ class ConnectionManager {
     const client = await pool.connect();
     try {
       return await callback(client);
+    } catch (error) {
+      console.error('Database query error:', error);
+      throw error;
     } finally {
       client.release();
     }

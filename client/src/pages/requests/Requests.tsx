@@ -37,6 +37,7 @@ const Requests = () => {
       });
       
       setRequests(response.data);
+      console.log('Requests state:', response.data); // Add this line
       setPagination(response.pagination || pagination);
     } catch (err: any) {
       console.error('Error fetching requests:', err);
@@ -155,7 +156,7 @@ const Requests = () => {
                     </div>
                   </td>
                 </tr>
-              ) : requests.length > 0 ? (
+              ) : requests && Array.isArray(requests) && requests.length > 0 ? (
                 requests.map(request => (
                   <tr key={request.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -175,21 +176,16 @@ const Requests = () => {
                       <div className="text-sm text-gray-900">
                         {new Date(request.createdAt).toLocaleDateString('de-DE')}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {new Date(request.createdAt).toLocaleTimeString('de-DE', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        request.statusClass === 'success' ? 'bg-green-100 text-green-800' :
-                        request.statusClass === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-                        request.statusClass === 'info' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
+                        request.status ? (request.status === 'neu' ? 'bg-blue-100 text-blue-800' :
+                        request.status === 'in_bearbeitung' ? 'bg-yellow-100 text-yellow-800' :
+                        request.status === 'beantwortet' ? 'bg-green-100 text-green-800' :
+                        request.status === 'geschlossen' ? 'bg-gray-100 text-gray-800' :
+                        'bg-gray-100 text-gray-800') : 'bg-gray-100 text-gray-800'
                       }`}>
-                        {request.statusLabel}
+                        {request.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

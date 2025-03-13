@@ -24,6 +24,7 @@ const RequestDetail = () => {
         setLoading(true);
         const data = await requestService.getById(parseInt(id));
         setRequest(data.request);
+        console.log('Request state:', data.request); // Add this line
         setNotes(data.notes || []);
       } catch (err: any) {
         console.error('Error fetching request data:', err);
@@ -165,23 +166,19 @@ const RequestDetail = () => {
               <Calendar className="h-5 w-5 text-gray-400 mr-2" />
               <span className="text-gray-500 mr-2">Erstellt am:</span>
               <span>
-                {new Date(request.createdAt).toLocaleDateString('de-DE')} um{' '}
-                {new Date(request.createdAt).toLocaleTimeString('de-DE', {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
+                {request.formattedDate}
               </span>
             </div>
             
             <div className="md:col-span-2 flex items-start">
             <span className="text-gray-500 mr-2 mt-0.5">Status:</span>
               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                request.statusClass === 'success' ? 'bg-green-100 text-green-800' :
-                request.statusClass === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-                request.statusClass === 'info' ? 'bg-blue-100 text-blue-800' :
+                request.statusInfo?.className === 'success' ? 'bg-green-100 text-green-800' :
+                request.statusInfo?.className === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                request.statusInfo?.className === 'info' ? 'bg-blue-100 text-blue-800' :
                 'bg-gray-100 text-gray-800'
               }`}>
-                {request.statusLabel}
+                {request.statusInfo?.label}
               </span>
             </div>
           </div>

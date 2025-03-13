@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const requestController = require('../controllers/request.controller');
 const { isAuthenticated } = require('../middleware/auth.middleware');
+const { validateRequestStatusUpdate, validateRequestId } = require('../middleware/requestValidation.middleware');
 
 // Apply authentication middleware to all routes
 router.use(isAuthenticated);
@@ -118,7 +119,7 @@ router.get('/:id', async (req, res, next) => {
  * @route   POST /dashboard/requests/update-status
  * @desc    Update request status
  */
-router.post('/update-status', async (req, res, next) => {
+router.post('/update-status', validateRequestStatusUpdate, async (req, res, next) => {
   try {
     const result = await requestController.updateRequestStatus(req, res, next);
     
@@ -143,7 +144,7 @@ router.post('/update-status', async (req, res, next) => {
  * @route   POST /dashboard/requests/:id/add-note
  * @desc    Add a note to request
  */
-router.post('/:id/add-note', async (req, res, next) => {
+router.post('/:id/add-note', validateRequestId, async (req, res, next) => {
   try {
     const result = await requestController.addRequestNote(req, res, next);
     

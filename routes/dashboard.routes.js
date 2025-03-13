@@ -127,7 +127,7 @@ router.get('/search', async (req, res, next) => {
    * @desc    API endpoint for dashboard data
    */
   
-  router.get('/api/data', (req, res) => {
+  router.get('/data', (req, res) => {
     try {
       // Return JSON data for your dashboard
       res.json({
