@@ -1,263 +1,176 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { serviceService } from '../../api/services/serviceService';
 import { Service } from '../../types';
-import { Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import React from 'react';
 
 const Services = () => {
   const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState({
-    active: '',
-    search: ''
-  });
-  const [pagination, setPagination] = useState({
-    current: 1,
-    limit: 20,
-    total: 1,
-    totalRecords: 0
-  });
+  const [activeFilter, setActiveFilter] = useState<string>('all');
 
   useEffect(() => {
+    const fetchServices = async () => {
+      setIsLoading(true);
+      try {
+        const response = await serviceService.getAll();
+        if (response && response.data) {
+          setServices(response.data);
+        } else {
+          // Handle empty response properly
+          setServices([]);
+        }
+      } catch (err) {
+        console.error('Error fetching services:', err);
+        setError('Failed to load services. Please try again later.');
+        setServices([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchServices();
-  }, [filters.active, pagination.current]);
+  }, []);
 
-  const fetchServices = async () => {
-    try {
-      setLoading(true);
-      const response = await serviceService.getAll({
-        active: filters.active,
-        search: filters.search,
-        page: pagination.current,
-        limit: pagination.limit
-      });
-      
-      setServices(response.data);
-      setPagination(response.pagination || pagination);
-    } catch (err: any) {
-      console.error('Error fetching services:', err);
-      setError('Fehler beim Laden der Dienstleistungen');
-    } finally {
-      setLoading(false);
-    }
+  const filteredServices = services ? services.filter(service => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'active') return service.active;
+    return !service.active;
+  }) : [];
+
+  const handleFilterChange = (filter: string) => {
+    setActiveFilter(filter);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPagination(prev => ({ ...prev, current: 1 })); // Reset to first page
-    fetchServices();
-  };
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
-  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-    setPagination(prev => ({ ...prev, current: 1 })); // Reset to first page
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters(prev => ({ ...prev, search: e.target.value }));
-  };
-
-  const handlePageChange = (page: number) => {
-    if (page < 1 || page > pagination.total) return;
-    setPagination(prev => ({ ...prev, current: page }));
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
-  };
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <p>{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-2 bg-red-100 hover:bg-red-200 text-red-700 py-1 px-2 rounded text-sm"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Dienstleistungen</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900">Services</h1>
         <Link
           to="/dashboard/dienste/neu"
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          className="bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded"
         >
-          <Plus size={16} className="mr-2" />
-          Neue Dienstleistung
+          New Service
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="active" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              id="active"
-              name="active"
-              value={filters.active}
-              onChange={handleFilterChange}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="border-b border-gray-200">
+          <nav className="flex -mb-px">
+            <button
+              onClick={() => handleFilterChange('all')}
+              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                activeFilter === 'all'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
             >
-              <option value="">Alle</option>
-              <option value="true">Aktiv</option>
-              <option value="false">Inaktiv</option>
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">Suche</label>
-            <div className="relative mt-1 flex rounded-md shadow-sm">
-              <input
-                type="text"
-                name="search"
-                id="search"
-                value={filters.search}
-                onChange={handleSearchChange}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                placeholder="Name oder Beschreibung"
-              />
-              <button
-                type="submit"
-                className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                <Search size={16} className="mr-2" />
-                Suchen
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {/* Results */}
-      {error && (
-        <div className="bg-red-50 p-4 rounded-md text-red-700 mb-4">
-          {error}
+              All
+            </button>
+            <button
+              onClick={() => handleFilterChange('active')}
+              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                activeFilter === 'active'
+                  ? 'border-green-500 text-green-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => handleFilterChange('inactive')}
+              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                activeFilter === 'inactive'
+                  ? 'border-red-500 text-red-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Inactive
+            </button>
+          </nav>
         </div>
-      )}
 
-      <div className="bg-white shadow overflow-hidden rounded-lg">
-        <div className="overflow-x-auto">
+        {filteredServices && filteredServices.length > 0 ? (
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preis</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Einheit</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MwSt</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aktionen</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Base Price
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Unit
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center">
-                    <div className="flex justify-center">
-                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary-600"></div>
-                    </div>
+              {filteredServices.map((service) => (
+                <tr key={service.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Link
+                      to={`/dashboard/dienste/${service.id}`}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      {service.name}
+                    </Link>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(service.priceBase)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {service.unit}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        service.active
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {service.active ? 'Active' : 'Inactive'}
+                    </span>
                   </td>
                 </tr>
-              ) : services.length > 0 ? (
-                services.map(service => (
-                  <tr key={service.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{service.name}</div>
-                      {service.description && (
-                        <div className="text-sm text-gray-500 truncate max-w-xs">{service.description}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{formatCurrency(service.priceBase)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{service.unit}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{service.vatRate}%</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        service.active 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {service.active ? 'Aktiv' : 'Inaktiv'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link to={`/dashboard/dienste/${service.id}`} className="text-primary-600 hover:text-primary-900 mr-4">
-                        Details
-                      </Link>
-                      <Link to={`/dashboard/dienste/${service.id}/edit`} className="text-primary-600 hover:text-primary-900">
-                        Bearbeiten
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                    Keine Dienstleistungen gefunden
-                  </td>
-                </tr>
-              )}
+              ))}
             </tbody>
           </table>
-        </div>
-
-        {/* Pagination */}
-        {pagination.total > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Zeige <span className="font-medium">{(pagination.current - 1) * pagination.limit + 1}</span> bis{' '}
-                  <span className="font-medium">
-                    {Math.min(pagination.current * pagination.limit, pagination.totalRecords)}
-                  </span>{' '}
-                  von <span className="font-medium">{pagination.totalRecords}</span> Ergebnissen
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                  <button
-                    onClick={() => handlePageChange(pagination.current - 1)}
-                    disabled={pagination.current === 1}
-                    className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
-                      pagination.current === 1 
-                        ? 'text-gray-300 cursor-not-allowed' 
-                        : 'text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="sr-only">Zurück</span>
-                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                  </button>
-                  
-                  {/* Page numbers */}
-                  {Array.from({ length: pagination.total }, (_, i) => i + 1).map(page => (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      className={`relative inline-flex items-center px-4 py-2 border ${
-                        pagination.current === page
-                          ? 'z-10 bg-primary-50 border-primary-500 text-primary-600'
-                          : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                      } text-sm font-medium`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                  
-                  <button
-                    onClick={() => handlePageChange(pagination.current + 1)}
-                    disabled={pagination.current === pagination.total}
-                    className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
-                      pagination.current === pagination.total 
-                        ? 'text-gray-300 cursor-not-allowed' 
-                        : 'text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="sr-only">Weiter</span>
-                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                  </button>
-                </nav>
-              </div>
-            </div>
+        ) : (
+          <div className="py-12 px-6 text-center">
+            <p className="text-gray-500 mb-4">No services found</p>
+            <Link
+              to="/dashboard/dienste/neu"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700"
+            >
+              Create New Service
+            </Link>
           </div>
         )}
       </div>

@@ -72,7 +72,7 @@ class ServiceController extends BaseController {
       // Execute both queries in parallel
       const [servicesResult, countResult] = await Promise.all([
         ConnectionManager.withConnection(client => client.query(query, queryParams)),
-        ConnectionManager.withConnection(client => client.query(countQuery, queryParams.slice(0, paramCounter - 2))) // Exclude LIMIT and OFFSET parameters
+        ConnectionManager.withConnection(client => client.query(countQuery, queryParams.slice(0, whereClauses.length > 0 ? paramCounter - 1 : 0))) // Use correct parameters for countQuery
       ]);
 
       // Format service data

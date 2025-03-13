@@ -11,6 +11,7 @@ const flash = require('connect-flash');
 const csrf = require('@dr.pogodin/csurf');
 const cors = require('cors');
 const { pool } = require('./services/db.service');
+const apiRoutes = require('./routes/api.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,7 +23,7 @@ app.use((req, res, next) => {
 });
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:9295'], // Your frontend URL
+  origin: ['http://localhost:5173', 'http://localhost:9295'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
@@ -171,15 +172,9 @@ app.use('/dashboard/profile', profileRoutes);
 app.use('/dashboard/settings', settingsRoutes);
 
 // API routes
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/services', serviceRoutes);
+app.use('/api', apiRoutes);
+app.use('/dashboard/requests', requestRoutes); // For the frontend when served through Express
 app.use('/api/requests', requestRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/settings', settingsRoutes);
-//app.use('/api/blog', require('./routes/blog.routes'));
 
 // Contact form route with rate limiting
 app.post('/contact', contactLimiter, require('./controllers/contact.controller').submitContact);

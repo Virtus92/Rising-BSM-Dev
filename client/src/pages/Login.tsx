@@ -19,6 +19,7 @@ const Login = () => {
     const fetchCsrfToken = async () => {
       const token = await getCsrfToken();
       setCsrfToken(token);
+      
       const metaElement = document.createElement('meta');
       metaElement.name = 'csrf-token';
       metaElement.content = token;

@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const serviceController = require('../controllers/service.controller');
 const { isAuthenticated } = require('../middleware/auth.middleware');
-const { validateService } = require('../middleware/validation.middleware');
+const { serviceValidation } = require('../middleware/validation.middleware');
 
 // Apply authentication middleware to all routes
 router.use(isAuthenticated);
 
 /**
- * @route   GET /dashboard/services
+ * @route   GET /dashboard/dienste
  * @desc    Display list of services with optional filtering
  */
 router.get('/', async (req, res, next) => {
@@ -21,7 +21,7 @@ router.get('/', async (req, res, next) => {
     }
     
     // Otherwise render the view
-    res.render('dashboard/services/index', { 
+    res.render('dashboard/dienste/index', { 
       title: 'Dienstleistungen - Rising BSM',
       user: req.session.user,
       currentPath: req.path,
@@ -39,15 +39,59 @@ router.get('/', async (req, res, next) => {
 });
 
 /**
- * @route   GET /dashboard/services/neu
+ * @route   POST /dashboard/dienste/edit
+ * @desc    Update a service via modal
+ */
+router.post('/edit', serviceValidation.validateService, async (req, res, next) => {
+  try {
+    const result = await serviceController.updateService(req, res, next);
+
+    // If it's an API request, return JSON
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.json(result);
+    }
+
+    // Otherwise, respond with a success message
+    req.flash('success', 'Dienstleistung erfolgreich aktualisiert.');
+    res.redirect('/dashboard/dienste'); // Redirect back to the main services page
+  } catch (error) {
+    console.error("Error updating service:", error);
+    next(error); // Pass the error to the error handling middleware
+  }
+});
+
+/**
+ * @route   POST /dashboard/dienste/:id/update
+ * @desc    Update a service via modal
+ */
+router.post('/update/:id', serviceValidation.validateServiceUpdate, async (req, res, next) => {
+  try {
+    const result = await serviceController.updateService(req, res, next);
+
+    // If it's an API request, return JSON
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.json(result);
+    }
+
+    // Otherwise, respond with a success message
+    req.flash('success', 'Dienstleistung erfolgreich aktualisiert.');
+    res.redirect('/dashboard/dienste'); // Redirect back to the main services page
+  } catch (error) {
+    console.error("Error updating service:", error);
+    next(error); // Pass the error to the error handling middleware
+  }
+});
+
+/**
+ * @route   GET /dashboard/dienste/neu
  * @desc    Display form to create a new service
  */
 router.get('/neu', async (req, res, next) => {
   try {
-    res.render('dashboard/services/neu', {
+    res.render('dashboard/dienste/neu', {
       title: 'Neue Dienstleistung - Rising BSM',
       user: req.session.user,
-      currentPath: '/dashboard/services',
+      currentPath: '/dashboard/dienste',
       formData: {
         name: '',
         beschreibung: '',
@@ -66,10 +110,10 @@ router.get('/neu', async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/services/neu
+ * @route   POST /dashboard/dienste/neu
  * @desc    Create a new service
  */
-router.post('/neu', validateService, async (req, res, next) => {
+router.post('/neu', serviceValidation.validateService, async (req, res, next) => {
   try {
     const result = await serviceController.createService(req, res, next);
     
@@ -80,18 +124,18 @@ router.post('/neu', validateService, async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Dienstleistung erfolgreich angelegt.');
-    res.redirect(`/dashboard/services/${result.serviceId}`);
+    res.redirect(`/dashboard/dienste/${result.serviceId}`);
   } catch (error) {
     if (error.statusCode === 400) {
       req.flash('error', error.message);
-      return res.redirect('/dashboard/services/neu');
+      return res.redirect('/dashboard/dienste/neu');
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/services/export
+ * @route   GET /dashboard/dienste/export
  * @desc    Export services in various formats
  */
 router.get('/export', async (req, res, next) => {
@@ -119,7 +163,7 @@ router.get('/export', async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/services/:id/toggle-status
+ * @route   POST /dashboard/dienste/:id/toggle-status
  * @desc    Toggle service status (active/inactive)
  */
 router.post('/:id/toggle-status', async (req, res, next) => {
@@ -133,43 +177,29 @@ router.post('/:id/toggle-status', async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Dienstleistungsstatus erfolgreich geändert.');
-    res.redirect(`/dashboard/services/${req.params.id}`);
+    res.redirect(`/dashboard/dienste/${req.params.id}`);
   } catch (error) {
     if (error.statusCode === 400) {
       req.flash('error', error.message);
-      return res.redirect(`/dashboard/services/${req.params.id}`);
+      return res.redirect(`/dashboard/dienste/${req.params.id}`);
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/services/:id
+ * @route   GET /dashboard/dienste/:id
  * @desc    Display service details
  */
 router.get('/:id', async (req, res, next) => {
   try {
     const data = await serviceController.getServiceById(req, res, next);
     
-    // If it's an API request, return JSON
-    if (req.headers.accept && req.headers.accept.includes('application/json')) {
-      return res.json(data);
-    }
-    
-    // Otherwise render the view
-    res.render('dashboard/services/detail', {
-      title: `Dienstleistung: ${data.service.name} - Rising BSM`,
-      user: req.session.user,
-      currentPath: '/dashboard/services',
-      service: data.service,
-      newRequestsCount: req.newRequestsCount,
-      csrfToken: req.csrfToken(),
-      messages: { success: req.flash('success'), error: req.flash('error') }
-    });
+    return res.json(data);
   } catch (error) {
     if (error.statusCode === 404) {
       req.flash('error', error.message);
-      return res.redirect('/dashboard/services');
+      return res.redirect('/dashboard/dienste');
     }
     next(error);
   }
@@ -198,21 +228,15 @@ router.get('/:id/edit', async (req, res, next) => {
 });
 
 /**
+/**
  * @route   POST /dashboard/services/:id/edit
  * @desc    Update a service
  */
-router.post('/:id/edit', validateService, async (req, res, next) => {
+router.post('/:id/edit', serviceValidation.validateServiceUpdate, async (req, res, next) => {
   try {
     const result = await serviceController.updateService(req, res, next);
     
-    // If it's an API request, return JSON
-    if (req.headers.accept && req.headers.accept.includes('application/json')) {
-      return res.json(result);
-    }
-    
-    // Otherwise set flash message and redirect
-    req.flash('success', 'Dienstleistung erfolgreich aktualisiert.');
-    res.redirect(`/dashboard/services/${req.params.id}`);
+    return res.json(result);
   } catch (error) {
     if (error.statusCode === 400 || error.statusCode === 404) {
       req.flash('error', error.message);
@@ -230,10 +254,10 @@ router.get('/:id/statistics', async (req, res, next) => {
   try {
     const data = await serviceController.getServiceStatistics(req, res, next);
     
-    res.render('dashboard/services/statistics', {
+    res.render('dashboard/dienste/statistics', {
       title: `Statistiken: ${data.statistics.name} - Rising BSM`,
       user: req.session.user,
-      currentPath: '/dashboard/services',
+      currentPath: '/dashboard/dienste',
       statistics: data.statistics,
       newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
@@ -245,4 +269,3 @@ router.get('/:id/statistics', async (req, res, next) => {
 });
 
 module.exports = router;
-

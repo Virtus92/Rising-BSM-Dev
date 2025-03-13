@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService } from '../api/services/authService';
 import { User } from '../types';
+import { getCsrfToken } from '../utils/csrf';
 
 interface AuthContextType {
   user: User | null;
@@ -21,9 +22,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const initializeUser = async () => {
       try {
+        // Ensure we have a CSRF token before making authenticated requests
+        await getCsrfToken();
+        
         const currentUser = await authService.getCurrentUser();
         setUser(currentUser);
       } catch (err) {
+        // Don't display error if it's just an auth check
+        console.log('No authenticated user found');
         setUser(null);
       } finally {
         setLoading(false);
@@ -37,12 +43,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       setError(null);
-      await authService.login(email, password);
+      
+      // Get a fresh CSRF token before login
+      await getCsrfToken();
+      
+      const loginResult = await authService.login(email, password);
       const currentUser = await authService.getCurrentUser();
       setUser(currentUser);
+      
+      return loginResult;
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Anmeldung fehlgeschlagen');
-      throw err;
+      const errorMessage = err.response?.data?.message || 'Login failed. Please check your credentials.';
+      setError(errorMessage);
+      throw errorMessage;
     } finally {
       setLoading(false);
     }
@@ -54,7 +67,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await authService.logout();
       setUser(null);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Abmeldung fehlgeschlagen');
+      const errorMessage = err.response?.data?.message || 'Logout failed';
+      setError(errorMessage);
+      console.error('Logout error:', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -63,10 +78,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
   };
-
-  if (loading) {
-    return <div>Laden...</div>;
-  }
 
   return (
     <AuthContext.Provider

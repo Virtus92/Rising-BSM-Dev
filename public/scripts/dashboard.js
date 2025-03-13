@@ -1,4 +1,3 @@
-
 /**
  * Dashboard Core JavaScript
  * Optimized for performance and mobile support

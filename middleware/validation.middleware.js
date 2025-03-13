@@ -1,4 +1,4 @@
- /**
+/**
  * Validation middleware for input data
  */
 const validator = require('validator');
@@ -174,7 +174,7 @@ exports.validateAppointment = (req, res, next) => {
 /**
  * Validates service data
  */
-exports.validateService = (req, res, next) => {
+const validateService = (req, res, next) => {
   try {
     const { name, preis_basis, einheit } = req.body;
     const errors = [];
@@ -214,6 +214,56 @@ exports.validateService = (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+/**
+ * Validates service data for update
+ */
+const validateServiceUpdate = (req, res, next) => {
+  try {
+    const { name, preis_basis, einheit } = req.body;
+    const errors = [];
+    
+    // Required fields
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      errors.push('Name is required');
+    }
+    
+    if (!preis_basis) {
+      errors.push('Base price is required');
+    } else if (isNaN(parseFloat(preis_basis)) || parseFloat(preis_basis) < 0) {
+      errors.push('Please enter a valid price (must be a positive number)');
+    }
+    
+    if (!einheit || typeof einheit !== 'string' || einheit.trim() === '') {
+      errors.push('Unit is required');
+    }
+    
+    // If there are validation errors
+    if (errors.length > 0) {
+      const error = new Error(errors.join('. '));
+      error.statusCode = 400;
+      error.validationErrors = errors;
+      throw error;
+    }
+    
+    // Sanitize inputs
+    req.body.name = validator.escape(req.body.name.trim());
+    req.body.einheit = validator.escape(req.body.einheit.trim());
+    
+    if (req.body.beschreibung) {
+      req.body.beschreibung = validator.escape(req.body.beschreibung.trim());
+    }
+    
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.serviceValidation = {
+  validateService: validateService,
+  validateServiceUpdate: validateServiceUpdate
 };
 
 /**

@@ -3,40 +3,75 @@ import { Appointment, ApiResponse } from '../../types';
 
 export const appointmentService = {
   async getAll(filters: any = {}) {
-    const response = await api.get<ApiResponse<Appointment[]>>('/termine', { params: filters });
-    return response.data;
+    try {
+      const response = await api.get<ApiResponse<Appointment[]>>('/termine', { params: filters });
+      return response.data;
+    } catch (error) {
+      console.error('Error in getAll appointments:', error);
+      throw error;
+    }
   },
   
   async getById(id: number) {
-    const response = await api.get<Appointment>(`/termine/${id}`);
-    return response.data;
+    try {
+      const response = await api.get<Appointment>(`/termine/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error in getById appointment ${id}:`, error);
+      throw error;
+    }
   },
   
   async create(data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt' | 'statusLabel' | 'statusClass' | 'dateFormatted' | 'timeFormatted'>) {
-    const response = await api.post<Appointment>('/termine', data);
-    return response.data;
+    try {
+      const response = await api.post<Appointment>('/termine', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error in create appointment:', error);
+      throw error;
+    }
   },
   
   async update(id: number, data: Partial<Appointment>) {
-    const response = await api.put<Appointment>(`/termine/${id}`, data);
-    return response.data;
+    try {
+      const response = await api.put<Appointment>(`/termine/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error in update appointment ${id}:`, error);
+      throw error;
+    }
   },
   
   async updateStatus(id: number, status: 'geplant' | 'bestaetigt' | 'abgeschlossen' | 'storniert') {
-    const response = await api.patch<Appointment>(`/termine/${id}/status`, { status });
-    return response.data;
+    try {
+      const response = await api.patch<Appointment>(`/termine/${id}/status`, { status });
+      return response.data;
+    } catch (error) {
+      console.error(`Error in updateStatus appointment ${id}:`, error);
+      throw error;
+    }
   },
   
   async delete(id: number) {
-    const response = await api.delete(`/termine/${id}`);
-    return response.data;
+    try {
+      const response = await api.delete(`/termine/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error in delete appointment ${id}:`, error);
+      throw error;
+    }
   },
   
   async export(format: 'csv' | 'excel' | 'pdf', filters: any = {}) {
-    const response = await api.get(`/termine/export/${format}`, {
-      params: filters,
-      responseType: 'blob'
-    });
-    return response.data;
+    try {
+      const response = await api.get(`/termine/export/${format}`, {
+        params: filters,
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error in export appointments:`, error);
+      throw error;
+    }
   }
 };

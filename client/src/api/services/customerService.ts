@@ -3,13 +3,25 @@ import { Customer, ApiResponse } from '../../types';
 
 export const customerService = {
   async getAll(filters: any = {}) {
-    const response = await api.get<ApiResponse<Customer[]>>('/customers', { params: filters });
-    return response.data;
+    try {
+      const response = await api.get<ApiResponse<Customer[]>>('customers', { 
+        params: filters 
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      throw error;
+    }
   },
   
   async getById(id: number) {
-    const response = await api.get<Customer>(`/customers/${id}`);
-    return response.data;
+    try {
+      const response = await api.get<Customer>(`customers/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching customer ${id}:`, error);
+      throw error;
+    }
   },
   
   async create(data: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) {

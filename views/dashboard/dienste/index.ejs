@@ -135,7 +135,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="editServiceForm" action="/dashboard/dienste/edit" method="POST">
+        <form id="editServiceForm" method="POST">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <input type="hidden" id="edit_id" name="id">
           
@@ -196,8 +196,13 @@
           const serviceId = this.dataset.id;
           const isActive = this.checked;
           
+          if (!serviceId) {
+            console.error('Service ID is undefined.');
+            return;
+          }
+
           // AJAX-Request für Service-Aktivierung/Deaktivierung
-          fetch(`/dashboard/dienste/toggle-status/${serviceId}`, {
+          fetch(`/dashboard/dienste/${serviceId}/toggle-status`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -234,7 +239,7 @@
           fetch(`/dashboard/dienste/${serviceId}`)
             .then(response => response.json())
             .then(data => {
-              if (data.success) {
+              if (typeof data.success === 'undefined' || data.success) {
                 const service = data.service;
                 document.getElementById('edit_id').value = service.id;
                 document.getElementById('edit_name').value = service.name;
@@ -243,6 +248,10 @@
                 document.getElementById('edit_einheit').value = service.einheit;
                 document.getElementById('edit_mwst_satz').value = service.mwst_satz;
                 document.getElementById('edit_aktiv').checked = service.aktiv;
+
+                // Set the form action dynamically
+                document.getElementById('editServiceForm').action = `/dashboard/dienste/update/${service.id}`;
+
               } else {
                 alert('Fehler beim Laden der Dienstleistung: ' + data.error);
               }

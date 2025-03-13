@@ -3,35 +3,65 @@ import { Service, ApiResponse } from '../../types';
 
 export const serviceService = {
     async getAll(filters: any = {}) {
-        const response = await api.get<ApiResponse<Service[]>>('/dienste', { params: filters });
-        return response.data;
+        try {
+            const response = await api.get<ApiResponse<Service[]>>('/dienste', { params: filters });
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching services:', error);
+            throw error;
+        }
     },
 
     async getById(id: number) {
-        const response = await api.get<Service>(`/dienste/${id}`);
-        return response.data;
+        try {
+            const response = await api.get<Service>(`/dienste/${id}`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error fetching service ${id}:`, error);
+            throw error;
+        }
     },
 
     async create(data: Omit<Service, 'id' | 'createdAt' | 'updatedAt'>) {
-        const response = await api.post<Service>('/dienste', data);
-        return response.data;
+        try {
+            const response = await api.post<Service>('/dienste', data);
+            return response.data;
+        } catch (error) {
+            console.error('Error creating service:', error);
+            throw error;
+        }
     },
 
     async update(id: number, data: Partial<Service>) {
-        const response = await api.put<Service>(`/dienste/${id}`, data);
-        return response.data;
+        try {
+            const response = await api.put<Service>(`/dienste/${id}`, data);
+            return response.data;
+        } catch (error) {
+            console.error(`Error updating service ${id}:`, error);
+            throw error;
+        }
     },
 
     async delete(id: number) {
-        const response = await api.delete(`/dienste/${id}`);
-        return response.data;
+        try {
+            const response = await api.delete(`/dienste/${id}`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error deleting service ${id}:`, error);
+            throw error;
+        }
     },
 
     async export(format: 'csv' | 'excel' | 'pdf', filters: any = {}) {
-        const response = await api.get(`/dienste/export/${format}`, {
-            params: filters,
-            responseType: 'blob'
-        });
-        return response.data;
+        try {
+            const response = await api.get(`/dienste/export/${format}`, {
+                params: filters,
+                responseType: 'blob'
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error exporting services:', error);
+            throw error;
+        }
     }
 };

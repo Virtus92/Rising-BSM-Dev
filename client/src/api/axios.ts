@@ -1,9 +1,14 @@
 import axios from 'axios';
 
+const getCSRFToken = () => {
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+};
+
 const api = axios.create({
   baseURL: 'http://localhost:9295/api',
   headers: {
     'Content-Type': 'application/json',
+    'X-CSRF-Token': getCSRFToken() || ''
   },
   withCredentials: true
 });

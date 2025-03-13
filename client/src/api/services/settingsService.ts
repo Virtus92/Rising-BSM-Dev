@@ -2,8 +2,13 @@ import api from '../axios';
 
 export const settingsService = {
   async getUserSettings() {
-    const response = await api.get('/settings');
-    return response.data;
+    try {
+      const response = await api.get('/settings/user');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user settings:', error);
+      throw error;
+    }
   },
   
   async updateUserSettings(settings: {
@@ -13,23 +18,43 @@ export const settingsService = {
     benachrichtigungen_push?: boolean;
     benachrichtigungen_intervall?: string;
   }) {
-    const response = await api.post('/settings/update', settings);
-    return response.data;
+    try {
+      const response = await api.post('/settings/user', settings);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating user settings:', error);
+      throw error;
+    }
   },
   
   async getSystemSettings() {
-    const response = await api.get('/settings/system');
-    return response.data;
+    try {
+      const response = await api.get('/settings/system');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching system settings:', error);
+      throw error;
+    }
   },
   
   async updateSystemSettings(settings: Record<string, any>) {
-    const response = await api.post('/settings/system/update', { settings });
-    return response.data;
+    try {
+      const response = await api.post('/settings/system', { settings });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating system settings:', error);
+      throw error;
+    }
   },
   
   async getBackupSettings() {
-    const response = await api.get('/settings/backup');
-    return response.data;
+    try {
+      const response = await api.get('/settings/backup');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching backup settings:', error);
+      throw error;
+    }
   },
   
   async updateBackupSettings(settings: {
@@ -38,12 +63,22 @@ export const settingsService = {
     zeit?: string;
     aufbewahrung?: number;
   }) {
-    const response = await api.post('/settings/backup/update', settings);
-    return response.data;
+    try {
+      const response = await api.post('/settings/backup', settings);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating backup settings:', error);
+      throw error;
+    }
   },
   
   async triggerManualBackup() {
-    const response = await api.post('/settings/backup/trigger');
-    return response.data;
+    try {
+      const response = await api.post('/settings/backup/trigger');
+      return response.data;
+    } catch (error) {
+      console.error('Error triggering manual backup:', error);
+      throw error;
+    }
   }
 };
