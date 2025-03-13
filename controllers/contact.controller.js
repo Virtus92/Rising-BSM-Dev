@@ -5,6 +5,7 @@
 const pool = require('../services/db.service');
 const NotificationService = require('../services/notification.service');
 const { validateInput } = require('../utils/validators');
+const ConnectionManager = require('../utils/connectionManager');
 
 /**
  * Submit contact form
@@ -63,7 +64,7 @@ exports.submitContact = async (req, res, next) => {
     } = validationResult.validatedData;
 
     // Insert contact request into database
-    const result = await pool.query({
+    const result = await ConnectionManager.withConnection(client => client.query({
       text: `
         INSERT INTO kontaktanfragen (
           name, 
@@ -85,15 +86,15 @@ exports.submitContact = async (req, res, next) => {
         'neu', 
         req.ip
       ]
-    });
+    }));
 
     const requestId = result.rows[0].id;
 
     // Determine notification recipient (admin users)
-    const adminQuery = await pool.query(`
+    const adminQuery = await ConnectionManager.withConnection(client => client.query(`
       SELECT id FROM benutzer 
       WHERE rolle IN ('admin', 'manager')
-    `);
+    `));
 
     // Create notifications for admins
     const notificationPromises = adminQuery.rows.map(admin => 
@@ -158,13 +159,13 @@ exports.getContactRequest = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query({
+    const result = await ConnectionManager.withConnection(client => client.query({
       text: `
         SELECT * FROM kontaktanfragen 
         WHERE id = $1
       `,
       values: [id]
-    });
+    }));
 
     if (result.rows.length === 0) {
       const error = new Error('Kontaktanfrage nicht gefunden');

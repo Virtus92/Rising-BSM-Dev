@@ -2,25 +2,24 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { dashboardService } from '../api/services/dashboardService';
 import { useAuth } from '../context/AuthContext';
+import { DashboardResponse } from '../types/dashboard';
 import { BarChartBig, Users, Briefcase, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 import React from 'react';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState<any>({});
-  const [recentRequests, setRecentRequests] = useState<any[]>([]);
-  const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([]);
+  const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const recentRequests = dashboardData?.recentRequests || [];
+  const upcomingAppointments = dashboardData?.upcomingAppointments || [];
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
         const data = await dashboardService.getDashboardData();
-        setStats(data.stats || {});
-        setRecentRequests(data.recentRequests || []);
-        setUpcomingAppointments(data.upcomingAppointments || []);
+        setDashboardData(data);
       } catch (err: any) {
         console.error('Error loading dashboard data:', err);
         setError('Fehler beim Laden der Dashboard-Daten');
@@ -64,22 +63,22 @@ const Dashboard = () => {
           <div className="flex justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Neue Anfragen</p>
-              <p className="text-2xl font-bold text-gray-800">{stats.newRequests?.count || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{dashboardData?.stats.newRequests?.count || 0}</p>
             </div>
             <div className="rounded-full bg-blue-100 p-3 text-blue-600">
               <BarChartBig size={20} />
             </div>
           </div>
           <div className="mt-2 flex items-center text-sm">
-            {stats.newRequests?.trend > 0 ? (
+            {dashboardData?.stats.newRequests?.trend > 0 ? (
               <>
                 <TrendingUp className="mr-1 h-4 w-4 text-green-500" />
-                <span className="text-green-500">{stats.newRequests?.trend}% mehr</span>
+                <span className="text-green-500">{dashboardData?.stats.newRequests?.trend}% mehr</span>
               </>
             ) : (
               <>
                 <TrendingDown className="mr-1 h-4 w-4 text-red-500" />
-                <span className="text-red-500">{Math.abs(stats.newRequests?.trend || 0)}% weniger</span>
+                <span className="text-red-500">{Math.abs(dashboardData?.stats.newRequests?.trend || 0)}% weniger</span>
               </>
             )}
             <span className="ml-1 text-gray-500">als letzte Woche</span>
@@ -91,22 +90,22 @@ const Dashboard = () => {
           <div className="flex justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Aktive Projekte</p>
-              <p className="text-2xl font-bold text-gray-800">{stats.activeProjects?.count || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{dashboardData?.stats.activeProjects?.count || 0}</p>
             </div>
             <div className="rounded-full bg-purple-100 p-3 text-purple-600">
               <Briefcase size={20} />
             </div>
           </div>
           <div className="mt-2 flex items-center text-sm">
-            {stats.activeProjects?.trend > 0 ? (
+            {dashboardData?.stats.activeProjects?.trend > 0 ? (
               <>
                 <TrendingUp className="mr-1 h-4 w-4 text-green-500" />
-                <span className="text-green-500">{stats.activeProjects?.trend}% mehr</span>
+                <span className="text-green-500">{dashboardData?.stats.activeProjects?.trend}% mehr</span>
               </>
             ) : (
               <>
                 <TrendingDown className="mr-1 h-4 w-4 text-red-500" />
-                <span className="text-red-500">{Math.abs(stats.activeProjects?.trend || 0)}% weniger</span>
+                <span className="text-red-500">{Math.abs(dashboardData?.stats.activeProjects?.trend || 0)}% weniger</span>
               </>
             )}
             <span className="ml-1 text-gray-500">als letzten Monat</span>
@@ -118,22 +117,22 @@ const Dashboard = () => {
           <div className="flex justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Kunden</p>
-              <p className="text-2xl font-bold text-gray-800">{stats.totalCustomers?.count || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{dashboardData?.stats.totalCustomers?.count || 0}</p>
             </div>
             <div className="rounded-full bg-green-100 p-3 text-green-600">
               <Users size={20} />
             </div>
           </div>
           <div className="mt-2 flex items-center text-sm">
-            {stats.totalCustomers?.trend > 0 ? (
+            {dashboardData?.stats.totalCustomers?.trend > 0 ? (
               <>
                 <TrendingUp className="mr-1 h-4 w-4 text-green-500" />
-                <span className="text-green-500">{stats.totalCustomers?.trend}% mehr</span>
+                <span className="text-green-500">{dashboardData?.stats.totalCustomers?.trend}% mehr</span>
               </>
             ) : (
               <>
                 <TrendingDown className="mr-1 h-4 w-4 text-red-500" />
-                <span className="text-red-500">{Math.abs(stats.totalCustomers?.trend || 0)}% weniger</span>
+                <span className="text-red-500">{Math.abs(dashboardData?.stats.totalCustomers?.trend || 0)}% weniger</span>
               </>
             )}
             <span className="ml-1 text-gray-500">als letztes Jahr</span>
@@ -146,7 +145,7 @@ const Dashboard = () => {
             <div>
               <p className="text-sm font-medium text-gray-500">Monatlicher Umsatz</p>
               <p className="text-2xl font-bold text-gray-800">
-                {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(stats.monthlyRevenue?.amount || 0)}
+                {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(dashboardData?.stats.monthlyRevenue?.amount || 0)}
               </p>
             </div>
             <div className="rounded-full bg-yellow-100 p-3 text-yellow-600">
@@ -154,15 +153,15 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="mt-2 flex items-center text-sm">
-            {stats.monthlyRevenue?.trend > 0 ? (
+            {dashboardData?.stats.monthlyRevenue?.trend > 0 ? (
               <>
                 <TrendingUp className="mr-1 h-4 w-4 text-green-500" />
-                <span className="text-green-500">{stats.monthlyRevenue?.trend}% mehr</span>
+                <span className="text-green-500">{dashboardData?.stats.monthlyRevenue?.trend}% mehr</span>
               </>
             ) : (
               <>
                 <TrendingDown className="mr-1 h-4 w-4 text-red-500" />
-                <span className="text-red-500">{Math.abs(stats.monthlyRevenue?.trend || 0)}% weniger</span>
+                <span className="text-red-500">{Math.abs(dashboardData?.stats.monthlyRevenue?.trend || 0)}% weniger</span>
               </>
             )}
             <span className="ml-1 text-gray-500">als letzten Monat</span>

@@ -7,6 +7,7 @@ const cacheService = require('../services/cache.service');
 const { getNotifications } = require('../utils/helpers');
 const { formatDateSafely, formatRelativeTime, formatDateWithLabel } = require('../utils/formatters');
 const { format } = require('date-fns');
+const ConnectionManager = require('../utils/connectionManager');
 
 /**
  * Get dashboard data including statistics, charts, and recent activities
@@ -68,59 +69,59 @@ exports.getDashboardStats = async () => {
   try {
     return await cacheService.getOrExecute('dashboard_stats', async () => {
       // New requests stats
-      const newRequestsQuery = await pool.query(`
+      const newRequestsQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'
-      `);
+      `));
       
-      const currentWeekRequestsQuery = await pool.query(`
+      const currentWeekRequestsQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT COUNT(*) FROM kontaktanfragen
         WHERE created_at >= NOW() - INTERVAL '7 days'
-      `);
+      `));
       
-      const prevWeekRequestsQuery = await pool.query(`
+      const prevWeekRequestsQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT COUNT(*) FROM kontaktanfragen
         WHERE created_at >= NOW() - INTERVAL '14 days' 
         AND created_at < NOW() - INTERVAL '7 days'
-      `);
+      `));
       
       // Active projects stats
-      const activeProjectsQuery = await pool.query(`
+      const activeProjectsQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT COUNT(*) FROM projekte 
         WHERE status IN ('neu', 'in_bearbeitung')
-      `);
+      `));
       
-      const currentMonthProjectsQuery = await pool.query(`
+      const currentMonthProjectsQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT COUNT(*) FROM projekte
         WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
-      `);
+      `));
       
-      const prevMonthProjectsQuery = await pool.query(`
+      const prevMonthProjectsQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT COUNT(*) FROM projekte
         WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
         AND created_at < DATE_TRUNC('month', CURRENT_DATE)
-      `);
+      `));
       
       // Total customers stats
-      const totalCustomersQuery = await pool.query(`
+      const totalCustomersQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT COUNT(*) FROM kunden WHERE status = 'aktiv'
-      `);
+      `));
       
-      const customersLastYearQuery = await pool.query(`
+      const customersLastYearQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT COUNT(*) FROM kunden 
         WHERE created_at < NOW() - INTERVAL '1 year' AND status = 'aktiv'
-      `);
+      `));
       
       // Monthly revenue stats
-      const monthlyRevenueQuery = await pool.query(`
+      const monthlyRevenueQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT COALESCE(SUM(betrag), 0) as summe FROM rechnungen
         WHERE rechnungsdatum >= DATE_TRUNC('month', CURRENT_DATE)
-      `);
+      `));
       
-      const prevMonthRevenueQuery = await pool.query(`
+      const prevMonthRevenueQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT COALESCE(SUM(betrag), 0) as summe FROM rechnungen
         WHERE rechnungsdatum >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
         AND rechnungsdatum < DATE_TRUNC('month', CURRENT_DATE)
-      `);
+      `));
       
       // Calculate trends
       const newRequestsCount = parseInt(newRequestsQuery.rows[0].count || 0);
@@ -170,7 +171,7 @@ async function getChartData(revenueFilter, servicesFilter) {
       const { startDate, groupBy, dateFormat } = calculateDateRange(revenueFilter);
       
       // Query for revenue chart
-      const revenueQuery = await pool.query(`
+      const revenueQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT 
           TO_CHAR(DATE_TRUNC($1, rechnungsdatum), $2) as label,
           SUM(betrag) as summe
@@ -182,7 +183,7 @@ async function getChartData(revenueFilter, servicesFilter) {
           DATE_TRUNC($1, rechnungsdatum)
         ORDER BY 
           DATE_TRUNC($1, rechnungsdatum)
-      `, [groupBy, dateFormat, startDate]);
+      `, [groupBy, dateFormat, startDate]));
       
       // Format data for chart
       return {
@@ -212,7 +213,7 @@ async function getChartData(revenueFilter, servicesFilter) {
       }
       
       // Query for services chart
-      const servicesQuery = await pool.query(`
+      const servicesQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT 
           d.name as service_name,
           SUM(p.anzahl * p.einzelpreis) as summe
@@ -227,7 +228,7 @@ async function getChartData(revenueFilter, servicesFilter) {
         ORDER BY 
           summe DESC
         LIMIT 4
-      `);
+      `));
       
       // Format data for chart
       return {
@@ -288,7 +289,7 @@ function calculateDateRange(filter) {
 async function getRecentRequests() {
   try {
     return await cacheService.getOrExecute('recent_requests', async () => {
-      const requestsQuery = await pool.query(`
+      const requestsQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT 
           id, name, email, service, status, created_at
         FROM 
@@ -296,7 +297,7 @@ async function getRecentRequests() {
         ORDER BY 
           created_at DESC
         LIMIT 5
-      `);
+      `));
       
       // Format requests
       return requestsQuery.rows.map(request => {
@@ -359,7 +360,7 @@ async function getRecentRequests() {
 async function getUpcomingAppointments() {
   try {
     return await cacheService.getOrExecute('upcoming_appointments', async () => {
-      const appointmentsQuery = await pool.query(`
+      const appointmentsQuery = await ConnectionManager.withConnection(client => client.query(`
         SELECT 
           t.id, 
           t.titel, 
@@ -374,7 +375,7 @@ async function getUpcomingAppointments() {
         ORDER BY 
           t.termin_datum ASC
         LIMIT 5
-      `);
+      `));
       
       // Format appointments
       return appointmentsQuery.rows.map(appointment => {
@@ -423,7 +424,7 @@ exports.globalSearch = async (query) => {
       serviceResults
     ] = await Promise.all([
       // Search customers
-      pool.query(`
+      ConnectionManager.withConnection(client => client.query(`
         SELECT id, name, email, firma, telefon, status
         FROM kunden 
         WHERE 
@@ -431,41 +432,41 @@ exports.globalSearch = async (query) => {
           LOWER(email) LIKE $1 OR
           LOWER(firma) LIKE $1
         LIMIT 5
-      `, [searchTerm]),
+      `, [searchTerm])),
       
       // Search projects
-      pool.query(`
+      ConnectionManager.withConnection(client => client.query(`
         SELECT p.id, p.titel, p.status, p.start_datum, k.name as kunde_name
         FROM projekte p
         LEFT JOIN kunden k ON p.kunde_id = k.id
         WHERE LOWER(p.titel) LIKE $1
         LIMIT 5
-      `, [searchTerm]),
+      `, [searchTerm])),
       
       // Search appointments
-      pool.query(`
+      ConnectionManager.withConnection(client => client.query(`
         SELECT t.id, t.titel, t.status, t.termin_datum, k.name as kunde_name
         FROM termine t
         LEFT JOIN kunden k ON t.kunde_id = k.id
         WHERE LOWER(t.titel) LIKE $1
         LIMIT 5
-      `, [searchTerm]),
+      `, [searchTerm])),
       
       // Search requests
-      pool.query(`
+      ConnectionManager.withConnection(client => client.query(`
         SELECT id, name, email, service, status, created_at
         FROM kontaktanfragen
         WHERE LOWER(name) LIKE $1 OR LOWER(email) LIKE $1
         LIMIT 5
-      `, [searchTerm]),
+      `, [searchTerm])),
       
       // Search services
-      pool.query(`
+      ConnectionManager.withConnection(client => client.query(`
         SELECT id, name, beschreibung, preis_basis, einheit, aktiv
         FROM dienstleistungen
         WHERE LOWER(name) LIKE $1 OR LOWER(beschreibung) LIKE $1
         LIMIT 5
-      `, [searchTerm])
+      `, [searchTerm]))
     ]);
     
     // Format and return results
@@ -533,7 +534,7 @@ exports.globalSearch = async (query) => {
 exports.getNotifications = async (userId) => {
   try {
     // Get notifications from database
-    const notificationsQuery = await pool.query(`
+    const notificationsQuery = await ConnectionManager.withConnection(client => client.query(`
       SELECT
         id,
         typ,
@@ -548,7 +549,7 @@ exports.getNotifications = async (userId) => {
         benutzer_id = $1
       ORDER BY
         erstellt_am DESC
-    `, [userId]);
+    `, [userId]));
     
     // Format notifications
     const notifications = notificationsQuery.rows.map(notification => {
@@ -617,20 +618,20 @@ exports.markNotificationsRead = async (userId, notificationId, markAll) => {
     
     if (markAll) {
       // Mark all notifications as read
-      result = await pool.query(`
+      result = await ConnectionManager.withConnection(client => client.query(`
         UPDATE benachrichtigungen
         SET gelesen = true, updated_at = CURRENT_TIMESTAMP
         WHERE benutzer_id = $1 AND gelesen = false
         RETURNING id
-      `, [userId]);
+      `, [userId]));
     } else if (notificationId) {
       // Mark specific notification as read
-      result = await pool.query(`
+      result = await ConnectionManager.withConnection(client => client.query(`
         UPDATE benachrichtigungen
         SET gelesen = true, updated_at = CURRENT_TIMESTAMP
         WHERE id = $1 AND benutzer_id = $2
         RETURNING id
-      `, [notificationId, userId]);
+      `, [notificationId, userId]));
     } else {
       throw new Error('Either notification ID or mark all flag is required');
     }

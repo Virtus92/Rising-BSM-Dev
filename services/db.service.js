@@ -1,4 +1,4 @@
-/**
+ /**
  * Database service 
  * Provides a centralized interface for all database operations
  */
@@ -32,15 +32,17 @@ pool.on('error', (err) => {
 exports.query = async (query, params = []) => {
   const client = await pool.connect();
   try {
-    // Handle both string queries and object queries
+    // Ensure params is always an array, even if empty
+    const safeParams = Array.isArray(params) ? params : [];
+    
+    // Handle both string and object queries
     if (typeof query === 'string') {
-      return await client.query(query, params.length > 0 ? params : []);
+      return await client.query(query, safeParams);
     } else if (typeof query === 'object' && query.text) {
-      // If values are already defined in the object, use them; otherwise use provided params
-      const values = query.values || params;
-      return await client.query(query.text, values.length > 0 ? values : undefined);
+      const values = query.values || safeParams;
+      return await client.query(query.text, values);
     } else {
-      throw new Error('Invalid query format: must be a string or an object with a text property');
+      throw new Error('Invalid query format');
     }
   } finally {
     client.release();

@@ -164,7 +164,7 @@ const Customers = () => {
                     </div>
                   </td>
                 </tr>
-              ) : customers.length > 0 ? (
+              ) : Array.isArray(customers) && customers.length > 0 ? ( // Added Array.isArray check
                 customers.map(customer => (
                   <tr key={customer.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
