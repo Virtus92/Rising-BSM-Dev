@@ -15,11 +15,25 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(false); // Set to false initially
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // IMPORTANT: Removed the problematic useEffect hook completely
-  // We'll handle authentication only through explicit login/logout
+  // Wichtig: Initialisierung beim App-Start
+  useEffect(() => {
+    const initializeUser = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        setUser(currentUser);
+      } catch (err) {
+        // Nicht eingeloggt ist kein Fehler
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeUser();
+  }, []);
 
   const login = async (email: string, password: string) => {
     try {
@@ -51,6 +65,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
   };
+
+  // Zeige Ladebildschirm während der Initialisierung
+  if (loading) {
+    return <div>Laden...</div>;
+  }
 
   return (
     <AuthContext.Provider
