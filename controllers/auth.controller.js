@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const pool = require('../services/db.service');
 const BaseController = require('./baseController');
 const { validateLogin } = require('../middleware/authValidation.middleware');
-const ConnectionManager = require('../utils/connectionManager');
+const ConnectionManager = require('../services/connectionManager');
 
 class AuthController extends BaseController {
   /**

@@ -8,7 +8,7 @@ const { formatDateSafely } = require('../utils/formatters');
 const { getTerminStatusInfo } = require('../utils/helpers');
 const exportService = require('../services/export.service');
 const { validateAppointmentCreation, validateAppointmentUpdate, validateAppointmentStatusUpdate } = require('../middleware/appointmentValidation.middleware');
-const ConnectionManager = require('../utils/connectionManager');
+const ConnectionManager = require('../services/connectionManager');
 
 class AppointmentController extends BaseController {
   /**

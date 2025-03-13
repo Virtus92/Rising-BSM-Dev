@@ -7,7 +7,7 @@ const cacheService = require('../services/cache.service');
 const { getNotifications } = require('../utils/helpers');
 const { formatDateSafely, formatRelativeTime, formatDateWithLabel } = require('../utils/formatters');
 const { format } = require('date-fns');
-const ConnectionManager = require('../utils/connectionManager');
+const ConnectionManager = require('../services/connectionManager');
 
 /**
  * Get dashboard data including statistics, charts, and recent activities

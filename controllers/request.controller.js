@@ -8,6 +8,7 @@ const { formatDateSafely } = require('../utils/formatters');
 const { getAnfrageStatusInfo } = require('../utils/helpers');
 const exportService = require('../services/export.service');
 const { validateRequestStatusUpdate, validateRequestId } = require('../middleware/requestValidation.middleware');
+const ConnectionManager = require('../services/connectionManager');
 
 class RequestController extends BaseController {
   /**
@@ -79,8 +80,8 @@ class RequestController extends BaseController {
 
       // Execute both queries in parallel
       const [requestsResult, countResult] = await Promise.all([
-        pool.query(query, params),
-        pool.query(countQuery, params.slice(0, params.length - 2)) // Exclude LIMIT and OFFSET parameters
+        ConnectionManager.withConnection(client => client.query(query, params)),
+        ConnectionManager.withConnection(client => client.query(countQuery, params.slice(0, params.length - 2))) // Exclude LIMIT and OFFSET parameters
       ]);
 
       // Format request data
@@ -129,10 +130,10 @@ class RequestController extends BaseController {
       const { id } = req.params;
       
       // Get request details
-      const requestQuery = await pool.query({
+      const requestQuery = await ConnectionManager.withConnection(client => client.query({
         text: `SELECT * FROM kontaktanfragen WHERE id = $1`,
         values: [id]
-      });
+      }));
       
       if (requestQuery.rows.length === 0) {
         const error = new Error(`Request with ID ${id} not found`);
@@ -144,10 +145,10 @@ class RequestController extends BaseController {
       const statusInfo = getAnfrageStatusInfo(request.status);
 
       // Get notes for this request
-      const notesQuery = await pool.query({
+      const notesQuery = await ConnectionManager.withConnection(client => client.query({
         text: `SELECT * FROM anfragen_notizen WHERE anfrage_id = $1 ORDER BY erstellt_am DESC`,
         values: [id]
-      });
+      }));
       
       // Format request data for response
       const result = {
@@ -198,14 +199,14 @@ class RequestController extends BaseController {
       // }
       
       // Update status in database
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `UPDATE kontaktanfragen SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
         values: [status, id]
-      });
+      }));
       
       // Add note if provided
       if (note && note.trim() !== '') {
-        await pool.query({
+        await ConnectionManager.withConnection(client => client.query({
           text: `
             INSERT INTO anfragen_notizen (
               anfrage_id, benutzer_id, benutzer_name, text
@@ -217,11 +218,11 @@ class RequestController extends BaseController {
             req.session.user.name,
             note
           ]
-        });
+        }));
       }
 
       // Log the status change
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           INSERT INTO anfragen_log (
             anfrage_id, benutzer_id, benutzer_name, aktion, details
@@ -234,7 +235,7 @@ class RequestController extends BaseController {
           'status_changed',
           `Status changed to: ${status}`
         ]
-      });
+      }));
 
       return {
         success: true,
@@ -259,10 +260,10 @@ class RequestController extends BaseController {
       }
       
       // Check if request exists
-      const checkResult = await pool.query({
+      const checkResult = await ConnectionManager.withConnection(client => client.query({
         text: 'SELECT id FROM kontaktanfragen WHERE id = $1',
         values: [id]
-      });
+      }));
 
       if (checkResult.rows.length === 0) {
         const error = new Error(`Request with ID ${id} not found`);
@@ -271,7 +272,7 @@ class RequestController extends BaseController {
       }
       
       // Insert note into database
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           INSERT INTO anfragen_notizen (
             anfrage_id, benutzer_id, benutzer_name, text
@@ -283,10 +284,10 @@ class RequestController extends BaseController {
           req.session.user.name,
           note
         ]
-      });
+      }));
       
       // Log the note addition
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           INSERT INTO anfragen_log (
             anfrage_id, benutzer_id, benutzer_name, aktion, details
@@ -299,7 +300,7 @@ class RequestController extends BaseController {
           'note_added',
           'Note added to request'
         ]
-      });
+      }));
 
       return {
         success: true,
@@ -365,7 +366,7 @@ class RequestController extends BaseController {
         values: params
       };
       
-      const result = await pool.query(query);
+      const result = await ConnectionManager.withConnection(client => client.query(query));
       
       // Use export service to generate the appropriate format
       return await exportService.generateExport(result.rows, format, {

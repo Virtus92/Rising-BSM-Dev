@@ -2,7 +2,7 @@ const BaseController = require('./baseController');
 const pool = require('../services/db.service');
 const fs = require('fs');
 const path = require('path');
-const ConnectionManager = require('../utils/connectionManager');
+const ConnectionManager = require('../services/connectionManager');
 
 class SettingsController extends BaseController {
   /**

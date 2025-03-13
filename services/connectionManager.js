@@ -1,4 +1,4 @@
-const pool = require('../services/db.service');
+const { pool } = require('./db.service');
 
 /**
  * Manages database connections for controllers

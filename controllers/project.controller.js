@@ -8,6 +8,7 @@ const { formatDateSafely } = require('../utils/formatters');
 const { getProjektStatusInfo } = require('../utils/helpers');
 const exportService = require('../services/export.service');
 const { validateProjectCreation, validateProjectUpdate, validateProjectStatusUpdate, validateProjectId } = require('../middleware/projectValidation.middleware');
+const ConnectionManager = require('../services/connectionManager');
 
 class ProjectController extends BaseController {
   /**
@@ -82,8 +83,8 @@ class ProjectController extends BaseController {
 
       // Execute both queries in parallel
       const [projectsResult, countResult] = await Promise.all([
-        pool.query(query, params),
-        pool.query(countQuery, params.slice(0, params.length - 2)) // Exclude LIMIT and OFFSET parameters
+        ConnectionManager.withConnection(client => client.query(query, params)),
+        ConnectionManager.withConnection(client => client.query(countQuery, params.slice(0, params.length - 2))) // Exclude LIMIT and OFFSET parameters
       ]);
 
       // Format project data
@@ -133,7 +134,7 @@ class ProjectController extends BaseController {
       const { id } = req.params;
       
       // Get project details
-      const projectQuery = await pool.query({
+      const projectQuery = await ConnectionManager.withConnection(client => client.query({
         text: `
         SELECT 
           p.*, 
@@ -145,7 +146,7 @@ class ProjectController extends BaseController {
           p.id = $1
       `,
         values: [id]
-      });
+      }));
       
       if (projectQuery.rows.length === 0) {
         const error = new Error(`Project with ID ${id} not found`);
@@ -157,7 +158,7 @@ class ProjectController extends BaseController {
       const statusInfo = getProjektStatusInfo(project.status);
 
       // Get appointments for this project
-      const appointmentsQuery = await pool.query({
+      const appointmentsQuery = await ConnectionManager.withConnection(client => client.query({
         text: `
         SELECT id, titel, termin_datum, status 
         FROM termine 
@@ -165,17 +166,17 @@ class ProjectController extends BaseController {
         ORDER BY termin_datum ASC
       `,
         values: [id]
-      });
+      }));
       
       // Get notes for this project
-      const notesQuery = await pool.query({
+      const notesQuery = await ConnectionManager.withConnection(client => client.query({
         text: `
         SELECT * FROM projekt_notizen 
         WHERE projekt_id = $1 
         ORDER BY erstellt_am DESC
       `,
         values: [id]
-      });
+      }));
       
       // Format project data for response
       const result = {
@@ -241,7 +242,7 @@ class ProjectController extends BaseController {
       }
       
       // Insert project into database
-      const result = await pool.query({
+      const result = await ConnectionManager.withConnection(client => client.query({
         text: `
         INSERT INTO projekte (
           titel, 
@@ -266,12 +267,12 @@ class ProjectController extends BaseController {
           status || 'neu',
           req.session.user.id
         ]
-      });
+      }));
       
       const projectId = result.rows[0].id;
       
       // Log the activity
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
         INSERT INTO projekt_log (
           projekt_id, benutzer_id, benutzer_name, aktion, details
@@ -284,11 +285,11 @@ class ProjectController extends BaseController {
           'created',
           'Project created'
         ]
-      });
+      }));
 
       // Create notification for customer if assigned
       if (kunde_id) {
-        await pool.query({
+        await ConnectionManager.withConnection(client => client.query({
           text: `
           INSERT INTO benachrichtigungen (
             benutzer_id, typ, titel, nachricht, referenz_id
@@ -301,7 +302,7 @@ class ProjectController extends BaseController {
             `Ein neues Projekt "${titel}" wurde angelegt.`,
             projectId
           ]
-        });
+        }));
       }
 
       return {
@@ -337,10 +338,10 @@ class ProjectController extends BaseController {
       }
 
       // Check if project exists
-      const checkResult = await pool.query({
+      const checkResult = await ConnectionManager.withConnection(client => client.query({
         text: 'SELECT id FROM projekte WHERE id = $1',
         values: [id]
-      });
+      }));
 
       if (checkResult.rows.length === 0) {
         const error = new Error(`Project with ID ${id} not found`);
@@ -349,7 +350,7 @@ class ProjectController extends BaseController {
       }
       
       // Update project in database
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
         UPDATE projekte SET 
           titel = $1, 
@@ -374,10 +375,10 @@ class ProjectController extends BaseController {
           status || 'neu',
           id
         ]
-      });
+      }));
       
       // Log the activity
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
         INSERT INTO projekt_log (
           projekt_id, benutzer_id, benutzer_name, aktion, details
@@ -390,7 +391,7 @@ class ProjectController extends BaseController {
           'updated',
           'Project updated'
         ]
-      });
+      }));
 
       return {
         success: true,
@@ -422,14 +423,14 @@ class ProjectController extends BaseController {
       }
       
       // Update status in database
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `UPDATE projekte SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
         values: [status, id]
-      });
+      }));
       
       // Add note if provided
       if (note && note.trim() !== '') {
-        await pool.query({
+        await ConnectionManager.withConnection(client => client.query({
           text: `
           INSERT INTO projekt_notizen (
             projekt_id, benutzer_id, benutzer_name, text
@@ -441,11 +442,11 @@ class ProjectController extends BaseController {
             req.session.user.name,
             note
           ]
-        });
+        }));
       }
       
       // Log the status change
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
         INSERT INTO projekt_log (
           projekt_id, benutzer_id, benutzer_name, aktion, details
@@ -458,7 +459,7 @@ class ProjectController extends BaseController {
           'status_changed',
           `Status changed to: ${status}`
         ]
-      });
+      }));
 
       return {
         success: true,
@@ -483,10 +484,10 @@ class ProjectController extends BaseController {
       }
       
       // Check if project exists
-      const checkResult = await pool.query({
+      const checkResult = await ConnectionManager.withConnection(client => client.query({
         text: 'SELECT id FROM projekte WHERE id = $1',
         values: [id]
-      });
+      }));
 
       if (checkResult.rows.length === 0) {
         const error = new Error(`Project with ID ${id} not found`);
@@ -495,7 +496,7 @@ class ProjectController extends BaseController {
       }
       
       // Insert note into database
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
         INSERT INTO projekt_notizen (
           projekt_id, benutzer_id, benutzer_name, text
@@ -507,10 +508,10 @@ class ProjectController extends BaseController {
           req.session.user.name,
           note
         ]
-      });
+      }));
       
       // Log the note addition
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
         INSERT INTO projekt_log (
           projekt_id, benutzer_id, benutzer_name, aktion, details
@@ -523,7 +524,7 @@ class ProjectController extends BaseController {
           'note_added',
           'Note added to project'
         ]
-      });
+      }));
 
       return {
         success: true,
@@ -581,7 +582,7 @@ class ProjectController extends BaseController {
         values: params
       };
       
-      const result = await pool.query(query);
+      const result = await ConnectionManager.withConnection(client => client.query(query));
       
       // Use export service to generate the appropriate format
       return await exportService.generateExport(result.rows, format, {

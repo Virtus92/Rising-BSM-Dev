@@ -5,7 +5,7 @@
 const pool = require('../services/db.service');
 const NotificationService = require('../services/notification.service');
 const { validateInput } = require('../utils/validators');
-const ConnectionManager = require('../utils/connectionManager');
+const ConnectionManager = require('../services/connectionManager');
 
 /**
  * Submit contact form

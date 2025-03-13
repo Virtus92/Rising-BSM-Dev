@@ -8,7 +8,7 @@ const { formatDateSafely } = require('../utils/formatters');
 const { getProjektStatusInfo, getTerminStatusInfo } = require('../utils/helpers');
 const exportService = require('../services/export.service');
 const { validateCustomerCreation, validateCustomerUpdate, validateCustomerStatusUpdate, validateCustomerId } = require('../middleware/customerValidation.middleware');
-const ConnectionManager = require('../utils/connectionManager');
+const ConnectionManager = require('../services/connectionManager');
 
 class CustomerController extends BaseController {
   /**

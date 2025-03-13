@@ -202,8 +202,8 @@
                 <p class="text-muted">Keine Notizen vorhanden.</p>
               <% } %>
               
-              <!-- Neue Notiz Form -->
-              <form action="/dashboard/termine/add-note" method="POST" class="mt-4">
+               <!-- Neue Notiz Form -->
+               <form action="/dashboard/termine/<%= termin.id %>/add-note" method="POST" class="mt-4">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="id" value="<%= termin.id %>">
                 

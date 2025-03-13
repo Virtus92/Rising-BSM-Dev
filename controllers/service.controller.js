@@ -3,7 +3,7 @@ const pool = require('../services/db.service');
 const { formatDateSafely } = require('../utils/formatters');
 const exportService = require('../services/export.service');
 const { validateServiceCreation, validateServiceUpdate, validateServiceId } = require('../middleware/serviceValidation.middleware');
-const ConnectionManager = require('../utils/connectionManager');
+const ConnectionManager = require('../services/connectionManager');
 
 class ServiceController extends BaseController {
   /**
@@ -253,10 +253,10 @@ class ServiceController extends BaseController {
       }
 
       // Check if service exists
-      const checkResult = await pool.query({
+      const checkResult = await ConnectionManager.withConnection(client => client.query({
         text: 'SELECT id FROM dienstleistungen WHERE id = $1',
         values: [id]
-      });
+      }));
 
       if (checkResult.rows.length === 0) {
         const error = new Error(`Service with ID ${id} not found`);
@@ -265,7 +265,7 @@ class ServiceController extends BaseController {
       }
       
       // Update service in database
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           UPDATE dienstleistungen 
           SET 
@@ -287,10 +287,10 @@ class ServiceController extends BaseController {
           aktiv === 'on' || aktiv === true,
           id
         ]
-      });
+      }));
       
       // Log the activity
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           INSERT INTO dienstleistungen_log (
             dienstleistung_id, 
@@ -307,7 +307,7 @@ class ServiceController extends BaseController {
           'updated',
           'Service updated'
         ]
-      });
+      }));
 
       return {
         success: true,
@@ -326,10 +326,10 @@ class ServiceController extends BaseController {
       const { aktiv } = req.body;
       
       // Check if service exists
-      const checkResult = await pool.query({
+      const checkResult = await ConnectionManager.withConnection(client => client.query({
         text: 'SELECT id FROM dienstleistungen WHERE id = $1',
         values: [id]
-      });
+      }));
 
       if (checkResult.rows.length === 0) {
         const error = new Error(`Service with ID ${id} not found`);
@@ -338,7 +338,7 @@ class ServiceController extends BaseController {
       }
       
       // Update service status in database
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           UPDATE dienstleistungen 
           SET 
@@ -350,10 +350,10 @@ class ServiceController extends BaseController {
           aktiv === 'on' || aktiv === true,
           id
         ]
-      });
+      }));
       
       // Log the activity
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           INSERT INTO dienstleistungen_log (
             dienstleistung_id, 
@@ -370,7 +370,7 @@ class ServiceController extends BaseController {
           'status_changed',
           `Status changed to: ${aktiv ? 'active' : 'inactive'}`
         ]
-      });
+      }));
 
       return {
         success: true,
@@ -388,10 +388,10 @@ class ServiceController extends BaseController {
       const { id } = req.params;
       
       // Validate service exists
-      const serviceQuery = await pool.query({
+      const serviceQuery = await ConnectionManager.withConnection(client => client.query({
         text: 'SELECT name FROM dienstleistungen WHERE id = $1',
         values: [id]
-      });
+      }));
       
       if (serviceQuery.rows.length === 0) {
         const error = new Error(`Service with ID ${id} not found`);
@@ -400,7 +400,7 @@ class ServiceController extends BaseController {
       }
       
       // Total revenue for this service
-      const revenueQuery = await pool.query({
+      const revenueQuery = await ConnectionManager.withConnection(client => client.query({
         text: `
           SELECT 
             SUM(rp.anzahl * rp.einzelpreis) as gesamtumsatz,
@@ -412,10 +412,10 @@ class ServiceController extends BaseController {
             rp.dienstleistung_id = $1
         `,
         values: [id]
-      });
+      }));
 
       // Monthly revenue development
-      const monthlyRevenueQuery = await pool.query({
+      const monthlyRevenueQuery = await ConnectionManager.withConnection(client => client.query({
         text: `
           SELECT 
             DATE_TRUNC('month', r.rechnungsdatum) as monat,
@@ -431,10 +431,10 @@ class ServiceController extends BaseController {
             monat
         `,
         values: [id]
-      });
+      }));
 
       // Top customers for this service
-      const topCustomersQuery = await pool.query({
+      const topCustomersQuery = await ConnectionManager.withConnection(client => client.query({
         text: `
           SELECT 
             k.id, 
@@ -453,7 +453,7 @@ class ServiceController extends BaseController {
           LIMIT 5
         `,
         values: [id]
-      });
+      }));
       
       return {
         statistics: {
@@ -514,7 +514,7 @@ class ServiceController extends BaseController {
         values: params
       };
       
-      const result = await pool.query(query);
+      const result = await ConnectionManager.withConnection(client => client.query(query));
       
       // Use export service to generate the appropriate format
       return await exportService.generateExport(result.rows, format, {

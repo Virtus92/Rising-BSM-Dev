@@ -30,6 +30,9 @@ app.use(cors({
 }));
 
 // Middleware imports
+const dbMiddleware = require('./middleware/db.middleware');
+app.use(dbMiddleware);
+
 const errorMiddleware = require('./middleware/error.middleware');
 
 // Routes imports
@@ -166,17 +169,16 @@ app.use('/dashboard/dienste', serviceRoutes);
 app.use('/dashboard/requests', requestRoutes);
 app.use('/dashboard/profile', profileRoutes);
 app.use('/dashboard/settings', settingsRoutes);
-//app.use('/blog', blogRoutes);
 
 // API routes
-app.use('/api/dashboard', require('./routes/dashboard.routes'));
-app.use('/api/customers', require('./routes/customer.routes'));
-app.use('/api/projects', require('./routes/project.routes'));
-app.use('/api/appointments', require('./routes/appointment.routes'));
-app.use('/api/services', require('./routes/service.routes'));
-app.use('/api/requests', require('./routes/request.routes'));
-app.use('/api/profile', require('./routes/profile.routes'));
-app.use('/api/settings', require('./routes/settings.routes'));
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/requests', requestRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/settings', settingsRoutes);
 //app.use('/api/blog', require('./routes/blog.routes'));
 
 // Contact form route with rate limiting
@@ -186,9 +188,6 @@ app.post('/contact', contactLimiter, require('./controllers/contact.controller')
 app.use(errorMiddleware.notFoundHandler);
 app.use(errorMiddleware.csrfErrorHandler);
 app.use(errorMiddleware.errorHandler);
-
-const dbMiddleware = require('./middleware/db.middleware');
-app.use(dbMiddleware);
 
 // Start server
 app.listen(PORT, () => {

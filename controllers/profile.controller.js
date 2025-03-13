@@ -6,6 +6,7 @@ const BaseController = require('./baseController');
 const bcrypt = require('bcryptjs');
 const pool = require('../services/db.service');
 const { formatDateSafely } = require('../utils/formatters');
+const ConnectionManager = require('../services/connectionManager');
 
 class ProfileController extends BaseController {
   /**
@@ -16,7 +17,7 @@ class ProfileController extends BaseController {
       const userId = req.session.user.id;
     
       // Get user data from database
-      const userQuery = await pool.query({
+      const userQuery = await ConnectionManager.withConnection(client => client.query({
         text: `
           SELECT 
             id, name, email, telefon, rolle, 
@@ -25,7 +26,7 @@ class ProfileController extends BaseController {
           WHERE id = $1
         `,
         values: [userId]
-      });
+      }));
     
       if (userQuery.rows.length === 0) {
         const error = new Error('User not found');
@@ -36,13 +37,13 @@ class ProfileController extends BaseController {
       const user = userQuery.rows[0];
     
       // Get user settings
-      const settingsQuery = await pool.query({
+      const settingsQuery = await ConnectionManager.withConnection(client => client.query({
         text: `
           SELECT * FROM benutzer_einstellungen
           WHERE benutzer_id = $1
         `,
         values: [userId]
-      });
+      }));
     
       const settings = settingsQuery.rows.length > 0 ? settingsQuery.rows[0] : {
         sprache: 'de',
@@ -52,7 +53,7 @@ class ProfileController extends BaseController {
       };
     
       // Get recent activity
-      const activityQuery = await pool.query({
+      const activityQuery = await ConnectionManager.withConnection(client => client.query({
         text: `
           SELECT aktivitaet, ip_adresse, erstellt_am
           FROM benutzer_aktivitaet
@@ -61,7 +62,7 @@ class ProfileController extends BaseController {
           LIMIT 5
         `,
         values: [userId]
-      });
+      }));
     
       // Format data for response
       return {
@@ -110,10 +111,10 @@ class ProfileController extends BaseController {
     
       // Check if email is unique (if changed)
       if (email !== req.session.user.email) {
-        const emailCheck = await pool.query({
+        const emailCheck = await ConnectionManager.withConnection(client => client.query({
           text: 'SELECT id FROM benutzer WHERE email = $1 AND id != $2',
           values: [email, userId]
-        });
+        }));
       
         if (emailCheck.rows.length > 0) {
           const error = new Error('Email address is already in use');
@@ -123,7 +124,7 @@ class ProfileController extends BaseController {
       }
     
       // Update user in database
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           UPDATE benutzer 
           SET 
@@ -134,10 +135,10 @@ class ProfileController extends BaseController {
           WHERE id = $4
         `,
         values: [name, email, telefon || null, userId]
-      });
+      }));
     
       // Log the activity
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           INSERT INTO benutzer_aktivitaet (
             benutzer_id, aktivitaet, ip_adresse
@@ -148,7 +149,7 @@ class ProfileController extends BaseController {
           'profile_updated',
           req.ip
         ]
-      });
+      }));
     
       // Return updated user data for session
       return {
@@ -193,10 +194,10 @@ class ProfileController extends BaseController {
       }
     
       // Get current password hash
-      const userQuery = await pool.query({
+      const userQuery = await ConnectionManager.withConnection(client => client.query({
         text: 'SELECT passwort FROM benutzer WHERE id = $1',
         values: [userId]
-      });
+      }));
     
       if (userQuery.rows.length === 0) {
         const error = new Error('User not found');
@@ -221,7 +222,7 @@ class ProfileController extends BaseController {
       const hashedPassword = await bcrypt.hash(new_password, saltRounds);
     
       // Update password in database
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           UPDATE benutzer 
           SET 
@@ -230,10 +231,10 @@ class ProfileController extends BaseController {
           WHERE id = $2
         `,
         values: [hashedPassword, userId]
-      });
+      }));
     
       // Log the activity
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           INSERT INTO benutzer_aktivitaet (
             benutzer_id, aktivitaet, ip_adresse
@@ -244,7 +245,7 @@ class ProfileController extends BaseController {
           'password_changed',
           req.ip
         ]
-      });
+      }));
     
       return {
         success: true,
@@ -271,7 +272,7 @@ class ProfileController extends BaseController {
       const imagePath = `/uploads/profile/${req.file.filename}`;
     
       // Update profile picture in database
-      await pool.query({
+      await ConnectionManager.withConnection(client => client.query({
         text: `
           UPDATE benutzer 
           SET 
@@ -280,7 +281,7 @@ class ProfileController extends BaseController {
           WHERE id = $2
         `,
         values: [imagePath, userId]
-      });
+      }));
     
       return {
         success: true,
@@ -303,14 +304,14 @@ class ProfileController extends BaseController {
       } = req.body;
     
       // Check if settings exist for this user
-      const settingsQuery = await pool.query({
+      const settingsQuery = await ConnectionManager.withConnection(client => client.query({
         text: 'SELECT benutzer_id FROM benutzer_einstellungen WHERE benutzer_id = $1',
         values: [userId]
-      });
+      }));
     
       if (settingsQuery.rows.length === 0) {
         // Create new settings
-        await pool.query({
+        await ConnectionManager.withConnection(client => client.query({
           text: `
             INSERT INTO benutzer_einstellungen (
               benutzer_id, 
@@ -325,10 +326,10 @@ class ProfileController extends BaseController {
             benachrichtigungen_push === 'on',
             benachrichtigungen_intervall || 'sofort'
           ]
-        });
+        }));
       } else {
         // Update existing settings
-        await pool.query({
+        await ConnectionManager.withConnection(client => client.query({
           text: `
             UPDATE benutzer_einstellungen 
             SET 
@@ -344,7 +345,7 @@ class ProfileController extends BaseController {
             benachrichtigungen_intervall || 'sofort',
             userId
           ]
-        });
+        }));
       }
     
       return {
