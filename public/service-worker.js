@@ -196,7 +196,7 @@ async function syncDashboardData() {
   try {
     const apiEndpoints = [
       '/dashboard/api/dashboard-stats',
-      '/dashboard/termine/api/events'
+      '/dashboard/appointments/api/events'
     ];
     
     const promises = apiEndpoints.map(async endpoint => {

@@ -8,7 +8,7 @@
       <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
           <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-          <li class="breadcrumb-item"><a href="/dashboard/kunden">Kunden</a></li>
+          <li class="breadcrumb-item"><a href="/dashboard/customers">Kunden</a></li>
           <li class="breadcrumb-item active" aria-current="page">Neuer Kunde</li>
         </ol>
       </nav>
@@ -33,7 +33,7 @@
           <h2 class="h5 mb-0">Kundendaten</h2>
         </div>
         <div class="card-body">
-          <form action="/dashboard/kunden/neu" method="POST" class="needs-validation" novalidate>
+          <form action="/dashboard/customers/neu" method="POST" class="needs-validation" novalidate>
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             
             <div class="row g-3">
@@ -120,7 +120,7 @@
               </div>
               
               <div class="col-12 d-flex justify-content-between mt-4">
-                <a href="/dashboard/kunden" class="btn btn-outline-secondary">
+                <a href="/dashboard/customers" class="btn btn-outline-secondary">
                   <i class="fas fa-arrow-left me-2"></i>Zurück
                 </a>
                 <button type="submit" class="btn btn-success">

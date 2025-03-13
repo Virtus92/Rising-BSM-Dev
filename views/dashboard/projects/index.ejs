@@ -22,7 +22,7 @@
               <option value="storniert" <% if (statusFilter === 'storniert') { %>selected<% } %>>Storniert</option>
             </select>
           </div>
-          <a href="/dashboard/projekte/neu" class="btn btn-success">
+          <a href="/dashboard/projects/neu" class="btn btn-success">
             <i class="fas fa-plus me-2"></i>Neues Projekt
           </a>
         </div>
@@ -71,13 +71,13 @@
                       <% projects.forEach(function(project) { %>
                         <tr>
                           <td>
-                            <a href="/dashboard/projekte/<%= project.id %>" class="text-decoration-none text-dark fw-medium">
+                            <a href="/dashboard/projects/<%= project.id %>" class="text-decoration-none text-dark fw-medium">
                               <%= project.titel %>
                             </a>
                           </td>
                           <td>
                             <% if (project.kunde_id) { %>
-                              <a href="/dashboard/kunden/<%= project.kunde_id %>" class="text-decoration-none">
+                              <a href="/dashboard/customers/<%= project.kunde_id %>" class="text-decoration-none">
                                 <%= project.kunde_name %>
                               </a>
                             <% } else { %>
@@ -99,10 +99,10 @@
                           </td>
                           <td>
                             <div class="btn-group btn-group-sm">
-                              <a href="/dashboard/projekte/<%= project.id %>" class="btn btn-outline-secondary">
+                              <a href="/dashboard/projects/<%= project.id %>" class="btn btn-outline-secondary">
                                 <i class="fas fa-eye"></i>
                               </a>
-                              <a href="/dashboard/projekte/<%= project.id %>/edit" class="btn btn-outline-primary">
+                              <a href="/dashboard/projects/<%= project.id %>/edit" class="btn btn-outline-primary">
                                 <i class="fas fa-edit"></i>
                               </a>
                               <button class="btn btn-outline-success status-toggle" 
@@ -135,7 +135,7 @@
                       <div class="list-group-item p-3">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                           <h6 class="mb-0">
-                            <a href="/dashboard/projekte/<%= project.id %>" class="text-decoration-none text-dark">
+                            <a href="/dashboard/projects/<%= project.id %>" class="text-decoration-none text-dark">
                               <%= project.titel %>
                             </a>
                           </h6>
@@ -147,7 +147,7 @@
                         <% if (project.kunde_id) { %>
                           <div class="mb-1 small">
                             <i class="fas fa-user text-muted me-1"></i> 
-                            <a href="/dashboard/kunden/<%= project.kunde_id %>" class="text-decoration-none">
+                            <a href="/dashboard/customers/<%= project.kunde_id %>" class="text-decoration-none">
                               <%= project.kunde_name %>
                             </a>
                           </div>
@@ -171,10 +171,10 @@
                         <% } %>
                         
                         <div class="d-flex justify-content-end gap-2 mt-2">
-                          <a href="/dashboard/projekte/<%= project.id %>" class="btn btn-sm btn-outline-secondary">
+                          <a href="/dashboard/projects/<%= project.id %>" class="btn btn-sm btn-outline-secondary">
                             <i class="fas fa-eye"></i>
                           </a>
-                          <a href="/dashboard/projekte/<%= project.id %>/edit" class="btn btn-sm btn-outline-primary">
+                          <a href="/dashboard/projects/<%= project.id %>/edit" class="btn btn-sm btn-outline-primary">
                             <i class="fas fa-edit"></i>
                           </a>
                           <button class="btn btn-sm btn-outline-success status-toggle" 
@@ -216,7 +216,7 @@
                         <div class="small text-muted">Kunde</div>
                         <div class="fw-medium">
                           <% if (project.kunde_id) { %>
-                            <a href="/dashboard/kunden/<%= project.kunde_id %>" class="text-decoration-none">
+                            <a href="/dashboard/customers/<%= project.kunde_id %>" class="text-decoration-none">
                               <%= project.kunde_name %>
                             </a>
                           <% } else { %>
@@ -249,10 +249,10 @@
                       <% } %>
                       
                       <div class="d-flex justify-content-end gap-2 mt-3">
-                        <a href="/dashboard/projekte/<%= project.id %>/edit" class="btn btn-sm btn-outline-primary">
+                        <a href="/dashboard/projects/<%= project.id %>/edit" class="btn btn-sm btn-outline-primary">
                           <i class="fas fa-edit me-1"></i>Bearbeiten
                         </a>
-                        <a href="/dashboard/projekte/<%= project.id %>" class="btn btn-sm btn-outline-secondary">
+                        <a href="/dashboard/projects/<%= project.id %>" class="btn btn-sm btn-outline-secondary">
                           <i class="fas fa-eye me-1"></i>Details
                         </a>
                       </div>
@@ -266,7 +266,7 @@
                   <i class="fas fa-project-diagram fa-3x text-muted mb-3"></i>
                   <h3 class="h5">Keine Projekte gefunden</h3>
                   <p class="text-muted">Erstellen Sie ein neues Projekt, um zu beginnen.</p>
-                  <a href="/dashboard/projekte/neu" class="btn btn-success mt-2">
+                  <a href="/dashboard/projects/neu" class="btn btn-success mt-2">
                     <i class="fas fa-plus me-2"></i>Neues Projekt
                   </a>
                 </div>
@@ -295,7 +295,7 @@
                         <div class="card mb-2 kanban-item" data-id="<%= project.id %>">
                           <div class="card-body p-3">
                             <h5 class="h6 mb-2">
-                              <a href="/dashboard/projekte/<%= project.id %>" class="text-decoration-none text-dark">
+                              <a href="/dashboard/projects/<%= project.id %>" class="text-decoration-none text-dark">
                                 <%= project.titel %>
                               </a>
                             </h5>
@@ -334,7 +334,7 @@
                         <div class="card mb-2 kanban-item" data-id="<%= project.id %>">
                           <div class="card-body p-3">
                             <h5 class="h6 mb-2">
-                              <a href="/dashboard/projekte/<%= project.id %>" class="text-decoration-none text-dark">
+                              <a href="/dashboard/projects/<%= project.id %>" class="text-decoration-none text-dark">
                                 <%= project.titel %>
                               </a>
                             </h5>
@@ -373,7 +373,7 @@
                         <div class="card mb-2 kanban-item" data-id="<%= project.id %>">
                           <div class="card-body p-3">
                             <h5 class="h6 mb-2">
-                              <a href="/dashboard/projekte/<%= project.id %>" class="text-decoration-none text-dark">
+                              <a href="/dashboard/projects/<%= project.id %>" class="text-decoration-none text-dark">
                                 <%= project.titel %>
                               </a>
                             </h5>
@@ -412,7 +412,7 @@
                         <div class="card mb-2 kanban-item" data-id="<%= project.id %>">
                           <div class="card-body p-3">
                             <h5 class="h6 mb-2">
-                              <a href="/dashboard/projekte/<%= project.id %>" class="text-decoration-none text-dark">
+                              <a href="/dashboard/projects/<%= project.id %>" class="text-decoration-none text-dark">
                                 <%= project.titel %>
                               </a>
                             </h5>
@@ -421,7 +421,7 @@
                             </div>
                             <div class="d-flex justify-content-between align-items-center">
                               <small class="text-muted"><%= project.end_datum || '-' %></small>
-                              <a href="/dashboard/projekte/<%= project.id %>" class="btn btn-sm btn-outline-secondary">
+                              <a href="/dashboard/projects/<%= project.id %>" class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-eye"></i>
                               </a>
                             </div>
@@ -449,7 +449,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="statusForm" action="/dashboard/projekte/update-status" method="POST">
+        <form id="statusForm" action="/dashboard/projects/update-status" method="POST">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <input type="hidden" id="projektId" name="id" value="">
           
@@ -561,7 +561,7 @@
       // CSRF-Token aus dem Meta-Tag abrufen
       const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
       
-      fetch('/dashboard/projekte/update-status', {
+      fetch('/dashboard/projects/update-status', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

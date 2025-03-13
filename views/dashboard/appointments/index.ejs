@@ -23,7 +23,7 @@
               <option value="storniert" <% if (statusFilter === 'storniert') { %>selected<% } %>>Storniert</option>
             </select>
           </div>
-          <a href="/dashboard/termine/neu" class="btn btn-success">
+          <a href="/dashboard/appointments/neu" class="btn btn-success">
             <i class="fas fa-plus me-2"></i>Neuer Termin
           </a>
         </div>
@@ -67,13 +67,13 @@
                       <% appointments.forEach(function(appointment) { %>
                         <tr>
                           <td>
-                            <a href="/dashboard/termine/<%= appointment.id %>" class="text-decoration-none text-dark fw-medium">
+                            <a href="/dashboard/appointments/<%= appointment.id %>" class="text-decoration-none text-dark fw-medium">
                               <%= appointment.titel %>
                             </a>
                           </td>
                           <td>
                             <% if (appointment.kunde_id) { %>
-                              <a href="/dashboard/kunden/<%= appointment.kunde_id %>" class="text-decoration-none">
+                              <a href="/dashboard/customers/<%= appointment.kunde_id %>" class="text-decoration-none">
                                 <%= appointment.kunde_name %>
                               </a>
                             <% } else { %>
@@ -89,10 +89,10 @@
                           </td>
                           <td>
                             <div class="btn-group btn-group-sm">
-                              <a href="/dashboard/termine/<%= appointment.id %>" class="btn btn-outline-secondary">
+                              <a href="/dashboard/appointments/<%= appointment.id %>" class="btn btn-outline-secondary">
                                 <i class="fas fa-eye"></i>
                               </a>
-                              <a href="/dashboard/termine/<%= appointment.id %>/edit" class="btn btn-outline-primary">
+                              <a href="/dashboard/appointments/<%= appointment.id %>/edit" class="btn btn-outline-primary">
                                 <i class="fas fa-edit"></i>
                               </a>
                               <button class="btn btn-outline-success status-toggle" 
@@ -126,13 +126,13 @@
                         <div class="d-flex justify-content-between align-items-start mb-2">
                           <div>
                             <h6 class="mb-0">
-                              <a href="/dashboard/termine/<%= appointment.id %>" class="text-decoration-none text-dark">
+                              <a href="/dashboard/appointments/<%= appointment.id %>" class="text-decoration-none text-dark">
                                 <%= appointment.titel %>
                               </a>
                             </h6>
                             <div class="small text-muted">
                               <% if (appointment.kunde_id) { %>
-                                <a href="/dashboard/kunden/<%= appointment.kunde_id %>" class="text-decoration-none">
+                                <a href="/dashboard/customers/<%= appointment.kunde_id %>" class="text-decoration-none">
                                   <i class="fas fa-user me-1"></i><%= appointment.kunde_name %>
                                 </a>
                               <% } else { %>
@@ -164,10 +164,10 @@
                         <% } %>
                         
                         <div class="d-flex justify-content-end gap-2 mt-2">
-                          <a href="/dashboard/termine/<%= appointment.id %>" class="btn btn-sm btn-outline-secondary">
+                          <a href="/dashboard/appointments/<%= appointment.id %>" class="btn btn-sm btn-outline-secondary">
                             <i class="fas fa-eye"></i>
                           </a>
-                          <a href="/dashboard/termine/<%= appointment.id %>/edit" class="btn btn-sm btn-outline-primary">
+                          <a href="/dashboard/appointments/<%= appointment.id %>/edit" class="btn btn-sm btn-outline-primary">
                             <i class="fas fa-edit"></i>
                           </a>
                           <button class="btn btn-sm btn-outline-success status-toggle" 
@@ -213,7 +213,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="statusForm" action="/dashboard/termine/update-status" method="POST">
+        <form id="statusForm" action="/dashboard/appointments/update-status" method="POST">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <input type="hidden" id="terminId" name="id">
           
@@ -369,7 +369,7 @@
             right: 'dayGridMonth,timeGridWeek,listWeek'
           },
           // Use the new endpoint
-          events: '/dashboard/termine/calendar-events',
+          events: '/dashboard/appointments/calendar-events',
           eventTimeFormat: {
             hour: '2-digit',
             minute: '2-digit',
@@ -410,7 +410,7 @@
           },
           eventClick: function(info) {
             info.jsEvent.preventDefault(); // Prevent default browser behavior
-            window.location.href = `/dashboard/termine/${info.event.id}`;
+            window.location.href = `/dashboard/appointments/${info.event.id}`;
           },
           dayMaxEvents: true, // Allow "more" link when too many events
           height: 'auto',

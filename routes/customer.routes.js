@@ -13,7 +13,7 @@ const { validateCustomer } = require('../middleware/validation.middleware');
 router.use(isAuthenticated);
 
 /**
- * @route   GET /dashboard/kunden
+ * @route   GET /dashboard/customers
  * @desc    Display list of customers with optional filtering
  */
 router.get('/', async (req, res, next) => {
@@ -26,7 +26,7 @@ router.get('/', async (req, res, next) => {
     }
     
     // Otherwise render the view
-    res.render('dashboard/kunden/index', { 
+    res.render('dashboard/customers/index', { 
       title: 'Kunden - Rising BSM',
       user: req.session.user,
       currentPath: req.path,
@@ -44,7 +44,7 @@ router.get('/', async (req, res, next) => {
 });
 
 /**
- * @route   GET /dashboard/kunden/neu
+ * @route   GET /dashboard/customers/neu
  * @desc    Display form to create a new customer
  */
 router.get('/neu', async (req, res, next) => {
@@ -52,10 +52,10 @@ router.get('/neu', async (req, res, next) => {
     // Pre-fill data from query parameters if available
     const { name, email, phone } = req.query;
     
-    res.render('dashboard/kunden/neu', {
+    res.render('dashboard/customers/neu', {
       title: 'Neuer Kunde - Rising BSM',
       user: req.session.user,
-      currentPath: '/dashboard/kunden',
+      currentPath: '/dashboard/customers',
       formData: {
         name: name || '',
         email: email || '',
@@ -75,7 +75,7 @@ router.get('/neu', async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/kunden/neu
+ * @route   POST /dashboard/customers/neu
  * @desc    Create a new customer
  */
 router.post('/neu', validateCustomer, async (req, res, next) => {
@@ -89,18 +89,18 @@ router.post('/neu', validateCustomer, async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Kunde erfolgreich angelegt.');
-    res.redirect(`/dashboard/kunden/${result.customerId}`);
+    res.redirect(`/dashboard/customers/${result.customerId}`);
   } catch (error) {
     if (error.statusCode === 400) {
       req.flash('error', error.message);
-      return res.redirect('/dashboard/kunden/neu');
+      return res.redirect('/dashboard/customers/neu');
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/kunden/export
+ * @route   GET /dashboard/customers/export
  * @desc    Export customers in various formats
  */
 router.get('/export', async (req, res, next) => {
@@ -129,7 +129,7 @@ router.get('/export', async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/kunden/update-status
+ * @route   POST /dashboard/customers/update-status
  * @desc    Update customer status
  */
 router.post('/update-status', async (req, res, next) => {
@@ -143,18 +143,18 @@ router.post('/update-status', async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Kundenstatus erfolgreich aktualisiert.');
-    res.redirect('/dashboard/kunden');
+    res.redirect('/dashboard/customers');
   } catch (error) {
     if (error.statusCode === 400) {
       req.flash('error', error.message);
-      return res.redirect('/dashboard/kunden');
+      return res.redirect('/dashboard/customers');
     }
     next(error);
   }
 });
 
 /**
- * @route   POST /dashboard/kunden/delete
+ * @route   POST /dashboard/customers/delete
  * @desc    Delete a customer (mark as deleted)
  */
 router.post('/delete', async (req, res, next) => {
@@ -168,18 +168,18 @@ router.post('/delete', async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Kunde erfolgreich gelöscht.');
-    res.redirect('/dashboard/kunden');
+    res.redirect('/dashboard/customers');
   } catch (error) {
     if (error.statusCode === 400) {
       req.flash('error', error.message);
-      return res.redirect('/dashboard/kunden');
+      return res.redirect('/dashboard/customers');
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/kunden/:id
+ * @route   GET /dashboard/customers/:id
  * @desc    Display customer details
  */
 router.get('/:id', async (req, res, next) => {
@@ -192,10 +192,10 @@ router.get('/:id', async (req, res, next) => {
     }
     
     // Otherwise render the view
-    res.render('dashboard/kunden/detail', {
+    res.render('dashboard/customers/detail', {
       title: `Kunde: ${data.customer.name} - Rising BSM`,
       user: req.session.user,
-      currentPath: '/dashboard/kunden',
+      currentPath: '/dashboard/customers',
       kunde: data.customer,
       termine: data.appointments,
       projekte: data.projects,
@@ -206,14 +206,14 @@ router.get('/:id', async (req, res, next) => {
   } catch (error) {
     if (error.statusCode === 404) {
       req.flash('error', error.message);
-      return res.redirect('/dashboard/kunden');
+      return res.redirect('/dashboard/customers');
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/kunden/:id/edit
+ * @route   GET /dashboard/customers/:id/edit
  * @desc    Display form to edit a customer
  */
 router.get('/:id/edit', async (req, res, next) => {
@@ -228,15 +228,15 @@ router.get('/:id/edit', async (req, res, next) => {
     
     if (customerQuery.rows.length === 0) {
       req.flash('error', `Kunde mit ID ${id} nicht gefunden`);
-      return res.redirect('/dashboard/kunden');
+      return res.redirect('/dashboard/customers');
     }
     
     const customer = customerQuery.rows[0];
     
-    res.render('dashboard/kunden/edit', {
+    res.render('dashboard/customers/edit', {
       title: `Kunde bearbeiten: ${customer.name} - Rising BSM`,
       user: req.session.user,
-      currentPath: '/dashboard/kunden',
+      currentPath: '/dashboard/customers',
       kunde: customer,
       newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken(),
@@ -248,7 +248,7 @@ router.get('/:id/edit', async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/kunden/:id/edit
+ * @route   POST /dashboard/customers/:id/edit
  * @desc    Update customer data
  */
 router.post('/:id/edit', validateCustomer, async (req, res, next) => {
@@ -262,18 +262,18 @@ router.post('/:id/edit', validateCustomer, async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Kunde erfolgreich aktualisiert.');
-    res.redirect(`/dashboard/kunden/${req.params.id}`);
+    res.redirect(`/dashboard/customers/${req.params.id}`);
   } catch (error) {
     if (error.statusCode === 400 || error.statusCode === 404) {
       req.flash('error', error.message);
-      return res.redirect(`/dashboard/kunden/${req.params.id}/edit`);
+      return res.redirect(`/dashboard/customers/${req.params.id}/edit`);
     }
     next(error);
   }
 });
 
 /**
- * @route   POST /dashboard/kunden/:id/add-note
+ * @route   POST /dashboard/customers/:id/add-note
  * @desc    Add a note to customer
  */
 router.post('/:id/add-note', async (req, res, next) => {
@@ -287,11 +287,11 @@ router.post('/:id/add-note', async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Notiz erfolgreich hinzugefügt.');
-    res.redirect(`/dashboard/kunden/${req.params.id}`);
+    res.redirect(`/dashboard/customers/${req.params.id}`);
   } catch (error) {
     if (error.statusCode === 400 || error.statusCode === 404) {
       req.flash('error', error.message);
-      return res.redirect(`/dashboard/kunden/${req.params.id}`);
+      return res.redirect(`/dashboard/customers/${req.params.id}`);
     }
     next(error);
   }

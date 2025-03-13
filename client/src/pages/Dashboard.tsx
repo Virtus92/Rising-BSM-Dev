@@ -219,7 +219,7 @@ const Dashboard = () => {
         <div className="bg-white rounded-lg shadow">
           <div className="border-b border-gray-200 p-4 flex justify-between items-center">
             <h2 className="text-lg font-medium text-gray-800">Anstehende Termine</h2>
-            <Link to="/dashboard/termine" className="text-sm text-primary-600 hover:text-primary-700">
+            <Link to="/dashboard/appointments" className="text-sm text-primary-600 hover:text-primary-700">
               Alle anzeigen
             </Link>
           </div>
@@ -228,7 +228,7 @@ const Dashboard = () => {
               <ul className="divide-y divide-gray-200">
                 {upcomingAppointments.map((appointment) => (
                   <li key={appointment.id} className="py-3">
-                    <Link to={`/dashboard/termine/${appointment.id}`} className="block hover:bg-gray-50">
+                    <Link to={`/dashboard/appointments/${appointment.id}`} className="block hover:bg-gray-50">
                       <div className="flex justify-between">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{appointment.titel}</p>

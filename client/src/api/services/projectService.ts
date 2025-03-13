@@ -4,7 +4,7 @@ import { Project, ApiResponse } from '../../types';
 export const projectService = {
     async getAll(filters: any = {}) {
         try {
-            const response = await api.get<ApiResponse<Project[]>>('/projekte', { params: filters });
+            const response = await api.get<ApiResponse<Project[]>>('/projects', { params: filters });
             return response.data;
         } catch (error) {
             console.error('Error fetching projects:', error);
@@ -14,7 +14,7 @@ export const projectService = {
 
     async getById(id: number) {
         try {
-            const response = await api.get<Project>(`/projekte/${id}`);
+            const response = await api.get<Project>(`/projects/${id}`);
             return response.data;
         } catch (error) {
             console.error(`Error fetching project ${id}:`, error);
@@ -24,7 +24,7 @@ export const projectService = {
 
     async create(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'statusLabel' | 'statusClass' | 'customer_name' | 'service_name'>) {
         try {
-            const response = await api.post<Project>('/projekte', data);
+            const response = await api.post<Project>('/projects', data);
             return response.data;
         } catch (error) {
             console.error('Error creating project:', error);
@@ -34,7 +34,7 @@ export const projectService = {
 
     async update(id: number, data: Partial<Project>) {
         try {
-            const response = await api.put<Project>(`/projekte/${id}`, data);
+            const response = await api.put<Project>(`/projects/${id}`, data);
             return response.data;
         } catch (error) {
             console.error(`Error updating project ${id}:`, error);
@@ -44,7 +44,7 @@ export const projectService = {
 
     async updateStatus(id: number, status: 'neu' | 'in_bearbeitung' | 'abgeschlossen' | 'storniert') {
         try {
-            const response = await api.patch<Project>(`/projekte/${id}/status`, { status });
+            const response = await api.patch<Project>(`/projects/${id}/status`, { status });
             return response.data;
         } catch (error) {
             console.error(`Error updating project status ${id}:`, error);
@@ -54,7 +54,7 @@ export const projectService = {
 
     async delete(id: number) {
         try {
-            const response = await api.delete(`/projekte/${id}`);
+            const response = await api.delete(`/projects/${id}`);
             return response.data;
         } catch (error) {
             console.error(`Error deleting project ${id}:`, error);
@@ -64,7 +64,7 @@ export const projectService = {
 
     async export(format: 'csv' | 'excel' | 'pdf', filters: any = {}) {
         try {
-            const response = await api.get(`/projekte/export/${format}`, {
+            const response = await api.get(`/projects/export/${format}`, {
                 params: filters,
                 responseType: 'blob'
             });

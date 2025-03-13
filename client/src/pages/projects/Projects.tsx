@@ -58,7 +58,7 @@ const Projects = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
         <Link
-          to="/dashboard/projekte/neu"
+          to="/dashboard/projects/neu"
           className="bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded"
         >
           New Project
@@ -89,7 +89,7 @@ const Projects = () => {
                 <tr key={project.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Link
-                      to={`/dashboard/projekte/${project.id}`}
+                      to={`/dashboard/projects/${project.id}`}
                       className="text-blue-600 hover:text-blue-900"
                     >
                       {project.title}
@@ -119,7 +119,7 @@ const Projects = () => {
         <div className="bg-white shadow rounded-lg p-6 text-center">
           <p className="text-gray-500 mb-4">No projects found</p>
           <Link
-            to="/dashboard/projekte/neu"
+            to="/dashboard/projects/neu"
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700"
           >
             Create New Project

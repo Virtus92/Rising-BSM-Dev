@@ -7,7 +7,7 @@
       <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
           <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-          <li class="breadcrumb-item"><a href="/dashboard/termine">Termine</a></li>
+          <li class="breadcrumb-item"><a href="/dashboard/appointments">Termine</a></li>
           <li class="breadcrumb-item active" aria-current="page">Neuer Termin</li>
         </ol>
       </nav>
@@ -32,7 +32,7 @@
           <h2 class="h5 mb-0">Termindaten</h2>
         </div>
         <div class="card-body">
-          <form action="/dashboard/termine/neu" method="POST" class="needs-validation" novalidate>
+          <form action="/dashboard/appointments/neu" method="POST" class="needs-validation" novalidate>
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             
             <div class="row g-3">
@@ -67,7 +67,7 @@
                 <% if (formData.kunde_name && !formData.kunde_id) { %>
                   <div class="form-text">
                     <i class="fas fa-info-circle me-1"></i> 
-                    '<%= formData.kunde_name %>' ist nicht als Kunde angelegt. <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(formData.kunde_name) %>" class="text-decoration-none">Jetzt anlegen</a>
+                    '<%= formData.kunde_name %>' ist nicht als Kunde angelegt. <a href="/dashboard/customers/neu?name=<%= encodeURIComponent(formData.kunde_name) %>" class="text-decoration-none">Jetzt anlegen</a>
                   </div>
                 <% } %>
               </div>
@@ -140,7 +140,7 @@
               </div>
               
               <div class="col-12 d-flex justify-content-between mt-4">
-                <a href="/dashboard/termine" class="btn btn-outline-secondary">
+                <a href="/dashboard/appointments" class="btn btn-outline-secondary">
                   <i class="fas fa-arrow-left me-2"></i>Zurück
                 </a>
                 <button type="submit" class="btn btn-success">

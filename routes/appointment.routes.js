@@ -12,7 +12,7 @@ const { validateAppointment } = require('../middleware/validation.middleware');
 router.use(isAuthenticated);
 
 /**
- * @route   GET /dashboard/termine
+ * @route   GET /dashboard/appointments
  * @desc    Display list of appointments with optional filtering
  */
 router.get('/', async (req, res, next) => {
@@ -25,7 +25,7 @@ router.get('/', async (req, res, next) => {
     }
     
     // Otherwise render the view
-    res.render('dashboard/termine/index', { 
+    res.render('dashboard/appointments/index', { 
       title: 'Termine - Rising BSM',
       user: req.session.user,
       currentPath: req.path,
@@ -42,7 +42,7 @@ router.get('/', async (req, res, next) => {
 });
 
 /**
- * @route   GET /dashboard/termine/neu
+ * @route   GET /dashboard/appointments/neu
  * @desc    Display form to create a new appointment
  */
 router.get('/neu', async (req, res, next) => {
@@ -66,10 +66,10 @@ router.get('/neu', async (req, res, next) => {
     // Prefilled data from query parameters
     const { kunde_id, projekt_id, kunde_name } = req.query;
     
-    res.render('dashboard/termine/neu', {
+    res.render('dashboard/appointments/neu', {
       title: 'Neuer Termin - Rising BSM',
       user: req.session.user,
-      currentPath: '/dashboard/termine',
+      currentPath: '/dashboard/appointments',
       kunden: kundenQuery.rows,
       projekte: projekteQuery.rows,
       formData: {
@@ -94,7 +94,7 @@ router.get('/neu', async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/termine/neu
+ * @route   POST /dashboard/appointments/neu
  * @desc    Create a new appointment
  */
 router.post('/neu', validateAppointment, async (req, res, next) => {
@@ -108,18 +108,18 @@ router.post('/neu', validateAppointment, async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Termin erfolgreich angelegt.');
-    res.redirect(`/dashboard/termine/${result.appointmentId}`);
+    res.redirect(`/dashboard/appointments/${result.appointmentId}`);
   } catch (error) {
     if (error.statusCode === 400) {
       req.flash('error', error.message);
-      return res.redirect('/dashboard/termine/neu');
+      return res.redirect('/dashboard/appointments/neu');
     }
     next(error);
   }
 });
 
 /**
- * @route   POST /dashboard/termine/update-status
+ * @route   POST /dashboard/appointments/update-status
  * @desc    Update appointment status
  */
 router.post('/update-status', async (req, res, next) => {
@@ -133,18 +133,18 @@ router.post('/update-status', async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Termin-Status erfolgreich aktualisiert.');
-    res.redirect(`/dashboard/termine/${req.body.id}`);
+    res.redirect(`/dashboard/appointments/${req.body.id}`);
   } catch (error) {
     if (error.statusCode === 400) {
       req.flash('error', error.message);
-      return res.redirect(`/dashboard/termine/${req.body.id}`);
+      return res.redirect(`/dashboard/appointments/${req.body.id}`);
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/termine/export
+ * @route   GET /dashboard/appointments/export
  * @desc    Export appointments in various formats
  */
 router.get('/export', async (req, res, next) => {
@@ -173,7 +173,7 @@ router.get('/export', async (req, res, next) => {
 });
 
 /**
- * @route   GET /dashboard/termine/calendar-events
+ * @route   GET /dashboard/appointments/calendar-events
  * @desc    Get calendar events as JSON for calendar view
  */
 router.get('/calendar-events', async (req, res, next) => {
@@ -239,7 +239,7 @@ router.get('/calendar-events', async (req, res, next) => {
           beschreibung: termin.beschreibung,
           status: termin.status
         },
-        url: `/dashboard/termine/${termin.id}`
+        url: `/dashboard/appointments/${termin.id}`
       };
     });
     
@@ -254,7 +254,7 @@ router.get('/calendar-events', async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/termine/:id/add-note
+ * @route   POST /dashboard/appointments/:id/add-note
  * @desc    Add a note to an appointment
  */
 router.post('/:id/add-note', async (req, res, next) => {
@@ -268,18 +268,18 @@ router.post('/:id/add-note', async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Notiz erfolgreich hinzugefügt.');
-    res.redirect(`/dashboard/termine/${req.params.id}`);
+    res.redirect(`/dashboard/appointments/${req.params.id}`);
   } catch (error) {
     if (error.statusCode === 400 || error.statusCode === 404) {
       req.flash('error', error.message);
-      return res.redirect(`/dashboard/termine/${req.params.id}`);
+      return res.redirect(`/dashboard/appointments/${req.params.id}`);
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/termine/:id/edit
+ * @route   GET /dashboard/appointments/:id/edit
  * @desc    Display form to edit an appointment
  */
 router.get('/:id/edit', async (req, res, next) => {
@@ -303,7 +303,7 @@ router.get('/:id/edit', async (req, res, next) => {
     
     if (appointmentQuery.rows.length === 0) {
       req.flash('error', `Termin mit ID ${id} nicht gefunden`);
-      return res.redirect('/dashboard/termine');
+      return res.redirect('/dashboard/appointments');
     }
     
     const appointment = appointmentQuery.rows[0];
@@ -325,10 +325,10 @@ router.get('/:id/edit', async (req, res, next) => {
     const formattedDate = appointmentDate.toISOString().split('T')[0];
     const formattedTime = appointmentDate.toTimeString().split(' ')[0].substring(0, 5);
     
-    res.render('dashboard/termine/edit', {
+    res.render('dashboard/appointments/edit', {
       title: `Termin bearbeiten: ${appointment.titel} - Rising BSM`,
       user: req.session.user,
-      currentPath: '/dashboard/termine',
+      currentPath: '/dashboard/appointments',
       appointment: {
         id: appointment.id,
         titel: appointment.titel,
@@ -354,7 +354,7 @@ router.get('/:id/edit', async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/termine/:id/edit
+ * @route   POST /dashboard/appointments/:id/edit
  * @desc    Update an appointment
  */
 router.post('/:id/edit', validateAppointment, async (req, res, next) => {
@@ -368,18 +368,18 @@ router.post('/:id/edit', validateAppointment, async (req, res, next) => {
     
     // Otherwise set flash message and redirect
     req.flash('success', 'Termin erfolgreich aktualisiert.');
-    res.redirect(`/dashboard/termine/${req.params.id}`);
+    res.redirect(`/dashboard/appointments/${req.params.id}`);
   } catch (error) {
     if (error.statusCode === 400 || error.statusCode === 404) {
       req.flash('error', error.message);
-      return res.redirect(`/dashboard/termine/${req.params.id}/edit`);
+      return res.redirect(`/dashboard/appointments/${req.params.id}/edit`);
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/termine/:id
+ * @route   GET /dashboard/appointments/:id
  * @desc    Display appointment details
  */
 router.get('/:id', async (req, res, next) => {
@@ -392,10 +392,10 @@ router.get('/:id', async (req, res, next) => {
     }
     
     // Otherwise render the view
-    res.render('dashboard/termine/detail', {
+    res.render('dashboard/appointments/detail', {
       title: `Termin: ${data.appointment.titel} - Rising BSM`,
       user: req.session.user,
-      currentPath: '/dashboard/termine',
+      currentPath: '/dashboard/appointments',
       termin: data.appointment,
       notizen: data.notes,
       newRequestsCount: req.newRequestsCount,
@@ -405,7 +405,7 @@ router.get('/:id', async (req, res, next) => {
   } catch (error) {
     if (error.statusCode === 404) {
       req.flash('error', error.message);
-      return res.redirect('/dashboard/termine');
+      return res.redirect('/dashboard/appointments');
     }
     next(error);
   }

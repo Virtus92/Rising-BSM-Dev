@@ -479,7 +479,7 @@ exports.globalSearch = async (query) => {
         telefon: customer.telefon,
         status: customer.status,
         type: 'Kunde',
-        url: `/dashboard/kunden/${customer.id}`
+        url: `/dashboard/customers/${customer.id}`
       })),
       
       projects: projectResults.rows.map(project => ({
@@ -489,7 +489,7 @@ exports.globalSearch = async (query) => {
         date: formatDateSafely(project.start_datum, 'dd.MM.yyyy'),
         kunde: project.kunde_name,
         type: 'Projekt',
-        url: `/dashboard/projekte/${project.id}`
+        url: `/dashboard/projects/${project.id}`
       })),
       
       appointments: appointmentResults.rows.map(appointment => ({
@@ -499,7 +499,7 @@ exports.globalSearch = async (query) => {
         date: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy, HH:mm'),
         kunde: appointment.kunde_name,
         type: 'Termin',
-        url: `/dashboard/termine/${appointment.id}`
+        url: `/dashboard/appointments/${appointment.id}`
       })),
       
       requests: requestResults.rows.map(request => ({
@@ -519,7 +519,7 @@ exports.globalSearch = async (query) => {
         einheit: service.einheit,
         aktiv: service.aktiv,
         type: 'Dienstleistung',
-        url: `/dashboard/dienste/${service.id}`
+        url: `/dashboard/services/${service.id}`
       }))
     };
   } catch (error) {
@@ -580,10 +580,10 @@ exports.getNotifications = async (userId) => {
           link = `/dashboard/requests/${notification.referenz_id}`;
           break;
         case 'termin':
-          link = `/dashboard/termine/${notification.referenz_id}`;
+          link = `/dashboard/appointments/${notification.referenz_id}`;
           break;
         case 'projekt':
-          link = `/dashboard/projekte/${notification.referenz_id}`;
+          link = `/dashboard/projects/${notification.referenz_id}`;
           break;
         default:
           link = '/dashboard/notifications';

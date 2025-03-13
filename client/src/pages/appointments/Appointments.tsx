@@ -72,7 +72,7 @@ const Appointments = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
         <Link
-          to="/dashboard/termine/neu"
+          to="/dashboard/appointments/neu"
           className="bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded"
         >
           New Appointment
@@ -141,7 +141,7 @@ const Appointments = () => {
             {filteredAppointments.map((appointment) => (
               <Link
                 key={appointment.id}
-                to={`/dashboard/termine/${appointment.id}`}
+                to={`/dashboard/appointments/${appointment.id}`}
                 className="block hover:bg-gray-50 transition duration-150"
               >
                 <div className="px-6 py-4">
@@ -191,7 +191,7 @@ const Appointments = () => {
           <div className="py-12 px-6 text-center">
             <p className="text-gray-500 mb-4">No appointments found</p>
             <Link
-              to="/dashboard/termine/neu"
+              to="/dashboard/appointments/neu"
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700"
             >
               Create New Appointment

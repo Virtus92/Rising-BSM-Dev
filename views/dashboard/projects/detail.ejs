@@ -7,7 +7,7 @@
       <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
           <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-          <li class="breadcrumb-item"><a href="/dashboard/projekte">Projekte</a></li>
+          <li class="breadcrumb-item"><a href="/dashboard/projects">Projekte</a></li>
           <li class="breadcrumb-item active" aria-current="page"><%= projekt.titel %></li>
         </ol>
       </nav>
@@ -45,7 +45,7 @@
                   <h3 class="h6 text-muted mb-1">Kunde</h3>
                   <p class="mb-0">
                     <% if (projekt.kunde_id) { %>
-                      <a href="/dashboard/kunden/<%= projekt.kunde_id %>" class="text-decoration-none"><%= projekt.kunde_name %></a>
+                      <a href="/dashboard/customers/<%= projekt.kunde_id %>" class="text-decoration-none"><%= projekt.kunde_name %></a>
                     <% } else { %>
                       <%= projekt.kunde_name %>
                     <% } %>
@@ -67,10 +67,10 @@
               </div>
               
               <div class="d-grid gap-2 mt-4">
-                <a href="/dashboard/projekte/<%= projekt.id %>/edit" class="btn btn-primary">
+                <a href="/dashboard/projects/<%= projekt.id %>/edit" class="btn btn-primary">
                   <i class="fas fa-edit me-2"></i>Bearbeiten
                 </a>
-                <a href="/dashboard/termine/neu?projekt_id=<%= projekt.id %>" class="btn btn-success">
+                <a href="/dashboard/appointments/neu?projekt_id=<%= projekt.id %>" class="btn btn-success">
                   <i class="fas fa-calendar-plus me-2"></i>Termin hinzufügen
                 </a>
                 <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#statusModal">
@@ -86,7 +86,7 @@
               <h2 class="h5 mb-0">Notizen</h2>
             </div>
             <div class="card-body">
-              <form action="/dashboard/projekte/<%= projekt.id %>/add-note" method="POST">
+              <form action="/dashboard/projects/<%= projekt.id %>/add-note" method="POST">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 
                 <div class="mb-3">
@@ -142,7 +142,7 @@
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
               <h2 class="h5 mb-0">Projekt-Termine</h2>
-              <a href="/dashboard/termine/neu?projekt_id=<%= projekt.id %>" class="btn btn-sm btn-success">
+              <a href="/dashboard/appointments/neu?projekt_id=<%= projekt.id %>" class="btn btn-sm btn-success">
                 <i class="fas fa-plus me-1"></i>Neuer Termin
               </a>
             </div>
@@ -162,7 +162,7 @@
                       <% termine.forEach(function(termin) { %>
                         <tr>
                           <td>
-                            <a href="/dashboard/termine/<%= termin.id %>" class="text-decoration-none text-dark">
+                            <a href="/dashboard/appointments/<%= termin.id %>" class="text-decoration-none text-dark">
                               <%= termin.titel %>
                             </a>
                           </td>
@@ -174,10 +174,10 @@
                           </td>
                           <td>
                             <div class="btn-group btn-group-sm">
-                              <a href="/dashboard/termine/<%= termin.id %>" class="btn btn-outline-secondary">
+                              <a href="/dashboard/appointments/<%= termin.id %>" class="btn btn-outline-secondary">
                                 <i class="fas fa-eye"></i>
                               </a>
-                              <a href="/dashboard/termine/<%= termin.id %>/edit" class="btn btn-outline-primary">
+                              <a href="/dashboard/appointments/<%= termin.id %>/edit" class="btn btn-outline-primary">
                                 <i class="fas fa-edit"></i>
                               </a>
                             </div>
@@ -191,7 +191,7 @@
                 <div class="p-4 text-center">
                   <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
                   <p class="text-muted mb-3">Keine Termine für dieses Projekt vorhanden.</p>
-                  <a href="/dashboard/termine/neu?projekt_id=<%= projekt.id %>" class="btn btn-success">
+                  <a href="/dashboard/appointments/neu?projekt_id=<%= projekt.id %>" class="btn btn-success">
                     <i class="fas fa-plus me-2"></i>Termin hinzufügen
                   </a>
                 </div>
@@ -215,7 +215,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="statusForm" action="/dashboard/projekte/<%= projekt.id %>/update-status" method="POST">
+        <form id="statusForm" action="/dashboard/projects/<%= projekt.id %>/update-status" method="POST">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           
           <div class="mb-3">

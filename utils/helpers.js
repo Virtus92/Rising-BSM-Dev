@@ -134,8 +134,8 @@ exports.getNotifications = async (req) => {
                 n.typ === 'warnung' ? 'exclamation-triangle' : 'bell',
           time: formatRelativeTime(n.erstellt_am),
           link: n.typ === 'anfrage' ? `/dashboard/requests/${n.referenz_id}` :
-                n.typ === 'termin' ? `/dashboard/termine/${n.referenz_id}` :
-                n.typ === 'projekt' ? `/dashboard/projekte/${n.referenz_id}` :
+                n.typ === 'termin' ? `/dashboard/appointments/${n.referenz_id}` :
+                n.typ === 'projekt' ? `/dashboard/projects/${n.referenz_id}` :
                 '/dashboard/notifications'
         };
       });

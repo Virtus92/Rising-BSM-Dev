@@ -81,7 +81,7 @@ const ServiceDetail = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
           <button 
-            onClick={() => navigate('/dashboard/dienste')}
+            onClick={() => navigate('/dashboard/services')}
             className="mr-4 p-2 rounded-full hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
@@ -102,7 +102,7 @@ const ServiceDetail = () => {
             {service.active ? 'Deaktivieren' : 'Aktivieren'}
           </button>
           <Link
-            to={`/dashboard/dienste/${id}/edit`}
+            to={`/dashboard/services/${id}/edit`}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             <Edit size={16} className="mr-2" />
@@ -170,7 +170,7 @@ const ServiceDetail = () => {
             <ul className="divide-y divide-gray-200">
               {service.projects.map(project => (
                 <li key={project.id} className="py-3">
-                  <Link to={`/dashboard/projekte/${project.id}`} className="block hover:bg-gray-50 -mx-6 px-6 py-2">
+                  <Link to={`/dashboard/projects/${project.id}`} className="block hover:bg-gray-50 -mx-6 px-6 py-2">
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{project.title}</p>

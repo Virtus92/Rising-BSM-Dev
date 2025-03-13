@@ -63,7 +63,7 @@ const AppointmentDetail = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
           <button 
-            onClick={() => navigate('/dashboard/termine')}
+            onClick={() => navigate('/dashboard/appointments')}
             className="mr-4 p-2 rounded-full hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
@@ -74,7 +74,7 @@ const AppointmentDetail = () => {
         </div>
         <div>
           <Link
-            to={`/dashboard/termine/${id}/edit`}
+            to={`/dashboard/appointments/${id}/edit`}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             <Edit size={16} className="mr-2" />
@@ -102,7 +102,7 @@ const AppointmentDetail = () => {
               <div className="flex items-center">
                 <Briefcase className="h-5 w-5 text-gray-400 mr-2" />
                 <span className="text-gray-500 mr-2">Projekt:</span>
-                <Link to={`/dashboard/projekte/${appointment.projekt_id}`} className="text-primary-600 hover:text-primary-800">
+                <Link to={`/dashboard/projects/${appointment.projekt_id}`} className="text-primary-600 hover:text-primary-800">
                   {appointment.projekt_titel}
                 </Link>
               </div>

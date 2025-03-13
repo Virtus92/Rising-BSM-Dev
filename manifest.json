@@ -68,15 +68,15 @@
         "name": "Termine verwalten",
         "short_name": "Termine",
         "description": "Termine anzeigen und bearbeiten",
-        "url": "/dashboard/termine",
-        "icons": [{ "src": "/images/icons/termine.png", "sizes": "96x96" }]
+        "url": "/dashboard/appointments",
+        "icons": [{ "src": "/images/icons/appointments.png", "sizes": "96x96" }]
       },
       {
         "name": "Kunden verwalten",
         "short_name": "Kunden",
         "description": "Kundendaten einsehen und bearbeiten",
-        "url": "/dashboard/kunden",
-        "icons": [{ "src": "/images/icons/kunden.png", "sizes": "96x96" }]
+        "url": "/dashboard/customers",
+        "icons": [{ "src": "/images/icons/customers.png", "sizes": "96x96" }]
       }
     ],
     "lang": "de-DE",

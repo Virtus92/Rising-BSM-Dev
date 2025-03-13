@@ -106,7 +106,7 @@ const EditProject = () => {
       };
 
       await projectService.update(parseInt(id), projectData);
-      navigate(`/dashboard/projekte/${id}`);
+      navigate(`/dashboard/projects/${id}`);
     } catch (err: any) {
       console.error('Error updating project:', err);
       setError(err.message || 'Fehler beim Aktualisieren des Projekts');
@@ -129,7 +129,7 @@ const EditProject = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
           <button 
-            onClick={() => navigate(`/dashboard/projekte/${id}`)}
+            onClick={() => navigate(`/dashboard/projects/${id}`)}
             className="mr-4 p-2 rounded-full hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
@@ -292,7 +292,7 @@ const EditProject = () => {
 
           <div className="flex justify-end space-x-3">
             <Link
-              to={`/dashboard/projekte/${id}`}
+              to={`/dashboard/projects/${id}`}
               className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               Abbrechen

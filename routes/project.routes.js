@@ -5,7 +5,7 @@ const { isAuthenticated } = require('../middleware/auth.middleware');
 const { validateProject } = require('../middleware/validation.middleware');
 
 /**
- * @route   GET /dashboard/projekte
+ * @route   GET /dashboard/projects
  * @desc    Display list of projects with optional filtering
  */
 router.get('/', isAuthenticated, async (req, res, next) => {
@@ -18,7 +18,7 @@ router.get('/', isAuthenticated, async (req, res, next) => {
     }
 
     // Otherwise render the view
-    res.render('dashboard/projekte/index', {
+    res.render('dashboard/projects/index', {
       title: 'Projekte - Rising BSM',
       user: req.session.user,
       currentPath: req.path,
@@ -35,7 +35,7 @@ router.get('/', isAuthenticated, async (req, res, next) => {
 });
 
 /**
- * @route   GET /dashboard/projekte/neu
+ * @route   GET /dashboard/projects/neu
  * @desc    Display form to create a new project
  */
 router.get('/neu', isAuthenticated, async (req, res, next) => {
@@ -54,10 +54,10 @@ router.get('/neu', isAuthenticated, async (req, res, next) => {
       `
     });
 
-    res.render('dashboard/projekte/neu', {
+    res.render('dashboard/projects/neu', {
       title: 'Neues Projekt - Rising BSM',
       user: req.session.user,
-      currentPath: '/dashboard/projekte',
+      currentPath: '/dashboard/projects',
       kunden: kundenQuery.rows,
       dienstleistungen: dienstleistungenQuery.rows,
       formData: {
@@ -80,7 +80,7 @@ router.get('/neu', isAuthenticated, async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/projekte/neu
+ * @route   POST /dashboard/projects/neu
  * @desc    Create a new project
  */
 router.post('/neu', isAuthenticated, validateProject, async (req, res, next) => {
@@ -94,18 +94,18 @@ router.post('/neu', isAuthenticated, validateProject, async (req, res, next) => 
 
     // Otherwise set flash message and redirect
     req.flash('success', 'Projekt erfolgreich angelegt.');
-    res.redirect(`/dashboard/projekte/${result.projectId}`);
+    res.redirect(`/dashboard/projects/${result.projectId}`);
   } catch (error) {
     if (error.statusCode === 400) {
       req.flash('error', error.message);
-      return res.redirect('/dashboard/projekte/neu');
+      return res.redirect('/dashboard/projects/neu');
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/projekte/export
+ * @route   GET /dashboard/projects/export
  * @desc    Export projects in various formats
  */
 router.get('/export', isAuthenticated, async (req, res, next) => {
@@ -133,7 +133,7 @@ router.get('/export', isAuthenticated, async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/projekte/update-status
+ * @route   POST /dashboard/projects/update-status
  * @desc    Update project status
  */
 router.post('/update-status', isAuthenticated, async (req, res, next) => {
@@ -147,18 +147,18 @@ router.post('/update-status', isAuthenticated, async (req, res, next) => {
 
     // Otherwise set flash message and redirect
     req.flash('success', 'Projekt-Status erfolgreich aktualisiert.');
-    res.redirect(`/dashboard/projekte/${req.body.id}`);
+    res.redirect(`/dashboard/projects/${req.body.id}`);
   } catch (error) {
     if (error.statusCode === 400) {
       req.flash('error', error.message);
-      return res.redirect(`/dashboard/projekte/${req.body.id}`);
+      return res.redirect(`/dashboard/projects/${req.body.id}`);
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/projekte/:id
+ * @route   GET /dashboard/projects/:id
  * @desc    Display project details
  */
 router.get('/:id', isAuthenticated, async (req, res, next) => {
@@ -171,10 +171,10 @@ router.get('/:id', isAuthenticated, async (req, res, next) => {
     }
 
     // Otherwise render the view
-    res.render('dashboard/projekte/detail', {
+    res.render('dashboard/projects/detail', {
       title: `Projekt: ${data.project.titel} - Rising BSM`,
       user: req.session.user,
-      currentPath: '/dashboard/projekte',
+      currentPath: '/dashboard/projects',
       projekt: data.project,
       termine: data.appointments,
       notizen: data.notes,
@@ -185,14 +185,14 @@ router.get('/:id', isAuthenticated, async (req, res, next) => {
   } catch (error) {
     if (error.statusCode === 404) {
       req.flash('error', error.message);
-      return res.redirect('/dashboard/projekte');
+      return res.redirect('/dashboard/projects');
     }
     next(error);
   }
 });
 
 /**
- * @route   POST /dashboard/projekte/:id/add-note
+ * @route   POST /dashboard/projects/:id/add-note
  * @desc    Add a note to a project
  */
 router.post('/:id/add-note', isAuthenticated, async (req, res, next) => {
@@ -206,18 +206,18 @@ router.post('/:id/add-note', isAuthenticated, async (req, res, next) => {
 
     // Otherwise set flash message and redirect
     req.flash('success', 'Notiz erfolgreich hinzugefügt.');
-    res.redirect(`/dashboard/projekte/${req.params.id}`);
+    res.redirect(`/dashboard/projects/${req.params.id}`);
   } catch (error) {
     if (error.statusCode === 400 || error.statusCode === 404) {
       req.flash('error', error.message);
-      return res.redirect(`/dashboard/projekte/${req.params.id}`);
+      return res.redirect(`/dashboard/projects/${req.params.id}`);
     }
     next(error);
   }
 });
 
 /**
- * @route   GET /dashboard/projekte/:id/edit
+ * @route   GET /dashboard/projects/:id/edit
  * @desc    Display form to edit a project
  */
 router.get('/:id/edit', isAuthenticated, async (req, res, next) => {
@@ -241,7 +241,7 @@ router.get('/:id/edit', isAuthenticated, async (req, res, next) => {
 
     if (projectQuery.rows.length === 0) {
       req.flash('error', `Projekt mit ID ${id} nicht gefunden`);
-      return res.redirect('/dashboard/projekte');
+      return res.redirect('/dashboard/projects');
     }
 
     const project = projectQuery.rows[0];
@@ -258,10 +258,10 @@ router.get('/:id/edit', isAuthenticated, async (req, res, next) => {
       ORDER BY name ASC
     `);
 
-    res.render('dashboard/projekte/edit', {
+    res.render('dashboard/projects/edit', {
       title: `Projekt bearbeiten: ${project.titel} - Rising BSM`,
       user: req.session.user,
-      currentPath: '/dashboard/projekte',
+      currentPath: '/dashboard/projects',
       projekt: {
         id: project.id,
         titel: project.titel,
@@ -286,7 +286,7 @@ router.get('/:id/edit', isAuthenticated, async (req, res, next) => {
 });
 
 /**
- * @route   POST /dashboard/projekte/:id/edit
+ * @route   POST /dashboard/projects/:id/edit
  * @desc    Update a project
  */
 router.post('/:id/edit', isAuthenticated, validateProject, async (req, res, next) => {
@@ -300,11 +300,11 @@ router.post('/:id/edit', isAuthenticated, validateProject, async (req, res, next
 
     // Otherwise set flash message and redirect
     req.flash('success', 'Projekt erfolgreich aktualisiert.');
-    res.redirect(`/dashboard/projekte/${req.params.id}`);
+    res.redirect(`/dashboard/projects/${req.params.id}`);
   } catch (error) {
     if (error.statusCode === 400 || error.statusCode === 404) {
       req.flash('error', error.message);
-      return res.redirect(`/dashboard/projekte/${req.params.id}/edit`);
+      return res.redirect(`/dashboard/projects/${req.params.id}/edit`);
     }
     next(error);
   }

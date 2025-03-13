@@ -84,7 +84,7 @@ router.get('/', isAuthenticated, async (req, res) => {
     const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
     const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
 
-    res.render('dashboard/projekte/index', { 
+    res.render('dashboard/projects/index', { 
       title: 'Projekte - Rising BSM',
       user: req.session.user,
       currentPath: req.path,
@@ -119,10 +119,10 @@ router.get('/neu', isAuthenticated, async (req, res) => {
     const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
     const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
     
-    res.render('dashboard/projekte/neu', {
+    res.render('dashboard/projects/neu', {
       title: 'Neues Projekt - Rising BSM',
       user: req.session.user,
-      currentPath: '/dashboard/projekte',
+      currentPath: '/dashboard/projects',
       kunden: kundenQuery.rows,
       formData: {
         kunde_id,
@@ -162,7 +162,7 @@ router.post('/neu', isAuthenticated, async (req, res) => {
     // Validierung
     if (!titel || !start_datum) {
       req.flash('error', 'Titel und Start-Datum sind Pflichtfelder.');
-      return res.redirect('/dashboard/projekte/neu');
+      return res.redirect('/dashboard/projects/neu');
     }
     
     // In Datenbank einfügen
@@ -188,11 +188,11 @@ router.post('/neu', isAuthenticated, async (req, res) => {
     const projektId = result.rows[0].id;
     
     req.flash('success', 'Projekt erfolgreich angelegt.');
-    res.redirect(`/dashboard/projekte/${projektId}`);
+    res.redirect(`/dashboard/projects/${projektId}`);
   } catch (error) {
     console.error('Fehler beim Anlegen des Projekts:', error);
     req.flash('error', 'Datenbankfehler: ' + error.message);
-    res.redirect('/dashboard/projekte/neu');
+    res.redirect('/dashboard/projects/neu');
   }
 });
 
@@ -251,10 +251,10 @@ router.get('/:id', isAuthenticated, async (req, res) => {
     const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
     const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
     
-    res.render('dashboard/projekte/detail', {
+    res.render('dashboard/projects/detail', {
       title: `Projekt: ${projekt.titel} - Rising BSM`,
       user: req.session.user,
-      currentPath: '/dashboard/projekte',
+      currentPath: '/dashboard/projects',
       projekt: {
         id: projekt.id,
         titel: projekt.titel,
@@ -329,7 +329,7 @@ router.post('/update-status', isAuthenticated, async (req, res) => {
     
     // Für normale Formulare Flash-Message und Redirect
     req.flash('success', 'Projekt-Status erfolgreich aktualisiert.');
-    res.redirect(`/dashboard/projekte/${id}`);
+    res.redirect(`/dashboard/projects/${id}`);
   } catch (error) {
     console.error('Fehler beim Aktualisieren des Projekt-Status:', error);
     
@@ -340,7 +340,7 @@ router.post('/update-status', isAuthenticated, async (req, res) => {
     
     // Für normale Formulare Flash-Message und Redirect
     req.flash('error', 'Datenbankfehler: ' + error.message);
-    res.redirect(`/dashboard/projekte/${req.body.id}`);
+    res.redirect(`/dashboard/projects/${req.body.id}`);
   }
 });
 
@@ -382,10 +382,10 @@ router.get('/:id/edit', isAuthenticated, async (req, res) => {
     const newRequestsCountQuery = await pool.query("SELECT COUNT(*) FROM kontaktanfragen WHERE status = 'neu'");
     const newRequestsCount = parseInt(newRequestsCountQuery.rows[0].count || 0);
     
-    res.render('dashboard/projekte/edit', {
+    res.render('dashboard/projects/edit', {
       title: `Projekt bearbeiten: ${projekt.titel} - Rising BSM`,
       user: req.session.user,
-      currentPath: '/dashboard/projekte',
+      currentPath: '/dashboard/projects',
       projekt: {
         id: projekt.id,
         titel: projekt.titel,
@@ -428,7 +428,7 @@ router.post('/:id/edit', isAuthenticated, async (req, res) => {
     // Validierung
     if (!titel || !start_datum) {
       req.flash('error', 'Titel und Start-Datum sind Pflichtfelder.');
-      return res.redirect(`/dashboard/projekte/${id}/edit`);
+      return res.redirect(`/dashboard/projects/${id}/edit`);
     }
     
     // In Datenbank aktualisieren
@@ -458,11 +458,11 @@ router.post('/:id/edit', isAuthenticated, async (req, res) => {
     });
     
     req.flash('success', 'Projekt erfolgreich aktualisiert.');
-    res.redirect(`/dashboard/projekte/${id}`);
+    res.redirect(`/dashboard/projects/${id}`);
   } catch (error) {
     console.error('Fehler beim Aktualisieren des Projekts:', error);
     req.flash('error', 'Datenbankfehler: ' + error.message);
-    res.redirect(`/dashboard/projekte/${req.params.id}/edit`);
+    res.redirect(`/dashboard/projects/${req.params.id}/edit`);
   }
 });
 

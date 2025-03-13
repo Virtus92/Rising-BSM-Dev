@@ -46,7 +46,7 @@
           <% } %>
         </p>
         <div class="mt-3">
-          <a href="/dashboard/projekte?status=in_bearbeitung" class="btn btn-sm btn-outline-success w-100">Details anzeigen</a>
+          <a href="/dashboard/projects?status=in_bearbeitung" class="btn btn-sm btn-outline-success w-100">Details anzeigen</a>
         </div>
       </div>
     </div>
@@ -70,7 +70,7 @@
           <% } %>
         </p>
         <div class="mt-3">
-          <a href="/dashboard/kunden" class="btn btn-sm btn-outline-info w-100">Kundenliste</a>
+          <a href="/dashboard/customers" class="btn btn-sm btn-outline-info w-100">Kundenliste</a>
         </div>
       </div>
     </div>
@@ -253,7 +253,7 @@
             <a href="/dashboard/requests/<%= request.id %>" class="btn btn-outline-secondary">
               <i class="fas fa-eye"></i>
             </a>
-            <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>" class="btn btn-outline-success" title="Kunde erstellen">
+            <a href="/dashboard/customers/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>" class="btn btn-outline-success" title="Kunde erstellen">
               <i class="fas fa-user-plus"></i>
             </a>
           </div>
@@ -298,7 +298,7 @@
           <a href="/dashboard/requests/<%= request.id %>" class="btn btn-sm btn-outline-secondary">
             <i class="fas fa-eye"></i>
           </a>
-          <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>" class="btn btn-sm btn-outline-success" title="Kunde erstellen">
+          <a href="/dashboard/customers/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>" class="btn btn-sm btn-outline-success" title="Kunde erstellen">
             <i class="fas fa-user-plus"></i>
           </a>
             </div>
@@ -323,10 +323,10 @@
         <div class="d-flex justify-content-between align-items-center">
           <h5 class="card-title mb-0">Anstehende Termine</h5>
           <div class="d-flex">
-            <a href="/dashboard/termine/neu" class="btn btn-sm btn-success me-2">
+            <a href="/dashboard/appointments/neu" class="btn btn-sm btn-success me-2">
               <i class="fas fa-plus me-1"></i>Neu
             </a>
-            <a href="/dashboard/termine" class="btn btn-sm btn-outline-secondary">
+            <a href="/dashboard/appointments" class="btn btn-sm btn-outline-secondary">
               Alle anzeigen
             </a>
           </div>
@@ -337,7 +337,7 @@
           <div class="p-4 text-center">
             <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
             <p class="text-muted mb-0">Keine anstehenden Termine</p>
-            <a href="/dashboard/termine/neu" class="btn btn-sm btn-success mt-3">
+            <a href="/dashboard/appointments/neu" class="btn btn-sm btn-success mt-3">
               <i class="fas fa-plus me-1"></i> Termin erstellen
             </a>
           </div>
@@ -360,7 +360,7 @@
                     
                     <div>
                       <h6 class="mb-1">
-                        <a href="/dashboard/termine/<%= appointment.id %>" class="text-decoration-none text-dark">
+                        <a href="/dashboard/appointments/<%= appointment.id %>" class="text-decoration-none text-dark">
                           <%= appointment.title %>
                         </a>
                       </h6>
@@ -368,7 +368,7 @@
                     </div>
                   </div>
                   <div>
-                    <a href="/dashboard/termine/<%= appointment.id %>" class="btn btn-sm btn-outline-secondary">
+                    <a href="/dashboard/appointments/<%= appointment.id %>" class="btn btn-sm btn-outline-secondary">
                       <i class="fas fa-eye"></i>
                     </a>
                   </div>
@@ -392,7 +392,7 @@
       <div class="card-body">
         <div class="row g-3">
           <div class="col-6 col-md-3">
-            <a href="/dashboard/kunden/neu" class="text-decoration-none">
+            <a href="/dashboard/customers/neu" class="text-decoration-none">
               <div class="d-flex flex-column align-items-center p-3 bg-light rounded">
                 <i class="fas fa-user-plus fa-2x text-primary mb-2"></i>
                 <span class="text-center">Neuer Kunde</span>
@@ -400,7 +400,7 @@
             </a>
           </div>
           <div class="col-6 col-md-3">
-            <a href="/dashboard/projekte/neu" class="text-decoration-none">
+            <a href="/dashboard/projects/neu" class="text-decoration-none">
               <div class="d-flex flex-column align-items-center p-3 bg-light rounded">
                 <i class="fas fa-project-diagram fa-2x text-success mb-2"></i>
                 <span class="text-center">Neues Projekt</span>
@@ -408,7 +408,7 @@
             </a>
           </div>
           <div class="col-6 col-md-3">
-            <a href="/dashboard/termine/neu" class="text-decoration-none">
+            <a href="/dashboard/appointments/neu" class="text-decoration-none">
               <div class="d-flex flex-column align-items-center p-3 bg-light rounded">
                 <i class="fas fa-calendar-plus fa-2x text-info mb-2"></i>
                 <span class="text-center">Neuer Termin</span>
@@ -416,7 +416,7 @@
             </a>
           </div>
           <div class="col-6 col-md-3">
-            <a href="/dashboard/dienste" class="text-decoration-none">
+            <a href="/dashboard/services" class="text-decoration-none">
               <div class="d-flex flex-column align-items-center p-3 bg-light rounded">
                 <i class="fas fa-tools fa-2x text-warning mb-2"></i>
                 <span class="text-center">Dienstleistungen</span>

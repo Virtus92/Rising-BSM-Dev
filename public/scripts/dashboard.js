@@ -306,9 +306,9 @@ document.addEventListener("DOMContentLoaded", function() {
             right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
           },
           locale: 'de',
-          events: '/dashboard/termine/api/events',
+          events: '/dashboard/appointments/api/events',
           eventClick: function(info) {
-            window.location.href = '/dashboard/termine/' + info.event.id;
+            window.location.href = '/dashboard/appointments/' + info.event.id;
           },
           // Für mobile Geräte optimierte Optionen
           height: 'auto',
@@ -424,7 +424,7 @@ document.addEventListener("DOMContentLoaded", function() {
     });
     
     function fetchServiceDetails(id) {
-      fetch(`/dashboard/dienste/${id}`)
+      fetch(`/dashboard/services/${id}`)
         .then(response => response.json())
         .then(data => {
           if (data.success) {
@@ -528,7 +528,7 @@ document.addEventListener("DOMContentLoaded", function() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 Sekunden Timeout
       
-      fetch(`/dashboard/dienste/toggle-status/${serviceId}`, {
+      fetch(`/dashboard/services/toggle-status/${serviceId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -714,7 +714,7 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault(); // Verhindere Standardverhalten
         
         if (this.value.trim()) {
-          window.location.href = `/dashboard/kunden?search=${encodeURIComponent(this.value.trim())}`;
+          window.location.href = `/dashboard/customers?search=${encodeURIComponent(this.value.trim())}`;
         }
       }
     });
@@ -727,7 +727,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (statusFilter) {
       e.preventDefault();
       const status = statusFilter.getAttribute('data-status-filter');
-      window.location.href = status ? `/dashboard/kunden?status=${status}` : '/dashboard/kunden';
+      window.location.href = status ? `/dashboard/customers?status=${status}` : '/dashboard/customers';
     }
     
     // Typ-Filter
@@ -735,7 +735,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeFilter) {
       e.preventDefault();
       const type = typeFilter.getAttribute('data-type-filter');
-      window.location.href = type ? `/dashboard/kunden?type=${type}` : '/dashboard/kunden';
+      window.location.href = type ? `/dashboard/customers?type=${type}` : '/dashboard/customers';
     }
   });
   

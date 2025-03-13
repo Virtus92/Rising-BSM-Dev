@@ -7,7 +7,7 @@
       <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
           <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-          <li class="breadcrumb-item"><a href="/dashboard/termine">Termine</a></li>
+          <li class="breadcrumb-item"><a href="/dashboard/appointments">Termine</a></li>
           <li class="breadcrumb-item active" aria-current="page">Termin #<%= termin.id %></li>
         </ol>
       </nav>
@@ -53,7 +53,7 @@
                       <h6 class="mb-1 text-muted small">Kunde</h6>
                       <p class="mb-0">
                         <% if (termin.kunde_id) { %>
-                          <a href="/dashboard/kunden/<%= termin.kunde_id %>" class="text-decoration-none text-break">
+                          <a href="/dashboard/customers/<%= termin.kunde_id %>" class="text-decoration-none text-break">
                             <%= termin.kunde_name %>
                           </a>
                         <% } else { %>
@@ -76,7 +76,7 @@
                       <h6 class="mb-1 text-muted small">Projekt</h6>
                       <p class="mb-0">
                         <% if (termin.projekt_id) { %>
-                          <a href="/dashboard/projekte/<%= termin.projekt_id %>" class="text-decoration-none text-break">
+                          <a href="/dashboard/projects/<%= termin.projekt_id %>" class="text-decoration-none text-break">
                             <%= termin.projekt_titel %>
                           </a>
                         <% } else { %>
@@ -203,7 +203,7 @@
               <% } %>
               
                <!-- Neue Notiz Form -->
-               <form action="/dashboard/termine/<%= termin.id %>/add-note" method="POST" class="mt-4">
+               <form action="/dashboard/appointments/<%= termin.id %>/add-note" method="POST" class="mt-4">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="id" value="<%= termin.id %>">
                 
@@ -227,7 +227,7 @@
             <button class="btn btn-primary flex-fill" data-bs-toggle="modal" data-bs-target="#statusModal">
               <i class="fas fa-edit me-2"></i>Status ändern
             </button>
-            <a href="/dashboard/termine/<%= termin.id %>/edit" class="btn btn-success flex-fill">
+            <a href="/dashboard/appointments/<%= termin.id %>/edit" class="btn btn-success flex-fill">
               <i class="fas fa-pencil-alt me-2"></i>Bearbeiten
             </a>
           </div>
@@ -242,12 +242,12 @@
                 <i class="fas fa-edit me-2"></i>Status ändern
               </button>
               
-              <a href="/dashboard/termine/<%= termin.id %>/edit" class="btn btn-success w-100 mb-3">
+              <a href="/dashboard/appointments/<%= termin.id %>/edit" class="btn btn-success w-100 mb-3">
                 <i class="fas fa-pencil-alt me-2"></i>Termin bearbeiten
               </a>
               
               <% if (termin.kunde_id) { %>
-                <a href="/dashboard/kunden/<%= termin.kunde_id %>" class="btn btn-info w-100 mb-3 text-white">
+                <a href="/dashboard/customers/<%= termin.kunde_id %>" class="btn btn-info w-100 mb-3 text-white">
                   <i class="fas fa-user me-2"></i>Kundendetails anzeigen
                 </a>
               <% } %>
@@ -279,7 +279,7 @@
                 </div>
               </div>
               
-              <a href="/dashboard/termine" class="btn btn-outline-secondary w-100">
+              <a href="/dashboard/appointments" class="btn btn-outline-secondary w-100">
                 <i class="fas fa-calendar-alt me-2"></i>Zum Kalender
               </a>
             </div>
@@ -299,7 +299,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="statusForm" action="/dashboard/termine/update-status" method="POST">
+        <form id="statusForm" action="/dashboard/appointments/update-status" method="POST">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <input type="hidden" name="id" value="<%= termin.id %>">
           

@@ -175,7 +175,7 @@ const CustomerDetail = () => {
         <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-lg font-medium text-gray-800">Projekte</h2>
           <Link
-            to={`/dashboard/projekte/neu?kunde_id=${id}`}
+            to={`/dashboard/projects/neu?kunde_id=${id}`}
             className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-primary-600 bg-primary-50 hover:bg-primary-100"
           >
             Projekt anlegen
@@ -219,7 +219,7 @@ const CustomerDetail = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link to={`/dashboard/projekte/${project.id}`} className="text-primary-600 hover:text-primary-900">
+                        <Link to={`/dashboard/projects/${project.id}`} className="text-primary-600 hover:text-primary-900">
                           Details
                         </Link>
                       </td>
@@ -233,7 +233,7 @@ const CustomerDetail = () => {
               <Briefcase className="mx-auto h-12 w-12 text-gray-400 mb-3" />
               <p>Keine Projekte vorhanden</p>
               <Link
-                to={`/dashboard/projekte/neu?kunde_id=${id}`}
+                to={`/dashboard/projects/neu?kunde_id=${id}`}
                 className="mt-2 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
               >
                 Erstes Projekt anlegen
@@ -248,7 +248,7 @@ const CustomerDetail = () => {
         <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-lg font-medium text-gray-800">Termine</h2>
           <Link
-            to={`/dashboard/termine/neu?kunde_id=${id}`}
+            to={`/dashboard/appointments/neu?kunde_id=${id}`}
             className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-primary-600 bg-primary-50 hover:bg-primary-100"
           >
             Termin anlegen
@@ -290,7 +290,7 @@ const CustomerDetail = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link to={`/dashboard/termine/${appointment.id}`} className="text-primary-600 hover:text-primary-900">
+                        <Link to={`/dashboard/appointments/${appointment.id}`} className="text-primary-600 hover:text-primary-900">
                           Details
                         </Link>
                       </td>
@@ -304,7 +304,7 @@ const CustomerDetail = () => {
               <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-3" />
               <p>Keine Termine vorhanden</p>
               <Link
-                to={`/dashboard/termine/neu?kunde_id=${id}`}
+                to={`/dashboard/appointments/neu?kunde_id=${id}`}
                 className="mt-2 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
               >
                 Ersten Termin anlegen

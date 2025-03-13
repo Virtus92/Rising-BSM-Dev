@@ -68,7 +68,7 @@ const ProjectDetail = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
           <button 
-            onClick={() => navigate('/dashboard/projekte')}
+            onClick={() => navigate('/dashboard/projects')}
             className="mr-4 p-2 rounded-full hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
@@ -79,7 +79,7 @@ const ProjectDetail = () => {
         </div>
         <div>
           <Link
-            to={`/dashboard/projekte/${id}/edit`}
+            to={`/dashboard/projects/${id}/edit`}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             <Edit size={16} className="mr-2" />
@@ -161,7 +161,7 @@ const ProjectDetail = () => {
         <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-lg font-medium text-gray-800">Termine</h2>
           <Link
-            to={`/dashboard/termine/neu?projekt_id=${id}&kunde_id=${project.customer_id}`}
+            to={`/dashboard/appointments/neu?projekt_id=${id}&kunde_id=${project.customer_id}`}
             className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-primary-600 bg-primary-50 hover:bg-primary-100"
           >
             Termin anlegen
@@ -200,7 +200,7 @@ const ProjectDetail = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link to={`/dashboard/termine/${appointment.id}`} className="text-primary-600 hover:text-primary-900">
+                        <Link to={`/dashboard/appointments/${appointment.id}`} className="text-primary-600 hover:text-primary-900">
                           Details
                         </Link>
                       </td>
@@ -214,7 +214,7 @@ const ProjectDetail = () => {
               <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-3" />
               <p>Keine Termine vorhanden</p>
               <Link
-                to={`/dashboard/termine/neu?projekt_id=${id}&kunde_id=${project.customer_id}`}
+                to={`/dashboard/appointments/neu?projekt_id=${id}&kunde_id=${project.customer_id}`}
                 className="mt-2 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
               >
                 Ersten Termin anlegen

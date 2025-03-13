@@ -7,9 +7,8 @@
       <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
           <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-          <li class="breadcrumb-item"><a href="/dashboard/projekte">Projekte</a></li>
-          <li class="breadcrumb-item"><a href="/dashboard/projekte/<%= projekt.id %>"><%= projekt.titel %></a></li>
-          <li class="breadcrumb-item active" aria-current="page">Bearbeiten</li>
+          <li class="breadcrumb-item"><a href="/dashboard/projects">Projekte</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Neues Projekt</li>
         </ol>
       </nav>
 
@@ -30,17 +29,17 @@
       <!-- Projektformular -->
       <div class="card border-0 shadow-sm">
         <div class="card-header bg-white">
-          <h2 class="h5 mb-0">Projektdaten bearbeiten</h2>
+          <h2 class="h5 mb-0">Projektdaten</h2>
         </div>
         <div class="card-body">
-          <form action="/dashboard/projekte/<%= projekt.id %>/edit" method="POST" class="needs-validation" novalidate>
+          <form action="/dashboard/projects/neu" method="POST" class="needs-validation" novalidate>
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             
             <div class="row g-3">
               <!-- Allgemeine Infos -->
               <div class="col-md-8">
                 <label for="titel" class="form-label">Projekttitel <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="titel" name="titel" value="<%= projekt.titel %>" required>
+                <input type="text" class="form-control" id="titel" name="titel" value="<%= formData.titel %>" required>
                 <div class="invalid-feedback">
                   Bitte geben Sie einen Projekttitel ein.
                 </div>
@@ -49,10 +48,10 @@
               <div class="col-md-4">
                 <label for="status" class="form-label">Status</label>
                 <select class="form-select" id="status" name="status">
-                  <option value="neu" <%= projekt.status === 'neu' ? 'selected' : '' %>>Neu</option>
-                  <option value="in_bearbeitung" <%= projekt.status === 'in_bearbeitung' ? 'selected' : '' %>>In Bearbeitung</option>
-                  <option value="abgeschlossen" <%= projekt.status === 'abgeschlossen' ? 'selected' : '' %>>Abgeschlossen</option>
-                  <option value="storniert" <%= projekt.status === 'storniert' ? 'selected' : '' %>>Storniert</option>
+                  <option value="neu" <%= formData.status === 'neu' ? 'selected' : '' %>>Neu</option>
+                  <option value="in_bearbeitung" <%= formData.status === 'in_bearbeitung' ? 'selected' : '' %>>In Bearbeitung</option>
+                  <option value="abgeschlossen" <%= formData.status === 'abgeschlossen' ? 'selected' : '' %>>Abgeschlossen</option>
+                  <option value="storniert" <%= formData.status === 'storniert' ? 'selected' : '' %>>Storniert</option>
                 </select>
               </div>
               
@@ -63,7 +62,7 @@
                   <option value="">-- Kein Kunde zugewiesen --</option>
                   <% if (typeof kunden !== 'undefined' && kunden.length > 0) { %>
                     <% kunden.forEach(function(kunde) { %>
-                      <option value="<%= kunde.id %>" <%= projekt.kunde_id == kunde.id ? 'selected' : '' %>><%= kunde.name %></option>
+                      <option value="<%= kunde.id %>" <%= formData.kunde_id == kunde.id ? 'selected' : '' %>><%= kunde.name %></option>
                     <% }); %>
                   <% } %>
                 </select>
@@ -72,7 +71,7 @@
               <!-- Datum -->
               <div class="col-md-6">
                 <label for="start_datum" class="form-label">Start-Datum <span class="text-danger">*</span></label>
-                <input type="date" class="form-control" id="start_datum" name="start_datum" value="<%= projekt.start_datum %>" required>
+                <input type="date" class="form-control" id="start_datum" name="start_datum" value="<%= formData.start_datum %>" required>
                 <div class="invalid-feedback">
                   Bitte wählen Sie ein Start-Datum.
                 </div>
@@ -80,28 +79,28 @@
               
               <div class="col-md-6">
                 <label for="end_datum" class="form-label">End-Datum</label>
-                <input type="date" class="form-control" id="end_datum" name="end_datum" value="<%= projekt.end_datum %>">
+                <input type="date" class="form-control" id="end_datum" name="end_datum" value="<%= formData.end_datum %>">
                 <div class="form-text">Optional. Leer lassen, wenn noch nicht bekannt.</div>
               </div>
               
               <!-- betrag -->
               <div class="col-md-12">
-                <label for="betrag" class="form-label">Betrag (€)</label>
-                <input type="number" class="form-control" id="betrag" name="betrag" value="<%= projekt.betrag %>" step="0.01" min="0">
+                <label for="betrag" class="form-label">betrag (€)</label>
+                <input type="number" class="form-control" id="betrag" name="betrag" value="<%= formData.betrag %>" step="0.01" min="0">
               </div>
               
               <!-- Beschreibung -->
               <div class="col-md-12">
                 <label for="beschreibung" class="form-label">Beschreibung</label>
-                <textarea class="form-control" id="beschreibung" name="beschreibung" rows="4"><%= projekt.beschreibung %></textarea>
+                <textarea class="form-control" id="beschreibung" name="beschreibung" rows="4"><%= formData.beschreibung %></textarea>
               </div>
               
               <div class="col-12 d-flex justify-content-between mt-4">
-                <a href="/dashboard/projekte/<%= projekt.id %>" class="btn btn-outline-secondary">
+                <a href="/dashboard/projects" class="btn btn-outline-secondary">
                   <i class="fas fa-arrow-left me-2"></i>Zurück
                 </a>
                 <button type="submit" class="btn btn-success">
-                  <i class="fas fa-save me-2"></i>Änderungen speichern
+                  <i class="fas fa-save me-2"></i>Speichern
                 </button>
               </div>
             </div>
@@ -109,25 +108,6 @@
         </div>
       </div>
     </div>
-  </main>
-</div>
-
-<script>
-  // Form Validation
-  document.addEventListener('DOMContentLoaded', function() {
-    const forms = document.querySelectorAll('.needs-validation');
-    
-    Array.from(forms).forEach(form => {
-      form.addEventListener('submit', event => {
-        if (!form.checkValidity()) {
-          event.preventDefault();
-          event.stopPropagation();
-        }
-        
-        form.classList.add('was-validated');
-      }, false);
-    });
-  });
-</script>
-
-<%- include('../../partials/admin-footer-simple') %>
+    <!-- Footer -->
+    <%- include('../../partials/admin-footer') %>
+  </div>

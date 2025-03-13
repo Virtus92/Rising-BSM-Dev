@@ -66,7 +66,7 @@ const NewService = () => {
     setIsSubmitting(true);
     try {
       const result = await serviceService.create(formData);
-      navigate(`/dashboard/dienste/${result.id}`);
+      navigate(`/dashboard/services/${result.id}`);
     } catch (err: any) {
       console.error('Error creating service:', err);
       setError(err.message || 'Fehler beim Erstellen der Dienstleistung');
@@ -81,7 +81,7 @@ const NewService = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
           <button 
-            onClick={() => navigate('/dashboard/dienste')}
+            onClick={() => navigate('/dashboard/services')}
             className="mr-4 p-2 rounded-full hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
@@ -206,7 +206,7 @@ const NewService = () => {
 
           <div className="flex justify-end space-x-3">
             <Link
-              to="/dashboard/dienste"
+              to="/dashboard/services"
               className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               Abbrechen

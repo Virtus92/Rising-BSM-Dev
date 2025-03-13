@@ -31,9 +31,9 @@ router.use('/settings', settingsRoutes);
 router.use('/dashboard', dashboardRoutes);
 
 // Add German route aliases if needed
-router.use('/kunden', customerRoutes);
-router.use('/projekte', projectRoutes);
-router.use('/termine', appointmentRoutes);
-router.use('/dienste', serviceRoutes);
+router.use('/customers', customerRoutes);
+router.use('/projects', projectRoutes);
+router.use('/appointments', appointmentRoutes);
+router.use('/services', serviceRoutes);
 
 module.exports = router;

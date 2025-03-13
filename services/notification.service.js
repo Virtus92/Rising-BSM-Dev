@@ -223,9 +223,9 @@ class NotificationService {
       case 'anfrage':
         return `/dashboard/requests/${notification.referenz_id}`;
       case 'termin':
-        return `/dashboard/termine/${notification.referenz_id}`;
+        return `/dashboard/appointments/${notification.referenz_id}`;
       case 'projekt':
-        return `/dashboard/projekte/${notification.referenz_id}`;
+        return `/dashboard/projects/${notification.referenz_id}`;
       default:
         return '/dashboard/notifications';
     }

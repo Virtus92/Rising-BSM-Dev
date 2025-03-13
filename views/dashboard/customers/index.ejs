@@ -11,7 +11,7 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
           <!-- Search Form -->
-          <form action="/dashboard/kunden" method="GET" id="searchForm">
+          <form action="/dashboard/customers" method="GET" id="searchForm">
             <div class="input-group">
               <span class="input-group-text bg-white">
                 <i class="fas fa-search text-muted"></i>
@@ -27,11 +27,11 @@
                 <li><a class="dropdown-item <%= filters.type === 'privat' ? 'active' : '' %>" href="?type=privat<%= filters.search ? '&search='+filters.search : '' %>">Privatkunden</a></li>
                 <li><a class="dropdown-item <%= filters.type === 'geschaeft' ? 'active' : '' %>" href="?type=geschaeft<%= filters.search ? '&search='+filters.search : '' %>">Geschäftskunden</a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="/dashboard/kunden">Filter zurücksetzen</a></li>
+                <li><a class="dropdown-item" href="/dashboard/customers">Filter zurücksetzen</a></li>
               </ul>
             </div>
           </form>
-          <a href="/dashboard/kunden/neu" class="btn btn-success">
+          <a href="/dashboard/customers/neu" class="btn btn-success">
             <i class="fas fa-plus me-2"></i>Neuer Kunde
           </a>
           <div class="dropdown">
@@ -39,9 +39,9 @@
               <i class="fas fa-download me-2"></i>Export
             </button>
             <ul class="dropdown-menu" aria-labelledby="exportDropdown">
-              <li><a class="dropdown-item" href="/dashboard/kunden/export?format=csv">CSV-Export</a></li>
-              <li><a class="dropdown-item" href="/dashboard/kunden/export?format=excel">Excel-Export</a></li>
-              <li><a class="dropdown-item" href="/dashboard/kunden/export?format=pdf">PDF-Export</a></li>
+              <li><a class="dropdown-item" href="/dashboard/customers/export?format=csv">CSV-Export</a></li>
+              <li><a class="dropdown-item" href="/dashboard/customers/export?format=excel">Excel-Export</a></li>
+              <li><a class="dropdown-item" href="/dashboard/customers/export?format=pdf">PDF-Export</a></li>
             </ul>
           </div>
         </div>
@@ -142,7 +142,7 @@
                                 <span><%= customer.name.charAt(0) %></span>
                               </div>
                               <div>
-                                <a href="/dashboard/kunden/<%= customer.id %>" class="text-decoration-none text-dark fw-medium">
+                                <a href="/dashboard/customers/<%= customer.id %>" class="text-decoration-none text-dark fw-medium">
                                   <%= customer.name %>
                                 </a>
                               </div>
@@ -172,18 +172,18 @@
                           </td>
                           <td>
                             <div class="btn-group btn-group-sm">
-                              <a href="/dashboard/kunden/<%= customer.id %>" class="btn btn-outline-secondary">
+                              <a href="/dashboard/customers/<%= customer.id %>" class="btn btn-outline-secondary">
                                 <i class="fas fa-eye"></i>
                               </a>
-                              <a href="/dashboard/kunden/<%= customer.id %>/edit" class="btn btn-outline-primary">
+                              <a href="/dashboard/customers/<%= customer.id %>/edit" class="btn btn-outline-primary">
                                 <i class="fas fa-edit"></i>
                               </a>
                               <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
                                 <span class="visually-hidden">Dropdown</span>
                               </button>
                               <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="/dashboard/termine/neu?kunde=<%= customer.id %>"><i class="fas fa-calendar-plus me-2"></i>Termin erstellen</a></li>
-                                <li><a class="dropdown-item" href="/dashboard/projekte/neu?kunde_id=<%= customer.id %>"><i class="fas fa-project-diagram me-2"></i>Projekt erstellen</a></li>
+                                <li><a class="dropdown-item" href="/dashboard/appointments/neu?kunde=<%= customer.id %>"><i class="fas fa-calendar-plus me-2"></i>Termin erstellen</a></li>
+                                <li><a class="dropdown-item" href="/dashboard/projects/neu?kunde_id=<%= customer.id %>"><i class="fas fa-project-diagram me-2"></i>Projekt erstellen</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changeStatusModal" data-id="<%= customer.id %>" data-name="<%= customer.name %>" data-status="<%= customer.status %>"><i class="fas fa-toggle-on me-2"></i>Status ändern</a></li>
                                 <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#deleteCustomerModal" data-id="<%= customer.id %>" data-name="<%= customer.name %>"><i class="fas fa-trash-alt me-2"></i>Löschen</a></li>
@@ -215,7 +215,7 @@
                               <span><%= customer.name.charAt(0) %></span>
                             </div>
                             <div>
-                              <a href="/dashboard/kunden/<%= customer.id %>" class="text-decoration-none text-dark fw-medium">
+                              <a href="/dashboard/customers/<%= customer.id %>" class="text-decoration-none text-dark fw-medium">
                                 <%= customer.name %>
                               </a>
                               <div class="small text-muted"><%= customer.firma || 'Privatkunde' %></div>
@@ -237,10 +237,10 @@
 
                         <div class="d-flex justify-content-between align-items-center mt-3">
                           <div class="btn-group btn-group-sm">
-                            <a href="/dashboard/kunden/<%= customer.id %>" class="btn btn-outline-secondary">
+                            <a href="/dashboard/customers/<%= customer.id %>" class="btn btn-outline-secondary">
                               <i class="fas fa-eye"></i>
                             </a>
-                            <a href="/dashboard/kunden/<%= customer.id %>/edit" class="btn btn-outline-primary">
+                            <a href="/dashboard/customers/<%= customer.id %>/edit" class="btn btn-outline-primary">
                               <i class="fas fa-edit"></i>
                             </a>
                           </div>
@@ -249,8 +249,8 @@
                               Mehr
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="customerActionsDropdown<%= customer.id %>">
-                              <li><a class="dropdown-item" href="/dashboard/termine/neu?kunde=<%= customer.id %>"><i class="fas fa-calendar-plus me-2"></i>Termin erstellen</a></li>
-                              <li><a class="dropdown-item" href="/dashboard/projekte/neu?kunde_id=<%= customer.id %>"><i class="fas fa-project-diagram me-2"></i>Projekt erstellen</a></li>
+                              <li><a class="dropdown-item" href="/dashboard/appointments/neu?kunde=<%= customer.id %>"><i class="fas fa-calendar-plus me-2"></i>Termin erstellen</a></li>
+                              <li><a class="dropdown-item" href="/dashboard/projects/neu?kunde_id=<%= customer.id %>"><i class="fas fa-project-diagram me-2"></i>Projekt erstellen</a></li>
                               <li><hr class="dropdown-divider"></li>
                               <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changeStatusModal" data-id="<%= customer.id %>" data-name="<%= customer.name %>" data-status="<%= customer.status %>"><i class="fas fa-toggle-on me-2"></i>Status ändern</a></li>
                               <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#deleteCustomerModal" data-id="<%= customer.id %>" data-name="<%= customer.name %>"><i class="fas fa-trash-alt me-2"></i>Löschen</a></li>
@@ -313,12 +313,12 @@
                       <% } %>
                       
                       <div class="mt-3 d-flex justify-content-between">
-                        <a href="/dashboard/kunden/<%= customer.id %>" class="btn btn-sm btn-outline-primary">Details</a>
+                        <a href="/dashboard/customers/<%= customer.id %>" class="btn btn-sm btn-outline-primary">Details</a>
                         <div class="btn-group btn-group-sm">
-                          <a href="/dashboard/termine/neu?kunde=<%= customer.id %>" class="btn btn-outline-success">
+                          <a href="/dashboard/appointments/neu?kunde=<%= customer.id %>" class="btn btn-outline-success">
                             <i class="fas fa-calendar-plus"></i>
                           </a>
-                          <a href="/dashboard/projekte/neu?kunde_id=<%= customer.id %>" class="btn btn-outline-info">
+                          <a href="/dashboard/projects/neu?kunde_id=<%= customer.id %>" class="btn btn-outline-info">
                             <i class="fas fa-project-diagram"></i>
                           </a>
                         </div>
@@ -426,7 +426,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
-        <form id="deleteCustomerForm" action="/dashboard/kunden/delete" method="POST">
+        <form id="deleteCustomerForm" action="/dashboard/customers/delete" method="POST">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <input type="hidden" id="customerIdToDelete" name="id">
           <button type="submit" class="btn btn-danger">Löschen</button>
@@ -446,7 +446,7 @@
       </div>
       <div class="modal-body">
         <p>Möchten Sie den Status des Kunden <strong id="customerNameToChange"></strong> ändern?</p>
-        <form id="changeStatusForm" action="/dashboard/kunden/update-status" method="POST">
+        <form id="changeStatusForm" action="/dashboard/customers/update-status" method="POST">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <input type="hidden" id="customerIdToChange" name="id">
           
@@ -500,7 +500,7 @@
       searchForm.addEventListener('submit', function(e) {
         e.preventDefault();
         const searchValue = document.getElementById('searchInput').value.trim();
-        let url = `/dashboard/kunden?search=${encodeURIComponent(searchValue)}`;
+        let url = `/dashboard/customers?search=${encodeURIComponent(searchValue)}`;
         if (filters.status) {
           url += `&status=${filters.status}`;
         }

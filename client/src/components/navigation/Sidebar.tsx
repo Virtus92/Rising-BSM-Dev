@@ -85,9 +85,9 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
             </Link>
 
             <Link
-              to="/dashboard/projekte"
+              to="/dashboard/projects"
               className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                isActive('/dashboard/projekte')
+                isActive('/dashboard/projects')
                   ? 'bg-primary-100 text-primary-700'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
@@ -97,9 +97,9 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
             </Link>
 
             <Link
-              to="/dashboard/termine"
+              to="/dashboard/appointments"
               className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                isActive('/dashboard/termine')
+                isActive('/dashboard/appointments')
                   ? 'bg-primary-100 text-primary-700'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
@@ -109,9 +109,9 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
             </Link>
 
             <Link
-              to="/dashboard/dienste"
+              to="/dashboard/services"
               className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                isActive('/dashboard/dienste')
+                isActive('/dashboard/services')
                   ? 'bg-primary-100 text-primary-700'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}

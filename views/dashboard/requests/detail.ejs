@@ -132,11 +132,11 @@
                 <i class="fas fa-edit me-2"></i>Status ändern
               </button>
               
-              <a href="/dashboard/kunden/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>&phone=<%= encodeURIComponent(request.phone) %>" class="btn btn-success w-100 mb-3">
+              <a href="/dashboard/customers/neu?name=<%= encodeURIComponent(request.name) %>&email=<%= encodeURIComponent(request.email) %>&phone=<%= encodeURIComponent(request.phone) %>" class="btn btn-success w-100 mb-3">
                 <i class="fas fa-user-plus me-2"></i>Als Kunde anlegen
               </a>
               
-              <a href="/dashboard/termine/neu?kunde_name=<%= encodeURIComponent(request.name) %>" class="btn btn-info w-100 mb-3 text-white">
+              <a href="/dashboard/appointments/neu?kunde_name=<%= encodeURIComponent(request.name) %>" class="btn btn-info w-100 mb-3 text-white">
                 <i class="fas fa-calendar-plus me-2"></i>Termin vereinbaren
               </a>
               

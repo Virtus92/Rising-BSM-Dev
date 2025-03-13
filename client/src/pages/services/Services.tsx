@@ -69,7 +69,7 @@ const Services = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Services</h1>
         <Link
-          to="/dashboard/dienste/neu"
+          to="/dashboard/services/neu"
           className="bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded"
         >
           New Service
@@ -135,7 +135,7 @@ const Services = () => {
                 <tr key={service.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Link
-                      to={`/dashboard/dienste/${service.id}`}
+                      to={`/dashboard/services/${service.id}`}
                       className="text-blue-600 hover:text-blue-900"
                     >
                       {service.name}
@@ -166,7 +166,7 @@ const Services = () => {
           <div className="py-12 px-6 text-center">
             <p className="text-gray-500 mb-4">No services found</p>
             <Link
-              to="/dashboard/dienste/neu"
+              to="/dashboard/services/neu"
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700"
             >
               Create New Service

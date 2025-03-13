@@ -91,7 +91,7 @@ const NewProject = () => {
       };
 
       const result = await projectService.create(projectData);
-      navigate(`/dashboard/projekte/${result.id}`);
+      navigate(`/dashboard/projects/${result.id}`);
     } catch (err: any) {
       console.error('Error creating project:', err);
       setError(err.message || 'Fehler beim Erstellen des Projekts');
@@ -114,7 +114,7 @@ const NewProject = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
           <button 
-            onClick={() => navigate('/dashboard/projekte')}
+            onClick={() => navigate('/dashboard/projects')}
             className="mr-4 p-2 rounded-full hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
@@ -278,7 +278,7 @@ const NewProject = () => {
 
           <div className="flex justify-end space-x-3">
             <Link
-              to="/dashboard/projekte"
+              to="/dashboard/projects"
               className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               Abbrechen
