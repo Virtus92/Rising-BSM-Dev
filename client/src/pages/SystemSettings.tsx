@@ -15,7 +15,6 @@ const SystemSettings = () => {
   const [formData, setFormData] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    // Only admins can access this page
     if (user && user.role !== 'admin') {
       navigate('/dashboard');
       return;
@@ -30,7 +29,6 @@ const SystemSettings = () => {
       const data = await settingsService.getSystemSettings();
       setSettings(data.settings || {});
       
-      // Initialize form data from settings
       const initialFormData: Record<string, any> = {};
       Object.keys(data.settings || {}).forEach(category => {
         data.settings[category].forEach((setting: any) => {
@@ -49,7 +47,6 @@ const SystemSettings = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
     
-    // Handle different input types
     if (type === 'checkbox') {
       setFormData(prev => ({
         ...prev,

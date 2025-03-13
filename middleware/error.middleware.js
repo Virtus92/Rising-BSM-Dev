@@ -7,7 +7,18 @@
  * Formats and processes all errors caught in route handlers
  */
 exports.errorHandler = (err, req, res, next) => {
-    // Set default status code and error message
+    
+  console.error('Error Details:', {
+    message: err.message,
+    name: err.name,
+    stack: err.stack,
+    statusCode: err.statusCode,
+    query: req.query,
+    body: req.body,
+    user: req.session?.user
+  });
+  
+  // Set default status code and error message
     const statusCode = err.statusCode || 500;
     const message = err.message || 'An unexpected error occurred';
     

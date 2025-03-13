@@ -13,7 +13,6 @@ const DashboardLayout = () => {
   const [newRequestsCount, setNewRequestsCount] = useState(0);
 
   useEffect(() => {
-    // Fetch dashboard data when component mounts
     const fetchDashboardData = async () => {
       try {
         const dashboardData = await dashboardService.getDashboardData();

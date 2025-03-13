@@ -15,12 +15,10 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   
-  // Fetch CSRF token when component mounts
   useEffect(() => {
     const fetchCsrfToken = async () => {
       const token = await getCsrfToken();
       setCsrfToken(token);
-      // Set it as a meta tag for axios interceptor to use
       const metaElement = document.createElement('meta');
       metaElement.name = 'csrf-token';
       metaElement.content = token;

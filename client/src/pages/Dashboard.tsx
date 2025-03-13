@@ -53,7 +53,7 @@ const Dashboard = () => {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
         <p className="text-sm text-gray-600">
-          Willkommen zurück, {user?.firstName || 'Benutzer'}!
+          Willkommen zurück, {user?.name?.split(' ')[0] || 'Benutzer'}!
         </p>
       </div>
 
@@ -176,7 +176,7 @@ const Dashboard = () => {
         <div className="bg-white rounded-lg shadow">
           <div className="border-b border-gray-200 p-4 flex justify-between items-center">
             <h2 className="text-lg font-medium text-gray-800">Neueste Anfragen</h2>
-            <Link to="/dashboard/requests" className="text-sm text-primary-600 hover:text-primary-700">
+            <Link to="/dashboard/kontaktanfragen" className="text-sm text-primary-600 hover:text-primary-700">
               Alle anzeigen
             </Link>
           </div>
@@ -185,22 +185,25 @@ const Dashboard = () => {
               <ul className="divide-y divide-gray-200">
                 {recentRequests.map((request) => (
                   <li key={request.id} className="py-3">
-                    <Link to={`/dashboard/requests/${request.id}`} className="block hover:bg-gray-50">
+                    <Link to={`/dashboard/kontaktanfragen/${request.id}`} className="block hover:bg-gray-50">
                       <div className="flex justify-between">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{request.name}</p>
-                          <p className="text-sm text-gray-500">{request.serviceLabel}</p>
+                          <p className="text-sm text-gray-500">{request.service}</p>
                         </div>
                         <div className="flex items-center">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            request.statusClass === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-                            request.statusClass === 'success' ? 'bg-green-100 text-green-800' :
-                            request.statusClass === 'info' ? 'bg-blue-100 text-blue-800' :
+                            request.status === 'neu' ? 'bg-yellow-100 text-yellow-800' :
+                            request.status === 'bearbeitet' ? 'bg-green-100 text-green-800' :
+                            request.status === 'in_bearbeitung' ? 'bg-blue-100 text-blue-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {request.status}
+                            {request.status === 'neu' ? 'Neu' :
+                             request.status === 'bearbeitet' ? 'Bearbeitet' :
+                             request.status === 'in_bearbeitung' ? 'In Bearbeitung' :
+                             request.status}
                           </span>
-                          <p className="ml-2 text-xs text-gray-500">{request.formattedDate}</p>
+                          <p className="ml-2 text-xs text-gray-500">{request.created_at}</p>
                         </div>
                       </div>
                     </Link>
@@ -229,16 +232,17 @@ const Dashboard = () => {
                     <Link to={`/dashboard/termine/${appointment.id}`} className="block hover:bg-gray-50">
                       <div className="flex justify-between">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{appointment.title}</p>
-                          <p className="text-sm text-gray-500">{appointment.customer}</p>
+                          <p className="text-sm font-medium text-gray-900">{appointment.titel}</p>
+                          <p className="text-sm text-gray-500">{appointment.kunde_name}</p>
                         </div>
                         <div>
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            appointment.dateClass === 'primary' ? 'bg-blue-100 text-blue-800' :
-                            appointment.dateClass === 'success' ? 'bg-green-100 text-green-800' :
+                            appointment.status === 'geplant' ? 'bg-blue-100 text-blue-800' :
+                            appointment.status === 'abgeschlossen' ? 'bg-green-100 text-green-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {appointment.dateLabel}, {appointment.time}
+                            {new Date(appointment.termin_datum).toLocaleDateString('de-DE')}, 
+                            {new Date(appointment.termin_datum).toLocaleTimeString('de-DE', {hour: '2-digit', minute:'2-digit'})}
                           </span>
                         </div>
                       </div>

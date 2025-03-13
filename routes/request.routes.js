@@ -6,6 +6,20 @@ const { isAuthenticated } = require('../middleware/auth.middleware');
 // Apply authentication middleware to all routes
 router.use(isAuthenticated);
 
+router.use((req, res, next) => {
+  console.log('Request Session:', req.session);
+  console.log('Authenticated User:', req.session?.user);
+  
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required'
+    });
+  }
+  
+  next();
+});
+
 /**
  * @route   GET /dashboard/requests
  * @desc    Display list of requests with optional filtering

@@ -1,4 +1,3 @@
-// src/types/index.ts
 export type StatusType = 
   | 'geplant' 
   | 'bestaetigt' 
@@ -61,10 +60,10 @@ export interface Appointment {
   kunde_name: string;
   projekt_id?: number;
   projekt_titel?: string;
-  termin_datum: string; // ISO-Datum
-  dateFormatted: string; // Lokalisiertes Datum
-  timeFormatted: string; // Formatierte Zeit
-  dauer: number; // in Minuten
+  termin_datum: string;
+  dateFormatted: string;
+  timeFormatted: string;
+  dauer: number;
   ort: string;
   beschreibung?: string;
   status: 'geplant' | 'bestaetigt' | 'abgeschlossen' | 'storniert';

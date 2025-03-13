@@ -1,4 +1,3 @@
-// client/src/pages/appointments/Appointments.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { appointmentService } from '../../api/services/appointmentService';
@@ -14,7 +13,7 @@ const Appointments = () => {
     status: '',
     date: '',
     search: '',
-    view: 'list' // 'list' or 'calendar'
+    view: 'list'
   });
   const [pagination, setPagination] = useState({
     current: 1,
@@ -50,14 +49,14 @@ const Appointments = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPagination(prev => ({ ...prev, current: 1 })); // Reset to first page
+    setPagination(prev => ({ ...prev, current: 1 }));
     fetchAppointments();
   };
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
-    setPagination(prev => ({ ...prev, current: 1 })); // Reset to first page
+    setPagination(prev => ({ ...prev, current: 1 }));
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -312,7 +311,7 @@ const Appointments = () => {
           )}
         </div>
       ) : (
-        // Calendar view would go here
+        // TODO: Calendar view would go here
         // This would typically use a library like FullCalendar
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="text-center py-8">

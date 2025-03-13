@@ -15,7 +15,6 @@ const NewProject = () => {
   const [services, setServices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Extract customer_id from URL if present
   const queryParams = new URLSearchParams(location.search);
   const preselectedCustomerId = queryParams.get('kunde_id');
 
@@ -34,11 +33,9 @@ const NewProject = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch customers for dropdown
         const customersData = await customerService.getAll({ status: 'aktiv' });
         setCustomers(customersData.data || []);
 
-        // Fetch services for dropdown
         const servicesData = await serviceService.getAll();
         setServices(servicesData.data || []);
       } catch (err: any) {

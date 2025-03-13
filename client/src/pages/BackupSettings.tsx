@@ -1,4 +1,3 @@
-// client/src/pages/BackupSettings.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { settingsService } from '../api/services/settingsService';
@@ -301,8 +300,8 @@ const BackupSettings = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <a
-                          href={backup.downloadUrl}
+                        
+                          <a href={backup.downloadUrl}
                           download
                           className="text-primary-600 hover:text-primary-900"
                         >

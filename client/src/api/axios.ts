@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:9295',
+  baseURL: 'http://localhost:9295/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -19,15 +19,16 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
-// Fehler-Handling
+// Error Handling Interceptor
 api.interceptors.response.use(
   response => response,
   error => {
-    const { response } = error;
+    console.error('Full Axios Error:', error);
+    console.error('Response:', error.response);
     
-    // Automatische Weiterleitung bei Authentifizierungsfehler
-    if (response && (response.status === 401 || response.status === 403)) {
-      window.location.href = '/login';
+    if (error.response) {
+      console.error('Error Status:', error.response.status);
+      console.error('Error Data:', error.response.data);
     }
     
     return Promise.reject(error);

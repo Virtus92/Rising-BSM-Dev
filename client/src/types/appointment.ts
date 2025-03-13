@@ -1,4 +1,3 @@
-// types/appointment.ts
 export interface AppointmentModel {
     id: number;
     titel: string;
@@ -6,10 +5,10 @@ export interface AppointmentModel {
     kunde_name: string;
     projekt_id: number | null;
     projekt_titel: string | null;
-    termin_datum: string; // ISO-Datum
-    dateFormatted: string; // Lokalisiertes Datum
-    timeFormatted: string; // Formatierte Zeit
-    dauer: number; // in Minuten
+    termin_datum: string;
+    dateFormatted: string;
+    timeFormatted: string;
+    dauer: number,
     ort: string;
     status: 'geplant' | 'bestaetigt' | 'abgeschlossen' | 'storniert';
     statusLabel: string;
@@ -21,11 +20,9 @@ export interface AppointmentModel {
     titel: string;
     kunde_id: number;
     projekt_id?: number;
-    termin_datum: string; // ISO-Datum
+    termin_datum: string; 
     dauer: number;
     ort: string;
     status: 'geplant' | 'bestaetigt' | 'abgeschlossen' | 'storniert';
     beschreibung?: string;
   }
-  
-  // Und ähnliche Definitionen für andere Entitätstypen

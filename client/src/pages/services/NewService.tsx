@@ -1,4 +1,3 @@
-// client/src/pages/services/NewService.tsx
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { serviceService } from '../../api/services/serviceService';

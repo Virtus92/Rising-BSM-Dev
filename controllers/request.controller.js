@@ -15,6 +15,10 @@ exports.getAllRequests = async (req, res, next) => {
     // Extract filter parameters
     const { status, service, date, search, page = 1, limit = 20 } = req.query;
 
+    console.log('Request User Session:', req.session?.user);
+    console.log('Request Query Parameters:', req.query);
+    console.log('Request Headers:', req.headers);
+
     // Build filter conditions
     let whereClauses = [];
     let queryParams = [];

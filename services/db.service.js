@@ -1,4 +1,4 @@
- /**
+/**
  * Database service 
  * Provides a centralized interface for all database operations
  */
@@ -34,9 +34,13 @@ exports.query = async (query, params = []) => {
   try {
     // Handle both string queries and object queries
     if (typeof query === 'string') {
-      return await client.query(query, params);
+      return await client.query(query, params.length > 0 ? params : []);
+    } else if (typeof query === 'object' && query.text) {
+      // If values are already defined in the object, use them; otherwise use provided params
+      const values = query.values || params;
+      return await client.query(query.text, values.length > 0 ? values : undefined);
     } else {
-      return await client.query(query);
+      throw new Error('Invalid query format: must be a string or an object with a text property');
     }
   } finally {
     client.release();

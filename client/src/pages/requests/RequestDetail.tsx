@@ -1,4 +1,3 @@
-// client/src/pages/requests/RequestDetail.tsx
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { requestService } from '../../api/services/requestService';

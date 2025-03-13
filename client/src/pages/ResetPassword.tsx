@@ -66,7 +66,6 @@ const ResetPassword = () => {
         text: 'Ihr Passwort wurde erfolgreich zurückgesetzt.'
       });
       
-      // Redirect to login after 3 seconds
       setTimeout(() => {
         navigate('/login');
       }, 3000);

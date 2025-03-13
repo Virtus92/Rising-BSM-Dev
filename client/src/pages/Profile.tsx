@@ -10,7 +10,6 @@ const Profile = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  // Form states
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -79,7 +78,6 @@ const Profile = () => {
       const result = await profileService.updateProfile(formData);
       setSuccess('Profil erfolgreich aktualisiert');
       
-      // Update user context if necessary
       if (user) {
         updateUser({
           ...user,
@@ -102,7 +100,6 @@ const Profile = () => {
     setError(null);
     setSuccess(null);
 
-    // Validate passwords
     if (passwordData.new_password !== passwordData.confirm_password) {
       setError('Die Passwörter stimmen nicht überein');
       setIsChangingPassword(false);

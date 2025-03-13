@@ -1,4 +1,3 @@
-// client/src/pages/requests/Requests.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { requestService } from '../../api/services/requestService';
@@ -49,14 +48,14 @@ const Requests = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPagination(prev => ({ ...prev, current: 1 })); // Reset to first page
+    setPagination(prev => ({ ...prev, current: 1 }));
     fetchRequests();
   };
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
-    setPagination(prev => ({ ...prev, current: 1 })); // Reset to first page
+    setPagination(prev => ({ ...prev, current: 1 }));
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

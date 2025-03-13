@@ -1,4 +1,3 @@
-// client/src/pages/projects/Projects.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { projectService } from '../../api/services/projectService';
@@ -49,14 +48,14 @@ const Projects = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPagination(prev => ({ ...prev, current: 1 })); // Reset to first page
+    setPagination(prev => ({ ...prev, current: 1 }));
     fetchProjects();
   };
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
-    setPagination(prev => ({ ...prev, current: 1 })); // Reset to first page
+    setPagination(prev => ({ ...prev, current: 1 }));
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

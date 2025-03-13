@@ -1,4 +1,3 @@
-// client/src/api/services/requestService.ts
 import api from '../axios';
 import { Inquiry, ApiResponse } from '../../types';
 

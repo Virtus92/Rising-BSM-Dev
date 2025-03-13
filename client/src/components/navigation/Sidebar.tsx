@@ -21,7 +21,6 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
   const { user } = useAuth();
   const location = useLocation();
 
-  // Check if a path is active
   const isActive = (path: string) => {
     return location.pathname.startsWith(path);
   };

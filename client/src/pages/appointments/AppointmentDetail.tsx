@@ -1,4 +1,3 @@
-// client/src/pages/appointments/AppointmentDetail.tsx
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { appointmentService } from '../../api/services/appointmentService';

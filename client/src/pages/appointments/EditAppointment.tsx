@@ -1,4 +1,3 @@
-// client/src/pages/appointments/EditAppointment.tsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { appointmentService } from '../../api/services/appointmentService';
@@ -44,7 +43,6 @@ const EditAppointment = () => {
         setCustomers(customersData.data || []);
         setProjects(projectsData.data || []);
         
-        // Parse date and time
         const appointmentDate = new Date(appointmentData.termin_datum);
         const formattedDate = appointmentDate.toISOString().split('T')[0];
         const formattedTime = appointmentDate.toTimeString().split(' ')[0].substring(0, 5);
@@ -61,7 +59,6 @@ const EditAppointment = () => {
           status: appointmentData.status || 'geplant'
         });
         
-        // Filter projects for selected customer
         if (appointmentData.kunde_id) {
           setFilteredProjects(
             projectsData.data.filter((project: any) => 
@@ -87,12 +84,10 @@ const EditAppointment = () => {
       [name]: value
     }));
     
-    // Filter projects when customer selection changes
     if (name === 'kunde_id') {
       setFilteredProjects(
         projects.filter(project => project.customer_id.toString() === value)
       );
-      // Reset project selection if customer changes
       setFormData(prev => ({
         ...prev,
         kunde_id: value,
@@ -133,7 +128,6 @@ const EditAppointment = () => {
     try {
       if (!id) throw new Error('Appointment ID is missing');
       
-      // Combine date and time
       const dateTime = new Date(`${formData.termin_datum}T${formData.termin_zeit}`);
       
       const appointmentData = {

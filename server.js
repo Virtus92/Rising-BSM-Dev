@@ -127,11 +127,13 @@ app.use((req, res, next) => {
 // New requests count middleware for dashboard
 const { getNewRequestsCountMiddleware } = require('./middleware/dashboard.middleware');
 app.use('/dashboard', getNewRequestsCountMiddleware);
+app.use('/api/dashboard', getNewRequestsCountMiddleware);
 
 // Apply routes
 app.use('/', indexRoutes);
 app.use('/', authRoutes);
 app.use('/auth', authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/dashboard/kunden', customerRoutes);
 app.use('/dashboard/projekte', projectRoutes);
@@ -140,7 +142,14 @@ app.use('/dashboard/dienste', serviceRoutes);
 app.use('/dashboard/requests', requestRoutes);
 app.use('/dashboard/profile', profileRoutes);
 app.use('/dashboard/settings', settingsRoutes);
-//app.use('/dashboard/blog', blogRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/kunden', customerRoutes);
+app.use('/api/projekte', projectRoutes);
+app.use('/api/termine', appointmentRoutes);
+app.use('/api/dienste', serviceRoutes);
+app.use('/api/requests', requestRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/settings', settingsRoutes);
 //app.use('/blog', blogRoutes);
 
 // Contact form route with rate limiting

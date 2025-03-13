@@ -3,7 +3,7 @@ import { DashboardStats } from '../../types';
 
 export const dashboardService = {
   async getDashboardData() {
-    const response = await api.get<DashboardStats>('/dashboard/api/data'); // Point to the API endpoint
+    const response = await api.get<DashboardStats>('/dashboard/api/data');
     return response.data;
   },
   

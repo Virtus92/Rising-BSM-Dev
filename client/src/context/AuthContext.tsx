@@ -18,14 +18,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Wichtig: Initialisierung beim App-Start
   useEffect(() => {
     const initializeUser = async () => {
       try {
         const currentUser = await authService.getCurrentUser();
         setUser(currentUser);
       } catch (err) {
-        // Nicht eingeloggt ist kein Fehler
         setUser(null);
       } finally {
         setLoading(false);
@@ -66,7 +64,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(updatedUser);
   };
 
-  // Zeige Ladebildschirm während der Initialisierung
   if (loading) {
     return <div>Laden...</div>;
   }

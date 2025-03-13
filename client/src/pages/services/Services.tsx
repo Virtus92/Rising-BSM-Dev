@@ -1,4 +1,3 @@
-// client/src/pages/services/Services.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { serviceService } from '../../api/services/serviceService';

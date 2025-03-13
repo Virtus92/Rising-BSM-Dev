@@ -34,7 +34,7 @@ import RequestDetail from './pages/requests/RequestDetail';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import SystemSettings from './pages/SystemSettings';
-import BackupSettings from './pages/backupSettings';
+import BackupSettings from './pages/BackupSettings';
 import NotFound from './pages/NotFound';
 
 // Protected Route component

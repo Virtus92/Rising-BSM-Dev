@@ -1,4 +1,3 @@
-// client/src/pages/services/EditService.tsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { serviceService } from '../../api/services/serviceService';
