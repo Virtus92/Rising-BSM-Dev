@@ -4,9 +4,12 @@
  */
 const express = require('express');
 const router = express.Router();
+const csrf = require('csurf');
 const contactController = require('../controllers/contact.controller');
 const validator = require('validator');
 const rateLimit = require('express-rate-limit');
+
+const csrfProtection = csrf({ cookie: true });
 
 // Rate limiter for contact form
 const contactLimiter = rateLimit({
@@ -19,9 +22,10 @@ const contactLimiter = rateLimit({
  * @route   GET /
  * @desc    Home page
  */
-router.get('/', (req, res) => {
+router.get('/', csrfProtection, (req, res) => {
   res.render('index', { 
     title: 'Rising BSM – Ihre Allround-Experten',
+    csrfToken: req.csrfToken(), // Pass the CSRF token to the view
     user: req.session.user || null
   });
 });
@@ -30,9 +34,10 @@ router.get('/', (req, res) => {
  * @route   GET /impressum
  * @desc    Imprint page
  */
-router.get('/impressum', (req, res) => {
+router.get('/impressum', csrfProtection, (req, res) => {
   res.render('impressum', { 
     title: 'Rising BSM – Impressum',
+    csrfToken: req.csrfToken(),
     user: req.session.user || null
   });
 });
@@ -41,9 +46,10 @@ router.get('/impressum', (req, res) => {
  * @route   GET /datenschutz
  * @desc    Privacy policy page
  */
-router.get('/datenschutz', (req, res) => {
+router.get('/datenschutz', csrfProtection, (req, res) => {
   res.render('datenschutz', { 
     title: 'Rising BSM – Datenschutz',
+    csrfToken: req.csrfToken(),
     user: req.session.user || null
   });
 });
@@ -52,9 +58,10 @@ router.get('/datenschutz', (req, res) => {
  * @route   GET /agb
  * @desc    Terms and conditions page
  */
-router.get('/agb', (req, res) => {
+router.get('/agb', csrfProtection, (req, res) => {
   res.render('agb', { 
     title: 'Rising BSM – AGB',
+    csrfToken: req.csrfToken(),
     user: req.session.user || null
   });
 });
