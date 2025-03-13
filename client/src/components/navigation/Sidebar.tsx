@@ -73,15 +73,15 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
             </Link>
 
             <Link
-              to="/dashboard/kunden"
+              to="/dashboard/customers"
               className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                isActive('/dashboard/kunden')
+                isActive('/dashboard/customers')
                   ? 'bg-primary-100 text-primary-700'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
               <Users className="mr-3 h-5 w-5" />
-              Kunden
+              customers
             </Link>
 
             <Link

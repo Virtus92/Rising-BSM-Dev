@@ -72,7 +72,7 @@ const Customers = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Kunden</h1>
         <Link
-          to="/dashboard/kunden/neu"
+          to="/dashboard/customers/neu"
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         >
           <Plus size={16} className="mr-2" />
@@ -211,10 +211,10 @@ const Customers = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link to={`/dashboard/kunden/${customer.id}`} className="text-primary-600 hover:text-primary-900 mr-4">
+                      <Link to={`/dashboard/customers/${customer.id}`} className="text-primary-600 hover:text-primary-900 mr-4">
                         Details
                       </Link>
-                      <Link to={`/dashboard/kunden/${customer.id}/edit`} className="text-primary-600 hover:text-primary-900">
+                      <Link to={`/dashboard/customers/${customer.id}/edit`} className="text-primary-600 hover:text-primary-900">
                         Bearbeiten
                       </Link>
                     </td>

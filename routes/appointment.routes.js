@@ -48,16 +48,20 @@ router.get('/', async (req, res, next) => {
 router.get('/neu', async (req, res, next) => {
   try {
     // Get customers for dropdown
-    const kundenQuery = await req.db.query(`
+    const kundenQuery = await req.db.query({
+      text: `
       SELECT id, name FROM kunden ORDER BY name ASC
-    `);
+    `
+    });
     
     // Get projects for dropdown
-    const projekteQuery = await req.db.query(`
+    const projekteQuery = await req.db.query({
+      text: `
       SELECT id, titel FROM projekte 
       WHERE status IN ('neu', 'in_bearbeitung') 
       ORDER BY titel ASC
-    `);
+    `
+    });
     
     // Prefilled data from query parameters
     const { kunde_id, projekt_id, kunde_name } = req.query;

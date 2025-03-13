@@ -207,7 +207,7 @@ const Appointments = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Link to={`/dashboard/kunden/${appointment.kunde_id}`} className="text-sm text-primary-600 hover:text-primary-900">
+                        <Link to={`/dashboard/customers/${appointment.kunde_id}`} className="text-sm text-primary-600 hover:text-primary-900">
                           {appointment.kunde_name}
                         </Link>
                       </td>

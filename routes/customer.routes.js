@@ -8,6 +8,7 @@ const customerController = require('../controllers/customer.controller');
 const { isAuthenticated } = require('../middleware/auth.middleware');
 const { validateCustomer } = require('../middleware/validation.middleware');
 
+
 // Apply authentication middleware to all routes
 router.use(isAuthenticated);
 
@@ -216,84 +217,84 @@ router.get('/:id', async (req, res, next) => {
  * @desc    Display form to edit a customer
  */
 router.get('/:id/edit', async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      
-      // Fetch customer data
-      const customerQuery = await pool.query({
-        text: `SELECT * FROM kunden WHERE id = $1`,
-        values: [id]
-      });
-      
-      if (customerQuery.rows.length === 0) {
-        req.flash('error', `Kunde mit ID ${id} nicht gefunden`);
-        return res.redirect('/dashboard/kunden');
-      }
-      
-      const customer = customerQuery.rows[0];
-      
-      res.render('dashboard/kunden/edit', {
-        title: `Kunde bearbeiten: ${customer.name} - Rising BSM`,
-        user: req.session.user,
-        currentPath: '/dashboard/kunden',
-        kunde: customer,
-        newRequestsCount: req.newRequestsCount,
-        csrfToken: req.csrfToken(),
-        messages: { success: req.flash('success'), error: req.flash('error') }
-      });
-    } catch (error) {
-      next(error);
+  try {
+    const { id } = req.params;
+    
+    // Fetch customer data
+    const customerQuery = await req.db.query({
+      text: `SELECT * FROM kunden WHERE id = $1`,
+      values: [id]
+    });
+    
+    if (customerQuery.rows.length === 0) {
+      req.flash('error', `Kunde mit ID ${id} nicht gefunden`);
+      return res.redirect('/dashboard/kunden');
     }
-  });
-  
-  /**
-   * @route   POST /dashboard/kunden/:id/edit
-   * @desc    Update customer data
-   */
-  router.post('/:id/edit', validateCustomer, async (req, res, next) => {
-    try {
-      const result = await customerController.updateCustomer(req, res, next);
-      
-      // If it's an API request, return JSON
-      if (req.headers.accept && req.headers.accept.includes('application/json')) {
-        return res.json(result);
-      }
-      
-      // Otherwise set flash message and redirect
-      req.flash('success', 'Kunde erfolgreich aktualisiert.');
-      res.redirect(`/dashboard/kunden/${req.params.id}`);
-    } catch (error) {
-      if (error.statusCode === 400 || error.statusCode === 404) {
-        req.flash('error', error.message);
-        return res.redirect(`/dashboard/kunden/${req.params.id}/edit`);
-      }
-      next(error);
+    
+    const customer = customerQuery.rows[0];
+    
+    res.render('dashboard/kunden/edit', {
+      title: `Kunde bearbeiten: ${customer.name} - Rising BSM`,
+      user: req.session.user,
+      currentPath: '/dashboard/kunden',
+      kunde: customer,
+      newRequestsCount: req.newRequestsCount,
+      csrfToken: req.csrfToken(),
+      messages: { success: req.flash('success'), error: req.flash('error') }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /dashboard/kunden/:id/edit
+ * @desc    Update customer data
+ */
+router.post('/:id/edit', validateCustomer, async (req, res, next) => {
+  try {
+    const result = await customerController.updateCustomer(req, res, next);
+    
+    // If it's an API request, return JSON
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.json(result);
     }
-  });
-  
-  /**
-   * @route   POST /dashboard/kunden/:id/add-note
-   * @desc    Add a note to customer
-   */
-  router.post('/:id/add-note', async (req, res, next) => {
-    try {
-      const result = await customerController.addCustomerNote(req, res, next);
-      
-      // If it's an API request, return JSON
-      if (req.headers.accept && req.headers.accept.includes('application/json')) {
-        return res.json(result);
-      }
-      
-      // Otherwise set flash message and redirect
-      req.flash('success', 'Notiz erfolgreich hinzugefügt.');
-      res.redirect(`/dashboard/kunden/${req.params.id}`);
-    } catch (error) {
-      if (error.statusCode === 400 || error.statusCode === 404) {
-        req.flash('error', error.message);
-        return res.redirect(`/dashboard/kunden/${req.params.id}`);
-      }
-      next(error);
+    
+    // Otherwise set flash message and redirect
+    req.flash('success', 'Kunde erfolgreich aktualisiert.');
+    res.redirect(`/dashboard/kunden/${req.params.id}`);
+  } catch (error) {
+    if (error.statusCode === 400 || error.statusCode === 404) {
+      req.flash('error', error.message);
+      return res.redirect(`/dashboard/kunden/${req.params.id}/edit`);
     }
-  });
-  
-  module.exports = router;
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /dashboard/kunden/:id/add-note
+ * @desc    Add a note to customer
+ */
+router.post('/:id/add-note', async (req, res, next) => {
+  try {
+    const result = await customerController.addCustomerNote(req, res, next);
+    
+    // If it's an API request, return JSON
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.json(result);
+    }
+    
+    // Otherwise set flash message and redirect
+    req.flash('success', 'Notiz erfolgreich hinzugefügt.');
+    res.redirect(`/dashboard/kunden/${req.params.id}`);
+  } catch (error) {
+    if (error.statusCode === 400 || error.statusCode === 404) {
+      req.flash('error', error.message);
+      return res.redirect(`/dashboard/kunden/${req.params.id}`);
+    }
+    next(error);
+  }
+});
+
+module.exports = router;

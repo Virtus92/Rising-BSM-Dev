@@ -116,7 +116,7 @@ const Dashboard = () => {
         <div className="bg-white rounded-lg shadow p-5">
           <div className="flex justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Kunden</p>
+              <p className="text-sm font-medium text-gray-500">customers</p>
               <p className="text-2xl font-bold text-gray-800">{dashboardData?.stats.totalCustomers?.count || 0}</p>
             </div>
             <div className="rounded-full bg-green-100 p-3 text-green-600">

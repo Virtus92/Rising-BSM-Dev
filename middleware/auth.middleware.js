@@ -7,7 +7,7 @@
  * If not, redirects to login page
  */
 exports.isAuthenticated = (req, res, next) => {
-  if (req.session && req.session.user) {
+  if (req.session && req.session.user && req.session.user.id) {
     return next();
   } else {
     // For API requests, return 401 Unauthorized

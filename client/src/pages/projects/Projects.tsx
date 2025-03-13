@@ -171,7 +171,7 @@ const Projects = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <User className="h-4 w-4 text-gray-400 mr-1" />
-                        <Link to={`/dashboard/kunden/${project.customer_id}`} className="text-sm text-primary-600 hover:text-primary-900">
+                        <Link to={`/dashboard/customers/${project.customer_id}`} className="text-sm text-primary-600 hover:text-primary-900">
                           {project.customer_name}
                         </Link>
                       </div>

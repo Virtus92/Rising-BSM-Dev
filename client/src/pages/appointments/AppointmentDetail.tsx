@@ -93,7 +93,7 @@ const AppointmentDetail = () => {
             <div className="flex items-center">
               <User className="h-5 w-5 text-gray-400 mr-2" />
               <span className="text-gray-500 mr-2">Kunde:</span>
-              <Link to={`/dashboard/kunden/${appointment.kunde_id}`} className="text-primary-600 hover:text-primary-800">
+              <Link to={`/dashboard/customers/${appointment.kunde_id}`} className="text-primary-600 hover:text-primary-800">
                 {appointment.kunde_name}
               </Link>
             </div>

@@ -70,7 +70,7 @@ const CustomerDetail = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
           <button 
-            onClick={() => navigate('/dashboard/kunden')}
+            onClick={() => navigate('/dashboard/customers')}
             className="mr-4 p-2 rounded-full hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
@@ -81,7 +81,7 @@ const CustomerDetail = () => {
         </div>
         <div>
           <Link
-            to={`/dashboard/kunden/${id}/edit`}
+            to={`/dashboard/customers/${id}/edit`}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             <Edit size={16} className="mr-2" />

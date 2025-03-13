@@ -1,14 +1,9 @@
-const pool = require('../services/db.service').pool;
+const pool = require('../services/db.service');
 
 /**
  * Manages database connections for controllers
  */
 class ConnectionManager {
-  /**
-   * Execute a query with automatic connection handling
-   * @param {Function} callback - Function that receives a client and executes queries
-   * @returns {Promise<any>} - Query result
-   */
   static async withConnection(callback) {
     const client = await pool.connect();
     try {

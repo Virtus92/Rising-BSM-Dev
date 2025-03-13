@@ -10,8 +10,7 @@ const pgSession = require('connect-pg-simple')(session);
 const flash = require('connect-flash');
 const csrf = require('@dr.pogodin/csurf');
 const cors = require('cors');
-
-
+const { pool } = require('./services/db.service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,9 +28,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
   exposedHeaders: ['X-CSRF-Token']
 }));
-
-// Database connection
-const pool = require('./services/db.service').pool;
 
 // Middleware imports
 const errorMiddleware = require('./middleware/error.middleware');
@@ -87,20 +83,30 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Configure session
-app.use(session({
-  store: new pgSession({
+let sessionStore;
+try {
+  sessionStore = new pgSession({
     pool,
     tableName: 'user_sessions',
     createTableIfMissing: true
-  }),
+  });
+  console.log('Using PostgreSQL session store');
+} catch (error) {
+  console.warn('Failed to initialize PostgreSQL session store:', error.message);
+  console.log('Falling back to memory session store');
+  sessionStore = new session.MemoryStore();
+}
+
+app.use(session({
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || 'rising-bsm-super-secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', 
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 24 * 60 * 60 * 1000 
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
@@ -121,8 +127,20 @@ app.use(csrf({
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax'
   },
-  value: (req) => req.headers['x-csrf-token']
+  // Use this simpler implementation
+  value: (req) => {
+    return req.body && req.body._csrf || 
+           req.query && req.query._csrf || 
+           req.headers['x-csrf-token'] || 
+           req.headers['x-xsrf-token'];
+  }
 }));
+
+// Expose CSRF token to all views
+app.use((req, res, next) => {
+  res.locals.csrfToken = req.csrfToken();
+  next();
+});
 
 // Make user information available to views
 app.use((req, res, next) => {
@@ -148,15 +166,18 @@ app.use('/dashboard/dienste', serviceRoutes);
 app.use('/dashboard/requests', requestRoutes);
 app.use('/dashboard/profile', profileRoutes);
 app.use('/dashboard/settings', settingsRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/kunden', customerRoutes);
-app.use('/api/projekte', projectRoutes);
-app.use('/api/termine', appointmentRoutes);
-app.use('/api/dienste', serviceRoutes);
-app.use('/api/requests', requestRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/settings', settingsRoutes);
 //app.use('/blog', blogRoutes);
+
+// API routes
+app.use('/api/dashboard', require('./routes/dashboard.routes'));
+app.use('/api/customers', require('./routes/customer.routes'));
+app.use('/api/projects', require('./routes/project.routes'));
+app.use('/api/appointments', require('./routes/appointment.routes'));
+app.use('/api/services', require('./routes/service.routes'));
+app.use('/api/requests', require('./routes/request.routes'));
+app.use('/api/profile', require('./routes/profile.routes'));
+app.use('/api/settings', require('./routes/settings.routes'));
+//app.use('/api/blog', require('./routes/blog.routes'));
 
 // Contact form route with rate limiting
 app.post('/contact', contactLimiter, require('./controllers/contact.controller').submitContact);
@@ -165,6 +186,9 @@ app.post('/contact', contactLimiter, require('./controllers/contact.controller')
 app.use(errorMiddleware.notFoundHandler);
 app.use(errorMiddleware.csrfErrorHandler);
 app.use(errorMiddleware.errorHandler);
+
+const dbMiddleware = require('./middleware/db.middleware');
+app.use(dbMiddleware);
 
 // Start server
 app.listen(PORT, () => {

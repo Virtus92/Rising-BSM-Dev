@@ -98,7 +98,7 @@ const ProjectDetail = () => {
             <div className="flex items-center">
               <User className="h-5 w-5 text-gray-400 mr-2" />
               <span className="text-gray-500 mr-2">Kunde:</span>
-              <Link to={`/dashboard/kunden/${project.customer_id}`} className="text-primary-600 hover:text-primary-800">
+              <Link to={`/dashboard/customers/${project.customer_id}`} className="text-primary-600 hover:text-primary-800">
                 {project.customer_name}
               </Link>
             </div>

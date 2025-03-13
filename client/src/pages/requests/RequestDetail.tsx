@@ -76,7 +76,7 @@ const RequestDetail = () => {
     if (!request) return;
     
     // Navigate to new customer form with prefilled data
-    navigate(`/dashboard/kunden/neu?name=${encodeURIComponent(request.name)}&email=${encodeURIComponent(request.email)}&phone=${encodeURIComponent(request.phone || '')}`);
+    navigate(`/dashboard/customers/neu?name=${encodeURIComponent(request.name)}&email=${encodeURIComponent(request.email)}&phone=${encodeURIComponent(request.phone || '')}`);
   };
 
   if (loading) {
