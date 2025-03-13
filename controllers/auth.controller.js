@@ -68,7 +68,8 @@ exports.login = async (req, res, next) => {
 
     return { user: sessionUser, remember: remember === 'on' };
   } catch (error) {
-    next(error);
+    // Instead of calling next with the error, throw it so it can be caught in the route handler
+    throw error;
   }
 };
 

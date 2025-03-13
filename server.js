@@ -21,7 +21,8 @@ app.use(cors({
   origin: 'http://localhost:5173', // Your frontend URL
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  exposedHeaders: ['X-CSRF-Token']
 }));
 
 // Database connection
@@ -109,13 +110,13 @@ const contactLimiter = rateLimit({
 });
 
 // CSRF protection
-app.use(csrf());
-
-// Make CSRF token available to views
-app.use((req, res, next) => {
-  res.locals.csrfToken = req.csrfToken();
-  next();
-});
+app.use(csrf({ 
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production'
+  },
+  value: (req) => req.headers['x-csrf-token']
+}));
 
 // Make user information available to views
 app.use((req, res, next) => {

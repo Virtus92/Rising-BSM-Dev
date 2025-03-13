@@ -29,7 +29,8 @@ router.get('/', async (req, res, next) => {
       notifications: data.notifications,
       recentRequests: data.recentRequests,
       upcomingAppointments: data.upcomingAppointments,
-      systemStatus: data.systemStatus
+      systemStatus: data.systemStatus,
+      csrfToken: req.csrfToken()
     });
   } catch (error) {
     next(error);
@@ -118,6 +119,27 @@ router.get('/search', async (req, res, next) => {
       res.json(data);
     } catch (error) {
       next(error);
+    }
+  });
+
+  /**
+   * @route   GET /dashboard/data
+   * @desc    API endpoint for dashboard data
+   */
+  
+  router.get('/api/data', (req, res) => {
+    try {
+      // Return JSON data for your dashboard
+      res.json({
+        stats: {
+          // Your dashboard stats here
+        },
+        recentRequests: [],
+        upcomingAppointments: []
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      res.status(500).json({ error: 'Error fetching dashboard data' });
     }
   });
   

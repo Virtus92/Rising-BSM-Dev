@@ -31,6 +31,11 @@ router.post('/login', async (req, res, next) => {
     
     const result = await authController.login(req, res, next);
     
+    // Check if result exists before trying to use it
+    if (!result) {
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+    
     // Create session with user data
     req.session.user = result.user;
     
@@ -45,8 +50,19 @@ router.post('/login', async (req, res, next) => {
     return res.json({ success: true, user: result.user });
   } catch (error) {
     console.error('Login error:', error);
-    return res.status(401).json({ success: false, message: error.message || 'Login failed' });
+    // Make sure we don't try to send a response if one has already been sent
+    if (!res.headersSent) {
+      return res.status(401).json({ success: false, message: error.message || 'Login failed' });
+    }
   }
+});
+
+/**
+ * @route   GET /auth/csrf-token
+ * @desc    Get CSRF token
+ */
+router.get('/csrf-token', (req, res) => {
+  return res.json({ csrfToken: req.csrfToken() });
 });
 
 /**
@@ -146,10 +162,10 @@ router.post('/reset-password/:token', isNotAuthenticated, async (req, res, next)
 });
 
 /**
- * @route   GET /me
+ * @route   GET /auth/me
  * @desc    Get current user info
  */
-router.get('/me', isNotAuthenticated, (req, res) => {
+router.get('/me', (req, res) => {
   if (req.session && req.session.user) {
     return res.json(req.session.user);
   } else {

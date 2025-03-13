@@ -11,7 +11,7 @@ export type StatusType =
 
 export interface User {
   id: number;
-  username: string;
+  email: string;
   email: string;
   role: 'admin' | 'manager' | 'mitarbeiter';
   firstName?: string;

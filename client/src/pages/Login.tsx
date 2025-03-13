@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import React from 'react';
-import { generateCsrfToken } from '../utils/csrf';
+import { getCsrfToken } from '../utils/csrf';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -10,10 +10,25 @@ const Login = () => {
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [csrfToken, setCsrfToken] = useState(generateCsrfToken());
+  const [csrfToken, setCsrfToken] = useState('');
   
   const { login } = useAuth();
   const navigate = useNavigate();
+  
+  // Fetch CSRF token when component mounts
+  useEffect(() => {
+    const fetchCsrfToken = async () => {
+      const token = await getCsrfToken();
+      setCsrfToken(token);
+      // Set it as a meta tag for axios interceptor to use
+      const metaElement = document.createElement('meta');
+      metaElement.name = 'csrf-token';
+      metaElement.content = token;
+      document.head.appendChild(metaElement);
+    };
+    
+    fetchCsrfToken();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

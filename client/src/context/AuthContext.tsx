@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
 }
@@ -21,11 +21,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // IMPORTANT: Removed the problematic useEffect hook completely
   // We'll handle authentication only through explicit login/logout
 
-  const login = async (username: string, password: string) => {
+  const login = async (email: string, password: string) => {
     try {
       setLoading(true);
       setError(null);
-      await authService.login(username, password);
+      await authService.login(email, password);
       const currentUser = await authService.getCurrentUser();
       setUser(currentUser);
     } catch (err: any) {

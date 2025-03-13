@@ -3,11 +3,15 @@ import { User } from '../../types';
 
 export const authService = {
 
-  async login(username: string, password: string) {
+  async login(email: string, password: string) {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     
+    if (!csrfToken) {
+      throw new Error('CSRF token not found. Please refresh the page.');
+    }
+
     const response = await api.post('/auth/login', 
-      { username, password },
+      { email, password },
       {
         headers: {
           'X-CSRF-Token': csrfToken
@@ -24,7 +28,7 @@ export const authService = {
   
   async getCurrentUser() {
     try {
-      const response = await api.get<User>('/auth/me');
+      const response = await api.get<User>('/auth/me'); // Change from /dashboard to /auth/me
       return response.data;
     } catch (error: any) {
       // Don't log this as an error if it's a 401 - that's expected

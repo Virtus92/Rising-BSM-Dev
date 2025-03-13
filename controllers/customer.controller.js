@@ -439,10 +439,10 @@ exports.addCustomerNote = async (req, res, next) => {
     
     const currentNotes = customerQuery.rows[0].notizen || '';
     const timestamp = formatDateSafely(new Date(), 'dd.MM.yyyy, HH:mm');
-    const userName = req.session.user.name;
+    const email = req.session.user.name;
     
-    // Format the new note with timestamp and username
-    const newNote = `${timestamp} - ${userName}:\n${notiz}\n\n${currentNotes}`;
+    // Format the new note with timestamp and email
+    const newNote = `${timestamp} - ${email}:\n${notiz}\n\n${currentNotes}`;
     
     // Update notes in database
     await pool.query({
