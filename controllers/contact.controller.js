@@ -17,6 +17,10 @@ const ConnectionManager = require('../services/connectionManager');
  * @returns {Promise<void>}
  */
 exports.submitContact = async (req, res, next) => {
+  console.log('Contact form submission received');
+  console.log('Request headers:', req.headers);  // Log all headers to debug
+  console.log('Request body:', req.body);
+  
   try {
     // Input validation schema
     const validationSchema = {
@@ -110,15 +114,24 @@ exports.submitContact = async (req, res, next) => {
 
     await Promise.all(notificationPromises);
 
-    // Respond based on request type
-    if (req.xhr || req.headers.accept.includes('application/json')) {
-      return res.status(201).json({
+    // Check if it's an AJAX request more comprehensively
+    const isAjax = 
+      req.xhr || 
+      req.headers.accept?.includes('application/json') ||
+      req.headers['x-requested-with'] === 'XMLHttpRequest';
+
+    console.log('Is AJAX request:', isAjax);
+
+    // Always use JSON response for AJAX, redirect for regular form
+    if (isAjax) {
+      return res.status(200).json({
         success: true,
         message: 'Ihre Anfrage wurde erfolgreich übermittelt. Wir melden uns bald bei Ihnen.',
         requestId
       });
     } else {
-      req.flash('success', 'Ihre Anfrage wurde erfolgreich übermittelt. Wir melden uns bald bei Ihnen.');
+      // Traditional form submission (shouldn't happen with our JS)
+      req.flash('success', 'Ihre Anfrage wurde erfolgreich übermittelt.');
       return res.redirect('/');
     }
 
@@ -133,16 +146,11 @@ exports.submitContact = async (req, res, next) => {
       });
     }
 
-    // Generic error handling
-    if (req.xhr || req.headers.accept.includes('application/json')) {
-      return res.status(500).json({
-        success: false,
-        message: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.'
-      });
-    } else {
-      req.flash('error', 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
-      return res.redirect('/');
-    }
+    // Always return JSON for errors too
+    return res.status(500).json({
+      success: false,
+      message: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.'
+    });
   }
 };
 

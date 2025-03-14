@@ -259,7 +259,7 @@
               <div class="card-body p-4">
                 <h3 class="h4 mb-4">Nachricht senden</h3>
                 
-                <form id="contact-form" class="needs-validation" action="/contact" method="POST">
+                <form id="contact-form" class="needs-validation" action="/contact" method="POST" novalidate enctype="multipart/form-data">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         
                   <div class="row g-3">
@@ -316,7 +316,14 @@
                         <div class="invalid-feedback">Sie müssen den Datenschutzhinweis akzeptieren.</div>
                       </div>
                     </div>
-                    <div id="formFeedback"></div>
+                    <div id="formFeedback">
+                      <% if(locals.messages && messages.error) { %>
+                        <div class="alert alert-danger"><%= messages.error %></div>
+                      <% } %>
+                      <% if(locals.messages && messages.success) { %>
+                        <div class="alert alert-success"><%= messages.success %></div>
+                      <% } %>
+                    </div>
                     <div class="col-12">
                       <button type="submit" class="btn btn-success btn-lg w-100">
                         <i class="fas fa-paper-plane me-2"></i>Nachricht senden

@@ -47,6 +47,7 @@ const serviceRoutes = require('./routes/service.routes');
 const requestRoutes = require('./routes/request.routes');
 const profileRoutes = require('./routes/profile.routes');
 const settingsRoutes = require('./routes/settings.routes');
+const validator = require('validator');
 // const blogRoutes = require('./routes/blog.routes');
 
 // Configure view engine
@@ -132,12 +133,22 @@ app.use(csrf({
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax'
   },
-  // Use this simpler implementation
+  // Make sure it can extract tokens from various sources with proper priority
   value: (req) => {
-    return req.body && req.body._csrf || 
-           req.query && req.query._csrf || 
-           req.headers['x-csrf-token'] || 
-           req.headers['x-xsrf-token'];
+    // Check headers with different naming conventions
+    const token = req.headers['csrf-token'] || 
+                  req.headers['x-csrf-token'] || 
+                  req.headers['x-xsrf-token'];
+    
+    if (token) return token;
+    
+    // Then check form fields
+    if (req.body && req.body._csrf) return req.body._csrf;
+    
+    // Finally check query params
+    if (req.query && req.query._csrf) return req.query._csrf;
+    
+    return null;
   }
 }));
 
@@ -177,7 +188,7 @@ app.use('/api', apiRoutes);
 app.use('/dashboard/requests', requestRoutes); // For the frontend when served through Express
 app.use('/api/requests', requestRoutes);
 
-// Contact form route with rate limiting
+// Contact form route with rate limiting (keep this one)
 app.post('/contact', contactLimiter, require('./controllers/contact.controller').submitContact);
 
 // Error handling middleware

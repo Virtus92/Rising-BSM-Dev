@@ -1,41 +1,6 @@
 document.addEventListener("DOMContentLoaded", function() {
   "use strict";
 
-  // CSRF-Token für alle Fetch-Anfragen automatisch einrichten
-  const setupCSRF = () => {
-    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    if (csrfMeta) {
-      const csrfToken = csrfMeta.getAttribute('content');
-      
-      // Originale fetch()-Funktion sichern
-      const originalFetch = window.fetch;
-      
-      // fetch() überschreiben, um CSRF-Token hinzuzufügen
-      window.fetch = function(url, options = {}) {
-        // Wenn es sich um eine POST/PUT/DELETE-Anfrage handelt
-        if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase())) {
-          // Headers vorbereiten
-          options.headers = options.headers || {};
-          
-          // CSRF-Token in Header setzen
-          options.headers['CSRF-Token'] = csrfToken;
-        }
-        
-        // Resolve relative URLs
-        const absoluteUrl = url.startsWith('http') ? url : new URL(url, window.location.origin).href;
-        
-        return originalFetch.call(this, absoluteUrl, options);
-      };
-      
-      console.log('CSRF-Schutz für AJAX-Anfragen konfiguriert');
-    } else {
-      console.warn('CSRF-Meta-Tag nicht gefunden!');
-    }
-  };
-  
-  // CSRF-Setup ausführen
-  setupCSRF();
-
   window.ServiceModals = {};
 
   // Utility Functions
@@ -365,6 +330,7 @@ document.addEventListener("DOMContentLoaded", function() {
           if (data.email) contactForm.querySelector('[name="email"]').value = data.email;
           if (data.phone) contactForm.querySelector('[name="phone"]').value = data.phone;
           if (data.service) contactForm.querySelector('[name="service"]').value = data.service;
+          if (data.message) contactForm.querySelector('[name="message"]').value = data.message;
           console.log('Formular-Teildaten wiederhergestellt');
         } catch (e) {
           console.error('Fehler beim Wiederherstellen der Formular-Teildaten:', e);
@@ -376,81 +342,81 @@ document.addEventListener("DOMContentLoaded", function() {
     // Call this function when page loads
     loadSavedData();
 
+    // Use AJAX submission for a better UX
     contactForm.addEventListener('submit', function(event) {
       event.preventDefault();
+
+      // Basic validation
+      if (!this.checkValidity()) {
+        event.stopPropagation();
+        this.classList.add('was-validated');
+        return;
+      }
 
       const scrollPosition = window.scrollY;
       const feedbackEl = document.getElementById('formFeedback');
       feedbackEl.innerHTML = '';
-      this.classList.remove('was-validated');
 
       // Get form elements
       const formElements = this.querySelectorAll('input, textarea, select, button');
       formElements.forEach(element => element.disabled = true);
 
+      // Show loading state
+      feedbackEl.innerHTML = `<div class="alert alert-info mt-3" role="alert"><div class="d-flex align-items-center"><div class="spinner-border spinner-border-sm me-2" role="status"></div><div>Ihre Nachricht wird gesendet...</div></div></div>`;
+
       // Get CSRF token
       const csrfToken = this.querySelector('[name="_csrf"]').value;
-
-      // Get form data
+      
+      // Create request payload exactly matching the working example
       const formData = {
-        name: this.querySelector('[name="name"]').value.trim(),
-        email: this.querySelector('[name="email"]').value.trim(),
-        phone: this.querySelector('[name="phone"]').value.trim(),
+        name: this.querySelector('[name="name"]').value,
+        email: this.querySelector('[name="email"]').value,
+        phone: this.querySelector('[name="phone"]').value || "",
         service: this.querySelector('[name="service"]').value,
-        message: this.querySelector('[name="message"]').value.trim(),
-        _csrf: csrfToken,
-        timestamp: new Date().toISOString()
+        message: this.querySelector('[name="message"]').value,
+        _csrf: csrfToken
       };
 
-      // Client-side validation
-      let errors = [];
-      if (!formData.name) errors.push('Name ist ein Pflichtfeld.');
-      if (!formData.email) errors.push('E-Mail ist ein Pflichtfeld.');
-      if (!formData.message) errors.push('Nachricht ist ein Pflichtfeld.');
-      if (!document.getElementById('privacyCheck').checked) errors.push('Sie müssen den Datenschutzhinweis akzeptieren.');
-
-      if (errors.length > 0) {
-        feedbackEl.innerHTML = `<div class="alert alert-danger mt-3" role="alert"><i class="fas fa-exclamation-circle me-2"></i>${errors.map(error => `<div>${error}</div>`).join('')}</div>`;
-        formElements.forEach(element => element.disabled = false);
-        window.scrollTo({ top: scrollPosition, behavior: 'smooth' });
-        return;
-      }
-
-      feedbackEl.innerHTML = `<div class="alert alert-info mt-3" role="alert"><div class="d-flex align-items-center"><div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Wird gesendet...</span></div><div>Ihre Nachricht wird gesendet...</div></div></div>`;
-
-      // Use a relative path or explicit HTTP to avoid SSL errors locally
-      const isLocalhost = window.location.hostname === 'localhost';
-      const contactUrl = isLocalhost ? 'http://localhost:9295/contact' : '/contact';
-
-      fetch(contactUrl, {
+      fetch('/contact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'CSRF-Token': csrfToken
+          'Accept': '*/*', 
+          'X-CSRF-Token': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
+        referrerPolicy: "no-referrer" // Match the example exactly
       })
       .then(response => {
         if (!response.ok) {
-          console.error('Server response error:', response.status, response.statusText);
-          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+          return response.json().then(errorData => {
+            throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+          });
         }
-        return response.text();
+        return response.json();
       })
       .then(data => {
-        if (data.includes('success')) {
-          contactForm.reset();
+        if (data.success) {
+          feedbackEl.innerHTML = `<div class="alert alert-success mt-3" role="alert"><div class="d-flex"><div class="me-3"><i class="fas fa-check-circle fa-2x"></i></div><div><h5 class="alert-heading">Vielen Dank für Ihre Nachricht!</h5><p class="mb-0">${data.message}</p></div></div></div>`;
+          this.reset();
           localStorage.removeItem('partialFormData');
         } else {
-          throw new Error('Form submission failed');
+          throw new Error(data.message || 'Ein unbekannter Fehler ist aufgetreten.');
         }
       })
       .catch(error => {
-        console.error('Error submitting form:', error);
-        feedbackEl.innerHTML = `<div class="alert alert-danger mt-3" role="alert"><div class="d-flex"><div class="me-3"><i class="fas fa-exclamation-triangle fa-2x"></i></div><div><h5 class="alert-heading">Fehler bei der Übermittlung</h5><p class="mb-0">Bitte versuchen Sie es später erneut oder kontaktieren Sie uns direkt.</p></div></div></div>`;
+        console.error('Error:', error);
+        feedbackEl.innerHTML = `<div class="alert alert-danger mt-3" role="alert"><div class="d-flex"><div class="me-3"><i class="fas fa-exclamation-triangle fa-2x"></i></div><div><h5 class="alert-heading">Fehler bei der Übermittlung</h5><p class="mb-0">${error.message || 'Bitte versuchen Sie es später erneut.'}</p></div></div></div>`;
         
-        // Save partial form data
-        const { _csrf, ...partialData } = formData;
+        // Save partial form data for retry
+        const partialData = {
+          name: this.querySelector('[name="name"]').value,
+          email: this.querySelector('[name="email"]').value,
+          phone: this.querySelector('[name="phone"]').value,
+          service: this.querySelector('[name="service"]').value,
+          message: this.querySelector('[name="message"]').value
+        };
         localStorage.setItem('partialFormData', JSON.stringify(partialData));
       })
       .finally(() => {
@@ -459,6 +425,7 @@ document.addEventListener("DOMContentLoaded", function() {
       });
     });
   };
+
 
   // Initialisierung aller Funktionen
   currentYear();
