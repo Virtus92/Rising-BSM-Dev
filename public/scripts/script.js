@@ -310,6 +310,35 @@ document.addEventListener("DOMContentLoaded", function() {
     const contactForm = document.getElementById('contact-form');
     if (!contactForm) return;
 
+    // Get CSRF token from JavaScript-accessible cookie
+    const getXsrfToken = () => {
+      return document.cookie
+        .split('; ')
+        .find(row => row.startsWith('XSRF-TOKEN='))
+        ?.split('=')[1];
+    };
+
+    // Debug CSRF tokens by comparing all sources
+    const debugCsrf = () => {
+      // Get cookie tokens
+      const xsrfCookie = getXsrfToken() || 'Not found';
+      
+      // Get form token
+      const formToken = contactForm.querySelector('[name="_csrf"]')?.value || 'Not in form';
+      
+      // Get meta token
+      const metaToken = document.querySelector('meta[name="csrf-token"]')?.content || 'Not in meta';
+      
+      console.log('CSRF Token Comparison:', {
+        xsrfCookie,
+        formToken,
+        metaToken
+      });
+    };
+
+    // Call debug function
+    debugCsrf();
+
     // Email validation
     const emailInput = document.getElementById('emailInput');
     if (emailInput) {
@@ -364,29 +393,36 @@ document.addEventListener("DOMContentLoaded", function() {
       // Show loading state
       feedbackEl.innerHTML = `<div class="alert alert-info mt-3" role="alert"><div class="d-flex align-items-center"><div class="spinner-border spinner-border-sm me-2" role="status"></div><div>Ihre Nachricht wird gesendet...</div></div></div>`;
 
-      // Get CSRF token
-      const csrfToken = this.querySelector('[name="_csrf"]').value;
-      
-      // Create request payload exactly matching the working example
+      // Get CSRF token from cookie
+      const csrfToken = getXsrfToken();
+      console.log('Using CSRF token from XSRF-TOKEN cookie:', csrfToken);
+
+      if (!csrfToken) {
+        feedbackEl.innerHTML = `<div class="alert alert-danger mt-3" role="alert">Sicherheitstoken fehlt. Bitte Seite neu laden.</div>`;
+        formElements.forEach(element => element.disabled = false);
+        return;
+      }
+
+      // Create request payload
       const formData = {
         name: this.querySelector('[name="name"]').value,
         email: this.querySelector('[name="email"]').value,
         phone: this.querySelector('[name="phone"]').value || "",
         service: this.querySelector('[name="service"]').value,
         message: this.querySelector('[name="message"]').value,
-        _csrf: csrfToken
+        _csrf: csrfToken // Send the token in the body
       };
 
       fetch('/contact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': '*/*', 
-          'X-CSRF-Token': csrfToken,
+          'Accept': 'application/json',
+          'X-CSRF-Token': csrfToken, // Send the token in the header
           'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify(formData),
-        referrerPolicy: "no-referrer" // Match the example exactly
+        credentials: 'same-origin'
       })
       .then(response => {
         if (!response.ok) {

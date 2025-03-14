@@ -9,18 +9,13 @@ const ConnectionManager = require('../services/connectionManager');
 
 /**
  * Submit contact form
- * Validates input, saves to database, and triggers notifications
- * 
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- * @returns {Promise<void>}
+ * Handles submission and processing of contact form submissions
  */
 exports.submitContact = async (req, res, next) => {
   console.log('Contact form submission received');
-  console.log('Request headers:', req.headers);  // Log all headers to debug
+  console.log('Request headers:', req.headers);
   console.log('Request body:', req.body);
-  
+
   try {
     // Input validation schema
     const validationSchema = {
@@ -138,7 +133,15 @@ exports.submitContact = async (req, res, next) => {
   } catch (error) {
     console.error('Contact form submission error:', error);
 
-    // Handle specific error types
+    // If it's a CSRF error, provide a clear message
+    if (error.code === 'EBADCSRFTOKEN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Sicherheitstoken ungültig oder abgelaufen. Bitte laden Sie die Seite neu und versuchen Sie es erneut.'
+      });
+    }
+
+    // Handle other errors
     if (error.code === '23505') { // Unique constraint violation
       return res.status(409).json({
         success: false,

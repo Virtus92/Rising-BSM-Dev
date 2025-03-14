@@ -17,6 +17,62 @@
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/styles/styles.css">
+  
+  <!-- Enhanced CSRF token debugging display -->
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      const debugDiv = document.createElement('div');
+      debugDiv.style.position = 'fixed';
+      debugDiv.style.bottom = '10px';
+      debugDiv.style.right = '10px';
+      debugDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+      debugDiv.style.border = '1px solid #000';
+      debugDiv.style.padding = '10px';
+      debugDiv.style.zIndex = '9999';
+      debugDiv.style.fontSize = '12px';
+      debugDiv.style.maxWidth = '300px';
+      
+      // Get all CSRF tokens
+      const getXsrfCookie = () => {
+        const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : 'Not found';
+      };
+      
+      const getCsrfCookie = () => {
+        const match = document.cookie.match(/_csrf=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : 'Not found';
+      };
+      
+      const metaToken = document.querySelector('meta[name="csrf-token"]')?.content || 'Not in meta';
+      const formToken = document.querySelector('input[name="_csrf"]')?.value || 'Not in form';
+      const xsrfCookie = getXsrfCookie();
+      const csrfCookie = getCsrfCookie();
+      
+      // Only show part of the token to avoid exposing it fully
+      const truncateToken = (token) => {
+        if (token === 'Not found' || token === 'Not in form' || token === 'Not in meta') return token;
+        return token.substring(0, 6) + '...';
+      };
+      
+      debugDiv.innerHTML = `
+        <h5 style="margin:0 0 5px 0">CSRF Debug</h5>
+        <div style="margin-bottom:3px"><strong>_csrf Cookie:</strong> ${truncateToken(csrfCookie)}</div>
+        <div style="margin-bottom:3px"><strong>XSRF Cookie:</strong> ${truncateToken(xsrfCookie)}</div>
+        <div style="margin-bottom:3px"><strong>Form:</strong> ${truncateToken(formToken)}</div>
+        <div style="margin-bottom:3px"><strong>Meta:</strong> ${truncateToken(metaToken)}</div>
+        <div style="margin-top:5px">
+          <a href="/debug-csrf" target="_blank" style="font-size:10px;">View Full Debug</a>
+          <button id="hideDebug" style="font-size:10px;padding:2px 5px;margin-left:5px">Hide</button>
+        </div>
+      `;
+      
+      document.body.appendChild(debugDiv);
+      
+      document.getElementById('hideDebug').addEventListener('click', function() {
+        debugDiv.style.display = 'none';
+      });
+    });
+  </script>
 </head>
 
 <body>

@@ -81,9 +81,9 @@ app.use(helmet({
 }));
 
 // Parse request body
+app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.use(cookieParser());
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -109,7 +109,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // Disable secure for local development
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000
@@ -126,48 +126,9 @@ const contactLimiter = rateLimit({
   message: { success: false, error: 'Too many requests. Please try again later.' }
 });
 
-// CSRF protection
-app.use(csrf({ 
-  cookie: {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax'
-  },
-  // Make sure it can extract tokens from various sources with proper priority
-  value: (req) => {
-    // Check headers with different naming conventions
-    const token = req.headers['csrf-token'] || 
-                  req.headers['x-csrf-token'] || 
-                  req.headers['x-xsrf-token'];
-    
-    if (token) return token;
-    
-    // Then check form fields
-    if (req.body && req.body._csrf) return req.body._csrf;
-    
-    // Finally check query params
-    if (req.query && req.query._csrf) return req.query._csrf;
-    
-    return null;
-  }
-}));
-
-// Expose CSRF token to all views
-app.use((req, res, next) => {
-  res.locals.csrfToken = req.csrfToken();
-  next();
-});
-
-// Make user information available to views
-app.use((req, res, next) => {
-  res.locals.user = req.session.user || null;
-  next();
-});
-
-// New requests count middleware for dashboard
-const { getNewRequestsCountMiddleware } = require('./middleware/dashboard.middleware');
-app.use('/dashboard', getNewRequestsCountMiddleware);
-app.use('/api/dashboard', getNewRequestsCountMiddleware);
+// Reset and configure CSRF (after session, before routes)
+const setupCsrf = require('./csrf-reset');
+setupCsrf(app);
 
 // Apply routes
 app.use('/', indexRoutes);
@@ -189,7 +150,57 @@ app.use('/dashboard/requests', requestRoutes); // For the frontend when served t
 app.use('/api/requests', requestRoutes);
 
 // Contact form route with rate limiting (keep this one)
-app.post('/contact', contactLimiter, require('./controllers/contact.controller').submitContact);
+app.post('/contact', contactLimiter, async (req, res) => {
+  const { name, email, phone, service, message } = req.body;
+
+  // Validierung
+  if (!name || !email || !message || !service) {
+    return res.status(400).json({ success: false, error: 'Name, E-Mail und Nachr                                                                                                             icht sind Pflichtfelder.' });
+  }
+
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ success: false, error: 'Bitte geben Sie eine g                                                                                                             ültige E-Mail-Adresse ein.' });
+  }
+
+  if (phone && !validator.isMobilePhone(phone, 'any', { strictMode: false })) {
+    return res.status(400).json({ success: false, error: 'Bitte geben Sie eine g                                                                                                             ültige Telefonnummer ein.' });
+  }
+
+  // XSS-Schutz durch Escape von HTML
+  const sanitizedName = validator.escape(name);
+  const sanitizedMessage = validator.escape(message);
+  const sanitizedPhone = phone ? validator.escape(phone) : '';
+
+
+  try {
+    // Daten in PostgreSQL speichern
+    const result = await pool.query(
+      'INSERT INTO kontaktanfragen (name, email, phone, service, message) VALUES                                                                                                              ($1, $2, $3, $4, $5) RETURNING id',
+      [name, email, phone, service, message]
+    );
+    const contactId = result.rows[0].id;
+
+    try {
+      await axios.post(process.env.N8N_WEBHOOK_URL || 'https://n8n.dinel.at/webh                                                                                                             ook/e2b8d680-425b-44ab-94aa-55ecda267de1', {
+        id: contactId,
+        name: sanitizedName,
+        email,
+        phone: sanitizedPhone,
+        service,
+        message: sanitizedMessage,
+      });
+    } catch (webhookError) {
+      console.error('Error notifying N8N webhook:', webhookError);
+      // Continue even if webhook fails - we already saved to database
+    }
+
+    res.status(200).json({ success: true, id: contactId });
+  } catch (error) {
+    console.error('Error saving contact or notifying N8N:', error);
+    console.error('Request body:', req.body); // Log the request body for debugg                                                                                                             ing
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Error handling middleware
 app.use(errorMiddleware.notFoundHandler);
