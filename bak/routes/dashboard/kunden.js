@@ -659,12 +659,12 @@ router.get('/export', async (req, res) => {
           created_at: formatDateSafely(kunde.created_at, 'dd.MM.yyyy')
         },
         termine: termineQuery.rows.map(termin => {
-          const terminStatusInfo = getTerminStatusInfo(termin.status);
+          const terminStatusInfo = getTerminStatusInfo(appointment.status);
           return {
-            id: termin.id,
-            titel: termin.titel,
-            datum: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy, HH:mm'),
-            status: termin.status,
+            id: appointment.id,
+            titel: appointment.titel,
+            datum: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy, HH:mm'),
+            status: appointment.status,
             statusLabel: terminStatusInfo.label,
             statusClass: terminStatusInfo.className
           };

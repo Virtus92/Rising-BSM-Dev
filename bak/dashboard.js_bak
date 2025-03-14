@@ -76,7 +76,7 @@ function getAnfrageStatusInfo(status) {
 }
 
 /**
- * Generiert Statusinformationen für einen Termin.
+ * Generiert Statusinformationen für einen appointment.
  * @param {string} status - Der Status des Termins.
  * @returns {object} - Ein Objekt mit Statuslabel und -klasse.
  */
@@ -555,7 +555,7 @@ router.get('/', isAuthenticated, async (req, res) => {
     const upcomingAppointmentsResult = await getCachedOrFreshData('upcomingAppointments', upcomingAppointmentsQuery, [], 300);
     
     const upcomingAppointments = upcomingAppointmentsResult.map(termin => {
-      const datumObj = new Date(termin.termin_datum);
+      const datumObj = new Date(appointment.termin_datum);
       const heute = isToday(datumObj);
       const morgen = isTomorrow(datumObj);
       
@@ -572,9 +572,9 @@ router.get('/', isAuthenticated, async (req, res) => {
       }
       
       return {
-        id: termin.id,
-        title: termin.titel,
-        customer: termin.kunde_name || 'Kein Kunde zugewiesen',
+        id: appointment.id,
+        title: appointment.titel,
+        customer: appointment.kunde_name || 'Kein Kunde zugewiesen',
         dateLabel: dateLabel,
         dateClass: dateClass,
         time: format(datumObj, 'HH:mm')
@@ -1885,12 +1885,12 @@ router.get('/customers/:id', isAuthenticated, async (req, res) => {
         created_at: formatDateSafely(kunde.created_at, 'dd.MM.yyyy')
       },
       termine: termineQuery.rows.map(termin => {
-        const terminStatusInfo = getTerminStatusInfo(termin.status);
+        const terminStatusInfo = getTerminStatusInfo(appointment.status);
         return {
-          id: termin.id,
-          titel: termin.titel,
-          datum: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy, HH:mm'),
-          status: termin.status,
+          id: appointment.id,
+          titel: appointment.titel,
+          datum: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy, HH:mm'),
+          status: appointment.status,
           statusLabel: terminStatusInfo.label,
           statusClass: terminStatusInfo.className
         };
@@ -2108,20 +2108,20 @@ router.get('/appointments', isAuthenticated, async (req, res) => {
     
     // Abfrageergebnisse formatieren
     const appointments = termineQuery.rows.map(termin => {
-      const terminStatusInfo = getTerminStatusInfo(termin.status);
+      const terminStatusInfo = getTerminStatusInfo(appointment.status);
       return {
-        id: termin.id,
-        titel: termin.titel,
-        kunde_id: termin.kunde_id,
-        kunde_name: termin.kunde_name || ' - ',
-        projekt_id: termin.projekt_id,
-        projekt_name: termin.projekt_name || ' - ',
-        termin_datum: termin.termin_datum,
-        dateFormatted: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy'),
-        timeFormatted: formatDateSafely(termin.termin_datum, 'HH:mm'),
-        dauer: termin.dauer,
-        ort: termin.ort,
-        status: termin.status,
+        id: appointment.id,
+        titel: appointment.titel,
+        kunde_id: appointment.kunde_id,
+        kunde_name: appointment.kunde_name || ' - ',
+        projekt_id: appointment.projekt_id,
+        projekt_name: appointment.projekt_name || ' - ',
+        termin_datum: appointment.termin_datum,
+        dateFormatted: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy'),
+        timeFormatted: formatDateSafely(appointment.termin_datum, 'HH:mm'),
+        dauer: appointment.dauer,
+        ort: appointment.ort,
+        status: appointment.status,
         statusLabel: terminStatusInfo.label,
         statusClass: terminStatusInfo.className
       };
@@ -2352,12 +2352,12 @@ router.get('/appointments/calendar-events', isAuthenticated, async (req, res) =>
     // Transform database rows into FullCalendar event objects
     const events = termineQuery.rows.map(termin => {
       // Calculate start and end time
-      const startDate = new Date(termin.termin_datum);
-      const endDate = new Date(startDate.getTime() + (termin.dauer || 60) * 60000); // Default to 60 mins if not specified
+      const startDate = new Date(appointment.termin_datum);
+      const endDate = new Date(startDate.getTime() + (appointment.dauer || 60) * 60000); // Default to 60 mins if not specified
       
       // Determine event color based on status
       let backgroundColor, borderColor, textColor;
-      switch(termin.status) {
+      switch(appointment.status) {
         case 'geplant': 
           backgroundColor = '#ffc107'; 
           borderColor = '#e0a800';
@@ -2386,8 +2386,8 @@ router.get('/appointments/calendar-events', isAuthenticated, async (req, res) =>
       
       // Build and return the event object
       return {
-        id: termin.id,
-        title: termin.titel,
+        id: appointment.id,
+        title: appointment.titel,
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         allDay: false,
@@ -2395,19 +2395,19 @@ router.get('/appointments/calendar-events', isAuthenticated, async (req, res) =>
         borderColor,
         textColor,
         extendedProps: {
-          kunde: termin.kunde_name,
-          kunde_id: termin.kunde_id,
-          projekt: termin.projekt_titel,
-          projekt_id: termin.projekt_id,
-          ort: termin.ort,
-          beschreibung: termin.beschreibung,
-          status: termin.status,
-          statusText: getTerminStatusInfo(termin.status).label
+          kunde: appointment.kunde_name,
+          kunde_id: appointment.kunde_id,
+          projekt: appointment.projekt_titel,
+          projekt_id: appointment.projekt_id,
+          ort: appointment.ort,
+          beschreibung: appointment.beschreibung,
+          status: appointment.status,
+          statusText: getTerminStatusInfo(appointment.status).label
         },
         // Additional properties for event rendering
-        description: termin.kunde_name ? `Kunde: ${termin.kunde_name}` : '',
-        location: termin.ort || '',
-        url: `/dashboard/appointments/${termin.id}`
+        description: appointment.kunde_name ? `Kunde: ${appointment.kunde_name}` : '',
+        location: appointment.ort || '',
+        url: `/dashboard/appointments/${appointment.id}`
       };
     });
     
@@ -2452,7 +2452,7 @@ router.get('/appointments/:id', isAuthenticated, async (req, res) => {
     }
     
     const termin = terminQuery.rows[0];
-    const terminStatusInfo = getTerminStatusInfo(termin.status);
+    const terminStatusInfo = getTerminStatusInfo(appointment.status);
 
     // Notizen zu diesem Termin abrufen (falls Sie eine entsprechende Tabelle haben)
     const notizenQuery = await pool.query({
@@ -2461,23 +2461,23 @@ router.get('/appointments/:id', isAuthenticated, async (req, res) => {
     });
     
     res.render('dashboard/appointments/detail', {
-      title: `Termin: ${termin.titel} - Rising BSM`,
+      title: `Termin: ${appointment.titel} - Rising BSM`,
       user: req.session.user,
       currentPath: '/dashboard/appointments',
       termin: {
-        id: termin.id,
-        titel: termin.titel,
-        kunde_id: termin.kunde_id,
-        kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
-        projekt_id: termin.projekt_id,
-        projekt_titel: termin.projekt_titel || 'Kein Projekt zugewiesen',
-        termin_datum: termin.termin_datum,
-        dateFormatted: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy'),
-        timeFormatted: formatDateSafely(termin.termin_datum, 'HH:mm'),
-        dauer: termin.dauer || 60,
-        ort: termin.ort || 'Nicht angegeben',
-        beschreibung: termin.beschreibung || 'Keine Beschreibung vorhanden',
-        status: termin.status,
+        id: appointment.id,
+        titel: appointment.titel,
+        kunde_id: appointment.kunde_id,
+        kunde_name: appointment.kunde_name || 'Kein Kunde zugewiesen',
+        projekt_id: appointment.projekt_id,
+        projekt_titel: appointment.projekt_titel || 'Kein Projekt zugewiesen',
+        termin_datum: appointment.termin_datum,
+        dateFormatted: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy'),
+        timeFormatted: formatDateSafely(appointment.termin_datum, 'HH:mm'),
+        dauer: appointment.dauer || 60,
+        ort: appointment.ort || 'Nicht angegeben',
+        beschreibung: appointment.beschreibung || 'Keine Beschreibung vorhanden',
+        status: appointment.status,
         statusLabel: terminStatusInfo.label,
         statusClass: terminStatusInfo.className
       },
@@ -2540,28 +2540,28 @@ router.get('/appointments/:id/edit', isAuthenticated, async (req, res) => {
     `);
     
     res.render('dashboard/appointments/edit', {
-      title: `Termin bearbeiten: ${termin.titel} - Rising BSM`,
+      title: `Termin bearbeiten: ${appointment.titel} - Rising BSM`,
       user: req.session.user,
       currentPath: '/dashboard/appointments',
       termin: {
-        id: termin.id,
-        titel: termin.titel,
-        kunde_id: termin.kunde_id,
-        kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
-        projekt_id: termin.projekt_id,
-        termin_datum: termin.termin_datum,
-        dateFormatted: formatDateSafely(termin.termin_datum, 'dd.MM.yyyy'),
-        timeFormatted: formatDateSafely(termin.termin_datum, 'HH:mm'),
-        dauer: termin.dauer || 60,
-        ort: termin.ort || 'Nicht angegeben',
-        beschreibung: termin.beschreibung || 'Keine Beschreibung vorhanden',
-        status: termin.status,
-        statusLabel: termin.status === 'geplant' ? 'Geplant' : 
-                    termin.status === 'bestaetigt' ? 'Bestätigt' : 
-                    termin.status === 'abgeschlossen' ? 'Abgeschlossen' : 'Storniert',
-        statusClass: termin.status === 'geplant' ? 'warning' : 
-                    termin.status === 'bestaetigt' ? 'success' : 
-                    termin.status === 'abgeschlossen' ? 'primary' : 'secondary'
+        id: appointment.id,
+        titel: appointment.titel,
+        kunde_id: appointment.kunde_id,
+        kunde_name: appointment.kunde_name || 'Kein Kunde zugewiesen',
+        projekt_id: appointment.projekt_id,
+        termin_datum: appointment.termin_datum,
+        dateFormatted: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy'),
+        timeFormatted: formatDateSafely(appointment.termin_datum, 'HH:mm'),
+        dauer: appointment.dauer || 60,
+        ort: appointment.ort || 'Nicht angegeben',
+        beschreibung: appointment.beschreibung || 'Keine Beschreibung vorhanden',
+        status: appointment.status,
+        statusLabel: appointment.status === 'geplant' ? 'Geplant' : 
+                    appointment.status === 'bestaetigt' ? 'Bestätigt' : 
+                    appointment.status === 'abgeschlossen' ? 'Abgeschlossen' : 'Storniert',
+        statusClass: appointment.status === 'geplant' ? 'warning' : 
+                    appointment.status === 'bestaetigt' ? 'success' : 
+                    appointment.status === 'abgeschlossen' ? 'primary' : 'secondary'
       },
       kunden: kundenQuery.rows,
       projekte: projekteQuery.rows,
@@ -2737,11 +2737,11 @@ router.get('/appointments/api/events', isAuthenticated, async (req, res) => {
     
     // Termine in FullCalendar-Event-Format umwandeln
     const events = termineQuery.rows.map(termin => {
-      const startDate = new Date(termin.termin_datum);
-      const endDate = new Date(startDate.getTime() + (termin.dauer * 60 * 1000));
+      const startDate = new Date(appointment.termin_datum);
+      const endDate = new Date(startDate.getTime() + (appointment.dauer * 60 * 1000));
       
       let backgroundColor, textColor;
-      switch(termin.status) {
+      switch(appointment.status) {
         case 'geplant': 
           backgroundColor = '#ffc107'; 
           textColor = '#000000';
@@ -2764,18 +2764,18 @@ router.get('/appointments/api/events', isAuthenticated, async (req, res) => {
       }
       
       return {
-        id: termin.id,
-        title: termin.titel,
-        description: termin.kunde_name ? `Kunde: ${termin.kunde_name}` : '',
+        id: appointment.id,
+        title: appointment.titel,
+        description: appointment.kunde_name ? `Kunde: ${appointment.kunde_name}` : '',
         start: startDate.toISOString(),
         end: endDate.toISOString(),
-        location: termin.ort || '',
+        location: appointment.ort || '',
         backgroundColor: backgroundColor,
         borderColor: backgroundColor,
         textColor: textColor,
         extendedProps: {
-          kunde_id: termin.kunde_id,
-          status: termin.status
+          kunde_id: appointment.kunde_id,
+          status: appointment.status
         }
       };
     });

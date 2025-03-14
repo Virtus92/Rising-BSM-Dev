@@ -5,6 +5,7 @@ export const serviceService = {
     async getAll(filters: any = {}) {
         try {
             const response = await api.get<ApiResponse<Service[]>>('/services', { params: filters });
+            console.log('Services API response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error fetching services:', error);

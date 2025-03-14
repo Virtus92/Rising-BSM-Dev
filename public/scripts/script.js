@@ -21,7 +21,10 @@ document.addEventListener("DOMContentLoaded", function() {
           options.headers['CSRF-Token'] = csrfToken;
         }
         
-        return originalFetch.call(this, url, options);
+        // Resolve relative URLs
+        const absoluteUrl = url.startsWith('http') ? url : new URL(url, window.location.origin).href;
+        
+        return originalFetch.call(this, absoluteUrl, options);
       };
       
       console.log('CSRF-Schutz für AJAX-Anfragen konfiguriert');
@@ -62,22 +65,22 @@ document.addEventListener("DOMContentLoaded", function() {
           <div class="row g-4">
             <div class="col-lg-6">
               <div class="mb-4">
-                <h4 class="h5 mb-3"><i class="fas fa-building text-success me-2"></i>Komplette Hausbetreuung</h4>
-                <p class="text-muted">Von der regelmäßigen Reinigung bis zur technischen Wartung kümmern wir uns um alle Aspekte Ihrer Immobilie.</p>
+                <h4 class="h5 mb-3"><i class="fas fa-leaf text-success me-2"></i>Grünflächenbetreuung</h4>
+                <p class="text-muted">Professionelle Pflege und Instandhaltung Ihrer Außenanlagen, Parks und Grünflächen für einen perfekten ersten Eindruck.</p>
               </div>
               <div class="mb-4">
-                <h4 class="h5 mb-3"><i class="fas fa-leaf text-success me-2"></i>Grünflächenpflege</h4>
-                <p class="text-muted">Unsere Experten halten Ihre Außenanlagen gepflegt und attraktiv, was den Wert Ihrer Immobilie steigert.</p>
+                <h4 class="h5 mb-3"><i class="fas fa-building text-success me-2"></i>Flächenbetreuung</h4>
+                <p class="text-muted">Umfassende Betreuung für Wohngebäude, Wohnungen und Spielplätze mit regelmäßigen Kontrollen und Wartungen.</p>
               </div>
             </div>
             <div class="col-lg-6">
               <div class="mb-4">
-                <h4 class="h5 mb-3"><i class="fas fa-broom text-success me-2"></i>Reinigungsservice</h4>
-                <p class="text-muted">Wir sorgen für Sauberkeit und Funktionalität, damit Sie sich auf Ihr Kerngeschäft konzentrieren können.</p>
+                <h4 class="h5 mb-3"><i class="fas fa-broom text-success me-2"></i>Stiegenreinigung</h4>
+                <p class="text-muted">Regelmäßige und gründliche Reinigung von Treppenhäusern und Gemeinschaftsbereichen in Wohn- und Geschäftsgebäuden.</p>
               </div>
               <div class="mb-4">
                 <h4 class="h5 mb-3"><i class="fas fa-tools text-success me-2"></i>Instandhaltung</h4>
-                <p class="text-muted">Regelmäßige Wartung und schnelle Reparaturen halten Ihre Immobilie in Top-Zustand.</p>
+                <p class="text-muted">Regelmäßige Wartung und schnelle Reparaturen halten Ihre Immobilie in Top-Zustand und verlängern deren Lebensdauer.</p>
               </div>
             </div>
           </div>
@@ -88,7 +91,7 @@ document.addEventListener("DOMContentLoaded", function() {
               </div>
               <div class="flex-grow-1 ms-3">
                 <h4 class="h5 mb-1">Ihr Vorteil</h4>
-                <p class="mb-0">Mit unserem Service sparen Sie Zeit und Ressourcen, während wir die Effizienz und den Wert Ihrer Immobilie erhöhen.</p>
+                <p class="mb-0">Mit unseren Facility Management Lösungen sparen Sie Zeit und Ressourcen, während wir die Effizienz und den Wert Ihrer Immobilie steigern.</p>
               </div>
             </div>
           </div>
@@ -98,30 +101,30 @@ document.addEventListener("DOMContentLoaded", function() {
             </button>
           </div>`
       },
-      moving: {
-        title: "Umzüge & Transporte",
-        subtitle: "Stressfrei von A nach B",
-        headerImage: "images/transport.jpg",
+      objektbetreuung: {
+        title: "Objektbetreuung & Hausmeisterdienste",
+        subtitle: "Zuverlässige Betreuung für Ihre Immobilie",
+        headerImage: "images/facility2.jpg",
         content: `
           <div class="row g-4">
             <div class="col-lg-6">
               <div class="mb-4">
-                <h4 class="h5 mb-3"><i class="fas fa-home text-success me-2"></i>Privat- & Firmenumzüge</h4>
-                <p class="text-muted">Ob kleines Apartment oder großes Büro, wir planen und führen Ihren Umzug professionell durch.</p>
+                <h4 class="h5 mb-3"><i class="fas fa-search text-success me-2"></i>Regelmäßige Objektkontrolle</h4>
+                <p class="text-muted">Wir führen regelmäßige Kontrollgänge durch und identifizieren potenzielle Probleme, bevor sie zu kostspieligen Schäden führen können.</p>
               </div>
               <div class="mb-4">
-                <h4 class="h5 mb-3"><i class="fas fa-couch text-success me-2"></i>Möbel- & Spezialtransporte</h4>
-                <p class="text-muted">Wir transportieren Ihre wertvollen oder empfindlichen Gegenstände sicher und zuverlässig.</p>
+                <h4 class="h5 mb-3"><i class="fas fa-hammer text-success me-2"></i>Hausmeistertätigkeiten</h4>
+                <p class="text-muted">Von der Glühbirne bis zum Wasserhahn – wir übernehmen alle alltäglichen Hausmeistertätigkeiten und sorgen für ein funktionierendes Gebäude.</p>
               </div>
             </div>
             <div class="col-lg-6">
               <div class="mb-4">
-                <h4 class="h5 mb-3"><i class="fas fa-truck-loading text-success me-2"></i>Logistik & Planung</h4>
-                <p class="text-muted">Wir übernehmen die gesamte Organisation und sorgen für einen reibungslosen Ablauf.</p>
+                <h4 class="h5 mb-3"><i class="fas fa-phone-alt text-success me-2"></i>Handwerkerkoordination</h4>
+                <p class="text-muted">Bei größeren Schäden oder spezialisierten Aufgaben koordinieren wir zuverlässige Handwerker und überwachen die fachgerechte Ausführung.</p>
               </div>
               <div class="mb-4">
-                <h4 class="h5 mb-3"><i class="fas fa-shipping-fast text-success me-2"></i>Express- & Langstrecken</h4>
-                <p class="text-muted">Egal, ob es schnell gehen muss oder über weite Distanzen, wir sind Ihr verlässlicher Partner.</p>
+                <h4 class="h5 mb-3"><i class="fas fa-key text-success me-2"></i>Schlüsselmanagement</h4>
+                <p class="text-muted">Wir übernehmen das professionelle Schlüsselmanagement für Ihre Immobilie und garantieren höchste Sicherheit.</p>
               </div>
             </div>
           </div>
@@ -131,8 +134,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 <i class="fas fa-lightbulb text-warning fa-2x"></i>
               </div>
               <div class="flex-grow-1 ms-3">
-                <h4 class="h5 mb-1">Ihr Vorteil</h4>
-                <p class="mb-0">Unsere Expertise garantiert einen reibungslosen Ablauf, sodass Sie sich entspannt zurücklehnen können.</p>
+                <h4 class="h5 mb-1">Unser Betreuungsprozess</h4>
+                <p class="mb-0">1. Erstbegehung und Bestandsaufnahme → 2. Individuelles Betreuungskonzept → 3. Regelmäßige Kontrollen → 4. Dokumentation und Reporting → 5. Kontinuierliche Optimierung</p>
               </div>
             </div>
           </div>
@@ -190,7 +193,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.ServiceModals = {
       openFacilityModal: () => openModal('facility'),
-      openUmzugModal: () => openModal('moving'),
+      openObjektbetreuungModal: () => openModal('objektbetreuung'),
       openWinterModal: () => openModal('winter')
     };
 
@@ -342,6 +345,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const contactForm = document.getElementById('contact-form');
     if (!contactForm) return;
 
+    // Email validation
     const emailInput = document.getElementById('emailInput');
     if (emailInput) {
       emailInput.addEventListener('blur', function() {
@@ -351,6 +355,27 @@ document.addEventListener("DOMContentLoaded", function() {
       });
     }
 
+    // Load partial form data on page load
+    const loadSavedData = () => {
+      const savedData = localStorage.getItem('partialFormData');
+      if (savedData) {
+        try {
+          const data = JSON.parse(savedData);
+          if (data.name) contactForm.querySelector('[name="name"]').value = data.name;
+          if (data.email) contactForm.querySelector('[name="email"]').value = data.email;
+          if (data.phone) contactForm.querySelector('[name="phone"]').value = data.phone;
+          if (data.service) contactForm.querySelector('[name="service"]').value = data.service;
+          console.log('Formular-Teildaten wiederhergestellt');
+        } catch (e) {
+          console.error('Fehler beim Wiederherstellen der Formular-Teildaten:', e);
+          localStorage.removeItem('partialFormData');
+        }
+      }
+    };
+    
+    // Call this function when page loads
+    loadSavedData();
+
     contactForm.addEventListener('submit', function(event) {
       event.preventDefault();
 
@@ -359,21 +384,25 @@ document.addEventListener("DOMContentLoaded", function() {
       feedbackEl.innerHTML = '';
       this.classList.remove('was-validated');
 
+      // Get form elements
       const formElements = this.querySelectorAll('input, textarea, select, button');
       formElements.forEach(element => element.disabled = true);
 
+      // Get CSRF token
       const csrfToken = this.querySelector('[name="_csrf"]').value;
 
+      // Get form data
       const formData = {
         name: this.querySelector('[name="name"]').value.trim(),
         email: this.querySelector('[name="email"]').value.trim(),
         phone: this.querySelector('[name="phone"]').value.trim(),
         service: this.querySelector('[name="service"]').value,
         message: this.querySelector('[name="message"]').value.trim(),
-        _csrf: csrfToken, // CSRF-TOKEN HINZUFÜGEN!
+        _csrf: csrfToken,
         timestamp: new Date().toISOString()
       };
 
+      // Client-side validation
       let errors = [];
       if (!formData.name) errors.push('Name ist ein Pflichtfeld.');
       if (!formData.email) errors.push('E-Mail ist ein Pflichtfeld.');
@@ -383,74 +412,51 @@ document.addEventListener("DOMContentLoaded", function() {
       if (errors.length > 0) {
         feedbackEl.innerHTML = `<div class="alert alert-danger mt-3" role="alert"><i class="fas fa-exclamation-circle me-2"></i>${errors.map(error => `<div>${error}</div>`).join('')}</div>`;
         formElements.forEach(element => element.disabled = false);
+        window.scrollTo({ top: scrollPosition, behavior: 'smooth' });
         return;
       }
 
       feedbackEl.innerHTML = `<div class="alert alert-info mt-3" role="alert"><div class="d-flex align-items-center"><div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Wird gesendet...</span></div><div>Ihre Nachricht wird gesendet...</div></div></div>`;
 
-      const sendFormData = (data, retryCount = 0) => {
-        fetch('/contact', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
-          body: JSON.stringify(data)
-        })
-        .then(response => {
-          if (!response.ok) {
-            if (response.status === 429 && retryCount < 2) {
-              setTimeout(() => sendFormData(data, retryCount + 1), 1000 * (retryCount + 1));
-              return Promise.reject(new Error('Server überlastet. Erneuter Versuch...'));
-            }
-            return response.json().then(errorData => {
-              throw new Error(errorData.error || `Fehler ${response.status}: ${response.statusText}`);
-            });
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (data.success) {
-            feedbackEl.innerHTML = `<div class="alert alert-success mt-3" role="alert"><div class="d-flex"><div class="me-3"><i class="fas fa-check-circle fa-2x"></i></div><div><h5 class="alert-heading">Vielen Dank für Ihre Nachricht!</h5><p class="mb-0">Wir haben Ihre Anfrage erhalten und werden uns in Kürze bei Ihnen melden.</p></div></div></div>`;
-            contactForm.reset();
-            localStorage.removeItem('partialFormData');
-            feedbackEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          } else {
-            throw new Error(data.error || 'Ein unbekannter Fehler ist aufgetreten.');
-          }
-        })
-        .catch(error => {
-          console.error('Fehler:', error);
-          feedbackEl.innerHTML = `<div class="alert alert-danger mt-3" role="alert"><div class="d-flex"><div class="me-3"><i class="fas fa-exclamation-triangle fa-2x"></i></div><div><h5 class="alert-heading">Fehler bei der Übermittlung</h5><p class="mb-0">${error.message || 'Bitte versuchen Sie es später erneut.'}</p><button class="btn btn-sm btn-outline-danger mt-2 retry-button">Erneut versuchen</button></div></div></div>`;
-          feedbackEl.querySelector('.retry-button')?.addEventListener('click', () => sendFormData(data));
-          savePartialFormData(data);
-        })
-        .finally(() => {
-          formElements.forEach(element => element.disabled = false);
-          window.scrollTo({ top: scrollPosition, behavior: 'smooth' });
-        });
-      };
+      // Use a relative path or explicit HTTP to avoid SSL errors locally
+      const isLocalhost = window.location.hostname === 'localhost';
+      const contactUrl = isLocalhost ? 'http://localhost:9295/contact' : '/contact';
 
-      const savePartialFormData = (data) => {
-        const { message, timestamp, ...partialData } = data;
-        localStorage.setItem('partialFormData', JSON.stringify(partialData));
-      };
-
-      (() => {
-        const savedData = localStorage.getItem('partialFormData');
-        if (savedData) {
-          try {
-            const data = JSON.parse(savedData);
-            if (data.name) contactForm.querySelector('[name="name"]').value = data.name;
-            if (data.email) contactForm.querySelector('[name="email"]').value = data.email;
-            if (data.phone) contactForm.querySelector('[name="phone"]').value = data.phone;
-            if (data.service) contactForm.querySelector('[name="service"]').value = data.service;
-            console.log('Formular-Teildaten wiederhergestellt');
-          } catch (e) {
-            console.error('Fehler beim Wiederherstellen der Formular-Teildaten', e);
-            localStorage.removeItem('partialFormData');
-          }
+      fetch(contactUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CSRF-Token': csrfToken
+        },
+        body: JSON.stringify(formData)
+      })
+      .then(response => {
+        if (!response.ok) {
+          console.error('Server response error:', response.status, response.statusText);
+          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
         }
-      })();
-
-      sendFormData(formData);
+        return response.text();
+      })
+      .then(data => {
+        if (data.includes('success')) {
+          contactForm.reset();
+          localStorage.removeItem('partialFormData');
+        } else {
+          throw new Error('Form submission failed');
+        }
+      })
+      .catch(error => {
+        console.error('Error submitting form:', error);
+        feedbackEl.innerHTML = `<div class="alert alert-danger mt-3" role="alert"><div class="d-flex"><div class="me-3"><i class="fas fa-exclamation-triangle fa-2x"></i></div><div><h5 class="alert-heading">Fehler bei der Übermittlung</h5><p class="mb-0">Bitte versuchen Sie es später erneut oder kontaktieren Sie uns direkt.</p></div></div></div>`;
+        
+        // Save partial form data
+        const { _csrf, ...partialData } = formData;
+        localStorage.setItem('partialFormData', JSON.stringify(partialData));
+      })
+      .finally(() => {
+        formElements.forEach(element => element.disabled = false);
+        window.scrollTo({ top: scrollPosition, behavior: 'smooth' });
+      });
     });
   };
 

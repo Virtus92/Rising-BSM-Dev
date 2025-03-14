@@ -15,11 +15,6 @@ const profileRoutes = require('./profile.routes');
 const settingsRoutes = require('./settings.routes');
 const dashboardRoutes = require('./dashboard.routes');
 
-// Simple test endpoint to verify API is working
-router.get('/test', (req, res) => {
-  res.json({ success: true, message: 'API is working correctly' });
-});
-
 // Register all API routes
 router.use('/customers', customerRoutes);
 router.use('/projects', projectRoutes);
@@ -29,11 +24,5 @@ router.use('/requests', requestRoutes);
 router.use('/profile', profileRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/dashboard', dashboardRoutes);
-
-// Add German route aliases if needed
-router.use('/customers', customerRoutes);
-router.use('/projects', projectRoutes);
-router.use('/appointments', appointmentRoutes);
-router.use('/services', serviceRoutes);
 
 module.exports = router;

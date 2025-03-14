@@ -5,6 +5,7 @@ export const projectService = {
     async getAll(filters: any = {}) {
         try {
             const response = await api.get<ApiResponse<Project[]>>('/projects', { params: filters });
+            console.log('Projects API response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error fetching projects:', error);

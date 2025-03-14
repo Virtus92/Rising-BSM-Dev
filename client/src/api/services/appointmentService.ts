@@ -5,6 +5,7 @@ export const appointmentService = {
   async getAll(filters: any = {}) {
     try {
       const response = await api.get<ApiResponse<Appointment[]>>('/appointments', { params: filters });
+      console.log('Appointments API response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error in getAll appointments:', error);

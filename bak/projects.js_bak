@@ -269,14 +269,14 @@ router.get('/:id', isAuthenticated, async (req, res) => {
         statusClass: statusInfo.className
       },
       termine: termineQuery.rows.map(termin => {
-        const terminStatus = termin.status === 'geplant' ? { label: 'Geplant', className: 'warning' } :
-                          termin.status === 'bestaetigt' ? { label: 'Bestätigt', className: 'success' } :
-                          termin.status === 'abgeschlossen' ? { label: 'Abgeschlossen', className: 'primary' } :
+        const terminStatus = appointment.status === 'geplant' ? { label: 'Geplant', className: 'warning' } :
+                          appointment.status === 'bestaetigt' ? { label: 'Bestätigt', className: 'success' } :
+                          appointment.status === 'abgeschlossen' ? { label: 'Abgeschlossen', className: 'primary' } :
                           { label: 'Storniert', className: 'secondary' };
         return {
-          id: termin.id,
-          titel: termin.titel,
-          datum: format(new Date(termin.termin_datum), 'dd.MM.yyyy, HH:mm'),
+          id: appointment.id,
+          titel: appointment.titel,
+          datum: format(new Date(appointment.termin_datum), 'dd.MM.yyyy, HH:mm'),
           statusLabel: terminStatus.label,
           statusClass: terminStatus.className
         };

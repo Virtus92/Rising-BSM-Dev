@@ -62,20 +62,20 @@ router.get('/', isAuthenticated, async (req, res) => {
     });
     
     const appointments = termineQuery.rows.map(termin => {
-      const terminStatusInfo = getTerminStatusInfo(termin.status);
+      const terminStatusInfo = getTerminStatusInfo(appointment.status);
       return {
-        id: termin.id,
-        titel: termin.titel,
-        kunde_id: termin.kunde_id,
-        kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
-        projekt_id: termin.projekt_id,
-        projekt_titel: termin.projekt_titel || 'Kein Projekt zugewiesen',
-        termin_datum: termin.termin_datum,
-        dateFormatted: format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
-        timeFormatted: format(new Date(termin.termin_datum), 'HH:mm'),
-        dauer: termin.dauer,
-        ort: termin.ort || 'Nicht angegeben',
-        status: termin.status,
+        id: appointment.id,
+        titel: appointment.titel,
+        kunde_id: appointment.kunde_id,
+        kunde_name: appointment.kunde_name || 'Kein Kunde zugewiesen',
+        projekt_id: appointment.projekt_id,
+        projekt_titel: appointment.projekt_titel || 'Kein Projekt zugewiesen',
+        termin_datum: appointment.termin_datum,
+        dateFormatted: format(new Date(appointment.termin_datum), 'dd.MM.yyyy'),
+        timeFormatted: format(new Date(appointment.termin_datum), 'HH:mm'),
+        dauer: appointment.dauer,
+        ort: appointment.ort || 'Nicht angegeben',
+        status: appointment.status,
         statusLabel: terminStatusInfo.label,
         statusClass: terminStatusInfo.className
       };
@@ -309,14 +309,14 @@ router.post('/neu', isAuthenticated, async (req, res) => {
       });
       
       const events = termineQuery.rows.map(termin => {
-        const startDate = new Date(termin.termin_datum);
-        const endDate = new Date(startDate.getTime() + (termin.dauer || 60) * 60000);
+        const startDate = new Date(appointment.termin_datum);
+        const endDate = new Date(startDate.getTime() + (appointment.dauer || 60) * 60000);
         
-        const terminStatusInfo = getTerminStatusInfo(termin.status);
+        const terminStatusInfo = getTerminStatusInfo(appointment.status);
         
         return {
-          id: termin.id,
-          title: termin.titel,
+          id: appointment.id,
+          title: appointment.titel,
           start: startDate.toISOString(),
           end: endDate.toISOString(),
           allDay: false,
@@ -324,16 +324,16 @@ router.post('/neu', isAuthenticated, async (req, res) => {
           borderColor: terminStatusInfo.className,
           textColor: 'white',
           extendedProps: {
-            kunde: termin.kunde_name,
-            kunde_id: termin.kunde_id,
-            projekt: termin.projekt_titel,
-            projekt_id: termin.projekt_id,
-            ort: termin.ort,
-            beschreibung: termin.beschreibung,
-            status: termin.status,
+            kunde: appointment.kunde_name,
+            kunde_id: appointment.kunde_id,
+            projekt: appointment.projekt_titel,
+            projekt_id: appointment.projekt_id,
+            ort: appointment.ort,
+            beschreibung: appointment.beschreibung,
+            status: appointment.status,
             statusText: terminStatusInfo.label
           },
-          url: `/dashboard/termine/${termin.id}`
+          url: `/dashboard/termine/${appointment.id}`
         };
       });
       
@@ -408,16 +408,16 @@ router.post('/neu', isAuthenticated, async (req, res) => {
             // CSV-Zeilen
             termineQuery.rows.forEach(termin => {
             const csvLine = [
-                termin.id,
-                `"${(termin.titel || '').replace(/"/g, '""')}"`,
-                format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
-                format(new Date(termin.termin_datum), 'HH:mm'),
-                termin.dauer,
-                termin.status,
-                `"${(termin.kunde_name || '').replace(/"/g, '""')}"`,
-                `"${(termin.projekt_titel || '').replace(/"/g, '""')}"`,
-                `"${(termin.ort || '').replace(/"/g, '""')}"`,
-                `"${(termin.beschreibung || '').replace(/"/g, '""').replace(/\n/g, ' ')}"` 
+                appointment.id,
+                `"${(appointment.titel || '').replace(/"/g, '""')}"`,
+                format(new Date(appointment.termin_datum), 'dd.MM.yyyy'),
+                format(new Date(appointment.termin_datum), 'HH:mm'),
+                appointment.dauer,
+                appointment.status,
+                `"${(appointment.kunde_name || '').replace(/"/g, '""')}"`,
+                `"${(appointment.projekt_titel || '').replace(/"/g, '""')}"`,
+                `"${(appointment.ort || '').replace(/"/g, '""')}"`,
+                `"${(appointment.beschreibung || '').replace(/"/g, '""').replace(/\n/g, ' ')}"` 
             ].join(',');
             
             res.write(csvLine + '\n');
@@ -448,16 +448,16 @@ router.post('/neu', isAuthenticated, async (req, res) => {
             // Zeilen hinzufügen
             termineQuery.rows.forEach(termin => {
             worksheet.addRow({
-                id: termin.id,
-                titel: termin.titel,
-                datum: format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
-                uhrzeit: format(new Date(termin.termin_datum), 'HH:mm'),
-                dauer: termin.dauer,
-                status: getTerminStatusInfo(termin.status).label,
-                kunde: termin.kunde_name || 'Kein Kunde',
-                projekt: termin.projekt_titel || 'Kein Projekt',
-                ort: termin.ort || '',
-                beschreibung: termin.beschreibung || ''
+                id: appointment.id,
+                titel: appointment.titel,
+                datum: format(new Date(appointment.termin_datum), 'dd.MM.yyyy'),
+                uhrzeit: format(new Date(appointment.termin_datum), 'HH:mm'),
+                dauer: appointment.dauer,
+                status: getTerminStatusInfo(appointment.status).label,
+                kunde: appointment.kunde_name || 'Kein Kunde',
+                projekt: appointment.projekt_titel || 'Kein Projekt',
+                ort: appointment.ort || '',
+                beschreibung: appointment.beschreibung || ''
             });
             });
             
@@ -538,15 +538,15 @@ router.post('/neu', isAuthenticated, async (req, res) => {
             }
             
             const rowData = [
-                termin.id.toString(),
-                termin.titel,
-                format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
-                format(new Date(termin.termin_datum), 'HH:mm'),
-                termin.dauer.toString(),
-                getTerminStatusInfo(termin.status).label,
-                termin.kunde_name || '-',
-                termin.projekt_titel || '-',
-                termin.ort || '-'
+                appointment.id.toString(),
+                appointment.titel,
+                format(new Date(appointment.termin_datum), 'dd.MM.yyyy'),
+                format(new Date(appointment.termin_datum), 'HH:mm'),
+                appointment.dauer.toString(),
+                getTerminStatusInfo(appointment.status).label,
+                appointment.kunde_name || '-',
+                appointment.projekt_titel || '-',
+                appointment.ort || '-'
             ];
             
             rowData.forEach((cell, colIndex) => {
@@ -622,7 +622,7 @@ router.get('/:id', isAuthenticated, async (req, res) => {
     }
     
     const termin = terminQuery.rows[0];
-    const terminStatusInfo = getTerminStatusInfo(termin.status);
+    const terminStatusInfo = getTerminStatusInfo(appointment.status);
 
     // Notizen zu diesem Termin abrufen
     const notizenQuery = await pool.query({
@@ -631,23 +631,23 @@ router.get('/:id', isAuthenticated, async (req, res) => {
     });
     
     res.render('dashboard/termine/detail', {
-      title: `Termin: ${termin.titel} - Rising BSM`,
+      title: `Termin: ${appointment.titel} - Rising BSM`,
       user: req.session.user,
       currentPath: '/dashboard/termine',
       termin: {
-        id: termin.id,
-        titel: termin.titel,
-        kunde_id: termin.kunde_id,
-        kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
-        projekt_id: termin.projekt_id,
-        projekt_titel: termin.projekt_titel || 'Kein Projekt zugewiesen',
-        termin_datum: termin.termin_datum,
-        dateFormatted: format(new Date(termin.termin_datum), 'dd.MM.yyyy'),
-        timeFormatted: format(new Date(termin.termin_datum), 'HH:mm'),
-        dauer: termin.dauer || 60,
-        ort: termin.ort || 'Nicht angegeben',
-        beschreibung: termin.beschreibung || 'Keine Beschreibung vorhanden',
-        status: termin.status,
+        id: appointment.id,
+        titel: appointment.titel,
+        kunde_id: appointment.kunde_id,
+        kunde_name: appointment.kunde_name || 'Kein Kunde zugewiesen',
+        projekt_id: appointment.projekt_id,
+        projekt_titel: appointment.projekt_titel || 'Kein Projekt zugewiesen',
+        termin_datum: appointment.termin_datum,
+        dateFormatted: format(new Date(appointment.termin_datum), 'dd.MM.yyyy'),
+        timeFormatted: format(new Date(appointment.termin_datum), 'HH:mm'),
+        dauer: appointment.dauer || 60,
+        ort: appointment.ort || 'Nicht angegeben',
+        beschreibung: appointment.beschreibung || 'Keine Beschreibung vorhanden',
+        status: appointment.status,
         statusLabel: terminStatusInfo.label,
         statusClass: terminStatusInfo.className
       },
@@ -712,21 +712,21 @@ router.get('/:id/edit', isAuthenticated, async (req, res) => {
     `);
     
     res.render('dashboard/termine/edit', {
-      title: `Termin bearbeiten: ${termin.titel} - Rising BSM`,
+      title: `Termin bearbeiten: ${appointment.titel} - Rising BSM`,
       user: req.session.user,
       currentPath: '/dashboard/termine',
       termin: {
-        id: termin.id,
-        titel: termin.titel,
-        kunde_id: termin.kunde_id,
-        kunde_name: termin.kunde_name || 'Kein Kunde zugewiesen',
-        projekt_id: termin.projekt_id,
-        termin_datum: termin.termin_datum.toISOString().split('T')[0],
-        timeFormatted: format(new Date(termin.termin_datum), 'HH:mm'),
-        dauer: termin.dauer || 60,
-        ort: termin.ort || '',
-        beschreibung: termin.beschreibung || '',
-        status: termin.status
+        id: appointment.id,
+        titel: appointment.titel,
+        kunde_id: appointment.kunde_id,
+        kunde_name: appointment.kunde_name || 'Kein Kunde zugewiesen',
+        projekt_id: appointment.projekt_id,
+        termin_datum: appointment.termin_datum.toISOString().split('T')[0],
+        timeFormatted: format(new Date(appointment.termin_datum), 'HH:mm'),
+        dauer: appointment.dauer || 60,
+        ort: appointment.ort || '',
+        beschreibung: appointment.beschreibung || '',
+        status: appointment.status
       },
       kunden: kundenQuery.rows,
       projekte: projekteQuery.rows,

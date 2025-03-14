@@ -162,22 +162,22 @@
                       <% termine.forEach(function(termin) { %>
                         <tr>
                           <td>
-                            <a href="/dashboard/appointments/<%= termin.id %>" class="text-decoration-none text-dark">
-                              <%= termin.titel %>
+                            <a href="/dashboard/appointments/<%= appointment.id %>" class="text-decoration-none text-dark">
+                              <%= appointment.titel %>
                             </a>
                           </td>
-                          <td><%= termin.datum %></td>
+                          <td><%= appointment.datum %></td>
                           <td>
-                            <span class="badge bg-<%= termin.statusClass %>">
-                              <%= termin.statusLabel %>
+                            <span class="badge bg-<%= appointment.statusClass %>">
+                              <%= appointment.statusLabel %>
                             </span>
                           </td>
                           <td>
                             <div class="btn-group btn-group-sm">
-                              <a href="/dashboard/appointments/<%= termin.id %>" class="btn btn-outline-secondary">
+                              <a href="/dashboard/appointments/<%= appointment.id %>" class="btn btn-outline-secondary">
                                 <i class="fas fa-eye"></i>
                               </a>
-                              <a href="/dashboard/appointments/<%= termin.id %>/edit" class="btn btn-outline-primary">
+                              <a href="/dashboard/appointments/<%= appointment.id %>/edit" class="btn btn-outline-primary">
                                 <i class="fas fa-edit"></i>
                               </a>
                             </div>

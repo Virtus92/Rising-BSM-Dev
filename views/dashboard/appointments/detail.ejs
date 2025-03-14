@@ -8,7 +8,7 @@
         <ol class="breadcrumb">
           <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
           <li class="breadcrumb-item"><a href="/dashboard/appointments">Termine</a></li>
-          <li class="breadcrumb-item active" aria-current="page">Termin #<%= termin.id %></li>
+          <li class="breadcrumb-item active" aria-current="page">Termin #<%= appointment.id %></li>
         </ol>
       </nav>
 
@@ -33,9 +33,9 @@
           <!-- Appointment information - optimized for mobile -->
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-              <h2 class="h5 mb-0 text-truncate"><%= termin.titel %></h2>
-              <span class="badge bg-<%= termin.statusClass %>">
-                <%= termin.statusLabel %>
+              <h2 class="h5 mb-0 text-truncate"><%= appointment.titel %></h2>
+              <span class="badge bg-<%= appointment.statusClass %>">
+                <%= appointment.statusLabel %>
               </span>
             </div>
             <div class="card-body">
@@ -52,12 +52,12 @@
                     <div>
                       <h6 class="mb-1 text-muted small">Kunde</h6>
                       <p class="mb-0">
-                        <% if (termin.kunde_id) { %>
-                          <a href="/dashboard/customers/<%= termin.kunde_id %>" class="text-decoration-none text-break">
-                            <%= termin.kunde_name %>
+                        <% if (appointment.kunde_id) { %>
+                          <a href="/dashboard/customers/<%= appointment.kunde_id %>" class="text-decoration-none text-break">
+                            <%= appointment.kunde_name %>
                           </a>
                         <% } else { %>
-                          <%= termin.kunde_name %>
+                          <%= appointment.kunde_name %>
                         <% } %>
                       </p>
                     </div>
@@ -75,9 +75,9 @@
                     <div>
                       <h6 class="mb-1 text-muted small">Projekt</h6>
                       <p class="mb-0">
-                        <% if (termin.projekt_id) { %>
-                          <a href="/dashboard/projects/<%= termin.projekt_id %>" class="text-decoration-none text-break">
-                            <%= termin.projekt_titel %>
+                        <% if (appointment.projekt_id) { %>
+                          <a href="/dashboard/projects/<%= appointment.projekt_id %>" class="text-decoration-none text-break">
+                            <%= appointment.projekt_titel %>
                           </a>
                         <% } else { %>
                           Kein Projekt zugewiesen
@@ -101,7 +101,7 @@
                     </div>
                     <div>
                       <h6 class="mb-1 text-muted small">Datum</h6>
-                      <p class="mb-0"><%= termin.dateFormatted %></p>
+                      <p class="mb-0"><%= appointment.dateFormatted %></p>
                     </div>
                   </div>
                 </div>
@@ -115,7 +115,7 @@
                     </div>
                     <div>
                       <h6 class="mb-1 text-muted small">Uhrzeit</h6>
-                      <p class="mb-0"><%= termin.timeFormatted %> Uhr</p>
+                      <p class="mb-0"><%= appointment.timeFormatted %> Uhr</p>
                     </div>
                   </div>
                 </div>
@@ -129,7 +129,7 @@
                     </div>
                     <div>
                       <h6 class="mb-1 text-muted small">Dauer</h6>
-                      <p class="mb-0"><%= termin.dauer %> Minuten</p>
+                      <p class="mb-0"><%= appointment.dauer %> Minuten</p>
                     </div>
                   </div>
                 </div>
@@ -148,7 +148,7 @@
                     </div>
                     <div>
                       <h6 class="mb-1 text-muted small">Ort</h6>
-                      <p class="mb-0"><%= termin.ort %></p>
+                      <p class="mb-0"><%= appointment.ort %></p>
                     </div>
                   </div>
                 </div>
@@ -168,7 +168,7 @@
                     <div>
                       <h6 class="mb-1 text-muted small">Beschreibung</h6>
                       <div class="p-3 bg-light rounded">
-                        <%= termin.beschreibung %>
+                        <%= appointment.beschreibung %>
                       </div>
                     </div>
                   </div>
@@ -203,9 +203,9 @@
               <% } %>
               
                <!-- Neue Notiz Form -->
-               <form action="/dashboard/appointments/<%= termin.id %>/add-note" method="POST" class="mt-4">
+               <form action="/dashboard/appointments/<%= appointment.id %>/add-note" method="POST" class="mt-4">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="id" value="<%= termin.id %>">
+                <input type="hidden" name="id" value="<%= appointment.id %>">
                 
                 <div class="mb-3">
                   <label for="noteText" class="form-label">Neue Notiz</label>
@@ -227,7 +227,7 @@
             <button class="btn btn-primary flex-fill" data-bs-toggle="modal" data-bs-target="#statusModal">
               <i class="fas fa-edit me-2"></i>Status ändern
             </button>
-            <a href="/dashboard/appointments/<%= termin.id %>/edit" class="btn btn-success flex-fill">
+            <a href="/dashboard/appointments/<%= appointment.id %>/edit" class="btn btn-success flex-fill">
               <i class="fas fa-pencil-alt me-2"></i>Bearbeiten
             </a>
           </div>
@@ -242,12 +242,12 @@
                 <i class="fas fa-edit me-2"></i>Status ändern
               </button>
               
-              <a href="/dashboard/appointments/<%= termin.id %>/edit" class="btn btn-success w-100 mb-3">
+              <a href="/dashboard/appointments/<%= appointment.id %>/edit" class="btn btn-success w-100 mb-3">
                 <i class="fas fa-pencil-alt me-2"></i>Termin bearbeiten
               </a>
               
-              <% if (termin.kunde_id) { %>
-                <a href="/dashboard/customers/<%= termin.kunde_id %>" class="btn btn-info w-100 mb-3 text-white">
+              <% if (appointment.kunde_id) { %>
+                <a href="/dashboard/customers/<%= appointment.kunde_id %>" class="btn btn-info w-100 mb-3 text-white">
                   <i class="fas fa-user me-2"></i>Kundendetails anzeigen
                 </a>
               <% } %>
@@ -266,15 +266,15 @@
             <div class="card-body">
               <div class="calendar-preview mb-3">
                 <div class="calendar-header text-center bg-light p-2 rounded">
-                  <%= new Date(termin.termin_datum).toLocaleString('de-DE', { month: 'long', year: 'numeric' }) %>
+                  <%= new Date(appointment.termin_datum).toLocaleString('de-DE', { month: 'long', year: 'numeric' }) %>
                 </div>
                 <div class="calendar-body p-3 text-center">
                   <div class="calendar-date">
-                    <span class="display-4 fw-bold"><%= new Date(termin.termin_datum).getDate() %></span>
-                    <p class="mb-0"><%= new Date(termin.termin_datum).toLocaleString('de-DE', { weekday: 'long' }) %></p>
+                    <span class="display-4 fw-bold"><%= new Date(appointment.termin_datum).getDate() %></span>
+                    <p class="mb-0"><%= new Date(appointment.termin_datum).toLocaleString('de-DE', { weekday: 'long' }) %></p>
                   </div>
                   <div class="calendar-time mt-3">
-                    <span class="badge bg-<%= termin.statusClass %> p-2"><%= termin.timeFormatted %> Uhr</span>
+                    <span class="badge bg-<%= appointment.statusClass %> p-2"><%= appointment.timeFormatted %> Uhr</span>
                   </div>
                 </div>
               </div>
@@ -301,15 +301,15 @@
       <div class="modal-body">
         <form id="statusForm" action="/dashboard/appointments/update-status" method="POST">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <input type="hidden" name="id" value="<%= termin.id %>">
+          <input type="hidden" name="id" value="<%= appointment.id %>">
           
           <div class="mb-3">
             <label for="status" class="form-label">Status</label>
             <select class="form-select" id="status" name="status" required>
-              <option value="geplant" <%= termin.status === 'geplant' ? 'selected' : '' %>>Geplant</option>
-              <option value="bestaetigt" <%= termin.status === 'bestaetigt' ? 'selected' : '' %>>Bestätigt</option>
-              <option value="abgeschlossen" <%= termin.status === 'abgeschlossen' ? 'selected' : '' %>>Abgeschlossen</option>
-              <option value="storniert" <%= termin.status === 'storniert' ? 'selected' : '' %>>Storniert</option>
+              <option value="geplant" <%= appointment.status === 'geplant' ? 'selected' : '' %>>Geplant</option>
+              <option value="bestaetigt" <%= appointment.status === 'bestaetigt' ? 'selected' : '' %>>Bestätigt</option>
+              <option value="abgeschlossen" <%= appointment.status === 'abgeschlossen' ? 'selected' : '' %>>Abgeschlossen</option>
+              <option value="storniert" <%= appointment.status === 'storniert' ? 'selected' : '' %>>Storniert</option>
             </select>
           </div>
           

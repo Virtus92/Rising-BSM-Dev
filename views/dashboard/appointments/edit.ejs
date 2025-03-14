@@ -9,7 +9,7 @@
         <ol class="breadcrumb">
           <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
           <li class="breadcrumb-item"><a href="/dashboard/appointments">Termine</a></li>
-          <li class="breadcrumb-item"><a href="/dashboard/appointments/<%= termin.id %>">Termin #<%= termin.id %></a></li>
+          <li class="breadcrumb-item"><a href="/dashboard/appointments/<%= appointment.id %>">Termin #<%= appointment.id %></a></li>
           <li class="breadcrumb-item active" aria-current="page">Bearbeiten</li>
         </ol>
       </nav>
@@ -34,14 +34,14 @@
           <h2 class="h5 mb-0">Termindaten bearbeiten</h2>
         </div>
         <div class="card-body">
-          <form action="/dashboard/appointments/<%= termin.id %>/edit" method="POST" class="needs-validation" novalidate>
+          <form action="/dashboard/appointments/<%= appointment.id %>/edit" method="POST" class="needs-validation" novalidate>
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             
             <div class="row g-3">
               <!-- Allgemeine Infos -->
               <div class="col-md-8">
                 <label for="titel" class="form-label">Titel <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="titel" name="titel" value="<%= termin.titel %>" required>
+                <input type="text" class="form-control" id="titel" name="titel" value="<%= appointment.titel %>" required>
                 <div class="invalid-feedback">
                   Bitte geben Sie einen Titel ein.
                 </div>
@@ -50,10 +50,10 @@
               <div class="col-md-4">
                 <label for="status" class="form-label">Status</label>
                 <select class="form-select" id="status" name="status">
-                  <option value="geplant" <%= termin.status === 'geplant' ? 'selected' : '' %>>Geplant</option>
-                  <option value="bestaetigt" <%= termin.status === 'bestaetigt' ? 'selected' : '' %>>Bestätigt</option>
-                  <option value="abgeschlossen" <%= termin.status === 'abgeschlossen' ? 'selected' : '' %>>Abgeschlossen</option>
-                  <option value="storniert" <%= termin.status === 'storniert' ? 'selected' : '' %>>Storniert</option>
+                  <option value="geplant" <%= appointment.status === 'geplant' ? 'selected' : '' %>>Geplant</option>
+                  <option value="bestaetigt" <%= appointment.status === 'bestaetigt' ? 'selected' : '' %>>Bestätigt</option>
+                  <option value="abgeschlossen" <%= appointment.status === 'abgeschlossen' ? 'selected' : '' %>>Abgeschlossen</option>
+                  <option value="storniert" <%= appointment.status === 'storniert' ? 'selected' : '' %>>Storniert</option>
                 </select>
               </div>
               
@@ -64,7 +64,7 @@
                   <option value="">-- Kein Kunde zugewiesen --</option>
                   <% if (typeof kunden !== 'undefined' && kunden.length > 0) { %>
                     <% kunden.forEach(function(kunde) { %>
-                      <option value="<%= kunde.id %>" <%= termin.kunde_id == kunde.id ? 'selected' : '' %>><%= kunde.name %></option>
+                      <option value="<%= kunde.id %>" <%= appointment.kunde_id == kunde.id ? 'selected' : '' %>><%= kunde.name %></option>
                     <% }); %>
                   <% } %>
                 </select>
@@ -77,7 +77,7 @@
                   <option value="">-- Kein Projekt zugewiesen --</option>
                   <% if (typeof projekte !== 'undefined' && projekte.length > 0) { %>
                     <% projekte.forEach(function(projekt) { %>
-                      <option value="<%= projekt.id %>" <%= termin.projekt_id == projekt.id ? 'selected' : '' %>><%= projekt.titel %></option>
+                      <option value="<%= projekt.id %>" <%= appointment.projekt_id == projekt.id ? 'selected' : '' %>><%= projekt.titel %></option>
                     <% }); %>
                   <% } %>
                 </select>
@@ -86,7 +86,7 @@
               <!-- Datum und Zeit -->
               <div class="col-md-4">
                 <label for="termin_datum" class="form-label">Datum <span class="text-danger">*</span></label>
-                <input type="date" class="form-control" id="termin_datum" name="termin_datum" value="<%= new Date(termin.termin_datum).toISOString().split('T')[0] %>" required>
+                <input type="date" class="form-control" id="termin_datum" name="termin_datum" value="<%= new Date(appointment.termin_datum).toISOString().split('T')[0] %>" required>
                 <div class="invalid-feedback">
                   Bitte wählen Sie ein Datum.
                 </div>
@@ -94,7 +94,7 @@
               
               <div class="col-md-4">
                 <label for="termin_zeit" class="form-label">Uhrzeit <span class="text-danger">*</span></label>
-                <input type="time" class="form-control" id="termin_zeit" name="termin_zeit" value="<%= termin.timeFormatted %>" required>
+                <input type="time" class="form-control" id="termin_zeit" name="termin_zeit" value="<%= appointment.timeFormatted %>" required>
                 <div class="invalid-feedback">
                   Bitte wählen Sie eine Uhrzeit.
                 </div>
@@ -102,19 +102,19 @@
               
               <div class="col-md-4">
                 <label for="dauer" class="form-label">Dauer (Minuten)</label>
-                <input type="number" class="form-control" id="dauer" name="dauer" value="<%= termin.dauer %>" min="15" step="15">
+                <input type="number" class="form-control" id="dauer" name="dauer" value="<%= appointment.dauer %>" min="15" step="15">
               </div>
               
               <!-- Ort -->
               <div class="col-md-12">
                 <label for="ort" class="form-label">Ort</label>
-                <input type="text" class="form-control" id="ort" name="ort" value="<%= termin.ort === 'Nicht angegeben' ? '' : termin.ort %>">
+                <input type="text" class="form-control" id="ort" name="ort" value="<%= appointment.ort === 'Nicht angegeben' ? '' : appointment.ort %>">
               </div>
               
               <!-- Beschreibung -->
               <div class="col-md-12">
                 <label for="beschreibung" class="form-label">Beschreibung</label>
-                <textarea class="form-control" id="beschreibung" name="beschreibung" rows="4"><%= termin.beschreibung === 'Keine Beschreibung vorhanden' ? '' : termin.beschreibung %></textarea>
+                <textarea class="form-control" id="beschreibung" name="beschreibung" rows="4"><%= appointment.beschreibung === 'Keine Beschreibung vorhanden' ? '' : appointment.beschreibung %></textarea>
               </div>
               
               <!-- Optionen -->
@@ -128,7 +128,7 @@
               </div>
               
               <div class="col-12 d-flex justify-content-between mt-4">
-                <a href="/dashboard/appointments/<%= termin.id %>" class="btn btn-outline-secondary">
+                <a href="/dashboard/appointments/<%= appointment.id %>" class="btn btn-outline-secondary">
                   <i class="fas fa-arrow-left me-2"></i>Zurück
                 </a>
                 <button type="submit" class="btn btn-success">

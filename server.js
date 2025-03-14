@@ -58,6 +58,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
+      connectSrc: ["'self'", "http://localhost:9295"],
       scriptSrc: [
         "'self'", 
         "https://cdn.jsdelivr.net", 

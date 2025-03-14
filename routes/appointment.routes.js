@@ -209,12 +209,12 @@ router.get('/calendar-events', async (req, res, next) => {
     
     // Format for fullcalendar
     const events = termineQuery.rows.map(termin => {
-      const startDate = new Date(termin.termin_datum);
-      const endDate = new Date(startDate.getTime() + (termin.dauer || 60) * 60000);
+      const startDate = new Date(appointment.termin_datum);
+      const endDate = new Date(startDate.getTime() + (appointment.dauer || 60) * 60000);
       
       // Determine color based on status
       let bgColor;
-      switch(termin.status) {
+      switch(appointment.status) {
         case 'geplant': bgColor = '#ffc107'; break; // warning
         case 'bestaetigt': bgColor = '#28a745'; break; // success
         case 'abgeschlossen': bgColor = '#007bff'; break; // primary
@@ -222,8 +222,8 @@ router.get('/calendar-events', async (req, res, next) => {
       }
       
       return {
-        id: termin.id,
-        title: termin.titel,
+        id: appointment.id,
+        title: appointment.titel,
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         allDay: false,
@@ -231,15 +231,15 @@ router.get('/calendar-events', async (req, res, next) => {
         borderColor: bgColor,
         textColor: 'white',
         extendedProps: {
-          kunde: termin.kunde_name,
-          kunde_id: termin.kunde_id,
-          projekt: termin.projekt_titel,
-          projekt_id: termin.projekt_id,
-          ort: termin.ort,
-          beschreibung: termin.beschreibung,
-          status: termin.status
+          kunde: appointment.kunde_name,
+          kunde_id: appointment.kunde_id,
+          projekt: appointment.projekt_titel,
+          projekt_id: appointment.projekt_id,
+          ort: appointment.ort,
+          beschreibung: appointment.beschreibung,
+          status: appointment.status
         },
-        url: `/dashboard/appointments/${termin.id}`
+        url: `/dashboard/appointments/${appointment.id}`
       };
     });
     
