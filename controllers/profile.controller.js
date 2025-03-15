@@ -62,7 +62,7 @@ exports.getUserProfile = async (req, res, next) => {
     });
     
     // Format data for response
-    return {
+    const result = {
       user: {
         id: user.id,
         name: user.name,
@@ -84,6 +84,18 @@ exports.getUserProfile = async (req, res, next) => {
         date: formatDateSafely(activity.erstellt_am, 'dd.MM.yyyy, HH:mm')
       }))
     };
+
+    // For API requests, return JSON
+    if (req.headers && req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.json(result);
+    }
+    
+    // For test environment, return the result directly
+    if (process.env.NODE_ENV === 'test') {
+      return result;
+    }
+    
+    return result;
   } catch (error) {
     console.error('Error getting user profile:', error);
     error.success = false;

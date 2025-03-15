@@ -1,9 +1,10 @@
 const NotificationService = require('../../services/notification.service');
 const pool = require('../../services/db.service');
+const db = require('../../services/db.service');
 const { formatRelativeTime } = require('../../utils/formatters');
 
 // Mock dependencies
-jest.mock('../services/db.service', () => ({
+jest.mock('../../services/db.service', () => ({
   query: jest.fn()
 }));
 

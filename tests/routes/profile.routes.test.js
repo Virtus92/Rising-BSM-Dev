@@ -2,64 +2,33 @@ const request = require('supertest');
 const express = require('express');
 const session = require('express-session');
 const flash = require('connect-flash');
-const multer = require('multer');
-const path = require('path');
 
-// Mock multer
+// Use a proper mock for the path module
+jest.mock('path', () => ({
+  join: jest.fn((...args) => args.join('/'))
+}));
+
+// Mock multer middleware properly
 jest.mock('multer', () => {
-  const multerMock = {
-    diskStorage: jest.fn().mockReturnValue({}),
-    single: jest.fn().mockImplementation((fieldName) => {
-      return (req, res, next) => {
-        if (req.fileTestError) {
-          return next(req.fileTestError);
-        }
-        if (req.fileTestEnabled) {
-          req.file = {
-            filename: 'test-profile-pic.jpg',
-            path: path.join('uploads', 'profile', 'test-profile-pic.jpg'),
-            mimetype: 'image/jpeg'
-          };
-          req.body = { profile_picture_label: 'My profile picture' };
-        }
-        return next();
+  const multerMock = () => ({
+    single: jest.fn(() => (req, res, next) => {
+      // Simulate file upload
+      req.file = {
+        filename: 'test-profile-pic.jpg',
+        mimetype: 'image/jpeg'
       };
+      next();
     })
-  };
+  });
+  multerMock.diskStorage = jest.fn(() => ({}));
   return multerMock;
 });
 
-// Mock controllers and middleware
-jest.mock('../../controllers/profile.controller', () => ({
-  getUserProfile: jest.fn().mockResolvedValue({
-    user: { 
-      id: 1, 
-      name: 'Test User', 
-      email: 'user@test.com', 
-      profile_picture: 'default.jpg'
-    },
-    settings: { notifications: { email: true, app: true } },
-    activity: [{ action: 'login', date: new Date() }]
-  }),
-  updateProfile: jest.fn().mockResolvedValue({
-    user: { id: 1, name: 'Updated Name' },
-    message: 'Profile updated successfully'
-  }),
-  updatePassword: jest.fn().mockResolvedValue({
-    success: true,
-    message: 'Password updated successfully'
-  }),
-  updateProfilePicture: jest.fn().mockResolvedValue({
-    success: true,
-    profile_picture: 'test-profile-pic.jpg',
-    message: 'Profile picture updated successfully'
-  }),
-  updateNotificationSettings: jest.fn().mockResolvedValue({
-    success: true,
-    message: 'Notification settings updated successfully'
-  })
-}));
+// Fix for "resolve is not a function" error
+const profileController = require('../controllers/profile.controller');
+jest.mock('../controllers/profile.controller');
 
+// Mock middleware
 jest.mock('../../middleware/auth.middleware', () => ({
   isAuthenticated: (req, res, next) => next()
 }));
@@ -113,6 +82,36 @@ describe('Profile Routes', () => {
   beforeEach(() => {
     app = setupApp();
     jest.clearAllMocks();
+    
+    // Setup controller mocks with Promise returns
+    profileController.getUserProfile.mockResolvedValue({
+      user: { id: 1, name: 'Test User', email: 'test@example.com' },
+      settings: { language: 'de' },
+      activity: []
+    });
+    
+    profileController.updateProfile.mockResolvedValue({
+      success: true,
+      user: { id: 1 },
+      message: 'Profile updated'
+    });
+
+    // Maintain other controller mocks from original implementation
+    profileController.updatePassword.mockResolvedValue({
+      success: true,
+      message: 'Password updated successfully'
+    });
+    
+    profileController.updateProfilePicture.mockResolvedValue({
+      success: true,
+      profile_picture: 'test-profile-pic.jpg',
+      message: 'Profile picture updated successfully'
+    });
+    
+    profileController.updateNotificationSettings.mockResolvedValue({
+      success: true,
+      message: 'Notification settings updated successfully'
+    });
   });
   
   describe('GET /', () => {

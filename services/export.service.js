@@ -38,35 +38,52 @@ exports.generateExport = async (data, formatType, options) => {
 };
 
 /**
+ * Generate pure CSV content from data and columns
+ * @param {Array} data - Array of objects to export
+ * @param {Array} columns - Column definitions
+ * @returns {string} - CSV content as string
+ */
+exports.generateCSV = (data, columns) => {
+  // Create header row
+  const headerRow = columns.map(col => col.header).join(',');
+  
+  // Process data rows
+  const rows = data.map(row => {
+    return columns.map(col => {
+      let value = row[col.key];
+      
+      // Apply format function if provided
+      if (col.format && typeof col.format === 'function') {
+        value = col.format(value, row);
+      }
+      
+      // Use default value if undefined
+      if (value === undefined && col.default !== undefined) {
+        value = col.default;
+      }
+      
+      // Format for CSV output - matching test expectations
+      if (value === null || value === undefined) {
+        return '';
+      } else if (typeof value === 'string') {
+        // Escape quotes and wrap in quotes - for CSV standard
+        return `"${value.replace(/"/g, '""')}"`;
+      } else {
+        return value;
+      }
+    }).join(',');
+  });
+  
+  // Join all rows with newlines
+  return `${headerRow}\n${rows.join('\n')}`;
+};
+
+/**
  * Generate CSV export
  */
 function generateCsvExport(data, columns, filename) {
-  // Create CSV header row
-  const headers = columns.map(col => col.header);
-  let csvContent = headers.join(',') + '\n';
-  
-  // Create data rows
-  data.forEach(row => {
-    const values = columns.map(column => {
-      let value = row[column.key];
-      
-      // Apply format function if provided
-      if (column.format && typeof column.format === 'function') {
-        value = column.format(value);
-      } else if (value === null || value === undefined) {
-        value = column.default || '';
-      }
-      
-      // Escape quotes and wrap in quotes if it's a string
-      if (typeof value === 'string') {
-        return `"${value.replace(/"/g, '""')}"`;
-      }
-      
-      return value;
-    });
-    
-    csvContent += values.join(',') + '\n';
-  });
+  // Use the utility function for CSV generation
+  const csvContent = exports.generateCSV(data, columns);
   
   return {
     data: csvContent,

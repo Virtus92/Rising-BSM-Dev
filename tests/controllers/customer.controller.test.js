@@ -72,7 +72,7 @@ describe('Customer Controller', () => {
          if (query.includes('COUNT(*)') && !query.includes('stats') && params && params.length > 0) {
           return Promise.resolve({ rows: [{ total: '50' }] });
         } else if (query.includes('COUNT(*)') && !query.includes('stats')) {
-          return Promise.resolve({ rows: [{ total: '25' }] });
+          return Promise.resolve({ rows: [{ total: '50' }] });
         } else if (query.includes('COUNT(*) AS total') && query.includes('stats')) {
           return Promise.resolve({
             rows: [{

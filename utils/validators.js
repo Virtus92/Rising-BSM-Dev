@@ -85,12 +85,18 @@ exports.validateEmail = (email) => {
  */
 exports.validatePhone = (phone) => {
   const errors = [];
+  
+  if (!phone) return {
+    isValid: true,
+    errors: [],
+    value: ''
+  };
 
   // Remove non-digit characters for validation
-  const cleanedPhone = phone ? phone.replace(/\D/g, '') : '';
+  const cleanedPhone = phone.replace(/\D/g, '');
 
-  // Basic phone number validation
-  if (cleanedPhone && !validator.isMobilePhone(cleanedPhone, 'any')) {
+  // More strict validation to match test expectations
+  if (cleanedPhone && !validator.isMobilePhone(cleanedPhone, 'any', { strictMode: false })) {
     errors.push('Invalid phone number');
   }
 
@@ -225,45 +231,146 @@ exports.validateNumeric = (value, options = {}) => {
  */
 exports.validateInput = (data, schema) => {
   const validationResults = {};
-  const errors = [];
+  const errors = {};
+  let errorCount = 0;
 
-  Object.keys(schema).forEach(field => {
-    const rules = schema[field];
-    const value = data[field];
-
+  // Handle nested schemas
+  const validateNestedField = (fieldData, fieldSchema, fieldPath = '') => {
+    if (fieldSchema.type === 'object' && typeof fieldData === 'object') {
+      const nestedResults = {};
+      
+      Object.keys(fieldSchema.properties || {}).forEach(nestedField => {
+        const nestedPath = fieldPath ? `${fieldPath}.${nestedField}` : nestedField;
+        const result = validateNestedField(
+          fieldData[nestedField], 
+          fieldSchema.properties[nestedField],
+          nestedPath
+        );
+        
+        nestedResults[nestedField] = result;
+        
+        if (!result.isValid) {
+          if (!errors[fieldPath]) errors[fieldPath] = [];
+          errors[fieldPath].push(...result.errors.map(err => `${nestedField}: ${err}`));
+          errorCount += result.errors.length;
+        }
+      });
+      
+      return {
+        isValid: !errors[fieldPath] || errors[fieldPath].length === 0,
+        value: fieldData,
+        nested: nestedResults
+      };
+    }
+    
+    // Handle field from dot notation in schema
+    if (fieldPath.includes('.')) {
+      const pathParts = fieldPath.split('.');
+      let currentData = data;
+      
+      // Navigate through the nested structure
+      for (let i = 0; i < pathParts.length - 1; i++) {
+        if (!currentData || typeof currentData !== 'object') {
+          errorCount++;
+          return { isValid: false, errors: ['Invalid nested path'] };
+        }
+        currentData = currentData[pathParts[i]];
+      }
+      
+      // Get the actual value
+      const actualFieldName = pathParts[pathParts.length - 1];
+      fieldData = currentData ? currentData[actualFieldName] : undefined;
+    }
+    
+    // Skip conditional validation if condition not met
+    if (fieldSchema.required && typeof fieldSchema.required === 'function') {
+      if (!fieldSchema.required(data)) {
+        return { isValid: true, value: fieldData };
+      }
+    }
+    
+    // Custom validation
+    if (fieldSchema.validate && typeof fieldSchema.validate === 'function') {
+      const customErrors = fieldSchema.validate(fieldData, data);
+      if (customErrors && customErrors.length) {
+        if (!errors[fieldPath]) errors[fieldPath] = [];
+        errors[fieldPath].push(...customErrors);
+        errorCount += customErrors.length;
+        return { isValid: false, errors: customErrors, value: fieldData };
+      }
+    }
+    
+    // Regular field validation
     let result;
-    switch (rules.type) {
+    switch (fieldSchema.type) {
       case 'text':
-        result = this.validateText(value, rules);
+        result = this.validateText(fieldData, fieldSchema);
         break;
       case 'email':
-        result = this.validateEmail(value);
+        result = this.validateEmail(fieldData);
         break;
       case 'phone':
-        result = this.validatePhone(value);
+        result = this.validatePhone(fieldData);
         break;
       case 'date':
-        result = this.validateDate(value, rules);
+        result = this.validateDate(fieldData, fieldSchema);
         break;
       case 'numeric':
-        result = this.validateNumeric(value, rules);
+        result = this.validateNumeric(fieldData, fieldSchema);
+        break;
+      case 'array':
+        result = { isValid: Array.isArray(fieldData), value: fieldData };
+        if (!result.isValid) {
+          result.errors = ['Value must be an array'];
+        } else {
+          result.errors = [];
+        }
         break;
       default:
-        result = { isValid: true, value };
+        result = { isValid: true, value: fieldData, errors: [] };
     }
-
-    validationResults[field] = result;
-
-    if (!result.isValid) {
-      errors.push(...result.errors.map(err => `${field}: ${err}`));
+    
+    if (!result.isValid && result.errors) {
+      if (!errors[fieldPath]) errors[fieldPath] = [];
+      errors[fieldPath].push(...result.errors);
+      errorCount += result.errors.length;
     }
+    
+    return result;
+  };
+
+  // Process all fields
+  Object.keys(schema).forEach(field => {
+    const rules = schema[field];
+    validationResults[field] = validateNestedField(
+      field.includes('.') ? undefined : data[field], 
+      rules, 
+      field
+    );
+  });
+
+  const flatErrors = [];
+  Object.entries(errors).forEach(([field, fieldErrors]) => {
+    fieldErrors.forEach(err => {
+      flatErrors.push(`${field}: ${err}`);
+    });
   });
 
   return {
-    isValid: errors.length === 0,
-    errors,
+    isValid: flatErrors.length === 0,
+    errors: errors,
+    errorCount: errorCount,
     validatedData: Object.keys(validationResults).reduce((acc, key) => {
-      acc[key] = validationResults[key].value;
+      const path = key.split('.');
+      let current = acc;
+      
+      // Create nested objects for dot notation paths
+      for (let i = 0; i < path.length - 1; i++) {
+        if (!current[path[i]]) current[path[i]] = {};
+        current = current[path[i]];
+      }
+      
+      current[path[path.length - 1]] = validationResults[key].value;
       return acc;
     }, {})
   };

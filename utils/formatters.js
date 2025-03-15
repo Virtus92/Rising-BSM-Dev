@@ -98,6 +98,49 @@ exports.formatDateWithLabel = (date) => {
 };
 
 /**
+ * Format a date in specified format
+ * @param {Date|string} date - Date to format
+ * @param {string} formatStr - Format string (optional)
+ * @returns {string} Formatted date
+ */
+exports.formatDate = (date, formatStr = 'dd.MM.yyyy') => {
+  try {
+    if (!date) return 'Unbekannt';
+    
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      return 'Unbekannt';
+    }
+    
+    return format(parsedDate, formatStr, { locale: de });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Unbekannt';
+  }
+};
+
+/**
+ * Format time from a date
+ * @param {Date|string} date - Date to extract time from
+ * @returns {string} Formatted time string
+ */
+exports.formatTime = (date, formatStr = 'HH:mm') => {
+  try {
+    if (!date) return 'Unbekannt';
+    
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      return 'Unbekannt';
+    }
+    
+    return format(parsedDate, formatStr, { locale: de });
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return 'Unbekannt';
+  }
+};
+
+/**
  * Format a currency amount
  * @param {number} amount - The amount to format
  * @param {string} currency - Currency code (default: EUR)
@@ -200,7 +243,7 @@ exports.formatPhone = (number) => {
     } else if (digits.length <= 10) {
       return digits.replace(/(\d{3})(\d{3})(\d+)/, '$1 $2 $3');
     } else {
-      return digits.replace(/(\d{3})(\d{3})(\d{2})(\d+)/, '$1 $2 $3 $4');
+      return digits.replace(/(\d{3})(\d{3})(\d{3})(\d+)/, '$1 $2 $3 $4');
     }
   } catch (error) {
     console.error('Error formatting phone number:', error);

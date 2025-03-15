@@ -1,4 +1,4 @@
- /**
+/**
  * Database service 
  * Provides a centralized interface for all database operations
  */
@@ -73,7 +73,7 @@ exports.transaction = async (callback) => {
  * @returns {Promise<object|null>} - Row object or null if not found
  */
 exports.getById = async (table, id, idColumn = 'id') => {
-  const result = await pool.query(`SELECT * FROM ${table} WHERE ${idColumn} = $1`, [id]);
+  const result = await exports.query(`SELECT * FROM ${table} WHERE ${idColumn} = $1`, [id]);
   return result.rows.length > 0 ? result.rows[0] : null;
 };
 
@@ -108,10 +108,15 @@ exports.insert = async (table, data, returning = '*') => {
  * @param {object} data - Object with column:value pairs to update
  * @param {string} [idColumn='id'] - Column name for ID
  * @param {string} [returning='*'] - What to return
- * @returns {Promise<object>} - Updated row
+ * @returns {Promise<object|null>} - Updated row or null if not found
  */
 exports.update = async (table, id, data, idColumn = 'id', returning = '*') => {
   const columns = Object.keys(data);
+  
+  if (columns.length === 0) {
+    throw new Error('No data provided for update');
+  }
+  
   const values = Object.values(data);
   
   const setClause = columns
@@ -126,7 +131,7 @@ exports.update = async (table, id, data, idColumn = 'id', returning = '*') => {
   `;
   
   const result = await pool.query(query, [...values, id]);
-  return result.rows[0];
+  return result.rows.length > 0 ? result.rows[0] : null;
 };
 
 /**

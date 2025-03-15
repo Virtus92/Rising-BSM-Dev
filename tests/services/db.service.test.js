@@ -1,29 +1,30 @@
 const dbService = require('../../services/db.service');
 
+// Define pool mock outside jest.mock for easier access
+const pool = {
+  query: jest.fn(),
+  connect: jest.fn(),
+  on: jest.fn()
+};
+
+// Mock client that will be returned by pool.connect()
+const mockClient = {
+  query: jest.fn(),
+  release: jest.fn()
+};
+
 // Mock the pg Pool
 jest.mock('pg', () => {
-  const mockClient = {
-    query: jest.fn(),
-    release: jest.fn()
-  };
-
-  const mockPool = {
-    connect: jest.fn().mockResolvedValue(mockClient),
-    query: jest.fn(),
-    on: jest.fn()
-  };
-
   return {
-    Pool: jest.fn().mockReturnValue(mockPool)
+    Pool: jest.fn(() => pool)
   };
 });
 
 describe('Database Service', () => {
-  const mockPool = require('pg').Pool.mock.results[0].value;
-  const mockClient = mockPool.connect.mock.results[0]?.value;
-
   beforeEach(() => {
     jest.clearAllMocks();
+    // Set up default mock behavior for each test
+    pool.connect.mockResolvedValue(mockClient);
   });
 
   describe('query', () => {
@@ -34,14 +35,13 @@ describe('Database Service', () => {
       const mockResult = { rows: [{ id: 1, name: 'Test User' }] };
       
       mockClient.query.mockResolvedValue(mockResult);
-      mockPool.connect.mockResolvedValue(mockClient);
 
       // Act
       const result = await dbService.query(queryString, params);
 
       // Assert
       expect(result).toBe(mockResult);
-      expect(mockPool.connect).toHaveBeenCalled();
+      expect(pool.connect).toHaveBeenCalled();
       expect(mockClient.query).toHaveBeenCalledWith(queryString, params);
       expect(mockClient.release).toHaveBeenCalled();
     });
@@ -55,7 +55,6 @@ describe('Database Service', () => {
       const mockResult = { rows: [{ id: 1, name: 'Test User' }] };
       
       mockClient.query.mockResolvedValue(mockResult);
-      mockPool.connect.mockResolvedValue(mockClient);
 
       // Act
       const result = await dbService.query(queryObject);
@@ -72,7 +71,6 @@ describe('Database Service', () => {
       const error = new Error('Relation does not exist');
       
       mockClient.query.mockRejectedValue(error);
-      mockPool.connect.mockResolvedValue(mockClient);
 
       // Act & Assert
       await expect(dbService.query(queryString)).rejects.toThrow(error);
@@ -85,7 +83,6 @@ describe('Database Service', () => {
       // Arrange
       const mockCallback = jest.fn().mockResolvedValue({ success: true });
       mockClient.query.mockResolvedValue({});
-      mockPool.connect.mockResolvedValue(mockClient);
 
       // Act
       const result = await dbService.transaction(mockCallback);
@@ -103,7 +100,6 @@ describe('Database Service', () => {
       const error = new Error('Transaction error');
       const mockCallback = jest.fn().mockRejectedValue(error);
       mockClient.query.mockResolvedValue({});
-      mockPool.connect.mockResolvedValue(mockClient);
 
       // Act & Assert
       await expect(dbService.transaction(mockCallback)).rejects.toThrow(error);
@@ -117,14 +113,14 @@ describe('Database Service', () => {
     test('should get a row by id', async () => {
       // Arrange
       const mockRow = { id: 1, name: 'Test' };
-      mockPool.query.mockResolvedValue({ rows: [mockRow] });
+      pool.query.mockResolvedValue({ rows: [mockRow] });
 
       // Act
       const result = await dbService.getById('users', 1);
 
       // Assert
       expect(result).toEqual(mockRow);
-      expect(mockPool.query).toHaveBeenCalledWith(
+      expect(pool.query).toHaveBeenCalledWith(
         'SELECT * FROM users WHERE id = $1',
         [1]
       );
@@ -132,7 +128,7 @@ describe('Database Service', () => {
 
     test('should return null when no row found', async () => {
       // Arrange
-      mockPool.query.mockResolvedValue({ rows: [] });
+      pool.query.mockResolvedValue({ rows: [] });
 
       // Act
       const result = await dbService.getById('users', 999);
@@ -144,14 +140,14 @@ describe('Database Service', () => {
     test('should use custom id column when provided', async () => {
       // Arrange
       const mockRow = { user_id: 1, name: 'Test' };
-      mockPool.query.mockResolvedValue({ rows: [mockRow] });
+      pool.query.mockResolvedValue({ rows: [mockRow] });
 
       // Act
       const result = await dbService.getById('users', 1, 'user_id');
 
       // Assert
       expect(result).toEqual(mockRow);
-      expect(mockPool.query).toHaveBeenCalledWith(
+      expect(pool.query).toHaveBeenCalledWith(
         'SELECT * FROM users WHERE user_id = $1',
         [1]
       );
@@ -163,15 +159,15 @@ describe('Database Service', () => {
       // Arrange
       const data = { name: 'Test User', email: 'test@example.com' };
       const mockRow = { id: 1, ...data };
-      mockPool.query.mockResolvedValue({ rows: [mockRow] });
+      pool.query.mockResolvedValue({ rows: [mockRow] });
 
       // Act
       const result = await dbService.insert('users', data);
 
       // Assert
       expect(result).toEqual(mockRow);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *'),
+      expect(pool.query).toHaveBeenCalledWith(
+        expect.stringMatching(/INSERT INTO users \(name, email\) VALUES \(\$1, \$2\) RETURNING \*/),
         ['Test User', 'test@example.com']
       );
     });
@@ -180,15 +176,15 @@ describe('Database Service', () => {
       // Arrange
       const data = { name: 'Test User', email: 'test@example.com' };
       const mockRow = { id: 1 };
-      mockPool.query.mockResolvedValue({ rows: [mockRow] });
+      pool.query.mockResolvedValue({ rows: [mockRow] });
 
       // Act
       const result = await dbService.insert('users', data, 'id');
 
       // Assert
       expect(result).toEqual(mockRow);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('RETURNING id'),
+      expect(pool.query).toHaveBeenCalledWith(
+        expect.stringMatching(/RETURNING id/),
         expect.any(Array)
       );
     });
@@ -200,15 +196,15 @@ describe('Database Service', () => {
       const id = 1;
       const data = { name: 'Updated User', email: 'updated@example.com' };
       const mockRow = { id, ...data };
-      mockPool.query.mockResolvedValue({ rows: [mockRow] });
+      pool.query.mockResolvedValue({ rows: [mockRow] });
 
       // Act
       const result = await dbService.update('users', id, data);
 
       // Assert
       expect(result).toEqual(mockRow);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *'),
+      expect(pool.query).toHaveBeenCalledWith(
+        expect.stringMatching(/UPDATE users SET name = \$1, email = \$2 WHERE id = \$3 RETURNING \*/),
         ['Updated User', 'updated@example.com', 1]
       );
     });
@@ -218,15 +214,15 @@ describe('Database Service', () => {
       const id = 'usr123';
       const data = { name: 'Updated User' };
       const mockRow = { user_id: id, ...data };
-      mockPool.query.mockResolvedValue({ rows: [mockRow] });
+      pool.query.mockResolvedValue({ rows: [mockRow] });
 
       // Act
       const result = await dbService.update('users', id, data, 'user_id', 'user_id, name');
 
       // Assert
       expect(result).toEqual(mockRow);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE user_id = $2 RETURNING user_id, name'),
+      expect(pool.query).toHaveBeenCalledWith(
+        expect.stringMatching(/WHERE user_id = \$2 RETURNING user_id, name/),
         expect.any(Array)
       );
     });
@@ -235,15 +231,15 @@ describe('Database Service', () => {
       // Arrange
       const data = { name: 'Updated User' };
       const mockRow = { user_id: 1, name: 'Updated User' };
-      mockPool.query.mockResolvedValue({ rows: [mockRow] });
+      pool.query.mockResolvedValue({ rows: [mockRow] });
 
       // Act
       const result = await dbService.update('users', 1, data, 'user_id');
 
       // Assert
       expect(result).toEqual(mockRow);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE user_id = '),
+      expect(pool.query).toHaveBeenCalledWith(
+        expect.stringMatching(/WHERE user_id = /),
         expect.any(Array)
       );
     });
@@ -259,7 +255,7 @@ describe('Database Service', () => {
     test('should return null when no row is updated', async () => {
       // Arrange
       const data = { name: 'Updated User' };
-      mockPool.query.mockResolvedValue({ rows: [] });
+      pool.query.mockResolvedValue({ rows: [] });
 
       // Act
       const result = await dbService.update('users', 999, data);
@@ -272,14 +268,14 @@ describe('Database Service', () => {
   describe('delete', () => {
     test('should delete a row by id and return true when successful', async () => {
       // Arrange
-      mockPool.query.mockResolvedValue({ rowCount: 1 });
+      pool.query.mockResolvedValue({ rowCount: 1 });
 
       // Act
       const result = await dbService.delete('users', 1);
 
       // Assert
       expect(result).toBe(true);
-      expect(mockPool.query).toHaveBeenCalledWith(
+      expect(pool.query).toHaveBeenCalledWith(
         'DELETE FROM users WHERE id = $1 RETURNING id',
         [1]
       );
@@ -287,7 +283,7 @@ describe('Database Service', () => {
 
     test('should return false when no row was deleted', async () => {
       // Arrange
-      mockPool.query.mockResolvedValue({ rowCount: 0 });
+      pool.query.mockResolvedValue({ rowCount: 0 });
 
       // Act
       const result = await dbService.delete('users', 999);
@@ -298,14 +294,14 @@ describe('Database Service', () => {
 
     test('should use custom id column when provided', async () => {
       // Arrange
-      mockPool.query.mockResolvedValue({ rowCount: 1 });
+      pool.query.mockResolvedValue({ rowCount: 1 });
 
       // Act
       const result = await dbService.delete('users', 'usr123', 'user_id');
 
       // Assert
       expect(result).toBe(true);
-      expect(mockPool.query).toHaveBeenCalledWith(
+      expect(pool.query).toHaveBeenCalledWith(
         'DELETE FROM users WHERE user_id = $1 RETURNING user_id',
         ['usr123']
       );

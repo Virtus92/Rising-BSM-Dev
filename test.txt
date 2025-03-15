@@ -1,0 +1,591 @@
+[{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/controllers/appointment.controller.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Appointment Controller > getAppointmentById > should return appointment details with notes\n-----\nError: expect(received).toHaveProperty(path)\n\nMatcher error: received value must not be null nor undefined\n\nReceived has value: undefined",
+	"source": "Jest",
+	"startLineNumber": 170,
+	"startColumn": 1,
+	"endLineNumber": 170,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/controllers/dashboard.controller.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Dashboard Controller > getDashboardData > should return complete dashboard data\n-----\nError: expect(received).toEqual(expected) // deep equality\n\nExpected: ArrayContaining [ObjectContaining {\"id\": Any<Number>, \"kunde_name\": Any<String>, \"status\": Any<String>, \"termin_datum\": Any<String>, \"titel\": Any<String>}]\nReceived: []",
+	"source": "Jest",
+	"startLineNumber": 148,
+	"startColumn": 1,
+	"endLineNumber": 148,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/controllers/dashboard.controller.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Dashboard Controller > Performance Tests > sollte Caching für wiederholte Abfragen verwenden\n-----\nTypeError: Cannot read properties of undefined (reading 'count')",
+	"source": "Jest",
+	"startLineNumber": 425,
+	"startColumn": 1,
+	"endLineNumber": 425,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/controllers/profile.controller.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Profile Controller > getUserProfile > should return user profile data\n-----\nError: expect(received).toHaveProperty(path)\n\nMatcher error: received value must not be null nor undefined\n\nReceived has value: undefined",
+	"source": "Jest",
+	"startLineNumber": 87,
+	"startColumn": 1,
+	"endLineNumber": 87,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/controllers/profile.controller.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Profile Controller > updateProfile > should update user profile data\n-----\nError: expect(jest.fn()).toHaveBeenCalledTimes(expected)\n\nExpected number of calls: 2\nReceived number of calls: 3",
+	"source": "Jest",
+	"startLineNumber": 123,
+	"startColumn": 1,
+	"endLineNumber": 123,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/controllers/profile.controller.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Profile Controller > updateProfilePicture > should update user profile picture\n-----\nError: expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: ObjectContaining {\"text\": StringContaining \"UPDATE benutzer SET profilbild\"}, Any<Array>\nReceived: {\"text\": \"\n        UPDATE benutzer·\n        SET·\n          profilbild = $1,·\n          updated_at = CURRENT_TIMESTAMP·\n        WHERE id = $2\n      \", \"values\": [\"/uploads/profile/profile1234.jpg\", 1]}\n\nNumber of calls: 1",
+	"source": "Jest",
+	"startLineNumber": 275,
+	"startColumn": 1,
+	"endLineNumber": 275,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/controllers/profile.controller.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Profile Controller > updateNotificationSettings > should create notification settings if none exist\n-----\nError: expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: ObjectContaining {\"text\": StringContaining \"INSERT INTO benutzer_einstellungen\"}, Any<Array>\nReceived\n       1: {\"text\": \"SELECT benutzer_id FROM benutzer_einstellungen WHERE benutzer_id = $1\", \"values\": [1]}\n       2: {\"text\": \"\n          INSERT INTO benutzer_einstellungen (\n            benutzer_id, \n            benachrichtigungen_email, \n            benachrichtigungen_push, \n            benachrichtigungen_intervall\n          ) VALUES ($1, $2, $3, $4)\n        \", \"values\": [1, true, false, \"taeglich\"]}\n\nNumber of calls: 2",
+	"source": "Jest",
+	"startLineNumber": 315,
+	"startColumn": 1,
+	"endLineNumber": 315,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/controllers/profile.controller.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Profile Controller > updateNotificationSettings > should update existing notification settings\n-----\nError: expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: ObjectContaining {\"text\": StringContaining \"SELECT benutzer_id FROM benutzer_einstellungen\"}, Any<Array>\nReceived\n       1: {\"text\": \"SELECT benutzer_id FROM benutzer_einstellungen WHERE benutzer_id = $1\", \"values\": [1]}\n       2: {\"text\": \"\n          UPDATE benutzer_einstellungen·\n          SET·\n            benachrichtigungen_email = $1,·\n            benachrichtigungen_push = $2,·\n            benachrichtigungen_intervall = $3,\n            updated_at = CURRENT_TIMESTAMP·\n          WHERE benutzer_id = $4\n        \", \"values\": [true, true, \"woechentlich\", 1]}\n\nNumber of calls: 2",
+	"source": "Jest",
+	"startLineNumber": 340,
+	"startColumn": 1,
+	"endLineNumber": 340,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/controllers/project.controller.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Project Controller > getProjectById > should return project details with appointments and notes\n-----\nError: expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: 200\n\nNumber of calls: 0",
+	"source": "Jest",
+	"startLineNumber": 182,
+	"startColumn": 1,
+	"endLineNumber": 182,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/integration/formatters.integration.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Formatters Integration Tests > formatPhone works with real customer phone numbers\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: \"030 123 456 78\"\nReceived: \"030 123 45 678\"",
+	"source": "Jest",
+	"startLineNumber": 14,
+	"startColumn": 1,
+	"endLineNumber": 14,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/integration/validators.integration.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Validators Integration Tests with Real Data > validateInput should catch real-world validation issues\n-----\nError: expect(received).toBeDefined()\n\nReceived: undefined",
+	"source": "Jest",
+	"startLineNumber": 125,
+	"startColumn": 1,
+	"endLineNumber": 125,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/appointment.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Appointment Routes > GET /neu > should render new appointment form\n-----\nError: expect(received).toHaveLength(expected)\n\nExpected length: 1\nReceived length: 0\nReceived array:  []",
+	"source": "Jest",
+	"startLineNumber": 175,
+	"startColumn": 1,
+	"endLineNumber": 175,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/appointment.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Appointment Routes > GET /calendar-events > should return calendar events as JSON\n-----\nTypeError: Cannot read properties of undefined (reading 'title')",
+	"source": "Jest",
+	"startLineNumber": 270,
+	"startColumn": 1,
+	"endLineNumber": 270,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/appointment.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Appointment Routes > GET /:id/edit > should render appointment edit form\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 302",
+	"source": "Jest",
+	"startLineNumber": 378,
+	"startColumn": 1,
+	"endLineNumber": 378,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/appointment.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Appointment Routes > Verbesserte Fehlerbehandlung > sollte spezifische HTTP-Statuscodes für verschiedene Fehlertypen zurückgeben\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 302",
+	"source": "Jest",
+	"startLineNumber": 460,
+	"startColumn": 1,
+	"endLineNumber": 460,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/auth.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Auth Routes > GET /forgot-password > should render forgot password page\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 167,
+	"startColumn": 1,
+	"endLineNumber": 167,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/auth.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Auth Routes > GET /reset-password/:token > should render reset password page for valid token\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 201,
+	"startColumn": 1,
+	"endLineNumber": 201,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/dashboard.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Dashboard Routes > GET /search > should render search results\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 132,
+	"startColumn": 1,
+	"endLineNumber": 132,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/dashboard.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Dashboard Routes > GET /notifications > should render notifications page\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 153,
+	"startColumn": 1,
+	"endLineNumber": 153,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/profile.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "  ● Test suite failed to run\n\n    ReferenceError: C:\\Users\\Dinel\\Desktop\\Rising BSM\\tests\\routes\\profile.routes.test.js: The module factory of `jest.mock()` is not allowed to reference any out-of-scope variables.\n    Invalid variable access: path\n    Allowed objects: AbortController, AbortSignal, AggregateError, Array, ArrayBuffer, Atomics, BigInt, BigInt64Array, BigUint64Array, Blob, Boolean, BroadcastChannel, Buffer, ByteLengthQueuingStrategy, CompressionStream, CountQueuingStrategy, Crypto, CryptoKey, CustomEvent, DOMException, DataView, Date, DecompressionStream, Error, EvalError, Event, EventTarget, File, FinalizationRegistry, Float32Array, Float64Array, FormData, Function, Generator, GeneratorFunction, Headers, Infinity, Int16Array, Int32Array, Int8Array, InternalError, Intl, Iterator, JSON, Map, Math, MessageChannel, MessageEvent, MessagePort, NaN, Navigator, Number, Object, Performance, PerformanceEntry, PerformanceMark, PerformanceMeasure, PerformanceObserver, PerformanceObserverEntryList, PerformanceResourceTiming, Promise, Proxy, RangeError, ReadableByteStreamController, ReadableStream, ReadableStreamBYOBReader, ReadableStreamBYOBRequest, ReadableStreamDefaultController, ReadableStreamDefaultReader, ReferenceError, Reflect, RegExp, Request, Response, Set, SharedArrayBuffer, String, SubtleCrypto, Symbol, SyntaxError, TextDecoder, TextDecoderStream, TextEncoder, TextEncoderStream, TransformStream, TransformStreamDefaultController, TypeError, URIError, URL, URLSearchParams, Uint16Array, Uint32Array, Uint8Array, Uint8ClampedArray, WeakMap, WeakRef, WeakSet, WebAssembly, WebSocket, WritableStream, WritableStreamDefaultController, WritableStreamDefaultWriter, __dirname, __filename, arguments, atob, btoa, clearImmediate, clearInterval, clearTimeout, console, crypto, decodeURI, decodeURIComponent, encodeURI, encodeURIComponent, escape, eval, expect, exports, fetch, global, globalThis, isFinite, isNaN, jest, module, navigator, parseFloat, parseInt, performance, process, queueMicrotask, require, setImmediate, setInterval, setTimeout, structuredClone, undefined, unescape.\n    Note: This is a precaution to guard against uninitialized mock variables. If it is ensured that the mock is required lazily, variable names prefixed with `mock` (case insensitive) are permitted.\n\n      18 |           req.file = {\n      19 |             filename: 'test-profile-pic.jpg',\n    > 20 |             path: path.join('uploads', 'profile', 'test-profile-pic.jpg'),\n         |                   ^^^^\n      21 |             mimetype: 'image/jpeg'\n      22 |           };\n      23 |           req.body = { profile_picture_label: 'My profile picture' };\n\n      at File.buildCodeFrameError (node_modules/@babel/core/src/transformation/file/file.ts:247:12)\n      at NodePath.buildError [as buildCodeFrameError] (node_modules/@babel/traverse/src/path/index.ts:141:21)\n      at call (node_modules/@babel/traverse/src/visitors.ts:303:14)\n      at NodePath.call [as _call] (node_modules/@babel/traverse/src/path/context.ts:36:20)\n      at NodePath.call (node_modules/@babel/traverse/src/path/context.ts:21:18)\n      at NodePath.call [as visit] (node_modules/@babel/traverse/src/path/context.ts:97:31)\n      at TraversalContext.visit [as visitQueue] (node_modules/@babel/traverse/src/context.ts:148:16)\n      at TraversalContext.visitQueue [as visitMultiple] (node_modules/@babel/traverse/src/context.ts:99:17)\n      at TraversalContext.visitMultiple [as visit] (node_modules/@babel/traverse/src/context.ts:178:19)\n      at visit (node_modules/@babel/traverse/src/traverse-node.ts:40:17)\n      at NodePath.visit (node_modules/@babel/traverse/src/path/context.ts:104:33)\n      at TraversalContext.visit [as visitQueue] (node_modules/@babel/traverse/src/context.ts:148:16)\n      at TraversalContext.visitQueue [as visitSingle] (node_modules/@babel/traverse/src/context.ts:109:19)\n      at TraversalContext.visitSingle [as visit] (node_modules/@babel/traverse/src/context.ts:180:19)\n      at visit (node_modules/@babel/traverse/src/traverse-node.ts:40:17)\n      at traverse (node_modules/@babel/traverse/src/index.ts:83:15)\n      at transformFile (node_modules/@babel/core/src/transformation/index.ts:119:15)\n          at transformFile.next (<anonymous>)\n      at transformFile (node_modules/@babel/core/src/transformation/index.ts:49:12)\n          at run.next (<anonymous>)\n      at transform (node_modules/@babel/core/src/transform.ts:29:20)\n          at transform.next (<anonymous>)\n      at evaluateSync (node_modules/gensync/index.js:251:28)\n      at sync (node_modules/gensync/index.js:89:14)\n      at fn (node_modules/@babel/core/src/errors/rewrite-stack-trace.ts:99:14)\n      at transformSync (node_modules/@babel/core/src/transform.ts:66:52)\n      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:545:31)\n      at ScriptTransformer._transformAndBuildScript (node_modules/@jest/transform/build/ScriptTransformer.js:674:40)\n      at ScriptTransformer.transform (node_modules/@jest/transform/build/ScriptTransformer.js:726:19)\n",
+	"source": "Jest",
+	"startLineNumber": 1,
+	"startColumn": 1,
+	"endLineNumber": 1,
+	"endColumn": 1
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/project.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Project Routes > GET /neu > should render new project form\n-----\nError: expect(received).toHaveLength(expected)\n\nExpected length: 1\nReceived length: 0\nReceived array:  []",
+	"source": "Jest",
+	"startLineNumber": 139,
+	"startColumn": 1,
+	"endLineNumber": 139,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/service.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Service Routes > GET / > should render services list page\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 93,
+	"startColumn": 1,
+	"endLineNumber": 93,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/service.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Service Routes > GET /neu > should render new service form\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 113,
+	"startColumn": 1,
+	"endLineNumber": 113,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/service.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Service Routes > GET /:id > should render service detail page\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 200,
+	"startColumn": 1,
+	"endLineNumber": 200,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/service.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Service Routes > GET /:id/edit > should render service edit form\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 232,
+	"startColumn": 1,
+	"endLineNumber": 232,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/service.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Service Routes > GET /:id/statistics > should render service statistics page\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 268,
+	"startColumn": 1,
+	"endLineNumber": 268,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/settings.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Settings Routes > GET / > should render settings page with user settings\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 80,
+	"startColumn": 1,
+	"endLineNumber": 80,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/settings.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Settings Routes > GET /system > should render system settings page\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 122,
+	"startColumn": 1,
+	"endLineNumber": 122,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/routes/settings.routes.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Settings Routes > GET /backup > should render backup settings page\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 200\nReceived: 500",
+	"source": "Jest",
+	"startLineNumber": 144,
+	"startColumn": 1,
+	"endLineNumber": 144,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/cache.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Cache Service > memory management > should enforce max items limit\n-----\nError: expect(received).toBeNull()\n\nReceived: \"value1\"",
+	"source": "Jest",
+	"startLineNumber": 226,
+	"startColumn": 1,
+	"endLineNumber": 226,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/cache.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "cache.service Erweiterte Tests > sollte Race Conditions bei gleichzeitigen Operationen vermeiden\n-----\nError: expect(jest.fn()).toHaveBeenCalledTimes(expected)\n\nExpected number of calls: 1\nReceived number of calls: 2",
+	"source": "Jest",
+	"startLineNumber": 260,
+	"startColumn": 1,
+	"endLineNumber": 260,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/cache.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "cache.service Erweiterte Tests > sollte Speicher effizient verwalten bei vielen Einträgen\n-----\nError: expect(received).toBeLessThanOrEqual(expected)\n\nExpected: <= 5\nReceived:    10",
+	"source": "Jest",
+	"startLineNumber": 278,
+	"startColumn": 1,
+	"endLineNumber": 278,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/db.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Database Service > query > should execute a query with string and params\n-----\nTypeError: Cannot read properties of undefined (reading 'query')",
+	"source": "Jest",
+	"startLineNumber": 36,
+	"startColumn": 1,
+	"endLineNumber": 36,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/db.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Database Service > query > should execute a query with object parameter\n-----\nTypeError: Cannot read properties of undefined (reading 'query')",
+	"source": "Jest",
+	"startLineNumber": 57,
+	"startColumn": 1,
+	"endLineNumber": 57,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/db.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Database Service > query > should release client even when query fails\n-----\nTypeError: Cannot read properties of undefined (reading 'query')",
+	"source": "Jest",
+	"startLineNumber": 74,
+	"startColumn": 1,
+	"endLineNumber": 74,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/db.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Database Service > transaction > should execute callback in a transaction\n-----\nTypeError: Cannot read properties of undefined (reading 'query')",
+	"source": "Jest",
+	"startLineNumber": 87,
+	"startColumn": 1,
+	"endLineNumber": 87,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/db.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Database Service > transaction > should rollback transaction on error\n-----\nTypeError: Cannot read properties of undefined (reading 'query')",
+	"source": "Jest",
+	"startLineNumber": 105,
+	"startColumn": 1,
+	"endLineNumber": 105,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/db.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Database Service > insert > should insert a row and return it\n-----\nError: expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\n- Expected\n+ Received\n\n- StringContaining \"INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *\",\n+ \"\n    INSERT INTO users (name, email)\n    VALUES ($1, $2)\n    RETURNING *\n  \",\n  [\"Test User\", \"test@example.com\"],\n\nNumber of calls: 1",
+	"source": "Jest",
+	"startLineNumber": 173,
+	"startColumn": 1,
+	"endLineNumber": 173,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/db.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Database Service > update > should update a row by id and return it\n-----\nError: expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\n- Expected\n+ Received\n\n- StringContaining \"UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *\",\n+ \"\n    UPDATE users\n    SET name = $1, email = $2\n    WHERE id = $3\n    RETURNING *\n  \",\n  [\"Updated User\", \"updated@example.com\", 1],\n\nNumber of calls: 1",
+	"source": "Jest",
+	"startLineNumber": 210,
+	"startColumn": 1,
+	"endLineNumber": 210,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/db.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Database Service > update > should use custom id column and returning clause when provided\n-----\nError: expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: StringContaining \"WHERE user_id = $2 RETURNING user_id, name\", Any<Array>\nReceived: \"\n    UPDATE users\n    SET name = $1\n    WHERE user_id = $2\n    RETURNING user_id, name\n  \", [\"Updated User\", \"usr123\"]\n\nNumber of calls: 1",
+	"source": "Jest",
+	"startLineNumber": 228,
+	"startColumn": 1,
+	"endLineNumber": 228,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/db.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Database Service > update > should handle empty data object\n-----\nError: expect(received).rejects.toThrow()\n\nReceived promise resolved instead of rejected\nResolved to value: {\"name\": \"Updated User\", \"user_id\": 1}",
+	"source": "Jest",
+	"startLineNumber": 256,
+	"startColumn": 1,
+	"endLineNumber": 256,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/db.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Database Service > update > should return null when no row is updated\n-----\nError: expect(received).toBeNull()\n\nReceived: undefined",
+	"source": "Jest",
+	"startLineNumber": 268,
+	"startColumn": 1,
+	"endLineNumber": 268,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/export.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Export Service > generateExport > should generate CSV export\n-----\nError: expect(received).toContain(expected) // indexOf\n\nExpected substring: \"1,\\\"Test 1\\\",100€\"\nReceived string:    \"ID,Name,Value\n1,\\\"Test 1\\\",\\\"100€\\\"\n2,\\\"Test 2\\\",\\\"200€\\\"\n\"",
+	"source": "Jest",
+	"startLineNumber": 94,
+	"startColumn": 1,
+	"endLineNumber": 94,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/export.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Export Service > generateExport > should apply format functions to column values\n-----\nError: expect(received).toContain(expected) // indexOf\n\nExpected substring: \"1,€100.00\"\nReceived string:    \"ID,Formatted Value\n1,\\\"€100.00\\\"\n2,\\\"€200.00\\\"\n\"",
+	"source": "Jest",
+	"startLineNumber": 168,
+	"startColumn": 1,
+	"endLineNumber": 168,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/export.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Export Service > Edge Cases für Export > sollte mit fehlenden Spalten in Datensätzen umgehen können\n-----\nError: expect(received).toContain(expected) // indexOf\n\nExpected substring: \"2,,200€\"\nReceived string:    \"ID,Name,Value\n1,\\\"Test 1\\\",\\\"undefined€\\\"\n2,\\\"\\\",\\\"200€\\\"\n\\\"\\\",\\\"Test 3\\\",\\\"300€\\\"\n\"",
+	"source": "Jest",
+	"startLineNumber": 230,
+	"startColumn": 1,
+	"endLineNumber": 230,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/export.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Export Service > Edge Cases für Export > sollte mit sehr großen Datensätzen effizient umgehen\n-----\nTypeError: Cannot read properties of undefined (reading 'value')",
+	"source": "Jest",
+	"startLineNumber": 243,
+	"startColumn": 1,
+	"endLineNumber": 243,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/export.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Export Service > Edge Cases für Export > sollte benutzerdefinierte Formatierungsfunktionen korrekt anwenden\n-----\nError: expect(received).toContain(expected) // indexOf\n\nExpected substring: \"1,\\\"N/A\\\",\\\"01.01.2023\\\"\"\nReceived string:    \"ID,Value,Date\n1,\\\"N/A\\\",\\\"1.1.2023\\\"\n2,\\\"Zero\\\",\\\"2.1.2023\\\"\n3,\\\"(100€)\\\",\\\"Undatiert\\\"\n\"",
+	"source": "Jest",
+	"startLineNumber": 295,
+	"startColumn": 1,
+	"endLineNumber": 295,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/services/notification.service.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "  ● Test suite failed to run\n\n    Cannot find module '../services/db.service' from 'tests/services/notification.service.test.js'\n\n      4 |\n      5 | // Mock dependencies\n    > 6 | jest.mock('../services/db.service', () => ({\n        |      ^\n      7 |   query: jest.fn()\n      8 | }));\n      9 |\n\n      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)\n      at Object.mock (tests/services/notification.service.test.js:6:6)\n",
+	"source": "Jest",
+	"startLineNumber": 1,
+	"startColumn": 1,
+	"endLineNumber": 1,
+	"endColumn": 1
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/formatters.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "formatNumber > formats number with correct decimals\n-----\nReferenceError: mockFormat is not defined",
+	"source": "Jest",
+	"startLineNumber": 180,
+	"startColumn": 1,
+	"endLineNumber": 180,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/formatters.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "formatDate > formats date in German format\n-----\nTypeError: formatters.formatDate is not a function",
+	"source": "Jest",
+	"startLineNumber": 245,
+	"startColumn": 1,
+	"endLineNumber": 245,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/formatters.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "formatDate > handles invalid date input\n-----\nTypeError: formatters.formatDate is not a function",
+	"source": "Jest",
+	"startLineNumber": 256,
+	"startColumn": 1,
+	"endLineNumber": 256,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/formatters.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "formatTime > formats time correctly\n-----\nTypeError: formatters.formatTime is not a function",
+	"source": "Jest",
+	"startLineNumber": 269,
+	"startColumn": 1,
+	"endLineNumber": 269,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/test-helpers.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Test Helpers > createMockRequest > should create default mock request\n-----\nError: expect(received).toBeInstanceOf(expected)\n\nExpected constructor: Function\nReceived constructor: Function",
+	"source": "Jest",
+	"startLineNumber": 17,
+	"startColumn": 1,
+	"endLineNumber": 17,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/test-helpers.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Test Helpers > createMockResponse > should create mock response with spy methods\n-----\nError: expect(received).toBeInstanceOf(expected)\n\nExpected constructor: Function\nReceived constructor: Function",
+	"source": "Jest",
+	"startLineNumber": 39,
+	"startColumn": 1,
+	"endLineNumber": 39,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/validators.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "validatePhone > should reject invalid phone numbers\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: false\nReceived: true",
+	"source": "Jest",
+	"startLineNumber": 86,
+	"startColumn": 1,
+	"endLineNumber": 86,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/validators.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "validateInput > should collect errors from all invalid fields\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: 3\nReceived: 2",
+	"source": "Jest",
+	"startLineNumber": 188,
+	"startColumn": 1,
+	"endLineNumber": 188,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/validators.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Erweiterter validateInput Test > sollte verschachtelte Objekte validieren können\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: true\nReceived: false",
+	"source": "Jest",
+	"startLineNumber": 213,
+	"startColumn": 1,
+	"endLineNumber": 213,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/validators.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Erweiterter validateInput Test > sollte bedingte Validierung unterstützen\n-----\nError: expect(received).toHaveProperty(path)\n\nExpected path: \"phone\"\nReceived path: []\n\nReceived value: [\"email: Invalid email address\"]",
+	"source": "Jest",
+	"startLineNumber": 252,
+	"startColumn": 1,
+	"endLineNumber": 252,
+	"endColumn": 9007199254740992
+},{
+	"resource": "/c:/Users/Dinel/Desktop/Rising BSM/tests/utils/validators.test.js",
+	"owner": "Jest (Rising BSM)",
+	"severity": 8,
+	"message": "Erweiterter validateInput Test > sollte benutzerdefinierte Validierungsfunktionen unterstützen\n-----\nError: expect(received).toBe(expected) // Object.is equality\n\nExpected: false\nReceived: true",
+	"source": "Jest",
+	"startLineNumber": 293,
+	"startColumn": 1,
+	"endLineNumber": 293,
+	"endColumn": 9007199254740992
+}]
