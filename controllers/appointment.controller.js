@@ -184,6 +184,7 @@ exports.getAppointmentById = async (req, res, next) => {
         dateFormatted: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy'),
         timeFormatted: formatDateSafely(appointment.termin_datum, 'HH:mm'),
         dauer: appointment.dauer || 60,
+        statusInfo: getStatusInfo(appointment.status),
         ort: appointment.ort || 'Nicht angegeben',
         beschreibung: appointment.beschreibung || 'Keine Beschreibung vorhanden',
         status: appointment.status,
@@ -198,7 +199,7 @@ exports.getAppointmentById = async (req, res, next) => {
       }))
     };
     
-    return result;
+    res.json(result);
   } catch (error) {
     console.error('Error getting appointment by ID:', error);
     error.success = false;

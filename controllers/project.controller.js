@@ -214,7 +214,7 @@ exports.getProjectById = async (req, res, next) => {
       }))
     };
     
-    return result;
+    res.json(result);
   } catch (error) {
     console.error('Error getting project by ID:', error);
     error.success = false;

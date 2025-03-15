@@ -69,16 +69,18 @@ describe('Customer Controller', () => {
 
       // Mock database responses
       pool.query.mockImplementation((query, params) => {
-        if (query.includes('COUNT(*)') && !query.includes('stats')) {
+         if (query.includes('COUNT(*)') && !query.includes('stats') && params && params.length > 0) {
+          return Promise.resolve({ rows: [{ total: '50' }] });
+        } else if (query.includes('COUNT(*)') && !query.includes('stats')) {
           return Promise.resolve({ rows: [{ total: '25' }] });
         } else if (query.includes('COUNT(*) AS total') && query.includes('stats')) {
-          return Promise.resolve({ 
-            rows: [{ 
-              total: '50', 
-              privat: '30', 
-              geschaeft: '20', 
-              aktiv: '40' 
-            }] 
+          return Promise.resolve({
+            rows: [{
+              total: '50',
+              privat: '30',
+              geschaeft: '20',
+              aktiv: '40'
+            }]
           });
         } else if (query.includes('DATE_TRUNC')) {
           return Promise.resolve({
@@ -131,11 +133,14 @@ describe('Customer Controller', () => {
       expect(result).toHaveProperty('stats');
       expect(result).toHaveProperty('growthData');
       expect(result.customers).toHaveLength(2);
-      expect(result.pagination.total).toBe(3); // Math.ceil(25/10)
+      expect(result.pagination.total).toBe(5); // Math.ceil(50/10)
       expect(result.pagination.current).toBe(1);
       expect(result.filters.status).toBe('aktiv');
       expect(result.filters.type).toBe('geschaeft');
       expect(result.stats.total).toBe('50');
+      expect(result.stats.privat).toBe('30');
+      expect(result.stats.geschaeft).toBe('20');
+      expect(result.stats.aktiv).toBe('40');
       expect(result.growthData).toHaveLength(2);
     });
 

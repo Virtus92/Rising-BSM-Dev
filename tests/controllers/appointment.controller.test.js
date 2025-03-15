@@ -164,17 +164,18 @@ describe('Appointment Controller', () => {
       });
 
       // Execute the controller method
-      const result = await appointmentController.getAppointmentById(mockReq, mockRes, mockNext);
+      await appointmentController.getAppointmentById(mockReq, mockRes, mockNext);
 
       // Assertions
-      expect(result).toHaveProperty('appointment');
-      expect(result).toHaveProperty('notes');
-      expect(result.appointment.id).toBe(1);
-      expect(result.appointment.titel).toBe('Client Meeting');
-      expect(result.appointment.kunde_name).toBe('ACME Inc.');
-      expect(result.appointment.statusLabel).toBe('Geplant');
-      expect(result.notes).toHaveLength(1);
-      expect(result.notes[0].text).toBe('Appointment note');
+      expect(mockRes.json).toHaveBeenCalled();
+      expect(mockRes.json.mock.calls[0][0]).toHaveProperty('appointment');
+      expect(mockRes.json.mock.calls[0][0]).toHaveProperty('notes');
+      expect(mockRes.json.mock.calls[0][0].appointment.id).toBe(1);
+      expect(mockRes.json.mock.calls[0][0].appointment.titel).toBe('Client Meeting');
+      expect(mockRes.json.mock.calls[0][0].appointment.kunde_name).toBe('ACME Inc.');
+      expect(mockRes.json.mock.calls[0][0].appointment.statusLabel).toBe('Geplant');
+      expect(mockRes.json.mock.calls[0][0].notes).toHaveLength(1);
+      expect(mockRes.json.mock.calls[0][0].notes[0].text).toBe('Appointment note');
     });
 
     it('should handle appointment not found', async () => {

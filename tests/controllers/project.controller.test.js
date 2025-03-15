@@ -179,8 +179,9 @@ describe('Project Controller', () => {
       const result = await projectController.getProjectById(mockReq, mockRes, mockNext);
 
       // Assertions
-      expect(result).toHaveProperty('project');
-      expect(result).toHaveProperty('appointments');
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(result).toBeUndefined();
+      expect(mockRes.json).toHaveBeenCalled();
       expect(result).toHaveProperty('notes');
       expect(result.project.id).toBe(1);
       expect(result.project.titel).toBe('Office Renovation');

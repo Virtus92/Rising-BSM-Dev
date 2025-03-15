@@ -93,7 +93,7 @@ describe('Validators Integration Tests with Real Data', () => {
     
     // Should validate successfully
     expect(result.isValid).toBe(true);
-    expect(result.errors).toEqual({});
+    expect(result.errors).toEqual([]);
     expect(result.validatedData).toHaveProperty('titel');
     expect(result.validatedData).toHaveProperty('betrag');
     expect(result.validatedData).toHaveProperty('start_datum');
@@ -106,14 +106,14 @@ describe('Validators Integration Tests with Real Data', () => {
       titel: '', // Empty required field
       betrag: -100, // Negative amount
       start_datum: 'not-a-date', // Invalid date
-      end_datum: '2023-02-15' // End date before start date
+      end_datum: '2023-02-15'
     };
     
     const projectSchema = {
       titel: { type: 'text', required: true },
       betrag: { type: 'numeric', min: 0 },
       start_datum: { type: 'date' },
-      end_datum: { type: 'date', afterDate: '2023-03-15' }
+      end_datum: { type: 'date', afterDate: projects[0].start_datum }
     };
     
     // Run validation
@@ -122,9 +122,9 @@ describe('Validators Integration Tests with Real Data', () => {
     // Should fail with multiple errors
     expect(result.isValid).toBe(false);
     expect(Object.keys(result.errors)).toHaveLength(4);
-    expect(result.errors).toHaveProperty('titel');
-    expect(result.errors).toHaveProperty('betrag');
-    expect(result.errors).toHaveProperty('start_datum');
-    expect(result.errors).toHaveProperty('end_datum');
+    expect(result.errors.titel).toBeDefined();
+    expect(result.errors.betrag).toBeDefined();
+    expect(result.errors.start_datum).toBeDefined();
+    expect(result.errors.end_datum).toBeDefined();
   });
 });

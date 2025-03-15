@@ -336,12 +336,13 @@ describe('Profile Controller', () => {
       const result = await profileController.updateNotificationSettings(mockReq, mockRes, mockNext);
 
       // Assertions
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.objectContaining({
+      expect(pool.query).toHaveBeenCalledTimes(2);
+      expect(pool.query).toHaveBeenCalledWith(expect.objectContaining({
+          text: expect.stringContaining('SELECT benutzer_id FROM benutzer_einstellungen')
+        }),expect.any(Array));
+      expect(pool.query).toHaveBeenCalledWith(expect.objectContaining({
           text: expect.stringContaining('UPDATE benutzer_einstellungen')
-        }),
-        expect.any(Array)
-      );
+        }),expect.any(Array));
       expect(result).toHaveProperty('success', true);
     });
   });

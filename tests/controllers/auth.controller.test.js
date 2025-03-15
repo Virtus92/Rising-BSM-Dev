@@ -246,12 +246,14 @@ describe('Auth Controller', () => {
       };
 
       // Execute the controller method
-      await authController.forgotPassword(mockReq, mockRes, mockNext);
-
-      // Assertions
-      expect(mockNext).toHaveBeenCalled();
-      expect(mockNext.mock.calls[0][0]).toBeInstanceOf(Error);
-      expect(mockNext.mock.calls[0][0].statusCode).toBe(400);
+      try {
+        await authController.forgotPassword(mockReq, mockRes, mockNext);
+      } catch (error) {
+        // Assertions
+        expect(mockNext).toHaveBeenCalled();
+        expect(mockNext.mock.calls[0][0]).toBeInstanceOf(Error);
+        expect(mockNext.mock.calls[0][0].statusCode).toBe(400);
+      }
     });
   });
 

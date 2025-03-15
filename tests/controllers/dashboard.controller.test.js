@@ -110,6 +110,14 @@ describe('Dashboard Controller', () => {
             service: 'moving', 
             status: 'in_bearbeitung', 
             created_at: '2023-06-02T09:00:00Z' 
+          },
+          { 
+            id: 3, 
+            name: 'Alice Johnson', 
+            email: 'alice@example.com', 
+            service: 'cleaning', 
+            status: 'offen', 
+            created_at: '2023-06-03T11:00:00Z' 
           }
         ]})
       );
@@ -135,19 +143,25 @@ describe('Dashboard Controller', () => {
       );
 
       // Execute controller method
-      const result = await dashboardController.getDashboardData(mockReq);
+      const result = await dashboardController.getDashboardData(mockReq, mockRes);
 
-      // Assertions
-      expect(result).toHaveProperty('stats');
-      expect(result).toHaveProperty('charts');
-      expect(result).toHaveProperty('notifications');
-      expect(result).toHaveProperty('recentRequests');
-      expect(result).toHaveProperty('upcomingAppointments');
+      expect(result.upcomingAppointments).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.any(Number),
+            titel: expect.any(String),
+            termin_datum: expect.any(String),
+            status: expect.any(String),
+            kunde_name: expect.any(String)
+          })
+        ])
+      );
+      expect(result.charts).toHaveProperty('services');
+      expect(result.recentRequests).toHaveLength(3);
+      expect(result.upcomingAppointments).toHaveLength(2);
+      expect(result.upcomingAppointments).toEqual(expect.any(Array));
       expect(result).toHaveProperty('systemStatus');
       expect(result.charts).toHaveProperty('revenue');
-      expect(result.charts).toHaveProperty('services');
-      expect(result.recentRequests).toHaveLength(2);
-      expect(result.upcomingAppointments).toHaveLength(2);
     });
   });
 

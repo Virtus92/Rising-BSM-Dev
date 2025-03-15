@@ -101,6 +101,13 @@ exports.getAllCustomers = async (req, res, next) => {
       FROM kunden
     `);
 
+    // Get total count of customers
+    const totalCountResult = await pool.query(`
+      SELECT COUNT(*) AS total
+      FROM kunden
+      WHERE status != 'geloescht'
+    `);
+    
     // Get growth data for the chart
     const growthQuery = await pool.query(`
       SELECT
@@ -111,10 +118,10 @@ exports.getAllCustomers = async (req, res, next) => {
       GROUP BY DATE_TRUNC('month', created_at)
       ORDER BY month
     `);
-
-    const total = parseInt(countResult.rows[0].total);
-    const totalPages = Math.ceil(total / limit);
-
+    
+    const total = parseInt(totalCountResult.rows[0].total);
+    const totalPages = Math.ceil(total / parseInt(limit));
+    
     // Return data object for rendering or JSON response
     const data = {
       customers,

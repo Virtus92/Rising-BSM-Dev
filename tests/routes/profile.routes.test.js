@@ -20,6 +20,7 @@ jest.mock('multer', () => {
             path: path.join('uploads', 'profile', 'test-profile-pic.jpg'),
             mimetype: 'image/jpeg'
           };
+          req.body = { profile_picture_label: 'My profile picture' };
         }
         return next();
       };
