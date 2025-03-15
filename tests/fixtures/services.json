@@ -1,0 +1,46 @@
+[
+  {
+    "id": 1,
+    "name": "Office Cleaning",
+    "beschreibung": "Professional cleaning service for office spaces",
+    "preis_basis": 45.00,
+    "einheit": "hour",
+    "mwst_satz": 19.00,
+    "aktiv": true,
+    "created_at": "2022-06-15T08:30:00Z",
+    "updated_at": "2023-01-10T14:45:00Z"
+  },
+  {
+    "id": 2,
+    "name": "Security Services",
+    "beschreibung": "Security system installation and monitoring",
+    "preis_basis": 75.00,
+    "einheit": "hour",
+    "mwst_satz": 19.00,
+    "aktiv": true,
+    "created_at": "2022-08-20T11:00:00Z",
+    "updated_at": "2023-02-05T09:30:00Z"
+  },
+  {
+    "id": 3,
+    "name": "Renovation",
+    "beschreibung": "Complete renovation services for offices and commercial spaces",
+    "preis_basis": 65.00,
+    "einheit": "hour",
+    "mwst_satz": 19.00,
+    "aktiv": true,
+    "created_at": "2022-09-12T10:15:00Z",
+    "updated_at": "2023-04-20T16:30:00Z"
+  },
+  {
+    "id": 4,
+    "name": "IT Support",
+    "beschreibung": "Technical support and IT infrastructure management",
+    "preis_basis": 60.00,
+    "einheit": "hour",
+    "mwst_satz": 19.00,
+    "aktiv": false,
+    "created_at": "2022-11-05T14:20:00Z",
+    "updated_at": "2023-01-15T11:10:00Z"
+  }
+]

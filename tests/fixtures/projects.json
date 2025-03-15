@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "titel": "Office Renovation",
+    "kunde_id": 1,
+    "dienstleistung_id": 3,
+    "start_datum": "2023-03-15T09:00:00Z",
+    "end_datum": "2023-05-30T18:00:00Z",
+    "betrag": 12500.75,
+    "beschreibung": "Complete office renovation including flooring, walls, and lighting",
+    "status": "abgeschlossen",
+    "created_at": "2023-02-10T14:30:00Z"
+  },
+  {
+    "id": 2,
+    "titel": "Monthly Cleaning Service",
+    "kunde_id": 1,
+    "dienstleistung_id": 1,
+    "start_datum": "2023-04-01T08:00:00Z",
+    "end_datum": null,
+    "betrag": 350.00,
+    "beschreibung": "Monthly office cleaning service, first Monday of each month",
+    "status": "in_bearbeitung",
+    "created_at": "2023-03-20T11:15:00Z"
+  },
+  {
+    "id": 3,
+    "titel": "Home Security Installation",
+    "kunde_id": 2,
+    "dienstleistung_id": 2,
+    "start_datum": "2023-06-10T10:00:00Z",
+    "end_datum": "2023-06-11T16:00:00Z",
+    "betrag": 1850.00,
+    "beschreibung": "Installation of smart home security system with 4 cameras",
+    "status": "neu",
+    "created_at": "2023-05-25T09:45:00Z"
+  }
+]

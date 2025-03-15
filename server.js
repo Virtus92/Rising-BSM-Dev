@@ -11,7 +11,6 @@ const pgSession = connectPgSimple(session);
 import flash from 'connect-flash';
 import csrf from '@dr.pogodin/csurf';
 
-let server;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -20,6 +19,7 @@ import { pool } from './services/db.service';
 
 // Middleware imports
 import * as errorMiddleware from './middleware/error.middleware';
+import { getNewRequestsCountMiddleware } from './middleware/dashboard.middleware';
 
 // Routes imports
 import indexRoutes from './routes/index';
@@ -131,6 +131,8 @@ const protectedRoutes = [
   '/dashboard/settings'
 ];
 
+applyCsrfProtection(protectedRoutes, csrfProtection);
+
 // Make user information available to views
 app.use((req, res, next) => {
   if (!res.locals.user) {
@@ -140,7 +142,6 @@ app.use((req, res, next) => {
 });
 
 // New requests count middleware for dashboard
-const { getNewRequestsCountMiddleware } = require('./middleware/dashboard.middleware');
 app.use('/dashboard', getNewRequestsCountMiddleware);
 
 // Apply routes
@@ -166,8 +167,7 @@ app.use(errorMiddleware.notFoundHandler);
 app.use(errorMiddleware.csrfErrorHandler);
 app.use(errorMiddleware.errorHandler);
 
-// Start server
-server = app.listen(PORT, () => {
+let server = app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
 
@@ -196,5 +196,3 @@ process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
   shutdown();
 });
-
-applyCsrfProtection(protectedRoutes, csrfProtection);

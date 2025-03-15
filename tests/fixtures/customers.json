@@ -1,0 +1,40 @@
+[
+  {
+    "id": 1,
+    "name": "ACME Corporation",
+    "email": "contact@acme.com",
+    "telefon": "123-456-7890",
+    "firma": "ACME Corp Ltd.",
+    "adresse": "Main Street 123",
+    "plz": "10115",
+    "ort": "Berlin",
+    "status": "aktiv",
+    "kundentyp": "geschaeft",
+    "created_at": "2023-01-15T10:30:00Z"
+  },
+  {
+    "id": 2,
+    "name": "John Smith",
+    "email": "john.smith@example.com",
+    "telefon": "987-654-3210",
+    "adresse": "Park Avenue 45",
+    "plz": "10117",
+    "ort": "Berlin",
+    "status": "aktiv",
+    "kundentyp": "privat",
+    "created_at": "2023-02-20T14:15:00Z"
+  },
+  {
+    "id": 3,
+    "name": "Tech Solutions GmbH",
+    "email": "info@techsolutions.de",
+    "telefon": "030-12345678",
+    "firma": "Tech Solutions GmbH",
+    "adresse": "Technologiepark 7",
+    "plz": "80333",
+    "ort": "München",
+    "status": "inaktiv",
+    "kundentyp": "geschaeft",
+    "created_at": "2022-11-05T09:45:00Z"
+  }
+]

@@ -1,30 +1,34 @@
 {
-    "name": "rising-bsm-modern",
+    "name": "rising-bsm",
     "version": "1.0.0",
-    "description": "Moderne Website für Rising BSM mit Node.js, Express und Tailwind CSS",
-    "main": "server.js",
+    "description": "Business Service Management System",
+    "main": "app.js",
     "scripts": {
-        "start": "node server.js",
+        "start": "node app.js",
+        "dev": "nodemon app.js",
+        "test": "jest",
+        "test:unit": "jest 'tests/utils|tests/services|tests/controllers' --testPathIgnorePatterns=integration",
+        "test:integration": "TEST_DB=true jest 'tests/integration'",
+        "test:coverage": "jest --coverage",
+        "test:watch": "jest --watch",
         "build-js": "uglifyjs public/scripts/scripts.js -o public/scripts/scripts.min.js"
     },
     "keywords": [
-        "Node.js",
-        "Express",
-        "Tailwind CSS",
-        "Responsive",
-        "Modern",
-        "Web Development"
+        "business",
+        "service",
+        "management",
+        "crm",
+        "node",
+        "express"
     ],
     "dependencies": {
         "@dr.pogodin/csurf": "^1.14.1",
         "axios": "^1.8.2",
         "bcrypt": "^5.1.1",
-        "bcryptjs": "^3.0.2",
+        "bcryptjs": "^2.4.3",
         "connect-flash": "^0.1.1",
-        "connect-pg-simple": "^10.0.0",
-        "cookie-parser": "^1.4.7",
+        "csurf": "^1.10.0",
         "date-fns": "^4.1.0",
-        "dotenv": "^16.4.7",
         "ejs": "^3.1.10",
         "exceljs": "^4.4.0",
         "express": "^4.18.2",
@@ -38,6 +42,9 @@
         "validator": "^13.12.0"
     },
     "devDependencies": {
+        "jest": "^29.7.0",
+        "jest-mock-extended": "^4.0.0-beta1",
+        "supertest": "^6.3.4",
         "uglify-js": "^3.19.3"
     }
 }
