@@ -198,4 +198,103 @@ describe('Export Service', () => {
       expect(result.data).toContain('2,"N/A"');
     });
   });
+
+  describe('Edge Cases für Export', () => {
+    test('sollte leere Datensätze korrekt verarbeiten', async () => {
+      // Leere Daten exportieren
+      const result = await generateExport([], 'csv', mockOptions);
+      
+      // Überprüfungen
+      expect(result).toHaveProperty('data');
+      expect(result.contentType).toBe('text/csv');
+      expect(result.data).toContain('ID,Name,Value');
+      // Sollte nur die Kopfzeile enthalten, keine Datenzeilen
+      expect(result.data.split('\n').length).toBe(2); // Kopfzeile + leere Zeile
+    });
+    
+    test('sollte mit fehlenden Spalten in Datensätzen umgehen können', async () => {
+      // Datensätze mit fehlenden Feldern
+      const incompleteData = [
+        { id: 1, name: 'Test 1' }, // value fehlt
+        { id: 2, value: 200 },     // name fehlt
+        { name: 'Test 3', value: 300 } // id fehlt
+      ];
+      
+      // Export
+      const result = await generateExport(incompleteData, 'csv', mockOptions);
+      
+      // Überprüfungen
+      expect(result).toHaveProperty('data');
+      expect(result.data).toContain('ID,Name,Value');
+      expect(result.data).toContain('1,"Test 1",');
+      expect(result.data).toContain('2,,200€');
+      expect(result.data).toContain(',Test 3,300€');
+    });
+    
+    test('sollte mit sehr großen Datensätzen effizient umgehen', async () => {
+      // Großen Datensatz generieren
+      const largeData = Array(1000).fill().map((_, i) => ({
+        id: i + 1,
+        name: `Test ${i+1}`,
+        value: i * 100
+      }));
+      
+      // Excel-Export mocken, um große Datenmengen zu simulieren
+      const workbook = Excel.Workbook.mock.results[0].value;
+      const worksheet = workbook.addWorksheet.mock.results[0].value;
+      
+      // Export
+      const startTime = Date.now();
+      const result = await generateExport(largeData, 'excel', mockOptions);
+      const executionTime = Date.now() - startTime;
+      
+      // Überprüfungen
+      expect(result).toHaveProperty('data');
+      expect(result.contentType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      expect(workbook.xlsx.writeBuffer).toHaveBeenCalled();
+      
+      // Sollte in angemessener Zeit verarbeitet werden
+      expect(executionTime).toBeLessThan(500); // unter 500ms
+      console.log(`Large dataset export execution time: ${executionTime}ms`);
+    });
+    
+    test('sollte benutzerdefinierte Formatierungsfunktionen korrekt anwenden', async () => {
+      // Daten mit verschiedenen Formaten
+      const customFormattedData = [
+        { id: 1, value: null, date: '2023-01-01' },
+        { id: 2, value: 0, date: '2023-01-02' },
+        { id: 3, value: -100, date: null }
+      ];
+      
+      // Spalten mit benutzerdefinierten Formatierungsfunktionen
+      const customColumns = [
+        { key: 'id', header: 'ID' },
+        { 
+          key: 'value', 
+          header: 'Value',
+          format: (val) => {
+            if (val === null || val === undefined) return 'N/A';
+            if (val === 0) return 'Zero';
+            return val < 0 ? `(${Math.abs(val)}€)` : `${val}€`;
+          }
+        },
+        {
+          key: 'date',
+          header: 'Date',
+          format: (val) => val ? new Date(val).toLocaleDateString('de-DE') : 'Undatiert'
+        }
+      ];
+      
+      // Export mit benutzerdefinierten Formaten
+      const result = await generateExport(customFormattedData, 'csv', {
+        ...mockOptions,
+        columns: customColumns
+      });
+      
+      // Überprüfungen
+      expect(result.data).toContain('1,"N/A","01.01.2023"');
+      expect(result.data).toContain('2,"Zero","02.01.2023"');
+      expect(result.data).toContain('3,"(100€)","Undatiert"');
+    });
+  });
 });

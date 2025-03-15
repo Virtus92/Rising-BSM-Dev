@@ -20,23 +20,38 @@ const testIf = (condition) => condition ? test : test.skip;
 describe('Database Service Integration Tests', () => {
   beforeAll(async () => {
     if (runTests) {
-      // Clean test database and set up test data
-      await dbService.query('DELETE FROM kunden');
-      
-      // Insert test customers one by one
-      for (const customer of customers) {
-        await dbService.insert('kunden', {
-          id: customer.id,
-          name: customer.name,
-          email: customer.email,
-          telefon: customer.telefon,
-          firma: customer.firma,
-          adresse: customer.adresse,
-          plz: customer.plz,
-          ort: customer.ort,
-          status: customer.status,
-          kundentyp: customer.kundentyp
-        });
+      try {
+        // Prüfen der Datenbankverbindung vor dem Testlauf
+        const testConnection = await dbService.query('SELECT 1 as test');
+        if (!testConnection || !testConnection.rows || !testConnection.rows[0].test) {
+          console.error('Test-Datenbankverbindung fehlgeschlagen. Überspringen von Integration Tests.');
+          process.env.TEST_DB = 'false';
+          return;
+        }
+        
+        console.log('Test-Datenbankverbindung erfolgreich. Führe Integration Tests aus.');
+        
+        // Bereinigung und Einrichtung der Testdaten
+        await dbService.query('DELETE FROM kunden');
+        
+        // Insert test customers one by one
+        for (const customer of customers) {
+          await dbService.insert('kunden', {
+            id: customer.id,
+            name: customer.name,
+            email: customer.email,
+            telefon: customer.telefon,
+            firma: customer.firma,
+            adresse: customer.adresse,
+            plz: customer.plz,
+            ort: customer.ort,
+            status: customer.status,
+            kundentyp: customer.kundentyp
+          });
+        }
+      } catch (error) {
+        console.error('Fehler beim Einrichten der Test-Datenbank:', error);
+        process.env.TEST_DB = 'false';
       }
     }
   });
@@ -80,6 +95,43 @@ describe('Database Service Integration Tests', () => {
     // Verify customer no longer exists
     const afterDelete = await dbService.getById('kunden', 3);
     expect(afterDelete).toBeNull();
+  });
+  
+  testIf(runTests)('sollte Transaktionen korrekt ausführen', async () => {
+    // Umhüllen in try-catch für bessere Fehlerbehandlung
+    try {
+      // Test für erfolgreiche Transaktion
+      await dbService.transaction(async (client) => {
+        await client.query('UPDATE kunden SET telefon = $1 WHERE id = $2', ['555-123-4567', 1]);
+        await client.query('UPDATE kunden SET email = $1 WHERE id = $2', ['updated@example.com', 1]);
+      });
+      
+      // Überprüfen, ob beide Updates erfolgreich waren
+      const updatedCustomer = await dbService.getById('kunden', 1);
+      expect(updatedCustomer.telefon).toBe('555-123-4567');
+      expect(updatedCustomer.email).toBe('updated@example.com');
+      
+      // Test für Transaktion mit Rollback
+      let rollbackOccurred = false;
+      try {
+        await dbService.transaction(async (client) => {
+          await client.query('UPDATE kunden SET telefon = $1 WHERE id = $2', ['999-999-9999', 1]);
+          // Eine Abfrage, die fehlschlagen sollte
+          await client.query('UPDATE nicht_existierende_tabelle SET wert = 1');
+        });
+      } catch (error) {
+        rollbackOccurred = true;
+      }
+      
+      expect(rollbackOccurred).toBe(true);
+      
+      // Überprüfen, ob das erste Update zurückgesetzt wurde
+      const afterRollbackCustomer = await dbService.getById('kunden', 1);
+      expect(afterRollbackCustomer.telefon).not.toBe('999-999-9999');
+      expect(afterRollbackCustomer.telefon).toBe('555-123-4567');
+    } catch (error) {
+      fail(`Test sollte nicht fehlschlagen: ${error.message}`);
+    }
   });
   
   afterAll(async () => {

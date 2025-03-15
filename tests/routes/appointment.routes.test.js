@@ -441,4 +441,62 @@ describe('Appointment Routes', () => {
       expect(res.headers.location).toBe('/dashboard/termine/1/edit');
     });
   });
+
+  describe('Verbesserte Fehlerbehandlung', () => {
+    it('sollte spezifische HTTP-Statuscodes für verschiedene Fehlertypen zurückgeben', async () => {
+      const appointmentController = require('../../controllers/appointment.controller');
+      
+      // Validierungsfehler (400)
+      const validationError = new Error('Validation error');
+      validationError.statusCode = 400;
+      validationError.validationErrors = { titel: 'Titel ist erforderlich' };
+      appointmentController.createAppointment.mockRejectedValueOnce(validationError);
+      
+      const res1 = await request(app)
+        .post('/dashboard/termine/neu')
+        .set('Accept', 'application/json')
+        .send({});
+      
+      expect(res1.status).toBe(400);
+      expect(res1.body).toHaveProperty('errors');
+      expect(res1.body.errors).toHaveProperty('titel');
+      
+      // Nicht gefunden Fehler (404)
+      const notFoundError = new Error('Appointment not found');
+      notFoundError.statusCode = 404;
+      appointmentController.getAppointmentById.mockRejectedValueOnce(notFoundError);
+      
+      const res2 = await request(app)
+        .get('/dashboard/termine/999')
+        .set('Accept', 'application/json');
+      
+      expect(res2.status).toBe(404);
+      expect(res2.body.message).toContain('not found');
+      
+      // Zugriffsrechte Fehler (403)
+      const accessError = new Error('No permission to access this appointment');
+      accessError.statusCode = 403;
+      appointmentController.updateAppointment.mockRejectedValueOnce(accessError);
+      
+      const res3 = await request(app)
+        .post('/dashboard/termine/1/edit')
+        .set('Accept', 'application/json')
+        .send({ titel: 'Updated Title' });
+      
+      expect(res3.status).toBe(403);
+      expect(res3.body.message).toContain('No permission');
+      
+      // Serverfehler (500)
+      const serverError = new Error('Database connection error');
+      serverError.statusCode = 500;
+      appointmentController.getAllAppointments.mockRejectedValueOnce(serverError);
+      
+      const res4 = await request(app)
+        .get('/dashboard/termine')
+        .set('Accept', 'application/json');
+      
+      expect(res4.status).toBe(500);
+      expect(res4.body.success).toBe(false);
+    });
+  });
 });

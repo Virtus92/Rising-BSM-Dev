@@ -414,4 +414,84 @@ describe('Dashboard Controller', () => {
       expect(result).toHaveProperty('count', 5);
     });
   });
+
+  describe('Performance Tests', () => {
+    it('sollte Caching für wiederholte Abfragen verwenden', async () => {
+      // Zurücksetzen der Mock-Aufrufe
+      jest.clearAllMocks();
+      const dashboardController = require('../../controllers/dashboard.controller');
+      
+      // Erste Anfrage - sollte die Datenbank abfragen
+      await dashboardController.getDashboardStats();
+      expect(pool.query).toHaveBeenCalled();
+      const initialCallCount = pool.query.mock.calls.length;
+      
+      // Cache-Mock einrichten, um Treffer zu simulieren
+      cacheService.getOrExecute.mockImplementation((key, callback, ttl) => {
+        if (key === 'dashboard_stats') {
+          return Promise.resolve({
+            newRequests: { count: 5, trend: 10 },
+            activeProjects: { count: 8, trend: -5 },
+            totalCustomers: { count: 50, trend: 2 },
+            monthlyRevenue: { amount: 15000, trend: 3 }
+          });
+        }
+        return callback();
+      });
+      
+      // Zweite Anfrage - sollte aus dem Cache kommen
+      jest.clearAllMocks();
+      await dashboardController.getDashboardStats();
+      
+      // Keine neuen Datenbankaufrufe sollten erfolgt sein
+      expect(pool.query).not.toHaveBeenCalled();
+      expect(cacheService.getOrExecute).toHaveBeenCalledWith(
+        'dashboard_stats',
+        expect.any(Function),
+        300
+      );
+    });
+    
+    it('sollte große Datenmengen effizient verarbeiten', async () => {
+      // Vorbereitung von großen Testdaten
+      const largeCustomerList = Array(1000).fill().map((_, i) => ({
+        id: i + 1,
+        name: `Customer ${i}`,
+        email: `customer${i}@example.com`,
+        status: i % 2 === 0 ? 'aktiv' : 'inaktiv'
+      }));
+      
+      // Mock für Datenbankergebnisse
+      pool.query.mockImplementation((query) => {
+        if (query.includes('COUNT(*)')) {
+          return Promise.resolve({ rows: [{ total: '1000' }] });
+        } else if (query.includes('ORDER BY')) {
+          // Simuliere Paginierung
+          const limit = parseInt(query.match(/LIMIT (\d+)/)[1]);
+          const offset = parseInt(query.match(/OFFSET (\d+)/)[1]);
+          return Promise.resolve({
+            rows: largeCustomerList.slice(offset, offset + limit)
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+      
+      // Test der Leistung
+      const startTime = Date.now();
+      
+      // Verarbeiten von 10 Seiten
+      for (let page = 1; page <= 10; page++) {
+        const result = await dashboardController.globalSearch('test', { page, limit: 100 });
+        expect(result.customers).toBeDefined();
+        expect(result.customers.length).toBeLessThanOrEqual(100);
+      }
+      
+      const endTime = Date.now();
+      const executionTime = endTime - startTime;
+      
+      // Performance-Überprüfung
+      expect(executionTime).toBeLessThan(1000); // sollte unter 1 Sekunde dauern
+      console.log(`Performance test execution time: ${executionTime}ms`);
+    });
+  });
 });

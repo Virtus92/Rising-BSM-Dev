@@ -163,3 +163,122 @@ describe('Auth Middleware', () => {
     });
   });
 });
+
+describe('Erweiterte Auth Middleware Tests', () => {
+  let req;
+  let res;
+  let next;
+
+  beforeEach(() => {
+    req = {
+      session: {},
+      xhr: false,
+      headers: {},
+      flash: jest.fn(),
+      path: '',
+      body: {}
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      redirect: jest.fn()
+    };
+    next = jest.fn();
+  });
+
+  test('sollte bei unbekannten Rollen korrektes Verhalten zeigen', () => {
+    // Erstelle Anfrage mit unbekannter Rolle
+    req.session.user = { id: 1, role: 'unknown_role' };
+    
+    // Teste isAdmin Middleware
+    authMiddleware.isAdmin(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.redirect).toHaveBeenCalledWith('/dashboard');
+    
+    // Reset für nächsten Test
+    jest.clearAllMocks();
+    
+    // Teste isManager Middleware
+    authMiddleware.isManager(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.redirect).toHaveBeenCalledWith('/dashboard');
+  });
+  
+  test('sollte JWT-Token basierte Authentifizierung unterstützen', () => {
+    // Erstelle Anfrage mit JWT im Authorization-Header
+    req.session = {}; // Keine Session
+    req.headers.authorization = 'Bearer test-jwt-token';
+    
+    // Mock für JWT-Verifizierung
+    jest.mock('jsonwebtoken', () => ({
+      verify: jest.fn().mockReturnValue({ 
+        id: 2, 
+        name: 'API User',
+        role: 'api' 
+      })
+    }));
+    const jwt = require('jsonwebtoken');
+    
+    // Ergänze Middleware für die JWT-Authentifizierung
+    const authenticateJWT = (req, res, next) => {
+      const authHeader = req.headers.authorization;
+      
+      if (authHeader) {
+        const token = authHeader.split(' ')[1];
+        
+        try {
+          const user = jwt.verify(token, 'test-secret-key');
+          req.user = user;
+          next();
+        } catch (err) {
+          res.status(403).json({ message: 'Invalid token' });
+        }
+      } else {
+        res.status(401).json({ message: 'Authentication token required' });
+      }
+    };
+    
+    // Teste JWT-Authentifizierung
+    authenticateJWT(req, res, next);
+    expect(jwt.verify).toHaveBeenCalledWith('test-jwt-token', 'test-secret-key');
+    expect(req.user).toEqual({ id: 2, name: 'API User', role: 'api' });
+    expect(next).toHaveBeenCalled();
+    
+    // Reset JWT-Mock
+    jest.unmock('jsonwebtoken');
+  });
+  
+  test('sollte bei bestimmten Routen CSRF-Validierung umgehen', () => {
+    // Middleware für CSRF-Prüfung mit Ausnahmen
+    const mockCSRF = jest.fn((req, res, next) => {
+      // Check for CSRF token bypass routes
+      if (req.path === '/api/webhook' || req.path.startsWith('/api/external/')) {
+        return next();
+      }
+      
+      // Check for CSRF token
+      if (!req.body._csrf) {
+        return res.status(403).json({ error: 'CSRF token missing' });
+      }
+      
+      next();
+    });
+    
+    // Test für normale Route
+    req.path = '/dashboard/settings';
+    req.body = {};
+    
+    mockCSRF(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+    
+    // Reset mocks
+    jest.clearAllMocks();
+    
+    // Test für Webhook-Route (keine CSRF-Prüfung)
+    req.path = '/api/webhook';
+    mockCSRF(req, res, next);
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+});

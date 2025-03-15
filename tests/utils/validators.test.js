@@ -188,3 +188,110 @@ describe('validateInput', () => {
     expect(result.errors.length).toBe(3);
   });
 });
+
+describe('Erweiterter validateInput Test', () => {
+  test('sollte verschachtelte Objekte validieren können', () => {
+    validator.isEmail.mockReturnValue(true);
+    
+    const data = {
+      user: {
+        name: 'John Doe',
+        contact: {
+          email: 'john@example.com'
+        }
+      },
+      preferences: ['email', 'sms']
+    };
+    
+    const schema = {
+      'user.name': { type: 'text', required: true },
+      'user.contact.email': { type: 'email', required: true },
+      'preferences': { type: 'array', required: true }
+    };
+    
+    const result = validators.validateInput(data, schema);
+    expect(result.isValid).toBe(true);
+    expect(result.validatedData).toHaveProperty('user.name', 'John Doe');
+    expect(result.validatedData).toHaveProperty('user.contact.email', 'john@example.com_normalized');
+    expect(result.validatedData).toHaveProperty('preferences', ['email', 'sms']);
+  });
+  
+  test('sollte bedingte Validierung unterstützen', () => {
+    validator.isEmail.mockReturnValue(true);
+    
+    const data = {
+      contactMethod: 'email',
+      email: 'test@example.com',
+      phone: ''
+    };
+    
+    const schema = {
+      contactMethod: { type: 'text', required: true },
+      email: { 
+        type: 'email', 
+        required: (data) => data.contactMethod === 'email'
+      },
+      phone: { 
+        type: 'phone', 
+        required: (data) => data.contactMethod === 'phone'
+      }
+    };
+    
+    const result = validators.validateInput(data, schema);
+    expect(result.isValid).toBe(true);
+    
+    // Test mit anderer Kontaktmethode
+    const data2 = {
+      contactMethod: 'phone',
+      email: '',
+      phone: ''
+    };
+    
+    const result2 = validators.validateInput(data2, schema);
+    expect(result2.isValid).toBe(false);
+    expect(result2.errors).toHaveProperty('phone');
+  });
+  
+  test('sollte benutzerdefinierte Validierungsfunktionen unterstützen', () => {
+    const data = {
+      password: 'Password123',
+      confirmPassword: 'Password123'
+    };
+    
+    const schema = {
+      password: { 
+        type: 'text', 
+        required: true,
+        validate: (value) => {
+          const errors = [];
+          if (!/[A-Z]/.test(value)) errors.push('Muss einen Großbuchstaben enthalten');
+          if (!/[0-9]/.test(value)) errors.push('Muss eine Ziffer enthalten');
+          if (!/[a-z]/.test(value)) errors.push('Muss einen Kleinbuchstaben enthalten');
+          return errors;
+        }
+      },
+      confirmPassword: {
+        type: 'text',
+        required: true,
+        validate: (value, data) => {
+          if (value !== data.password) return ['Passwörter stimmen nicht überein'];
+          return [];
+        }
+      }
+    };
+    
+    const result = validators.validateInput(data, schema);
+    expect(result.isValid).toBe(true);
+    
+    // Test mit unzureichendem Passwort
+    const data2 = {
+      password: 'password',
+      confirmPassword: 'password'
+    };
+    
+    const result2 = validators.validateInput(data2, schema);
+    expect(result2.isValid).toBe(false);
+    expect(result2.errors).toHaveProperty('password');
+    expect(result2.errors.password).toContain('Muss einen Großbuchstaben enthalten');
+  });
+});

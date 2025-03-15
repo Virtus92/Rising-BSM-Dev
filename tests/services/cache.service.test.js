@@ -234,3 +234,81 @@ describe('Cache Service', () => {
     });
   });
 });
+
+describe('cache.service Erweiterte Tests', () => {
+  // Test für Race Conditions
+  test('sollte Race Conditions bei gleichzeitigen Operationen vermeiden', async () => {
+    // Vorbereitungen
+    cacheService.clear();
+    
+    // Simuliere parallele Abfragen für den gleichen Cache-Key
+    const mockFn = jest.fn()
+      .mockImplementationOnce(() => new Promise(resolve => {
+        // Verzögere die erste Auflösung, um Race Conditions zu simulieren
+        setTimeout(() => resolve('result 1'), 50);
+      }))
+      .mockImplementationOnce(() => Promise.resolve('result 2'));
+    
+    // Parallele Ausführung
+    const promise1 = cacheService.getOrExecute('race-key', mockFn);
+    const promise2 = cacheService.getOrExecute('race-key', mockFn);
+    
+    // Beide Promises sollten das gleiche Ergebnis liefern
+    const [result1, result2] = await Promise.all([promise1, promise2]);
+    
+    // Die Funktion sollte nur einmal aufgerufen werden
+    expect(mockFn).toHaveBeenCalledTimes(1);
+    expect(result1).toBe(result2);
+  });
+  
+  // Test für Speichermanagement mit vielen Einträgen
+  test('sollte Speicher effizient verwalten bei vielen Einträgen', () => {
+    // Vorbereitungen
+    cacheService.clear();
+    const originalMaxItems = cacheService.maxItems;
+    cacheService.maxItems = 5;
+    
+    // Fülle den Cache mit mehreren Einträgen
+    for (let i = 0; i < 10; i++) {
+      cacheService.set(`key-${i}`, `value-${i}`);
+    }
+    
+    // Überprüfe Speichernutzung
+    const stats = cacheService.getStats();
+    expect(stats.totalItems).toBeLessThanOrEqual(5);
+    
+    // Überprüfe, ob die neuesten Einträge beibehalten wurden
+    for (let i = 5; i < 10; i++) {
+      expect(cacheService.get(`key-${i}`)).toBe(`value-${i}`);
+    }
+    
+    // Stelle ursprüngliche Konfiguration wieder her
+    cacheService.maxItems = originalMaxItems;
+  });
+  
+  // Test für automatische Bereinigung
+  test('sollte automatische Bereinigung bei Ablauf der TTL durchführen', async () => {
+    // Vorbereitungen
+    cacheService.clear();
+    
+    // Setze Einträge mit unterschiedlichen TTLs
+    cacheService.set('short-ttl', 'value1', 1); // 1 Sekunde TTL
+    cacheService.set('medium-ttl', 'value2', 2); // 2 Sekunden TTL
+    cacheService.set('long-ttl', 'value3', 5); // 5 Sekunden TTL
+    
+    // Überprüfe anfängliche Anzahl von Einträgen
+    expect(cacheService.getStats().totalItems).toBe(3);
+    
+    // Warte, bis der erste Eintrag abläuft
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Löse Bereinigung aus
+    cacheService.cleanup();
+    
+    // Überprüfe, dass der erste Eintrag bereinigt wurde
+    expect(cacheService.get('short-ttl')).toBeNull();
+    expect(cacheService.get('medium-ttl')).toBe('value2');
+    expect(cacheService.get('long-ttl')).toBe('value3');
+    expect(cacheService.getStats().totalItems).toBe(2);
+  });
+});
