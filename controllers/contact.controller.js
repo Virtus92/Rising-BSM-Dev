@@ -16,6 +16,7 @@ const { validateInput } = require('../utils/validators');
  * @returns {Promise<void>}
  */
 exports.submitContact = async (req, res, next) => {
+  console.log('Request Body:', req.body); // Log the request body to the console
   try {
     // Input validation schema
     const validationSchema = {
@@ -169,11 +170,14 @@ exports.getContactRequest = async (req, res, next) => {
     if (result.rows.length === 0) {
       const error = new Error('Kontaktanfrage nicht gefunden');
       error.statusCode = 404;
-      throw error;
+      error.success = false;
+      return next(error);
     }
 
     return result.rows[0];
   } catch (error) {
+    console.error('Error retrieving contact request:', error);
+    error.success = false;
     next(error);
   }
 };

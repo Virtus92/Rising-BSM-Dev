@@ -125,6 +125,8 @@ exports.getAllAppointments = async (req, res, next) => {
       }
     };
   } catch (error) {
+    console.error('Error getting all appointments:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -198,6 +200,8 @@ exports.getAppointmentById = async (req, res, next) => {
     
     return result;
   } catch (error) {
+    console.error('Error getting appointment by ID:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -223,9 +227,31 @@ exports.createAppointment = async (req, res, next) => {
     if (!titel || !termin_datum || !termin_zeit) {
       const error = new Error('Title, date and time are required fields');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
     }
-    
+
+    if (dauer && isNaN(dauer)) {
+      const error = new Error('Dauer must be a number');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
+    }
+
+    if (!termin_datum || !/^\d{4}-\d{2}-\d{2}$/.test(termin_datum)) {
+      const error = new Error('Invalid date format. Use YYYY-MM-DD');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
+    }
+
+    if (!termin_zeit || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(termin_zeit)) {
+      const error = new Error('Invalid time format. Use HH:mm');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
+    }
+
     // Combine date and time
     const appointmentDate = new Date(`${termin_datum}T${termin_zeit}`);
     
@@ -272,6 +298,8 @@ exports.createAppointment = async (req, res, next) => {
       message: 'Appointment created successfully'
     };
   } catch (error) {
+    console.error('Error creating appointment:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -298,7 +326,29 @@ exports.updateAppointment = async (req, res, next) => {
     if (!titel || !termin_datum || !termin_zeit) {
       const error = new Error('Title, date and time are required fields');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
+    }
+
+    if (dauer && isNaN(dauer)) {
+      const error = new Error('Dauer must be a number');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
+    }
+
+    if (!termin_datum || !/^\d{4}-\d{2}-\d{2}$/.test(termin_datum)) {
+      const error = new Error('Invalid date format. Use YYYY-MM-DD');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
+    }
+
+    if (!termin_zeit || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(termin_zeit)) {
+      const error = new Error('Invalid time format. Use HH:mm');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
     }
 
     // Check if appointment exists
@@ -366,6 +416,8 @@ exports.updateAppointment = async (req, res, next) => {
       message: 'Appointment updated successfully'
     };
   } catch (error) {
+    console.error('Error updating appointment:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -381,14 +433,16 @@ exports.updateAppointmentStatus = async (req, res, next) => {
     if (!id || !status) {
       const error = new Error('Appointment ID and status are required');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
     }
     
     // Check valid status values
     if (!['geplant', 'bestaetigt', 'abgeschlossen', 'storniert'].includes(status)) {
       const error = new Error('Invalid status value');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
     }
     
     // Update status in database
@@ -436,6 +490,8 @@ exports.updateAppointmentStatus = async (req, res, next) => {
       message: 'Appointment status updated successfully'
     };
   } catch (error) {
+    console.error('Error updating appointment status:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -451,6 +507,7 @@ exports.addAppointmentNote = async (req, res, next) => {
     if (!note || note.trim() === '') {
       const error = new Error('Note cannot be empty');
       error.statusCode = 400;
+      error.success = false;
       throw error;
     }
     
@@ -503,6 +560,8 @@ exports.addAppointmentNote = async (req, res, next) => {
       message: 'Note added successfully'
     };
   } catch (error) {
+    console.error('Error adding appointment note:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -586,6 +645,8 @@ exports.exportAppointments = async (req, res, next) => {
       filters: { start_date, end_date, status }
     });
   } catch (error) {
+    console.error('Error exporting appointments:', error);
+    error.success = false;
     next(error);
   }
 };

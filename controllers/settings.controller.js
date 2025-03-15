@@ -40,7 +40,9 @@ exports.getUserSettings = async (req, res, next) => {
       }
     };
   } catch (error) {
-    next(error);
+    console.error('Error getting user settings:', error);
+    error.success = false;
+    return next(error);
   }
 };
 
@@ -57,6 +59,21 @@ exports.updateUserSettings = async (req, res, next) => {
       benachrichtigungen_push, 
       benachrichtigungen_intervall
     } = req.body;
+    
+    // Validation
+    if (!sprache || !['de', 'en'].includes(sprache)) {
+      const error = new Error('Invalid language setting');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
+    }
+
+    if (!benachrichtigungen_intervall || !['sofort', 'taeglich', 'woechentlich'].includes(benachrichtigungen_intervall)) {
+      const error = new Error('Invalid notification interval setting');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
+    }
     
     // Check if settings exist for this user
     const settingsQuery = await pool.query({
@@ -130,6 +147,8 @@ exports.updateUserSettings = async (req, res, next) => {
       message: 'Settings updated successfully'
     };
   } catch (error) {
+    console.error('Error updating user settings:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -170,6 +189,8 @@ exports.getSystemSettings = async (req, res, next) => {
       settings: settingsByCategory
     };
   } catch (error) {
+    console.error('Error getting system settings:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -192,6 +213,7 @@ exports.updateSystemSettings = async (req, res, next) => {
     if (!settings || typeof settings !== 'object') {
       const error = new Error('Invalid settings data');
       error.statusCode = 400;
+      error.success = false;
       throw error;
     }
     
@@ -230,6 +252,8 @@ exports.updateSystemSettings = async (req, res, next) => {
       message: 'System settings updated successfully'
     };
   } catch (error) {
+    console.error('Error updating system settings:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -289,6 +313,8 @@ exports.getBackupSettings = async (req, res, next) => {
       }))
     };
   } catch (error) {
+    console.error('Error getting backup settings:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -313,10 +339,18 @@ exports.updateBackupSettings = async (req, res, next) => {
     } = req.body;
     
     // Validation
-    if (!intervall || !zeit) {
-      const error = new Error('Backup interval and time are required');
+    if (!intervall || !['taeglich', 'woechentlich', 'monatlich'].includes(intervall)) {
+      const error = new Error('Invalid backup interval');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
+    }
+
+    if (!zeit || !/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(zeit)) {
+      const error = new Error('Invalid backup time format. Use HH:mm');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
     }
     
     // Insert new backup settings
@@ -374,6 +408,8 @@ exports.updateBackupSettings = async (req, res, next) => {
       message: 'Backup settings updated successfully'
     };
   } catch (error) {
+    console.error('Error updating backup settings:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -435,6 +471,8 @@ exports.triggerManualBackup = async (req, res, next) => {
       status: 'pending'
     };
   } catch (error) {
+    console.error('Error triggering manual backup:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };

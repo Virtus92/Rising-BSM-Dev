@@ -1,35 +1,37 @@
-require('dotenv').config();
-const express = require('express');
-const path = require('path');
-const bodyParser = require('body-parser');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const cookieParser = require('cookie-parser');
-const session = require('express-session');
-const pgSession = require('connect-pg-simple')(session);
-const flash = require('connect-flash');
-const csrf = require('@dr.pogodin/csurf');
+import dotenv from 'dotenv';
+dotenv.config();
+import express from 'express';
+import path from 'path';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
+const pgSession = connectPgSimple(session);
+import flash from 'connect-flash';
+import csrf from '@dr.pogodin/csurf';
 
+let server;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Database connection
-const pool = require('./services/db.service').pool;
+import { pool } from './services/db.service';
 
 // Middleware imports
-const errorMiddleware = require('./middleware/error.middleware');
+import * as errorMiddleware from './middleware/error.middleware';
 
 // Routes imports
-const indexRoutes = require('./routes/index');
-const authRoutes = require('./routes/auth.routes');
-const dashboardRoutes = require('./routes/dashboard.routes');
-const customerRoutes = require('./routes/customer.routes');
-const projectRoutes = require('./routes/project.routes');
-const appointmentRoutes = require('./routes/appointment.routes');
-const serviceRoutes = require('./routes/service.routes');
-const requestRoutes = require('./routes/request.routes');
-const profileRoutes = require('./routes/profile.routes');
-const settingsRoutes = require('./routes/settings.routes');
+import indexRoutes from './routes/index';
+import authRoutes from './routes/auth.routes';
+import dashboardRoutes from './routes/dashboard.routes';
+import customerRoutes from './routes/customer.routes';
+import projectRoutes from './routes/project.routes';
+import appointmentRoutes from './routes/appointment.routes';
+import serviceRoutes from './routes/service.routes';
+import requestRoutes from './routes/request.routes';
+import profileRoutes from './routes/profile.routes';
+import settingsRoutes from './routes/settings.routes';
 // const blogRoutes = require('./routes/blog.routes');
 
 // Configure view engine
@@ -37,33 +39,33 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // Security middleware
-app.use(helmet({
+const helmetConfig = {
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: [
-        "'self'", 
-        "https://cdn.jsdelivr.net", 
-        "https://cdnjs.cloudflare.com", 
-        "https://code.jquery.com", 
-        "https://cdn.datatables.net", 
-        "'unsafe-inline'", 
+        "'self'",
+        "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
+        "https://code.jquery.com",
+        "https://cdn.datatables.net",
+        "'unsafe-inline'",
         "'unsafe-hashes'"
       ],
       styleSrc: [
-        "'self'", 
-        "'unsafe-inline'", 
-        "https://cdn.jsdelivr.net", 
-        "https://cdnjs.cloudflare.com", 
+        "'self'",
+        "'unsafe-inline'",
+        "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
         "https://cdn.datatables.net"
       ]
     }
   }
-}));
+};
 
-// Parse request body
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+app.use(helmet(helmetConfig));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use(cookieParser());
 
 // Serve static files
@@ -80,7 +82,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', 
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: 'strict',
     maxAge: 24 * 60 * 60 * 1000 // 1 day
@@ -97,18 +99,43 @@ const contactLimiter = rateLimit({
   message: { success: false, error: 'Too many requests. Please try again later.' }
 });
 
-// CSRF protection
-app.use(csrf());
-
-// Make CSRF token available to views
-app.use((req, res, next) => {
-  res.locals.csrfToken = req.csrfToken();
-  next();
+// CSRF protection middleware
+const csrfProtection = csrf({
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  },
+  headerName: 'x-csrf-token' // Configure csrf to look for the token in the x-csrf-token header
 });
+
+// Function to apply CSRF protection
+const applyCsrfProtection = (routes, csrfProtection) => {
+  routes.forEach(route => {
+    app.use(route, csrfProtection, (req, res, next) => {
+      res.locals.csrfToken = req.csrfToken();
+      next();
+    });
+  });
+};
+
+// Apply CSRF protection to specific routes
+const protectedRoutes = [
+  '/dashboard',
+  '/dashboard/customers',
+  '/dashboard/projects',
+  '/dashboard/appointments',
+  '/dashboard/services',
+  '/dashboard/requests',
+  '/dashboard/profile',
+  '/dashboard/settings'
+];
 
 // Make user information available to views
 app.use((req, res, next) => {
-  res.locals.user = req.session.user || null;
+  if (!res.locals.user) {
+    res.locals.user = req.session.user || null;
+  }
   next();
 });
 
@@ -120,10 +147,10 @@ app.use('/dashboard', getNewRequestsCountMiddleware);
 app.use('/', indexRoutes);
 app.use('/', authRoutes);
 app.use('/dashboard', dashboardRoutes);
-app.use('/dashboard/kunden', customerRoutes);
-app.use('/dashboard/projekte', projectRoutes);
-app.use('/dashboard/termine', appointmentRoutes);
-app.use('/dashboard/dienste', serviceRoutes);
+app.use('/dashboard/customers', customerRoutes);
+app.use('/dashboard/projects', projectRoutes);
+app.use('/dashboard/appointments', appointmentRoutes);
+app.use('/dashboard/services', serviceRoutes);
 app.use('/dashboard/requests', requestRoutes);
 app.use('/dashboard/profile', profileRoutes);
 app.use('/dashboard/settings', settingsRoutes);
@@ -131,7 +158,8 @@ app.use('/dashboard/settings', settingsRoutes);
 //app.use('/blog', blogRoutes);
 
 // Contact form route with rate limiting
-app.post('/contact', contactLimiter, require('./controllers/contact.controller').submitContact);
+import { submitContact } from './controllers/contact.controller';
+app.post('/contact', contactLimiter, submitContact);
 
 // Error handling middleware
 app.use(errorMiddleware.notFoundHandler);
@@ -139,19 +167,34 @@ app.use(errorMiddleware.csrfErrorHandler);
 app.use(errorMiddleware.errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+server = app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
 
-// Process error handling
+// Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  shutdown();
 });
+
+function shutdown() {
+  server.close(() => {
+    console.log('Closed out remaining connections.');
+    pool.end(() => {
+      console.log('Closed database connection.');
+      process.exit(1);
+    });
+  });
+
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+}
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
-  // Give the server time to log the error before shutting down
-  setTimeout(() => {
-    process.exit(1);
-  }, 1000);
+  shutdown();
 });
+
+applyCsrfProtection(protectedRoutes, csrfProtection);

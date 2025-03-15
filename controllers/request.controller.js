@@ -139,6 +139,8 @@ exports.getAllRequests = async (req, res, next) => {
       }
     };
   } catch (error) {
+    console.error('Error getting all requests:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -196,6 +198,8 @@ exports.getRequestById = async (req, res, next) => {
     
     return result;
   } catch (error) {
+    console.error('Error getting request by ID:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -211,14 +215,16 @@ exports.updateRequestStatus = async (req, res, next) => {
     if (!id || !status) {
       const error = new Error('Request ID and status are required');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
     }
     
     // Check valid status values
     if (!['neu', 'in_bearbeitung', 'beantwortet', 'geschlossen'].includes(status)) {
       const error = new Error('Invalid status value');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
     }
     
     // Update status in database
@@ -266,6 +272,8 @@ exports.updateRequestStatus = async (req, res, next) => {
       message: 'Request status updated successfully'
     };
   } catch (error) {
+    console.error('Error updating request status:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -333,6 +341,8 @@ exports.addRequestNote = async (req, res, next) => {
       message: 'Note added successfully'
     };
   } catch (error) {
+    console.error('Error adding request note:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -416,6 +426,8 @@ exports.exportRequests = async (req, res, next) => {
       filters: { dateFrom, dateTo, status }
     });
   } catch (error) {
+    console.error('Error exporting requests:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };

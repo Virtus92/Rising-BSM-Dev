@@ -1,4 +1,4 @@
- /**
+/**
  * Customer Controller
  * Handles all customer-related business logic
  */
@@ -138,6 +138,8 @@ exports.getAllCustomers = async (req, res, next) => {
 
     return data;
   } catch (error) {
+    console.error('Error getting all customers:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -158,6 +160,7 @@ exports.getCustomerById = async (req, res, next) => {
     if (customerQuery.rows.length === 0) {
       const error = new Error(`Customer with ID ${id} not found`);
       error.statusCode = 404;
+      error.success = false;
       throw error;
     }
     
@@ -232,6 +235,8 @@ exports.getCustomerById = async (req, res, next) => {
     
     return result;
   } catch (error) {
+    console.error('Error getting customer by ID:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -259,7 +264,15 @@ exports.createCustomer = async (req, res, next) => {
     if (!name || !email) {
       const error = new Error('Name and email are required fields');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
+    }
+
+    if (kundentyp && !['privat', 'geschaeft'].includes(kundentyp)) {
+      const error = new Error('Invalid customer type');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
     }
     
     // Insert customer into database
@@ -308,6 +321,8 @@ exports.createCustomer = async (req, res, next) => {
       message: 'Customer created successfully'
     };
   } catch (error) {
+    console.error('Error creating customer:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -336,7 +351,15 @@ exports.updateCustomer = async (req, res, next) => {
     if (!name || !email) {
       const error = new Error('Name and email are required fields');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
+    }
+
+    if (kundentyp && !['privat', 'geschaeft'].includes(kundentyp)) {
+      const error = new Error('Invalid customer type');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
     }
 
     // Check if customer exists
@@ -348,6 +371,7 @@ exports.updateCustomer = async (req, res, next) => {
     if (checkResult.rows.length === 0) {
       const error = new Error(`Customer with ID ${id} not found`);
       error.statusCode = 404;
+      error.success = false;
       throw error;
     }
     
@@ -407,6 +431,8 @@ exports.updateCustomer = async (req, res, next) => {
       message: 'Customer updated successfully'
     };
   } catch (error) {
+    console.error('Error updating customer:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -422,6 +448,7 @@ exports.addCustomerNote = async (req, res, next) => {
     if (!notiz || notiz.trim() === '') {
       const error = new Error('Note cannot be empty');
       error.statusCode = 400;
+      error.success = false;
       throw error;
     }
     
@@ -434,6 +461,7 @@ exports.addCustomerNote = async (req, res, next) => {
     if (customerQuery.rows.length === 0) {
       const error = new Error(`Customer with ID ${id} not found`);
       error.statusCode = 404;
+      error.success = false;
       throw error;
     }
     
@@ -472,6 +500,8 @@ exports.addCustomerNote = async (req, res, next) => {
       message: 'Note added successfully'
     };
   } catch (error) {
+    console.error('Error adding customer note:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -487,6 +517,7 @@ exports.updateCustomerStatus = async (req, res, next) => {
     if (!id || !status) {
       const error = new Error('Customer ID and status are required');
       error.statusCode = 400;
+      error.success = false;
       throw error;
     }
     
@@ -494,6 +525,7 @@ exports.updateCustomerStatus = async (req, res, next) => {
     if (!['aktiv', 'inaktiv', 'geloescht'].includes(status)) {
       const error = new Error('Invalid status value');
       error.statusCode = 400;
+      error.success = false;
       throw error;
     }
     
@@ -525,6 +557,8 @@ exports.updateCustomerStatus = async (req, res, next) => {
       message: 'Customer status updated successfully'
     };
   } catch (error) {
+    console.error('Error updating customer status:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -540,6 +574,7 @@ exports.deleteCustomer = async (req, res, next) => {
     if (!id) {
       const error = new Error('Customer ID is required');
       error.statusCode = 400;
+      error.success = false;
       throw error;
     }
     
@@ -560,6 +595,7 @@ exports.deleteCustomer = async (req, res, next) => {
     if (relatedProjects > 0 || relatedAppointments > 0) {
       const error = new Error(`Cannot delete customer. ${relatedProjects} projects and ${relatedAppointments} appointments are still linked to this customer.`);
       error.statusCode = 400;
+      error.success = false;
       throw error;
     }
     
@@ -590,6 +626,8 @@ exports.deleteCustomer = async (req, res, next) => {
       message: 'Customer successfully deleted'
     };
   } catch (error) {
+    console.error('Error deleting customer:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -663,6 +701,8 @@ exports.exportCustomers = async (req, res, next) => {
       filters: { status, type }
     });
   } catch (error) {
+    console.error('Error exporting customers:', error);
+    error.success = false;
     next(error);
   }
 };

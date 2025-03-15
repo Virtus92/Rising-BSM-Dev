@@ -68,6 +68,8 @@ exports.login = async (req, res, next) => {
 
     return { user: sessionUser, remember: remember === 'on' };
   } catch (error) {
+    console.error('Login failed:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -133,6 +135,8 @@ exports.forgotPassword = async (req, res, next) => {
       message: 'If an account with this email exists, password reset instructions have been sent'
     };
   } catch (error) {
+    console.error('Forgot password request failed:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -176,6 +180,8 @@ exports.validateResetToken = async (req, res, next) => {
       email: result.rows[0].email
     };
   } catch (error) {
+    console.error('Token validation failed:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -253,6 +259,8 @@ exports.resetPassword = async (req, res, next) => {
       message: 'Password has been reset successfully'
     };
   } catch (error) {
+    console.error('Password reset failed:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -273,6 +281,8 @@ exports.logout = async (req, res, next) => {
 
     return { success: true };
   } catch (error) {
+    console.error('Logout failed:', error);
+    error.success = false;
     next(error);
   }
 };

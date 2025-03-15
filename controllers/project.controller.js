@@ -120,6 +120,8 @@ exports.getAllProjects = async (req, res, next) => {
       }
     };
   } catch (error) {
+    console.error('Error getting all projects:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -214,6 +216,8 @@ exports.getProjectById = async (req, res, next) => {
     
     return result;
   } catch (error) {
+    console.error('Error getting project by ID:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -238,7 +242,15 @@ exports.createProject = async (req, res, next) => {
     if (!titel || !start_datum) {
       const error = new Error('Title and start date are required fields');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
+    }
+
+    if (betrag && isNaN(betrag)) {
+      const error = new Error('Betrag must be a number');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
     }
     
     // Insert project into database
@@ -311,6 +323,8 @@ exports.createProject = async (req, res, next) => {
       message: 'Project created successfully'
     };
   } catch (error) {
+    console.error('Error creating project:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -336,7 +350,15 @@ exports.updateProject = async (req, res, next) => {
     if (!titel || !start_datum) {
       const error = new Error('Title and start date are required fields');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
+    }
+
+    if (betrag && isNaN(betrag)) {
+      const error = new Error('Betrag must be a number');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
     }
 
     // Check if project exists
@@ -401,6 +423,8 @@ exports.updateProject = async (req, res, next) => {
       message: 'Project updated successfully'
     };
   } catch (error) {
+    console.error('Error updating project:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -416,14 +440,16 @@ exports.updateProjectStatus = async (req, res, next) => {
     if (!id || !status) {
       const error = new Error('Project ID and status are required');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
     }
     
     // Check valid status values
     if (!['neu', 'in_bearbeitung', 'abgeschlossen', 'storniert'].includes(status)) {
       const error = new Error('Invalid status value');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
     }
     
     // Update status in database
@@ -471,6 +497,8 @@ exports.updateProjectStatus = async (req, res, next) => {
       message: 'Project status updated successfully'
     };
   } catch (error) {
+    console.error('Error updating project status:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -486,6 +514,7 @@ exports.addProjectNote = async (req, res, next) => {
     if (!note || note.trim() === '') {
       const error = new Error('Note cannot be empty');
       error.statusCode = 400;
+      error.success = false;
       throw error;
     }
     
@@ -538,6 +567,8 @@ exports.addProjectNote = async (req, res, next) => {
       message: 'Note added successfully'
     };
   } catch (error) {
+    console.error('Error adding project note:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -614,6 +645,8 @@ exports.exportProjects = async (req, res, next) => {
       filters: { status, kunde_id }
     });
   } catch (error) {
+    console.error('Error exporting projects:', error);
+    error.success = false;
     next(error);
   }
 };

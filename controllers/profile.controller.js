@@ -85,7 +85,9 @@ exports.getUserProfile = async (req, res, next) => {
       }))
     };
   } catch (error) {
-    next(error);
+    console.error('Error getting user profile:', error);
+    error.success = false;
+    return next(error);
   }
 };
 
@@ -163,6 +165,8 @@ exports.updateProfile = async (req, res, next) => {
       message: 'Profile updated successfully'
     };
   } catch (error) {
+    console.error('Error updating profile:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -253,6 +257,8 @@ exports.updatePassword = async (req, res, next) => {
       message: 'Password updated successfully'
     };
   } catch (error) {
+    console.error('Error updating password:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -292,6 +298,8 @@ exports.updateProfilePicture = async (req, res, next) => {
       message: 'Profile picture updated successfully'
     };
   } catch (error) {
+    console.error('Error updating profile picture:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -358,6 +366,8 @@ exports.updateNotificationSettings = async (req, res, next) => {
       message: 'Notification settings updated successfully'
     };
   } catch (error) {
+    console.error('Error updating notification settings:', error);
+    error.success = false;
     next(error);
   }
 };

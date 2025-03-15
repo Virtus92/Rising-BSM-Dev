@@ -22,7 +22,8 @@ const contactLimiter = rateLimit({
 router.get('/', (req, res) => {
   res.render('index', { 
     title: 'Rising BSM – Ihre Allround-Experten',
-    user: req.session.user || null
+    user: req.session.user || null,
+    csrfToken: req.csrfToken() // Pass CSRF token to the view
   });
 });
 

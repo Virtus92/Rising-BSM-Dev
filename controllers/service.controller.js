@@ -106,6 +106,8 @@ exports.getAllServices = async (req, res, next) => {
       }
     };
   } catch (error) {
+    console.error('Error getting all services:', error);
+    error.success = false;
     next(error);
   }
 };
@@ -139,6 +141,7 @@ exports.getServiceById = async (req, res, next) => {
     if (serviceQuery.rows.length === 0) {
       const error = new Error(`Service with ID ${id} not found`);
       error.statusCode = 404;
+      error.success = false;
       throw error;
     }
     
@@ -159,6 +162,8 @@ exports.getServiceById = async (req, res, next) => {
       }
     };
   } catch (error) {
+    console.error('Error getting service by ID:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -181,7 +186,22 @@ exports.createService = async (req, res, next) => {
     if (!name || !preis_basis || !einheit) {
       const error = new Error('Name, base price and unit are required fields');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
+    }
+
+    if (isNaN(preis_basis)) {
+      const error = new Error('Base price must be a number');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
+    }
+
+    if (mwst_satz && isNaN(mwst_satz)) {
+      const error = new Error('VAT rate must be a number');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
     }
     
     // Insert service into database
@@ -232,6 +252,8 @@ exports.createService = async (req, res, next) => {
       message: 'Service created successfully'
     };
   } catch (error) {
+    console.error('Error creating service:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -255,7 +277,22 @@ exports.updateService = async (req, res, next) => {
     if (!name || !preis_basis || !einheit) {
       const error = new Error('Name, base price and unit are required fields');
       error.statusCode = 400;
-      throw error;
+      error.success = false;
+      return next(error);
+    }
+
+    if (isNaN(preis_basis)) {
+      const error = new Error('Base price must be a number');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
+    }
+
+    if (mwst_satz && isNaN(mwst_satz)) {
+      const error = new Error('VAT rate must be a number');
+      error.statusCode = 400;
+      error.success = false;
+      return next(error);
     }
 
     // Check if service exists
@@ -267,7 +304,8 @@ exports.updateService = async (req, res, next) => {
     if (checkResult.rows.length === 0) {
       const error = new Error(`Service with ID ${id} not found`);
       error.statusCode = 404;
-      throw error;
+      error.success = false;
+      return next(error);
     }
     
     // Update service in database
@@ -321,6 +359,8 @@ exports.updateService = async (req, res, next) => {
       message: 'Service updated successfully'
     };
   } catch (error) {
+    console.error('Error updating service:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -342,6 +382,7 @@ exports.toggleServiceStatus = async (req, res, next) => {
     if (checkResult.rows.length === 0) {
       const error = new Error(`Service with ID ${id} not found`);
       error.statusCode = 404;
+      error.success = false;
       throw error;
     }
     
@@ -386,6 +427,8 @@ exports.toggleServiceStatus = async (req, res, next) => {
       message: `Service ${aktiv ? 'activated' : 'deactivated'} successfully`
     };
   } catch (error) {
+    console.error('Error toggling service status:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -406,6 +449,7 @@ exports.getServiceStatistics = async (req, res, next) => {
     if (serviceQuery.rows.length === 0) {
       const error = new Error(`Service with ID ${id} not found`);
       error.statusCode = 404;
+      error.success = false;
       throw error;
     }
     
@@ -482,6 +526,8 @@ exports.getServiceStatistics = async (req, res, next) => {
       }
     };
   } catch (error) {
+    console.error('Error getting service statistics:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
@@ -549,6 +595,8 @@ exports.exportServices = async (req, res, next) => {
       filters: { status }
     });
   } catch (error) {
+    console.error('Error exporting services:', error);
+    error.success = false; // Ensure error object has success property
     next(error);
   }
 };
