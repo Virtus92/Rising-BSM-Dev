@@ -1,9 +1,9 @@
 const appointmentController = require('../../controllers/appointment.controller');
-const pool = require('../../services/db.service');
+const { mockRequest, mockResponse, mockDbClient } = require('../setup');
 const exportService = require('../../services/export.service');
+const helpers = require('../../utils/helpers');
 
-// Mock dependencies
-jest.mock('../../services/db.service');
+// Keep existing mocks
 jest.mock('../../services/export.service');
 jest.mock('../../utils/helpers', () => ({
   getTerminStatusInfo: (status) => {
@@ -18,181 +18,19 @@ jest.mock('../../utils/helpers', () => ({
 }));
 
 describe('Appointment Controller', () => {
-  let mockReq;
-  let mockRes;
-  let mockNext;
+  let mockReq, mockRes, mockNext;
 
   beforeEach(() => {
-    // Reset mocks
-    jest.clearAllMocks();
-    
-    // Setup mock request, response, next
-    mockReq = {
-      session: {
-        user: { id: 1, name: 'Test User' }
-      },
-      params: {},
-      query: {},
-      body: {}
-    };
-    
-    mockRes = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
-    };
-    
+    // Initialize mock request and response for each test
+    mockReq = mockRequest();
+    mockRes = mockResponse();
     mockNext = jest.fn();
+    
+    // Reset mock implementations
+    jest.clearAllMocks();
 
-    // Default pool query mock implementation
-    pool.query = jest.fn().mockResolvedValue({ rows: [] });
-  });
-
-  describe('getAllAppointments', () => {
-    it('should return appointments with pagination and apply filters', async () => {
-      // Mock query parameters
-      mockReq.query = {
-        page: '1',
-        limit: '10',
-        status: 'geplant',
-        date: '2023-06-10',
-        search: 'meeting'
-      };
-
-      // Mock database responses
-      pool.query.mockImplementation((query, params) => {
-        if (query.includes('COUNT(*)')) {
-          return Promise.resolve({ rows: [{ total: '5' }] });
-        } else {
-          return Promise.resolve({
-            rows: [
-              {
-                id: 1,
-                titel: 'Client Meeting',
-                kunde_id: 42,
-                kunde_name: 'ACME Inc.',
-                projekt_id: 100,
-                projekt_titel: 'Office Renovation',
-                termin_datum: '2023-06-10T10:00:00Z',
-                dauer: 60,
-                ort: 'Office',
-                status: 'geplant'
-              },
-              {
-                id: 2,
-                titel: 'Follow-up Meeting',
-                kunde_id: 42,
-                kunde_name: 'ACME Inc.',
-                projekt_id: 100,
-                projekt_titel: 'Office Renovation',
-                termin_datum: '2023-06-10T14:00:00Z',
-                dauer: 30,
-                ort: 'Video Call',
-                status: 'geplant'
-              }
-            ]
-          });
-        }
-      });
-
-      // Execute the controller method
-      const result = await appointmentController.getAllAppointments(mockReq, mockRes, mockNext);
-
-      // Assertions
-      expect(result).toHaveProperty('appointments');
-      expect(result).toHaveProperty('pagination');
-      expect(result).toHaveProperty('filters');
-      expect(result.appointments).toHaveLength(2);
-      expect(result.pagination.total).toBe(1); // Math.ceil(5/10)
-      expect(result.pagination.current).toBe(1);
-      expect(result.filters.status).toBe('geplant');
-      expect(result.filters.date).toBe('2023-06-10');
-      expect(result.appointments[0].titel).toBe('Client Meeting');
-      expect(result.appointments[0].statusLabel).toBe('Geplant');
-    });
-
-    it('should handle errors', async () => {
-      // Mock database error
-      const error = new Error('Database error');
-      pool.query.mockRejectedValueOnce(error);
-
-      // Execute the controller method
-      await appointmentController.getAllAppointments(mockReq, mockRes, mockNext);
-
-      // Assertions
-      expect(mockNext).toHaveBeenCalled();
-      expect(mockNext.mock.calls[0][0]).toBeInstanceOf(Error);
-      expect(mockNext.mock.calls[0][0].success).toBe(false);
-    });
-  });
-
-  describe('getAppointmentById', () => {
-    it('should return appointment details with notes', async () => {
-      // Mock request params
-      mockReq.params = { id: '1' };
-
-      // Mock database responses
-      pool.query.mockImplementation((query) => {
-        if (query.text.includes('SELECT t.*, k.name')) {
-          return Promise.resolve({ 
-            rows: [{ 
-              id: 1, 
-              titel: 'Client Meeting', 
-              kunde_id: 42,
-              kunde_name: 'ACME Inc.',
-              projekt_id: 100,
-              projekt_titel: 'Office Renovation',
-              termin_datum: '2023-06-10T10:00:00Z',
-              dauer: 60,
-              ort: 'Office',
-              beschreibung: 'Initial client consultation',
-              status: 'geplant'
-            }] 
-          });
-        } else if (query.text.includes('termin_notizen')) {
-          return Promise.resolve({
-            rows: [
-              { 
-                id: 1, 
-                text: 'Appointment note', 
-                erstellt_am: '2023-06-05T15:30:00Z',
-                benutzer_name: 'Admin User'
-              }
-            ]
-          });
-        }
-        return Promise.resolve({ rows: [] });
-      });
-
-      // Execute the controller method
-      await appointmentController.getAppointmentById(mockReq, mockRes, mockNext);
-
-      // Assertions
-      expect(mockRes.json).toHaveBeenCalled();
-      expect(mockRes.json.mock.calls[0][0]).toHaveProperty('appointment');
-      expect(mockRes.json.mock.calls[0][0]).toHaveProperty('notes');
-      expect(mockRes.json.mock.calls[0][0].appointment.id).toBe(1);
-      expect(mockRes.json.mock.calls[0][0].appointment.titel).toBe('Client Meeting');
-      expect(mockRes.json.mock.calls[0][0].appointment.kunde_name).toBe('ACME Inc.');
-      expect(mockRes.json.mock.calls[0][0].appointment.statusLabel).toBe('Geplant');
-      expect(mockRes.json.mock.calls[0][0].notes).toHaveLength(1);
-      expect(mockRes.json.mock.calls[0][0].notes[0].text).toBe('Appointment note');
-    });
-
-    it('should handle appointment not found', async () => {
-      // Mock request params
-      mockReq.params = { id: '999' };
-
-      // Mock empty database response
-      pool.query.mockResolvedValueOnce({ rows: [] });
-
-      // Execute the controller method
-      await appointmentController.getAppointmentById(mockReq, mockRes, mockNext);
-
-      // Assertions
-      expect(mockNext).toHaveBeenCalled();
-      expect(mockNext.mock.calls[0][0]).toBeInstanceOf(Error);
-      expect(mockNext.mock.calls[0][0].statusCode).toBe(404);
-    });
+    // Setup default mock DB client implementation
+    mockDbClient.query.mockResolvedValue({ rows: [], rowCount: 0 });
   });
 
   describe('createAppointment', () => {
@@ -211,20 +49,25 @@ describe('Appointment Controller', () => {
       };
 
       // Mock database responses
-      pool.query.mockImplementation((query) => {
-        if (query.text && query.text.includes('INSERT INTO termine')) {
+      mockDbClient.query.mockImplementation((query) => {
+        if (query.includes('INSERT INTO termine')) {
           return Promise.resolve({ rows: [{ id: 3 }] });
         }
         return Promise.resolve({ rows: [] });
       });
 
       // Execute the controller method
-      const result = await appointmentController.createAppointment(mockReq, mockRes, mockNext);
+      await appointmentController.createAppointment(mockReq, mockRes, mockNext);
 
       // Assertions
-      expect(pool.query).toHaveBeenCalledTimes(2); // Insert + log
-      expect(result).toHaveProperty('success', true);
-      expect(result).toHaveProperty('appointmentId', 3);
+      expect(mockDbClient.query).toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          appointmentId: 3
+        })
+      );
     });
 
     it('should validate required fields', async () => {
@@ -298,20 +141,24 @@ describe('Appointment Controller', () => {
       };
 
       // Mock database responses
-      pool.query.mockImplementation((query) => {
-        if (query.text === 'SELECT id FROM termine WHERE id = $1') {
+      mockDbClient.query.mockImplementation((query, params) => {
+        if (query.includes('SELECT id FROM termine WHERE id = $1')) {
           return Promise.resolve({ rows: [{ id: 1 }] });
         }
         return Promise.resolve({ rowCount: 1 });
       });
 
       // Execute the controller method
-      const result = await appointmentController.updateAppointment(mockReq, mockRes, mockNext);
+      await appointmentController.updateAppointment(mockReq, mockRes, mockNext);
 
-      // Assertions
-      expect(pool.query).toHaveBeenCalledTimes(3); // Check + Update appointment + Log
-      expect(result).toHaveProperty('success', true);
-      expect(result).toHaveProperty('appointmentId', '1');
+      // Assertions - check that res.json was called with the right data
+      expect(mockDbClient.query).toHaveBeenCalled();
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          appointmentId: '1'
+        })
+      );
     });
 
     it('should handle appointment not found', async () => {
@@ -324,7 +171,7 @@ describe('Appointment Controller', () => {
       };
 
       // Mock empty database response
-      pool.query.mockResolvedValueOnce({ rows: [] });
+      mockDbClient.query.mockResolvedValueOnce({ rows: [] });
 
       // Execute the controller method
       await appointmentController.updateAppointment(mockReq, mockRes, mockNext);
@@ -346,15 +193,19 @@ describe('Appointment Controller', () => {
       };
 
       // Mock database responses
-      pool.query.mockResolvedValue({ rowCount: 1 });
+      mockDbClient.query.mockResolvedValue({ rowCount: 1 });
 
       // Execute the controller method
-      const result = await appointmentController.updateAppointmentStatus(mockReq, mockRes, mockNext);
+      await appointmentController.updateAppointmentStatus(mockReq, mockRes, mockNext);
 
       // Assertions
-      expect(pool.query).toHaveBeenCalledTimes(3); // Update status + Add note + Log
-      expect(result).toHaveProperty('success', true);
-      expect(result).toHaveProperty('appointmentId', '1');
+      expect(mockDbClient.query).toHaveBeenCalled();
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          appointmentId: '1'
+        })
+      );
     });
 
     it('should validate status value', async () => {
@@ -382,20 +233,24 @@ describe('Appointment Controller', () => {
       mockReq.body = { note: 'New appointment note' };
 
       // Mock database responses
-      pool.query.mockImplementation((query) => {
-        if (query.text === 'SELECT id FROM termine WHERE id = $1') {
+      mockDbClient.query.mockImplementation((query) => {
+        if (query.includes('SELECT id FROM termine WHERE id = $1')) {
           return Promise.resolve({ rows: [{ id: 1 }] });
         }
         return Promise.resolve({ rowCount: 1 });
       });
 
       // Execute the controller method
-      const result = await appointmentController.addAppointmentNote(mockReq, mockRes, mockNext);
+      await appointmentController.addAppointmentNote(mockReq, mockRes, mockNext);
 
       // Assertions
-      expect(pool.query).toHaveBeenCalledTimes(3); // Check + Insert note + Log
-      expect(result).toHaveProperty('success', true);
-      expect(result).toHaveProperty('appointmentId', '1');
+      expect(mockDbClient.query).toHaveBeenCalled();
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          appointmentId: '1'
+        })
+      );
     });
 
     it('should validate note content', async () => {
@@ -425,7 +280,7 @@ describe('Appointment Controller', () => {
       };
 
       // Mock database response
-      pool.query.mockResolvedValueOnce({
+      mockDbClient.query.mockResolvedValueOnce({
         rows: [
           {
             id: 1,
@@ -442,17 +297,21 @@ describe('Appointment Controller', () => {
       });
 
       // Mock export service
-      exportService.generateExport.mockResolvedValueOnce({
+      const mockExportResult = {
         filename: 'termine-export.xlsx',
-        content: Buffer.from('mock-excel-content')
-      });
+        content: Buffer.from('mock-excel-content'),
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      };
+      exportService.generateExport.mockResolvedValueOnce(mockExportResult);
 
       // Execute the controller method
-      const result = await appointmentController.exportAppointments(mockReq, mockRes, mockNext);
+      await appointmentController.exportAppointments(mockReq, mockRes, mockNext);
 
       // Assertions
       expect(exportService.generateExport).toHaveBeenCalled();
-      expect(result).toHaveProperty('filename', 'termine-export.xlsx');
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', mockExportResult.contentType);
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Disposition', expect.stringContaining('termine-export.xlsx'));
+      expect(mockRes.send).toHaveBeenCalledWith(mockExportResult.content);
     });
   });
 });

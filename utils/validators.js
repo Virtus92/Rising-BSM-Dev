@@ -10,13 +10,14 @@ const validator = require('validator');
  * @param {object} options - Validation options
  * @returns {object} - Validation result
  */
-exports.validateText = (input, options = {}) => {
+const validateText = (input, options = {}) => {
   const {
     required = false,
     minLength = 0,
     maxLength = 500,
     trim = true,
-    escape = true
+    escape = true,
+    pattern = null
   } = options;
 
   const errors = [];
@@ -26,11 +27,12 @@ exports.validateText = (input, options = {}) => {
     if (required) {
       errors.push('Input is required');
     }
-    return { isValid: errors.length === 0, errors, value: input };
+    return { isValid: errors.length === 0, errors, value: '' };
   }
 
   // Ensure input is a string
-  const value = trim ? input.trim() : input;
+  const strInput = String(input);
+  const value = trim ? strInput.trim() : strInput;
 
   // Check if empty
   if (value === '' && required) {
@@ -46,8 +48,13 @@ exports.validateText = (input, options = {}) => {
     errors.push(`Input must not exceed ${maxLength} characters`);
   }
 
-  // Escape if requested
-  const sanitizedValue = escape ? validator.escape(value) : value;
+  // Pattern validation
+  if (pattern && !pattern.test(value)) {
+    errors.push('Input format is invalid');
+  }
+
+  // Always escape HTML to prevent XSS
+  const sanitizedValue = validator.escape(value);
 
   return {
     isValid: errors.length === 0,
@@ -59,21 +66,32 @@ exports.validateText = (input, options = {}) => {
 /**
  * Validate email address
  * @param {string} email - Email to validate
+ * @param {boolean} required - Whether the email is required
  * @returns {object} - Validation result
  */
-exports.validateEmail = (email) => {
+const validateEmail = (email, required = false) => {
   const errors = [];
 
-  // Check if email is provided and valid
-  if (!email || !validator.isEmail(email)) {
-    errors.push('Invalid email address');
+  // Handle null, undefined or empty
+  if (!email) {
+    if (required) {
+      errors.push('Email is required');
+    }
+    return { isValid: !required, errors, value: '' };
   }
 
+  // Validate email format
+  if (!validator.isEmail(email)) {
+    errors.push('Invalid email address');
+    return { isValid: false, errors, value: email };
+  }
+
+  // Normalize only valid emails
   const sanitizedEmail = validator.normalizeEmail(email);
 
   return {
-    isValid: errors.length === 0,
-    errors,
+    isValid: true,
+    errors: [],
     value: sanitizedEmail
   };
 };
@@ -81,23 +99,31 @@ exports.validateEmail = (email) => {
 /**
  * Validate phone number
  * @param {string} phone - Phone number to validate
+ * @param {boolean} required - Whether the phone is required
  * @returns {object} - Validation result
  */
-exports.validatePhone = (phone) => {
+const validatePhone = (phone, required = false) => {
   const errors = [];
   
-  if (!phone) return {
-    isValid: true,
-    errors: [],
-    value: ''
-  };
+  // Handle null, undefined or empty
+  if (!phone) {
+    if (required) {
+      errors.push('Phone number is required');
+    }
+    return { isValid: !required, errors, value: '' };
+  }
 
   // Remove non-digit characters for validation
   const cleanedPhone = phone.replace(/\D/g, '');
 
-  // More strict validation to match test expectations
-  if (cleanedPhone && !validator.isMobilePhone(cleanedPhone, 'any', { strictMode: false })) {
-    errors.push('Invalid phone number');
+  // Basic phone number validation
+  if (cleanedPhone.length < 8 || cleanedPhone.length > 15) {
+    errors.push('Phone number must be between 8 and 15 digits');
+  }
+
+  // Check if it's a valid phone number format for Germany
+  if (!validator.isMobilePhone(cleanedPhone, ['de-DE', 'any'])) {
+    errors.push('Invalid phone number format');
   }
 
   return {
@@ -113,29 +139,35 @@ exports.validatePhone = (phone) => {
  * @param {object} options - Validation options
  * @returns {object} - Validation result
  */
-exports.validateDate = (date, options = {}) => {
+const validateDate = (date, options = {}) => {
   const {
     required = false,
     pastAllowed = true,
     futureAllowed = true,
     beforeDate,
-    afterDate
+    afterDate,
+    format = 'YYYY-MM-DD'
   } = options;
 
   const errors = [];
 
-  // Handle null or undefined
-  if (date === null || date === undefined) {
+  // Handle null, undefined or empty
+  if (!date) {
     if (required) {
       errors.push('Date is required');
     }
-    return { isValid: errors.length === 0, errors, value: date };
+    return { isValid: !required, errors, value: null };
   }
 
-  const parsedDate = new Date(date);
-
-  // Check if date is valid
-  if (isNaN(parsedDate.getTime())) {
+  let parsedDate;
+  
+  // Parse date based on format
+  try {
+    parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      throw new Error('Invalid date');
+    }
+  } catch (err) {
     errors.push('Invalid date format');
     return { isValid: false, errors, value: date };
   }
@@ -153,13 +185,19 @@ exports.validateDate = (date, options = {}) => {
   }
 
   // Before date validation
-  if (beforeDate && parsedDate > new Date(beforeDate)) {
-    errors.push(`Date must be before ${beforeDate}`);
+  if (beforeDate) {
+    const beforeLimit = new Date(beforeDate);
+    if (parsedDate > beforeLimit) {
+      errors.push(`Date must be before ${beforeDate}`);
+    }
   }
 
   // After date validation
-  if (afterDate && parsedDate < new Date(afterDate)) {
-    errors.push(`Date must be after ${afterDate}`);
+  if (afterDate) {
+    const afterLimit = new Date(afterDate);
+    if (parsedDate < afterLimit) {
+      errors.push(`Date must be after ${afterDate}`);
+    }
   }
 
   return {
@@ -171,26 +209,27 @@ exports.validateDate = (date, options = {}) => {
 
 /**
  * Validate numeric values
- * @param {number} value - Numeric value to validate
+ * @param {number|string} value - Numeric value to validate
  * @param {object} options - Validation options
  * @returns {object} - Validation result
  */
-exports.validateNumeric = (value, options = {}) => {
+const validateNumeric = (value, options = {}) => {
   const {
     required = false,
     min = -Infinity,
     max = Infinity,
-    integer = false
+    integer = false,
+    positive = false
   } = options;
 
   const errors = [];
 
-  // Handle null or undefined
-  if (value === null || value === undefined) {
+  // Handle null, undefined or empty
+  if (value === null || value === undefined || value === '') {
     if (required) {
       errors.push('Value is required');
     }
-    return { isValid: errors.length === 0, errors, value };
+    return { isValid: !required, errors, value: null };
   }
 
   // Convert to number
@@ -199,11 +238,17 @@ exports.validateNumeric = (value, options = {}) => {
   // Check if numeric
   if (isNaN(numericValue)) {
     errors.push('Value must be a number');
+    return { isValid: false, errors, value };
   }
 
   // Integer validation
   if (integer && !Number.isInteger(numericValue)) {
     errors.push('Value must be an integer');
+  }
+
+  // Positive number validation
+  if (positive && numericValue <= 0) {
+    errors.push('Value must be positive');
   }
 
   // Min value validation
@@ -224,154 +269,134 @@ exports.validateNumeric = (value, options = {}) => {
 };
 
 /**
- * Comprehensive input validation
- * @param {object} data - Input data to validate
- * @param {object} schema - Validation schema
+ * Validate boolean values
+ * @param {boolean|string} value - Boolean value to validate
+ * @param {boolean} required - Whether the value is required
  * @returns {object} - Validation result
  */
-exports.validateInput = (data, schema) => {
-  const validationResults = {};
-  const errors = {};
-  let errorCount = 0;
+const validateBoolean = (value, required = false) => {
+  const errors = [];
 
-  // Handle nested schemas
-  const validateNestedField = (fieldData, fieldSchema, fieldPath = '') => {
-    if (fieldSchema.type === 'object' && typeof fieldData === 'object') {
-      const nestedResults = {};
-      
-      Object.keys(fieldSchema.properties || {}).forEach(nestedField => {
-        const nestedPath = fieldPath ? `${fieldPath}.${nestedField}` : nestedField;
-        const result = validateNestedField(
-          fieldData[nestedField], 
-          fieldSchema.properties[nestedField],
-          nestedPath
-        );
-        
-        nestedResults[nestedField] = result;
-        
-        if (!result.isValid) {
-          if (!errors[fieldPath]) errors[fieldPath] = [];
-          errors[fieldPath].push(...result.errors.map(err => `${nestedField}: ${err}`));
-          errorCount += result.errors.length;
-        }
-      });
-      
-      return {
-        isValid: !errors[fieldPath] || errors[fieldPath].length === 0,
-        value: fieldData,
-        nested: nestedResults
-      };
+  // Handle null, undefined or empty
+  if (value === null || value === undefined || value === '') {
+    if (required) {
+      errors.push('Value is required');
     }
-    
-    // Handle field from dot notation in schema
-    if (fieldPath.includes('.')) {
-      const pathParts = fieldPath.split('.');
-      let currentData = data;
-      
-      // Navigate through the nested structure
-      for (let i = 0; i < pathParts.length - 1; i++) {
-        if (!currentData || typeof currentData !== 'object') {
-          errorCount++;
-          return { isValid: false, errors: ['Invalid nested path'] };
-        }
-        currentData = currentData[pathParts[i]];
-      }
-      
-      // Get the actual value
-      const actualFieldName = pathParts[pathParts.length - 1];
-      fieldData = currentData ? currentData[actualFieldName] : undefined;
-    }
-    
-    // Skip conditional validation if condition not met
-    if (fieldSchema.required && typeof fieldSchema.required === 'function') {
-      if (!fieldSchema.required(data)) {
-        return { isValid: true, value: fieldData };
-      }
-    }
-    
-    // Custom validation
-    if (fieldSchema.validate && typeof fieldSchema.validate === 'function') {
-      const customErrors = fieldSchema.validate(fieldData, data);
-      if (customErrors && customErrors.length) {
-        if (!errors[fieldPath]) errors[fieldPath] = [];
-        errors[fieldPath].push(...customErrors);
-        errorCount += customErrors.length;
-        return { isValid: false, errors: customErrors, value: fieldData };
-      }
-    }
-    
-    // Regular field validation
-    let result;
-    switch (fieldSchema.type) {
-      case 'text':
-        result = this.validateText(fieldData, fieldSchema);
-        break;
-      case 'email':
-        result = this.validateEmail(fieldData);
-        break;
-      case 'phone':
-        result = this.validatePhone(fieldData);
-        break;
-      case 'date':
-        result = this.validateDate(fieldData, fieldSchema);
-        break;
-      case 'numeric':
-        result = this.validateNumeric(fieldData, fieldSchema);
-        break;
-      case 'array':
-        result = { isValid: Array.isArray(fieldData), value: fieldData };
-        if (!result.isValid) {
-          result.errors = ['Value must be an array'];
-        } else {
-          result.errors = [];
-        }
-        break;
-      default:
-        result = { isValid: true, value: fieldData, errors: [] };
-    }
-    
-    if (!result.isValid && result.errors) {
-      if (!errors[fieldPath]) errors[fieldPath] = [];
-      errors[fieldPath].push(...result.errors);
-      errorCount += result.errors.length;
-    }
-    
-    return result;
-  };
+    return { isValid: !required, errors, value: null };
+  }
 
-  // Process all fields
-  Object.keys(schema).forEach(field => {
-    const rules = schema[field];
-    validationResults[field] = validateNestedField(
-      field.includes('.') ? undefined : data[field], 
-      rules, 
-      field
-    );
-  });
-
-  const flatErrors = [];
-  Object.entries(errors).forEach(([field, fieldErrors]) => {
-    fieldErrors.forEach(err => {
-      flatErrors.push(`${field}: ${err}`);
-    });
-  });
+  // Convert string to boolean
+  let boolValue;
+  if (typeof value === 'string') {
+    const lowered = value.toLowerCase();
+    if (['true', '1', 'yes'].includes(lowered)) {
+      boolValue = true;
+    } else if (['false', '0', 'no'].includes(lowered)) {
+      boolValue = false;
+    } else {
+      errors.push('Value must be a boolean');
+      return { isValid: false, errors, value };
+    }
+  } else {
+    boolValue = Boolean(value);
+  }
 
   return {
-    isValid: flatErrors.length === 0,
-    errors: errors,
-    errorCount: errorCount,
-    validatedData: Object.keys(validationResults).reduce((acc, key) => {
-      const path = key.split('.');
-      let current = acc;
-      
-      // Create nested objects for dot notation paths
-      for (let i = 0; i < path.length - 1; i++) {
-        if (!current[path[i]]) current[path[i]] = {};
-        current = current[path[i]];
-      }
-      
-      current[path[path.length - 1]] = validationResults[key].value;
-      return acc;
-    }, {})
+    isValid: true,
+    errors: [],
+    value: boolValue
   };
+};
+
+/**
+ * Validates input data against a schema
+ * @param {Object} data - Input data to validate
+ * @param {Object} schema - Validation schema
+ * @returns {Object} Validation result
+ */
+const validateInput = (data = {}, schema = {}) => {
+  const errors = {};
+  const validatedData = {};
+
+  // Validate each field according to schema
+  for (const [field, rules] of Object.entries(schema)) {
+    const value = data[field];
+    const fieldErrors = [];
+
+    // Type validation
+    switch (rules.type) {
+      case 'text':
+        const textResult = validateText(value, rules);
+        if (!textResult.isValid) {
+          fieldErrors.push(...textResult.errors);
+        }
+        validatedData[field] = textResult.value;
+        break;
+
+      case 'email':
+        const emailResult = validateEmail(value, rules.required);
+        if (!emailResult.isValid) {
+          fieldErrors.push(...emailResult.errors);
+        }
+        validatedData[field] = emailResult.value;
+        break;
+
+      case 'phone':
+        const phoneResult = validatePhone(value, rules.required);
+        if (!phoneResult.isValid) {
+          fieldErrors.push(...phoneResult.errors);
+        }
+        validatedData[field] = phoneResult.value;
+        break;
+
+      case 'date':
+        const dateResult = validateDate(value, rules);
+        if (!dateResult.isValid) {
+          fieldErrors.push(...dateResult.errors);
+        }
+        validatedData[field] = dateResult.value;
+        break;
+
+      case 'numeric':
+        const numericResult = validateNumeric(value, rules);
+        if (!numericResult.isValid) {
+          fieldErrors.push(...numericResult.errors);
+        }
+        validatedData[field] = numericResult.value;
+        break;
+
+      case 'boolean':
+        const booleanResult = validateBoolean(value, rules.required);
+        if (!booleanResult.isValid) {
+          fieldErrors.push(...booleanResult.errors);
+        }
+        validatedData[field] = booleanResult.value;
+        break;
+
+      default:
+        fieldErrors.push('Invalid field type');
+    }
+
+    // Add field errors if any
+    if (fieldErrors.length > 0) {
+      errors[field] = fieldErrors;
+    }
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+    data: validatedData
+  };
+};
+
+// Export all validation functions
+module.exports = {
+  validateInput,
+  validateText,
+  validateEmail,
+  validatePhone,
+  validateDate,
+  validateNumeric,
+  validateBoolean
 };

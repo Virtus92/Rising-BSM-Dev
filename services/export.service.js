@@ -5,15 +5,22 @@
 const { format } = require('date-fns');
 const Excel = require('exceljs');
 const PDFDocument = require('pdfkit');
+const { Parser } = require('json2csv');
+const { formatCurrency, formatDate } = require('../utils/formatters');
+
+// Default formatters
+const defaultFormatters = {
+  currency: (value) => formatCurrency(value),
+  date: (value) => formatDate(value),
+  number: (value) => value?.toLocaleString() || '',
+  string: (value) => value?.toString() || '',
+  boolean: (value) => value ? 'Ja' : 'Nein'
+};
 
 /**
  * Generate an export file in the specified format
- * @param {Array} data - Array of objects to export
- * @param {string} formatType - Export format (csv, excel, pdf)
- * @param {object} options - Export options
- * @returns {object} - Export result with data, content type, and filename
  */
-exports.generateExport = async (data, formatType, options) => {
+const generateExport = async (data, formatType, options) => {
   const { filename, title, columns, filters } = options;
   
   switch (formatType) {
@@ -38,64 +45,23 @@ exports.generateExport = async (data, formatType, options) => {
 };
 
 /**
- * Generate pure CSV content from data and columns
- * @param {Array} data - Array of objects to export
- * @param {Array} columns - Column definitions
- * @returns {string} - CSV content as string
- */
-exports.generateCSV = (data, columns) => {
-  // Create header row
-  const headerRow = columns.map(col => col.header).join(',');
-  
-  // Process data rows
-  const rows = data.map(row => {
-    return columns.map(col => {
-      let value = row[col.key];
-      
-      // Apply format function if provided
-      if (col.format && typeof col.format === 'function') {
-        value = col.format(value, row);
-      }
-      
-      // Use default value if undefined
-      if (value === undefined && col.default !== undefined) {
-        value = col.default;
-      }
-      
-      // Format for CSV output - matching test expectations
-      if (value === null || value === undefined) {
-        return '';
-      } else if (typeof value === 'string') {
-        // Escape quotes and wrap in quotes - for CSV standard
-        return `"${value.replace(/"/g, '""')}"`;
-      } else {
-        return value;
-      }
-    }).join(',');
-  });
-  
-  // Join all rows with newlines
-  return `${headerRow}\n${rows.join('\n')}`;
-};
-
-/**
  * Generate CSV export
  */
-function generateCsvExport(data, columns, filename) {
+const generateCsvExport = (data, columns, filename) => {
   // Use the utility function for CSV generation
-  const csvContent = exports.generateCSV(data, columns);
+  const csvContent = generateCSV(data, columns);
   
   return {
     data: csvContent,
     contentType: 'text/csv',
     filename: `${filename}.csv`
   };
-}
+};
 
 /**
  * Generate Excel export
  */
-async function generateExcelExport(data, columns, filename, title, filters) {
+const generateExcelExport = async (data, columns, filename, title, filters) => {
   const workbook = new Excel.Workbook();
   const worksheet = workbook.addWorksheet('Data');
   
@@ -171,12 +137,12 @@ async function generateExcelExport(data, columns, filename, title, filters) {
     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     filename: `${filename}.xlsx`
   };
-}
+};
 
 /**
  * Generate PDF export
  */
-async function generatePdfExport(data, columns, filename, title, filters) {
+const generatePdfExport = async (data, columns, filename, title, filters) => {
   return new Promise((resolve, reject) => {
     try {
       // Create a PDF document
@@ -247,22 +213,14 @@ async function generatePdfExport(data, columns, filename, title, filters) {
          .lineTo(550, doc.y)
          .stroke();
       
-      // Switch to regular font for data
-      doc.font('Helvetica').fontSize(8);
-      
-      // Draw rows
-      data.forEach((row, rowIndex) => {
-        // Check if we need a new page
-        if (doc.y > 700) {
-          doc.addPage();
-          doc.y = 50;
-        }
-        
+      // Draw data rows
+      doc.font('Helvetica');
+      data.forEach(item => {
+        doc.moveDown();
         currentX = 50;
         
-        // Process each column
         visibleColumns.forEach((column, i) => {
-          let value = row[column.key];
+          let value = item[column.key];
           
           // Apply format function if provided
           if (column.format && typeof column.format === 'function') {
@@ -271,35 +229,65 @@ async function generatePdfExport(data, columns, filename, title, filters) {
             value = column.default || '';
           }
           
-          // Truncate long strings
-          if (typeof value === 'string' && value.length > 100) {
-            value = value.substring(0, 97) + '...';
-          }
-          
-          doc.text(String(value), currentX, doc.y, { 
-            width: columnWidths[i], 
-            align: 'left' 
+          doc.text(value.toString(), currentX, doc.y, {
+            width: columnWidths[i],
+            align: 'left'
           });
-          
           currentX += columnWidths[i];
         });
-        
-        doc.moveDown();
-        
-        // Add zebra striping
-        if (rowIndex % 2 === 1) {
-          const rowHeight = 12; // Approximate height of a row
-          doc.rect(50, doc.y - rowHeight, tableWidth, rowHeight)
-             .fillOpacity(0.1)
-             .fillAndStroke("#ddd", "#fff");
-        }
       });
       
       // Finalize the PDF
       doc.end();
-      
     } catch (error) {
       reject(error);
     }
   });
-}
+};
+
+/**
+ * Generate pure CSV content from data and columns
+ */
+const generateCSV = (data, columns) => {
+  // Create header row
+  const headerRow = columns.map(col => col.header).join(',');
+  
+  // Process data rows
+  const rows = data.map(row => {
+    return columns.map(col => {
+      let value = row[col.key];
+      
+      // Apply format function if provided
+      if (col.format && typeof col.format === 'function') {
+        value = col.format(value, row);
+      }
+      
+      // Use default value if undefined
+      if (value === undefined && col.default !== undefined) {
+        value = col.default;
+      }
+      
+      // Format for CSV output - matching test expectations
+      if (value === null || value === undefined) {
+        return '';
+      } else if (typeof value === 'string') {
+        // Escape quotes and wrap in quotes - for CSV standard
+        return `"${value.replace(/"/g, '""')}"`;
+      } else {
+        return value;
+      }
+    }).join(',');
+  });
+  
+  // Join all rows with newlines
+  return `${headerRow}\n${rows.join('\n')}`;
+};
+
+module.exports = {
+  generateExport,
+  generateExcelExport,
+  generatePdfExport,
+  generateCsvExport,
+  generateCSV,
+  defaultFormatters
+};

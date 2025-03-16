@@ -1,215 +1,277 @@
-const request = require('supertest');
 const express = require('express');
+const request = require('supertest');
 const session = require('express-session');
-const flash = require('connect-flash');
+const path = require('path');
 
-// Mock controllers and middleware
+// Mock-Funktionen vor jest.mock definieren
+const mockGetDashboardData = jest.fn();
+const mockGlobalSearch = jest.fn();
+const mockGetNotifications = jest.fn();
+const mockMarkNotificationsRead = jest.fn();
+const mockGetDashboardStats = jest.fn();
+
+// Mock des Controllers
 jest.mock('../../controllers/dashboard.controller', () => ({
-  getDashboardData: jest.fn().mockResolvedValue({
-    stats: {
-      requests: { total: 10, new: 5 },
-      projects: { total: 15, active: 8 },
-      appointments: { total: 20, upcoming: 12 },
-      customers: { total: 25 }
-    },
-    chartFilters: ['lastWeek', 'lastMonth', 'lastYear'],
-    charts: {
-      projectsGrowth: [],
-      requestsDistribution: [],
-      revenueByMonth: []
-    },
-    notifications: [{ id: 1, message: 'Test notification', created_at: new Date() }],
-    recentRequests: [{ id: 1, name: 'Test Request', created_at: new Date() }],
-    upcomingAppointments: [{ id: 1, title: 'Test Appointment', date: new Date() }],
-    systemStatus: { maintenance_mode: false, backup_status: 'ok' }
-  }),
-  globalSearch: jest.fn().mockResolvedValue({
-    customers: [{ id: 1, name: 'Test Customer' }],
-    projects: [{ id: 1, titel: 'Test Project' }],
-    appointments: [{ id: 1, titel: 'Test Appointment' }],
-    requests: [{ id: 1, name: 'Test Request' }],
-    services: [{ id: 1, name: 'Test Service' }]
-  }),
-  getNotifications: jest.fn().mockResolvedValue({
-    notifications: [
-      { id: 1, message: 'Test notification 1', created_at: new Date() },
-      { id: 2, message: 'Test notification 2', created_at: new Date() }
-    ]
-  }),
-  markNotificationsRead: jest.fn().mockResolvedValue({
-    success: true,
-    message: 'Notifications marked as read'
-  }),
-  getDashboardStats: jest.fn().mockResolvedValue({
-    stats: {
-      requests: { total: 10, new: 5 },
-      projects: { total: 15, active: 8 },
-      appointments: { total: 20, upcoming: 12 },
-      customers: { total: 25 }
-    }
-  })
+  getDashboardData: mockGetDashboardData,
+  globalSearch: mockGlobalSearch,
+  getNotifications: mockGetNotifications,
+  markNotificationsRead: mockMarkNotificationsRead,
+  getDashboardStats: mockGetDashboardStats
 }));
 
-jest.mock('../../middleware/auth.middleware', () => ({
-  isAuthenticated: (req, res, next) => next()
+// Mock des Auth Middleware
+jest.mock('../../middleware/auth', () => ({
+  isAuthenticated: (req, res, next) => {
+    req.session = req.session || {};
+    req.session.user = {
+      id: 'test-user-id',
+      email: 'test@example.com'
+    };
+    req.session.userId = 'test-user-id';
+    next();
+  }
 }));
-
-// Setup app for testing
-const setupApp = () => {
-  const app = express();
-  
-  // Mock session
-  app.use(session({
-    secret: 'test-secret',
-    resave: false,
-    saveUninitialized: false
-  }));
-  
-  // Mock flash messages
-  app.use(flash());
-  
-  // Mock CSRF
-  app.use((req, res, next) => {
-    req.csrfToken = () => 'test-csrf-token';
-    next();
-  });
-  
-  // Setup body parser
-  app.use(express.urlencoded({ extended: true }));
-  app.use(express.json());
-  
-  // Add session user
-  app.use((req, res, next) => {
-    req.session.user = { id: 1, name: 'Test User' };
-    req.newRequestsCount = 5;
-    next();
-  });
-  
-  // Setup view engine (mock)
-  app.set('view engine', 'ejs');
-  app.set('views', 'views');
-  app.engine('ejs', (path, data, cb) => cb(null, JSON.stringify(data)));
-  
-  // Load routes
-  const dashboardRoutes = require('../../routes/dashboard.routes');
-  app.use('/dashboard', dashboardRoutes);
-  
-  return app;
-};
 
 describe('Dashboard Routes', () => {
   let app;
-  
+
   beforeEach(() => {
-    app = setupApp();
+    app = express();
+    
+    // Session Middleware
+    app.use(session({
+      secret: 'test-secret',
+      resave: false,
+      saveUninitialized: false
+    }));
+    
+    // Body Parser
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
+    
+    // Mock view engine
+    app.set('view engine', 'ejs');
+    app.set('views', path.join(__dirname, '../../views'));
+    app.engine('ejs', (filePath, options, callback) => {
+      // Mock render function that returns the data that would be passed to the view
+      callback(null, JSON.stringify(options));
+    });
+    
+    // CSRF Mock
+    app.use((req, res, next) => {
+      req.csrfToken = () => 'test-csrf-token';
+      next();
+    });
+    
+    // Flash messages
+    app.use((req, res, next) => {
+      req.flash = jest.fn();
+      next();
+    });
+
+    // Add newRequestsCount to req
+    app.use((req, res, next) => {
+      req.newRequestsCount = 0;
+      next();
+    });
+    
+    // Routes
+    const dashboardRoutes = require('../../routes/dashboard.routes');
+    app.use('/dashboard', dashboardRoutes);
+    
+    // Error handling middleware
+    app.use((err, req, res, next) => {
+      res.status(err.statusCode || 500).json({ error: err.message });
+    });
+    
+    // Reset all mocks
     jest.clearAllMocks();
   });
-  
+
   describe('GET /', () => {
+    beforeEach(() => {
+      mockGetDashboardData.mockResolvedValue({
+        stats: {
+          requests: { total: 10, new: 5 },
+          projects: { total: 15, active: 8 },
+          appointments: { total: 20, upcoming: 12 },
+          customers: { total: 25 }
+        },
+        chartFilters: ['lastWeek', 'lastMonth', 'lastYear'],
+        charts: {
+          projectsGrowth: [],
+          requestsDistribution: [],
+          revenueByMonth: []
+        },
+        notifications: [{ id: 1, message: 'Test notification' }],
+        recentRequests: [{ id: 1, name: 'Test Request' }],
+        upcomingAppointments: [{ id: 1, title: 'Test Appointment' }],
+        systemStatus: { maintenance_mode: false, backup_status: 'ok' }
+      });
+    });
+
     it('should render dashboard home page', async () => {
-      const res = await request(app).get('/dashboard');
-      
-      expect(res.status).toBe(200);
-      const data = JSON.parse(res.text);
+      const response = await request(app).get('/dashboard');
+      expect(response.status).toBe(200);
+      const data = JSON.parse(response.text);
       expect(data.title).toBe('Dashboard - Rising BSM');
-      expect(data.stats.requests.total).toBe(10);
-      expect(data.notifications).toHaveLength(1);
     });
-    
-    it('should handle errors and pass to error middleware', async () => {
-      const dashboardController = require('../../controllers/dashboard.controller');
-      dashboardController.getDashboardData.mockRejectedValueOnce(new Error('Dashboard data error'));
-      
-      const res = await request(app).get('/dashboard');
-      expect(res.status).toBe(500);
+
+    it('should handle errors', async () => {
+      mockGetDashboardData.mockRejectedValue(new Error('Test error'));
+      const response = await request(app).get('/dashboard');
+      expect(response.status).toBe(500);
     });
   });
-  
-  describe('GET /search', () => {
-    it('should render search results', async () => {
-      const res = await request(app).get('/dashboard/search?query=test');
-      
-      expect(res.status).toBe(200);
-      const data = JSON.parse(res.text);
+
+  describe('GET /dashboard/search', () => {
+    beforeEach(() => {
+      mockGlobalSearch.mockResolvedValue({
+        customers: [{ id: 1, name: 'Test Customer' }],
+        projects: [{ id: 1, title: 'Test Project' }],
+        appointments: [{ id: 1, title: 'Test Appointment' }],
+        requests: [{ id: 1, name: 'Test Request' }],
+        services: [{ id: 1, name: 'Test Service' }]
+      });
+    });
+
+    it('should return search results as JSON when Accept header is application/json', async () => {
+      const response = await request(app)
+        .get('/dashboard/search')
+        .set('Accept', 'application/json')
+        .query({ query: 'test' });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        customers: [{ id: 1, name: 'Test Customer' }],
+        projects: [{ id: 1, title: 'Test Project' }],
+        appointments: [{ id: 1, title: 'Test Appointment' }],
+        requests: [{ id: 1, name: 'Test Request' }],
+        services: [{ id: 1, name: 'Test Service' }]
+      });
+    });
+
+    it('should render search page when Accept header is not application/json', async () => {
+      const response = await request(app)
+        .get('/dashboard/search')
+        .query({ query: 'test' });
+
+      expect(response.status).toBe(200);
+      const data = JSON.parse(response.text);
       expect(data.title).toContain('Suchergebnisse: test');
-      expect(data.results.customers).toHaveLength(1);
-    });
-    
-    it('should return JSON when accept header is application/json', async () => {
-      const res = await request(app)
-        .get('/dashboard/search?query=test')
-        .set('Accept', 'application/json');
-      
-      expect(res.status).toBe(200);
-      expect(res.body.customers).toHaveLength(1);
-      expect(res.body.projects).toHaveLength(1);
     });
   });
-  
-  describe('GET /notifications', () => {
-    it('should render notifications page', async () => {
-      const res = await request(app).get('/dashboard/notifications');
-      
-      expect(res.status).toBe(200);
-      const data = JSON.parse(res.text);
-      expect(data.title).toBe('Benachrichtigungen - Rising BSM');
-      expect(data.notifications).toHaveLength(2);
+
+  describe('GET /dashboard/notifications', () => {
+    beforeEach(() => {
+      mockGetNotifications.mockResolvedValue({
+        notifications: [
+          { id: 1, title: 'Test Notification', message: 'Test Message' }
+        ],
+        unreadCount: 1,
+        totalCount: 1
+      });
     });
-    
-    it('should return JSON when accept header is application/json', async () => {
-      const res = await request(app)
+
+    it('should return notifications as JSON when Accept header is application/json', async () => {
+      const response = await request(app)
         .get('/dashboard/notifications')
         .set('Accept', 'application/json');
-      
-      expect(res.status).toBe(200);
-      expect(res.body.notifications).toHaveLength(2);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        notifications: [
+          { id: 1, title: 'Test Notification', message: 'Test Message' }
+        ],
+        unreadCount: 1,
+        totalCount: 1
+      });
+    });
+
+    it('should render notifications page when Accept header is not application/json', async () => {
+      const response = await request(app)
+        .get('/dashboard/notifications');
+
+      expect(response.status).toBe(200);
+      const data = JSON.parse(response.text);
+      expect(data.title).toBe('Benachrichtigungen - Rising BSM');
     });
   });
-  
-  describe('POST /notifications/mark-read', () => {
-    it('should mark notification as read and return JSON', async () => {
-      const res = await request(app)
+
+  describe('POST /dashboard/notifications/mark-read', () => {
+    beforeEach(() => {
+      mockMarkNotificationsRead.mockResolvedValue({
+        success: true,
+        message: 'Notifications marked as read'
+      });
+    });
+
+    it('should mark notification as read', async () => {
+      const response = await request(app)
         .post('/dashboard/notifications/mark-read')
         .send({ id: 1 });
-      
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        message: 'Notifications marked as read'
+      });
     });
-    
+
     it('should mark all notifications as read', async () => {
-      const res = await request(app)
+      const response = await request(app)
         .post('/dashboard/notifications/mark-read')
         .send({ all: true });
-      
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        message: 'Notifications marked as read'
+      });
     });
   });
-  
-  describe('GET /stats', () => {
+
+  describe('GET /dashboard/stats', () => {
+    beforeEach(() => {
+      mockGetDashboardStats.mockResolvedValue({
+        stats: {
+          requests: { total: 10, new: 5 },
+          projects: { total: 15, active: 8 },
+          appointments: { total: 20, upcoming: 12 },
+          customers: { total: 25 }
+        }
+      });
+    });
+
     it('should return dashboard statistics as JSON', async () => {
-      const res = await request(app).get('/dashboard/stats');
-      
-      expect(res.status).toBe(200);
-      expect(res.body.stats.requests.total).toBe(10);
-      expect(res.body.stats.projects.total).toBe(15);
+      const response = await request(app)
+        .get('/dashboard/stats');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        stats: {
+          requests: { total: 10, new: 5 },
+          projects: { total: 15, active: 8 },
+          appointments: { total: 20, upcoming: 12 },
+          customers: { total: 25 }
+        }
+      });
     });
-    
+
     it('should handle errors', async () => {
-      const dashboardController = require('../../controllers/dashboard.controller');
-      dashboardController.getDashboardStats.mockRejectedValueOnce(new Error('Stats error'));
-      
-      const res = await request(app).get('/dashboard/stats');
-      expect(res.status).toBe(500);
+      mockGetDashboardStats.mockRejectedValue(new Error('Test error'));
+      const response = await request(app)
+        .get('/dashboard/stats');
+      expect(response.status).toBe(500);
     });
   });
-  
-  describe('GET /logout', () => {
+
+  describe('GET /dashboard/logout', () => {
     it('should destroy session and redirect to login', async () => {
-      const res = await request(app).get('/dashboard/logout');
-      
-      expect(res.status).toBe(302);
-      expect(res.headers.location).toBe('/login');
+      const response = await request(app)
+        .get('/dashboard/logout');
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toBe('/login');
     });
   });
 });

@@ -26,10 +26,10 @@ jest.mock('multer', () => {
 
 // Fix for "resolve is not a function" error
 const profileController = require('../controllers/profile.controller');
-jest.mock('../controllers/profile.controller');
+jest.mock('../../controllers/profile.controller');
 
 // Mock middleware
-jest.mock('../../middleware/auth.middleware', () => ({
+jest.mock('../../middleware/auth', () => ({
   isAuthenticated: (req, res, next) => next()
 }));
 

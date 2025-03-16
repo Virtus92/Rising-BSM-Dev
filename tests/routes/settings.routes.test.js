@@ -3,23 +3,25 @@ const express = require('express');
 const session = require('express-session');
 const flash = require('connect-flash');
 const csrf = require('csurf');
+const settingsController = require('../../controllers/settings.controller');
 
-// Mock controllers and middleware
-jest.mock('../../controllers/settings.controller', () => ({
-  getUserSettings: jest.fn().mockResolvedValue({ settings: { sprache: 'de', dark_mode: false } }),
-  updateUserSettings: jest.fn().mockResolvedValue(true),
-  getSystemSettings: jest.fn().mockResolvedValue({ settings: { maintenance_mode: false } }),
-  updateSystemSettings: jest.fn().mockResolvedValue(true),
-  getBackupSettings: jest.fn().mockResolvedValue({ 
-    settings: { auto_backup: true }, 
-    backups: [{ id: 1, created_at: new Date() }] 
-  }),
-  updateBackupSettings: jest.fn().mockResolvedValue(true),
-  triggerManualBackup: jest.fn().mockResolvedValue(true)
-}));
+// Mock des Controllers
+jest.mock('../../controllers/settings.controller');
 
-jest.mock('../../middleware/auth.middleware', () => ({
-  isAuthenticated: (req, res, next) => next()
+// Mock der Auth-Middleware
+jest.mock('../../middleware/auth', () => ({
+  isAuthenticated: (req, res, next) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: 'Nicht authentifiziert' });
+    }
+    next();
+  },
+  isAdmin: (req, res, next) => {
+    if (!req.session.userRole || req.session.userRole !== 'admin') {
+      return res.status(403).json({ message: 'Keine Berechtigung' });
+    }
+    next();
+  }
 }));
 
 // Setup app for testing
@@ -60,7 +62,7 @@ const setupApp = () => {
   
   // Load routes
   const settingsRoutes = require('../../routes/settings.routes');
-  app.use('/dashboard/settings', settingsRoutes);
+  app.use('/settings', settingsRoutes);
   
   return app;
 };
@@ -74,99 +76,185 @@ describe('Settings Routes', () => {
   });
   
   describe('GET /', () => {
-    it('should render settings page with user settings', async () => {
-      const res = await request(app).get('/dashboard/settings');
-      
-      expect(res.status).toBe(200);
-      const data = JSON.parse(res.text);
-      expect(data.title).toBe('Einstellungen - Rising BSM');
-      expect(data.settings).toEqual({ sprache: 'de', dark_mode: false });
+    test('sollte Benutzereinstellungen zurückgeben', async () => {
+      const mockSettings = {
+        sprache: 'de',
+        dark_mode: false,
+        benachrichtigungen_email: true
+      };
+
+      settingsController.getUserSettings.mockResolvedValue(mockSettings);
+
+      const response = await request(app)
+        .get('/settings')
+        .expect(200);
+
+      expect(response.body.settings).toEqual(mockSettings);
+      expect(settingsController.getUserSettings).toHaveBeenCalledWith(1);
     });
-    
-    it('should handle errors and pass to error middleware', async () => {
-      const settingsController = require('../../controllers/settings.controller');
-      settingsController.getUserSettings.mockRejectedValueOnce(new Error('Database error'));
-      
-      const res = await request(app).get('/dashboard/settings');
-      expect(res.status).toBe(500);
+
+    test('sollte Fehler bei nicht authentifiziertem Benutzer zurückgeben', async () => {
+      app.use((req, res, next) => {
+        req.session.userId = null;
+        next();
+      });
+
+      await request(app)
+        .get('/settings')
+        .expect(401);
     });
   });
   
   describe('POST /update', () => {
-    it('should update user settings and redirect', async () => {
-      const res = await request(app)
-        .post('/dashboard/settings/update')
-        .send({ sprache: 'en', dark_mode: 'on' });
-      
-      expect(res.status).toBe(302);
-      expect(res.headers.location).toBe('/dashboard/settings');
+    test('sollte Benutzereinstellungen aktualisieren', async () => {
+      const settings = {
+        sprache: 'en',
+        dark_mode: true,
+        benachrichtigungen_email: false
+      };
+
+      settingsController.updateUserSettings.mockResolvedValue();
+
+      await request(app)
+        .post('/settings/update')
+        .send(settings)
+        .expect(302)
+        .expect('Location', '/settings');
+
+      expect(settingsController.updateUserSettings).toHaveBeenCalledWith(1, settings);
     });
-    
-    it('should handle errors during update', async () => {
-      const settingsController = require('../../controllers/settings.controller');
-      settingsController.updateUserSettings.mockRejectedValueOnce(new Error('Update failed'));
-      
-      const res = await request(app)
-        .post('/dashboard/settings/update')
-        .send({ sprache: 'en', dark_mode: 'on' });
-      
-      expect(res.status).toBe(302);
-      expect(res.headers.location).toBe('/dashboard/settings');
+
+    test('sollte Validierungsfehler behandeln', async () => {
+      settingsController.updateUserSettings.mockRejectedValue(
+        new Error('Ungültige Sprache')
+      );
+
+      await request(app)
+        .post('/settings/update')
+        .send({ sprache: 'invalid' })
+        .expect(302)
+        .expect('Location', '/settings');
     });
   });
   
   describe('GET /system', () => {
-    it('should render system settings page', async () => {
-      const res = await request(app).get('/dashboard/settings/system');
-      
-      expect(res.status).toBe(200);
-      const data = JSON.parse(res.text);
-      expect(data.title).toBe('Systemeinstellungen - Rising BSM');
-      expect(data.settings).toEqual({ maintenance_mode: false });
+    test('sollte Systemeinstellungen zurückgeben', async () => {
+      const mockSettings = {
+        maintenance_mode: false,
+        backup_interval: 'taeglich'
+      };
+
+      settingsController.getSystemSettings.mockResolvedValue(mockSettings);
+
+      const response = await request(app)
+        .get('/settings/system')
+        .expect(200);
+
+      expect(response.body.settings).toEqual(mockSettings);
+    });
+
+    test('sollte Zugriff für Nicht-Admins verweigern', async () => {
+      app.use((req, res, next) => {
+        req.session.userRole = 'user';
+        next();
+      });
+
+      await request(app)
+        .get('/settings/system')
+        .expect(403);
     });
   });
   
   describe('POST /system/update', () => {
-    it('should update system settings and redirect', async () => {
-      const res = await request(app)
-        .post('/dashboard/settings/system/update')
-        .send({ maintenance_mode: 'on' });
-      
-      expect(res.status).toBe(302);
-      expect(res.headers.location).toBe('/dashboard/settings/system');
+    test('sollte Systemeinstellungen aktualisieren', async () => {
+      const settings = {
+        maintenance_mode: true,
+        backup_interval: 'woechentlich'
+      };
+
+      settingsController.updateSystemSettings.mockResolvedValue();
+
+      await request(app)
+        .post('/settings/system/update')
+        .send(settings)
+        .expect(302)
+        .expect('Location', '/settings/system');
+
+      expect(settingsController.updateSystemSettings).toHaveBeenCalledWith(settings);
     });
   });
   
   describe('GET /backup', () => {
-    it('should render backup settings page', async () => {
-      const res = await request(app).get('/dashboard/settings/backup');
-      
-      expect(res.status).toBe(200);
-      const data = JSON.parse(res.text);
-      expect(data.title).toBe('Backup Einstellungen - Rising BSM');
-      expect(data.settings).toEqual({ auto_backup: true });
-      expect(data.backups).toHaveLength(1);
+    test('sollte Backup-Einstellungen zurückgeben', async () => {
+      const mockData = {
+        settings: {
+          automatisch: true,
+          intervall: 'taeglich'
+        },
+        backups: [
+          { id: 1, dateiname: 'backup1.sql', status: 'erfolgreich' }
+        ]
+      };
+
+      settingsController.getBackupSettings.mockResolvedValue(mockData);
+
+      const response = await request(app)
+        .get('/settings/backup')
+        .expect(200);
+
+      expect(response.body.settings).toEqual(mockData.settings);
+      expect(response.body.backups).toEqual(mockData.backups);
     });
   });
   
   describe('POST /backup/update', () => {
-    it('should update backup settings and redirect', async () => {
-      const res = await request(app)
-        .post('/dashboard/settings/backup/update')
-        .send({ auto_backup: 'on' });
-      
-      expect(res.status).toBe(302);
-      expect(res.headers.location).toBe('/dashboard/settings/backup');
+    test('sollte Backup-Einstellungen aktualisieren', async () => {
+      const settings = {
+        automatisch: true,
+        intervall: 'taeglich',
+        zeit: '02:00',
+        aufbewahrung: 7
+      };
+
+      settingsController.updateBackupSettings.mockResolvedValue();
+
+      await request(app)
+        .post('/settings/backup/update')
+        .send(settings)
+        .expect(302)
+        .expect('Location', '/settings/backup');
+
+      expect(settingsController.updateBackupSettings).toHaveBeenCalledWith(settings);
     });
   });
   
   describe('POST /backup/trigger', () => {
-    it('should trigger manual backup and redirect', async () => {
-      const res = await request(app)
-        .post('/dashboard/settings/backup/trigger');
-      
-      expect(res.status).toBe(302);
-      expect(res.headers.location).toBe('/dashboard/settings/backup');
+    test('sollte manuelles Backup starten', async () => {
+      const mockResult = {
+        backupId: 1,
+        fileName: 'manual_backup_2024-01-01.sql',
+        status: 'ausstehend'
+      };
+
+      settingsController.triggerManualBackup.mockResolvedValue(mockResult);
+
+      await request(app)
+        .post('/settings/backup/trigger')
+        .expect(302)
+        .expect('Location', '/settings/backup');
+
+      expect(settingsController.triggerManualBackup).toHaveBeenCalled();
+    });
+
+    test('sollte Fehler beim Backup-Start behandeln', async () => {
+      settingsController.triggerManualBackup.mockRejectedValue(
+        new Error('Backup-Fehler')
+      );
+
+      await request(app)
+        .post('/settings/backup/trigger')
+        .expect(302)
+        .expect('Location', '/settings/backup');
     });
   });
 });

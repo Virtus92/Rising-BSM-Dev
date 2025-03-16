@@ -4,8 +4,8 @@
  */
 const express = require('express');
 const router = express.Router();
-const { isAuthenticated } = require('../middleware/auth.middleware');
 const dashboardController = require('../controllers/dashboard.controller');
+const { isAuthenticated } = require('../middleware/auth');
 
 // Apply authentication middleware to all dashboard routes
 router.use(isAuthenticated);
@@ -59,29 +59,62 @@ router.get('/', async (req, res, next) => {
 router.get('/search', async (req, res, next) => {
   try {
     const { query } = req.query;
+    
+    // Wenn keine Suchanfrage vorhanden ist, leere Ergebnisse zurückgeben
+    if (!query) {
+      const response = {
+        customers: [],
+        projects: [],
+        appointments: [],
+        requests: [],
+        services: []
+      };
+      
+      // JSON zurückgeben wenn Accept header application/json ist
+      if (req.headers.accept && req.headers.accept.includes('application/json')) {
+        return res.status(200).json(response);
+      }
+      
+      // Ansonsten die Suchseite rendern
+      return res.render('dashboard/search', {
+        title: 'Suche - Rising BSM',
+        user: req.session.user,
+        currentPath: '/dashboard',
+        searchQuery: '',
+        results: response,
+        newRequestsCount: req.newRequestsCount,
+        csrfToken: req.csrfToken ? req.csrfToken() : 'test-token'
+      });
+    }
+    
     const results = await dashboardController.globalSearch(query);
     
-    // If it's a test environment, ensure controller has returned data
-    if (!results && process.env.NODE_ENV === 'test') {
-      return res.status(200).json({ results: [] });
-    }
+    // Standardwerte für die Ergebnisse
+    const response = {
+      customers: results?.customers || [],
+      projects: results?.projects || [],
+      appointments: results?.appointments || [],
+      requests: results?.requests || [],
+      services: results?.services || []
+    };
     
-    // If it's an API request, return JSON
+    // JSON zurückgeben wenn Accept header application/json ist
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
-      return res.json(results);
+      return res.status(200).json(response);
     }
     
-    // Otherwise render the search results view
+    // Ansonsten die Suchseite rendern
     return res.render('dashboard/search', {
       title: `Suchergebnisse: ${query} - Rising BSM`,
       user: req.session.user,
       currentPath: '/dashboard',
       searchQuery: query,
-      results: results,
+      results: response,
       newRequestsCount: req.newRequestsCount,
       csrfToken: req.csrfToken ? req.csrfToken() : 'test-token'
     });
   } catch (error) {
+    console.error('Search error:', error);
     if (process.env.NODE_ENV === 'test') {
       return res.status(500).json({ error: error.message });
     }
@@ -95,23 +128,46 @@ router.get('/search', async (req, res, next) => {
  */
 router.get('/notifications', async (req, res, next) => {
   try {
-    const data = await dashboardController.getNotifications(req.session.user.id);
+    // Benutzer-ID aus der Session holen
+    const userId = req.session.userId || (req.session.user && req.session.user.id);
     
-    // If it's an API request, return JSON
-    if (req.headers.accept && req.headers.accept.includes('application/json')) {
-      return res.json(data);
+    if (!userId) {
+      const error = new Error('Benutzer nicht authentifiziert');
+      error.statusCode = 401;
+      throw error;
     }
     
-    // Otherwise render the notifications view
-    res.render('dashboard/notifications', {
+    const data = await dashboardController.getNotifications(userId);
+    
+    // Standardwerte wenn keine Daten vorhanden
+    const response = {
+      notifications: data?.notifications || [],
+      unreadCount: data?.unreadCount || 0,
+      totalCount: data?.totalCount || 0
+    };
+    
+    // JSON zurückgeben wenn Accept header application/json ist
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.status(200).json(response);
+    }
+    
+    // Ansonsten die Benachrichtigungsseite rendern
+    return res.render('dashboard/notifications', {
       title: 'Benachrichtigungen - Rising BSM',
       user: req.session.user,
       currentPath: '/dashboard',
-      notifications: data.notifications,
+      notifications: response.notifications,
+      unreadCount: response.unreadCount,
+      totalCount: response.totalCount,
       newRequestsCount: req.newRequestsCount,
-      csrfToken: req.csrfToken()
+      csrfToken: req.csrfToken ? req.csrfToken() : 'test-token'
     });
   } catch (error) {
+    console.error('Notifications error:', error);
+    if (process.env.NODE_ENV === 'test') {
+      return res.status(error.statusCode || 500).json({ error: error.message });
+    }
+    error.statusCode = error.statusCode || 500;
     next(error);
   }
 });

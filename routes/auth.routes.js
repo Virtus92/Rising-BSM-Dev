@@ -5,54 +5,37 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
-const { isNotAuthenticated } = require('../middleware/auth.middleware');
+const { validateLogin, validateRegistration } = require('../middleware/validation.middleware');
+const { csrfProtection } = require('../middleware/csrf.middleware');
 
 /**
  * @route   GET /login
  * @desc    Render login page
  */
-router.get('/login', isNotAuthenticated, (req, res, next) => {
-  try {
-    return res.status(200).render('login', {
-      title: 'Login - Rising BSM',
-      error: req.flash ? req.flash('error')[0] : null,
-      success: req.flash ? req.flash('success')[0] : null,
-      csrfToken: req.csrfToken ? req.csrfToken() : 'test-token'
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === 'test') {
-      return res.status(500).json({ error: error.message });
-    }
-    next(error);
-  }
+router.get('/login', csrfProtection, (req, res) => {
+  res.status(200).json({
+    title: 'Login - Rising BSM',
+    csrfToken: req.csrfToken()
+  });
 });
 
 /**
  * @route   POST /login
  * @desc    Process login
  */
-router.post('/login', isNotAuthenticated, async (req, res, next) => {
+router.post('/login', csrfProtection, validateLogin, async (req, res, next) => {
   try {
-    const result = await authController.login(req, res, next);
-    
-    // Create session with user data
-    req.session.user = result.user;
-    
-    // Set cookie lifetime for "remember me"
-    if (result.remember) {
-      req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+    const result = await authController.login(req.body);
+    if (result.success) {
+      req.session.user = result.user;
+      res.redirect('/dashboard');
     } else {
-      req.session.cookie.maxAge = 8 * 60 * 60 * 1000; // 8 hours
+      req.flash('error', result.message);
+      res.redirect('/login');
     }
-    
-    // Redirect to dashboard
-    return res.redirect('/dashboard');
   } catch (error) {
-    if (req.flash) req.flash('error', error.message || 'Login failed. Please try again.');
-    if (process.env.NODE_ENV === 'test') {
-      return res.status(401).json({ error: error.message || 'Login failed. Please try again.' });
-    }
-    return res.redirect('/login');
+    req.flash('error', 'Ein Fehler ist aufgetreten');
+    res.redirect('/login');
   }
 });
 
@@ -60,23 +43,39 @@ router.post('/login', isNotAuthenticated, async (req, res, next) => {
  * @route   GET /logout
  * @desc    Process logout
  */
-router.get('/logout', async (req, res, next) => {
+router.get('/logout', (req, res) => {
+  req.session.destroy();
+  res.redirect('/login');
+});
+
+/**
+ * @route   GET /register
+ * @desc    Render registration page
+ */
+router.get('/register', csrfProtection, (req, res) => {
+  res.status(200).json({
+    title: 'Registrierung - Rising BSM',
+    csrfToken: req.csrfToken()
+  });
+});
+
+/**
+ * @route   POST /register
+ * @desc    Process registration
+ */
+router.post('/register', csrfProtection, validateRegistration, async (req, res, next) => {
   try {
-    // Call logout controller if user is logged in
-    if (req.session && req.session.user) {
-      await authController.logout(req, res, next);
-    }
-    
-    // Destroy session
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Logout error:', err);
-      }
+    const result = await authController.register(req.body);
+    if (result.success) {
+      req.flash('success', 'Registrierung erfolgreich. Bitte melden Sie sich an.');
       res.redirect('/login');
-    });
+    } else {
+      req.flash('error', result.message);
+      res.redirect('/register');
+    }
   } catch (error) {
-    console.error('Logout error:', error);
-    res.redirect('/login');
+    req.flash('error', 'Ein Fehler ist aufgetreten');
+    res.redirect('/register');
   }
 });
 
@@ -84,36 +83,24 @@ router.get('/logout', async (req, res, next) => {
  * @route   GET /forgot-password
  * @desc    Render forgot password page
  */
-router.get('/forgot-password', isNotAuthenticated, (req, res, next) => {
-  try {
-    return res.status(200).render('forgot-password', {
-      title: 'Passwort vergessen - Rising BSM',
-      error: req.flash ? req.flash('error')[0] : null,
-      success: req.flash ? req.flash('success')[0] : null,
-      csrfToken: req.csrfToken ? req.csrfToken() : 'test-token'
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === 'test') {
-      return res.status(500).json({ error: error.message });
-    }
-    next(error);
-  }
+router.get('/forgot-password', csrfProtection, (req, res) => {
+  res.status(200).json({
+    title: 'Passwort vergessen - Rising BSM',
+    csrfToken: req.csrfToken()
+  });
 });
 
 /**
  * @route   POST /forgot-password
  * @desc    Process forgot password request
  */
-router.post('/forgot-password', isNotAuthenticated, async (req, res, next) => {
+router.post('/forgot-password', csrfProtection, async (req, res, next) => {
   try {
-    const result = await authController.forgotPassword(req, res, next);
-    
-    // In a real application, you would send an email with the reset link here
-    // We'll just set a success flash message
-    req.flash('success', result.message);
+    const result = await authController.forgotPassword(req.body.email);
+    req.flash('success', 'Falls ein Account mit dieser E-Mail existiert, wurde ein Reset-Link versendet.');
     res.redirect('/login');
   } catch (error) {
-    req.flash('error', error.message || 'An error occurred. Please try again.');
+    req.flash('error', 'Ein Fehler ist aufgetreten');
     res.redirect('/forgot-password');
   }
 });
@@ -122,27 +109,22 @@ router.post('/forgot-password', isNotAuthenticated, async (req, res, next) => {
  * @route   GET /reset-password/:token
  * @desc    Render reset password page
  */
-router.get('/reset-password/:token', isNotAuthenticated, async (req, res, next) => {
+router.get('/reset-password/:token', csrfProtection, async (req, res, next) => {
   try {
-    const { token } = req.params;
-    
-    // Validate token
-    const result = await authController.validateResetToken(req, res, next);
-    
-    return res.render('reset-password', {
-      title: 'Passwort zurücksetzen - Rising BSM',
-      token,
-      email: result.email,
-      error: req.flash ? req.flash('error')[0] : null,
-      success: req.flash ? req.flash('success')[0] : null,
-      csrfToken: req.csrfToken ? req.csrfToken() : 'test-token'
-    });
-  } catch (error) {
-    if (req.flash) req.flash('error', error.message || 'Invalid or expired reset link.');
-    if (process.env.NODE_ENV === 'test') {
-      return res.status(400).json({ error: error.message || 'Invalid or expired reset link.' });
+    const isValid = await authController.validateResetToken(req.params.token);
+    if (isValid) {
+      res.status(200).json({
+        title: 'Passwort zurücksetzen - Rising BSM',
+        token: req.params.token,
+        csrfToken: req.csrfToken()
+      });
+    } else {
+      req.flash('error', 'Ungültiger oder abgelaufener Reset-Link');
+      res.redirect('/login');
     }
-    return res.redirect('/login');
+  } catch (error) {
+    req.flash('error', 'Ein Fehler ist aufgetreten');
+    res.redirect('/login');
   }
 });
 
@@ -150,15 +132,19 @@ router.get('/reset-password/:token', isNotAuthenticated, async (req, res, next) 
  * @route   POST /reset-password/:token
  * @desc    Process reset password
  */
-router.post('/reset-password/:token', isNotAuthenticated, async (req, res, next) => {
+router.post('/reset-password/:token', csrfProtection, async (req, res, next) => {
   try {
-    const result = await authController.resetPassword(req, res, next);
-    
-    req.flash('success', result.message);
-    res.redirect('/login');
+    const result = await authController.resetPassword(req.params.token, req.body.password);
+    if (result.success) {
+      req.flash('success', 'Passwort wurde erfolgreich zurückgesetzt');
+      res.redirect('/login');
+    } else {
+      req.flash('error', result.message);
+      res.redirect('/reset-password/' + req.params.token);
+    }
   } catch (error) {
-    req.flash('error', error.message || 'Password reset failed. Please try again.');
-    res.redirect(`/reset-password/${req.params.token}`);
+    req.flash('error', 'Ein Fehler ist aufgetreten');
+    res.redirect('/reset-password/' + req.params.token);
   }
 });
 

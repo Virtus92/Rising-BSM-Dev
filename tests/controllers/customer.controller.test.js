@@ -1,6 +1,7 @@
 const customerController = require('../../controllers/customer.controller');
 const pool = require('../../services/db.service');
 const exportService = require('../../services/export.service');
+const { mockRequest, mockResponse, mockDbClient } = require('../setup');
 
 // Mock dependencies
 jest.mock('../../services/db.service');
@@ -36,20 +37,9 @@ describe('Customer Controller', () => {
     jest.clearAllMocks();
     
     // Setup mock request, response, next
-    mockReq = {
-      session: {
-        user: { id: 1, name: 'Test User' }
-      },
-      params: {},
-      query: {},
-      body: {}
-    };
-    
-    mockRes = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
-    };
-    
+    mockReq = mockRequest();
+    mockReq.session.user = { id: 1, name: 'Test User' };
+    mockRes = mockResponse();
     mockNext = jest.fn();
 
     // Default pool query mock implementation

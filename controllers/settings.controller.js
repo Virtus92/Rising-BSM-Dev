@@ -2,477 +2,211 @@
  * Settings Controller
  * Handles all application settings-related business logic
  */
-const pool = require('../services/db.service');
+const { pool } = require('../services/db.service');
 const fs = require('fs');
 const path = require('path');
+const { validateInput } = require('../utils/validators');
 
 /**
  * Get user settings
+ * @param {number} userId - ID des Benutzers
  */
-exports.getUserSettings = async (req, res, next) => {
-  try {
-    const userId = req.session.user.id;
-    
-    // Get user settings from database
-    const settingsQuery = await pool.query({
-      text: `
-        SELECT * FROM benutzer_einstellungen
-        WHERE benutzer_id = $1
-      `,
-      values: [userId]
-    });
-    
-    // Default settings if none exist
-    const settings = settingsQuery.rows.length > 0 ? settingsQuery.rows[0] : {
-      sprache: 'de',
-      dark_mode: false,
-      benachrichtigungen_email: true,
-      benachrichtigungen_intervall: 'sofort'
-    };
-    
-    return {
-      settings: {
-        sprache: settings.sprache || 'de',
-        dark_mode: settings.dark_mode || false,
-        benachrichtigungen_email: settings.benachrichtigungen_email || true,
-        benachrichtigungen_push: settings.benachrichtigungen_push || false,
-        benachrichtigungen_intervall: settings.benachrichtigungen_intervall || 'sofort'
-      }
-    };
-  } catch (error) {
-    console.error('Error getting user settings:', error);
-    error.success = false;
-    return next(error);
-  }
+exports.getUserSettings = async (userId) => {
+  const settingsQuery = await pool.query(
+    'SELECT * FROM benutzer_einstellungen WHERE benutzer_id = $1',
+    [userId]
+  );
+
+  // Default settings if none exist
+  return settingsQuery.rows[0] || {
+    sprache: 'de',
+    dark_mode: false,
+    benachrichtigungen_email: true,
+    benachrichtigungen_intervall: 'sofort'
+  };
 };
 
 /**
  * Update user settings
+ * @param {number} userId - ID des Benutzers
+ * @param {Object} settings - Neue Einstellungen
  */
-exports.updateUserSettings = async (req, res, next) => {
-  try {
-    const userId = req.session.user.id;
-    const { 
-      sprache, 
-      dark_mode, 
-      benachrichtigungen_email, 
-      benachrichtigungen_push, 
-      benachrichtigungen_intervall
-    } = req.body;
-    
-    // Validation
-    if (!sprache || !['de', 'en'].includes(sprache)) {
-      const error = new Error('Invalid language setting');
-      error.statusCode = 400;
-      error.success = false;
-      return next(error);
-    }
+exports.updateUserSettings = async (userId, settings) => {
+  const schema = {
+    sprache: { type: 'text', required: true, enum: ['de', 'en'] },
+    dark_mode: { type: 'boolean' },
+    benachrichtigungen_email: { type: 'boolean' },
+    benachrichtigungen_intervall: { type: 'text', enum: ['sofort', 'taeglich', 'woechentlich'] }
+  };
 
-    if (!benachrichtigungen_intervall || !['sofort', 'taeglich', 'woechentlich'].includes(benachrichtigungen_intervall)) {
-      const error = new Error('Invalid notification interval setting');
-      error.statusCode = 400;
-      error.success = false;
-      return next(error);
-    }
-    
-    // Check if settings exist for this user
-    const settingsQuery = await pool.query({
-      text: 'SELECT benutzer_id FROM benutzer_einstellungen WHERE benutzer_id = $1',
-      values: [userId]
-    });
-    
-    if (settingsQuery.rows.length === 0) {
-      // Create new settings
-      await pool.query({
-        text: `
-          INSERT INTO benutzer_einstellungen (
-            benutzer_id, 
-            sprache, 
-            dark_mode, 
-            benachrichtigungen_email, 
-            benachrichtigungen_push, 
-            benachrichtigungen_intervall
-          ) VALUES ($1, $2, $3, $4, $5, $6)
-        `,
-        values: [
-          userId,
-          sprache || 'de', 
-          dark_mode === 'on' || dark_mode === true, 
-          benachrichtigungen_email === 'on' || benachrichtigungen_email === true, 
-          benachrichtigungen_push === 'on' || benachrichtigungen_push === true,
-          benachrichtigungen_intervall || 'sofort'
-        ]
-      });
-    } else {
-      // Update existing settings
-      await pool.query({
-        text: `
-          UPDATE benutzer_einstellungen 
-          SET 
-            sprache = $1, 
-            dark_mode = $2, 
-            benachrichtigungen_email = $3, 
-            benachrichtigungen_push = $4, 
-            benachrichtigungen_intervall = $5,
-            updated_at = CURRENT_TIMESTAMP 
-          WHERE benutzer_id = $6
-        `,
-        values: [
-          sprache || 'de', 
-          dark_mode === 'on' || dark_mode === true, 
-          benachrichtigungen_email === 'on' || benachrichtigungen_email === true, 
-          benachrichtigungen_push === 'on' || benachrichtigungen_push === true,
-          benachrichtigungen_intervall || 'sofort',
-          userId
-        ]
-      });
-    }
-    
-    // Log activity
-    await pool.query({
-      text: `
-        INSERT INTO benutzer_aktivitaet (
-          benutzer_id, aktivitaet, ip_adresse
-        ) VALUES ($1, $2, $3)
-      `,
-      values: [
-        userId,
-        'settings_updated',
-        req.ip
-      ]
-    });
-    
-    return {
-      success: true,
-      message: 'Settings updated successfully'
-    };
-  } catch (error) {
-    console.error('Error updating user settings:', error);
-    error.success = false; // Ensure error object has success property
-    next(error);
+  const validation = validateInput(settings, schema);
+  if (!validation.isValid) {
+    throw new Error('Ungültige Einstellungen: ' + Object.values(validation.errors).join(', '));
+  }
+
+  const { sprache, dark_mode, benachrichtigungen_email, benachrichtigungen_intervall } = validation.data;
+
+  // Prüfen ob Einstellungen existieren
+  const existingSettings = await pool.query(
+    'SELECT benutzer_id FROM benutzer_einstellungen WHERE benutzer_id = $1',
+    [userId]
+  );
+
+  if (existingSettings.rows.length > 0) {
+    await pool.query(
+      `UPDATE benutzer_einstellungen 
+       SET sprache = $1, dark_mode = $2, benachrichtigungen_email = $3, 
+           benachrichtigungen_intervall = $4, updated_at = CURRENT_TIMESTAMP 
+       WHERE benutzer_id = $5`,
+      [sprache, dark_mode, benachrichtigungen_email, benachrichtigungen_intervall, userId]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO benutzer_einstellungen 
+       (benutzer_id, sprache, dark_mode, benachrichtigungen_email, benachrichtigungen_intervall) 
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, sprache, dark_mode, benachrichtigungen_email, benachrichtigungen_intervall]
+    );
   }
 };
 
 /**
- * Get system settings (admin only)
+ * Get system settings
  */
-exports.getSystemSettings = async (req, res, next) => {
-  try {
-    // Verify user is admin
-    if (req.session.user.role !== 'admin') {
-      const error = new Error('Unauthorized access to system settings');
-      error.statusCode = 403;
-      throw error;
+exports.getSystemSettings = async () => {
+  const settingsQuery = await pool.query(
+    'SELECT * FROM system_einstellungen ORDER BY kategorie, einstellung'
+  );
+
+  // Group settings by category
+  const settingsByCategory = {};
+  settingsQuery.rows.forEach(setting => {
+    if (!settingsByCategory[setting.kategorie]) {
+      settingsByCategory[setting.kategorie] = [];
     }
-    
-    // Get system settings from database
-    const settingsQuery = await pool.query(`
-      SELECT * FROM system_einstellungen
-      ORDER BY kategorie, einstellung
-    `);
-    
-    // Group settings by category
-    const settingsByCategory = {};
-    settingsQuery.rows.forEach(setting => {
-      if (!settingsByCategory[setting.kategorie]) {
-        settingsByCategory[setting.kategorie] = [];
-      }
-      settingsByCategory[setting.kategorie].push({
-        key: setting.einstellung,
-        value: setting.wert,
-        description: setting.beschreibung,
-        type: setting.typ
-      });
+    settingsByCategory[setting.kategorie].push({
+      key: setting.einstellung,
+      value: setting.wert,
+      description: setting.beschreibung,
+      type: setting.typ
     });
-    
-    return {
-      settings: settingsByCategory
-    };
-  } catch (error) {
-    console.error('Error getting system settings:', error);
-    error.success = false; // Ensure error object has success property
-    next(error);
+  });
+
+  return settingsByCategory;
+};
+
+/**
+ * Update system settings
+ * @param {Object} settings - Neue Systemeinstellungen
+ */
+exports.updateSystemSettings = async (settings) => {
+  const schema = {
+    maintenance_mode: { type: 'boolean' },
+    backup_interval: { type: 'text', enum: ['taeglich', 'woechentlich', 'monatlich'] },
+    log_level: { type: 'text', enum: ['error', 'warn', 'info', 'debug'] }
+  };
+
+  const validation = validateInput(settings, schema);
+  if (!validation.isValid) {
+    throw new Error('Ungültige Systemeinstellungen: ' + Object.values(validation.errors).join(', '));
+  }
+
+  // Update each setting
+  for (const [key, value] of Object.entries(validation.data)) {
+    await pool.query(
+      'UPDATE system_einstellungen SET wert = $1, updated_at = CURRENT_TIMESTAMP WHERE einstellung = $2',
+      [value, key]
+    );
   }
 };
 
 /**
- * Update system settings (admin only)
+ * Get backup settings
  */
-exports.updateSystemSettings = async (req, res, next) => {
-  try {
-    // Verify user is admin
-    if (req.session.user.role !== 'admin') {
-      const error = new Error('Unauthorized access to system settings');
-      error.statusCode = 403;
-      throw error;
-    }
-    
-    const { settings } = req.body;
-    
-    // Validate settings
-    if (!settings || typeof settings !== 'object') {
-      const error = new Error('Invalid settings data');
-      error.statusCode = 400;
-      error.success = false;
-      throw error;
-    }
-    
-    // Update each setting in the database
-    const updatePromises = Object.entries(settings).map(([key, value]) => {
-      return pool.query({
-        text: `
-          UPDATE system_einstellungen 
-          SET wert = $1, updated_at = CURRENT_TIMESTAMP 
-          WHERE einstellung = $2
-        `,
-        values: [value, key]
-      });
-    });
-    
-    await Promise.all(updatePromises);
-    
-    // Log activity
-    await pool.query({
-      text: `
-        INSERT INTO system_log (
-          aktion, benutzer_id, benutzer_name, details, ip_adresse
-        ) VALUES ($1, $2, $3, $4, $5)
-      `,
-      values: [
-        'system_settings_updated',
-        req.session.user.id,
-        req.session.user.name,
-        'System settings updated',
-        req.ip
-      ]
-    });
-    
-    return {
-      success: true,
-      message: 'System settings updated successfully'
-    };
-  } catch (error) {
-    console.error('Error updating system settings:', error);
-    error.success = false; // Ensure error object has success property
-    next(error);
-  }
+exports.getBackupSettings = async () => {
+  const settingsQuery = await pool.query(
+    'SELECT * FROM backup_einstellungen WHERE aktiv = true ORDER BY created_at DESC LIMIT 1'
+  );
+
+  const backupsQuery = await pool.query(
+    'SELECT * FROM backup_log ORDER BY erstellt_am DESC LIMIT 10'
+  );
+
+  // Default backup settings if none exist
+  const settings = settingsQuery.rows[0] || {
+    automatisch: true,
+    intervall: 'taeglich',
+    zeit: '02:00',
+    aufbewahrung: 7,
+    letzte_ausfuehrung: null,
+    status: 'nicht_ausgefuehrt'
+  };
+
+  return {
+    settings,
+    backups: backupsQuery.rows.map(backup => ({
+      id: backup.id,
+      dateiname: backup.dateiname,
+      groesse: backup.groesse,
+      datum: backup.erstellt_am,
+      status: backup.status
+    }))
+  };
 };
 
 /**
- * Get backup settings (admin only)
+ * Update backup settings
+ * @param {Object} settings - Neue Backup-Einstellungen
  */
-exports.getBackupSettings = async (req, res, next) => {
-  try {
-    // Verify user is admin
-    if (req.session.user.role !== 'admin') {
-      const error = new Error('Unauthorized access to backup settings');
-      error.statusCode = 403;
-      throw error;
-    }
-    
-    // Get backup settings from database
-    const settingsQuery = await pool.query(`
-      SELECT * FROM backup_einstellungen
-      WHERE aktiv = true
-      ORDER BY created_at DESC
-      LIMIT 1
-    `);
-    
-    // Default backup settings if none exist
-    const backupSettings = settingsQuery.rows.length > 0 ? settingsQuery.rows[0] : {
-      automatisch: true,
-      intervall: 'taeglich',
-      zeit: '02:00',
-      aufbewahrung: 7,
-      letzte_ausfuehrung: null,
-      status: 'nicht_ausgefuehrt'
-    };
-    
-    // Get recent backups
-    const backupsQuery = await pool.query(`
-      SELECT * FROM backup_log
-      ORDER BY erstellt_am DESC
-      LIMIT 10
-    `);
-    
-    return {
-      settings: {
-        automatisch: backupSettings.automatisch,
-        intervall: backupSettings.intervall,
-        zeit: backupSettings.zeit,
-        aufbewahrung: backupSettings.aufbewahrung,
-        letzte_ausfuehrung: backupSettings.letzte_ausfuehrung,
-        status: backupSettings.status
-      },
-      backups: backupsQuery.rows.map(backup => ({
-        id: backup.id,
-        dateiname: backup.dateiname,
-        groesse: backup.groesse,
-        datum: backup.erstellt_am,
-        status: backup.status
-      }))
-    };
-  } catch (error) {
-    console.error('Error getting backup settings:', error);
-    error.success = false; // Ensure error object has success property
-    next(error);
+exports.updateBackupSettings = async (settings) => {
+  const schema = {
+    automatisch: { type: 'boolean' },
+    intervall: { type: 'text', required: true, enum: ['taeglich', 'woechentlich', 'monatlich'] },
+    zeit: { type: 'text', required: true, pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$' },
+    aufbewahrung: { type: 'numeric', min: 1, max: 365 }
+  };
+
+  const validation = validateInput(settings, schema);
+  if (!validation.isValid) {
+    throw new Error('Ungültige Backup-Einstellungen: ' + Object.values(validation.errors).join(', '));
   }
+
+  const { automatisch, intervall, zeit, aufbewahrung } = validation.data;
+
+  // Deactivate old settings
+  await pool.query(
+    'UPDATE backup_einstellungen SET aktiv = false WHERE aktiv = true'
+  );
+
+  // Insert new settings
+  await pool.query(
+    `INSERT INTO backup_einstellungen 
+     (automatisch, intervall, zeit, aufbewahrung, aktiv) 
+     VALUES ($1, $2, $3, $4, true)`,
+    [automatisch, intervall, zeit, aufbewahrung]
+  );
 };
 
 /**
- * Update backup settings (admin only)
+ * Trigger manual backup
  */
-exports.updateBackupSettings = async (req, res, next) => {
-  try {
-    // Verify user is admin
-    if (req.session.user.role !== 'admin') {
-      const error = new Error('Unauthorized access to backup settings');
-      error.statusCode = 403;
-      throw error;
-    }
-    
-    const { 
-      automatisch, 
-      intervall, 
-      zeit, 
-      aufbewahrung 
-    } = req.body;
-    
-    // Validation
-    if (!intervall || !['taeglich', 'woechentlich', 'monatlich'].includes(intervall)) {
-      const error = new Error('Invalid backup interval');
-      error.statusCode = 400;
-      error.success = false;
-      return next(error);
-    }
+exports.triggerManualBackup = async () => {
+  const backupFileName = `manual_backup_${new Date().toISOString().replace(/[:.]/g, '_')}.sql`;
+  
+  // Create backup log entry
+  const result = await pool.query(
+    `INSERT INTO backup_log (dateiname, typ, status, details) 
+     VALUES ($1, 'manuell', 'ausstehend', 'Manuelles Backup gestartet') 
+     RETURNING id`,
+    [backupFileName]
+  );
 
-    if (!zeit || !/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(zeit)) {
-      const error = new Error('Invalid backup time format. Use HH:mm');
-      error.statusCode = 400;
-      error.success = false;
-      return next(error);
-    }
-    
-    // Insert new backup settings
-    await pool.query({
-      text: `
-        INSERT INTO backup_einstellungen (
-          automatisch, 
-          intervall, 
-          zeit, 
-          aufbewahrung, 
-          aktiv
-        ) VALUES ($1, $2, $3, $4, $5)
-      `,
-      values: [
-        automatisch === 'on' || automatisch === true,
-        intervall,
-        zeit,
-        parseInt(aufbewahrung || 7),
-        true
-      ]
-    });
-    
-    // Deactivate previous settings
-    await pool.query({
-      text: `
-        UPDATE backup_einstellungen 
-        SET aktiv = false 
-        WHERE created_at < CURRENT_TIMESTAMP
-        AND id NOT IN (
-          SELECT id FROM backup_einstellungen 
-          ORDER BY created_at DESC 
-          LIMIT 1
-        )
-      `
-    });
-    
-    // Log activity
-    await pool.query({
-      text: `
-        INSERT INTO system_log (
-          aktion, benutzer_id, benutzer_name, details, ip_adresse
-        ) VALUES ($1, $2, $3, $4, $5)
-      `,
-      values: [
-        'backup_settings_updated',
-        req.session.user.id,
-        req.session.user.name,
-        'Backup settings updated',
-        req.ip
-      ]
-    });
-    
-    return {
-      success: true,
-      message: 'Backup settings updated successfully'
-    };
-  } catch (error) {
-    console.error('Error updating backup settings:', error);
-    error.success = false; // Ensure error object has success property
-    next(error);
-  }
-};
-
-/**
- * Trigger manual backup (admin only)
- */
-exports.triggerManualBackup = async (req, res, next) => {
-  try {
-    // Verify user is admin
-    if (req.session.user.role !== 'admin') {
-      const error = new Error('Unauthorized access to backup functionality');
-      error.statusCode = 403;
-      throw error;
-    }
-    
-    // Start backup process (this would typically be handled by a separate backup service)
-    // For this example, we'll just record the request
-    
-    // Log backup request
-    await pool.query({
-      text: `
-        INSERT INTO backup_log (
-          dateiname, 
-          typ, 
-          benutzer_id, 
-          status,
-          details
-        ) VALUES ($1, $2, $3, $4, $5)
-      `,
-      values: [
-        `manual_backup_${new Date().toISOString().replace(/[:.]/g, '_')}.sql`,
-        'manuell',
-        req.session.user.id,
-        'ausstehend',
-        'Manual backup triggered'
-      ]
-    });
-    
-    // Log activity
-    await pool.query({
-      text: `
-        INSERT INTO system_log (
-          aktion, benutzer_id, benutzer_name, details, ip_adresse
-        ) VALUES ($1, $2, $3, $4, $5)
-      `,
-      values: [
-        'manual_backup',
-        req.session.user.id,
-        req.session.user.name,
-        'Manual backup triggered',
-        req.ip
-      ]
-    });
-    
-    return {
-      success: true,
-      message: 'Backup process initiated',
-      status: 'pending'
-    };
-  } catch (error) {
-    console.error('Error triggering manual backup:', error);
-    error.success = false; // Ensure error object has success property
-    next(error);
-  }
+  // Start backup process asynchronously
+  // This would typically be handled by a separate backup service
+  // For now, we just return the backup ID
+  return {
+    backupId: result.rows[0].id,
+    fileName: backupFileName,
+    status: 'ausstehend'
+  };
 };

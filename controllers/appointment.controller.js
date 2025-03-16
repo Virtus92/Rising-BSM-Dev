@@ -200,7 +200,7 @@ exports.getAppointmentById = async (req, res, next) => {
         dateFormatted: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy'),
         timeFormatted: formatDateSafely(appointment.termin_datum, 'HH:mm'),
         dauer: appointment.dauer || 60,
-        statusInfo: getStatusInfo(appointment.status),
+        statusInfo: getTerminStatusInfo(appointment.status),
         ort: appointment.ort || 'Nicht angegeben',
         beschreibung: appointment.beschreibung || 'Keine Beschreibung vorhanden',
         status: appointment.status,
@@ -309,7 +309,7 @@ exports.createAppointment = async (req, res, next) => {
         ort || null, 
         beschreibung || null, 
         status || 'geplant',
-        req.session.user.id
+        req.session?.user?.id || 1
       ]
     });
     
@@ -322,18 +322,21 @@ exports.createAppointment = async (req, res, next) => {
       `,
       values: [
         result.rows[0].id,
-        req.session.user.id,
-        req.session.user.name,
+        req.session?.user?.id || 1,
+        req.session?.user?.name || 'System',
         'created',
         'Appointment created'
       ]
     });
 
-    return {
+    const response = {
       success: true,
       appointmentId: result.rows[0].id,
       message: 'Appointment created successfully'
     };
+    
+    // Always use res.status().json() instead of returning directly
+    return res.status(201).json(response);
   } catch (error) {
     console.error('Error creating appointment:', error);
     error.success = false;
@@ -447,11 +450,14 @@ exports.updateAppointment = async (req, res, next) => {
       ]
     });
 
-    return {
+    const response = {
       success: true,
       appointmentId: id,
       message: 'Appointment updated successfully'
     };
+    
+    // Always use res.json() instead of conditional returns
+    return res.json(response);
   } catch (error) {
     console.error('Error updating appointment:', error);
     error.success = false;
@@ -521,11 +527,14 @@ exports.updateAppointmentStatus = async (req, res, next) => {
       ]
     });
 
-    return {
+    const response = {
       success: true,
       appointmentId: id,
       message: 'Appointment status updated successfully'
     };
+    
+    // Always use res.json() instead of conditional returns
+    return res.json(response);
   } catch (error) {
     console.error('Error updating appointment status:', error);
     error.success = false;
@@ -591,11 +600,14 @@ exports.addAppointmentNote = async (req, res, next) => {
       ]
     });
 
-    return {
+    const response = {
       success: true,
       appointmentId: id,
       message: 'Note added successfully'
     };
+    
+    // Always use res.json() instead of conditional returns
+    return res.json(response);
   } catch (error) {
     console.error('Error adding appointment note:', error);
     error.success = false;
@@ -661,7 +673,7 @@ exports.exportAppointments = async (req, res, next) => {
     const result = await pool.query(query);
     
     // Use export service to generate the appropriate format
-    return await exportService.generateExport(result.rows, format, {
+    const exportResult = await exportService.generateExport(result.rows, format, {
       filename: 'termine-export',
       title: 'Terminliste - Rising BSM',
       columns: [
@@ -681,6 +693,11 @@ exports.exportAppointments = async (req, res, next) => {
       ],
       filters: { start_date, end_date, status }
     });
+    
+    // Always set headers and send response
+    res.setHeader('Content-Type', exportResult.contentType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${exportResult.filename}"`);
+    return res.send(exportResult.content);
   } catch (error) {
     console.error('Error exporting appointments:', error);
     error.success = false;

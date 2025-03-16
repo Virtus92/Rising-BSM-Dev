@@ -34,7 +34,7 @@ jest.mock('../../controllers/auth.controller', () => ({
   })
 }));
 
-jest.mock('../../middleware/auth.middleware', () => ({
+jest.mock('../../middleware/auth', () => ({
   isAuthenticated: (req, res, next) => next(),
   isNotAuthenticated: (req, res, next) => {
     if (req.session && req.session.user && req.path !== '/logout') {
@@ -111,7 +111,7 @@ describe('Auth Routes', () => {
       const res = { redirect: jest.fn() };
       const next = jest.fn();
       
-      const authMiddleware = require('../../middleware/auth.middleware');
+      const authMiddleware = require('../../middleware/auth');
       authMiddleware.isNotAuthenticated(req, res, next);
       
       expect(res.redirect).toHaveBeenCalledWith('/dashboard');

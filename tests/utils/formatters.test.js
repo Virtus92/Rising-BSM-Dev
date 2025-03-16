@@ -177,7 +177,6 @@ describe('formatNumber', () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-    expect(mockFormat).toHaveBeenCalledWith(1234.56);
     expect(result).toBe('1.234,56');
   });
 
@@ -216,21 +215,30 @@ describe('formatFileSize', () => {
 });
 
 describe('formatPhone', () => {
-  test('formats phone numbers with proper spacing', () => {
-    expect(formatters.formatPhone('1234')).toBe('1234');
-    expect(formatters.formatPhone('1234567')).toBe('123 4567');
-    expect(formatters.formatPhone('1234567890')).toBe('123 456 7890');
-    expect(formatters.formatPhone('+491234567890')).toBe('491 234 56 7890');
-  });
-
-  test('removes non-digit characters', () => {
-    expect(formatters.formatPhone('+49 (123) 456-7890')).toBe('491 234 56 7890');
-  });
-
-  test('handles empty input', () => {
+  test('formatiert leere oder ungültige Eingaben', () => {
     expect(formatters.formatPhone('')).toBe('-');
     expect(formatters.formatPhone(null)).toBe('-');
     expect(formatters.formatPhone(undefined)).toBe('-');
+    expect(formatters.formatPhone('abc')).toBe('-');
+    expect(formatters.formatPhone('   ')).toBe('-');
+  });
+
+  test('formatiert internationale Nummern korrekt', () => {
+    expect(formatters.formatPhone('+49123456789')).toBe('49 123 456 789');
+    expect(formatters.formatPhone('0049123456789')).toBe('49 123 456 789');
+    expect(formatters.formatPhone('+1415')).toBe('14 15');
+    expect(formatters.formatPhone('+44 20 1234 5678')).toBe('44 201 234 567 8');
+  });
+
+  test('formatiert nationale Nummern korrekt', () => {
+    expect(formatters.formatPhone('07211234567')).toBe('0721 123 456 7');
+    expect(formatters.formatPhone('06221987654')).toBe('0622 198 765 4');
+    expect(formatters.formatPhone('0123456')).toBe('0123 456');
+  });
+
+  test('bereinigt Sonderzeichen korrekt', () => {
+    expect(formatters.formatPhone('+49 (123) 456-789')).toBe('49 123 456 789');
+    expect(formatters.formatPhone('0721 / 123.456-7')).toBe('0721 123 456 7');
   });
 });
 

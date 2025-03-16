@@ -24,13 +24,11 @@ router.get('/', (req, res, next) => {
     return res.render('index', { 
       title: 'Rising BSM – Ihre Allround-Experten',
       user: req.session.user || null,
-      csrfToken: req.csrfToken ? req.csrfToken() : 'test-token' 
+      csrfToken: req.csrfToken ? req.csrfToken() : null
     });
   } catch (error) {
-    if (process.env.NODE_ENV === 'test') {
-      return res.status(500).json({ error: error.message });
-    }
-    next(error);
+    console.error('Fehler auf der Startseite:', error);
+    return next(error);
   }
 });
 
@@ -45,10 +43,8 @@ router.get('/impressum', (req, res, next) => {
       user: req.session.user || null
     });
   } catch (error) {
-    if (process.env.NODE_ENV === 'test') {
-      return res.status(500).json({ error: error.message });
-    }
-    next(error);
+    console.error('Fehler auf der Impressum-Seite:', error);
+    return next(error);
   }
 });
 
@@ -63,10 +59,8 @@ router.get('/datenschutz', (req, res, next) => {
       user: req.session.user || null
     });
   } catch (error) {
-    if (process.env.NODE_ENV === 'test') {
-      return res.status(500).json({ error: error.message });
-    }
-    next(error);
+    console.error('Fehler auf der Datenschutz-Seite:', error);
+    return next(error);
   }
 });
 
@@ -81,10 +75,8 @@ router.get('/agb', (req, res, next) => {
       user: req.session.user || null
     });
   } catch (error) {
-    if (process.env.NODE_ENV === 'test') {
-      return res.status(500).json({ error: error.message });
-    }
-    next(error);
+    console.error('Fehler auf der AGB-Seite:', error);
+    return next(error);
   }
 });
 
@@ -92,16 +84,19 @@ router.get('/agb', (req, res, next) => {
  * @route   POST /contact
  * @desc    Process contact form submission
  */
-router.post('/contact', contactLimiter, async (req, res, next) => {
+router.post('/contact', contactLimiter, async (req, res) => {
   try {
-    const result = await contactController.submitContact(req, res);
+    const result = await contactController.submitContact(req);
     
-    // If it's an API request, return JSON
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
-      return res.json(result);
+      return res.status(result.statusCode || 200).json({
+        success: result.success,
+        message: result.message || result.error,
+        errors: result.errors,
+        requestId: result.requestId
+      });
     }
     
-    // Handle result with appropriate redirect
     if (result.success) {
       if (req.flash) req.flash('success', result.message);
       return res.redirect('/#contact-success');
@@ -110,10 +105,17 @@ router.post('/contact', contactLimiter, async (req, res, next) => {
       return res.redirect('/#contact-error');
     }
   } catch (error) {
-    if (process.env.NODE_ENV === 'test') {
-      return res.status(500).json({ success: false, error: error.message });
+    console.error('Fehler beim Kontaktformular:', error);
+    
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.' 
+      });
     }
-    next(error);
+    
+    if (req.flash) req.flash('error', 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
+    return res.redirect('/#contact-error');
   }
 });
 

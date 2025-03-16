@@ -1,6 +1,7 @@
 const profileController = require('../../controllers/profile.controller');
 const pool = require('../../services/db.service');
 const bcrypt = require('bcryptjs');
+const { mockRequest, mockResponse, mockDbClient } = require('../setup');
 
 // Mock dependencies
 jest.mock('../../services/db.service');
@@ -16,19 +17,9 @@ describe('Profile Controller', () => {
     jest.clearAllMocks();
     
     // Setup mock request, response, next
-    mockReq = {
-      session: {
-        user: { id: 1, name: 'Test User', email: 'test@example.com', role: 'user' }
-      },
-      ip: '127.0.0.1',
-      body: {}
-    };
-    
-    mockRes = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
-    };
-    
+    mockReq = mockRequest();
+    mockReq.session.user = { id: 1, name: 'Test User', email: 'test@example.com', role: 'user' };
+    mockRes = mockResponse();
     mockNext = jest.fn();
 
     // Default pool query mock implementation

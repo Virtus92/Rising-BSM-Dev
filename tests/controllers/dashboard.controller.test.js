@@ -1,6 +1,7 @@
 const dashboardController = require('../../controllers/dashboard.controller');
 const pool = require('../../services/db.service');
 const cacheService = require('../../services/cache.service');
+const { mockRequest, mockResponse, mockDbClient } = require('../setup');
 
 // Mock dependencies
 jest.mock('../../services/db.service');
@@ -12,25 +13,18 @@ jest.mock('../../utils/helpers', () => ({
 describe('Dashboard Controller', () => {
   let mockReq;
   let mockRes;
+  let mockNext;
 
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
     
-    // Setup mock request, response
-    mockReq = {
-      session: {
-        user: { id: 1, name: 'Test User' }
-      },
-      query: {},
-      params: {},
-      ip: '127.0.0.1'
-    };
-    
-    mockRes = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
-    };
+    // Setup mock request, response, next
+    mockReq = mockRequest();
+    mockReq.session.user = { id: 1, name: 'Test User' };
+    mockReq.ip = '127.0.0.1';
+    mockRes = mockResponse();
+    mockNext = jest.fn();
 
     // Default pool query mock implementation
     pool.query = jest.fn().mockResolvedValue({ rows: [] });

@@ -1,4 +1,4 @@
- /**
+/**
  * Validation middleware for input data
  */
 const validator = require('validator');
@@ -240,6 +240,85 @@ exports.validateStatusUpdate = (req, res, next) => {
       error.validationErrors = errors;
       throw error;
     }
+    
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Validates login data
+ */
+exports.validateLogin = (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    const errors = [];
+    
+    // Required fields
+    if (!email || typeof email !== 'string' || email.trim() === '') {
+      errors.push('Email is required');
+    } else if (!validator.isEmail(email)) {
+      errors.push('Please enter a valid email address');
+    }
+    
+    if (!password || typeof password !== 'string' || password.trim() === '') {
+      errors.push('Password is required');
+    }
+    
+    // If there are validation errors
+    if (errors.length > 0) {
+      const error = new Error(errors.join('. '));
+      error.statusCode = 400;
+      error.validationErrors = errors;
+      throw error;
+    }
+    
+    // Sanitize inputs
+    req.body.email = validator.normalizeEmail(email.trim());
+    
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Validates registration data
+ */
+exports.validateRegistration = (req, res, next) => {
+  try {
+    const { email, password, name } = req.body;
+    const errors = [];
+    
+    // Required fields
+    if (!email || typeof email !== 'string' || email.trim() === '') {
+      errors.push('Email is required');
+    } else if (!validator.isEmail(email)) {
+      errors.push('Please enter a valid email address');
+    }
+    
+    if (!password || typeof password !== 'string' || password.trim() === '') {
+      errors.push('Password is required');
+    } else if (password.length < 8) {
+      errors.push('Password must be at least 8 characters long');
+    }
+    
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      errors.push('Name is required');
+    }
+    
+    // If there are validation errors
+    if (errors.length > 0) {
+      const error = new Error(errors.join('. '));
+      error.statusCode = 400;
+      error.validationErrors = errors;
+      throw error;
+    }
+    
+    // Sanitize inputs
+    req.body.email = validator.normalizeEmail(email.trim());
+    req.body.name = validator.escape(name.trim());
     
     next();
   } catch (error) {

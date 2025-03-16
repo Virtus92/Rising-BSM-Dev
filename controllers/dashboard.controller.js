@@ -123,25 +123,25 @@ exports.getDashboardStats = async () => {
       `);
       
       // Calculate trends
-      const newRequestsCount = parseInt(newRequestsQuery.rows[0].count || 0);
-      const currentWeekCount = parseInt(currentWeekRequestsQuery.rows[0].count || 0);
-      const prevWeekCount = parseInt(prevWeekRequestsQuery.rows[0].count || 0);
+      const newRequestsCount = parseInt(newRequestsQuery.rows[0]?.count || 0);
+      const currentWeekCount = parseInt(currentWeekRequestsQuery.rows[0]?.count || 0);
+      const prevWeekCount = parseInt(prevWeekRequestsQuery.rows[0]?.count || 0);
       const newRequestsTrend = prevWeekCount > 0 ? 
         Math.round(((currentWeekCount - prevWeekCount) / prevWeekCount) * 100) : 0;
       
-      const activeProjectsCount = parseInt(activeProjectsQuery.rows[0].count || 0);
-      const currentMonthCount = parseInt(currentMonthProjectsQuery.rows[0].count || 0);
-      const prevMonthCount = parseInt(prevMonthProjectsQuery.rows[0].count || 0);
+      const activeProjectsCount = parseInt(activeProjectsQuery.rows[0]?.count || 0);
+      const currentMonthCount = parseInt(currentMonthProjectsQuery.rows[0]?.count || 0);
+      const prevMonthCount = parseInt(prevMonthProjectsQuery.rows[0]?.count || 0);
       const activeProjectsTrend = prevMonthCount > 0 ?
         Math.round(((currentMonthCount - prevMonthCount) / prevMonthCount) * 100) : 0;
       
-      const totalCustomersCount = parseInt(totalCustomersQuery.rows[0].count || 0);
-      const customersLastYear = parseInt(customersLastYearQuery.rows[0].count || 0);
+      const totalCustomersCount = parseInt(totalCustomersQuery.rows[0]?.count || 0);
+      const customersLastYear = parseInt(customersLastYearQuery.rows[0]?.count || 0);
       const totalCustomersTrend = customersLastYear > 0 ?
         Math.round(((totalCustomersCount - customersLastYear) / customersLastYear) * 100) : 0;
       
-      const monthlyRevenue = parseFloat(monthlyRevenueQuery.rows[0].summe || 0);
-      const prevMonthRevenue = parseFloat(prevMonthRevenueQuery.rows[0].summe || 0);
+      const monthlyRevenue = parseFloat(monthlyRevenueQuery.rows[0]?.summe || 0);
+      const prevMonthRevenue = parseFloat(prevMonthRevenueQuery.rows[0]?.summe || 0);
       const monthlyRevenueTrend = prevMonthRevenue > 0 ?
         Math.round(((monthlyRevenue - prevMonthRevenue) / prevMonthRevenue) * 100) : 0;
       
@@ -371,6 +371,7 @@ async function getUpcomingAppointments() {
           LEFT JOIN kunden k ON t.kunde_id = k.id
         WHERE 
           t.termin_datum >= CURRENT_DATE
+          AND t.termin_datum IS NOT NULL
         ORDER BY 
           t.termin_datum ASC
         LIMIT 5
@@ -378,18 +379,27 @@ async function getUpcomingAppointments() {
       
       // Format appointments
       return appointmentsQuery.rows.map(appointment => {
-        const datumObj = new Date(appointment.termin_datum);
-        const dateInfo = formatDateWithLabel(datumObj);
-        
-        return {
-          id: appointment.id,
-          title: appointment.titel,
-          customer: appointment.kunde_name || 'Kein Kunde zugewiesen',
-          dateLabel: dateInfo.label,
-          dateClass: dateInfo.class,
-          time: format(datumObj, 'HH:mm')
-        };
-      });
+        try {
+          const datumObj = new Date(appointment.termin_datum);
+          if (isNaN(datumObj.getTime())) {
+            console.error(`Invalid date format for appointment ${appointment.id}: ${appointment.termin_datum}`);
+            return null;
+          }
+          const dateInfo = formatDateWithLabel(datumObj);
+          
+          return {
+            id: appointment.id,
+            title: appointment.titel,
+            customer: appointment.kunde_name || 'Kein Kunde zugewiesen',
+            dateLabel: dateInfo.label,
+            dateClass: dateInfo.class,
+            time: format(datumObj, 'HH:mm')
+          };
+        } catch (error) {
+          console.error(`Error formatting appointment ${appointment.id}:`, error);
+          return null;
+        }
+      }).filter(appointment => appointment !== null);
     }, 120); // Cache for 2 minutes
   } catch (error) {
     console.error('Error fetching upcoming appointments:', error);
@@ -399,9 +409,96 @@ async function getUpcomingAppointments() {
 
 /**
  * Global search across all entities
+ * @param {string} query - Search query
  */
 exports.globalSearch = async (query) => {
-  if (!query || query.trim().length < 2) {
+  try {
+    // Return empty results for invalid queries
+    if (!query || query.length < 2) {
+      return {
+        customers: [],
+        projects: [],
+        appointments: [],
+        requests: [],
+        services: []
+      };
+    }
+
+    const searchTerm = `%${query}%`;
+    const results = {
+      customers: [],
+      projects: [],
+      appointments: [],
+      requests: [],
+      services: []
+    };
+
+    try {
+      const customersResult = await pool.query(`
+        SELECT id, firma, vorname, nachname, email 
+        FROM kunden 
+        WHERE LOWER(firma) LIKE LOWER($1) OR 
+              LOWER(vorname) LIKE LOWER($1) OR 
+              LOWER(nachname) LIKE LOWER($1)
+        LIMIT 5
+      `, [searchTerm]);
+      results.customers = customersResult.rows;
+    } catch (error) {
+      console.error('Error searching customers:', error);
+    }
+
+    try {
+      const projectsResult = await pool.query(`
+        SELECT id, titel, status 
+        FROM projekte 
+        WHERE LOWER(titel) LIKE LOWER($1)
+        LIMIT 5
+      `, [searchTerm]);
+      results.projects = projectsResult.rows;
+    } catch (error) {
+      console.error('Error searching projects:', error);
+    }
+
+    try {
+      const appointmentsResult = await pool.query(`
+        SELECT id, titel, datum 
+        FROM termine 
+        WHERE LOWER(titel) LIKE LOWER($1)
+        LIMIT 5
+      `, [searchTerm]);
+      results.appointments = appointmentsResult.rows;
+    } catch (error) {
+      console.error('Error searching appointments:', error);
+    }
+
+    try {
+      const requestsResult = await pool.query(`
+        SELECT id, name, email, status 
+        FROM kontaktanfragen 
+        WHERE LOWER(name) LIKE LOWER($1) OR 
+              LOWER(email) LIKE LOWER($1)
+        LIMIT 5
+      `, [searchTerm]);
+      results.requests = requestsResult.rows;
+    } catch (error) {
+      console.error('Error searching requests:', error);
+    }
+
+    try {
+      const servicesResult = await pool.query(`
+        SELECT id, name 
+        FROM services 
+        WHERE LOWER(name) LIKE LOWER($1)
+        LIMIT 5
+      `, [searchTerm]);
+      results.services = servicesResult.rows;
+    } catch (error) {
+      console.error('Error searching services:', error);
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Global search error:', error);
     return {
       customers: [],
       projects: [],
@@ -410,148 +507,62 @@ exports.globalSearch = async (query) => {
       services: []
     };
   }
-  
-  try {
-    const searchTerm = `%${query.toLowerCase()}%`;
-    
-    // Execute all search queries in parallel
-    const [
-      customerResults,
-      projectResults,
-      appointmentResults,
-      requestResults,
-      serviceResults
-    ] = await Promise.all([
-      // Search customers
-      pool.query(`
-        SELECT id, name, email, firma, telefon, status
-        FROM kunden 
-        WHERE 
-          LOWER(name) LIKE $1 OR 
-          LOWER(email) LIKE $1 OR
-          LOWER(firma) LIKE $1
-        LIMIT 5
-      `, [searchTerm]),
-      
-      // Search projects
-      pool.query(`
-        SELECT p.id, p.titel, p.status, p.start_datum, k.name as kunde_name
-        FROM projekte p
-        LEFT JOIN kunden k ON p.kunde_id = k.id
-        WHERE LOWER(p.titel) LIKE $1
-        LIMIT 5
-      `, [searchTerm]),
-      
-      // Search appointments
-      pool.query(`
-        SELECT t.id, t.titel, t.status, t.termin_datum, k.name as kunde_name
-        FROM termine t
-        LEFT JOIN kunden k ON t.kunde_id = k.id
-        WHERE LOWER(t.titel) LIKE $1
-        LIMIT 5
-      `, [searchTerm]),
-      
-      // Search requests
-      pool.query(`
-        SELECT id, name, email, service, status, created_at
-        FROM kontaktanfragen
-        WHERE LOWER(name) LIKE $1 OR LOWER(email) LIKE $1
-        LIMIT 5
-      `, [searchTerm]),
-      
-      // Search services
-      pool.query(`
-        SELECT id, name, beschreibung, preis_basis, einheit, aktiv
-        FROM dienstleistungen
-        WHERE LOWER(name) LIKE $1 OR LOWER(beschreibung) LIKE $1
-        LIMIT 5
-      `, [searchTerm])
-    ]);
-    
-    // Format and return results
-    return {
-      customers: customerResults.rows.map(customer => ({
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        firma: customer.firma,
-        telefon: customer.telefon,
-        status: customer.status,
-        type: 'Kunde',
-        url: `/dashboard/kunden/${customer.id}`
-      })),
-      
-      projects: projectResults.rows.map(project => ({
-        id: project.id,
-        title: project.titel,
-        status: project.status,
-        date: formatDateSafely(project.start_datum, 'dd.MM.yyyy'),
-        kunde: project.kunde_name,
-        type: 'Projekt',
-        url: `/dashboard/projekte/${project.id}`
-      })),
-      
-      appointments: appointmentResults.rows.map(appointment => ({
-        id: appointment.id,
-        title: appointment.titel,
-        status: appointment.status,
-        date: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy, HH:mm'),
-        kunde: appointment.kunde_name,
-        type: 'Termin',
-        url: `/dashboard/termine/${appointment.id}`
-      })),
-      
-      requests: requestResults.rows.map(request => ({
-        id: request.id,
-        name: request.name,
-        email: request.email,
-        status: request.status,
-        date: formatDateSafely(request.created_at, 'dd.MM.yyyy'),
-        type: 'Anfrage',
-        url: `/dashboard/requests/${request.id}`
-      })),
-      
-      services: serviceResults.rows.map(service => ({
-        id: service.id,
-        name: service.name,
-        preis: service.preis_basis,
-        einheit: service.einheit,
-        aktiv: service.aktiv,
-        type: 'Dienstleistung',
-        url: `/dashboard/dienste/${service.id}`
-      }))
-    };
-  } catch (error) {
-    console.error('Error performing global search:', error);
-    throw error;
-  }
 };
 
 /**
- * Get all notifications for a user
+ * Get notifications for a user
+ * @param {number} userId - User ID
  */
 exports.getNotifications = async (userId) => {
   try {
-    // Get notifications from database
-    const notificationsQuery = await pool.query(`
+    if (!userId) {
+      return {
+        notifications: [],
+        unreadCount: 0,
+        totalCount: 0
+      };
+    }
+
+    // Get notifications with counts in a single query
+    const result = await pool.query(`
+      WITH notification_data AS (
+        SELECT
+          id,
+          typ,
+          titel,
+          nachricht,
+          erstellt_am,
+          gelesen,
+          referenz_id
+        FROM benachrichtigungen
+        WHERE benutzer_id = $1
+        ORDER BY erstellt_am DESC
+      ),
+      notification_counts AS (
+        SELECT
+          COUNT(*) FILTER (WHERE gelesen = false) as unread_count,
+          COUNT(*) as total_count
+        FROM benachrichtigungen
+        WHERE benutzer_id = $1
+      )
       SELECT
-        id,
-        typ,
-        titel,
-        nachricht,
-        erstellt_am,
-        gelesen,
-        referenz_id
-      FROM
-        benachrichtigungen
-      WHERE
-        benutzer_id = $1
-      ORDER BY
-        erstellt_am DESC
+        json_agg(notification_data.*) as notifications,
+        (SELECT unread_count FROM notification_counts) as unread_count,
+        (SELECT total_count FROM notification_counts) as total_count
+      FROM notification_data
     `, [userId]);
-    
+
+    // If no notifications found, return empty result
+    if (!result.rows[0].notifications) {
+      return {
+        notifications: [],
+        unreadCount: 0,
+        totalCount: 0
+      };
+    }
+
     // Format notifications
-    const notifications = notificationsQuery.rows.map(notification => {
+    const notifications = result.rows[0].notifications.map(notification => {
       // Determine type and icon
       let type, icon;
       switch (notification.typ) {
@@ -571,8 +582,8 @@ exports.getNotifications = async (userId) => {
           type = 'info';
           icon = 'bell';
       }
-      
-      // Determine link based on type
+
+      // Generate link based on type
       let link;
       switch (notification.typ) {
         case 'anfrage':
@@ -587,7 +598,7 @@ exports.getNotifications = async (userId) => {
         default:
           link = '/dashboard/notifications';
       }
-      
+
       return {
         id: notification.id,
         title: notification.titel,
@@ -600,11 +611,19 @@ exports.getNotifications = async (userId) => {
         link
       };
     });
-    
-    return { notifications };
+
+    return {
+      notifications,
+      unreadCount: parseInt(result.rows[0].unread_count || 0),
+      totalCount: parseInt(result.rows[0].total_count || 0)
+    };
   } catch (error) {
     console.error('Error fetching notifications:', error);
-    throw error;
+    return {
+      notifications: [],
+      unreadCount: 0,
+      totalCount: 0
+    };
   }
 };
 

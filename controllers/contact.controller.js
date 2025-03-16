@@ -2,9 +2,11 @@
  * Contact Controller
  * Handles submission and processing of contact form submissions
  */
-const pool = require('../services/db.service');
+const { pool } = require('../services/db.service');
 const NotificationService = require('../services/notification.service');
 const { validateInput } = require('../utils/validators');
+const { sanitizeInput } = require('../utils/sanitizers');
+const { sendMail } = require('../services/mail.service');
 
 /**
  * Submit contact form
@@ -12,172 +14,86 @@ const { validateInput } = require('../utils/validators');
  * 
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- * @returns {Promise<void>}
+ * @returns {Promise<Object>} Response object with success status and message
  */
-exports.submitContact = async (req, res, next) => {
-  console.log('Request Body:', req.body); // Log the request body to the console
+async function submitContact(req, res, next) {
   try {
-    // Input validation schema
-    const validationSchema = {
-      name: { 
-        type: 'text', 
-        required: true, 
-        minLength: 2, 
-        maxLength: 100 
-      },
-      email: { 
-        type: 'email' 
-      },
-      phone: { 
-        type: 'phone', 
-        required: false 
-      },
-      service: { 
-        type: 'text', 
-        required: true 
-      },
-      message: { 
-        type: 'text', 
-        required: true, 
-        minLength: 10, 
-        maxLength: 1000 
-      }
+    // Validierungsschema
+    const schema = {
+      name: { type: 'text', required: true, maxLength: 100 },
+      email: { type: 'email', required: true },
+      telefon: { type: 'phone' },
+      nachricht: { type: 'text', required: true, maxLength: 2000 }
     };
 
-    // Validate input
-    const validationResult = validateInput(req.body, validationSchema);
+    // Validierung durchführen
+    const validation = validateInput(req.body, schema);
 
-    if (!validationResult.isValid) {
-      return res.status(400).json({
-        success: false,
-        errors: validationResult.errors
-      });
+    if (!validation.isValid) {
+      req.flash('error', 'Bitte überprüfen Sie Ihre Eingaben');
+      req.flash('errors', validation.errors);
+      req.flash('formData', req.body);
+      return res.redirect('/contact');
     }
 
-    const { 
-      name, 
-      email, 
-      phone = null, 
-      service, 
-      message 
-    } = validationResult.validatedData;
-
-    // Insert contact request into database
-    const result = await pool.query({
-      text: `
-        INSERT INTO kontaktanfragen (
-          name, 
-          email, 
-          phone, 
-          service, 
-          message, 
-          status,
-          ip_adresse
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7) 
-        RETURNING id
-      `,
-      values: [
-        name, 
-        email, 
-        phone, 
-        service, 
-        message, 
-        'neu', 
-        req.ip
-      ]
-    });
-
-    const requestId = result.rows[0].id;
-
-    // Determine notification recipient (admin users)
-    const adminQuery = await pool.query(`
-      SELECT id FROM benutzer 
-      WHERE rolle IN ('admin', 'manager')
-    `);
-
-    // Create notifications for admins
-    const notificationPromises = adminQuery.rows.map(admin => 
-      NotificationService.create({
-        userId: admin.id,
-        type: 'anfrage',
-        title: 'Neue Kontaktanfrage',
-        message: `Neue Anfrage von ${name} über ${service}`,
-        referenceId: requestId,
-        referenceType: 'kontaktanfragen'
-      })
+    // Kontaktanfrage in DB speichern
+    const { data } = validation;
+    await pool.query(
+      'INSERT INTO kontaktanfragen (name, email, telefon, nachricht) VALUES ($1, $2, $3, $4)',
+      [data.name, data.email, data.telefon, data.nachricht]
     );
 
-    await Promise.all(notificationPromises);
+    // E-Mail versenden
+    await sendMail({
+      to: process.env.CONTACT_EMAIL,
+      subject: 'Neue Kontaktanfrage',
+      text: `
+        Name: ${data.name}
+        E-Mail: ${data.email}
+        Telefon: ${data.telefon || 'Nicht angegeben'}
+        
+        Nachricht:
+        ${data.nachricht}
+      `
+    });
 
-    // Respond based on request type
-    if (req.xhr || req.headers.accept.includes('application/json')) {
-      return res.status(201).json({
-        success: true,
-        message: 'Ihre Anfrage wurde erfolgreich übermittelt. Wir melden uns bald bei Ihnen.',
-        requestId
-      });
-    } else {
-      req.flash('success', 'Ihre Anfrage wurde erfolgreich übermittelt. Wir melden uns bald bei Ihnen.');
-      return res.redirect('/');
-    }
-
-  } catch (error) {
-    console.error('Contact form submission error:', error);
-
-    // Handle specific error types
-    if (error.code === '23505') { // Unique constraint violation
-      return res.status(409).json({
-        success: false,
-        message: 'Eine ähnliche Anfrage wurde kürzlich bereits übermittelt.'
-      });
-    }
-
-    // Generic error handling
-    if (req.xhr || req.headers.accept.includes('application/json')) {
-      return res.status(500).json({
-        success: false,
-        message: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.'
-      });
-    } else {
-      req.flash('error', 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
-      return res.redirect('/');
-    }
+    req.flash('success', 'Ihre Nachricht wurde erfolgreich gesendet');
+    res.redirect('/contact');
+  } catch (err) {
+    next(err);
   }
-};
+}
 
 /**
  * Retrieve contact request details
  * Used for admin dashboard or detailed view
  * 
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- * @returns {Promise<Object>}
+ * @param {string} id - Contact request ID
+ * @returns {Promise<Object>} Contact request details
  */
-exports.getContactRequest = async (req, res, next) => {
+async function getContactRequest(req, res, next) {
   try {
-    const { id } = req.params;
-
-    const result = await pool.query({
-      text: `
+    const result = await pool.query(
+      `
         SELECT * FROM kontaktanfragen 
         WHERE id = $1
       `,
-      values: [id]
-    });
+      [req.params.id]
+    );
 
     if (result.rows.length === 0) {
       const error = new Error('Kontaktanfrage nicht gefunden');
       error.statusCode = 404;
-      error.success = false;
       return next(error);
     }
 
-    return result.rows[0];
+    res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error retrieving contact request:', error);
-    error.success = false;
     next(error);
   }
+}
+
+module.exports = {
+  submitContact,
+  getContactRequest
 };

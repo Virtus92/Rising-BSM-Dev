@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const serviceController = require('../controllers/service.controller');
-const { isAuthenticated } = require('../middleware/auth.middleware');
+const { isAuthenticated } = require('../middleware/auth');
 const { validateService } = require('../middleware/validation.middleware');
 
 // Apply authentication middleware to all routes

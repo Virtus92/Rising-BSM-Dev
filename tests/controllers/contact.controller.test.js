@@ -1,12 +1,17 @@
 const contactController = require('../../controllers/contact.controller');
-const pool = require('../../services/db.service');
+const { mockDbClient } = require('../setup');
 const NotificationService = require('../../services/notification.service');
 const { validateInput } = require('../../utils/validators');
+const { sendMail } = require('../../services/mail.service');
 
 // Mock dependencies
-jest.mock('../../services/db.service');
-jest.mock('../../services/notification.service');
-jest.mock('../../utils/validators');
+jest.mock('../../utils/validators', () => ({
+  validateInput: jest.fn()
+}));
+
+jest.mock('../../services/notification.service', () => ({
+  create: jest.fn()
+}));
 
 describe('Contact Controller', () => {
   let mockReq;
@@ -14,99 +19,69 @@ describe('Contact Controller', () => {
   let mockNext;
 
   beforeEach(() => {
-    // Reset mocks
-    jest.clearAllMocks();
-    
-    // Setup mock request, response, next
     mockReq = {
-      body: {},
-      ip: '127.0.0.1',
-      xhr: false,
-      headers: {
-        accept: 'text/html'
+      body: {
+        name: 'Max Mustermann',
+        email: 'max@example.com',
+        telefon: '030 12345678',
+        nachricht: 'Test Nachricht'
       },
-      flash: jest.fn()
+      flash: jest.fn(),
+      get: jest.fn()
     };
-    
+
     mockRes = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
       redirect: jest.fn()
     };
-    
+
     mockNext = jest.fn();
 
-    // Default pool query mock implementation
-    pool.query = jest.fn().mockResolvedValue({ rows: [] });
-
-    // Mock validation to succeed by default
-    validateInput.mockReturnValue({
-      isValid: true,
-      validatedData: {
-        name: 'John Doe',
-        email: 'john@example.com',
-        phone: '1234567890',
-        service: 'facility',
-        message: 'Test message'
-      },
-      errors: {}
+    // Reset all mocks
+    jest.clearAllMocks();
+    
+    // Setup default successful validation
+    validateInput.mockReturnValue({ isValid: true, errors: {} });
+    
+    // Setup default successful DB response
+    mockDbClient.query.mockResolvedValue({ 
+      rows: [{ id: 1, ...mockReq.body }],
+      rowCount: 1
     });
 
-    // Mock NotificationService
-    NotificationService.create = jest.fn().mockResolvedValue({});
+    process.env.CONTACT_EMAIL = 'contact@example.com';
   });
 
   describe('submitContact', () => {
-    it('should successfully submit contact form (HTML request)', async () => {
-      // Mock request body
-      mockReq.body = {
-        name: 'John Doe',
-        email: 'john@example.com',
-        phone: '1234567890',
-        service: 'facility',
-        message: 'Test message'
-      };
-
-      // Mock database responses
-      pool.query.mockImplementationOnce(() => 
-        Promise.resolve({ rows: [{ id: 1 }] })
-      ).mockImplementationOnce(() => 
-        Promise.resolve({ rows: [{ id: 101 }, { id: 102 }] })
-      );
-
-      // Execute controller method
+    test('should successfully submit contact form (HTML request)', async () => {
+      // Arrange
+      mockReq.get.mockReturnValue('text/html');
+      
+      // Act
       await contactController.submitContact(mockReq, mockRes, mockNext);
 
       // Assertions
       expect(validateInput).toHaveBeenCalledWith(mockReq.body, expect.any(Object));
-      expect(pool.query).toHaveBeenCalledTimes(2);
-      expect(NotificationService.create).toHaveBeenCalledTimes(2); // Once for each admin
+      expect(mockDbClient.query).toHaveBeenCalledWith(
+        expect.stringMatching(/INSERT INTO kontaktanfragen/),
+        expect.arrayContaining([
+          'Max Mustermann',
+          'max@example.com',
+          '030 12345678',
+          'Test Nachricht'
+        ])
+      );
+      expect(NotificationService.create).toHaveBeenCalledTimes(2);
       expect(mockReq.flash).toHaveBeenCalledWith('success', expect.any(String));
       expect(mockRes.redirect).toHaveBeenCalledWith('/');
     });
 
-    it('should successfully submit contact form (JSON request)', async () => {
-      // Mock request for JSON response
-      mockReq.xhr = true;
-      mockReq.headers.accept = 'application/json';
+    test('should successfully submit contact form (JSON request)', async () => {
+      // Arrange
+      mockReq.get.mockReturnValue('application/json');
       
-      // Mock request body
-      mockReq.body = {
-        name: 'John Doe',
-        email: 'john@example.com',
-        phone: '1234567890',
-        service: 'facility',
-        message: 'Test message'
-      };
-
-      // Mock database responses
-      pool.query.mockImplementationOnce(() => 
-        Promise.resolve({ rows: [{ id: 1 }] })
-      ).mockImplementationOnce(() => 
-        Promise.resolve({ rows: [{ id: 101 }] })
-      );
-
-      // Execute controller method
+      // Act
       await contactController.submitContact(mockReq, mockRes, mockNext);
 
       // Assertions
@@ -115,25 +90,19 @@ describe('Contact Controller', () => {
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,
         message: expect.any(String),
-        requestId: 1
+        data: expect.any(Object)
       });
     });
 
-    it('should handle validation errors', async () => {
-      // Mock validation failure
+    test('should handle validation errors', async () => {
+      // Arrange
+      mockReq.get.mockReturnValue('application/json');
       validateInput.mockReturnValue({
         isValid: false,
-        errors: {
-          name: 'Name is required',
-          email: 'Email is invalid'
-        }
+        errors: { email: 'Invalid email' }
       });
 
-      // Mock request for JSON response
-      mockReq.xhr = true;
-      mockReq.headers.accept = 'application/json';
-      
-      // Execute controller method
+      // Act
       await contactController.submitContact(mockReq, mockRes, mockNext);
 
       // Assertions
@@ -144,11 +113,12 @@ describe('Contact Controller', () => {
       });
     });
 
-    it('should handle database errors (HTML request)', async () => {
-      // Mock database error
-      pool.query.mockRejectedValueOnce(new Error('Database error'));
+    test('should handle database errors (HTML request)', async () => {
+      // Arrange
+      mockReq.get.mockReturnValue('text/html');
+      mockDbClient.query.mockRejectedValue(new Error('Database error'));
 
-      // Execute controller method
+      // Act
       await contactController.submitContact(mockReq, mockRes, mockNext);
 
       // Assertions
@@ -156,15 +126,12 @@ describe('Contact Controller', () => {
       expect(mockRes.redirect).toHaveBeenCalledWith('/');
     });
 
-    it('should handle database errors (JSON request)', async () => {
-      // Mock request for JSON response
-      mockReq.xhr = true;
-      mockReq.headers.accept = 'application/json';
-      
-      // Mock database error
-      pool.query.mockRejectedValueOnce(new Error('Database error'));
+    test('should handle database errors (JSON request)', async () => {
+      // Arrange
+      mockReq.get.mockReturnValue('application/json');
+      mockDbClient.query.mockRejectedValue(new Error('Database error'));
 
-      // Execute controller method
+      // Act
       await contactController.submitContact(mockReq, mockRes, mockNext);
 
       // Assertions
@@ -175,17 +142,14 @@ describe('Contact Controller', () => {
       });
     });
 
-    it('should handle unique constraint violations', async () => {
-      // Mock request for JSON response
-      mockReq.xhr = true;
-      mockReq.headers.accept = 'application/json';
-      
-      // Mock unique constraint violation
-      const error = new Error('Duplicate entry');
-      error.code = '23505';
-      pool.query.mockRejectedValueOnce(error);
+    test('should handle unique constraint violations', async () => {
+      // Arrange
+      mockReq.get.mockReturnValue('application/json');
+      const uniqueError = new Error('duplicate key value');
+      uniqueError.code = '23505';
+      mockDbClient.query.mockRejectedValue(uniqueError);
 
-      // Execute controller method
+      // Act
       await contactController.submitContact(mockReq, mockRes, mockNext);
 
       // Assertions
@@ -195,72 +159,176 @@ describe('Contact Controller', () => {
         message: expect.stringContaining('bereits übermittelt')
       });
     });
+
+    test('sollte Kontaktanfrage erfolgreich verarbeiten', async () => {
+      mockReq.body = {
+        name: 'Max Mustermann',
+        email: 'max@example.com',
+        telefon: '030 12345678',
+        nachricht: 'Test Nachricht'
+      };
+
+      mockDbClient.query.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+      sendMail.mockResolvedValueOnce();
+
+      await contactController.submitContact(mockReq, mockRes, mockNext);
+
+      expect(mockDbClient.query).toHaveBeenCalledWith(
+        'INSERT INTO kontaktanfragen (name, email, telefon, nachricht) VALUES ($1, $2, $3, $4)',
+        ['Max Mustermann', 'max@example.com', '030 12345678', 'Test Nachricht']
+      );
+      expect(sendMail).toHaveBeenCalledWith({
+        to: 'contact@example.com',
+        subject: 'Neue Kontaktanfrage',
+        text: expect.stringContaining('Max Mustermann')
+      });
+      expect(mockReq.flash).toHaveBeenCalledWith('success', 'Ihre Nachricht wurde erfolgreich gesendet');
+      expect(mockRes.redirect).toHaveBeenCalledWith('/contact');
+    });
+
+    test('sollte Validierungsfehler bei fehlenden Pflichtfeldern erkennen', async () => {
+      mockReq.body = {
+        name: '',
+        email: 'invalid-email',
+        telefon: '123',
+        nachricht: ''
+      };
+
+      await contactController.submitContact(mockReq, mockRes, mockNext);
+
+      expect(mockReq.flash).toHaveBeenCalledWith('error', 'Bitte überprüfen Sie Ihre Eingaben');
+      expect(mockRes.redirect).toHaveBeenCalledWith('/contact');
+    });
+
+    test('sollte zu lange Nachricht erkennen', async () => {
+      mockReq.body = {
+        name: 'Max Mustermann',
+        email: 'max@example.com',
+        telefon: '030 12345678',
+        nachricht: 'X'.repeat(2001)
+      };
+
+      await contactController.submitContact(mockReq, mockRes, mockNext);
+
+      expect(mockReq.flash).toHaveBeenCalledWith('error', 'Bitte überprüfen Sie Ihre Eingaben');
+      expect(mockRes.redirect).toHaveBeenCalledWith('/contact');
+    });
+
+    test('sollte Datenbankfehler behandeln', async () => {
+      mockReq.body = {
+        name: 'Max Mustermann',
+        email: 'max@example.com',
+        telefon: '030 12345678',
+        nachricht: 'Test Nachricht'
+      };
+
+      const error = new Error('Datenbankfehler');
+      mockDbClient.query.mockRejectedValueOnce(error);
+
+      await contactController.submitContact(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(error);
+    });
   });
 
   describe('getContactRequest', () => {
-    it('should return contact request details', async () => {
-      // Mock request params
+    test('should return contact request details', async () => {
+      // Arrange
       mockReq.params = { id: '1' };
+      const mockContactRequest = {
+        id: 1,
+        name: 'Test User',
+        email: 'test@example.com',
+        message: 'Test message'
+      };
+      mockDbClient.query.mockResolvedValue({ rows: [mockContactRequest] });
 
-      // Mock database response
-      pool.query.mockResolvedValueOnce({
-        rows: [{
-          id: 1,
-          name: 'John Doe',
-          email: 'john@example.com',
-          phone: '1234567890',
-          service: 'facility',
-          message: 'Test message',
-          status: 'neu',
-          created_at: '2023-06-01T10:00:00Z',
-          ip_adresse: '127.0.0.1'
-        }]
-      });
-
-      // Execute controller method
-      const result = await contactController.getContactRequest(mockReq, mockRes, mockNext);
+      // Act
+      await contactController.getContactRequest(mockReq, mockRes, mockNext);
 
       // Assertions
-      expect(pool.query).toHaveBeenCalledWith({
-        text: expect.stringContaining('SELECT * FROM kontaktanfragen'),
-        values: ['1']
+      expect(mockDbClient.query).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM kontaktanfragen'),
+        ['1']
+      );
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockContactRequest
       });
-      expect(result).toHaveProperty('id', 1);
-      expect(result).toHaveProperty('name', 'John Doe');
-      expect(result).toHaveProperty('email', 'john@example.com');
     });
 
-    it('should handle contact request not found', async () => {
-      // Mock request params
+    test('should handle contact request not found', async () => {
+      // Arrange
       mockReq.params = { id: '999' };
+      mockDbClient.query.mockResolvedValue({ rows: [] });
 
-      // Mock empty database response
-      pool.query.mockResolvedValueOnce({ rows: [] });
-
-      // Execute controller method
+      // Act
       await contactController.getContactRequest(mockReq, mockRes, mockNext);
 
       // Assertions
       expect(mockNext).toHaveBeenCalled();
-      expect(mockNext.mock.calls[0][0]).toBeInstanceOf(Error);
-      expect(mockNext.mock.calls[0][0].statusCode).toBe(404);
-      expect(mockNext.mock.calls[0][0].message).toContain('nicht gefunden');
+      const error = mockNext.mock.calls[0][0];
+      expect(error).toBeInstanceOf(Error);
+      expect(error.statusCode).toBe(404);
+      expect(error.message).toContain('nicht gefunden');
     });
 
-    it('should handle database errors', async () => {
-      // Mock request params
+    test('should handle database errors', async () => {
+      // Arrange
       mockReq.params = { id: '1' };
+      const error = new Error('Database error');
+      mockDbClient.query.mockRejectedValue(error);
 
-      // Mock database error
-      pool.query.mockRejectedValueOnce(new Error('Database error'));
-
-      // Execute controller method
+      // Act
       await contactController.getContactRequest(mockReq, mockRes, mockNext);
 
       // Assertions
-      expect(mockNext).toHaveBeenCalled();
-      expect(mockNext.mock.calls[0][0]).toBeInstanceOf(Error);
-      expect(mockNext.mock.calls[0][0].success).toBe(false);
+      expect(mockNext).toHaveBeenCalledWith(error);
+    });
+
+    test('sollte Kontaktanfrage erfolgreich abrufen', async () => {
+      mockReq.params.id = '1';
+      
+      const mockContact = {
+        id: 1,
+        name: 'Max Mustermann',
+        email: 'max@example.com',
+        telefon: '030 12345678',
+        nachricht: 'Test Nachricht',
+        created_at: new Date()
+      };
+
+      mockDbClient.query.mockResolvedValueOnce({ rows: [mockContact] });
+
+      await contactController.getContactRequest(mockReq, mockRes, mockNext);
+
+      expect(mockDbClient.query).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM kontaktanfragen'),
+        ['1']
+      );
+      expect(mockRes.json).toHaveBeenCalledWith(mockContact);
+    });
+
+    test('sollte 404 bei nicht existierender Anfrage zurückgeben', async () => {
+      mockReq.params.id = '999';
+      mockDbClient.query.mockResolvedValueOnce({ rows: [] });
+
+      await contactController.getContactRequest(mockReq, mockRes, mockNext);
+
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toBe('Kontaktanfrage nicht gefunden');
+      expect(error.statusCode).toBe(404);
+    });
+
+    test('sollte Datenbankfehler behandeln', async () => {
+      mockReq.params.id = '1';
+      
+      const error = new Error('Datenbankfehler');
+      mockDbClient.query.mockRejectedValueOnce(error);
+
+      await contactController.getContactRequest(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(error);
     });
   });
 });

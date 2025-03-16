@@ -8,7 +8,7 @@ jest.mock('../../services/db.service', () => ({
   query: jest.fn()
 }));
 
-jest.mock('../utils/formatters', () => ({
+jest.mock('../../utils/formatters', () => ({
   formatRelativeTime: jest.fn().mockReturnValue('3 hours ago')
 }));
 

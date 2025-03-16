@@ -24,7 +24,7 @@ jest.mock('../../controllers/request.controller', () => ({
   })
 }));
 
-jest.mock('../../middleware/auth.middleware', () => ({
+jest.mock('../../middleware/auth', () => ({
   isAuthenticated: (req, res, next) => next()
 }));
 
