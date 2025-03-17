@@ -136,6 +136,35 @@ describe('Auth Controller', () => {
                 remember: false
             });
         });
+
+        test('should handle remember me functionality', async () => {
+            req.body = { email: 'user@example.com', password: 'password123', remember: 'on' };
+            pool.query.mockResolvedValueOnce({
+            rows: [{
+                id: 1,
+                email: 'user@example.com',
+                passwort: 'hashedpassword',
+                name: 'Test User',
+                rolle: 'user',
+                status: 'aktiv'
+            }]
+            });
+            bcrypt.compare.mockResolvedValueOnce(true);
+
+            await authController.login(req, res, next);
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith({
+            user: {
+                id: 1,
+                email: 'user@example.com',
+                name: 'Test User',
+                role: 'user',
+                initials: 'TU'
+            },
+            remember: true
+            });
+        });
     });
 
     describe('forgotPassword', () => {

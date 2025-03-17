@@ -58,6 +58,21 @@ exports.getProjektStatusInfo = (status) => {
 };
 
 /**
+ * Get status information for a user
+ * @param {string} status - Status code
+ * @returns {object} - Status label and class name
+ */
+exports.getBenutzerStatusInfo = (status) => {
+  const statusMap = {
+    'aktiv': { label: 'Aktiv', className: 'success' },
+    'inaktiv': { label: 'Inaktiv', className: 'secondary' },
+    'gesperrt': { label: 'Gesperrt', className: 'danger' }
+  };
+
+  return statusMap[status] || { label: 'Unbekannt', className: 'secondary' };
+};
+
+/**
  * Generate unique ID
  * @param {number} length - Length of ID
  * @returns {string} - Random ID

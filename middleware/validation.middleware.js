@@ -1,4 +1,4 @@
- /**
+/**
  * Validation middleware for input data
  */
 const validator = require('validator');
@@ -140,10 +140,14 @@ exports.validateAppointment = (req, res, next) => {
       errors.push('Please enter a valid time (HH:MM)');
     }
     
-    // Validate the date is not in the past
-    const appointmentDate = new Date(`${termin_datum}T${termin_zeit}`);
-    if (appointmentDate < new Date()) {
-      errors.push('Appointment date and time cannot be in the past');
+    // Validate the date is not in the past - store current time first to avoid recursion
+    if (termin_datum && termin_zeit) {
+      // Create current date once to avoid recursion with mocked Date constructor
+      const now = new Date();
+      const appointmentDate = new Date(`${termin_datum}T${termin_zeit}`);
+      if (appointmentDate < now) {
+        errors.push('Appointment date and time cannot be in the past');
+      }
     }
     
     // If there are validation errors

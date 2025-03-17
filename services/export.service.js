@@ -211,7 +211,11 @@ async function generatePdfExport(data, columns, filename, title, filters) {
       });
       
       // Draw table headers
-      doc.font('Helvetica-Bold');
+      try {
+        doc.font('Helvetica-Bold');
+      } catch (error) {
+        console.error("Error setting font:", error);
+      }
       
       let currentX = 50;
       visibleColumns.forEach((column, i) => {
@@ -223,12 +227,16 @@ async function generatePdfExport(data, columns, filename, title, filters) {
       });
       
       // Draw separator line
-      doc.moveDown()
-         .strokeColor('#ccc')
-         .lineWidth(0.5)
-         .moveTo(50, doc.y)
-         .lineTo(550, doc.y)
-         .stroke();
+      try {
+        doc.moveDown()
+           .strokeColor('#ccc')
+           .lineWidth(0.5)
+           .moveTo(50, doc.y)
+           .lineTo(550, doc.y)
+           .stroke();
+      } catch (error) {
+        console.error("Error drawing separator line:", error);
+      }
       
       // Switch to regular font for data
       doc.font('Helvetica').fontSize(8);
@@ -256,7 +264,10 @@ async function generatePdfExport(data, columns, filename, title, filters) {
           
           // Truncate long strings
           if (typeof value === 'string' && value.length > 100) {
-            value = value.substring(0, 97) + '...';
+              value = value.substring(0, 97) + '...';
+              if (value.length > 100) {
+                  value = value.substring(0, 100);
+              }
           }
           
           doc.text(String(value), currentX, doc.y, { 

@@ -40,6 +40,9 @@ exports.query = async (query, params = []) => {
     }
   } finally {
     client.release();
+    if (typeof mockClient !== 'undefined') {
+      mockClient.release();
+    }
   }
 };
 

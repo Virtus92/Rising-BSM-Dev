@@ -151,7 +151,7 @@ exports.formatPercentage = (value, decimals = 1) => {
       style: 'percent',
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals
-    }).format(value / 100);
+    }).format(value);
   } catch (error) {
     console.error('Error formatting percentage:', error);
     return '-';

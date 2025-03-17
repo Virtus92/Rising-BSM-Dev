@@ -111,6 +111,40 @@ describe('Profile Controller', () => {
             expect(next.mock.calls[0][0].statusCode).toBe(400);
             expect(next.mock.calls[0][0].message).toContain('Current password is incorrect');
         });
+
+        it('should handle database error', async () => {
+            req.body = {
+            current_password: 'oldpassword',
+            new_password: 'newpassword123',
+            confirm_password: 'newpassword123'
+            };
+            
+            bcrypt.compare.mockResolvedValueOnce(true);
+            bcrypt.hash.mockResolvedValueOnce('hashedpassword');
+            
+            pool.query.mockRejectedValueOnce(new Error('Database error'));
+            
+            await ProfileController.updatePassword(req, res, next);
+            
+            expect(next).toHaveBeenCalled();
+            expect(next.mock.calls[0][0].message).toBe('Database error');
+        });
+
+        it('should handle user not found', async () => {
+            req.body = {
+            current_password: 'oldpassword',
+            new_password: 'newpassword123',
+            confirm_password: 'newpassword123'
+            };
+            
+            pool.query.mockResolvedValueOnce({ rows: [] });
+            
+            await ProfileController.updatePassword(req, res, next);
+            
+            expect(next).toHaveBeenCalled();
+            expect(next.mock.calls[0][0].statusCode).toBe(404);
+            expect(next.mock.calls[0][0].message).toBe('User not found');
+        });
     });
 
     describe('updateProfilePicture', () => {
@@ -170,6 +204,22 @@ describe('Profile Controller', () => {
             expect(res.status).toHaveBeenCalledWith(200);
             expect(res.json.mock.calls[0][0].success).toBe(true);
         });
+
+        it('should handle database error', async () => {
+            req.body = {
+                benachrichtigungen_email: 'on',
+                benachrichtigungen_push: 'off',
+                benachrichtigungen_intervall: 'täglich'
+            };
+        
+            pool.query.mockRejectedValueOnce(new Error('Database error'));
+        
+            await ProfileController.updateNotificationSettings(req, res, next);
+        
+            expect(next).toHaveBeenCalled();
+            expect(next.mock.calls[0][0].message).toBe('Database error');
+        });
+        
     });
 
     describe('getUserProfile', () => {
