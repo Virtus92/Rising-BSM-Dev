@@ -506,7 +506,7 @@ router.post('/neu', isAuthenticated, isManager, async (req, res) => {
           excerpt,
           keywords: seo_keywords ? seo_keywords.split(',').map(k => k.trim()) : []
         });
-        console.log(`N8N Webhook für Post ${postId} ausgelöst`);
+        // console.log(`N8N Webhook für Post ${postId} ausgelöst`);
       } catch (webhookError) {
         console.error('Fehler beim Auslösen des N8N Webhooks:', webhookError);
         // Wir brechen hier nicht ab, wenn der Webhook fehlschlägt
@@ -849,7 +849,7 @@ router.post('/:id/edit', isAuthenticated, isManager, async (req, res) => {
           excerpt,
           keywords: seo_keywords ? seo_keywords.split(',').map(k => k.trim()) : []
         });
-        console.log(`N8N Webhook für Post ${id} ausgelöst`);
+        // console.log(`N8N Webhook für Post ${id} ausgelöst`);
       } catch (webhookError) {
         console.error('Fehler beim Auslösen des N8N Webhooks:', webhookError);
       }

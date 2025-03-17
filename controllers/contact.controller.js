@@ -90,7 +90,7 @@ exports.submitContact = async (req, res, next) => {
     const requestId = result.rows[0].id;
 
     // Determine notification recipient (admin users)
-    console.log("Querying for admin users...");
+    // console.log("Querying for admin users...");
     const adminQuery = await pool.query({
       text: `
         SELECT id FROM benutzer 
@@ -98,8 +98,8 @@ exports.submitContact = async (req, res, next) => {
       `
     });
     
-    console.log(`Admin query result: ${JSON.stringify(adminQuery)}`);
-    console.log(`Admin users found: ${adminQuery.rows?.length || 0}`);
+    // console.log(`Admin query result: ${JSON.stringify(adminQuery)}`);
+    // console.log(`Admin users found: ${adminQuery.rows?.length || 0}`);
 
     // Prepare notifications array
     const notifications = [];
@@ -108,11 +108,11 @@ exports.submitContact = async (req, res, next) => {
     if (!adminQuery.rows || adminQuery.rows.length === 0) {
       console.warn('No admin users found to notify.');
     } else {
-      console.log(`Creating notifications for ${adminQuery.rows.length} admin users`);
+      // console.log(`Creating notifications for ${adminQuery.rows.length} admin users`);
       
       // Create notification payload for each admin
       adminQuery.rows.forEach(admin => {
-        console.log(`Adding notification for admin ${admin.id}`);
+        // console.log(`Adding notification for admin ${admin.id}`);
         notifications.push({
           userId: admin.id, 
           type: 'anfrage',
@@ -125,7 +125,7 @@ exports.submitContact = async (req, res, next) => {
     }
     
     // Add confirmation notification
-    console.log("Adding confirmation notification");
+    // console.log("Adding confirmation notification");
     notifications.push({
       userId: null,  // System notification
       type: 'contact_confirmation',
@@ -136,7 +136,7 @@ exports.submitContact = async (req, res, next) => {
     });
 
     // Send all notifications in parallel using Promise.all
-    console.log(`Sending ${notifications.length} notifications`);
+    // console.log(`Sending ${notifications.length} notifications`);
     await Promise.all(notifications.map(notification => 
       NotificationService.create(notification)
     ));

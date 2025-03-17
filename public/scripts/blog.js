@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
    */
   function initAnalytics() {
     // This would be where you initialize analytics tools
-    console.log('Analytics initialized');
+    // console.log('Analytics initialized');
   }
   
   /**
@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
    */
   function initChatbot() {
     // This would be where you initialize a chatbot
-    console.log('Chatbot initialized');
+    // console.log('Chatbot initialized');
   }
   
   /**

@@ -8,12 +8,12 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/service-worker.js')
         .then(registration => {
-          console.log('Service Worker registered successfully:', registration.scope);
+          // console.log('Service Worker registered successfully:', registration.scope);
           
           // Nach Updates checken
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing;
-            console.log('Service Worker update found!');
+            // console.log('Service Worker update found!');
             
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
@@ -192,11 +192,11 @@ if ('serviceWorker' in navigator) {
         // Auf Antwort des Benutzers warten
         deferredPrompt.userChoice.then((choiceResult) => {
           if (choiceResult.outcome === 'accepted') {
-            console.log('User accepted the install prompt');
+            // console.log('User accepted the install prompt');
             // Button ausblenden
             installButton.style.display = 'none';
           } else {
-            console.log('User dismissed the install prompt');
+            // console.log('User dismissed the install prompt');
           }
         });
       });
@@ -205,7 +205,7 @@ if ('serviceWorker' in navigator) {
   
   // Wenn die App fertig installiert ist
   window.addEventListener('appinstalled', (event) => {
-    console.log('App was installed', event);
+    // console.log('App was installed', event);
     // Verstecke den Install-Button nach erfolgreicher Installation
     if (installButton) {
       installButton.style.display = 'none';

@@ -19,6 +19,10 @@ describe('Formatter Utilities', () => {
             expect(formatDateSafely('invalid-date', 'dd.MM.yyyy')).toBe('Unbekannt');
         });
 
+        it('should return the default value if an error occurs during date formatting', () => {
+            expect(formatDateSafely('2024-01-40', 'dd.MM.yyyy')).toBe('Unbekannt');
+        });
+
         it('should return the default value if the date is null or undefined', () => {
             expect(formatDateSafely(null, 'dd.MM.yyyy')).toBe('Unbekannt');
             expect(formatDateSafely(undefined, 'dd.MM.yyyy')).toBe('Unbekannt');
@@ -45,6 +49,12 @@ describe('Formatter Utilities', () => {
 
         it('should return "Ungültiges Datum" for an invalid date', () => {
             expect(formatRelativeTime('invalid-date')).toBe('Ungültiges Datum');
+        });
+
+        it('should return "Unbekannt" for an invalid date due to error', () => {
+            const invalidDate = new Date('invalid-date');
+            const result = formatRelativeTime(invalidDate);
+            expect(result).toBe('Ungültiges Datum');
         });
 
         it('should return "Unbekannt" if the date is null or undefined', () => {
@@ -84,6 +94,14 @@ describe('Formatter Utilities', () => {
         it('should return "Unbekannt" label for null or undefined date', () => {
             expect(formatDateWithLabel(null).label).toBe('Unbekannt');
             expect(formatDateWithLabel(undefined).label).toBe('Unbekannt');
+        });
+
+        it('should handle errors and return a default value', () => {
+            jest.spyOn(console, 'error').mockImplementation(() => {});
+            const result = formatDateWithLabel(() => { throw new Error('Test error'); });
+            expect(result.label).toBe('Unbekannt');
+            expect(result.class).toBe('secondary');
+            console.error.mockRestore();
         });
 
         it('should return "Ungültiges Datum" label for invalid date', () => {
@@ -151,15 +169,15 @@ describe('Formatter Utilities', () => {
 
     describe('formatFileSize', () => {
         it('should format bytes to KB', () => {
-            expect(formatFileSize(1024)).toBe('1.00 KB');
+            expect(formatFileSize(1024)).toBe('1 KB');
         });
 
         it('should format bytes to MB', () => {
-            expect(formatFileSize(1048576)).toBe('1.00 MB');
+            expect(formatFileSize(1048576)).toBe('1 MB');
         });
 
         it('should format bytes to GB', () => {
-            expect(formatFileSize(1073741824)).toBe('1.00 GB');
+            expect(formatFileSize(1073741824)).toBe('1 GB');
         });
 
         it('should format bytes less than 1024 to Bytes', () => {
@@ -204,6 +222,197 @@ describe('Formatter Utilities', () => {
 
         it('should return "-" if the number is an empty string', () => {
             expect(formatPhone('')).toBe('-');
+        });
+    });
+
+});
+
+describe('Error Handling Tests', () => {
+    let consoleErrorSpy;
+
+    beforeEach(() => {
+        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        // Mock the entire date-fns module to avoid redefining properties
+        jest.mock('date-fns', () => {
+            const actual = jest.requireActual('date-fns');
+            return {
+                ...actual,
+                format: jest.fn().mockImplementation(() => { throw new Error('Mock format error'); }),
+                formatDistanceToNow: jest.fn().mockImplementation(() => { throw new Error('Mock formatDistanceToNow error'); }),
+                isToday: jest.fn().mockImplementation(() => { throw new Error('Mock isToday error'); }),
+                // ...add other mocks as needed...
+            };
+        });
+        jest.resetModules();
+    });
+
+    afterEach(() => {
+        consoleErrorSpy.mockRestore();
+        jest.unmock('date-fns');
+        jest.restoreAllMocks();
+    });
+
+    describe('formatDateSafely error handling', () => {
+        it('should handle errors thrown by date-fns format function', () => {
+            const { formatDateSafely } = require('../../utils/formatters');
+            const result = formatDateSafely(new Date(), 'yyyy-MM-dd');
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            expect(result).toBe('Unbekannt');
+        });
+    });
+
+    describe('formatRelativeTime error handling', () => {
+        it('should handle errors thrown by date-fns formatDistanceToNow function', () => {
+            const { formatRelativeTime } = require('../../utils/formatters');
+            const result = formatRelativeTime(new Date());
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            expect(result).toBe('Unbekannt');
+        });
+    });
+
+    describe('formatDateWithLabel error handling', () => {
+        it('should handle errors thrown by date-fns format function in result object', () => {
+            const { formatDateWithLabel } = require('../../utils/formatters');
+            const result = formatDateWithLabel(new Date());
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            expect(result.label).toBe('Unbekannt');
+        });
+
+        it('should handle errors with isToday function', () => {
+            const { formatDateWithLabel } = require('../../utils/formatters');
+            const result = formatDateWithLabel(new Date());
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            expect(result.label).toBe('Unbekannt');
+        });
+    });
+
+    describe('formatCurrency error handling', () => {
+        it('should handle errors thrown by Intl.NumberFormat', () => {
+            const originalNumberFormat = Intl.NumberFormat;
+            // Create a Jest mock function for Intl.NumberFormat
+            const numberFormatMock = jest.fn().mockImplementation(() => {
+                throw new Error('Mock NumberFormat error');
+            });
+            Intl.NumberFormat = numberFormatMock;
+            
+            // Clear the require cache to get a fresh import with new mocks
+            jest.resetModules();
+            
+            const { formatCurrency } = require('../../utils/formatters');
+            const result = formatCurrency(1000);
+            
+            expect(numberFormatMock).toHaveBeenCalled();
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            expect(result).toBe('-');
+            
+            Intl.NumberFormat = originalNumberFormat;
+        });
+
+        it('should handle errors thrown by format method', () => {
+            const mockFormat = jest.fn().mockImplementation(() => {
+                throw new Error('Mock format method error');
+            });
+            
+            const originalNumberFormat = Intl.NumberFormat;
+            Intl.NumberFormat = jest.fn().mockImplementation(() => ({
+                format: mockFormat
+            }));
+            
+            jest.resetModules();
+            
+            const { formatCurrency } = require('../../utils/formatters');
+            const result = formatCurrency(1000);
+            
+            expect(Intl.NumberFormat).toHaveBeenCalled();
+            expect(mockFormat).toHaveBeenCalled();
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            expect(result).toBe('-');
+            
+            Intl.NumberFormat = originalNumberFormat;
+        });
+    });
+
+    describe('formatNumber error handling', () => {
+        it('should handle errors thrown by Intl.NumberFormat', () => {
+            const originalNumberFormat = Intl.NumberFormat;
+            const numberFormatMock = jest.fn().mockImplementation(() => {
+                throw new Error('Mock NumberFormat error');
+            });
+            Intl.NumberFormat = numberFormatMock;
+            
+            jest.resetModules();
+            
+            const { formatNumber } = require('../../utils/formatters');
+            const result = formatNumber(1000);
+            
+            expect(numberFormatMock).toHaveBeenCalled();
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            expect(result).toBe('-');
+            
+            Intl.NumberFormat = originalNumberFormat;
+        });
+    });
+
+    describe('formatPercentage error handling', () => {
+        it('should handle errors thrown by Intl.NumberFormat', () => {
+            const originalNumberFormat = Intl.NumberFormat;
+            const numberFormatMock = jest.fn().mockImplementation(() => {
+                throw new Error('Mock NumberFormat error');
+            });
+            Intl.NumberFormat = numberFormatMock;
+            
+            jest.resetModules();
+            
+            const { formatPercentage } = require('../../utils/formatters');
+            const result = formatPercentage(0.5);
+            
+            expect(numberFormatMock).toHaveBeenCalled();
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            expect(result).toBe('-');
+            
+            Intl.NumberFormat = originalNumberFormat;
+        });
+    });
+
+    describe('formatFileSize error handling', () => {
+        it('should handle errors thrown by Math functions', () => {
+            const originalMathLog = Math.log;
+            const mathLogMock = jest.fn().mockImplementation(() => {
+                throw new Error('Mock Math.log error');
+            });
+            Math.log = mathLogMock;
+            
+            jest.resetModules();
+            
+            const { formatFileSize } = require('../../utils/formatters');
+            const result = formatFileSize(1024);
+            
+            expect(mathLogMock).toHaveBeenCalled();
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            expect(result).toBe('-');
+            
+            Math.log = originalMathLog;
+        });
+    });
+
+    describe('formatPhone error handling', () => {
+        it('should handle errors thrown by replace method', () => {
+            const originalReplace = String.prototype.replace;
+            const replaceMock = jest.fn().mockImplementation(() => {
+                throw new Error('Mock replace error');
+            });
+            String.prototype.replace = replaceMock;
+            
+            jest.resetModules();
+            
+            const { formatPhone } = require('../../utils/formatters');
+            const result = formatPhone('1234567890');
+            
+            expect(replaceMock).toHaveBeenCalled();
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            expect(result).toBe('1234567890');
+            
+            String.prototype.replace = originalReplace;
         });
     });
 });

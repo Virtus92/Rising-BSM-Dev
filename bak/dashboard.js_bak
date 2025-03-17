@@ -13,7 +13,7 @@ const isAuthenticated = (req, res, next) => {
   if (req.session && req.session.user) {
     return next();
   } else {
-    console.log("Auth failed, redirecting to login");
+    // console.log("Auth failed, redirecting to login");
     return res.redirect('/login');
   }
 };
@@ -246,11 +246,11 @@ router.get('/', isAuthenticated, async (req, res) => {
       const now = Date.now();
       
       if (cache[cacheKey] && cache[cacheKey].expiry > now) {
-        console.log(`Cache hit for ${cacheKey}`);
+        // console.log(`Cache hit for ${cacheKey}`);
         return cache[cacheKey].data;
       }
       
-      console.log(`Cache miss for ${cacheKey}, fetching fresh data`);
+      // console.log(`Cache miss for ${cacheKey}, fetching fresh data`);
       const result = await pool.query(query, params);
       
       cache[cacheKey] = {
@@ -2651,7 +2651,7 @@ router.post('/termine/:id/edit', isAuthenticated, async (req, res) => {
     if (benachrichtigung && kunde_id) {
       try {
         // Hier Code für E-Mail-Benachrichtigung
-        console.log('Benachrichtigung für Kunden-ID:', kunde_id);
+        // console.log('Benachrichtigung für Kunden-ID:', kunde_id);
       } catch (notifyError) {
         console.error('Fehler bei der Benachrichtigung:', notifyError);
       }

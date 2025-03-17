@@ -171,11 +171,11 @@ async function getCachedOrFreshData(cacheKey, query, params = [], ttlSeconds = 3
   const now = Date.now();
   
   if (cache[cacheKey] && cache[cacheKey].expiry > now) {
-    console.log(`Cache hit for ${cacheKey}`);
+    // console.log(`Cache hit for ${cacheKey}`);
     return cache[cacheKey].data;
   }
   
-  console.log(`Cache miss for ${cacheKey}, fetching fresh data`);
+  // console.log(`Cache miss for ${cacheKey}, fetching fresh data`);
   const result = await pool.query(query, params);
   
   cache[cacheKey] = {
@@ -193,7 +193,7 @@ const isAuthenticated = (req, res, next) => {
   if (req.session && req.session.user) {
     return next();
   } else {
-    console.log("Auth failed, redirecting to login");
+    // console.log("Auth failed, redirecting to login");
     return res.redirect('/login');
   }
 };

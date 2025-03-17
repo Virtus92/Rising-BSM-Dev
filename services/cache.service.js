@@ -130,8 +130,17 @@ exports.cleanup = () => {
 if (process.env.NODE_ENV !== 'test') {
   cleanupIntervalId = setInterval(exports.cleanup, 5 * 60 * 1000);
 } else {
-  console.log('Cache service cleanup interval not started in test environment');
+  // console.log('Cache service cleanup interval not started in test environment');
 }
+
+// Add a method to start the interval (for testing purposes)
+exports.startCleanupInterval = () => {
+  if (!cleanupIntervalId) {
+    cleanupIntervalId = setInterval(exports.cleanup, 5 * 60 * 1000);
+    return true;
+  }
+  return false;
+};
 
 // Add a method to stop the interval (for testing purposes)
 exports.stopCleanupInterval = () => {

@@ -20,7 +20,7 @@ const isAuthenticated = (req, res, next) => {
   if (req.session && req.session.user) {
     return next();
   } else {
-    console.log("Auth failed, redirecting to login");
+    // console.log("Auth failed, redirecting to login");
     return res.redirect('/login');
   }
 };

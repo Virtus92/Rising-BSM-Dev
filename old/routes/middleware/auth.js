@@ -7,7 +7,7 @@
  * Wenn nicht, wird zur Login-Seite weitergeleitet
  */
 exports.isAuthenticated = (req, res, next) => {
-  console.log('isAuthenticated middleware called', req.session.user); // Debugging line
+  // console.log('isAuthenticated middleware called', req.session.user); // Debugging line
   if (req.session && req.session.user) {
     return next();
   } else {

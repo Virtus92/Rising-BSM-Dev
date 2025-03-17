@@ -2,7 +2,7 @@
  * Formatter utilities
  * Functions for consistent data formatting across the application
  */
-const { format, formatDistanceToNow, isToday, isTomorrow } = require('date-fns');
+const { format, formatDistanceToNow, isToday, isTomorrow, isYesterday } = require('date-fns');
 const { de } = require('date-fns/locale');
 
 /**
@@ -17,13 +17,14 @@ exports.formatDateSafely = (date, formatString, defaultValue = 'Unbekannt') => {
     if (!date) return defaultValue;
     
     const parsedDate = new Date(date);
-    if (isNaN(parsedDate.getTime())) {
+    if (!parsedDate || isNaN(parsedDate.getTime())) {
       console.error(`Invalid date format: ${date} with format: ${formatString}`);
       return defaultValue;
     }
     
     return format(parsedDate, formatString, { locale: de });
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error formatting date:', error);
     return defaultValue;
   }
@@ -40,7 +41,8 @@ exports.formatRelativeTime = (date, options = {}) => {
     if (!date) return 'Unbekannt';
     
     const parsedDate = new Date(date);
-    if (isNaN(parsedDate.getTime())) {
+    if (!parsedDate || isNaN(parsedDate.getTime())) {
+      console.error(`Invalid date provided to formatRelativeTime: ${date}`);
       return 'Ungültiges Datum';
     }
     
@@ -49,11 +51,12 @@ exports.formatRelativeTime = (date, options = {}) => {
       locale: de,
       ...options
     });
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error formatting relative time:', error);
     return 'Unbekannt';
   }
-};
+}
 
 /**
  * Format a date with a special label for today/tomorrow
@@ -65,7 +68,18 @@ exports.formatDateWithLabel = (date) => {
   try {
     if (!date) return { label: 'Unbekannt', class: 'secondary' };
     
-    const parsedDate = new Date(date);
+    let parsedDate;
+    if (typeof date === 'function') {
+      try {
+        parsedDate = new Date(date());
+      } catch (error) {
+        console.error('Error executing date function:', error);
+        return { label: 'Unbekannt', class: 'secondary' };
+      }
+    } else {
+      parsedDate = new Date(date);
+    }
+
     if (isNaN(parsedDate.getTime())) {
       return { label: 'Ungültiges Datum', class: 'danger' };
     }
@@ -83,6 +97,14 @@ exports.formatDateWithLabel = (date) => {
         label: 'Morgen', 
         fullDate: format(parsedDate, 'dd.MM.yyyy'),
         class: 'success' 
+      };
+    }
+
+    if (isYesterday(parsedDate)) {
+      return { 
+        label: 'Gestern', 
+        fullDate: format(parsedDate, 'dd.MM.yyyy'),
+        class: 'warning' 
       };
     }
     
@@ -107,10 +129,15 @@ exports.formatCurrency = (amount, currency = 'EUR') => {
   try {
     if (amount === null || amount === undefined) return '-';
     
-    return new Intl.NumberFormat('de-DE', {
-      style: 'currency',
-      currency
-    }).format(amount);
+    try {
+      return new Intl.NumberFormat('de-DE', {
+        style: 'currency',
+        currency
+      }).format(amount);
+    } catch (error) {
+      console.error('Error formatting currency:', error);
+      return '-';
+    }
   } catch (error) {
     console.error('Error formatting currency:', error);
     return '-';

@@ -170,16 +170,18 @@ describe('Cache Service', () => {
         });
     });
 
-    describe('stopCleanupInterval', () => {
-        test('should stop cleanup interval and return true', () => {
-            // This is tricky to test since the interval is started conditionally
-            // We can at least ensure the function returns correct values
-            const result1 = cacheService.stopCleanupInterval();
-            const result2 = cacheService.stopCleanupInterval();
-            
-            // First call might be true or false depending on whether interval was started
-            // Second call should definitely be false
-            expect(result2).toBe(false);
+    describe('CleanupInterval', () => {
+        test('should start cleanup interval if not in test environment', () => {
+            const originalNodeEnv = process.env.NODE_ENV;
+            process.env.NODE_ENV = 'development';
+            const cleanupSpy = jest.spyOn(cacheService, 'cleanup');
+            jest.useFakeTimers();
+            cacheService.startCleanupInterval();
+            jest.advanceTimersByTime(5 * 60 * 1000);
+            expect(cleanupSpy).toHaveBeenCalled();
+            cacheService.stopCleanupInterval();
+            jest.useRealTimers();
+            process.env.NODE_ENV = originalNodeEnv;
         });
     });
 });

@@ -30,7 +30,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then(cache => {
-        console.log('Service Worker: Caching static files');
+        // console.log('Service Worker: Caching static files');
         return cache.addAll(STATIC_ASSETS);
       })
       .then(() => self.skipWaiting()) // Neuen Service Worker sofort aktivieren
@@ -48,7 +48,7 @@ self.addEventListener('activate', event => {
       })
       .then(cachesToDelete => {
         return Promise.all(cachesToDelete.map(cacheToDelete => {
-          console.log('Service Worker: Cleaning old cache:', cacheToDelete);
+          // console.log('Service Worker: Cleaning old cache:', cacheToDelete);
           return caches.delete(cacheToDelete);
         }));
       })
@@ -140,7 +140,7 @@ async function networkFirstStrategy(request) {
     
     return networkResponse;
   } catch (error) {
-    console.log('Network request failed, trying cache:', request.url);
+    // console.log('Network request failed, trying cache:', request.url);
     
     // Vom Netzwerk fehlgeschlagen, aus dem Cache versuchen
     const cachedResponse = await caches.match(request);
@@ -170,7 +170,7 @@ async function updateCache(request, cacheName) {
       cache.put(request, networkResponse);
     }
   } catch (error) {
-    console.log('Background cache update failed:', error);
+    // console.log('Background cache update failed:', error);
   }
 }
 
@@ -210,7 +210,7 @@ async function syncDashboardData() {
     });
     
     await Promise.all(promises);
-    console.log('Dashboard data synchronized successfully');
+    // console.log('Dashboard data synchronized successfully');
   } catch (error) {
     console.error('Failed to sync dashboard data:', error);
   }

@@ -47,7 +47,15 @@ exports.validateText = (input, options = {}) => {
   }
 
   // Escape if requested
-  const sanitizedValue = escape ? validator.escape(value) : value;
+  let sanitizedValue = value;
+  if (escape) {
+    // Custom escaping without escaping forward slashes
+    sanitizedValue = sanitizedValue
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
 
   return {
     isValid: errors.length === 0,
@@ -67,12 +75,17 @@ exports.validateEmail = (email) => {
   // Check if email is provided and valid
   if (!email || !validator.isEmail(email)) {
     errors.push('Invalid email address');
+    return {
+      isValid: false,
+      errors,
+      value: email // Return original value for invalid emails
+    };
   }
 
   const sanitizedEmail = validator.normalizeEmail(email);
 
   return {
-    isValid: errors.length === 0,
+    isValid: true,
     errors,
     value: sanitizedEmail
   };

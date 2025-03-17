@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", function() {
         return originalFetch.call(this, url, options);
       };
       
-      console.log('CSRF-Schutz für AJAX-Anfragen konfiguriert');
+      // console.log('CSRF-Schutz für AJAX-Anfragen konfiguriert');
     } else {
       console.warn('CSRF-Meta-Tag nicht gefunden!');
     }
@@ -295,10 +295,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
     const applyPreferences = (preferences) => {
       if (preferences.analytics) {
-        console.log('Analytics würde hier geladen werden');
+        // console.log('Analytics würde hier geladen werden');
       }
       if (preferences.chatbot) {
-        console.log('Chatbot würde hier geladen werden');
+        // console.log('Chatbot würde hier geladen werden');
       }
     };
 
@@ -442,7 +442,7 @@ document.addEventListener("DOMContentLoaded", function() {
             if (data.email) contactForm.querySelector('[name="email"]').value = data.email;
             if (data.phone) contactForm.querySelector('[name="phone"]').value = data.phone;
             if (data.service) contactForm.querySelector('[name="service"]').value = data.service;
-            console.log('Formular-Teildaten wiederhergestellt');
+            // console.log('Formular-Teildaten wiederhergestellt');
           } catch (e) {
             console.error('Fehler beim Wiederherstellen der Formular-Teildaten', e);
             localStorage.removeItem('partialFormData');
