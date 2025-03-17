@@ -62,7 +62,7 @@ exports.getUserProfile = async (req, res, next) => {
     });
     
     // Format data for response
-    return {
+    return res.status(200).json({
       user: {
         id: user.id,
         name: user.name,
@@ -83,7 +83,7 @@ exports.getUserProfile = async (req, res, next) => {
         ip: activity.ip_adresse,
         date: formatDateSafely(activity.erstellt_am, 'dd.MM.yyyy, HH:mm')
       }))
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -151,7 +151,7 @@ exports.updateProfile = async (req, res, next) => {
     });
     
     // Return updated user data for session
-    return {
+    return res.status(200).json({
       success: true,
       user: {
         id: userId,
@@ -161,7 +161,7 @@ exports.updateProfile = async (req, res, next) => {
         initials: name.split(' ').map(n => n[0]).join('')
       },
       message: 'Profile updated successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -248,10 +248,10 @@ exports.updatePassword = async (req, res, next) => {
       ]
     });
     
-    return {
+    return res.status(200).json({
       success: true,
       message: 'Password updated successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -286,11 +286,11 @@ exports.updateProfilePicture = async (req, res, next) => {
       values: [imagePath, userId]
     });
     
-    return {
+    return res.status(200).json({
       success: true,
       imagePath: imagePath,
       message: 'Profile picture updated successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -353,10 +353,10 @@ exports.updateNotificationSettings = async (req, res, next) => {
       });
     }
     
-    return {
+    return res.status(200).json({
       success: true,
       message: 'Notification settings updated successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }

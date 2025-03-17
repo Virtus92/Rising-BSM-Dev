@@ -96,9 +96,12 @@ exports.submitContact = async (req, res, next) => {
     `);
 
     // Create notifications for admins
+    if (adminQuery.rows.length === 0) {
+      console.warn('No admin users found to notify.');
+    }
+    
     const notificationPromises = adminQuery.rows.map(admin => 
       NotificationService.create({
-        userId: admin.id,
         type: 'anfrage',
         title: 'Neue Kontaktanfrage',
         message: `Neue Anfrage von ${name} über ${service}`,
@@ -106,8 +109,17 @@ exports.submitContact = async (req, res, next) => {
         referenceType: 'kontaktanfragen'
       })
     );
-
+    
     await Promise.all(notificationPromises);
+
+    // Create confirmation notification
+    await NotificationService.create({
+      type: 'contact_confirmation',
+      title: 'Kontaktanfrage erhalten',
+      message: `Wir haben Ihre Anfrage erhalten und werden uns in Kürze bei Ihnen melden`,
+      relatedId: requestId,
+      recipients: [/* recipient ID for the user or system notification */]
+    });
 
     // Respond based on request type
     if (req.xhr || req.headers.accept.includes('application/json')) {

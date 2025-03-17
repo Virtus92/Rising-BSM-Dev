@@ -88,3 +88,13 @@ exports.errorHandler = (err, req, res, next) => {
     req.flash('error', 'Das Formular ist abgelaufen. Bitte versuchen Sie es erneut.');
     res.redirect('back');
   };
+
+module.exports = (err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  
+  res.status(statusCode).json({
+    success: false,
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+};

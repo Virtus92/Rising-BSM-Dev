@@ -6,6 +6,7 @@ const pool = require('../services/db.service');
 const { formatDateSafely } = require('../utils/formatters');
 const { getTerminStatusInfo } = require('../utils/helpers');
 const exportService = require('../services/export.service');
+const { validateDate, validateTimeFormat } = require('../utils/validators');
 
 /**
  * Get all appointments with optional filtering
@@ -126,6 +127,7 @@ exports.getAllAppointments = async (req, res, next) => {
     };
   } catch (error) {
     next(error);
+    return undefined;
   }
 };
 
@@ -199,6 +201,7 @@ exports.getAppointmentById = async (req, res, next) => {
     return result;
   } catch (error) {
     next(error);
+    return undefined; // Explicitly return undefined when there's an error
   }
 };
 
@@ -218,10 +221,21 @@ exports.createAppointment = async (req, res, next) => {
       beschreibung, 
       status 
     } = req.body;
+
+    // Validate inputs
+    const dateValidation = validateDate(termin_datum, { required: true });
+    const timeValidation = validateTimeFormat(termin_zeit, { required: true });
     
     // Validation
-    if (!titel || !termin_datum || !termin_zeit) {
-      const error = new Error('Title, date and time are required fields');
+    if (!titel || !termin_datum || !termin_zeit || !dateValidation.isValid || !timeValidation.isValid) {
+      const errorMessages = [];
+      if (!titel) errorMessages.push('Title is required');
+      if (!termin_datum) errorMessages.push('Date is required');
+      if (!termin_zeit) errorMessages.push('Time is required');
+      if (termin_datum && !dateValidation.isValid) errorMessages.push(dateValidation.errors.join(', '));
+      if (termin_zeit && !timeValidation.isValid) errorMessages.push(timeValidation.errors.join(', '));
+      
+      const error = new Error(`Validation failed: ${errorMessages.join('; ')}`);
       error.statusCode = 400;
       throw error;
     }
@@ -273,6 +287,7 @@ exports.createAppointment = async (req, res, next) => {
     };
   } catch (error) {
     next(error);
+    return undefined;
   }
 };
 
@@ -367,6 +382,7 @@ exports.updateAppointment = async (req, res, next) => {
     };
   } catch (error) {
     next(error);
+    return undefined;
   }
 };
 
@@ -437,6 +453,7 @@ exports.updateAppointmentStatus = async (req, res, next) => {
     };
   } catch (error) {
     next(error);
+    return undefined;
   }
 };
 
@@ -499,11 +516,12 @@ exports.addAppointmentNote = async (req, res, next) => {
 
     return {
       success: true,
-      appointmentId: id,
+      appointmentId: id.toString(),
       message: 'Note added successfully'
     };
   } catch (error) {
     next(error);
+    return undefined;
   }
 };
 
@@ -587,5 +605,6 @@ exports.exportAppointments = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return undefined;
   }
 };

@@ -24,27 +24,7 @@ router.get('/login', isNotAuthenticated, (req, res) => {
  * @route   POST /login
  * @desc    Process login
  */
-router.post('/login', isNotAuthenticated, async (req, res, next) => {
-  try {
-    const result = await authController.login(req, res, next);
-    
-    // Create session with user data
-    req.session.user = result.user;
-    
-    // Set cookie lifetime for "remember me"
-    if (result.remember) {
-      req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
-    } else {
-      req.session.cookie.maxAge = 8 * 60 * 60 * 1000; // 8 hours
-    }
-    
-    // Redirect to dashboard
-    res.redirect('/dashboard');
-  } catch (error) {
-    req.flash('error', error.message || 'Login failed. Please try again.');
-    res.redirect('/login');
-  }
-});
+router.post('/login', isNotAuthenticated, authController.login);
 
 /**
  * @route   GET /logout

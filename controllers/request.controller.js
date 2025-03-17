@@ -123,7 +123,7 @@ exports.getAllRequests = async (req, res, next) => {
     const totalPages = Math.ceil(total / limit);
 
     // Return data object for rendering or JSON response
-    return {
+    return res.status(200).json({
       requests,
       pagination: {
         current: parseInt(page),
@@ -137,7 +137,7 @@ exports.getAllRequests = async (req, res, next) => {
         date,
         search
       }
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -194,7 +194,7 @@ exports.getRequestById = async (req, res, next) => {
       }))
     };
     
-    return result;
+    return res.status(200).json(result);
   } catch (error) {
     next(error);
   }
@@ -260,11 +260,11 @@ exports.updateRequestStatus = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(200).json({
       success: true,
       requestId: id,
       message: 'Request status updated successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -327,11 +327,11 @@ exports.addRequestNote = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(201).json({
       success: true,
       requestId: id,
       message: 'Note added successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -395,7 +395,7 @@ exports.exportRequests = async (req, res, next) => {
     const result = await pool.query(query);
     
     // Use export service to generate the appropriate format
-    return await exportService.generateExport(result.rows, format, {
+    const exportData = await exportService.generateExport(result.rows, format, {
       filename: 'anfragen-export',
       title: 'Kontaktanfragen - Rising BSM',
       columns: [
@@ -415,6 +415,14 @@ exports.exportRequests = async (req, res, next) => {
       ],
       filters: { dateFrom, dateTo, status }
     });
+
+    if (format === 'json') {
+      return res.status(200).json(exportData);
+    } else {
+      res.setHeader('Content-Type', exportData.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${exportData.filename}"`);
+      return res.status(200).send(exportData.buffer);
+    }
   } catch (error) {
     next(error);
   }

@@ -105,7 +105,7 @@ exports.getAllProjects = async (req, res, next) => {
     const totalPages = Math.ceil(total / limit);
 
     // Return data object for rendering or JSON response
-    return {
+    return res.status(200).json({
       projects,
       pagination: {
         current: parseInt(page),
@@ -118,7 +118,7 @@ exports.getAllProjects = async (req, res, next) => {
         kunde_id,
         search
       }
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -212,7 +212,7 @@ exports.getProjectById = async (req, res, next) => {
       }))
     };
     
-    return result;
+    return res.status(200).json(result);
   } catch (error) {
     next(error);
   }
@@ -305,11 +305,11 @@ exports.createProject = async (req, res, next) => {
       });
     }
 
-    return {
+    return res.status(201).json({
       success: true,
       projectId: projectId,
       message: 'Project created successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -395,11 +395,11 @@ exports.updateProject = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(200).json({
       success: true,
       projectId: id,
       message: 'Project updated successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -465,11 +465,11 @@ exports.updateProjectStatus = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(200).json({
       success: true,
       projectId: id,
       message: 'Project status updated successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -532,11 +532,11 @@ exports.addProjectNote = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(201).json({
       success: true,
       projectId: id,
       message: 'Note added successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -593,7 +593,7 @@ exports.exportProjects = async (req, res, next) => {
     const result = await pool.query(query);
     
     // Use export service to generate the appropriate format
-    return await exportService.generateExport(result.rows, format, {
+    const exportData = await exportService.generateExport(result.rows, format, {
       filename: 'projekte-export',
       title: 'Projektliste - Rising BSM',
       columns: [
@@ -613,6 +613,14 @@ exports.exportProjects = async (req, res, next) => {
       ],
       filters: { status, kunde_id }
     });
+
+    if (format === 'json') {
+      return res.status(200).json(exportData);
+    } else {
+      res.setHeader('Content-Type', exportData.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${exportData.filename}"`);
+      return res.status(200).send(exportData.buffer);
+    }
   } catch (error) {
     next(error);
   }

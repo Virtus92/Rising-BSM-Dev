@@ -164,6 +164,41 @@ exports.validateDate = (date, options = {}) => {
 };
 
 /**
+ * Validate time format (24-hour format: HH:MM)
+ * @param {string} time - Time string to validate
+ * @param {object} options - Validation options
+ * @returns {object} - Validation result
+ */
+exports.validateTimeFormat = (time, options = {}) => {
+  const {
+    required = false,
+  } = options;
+
+  const errors = [];
+
+  // Handle null or undefined
+  if (time === null || time === undefined) {
+    if (required) {
+      errors.push('Time is required');
+    }
+    return { isValid: errors.length === 0, errors, value: time };
+  }
+
+  // Regular expression for 24-hour format (HH:MM)
+  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  
+  if (!timeRegex.test(time)) {
+    errors.push('Invalid time format. Use 24-hour format (HH:MM)');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    value: time
+  };
+};
+
+/**
  * Validate numeric values
  * @param {number} value - Numeric value to validate
  * @param {object} options - Validation options

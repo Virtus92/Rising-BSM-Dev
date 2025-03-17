@@ -92,7 +92,7 @@ exports.getAllServices = async (req, res, next) => {
     const totalPages = Math.ceil(total / limit);
 
     // Return data object for rendering or JSON response
-    return {
+    return res.status(200).json({
       services,
       pagination: {
         current: parseInt(page),
@@ -104,7 +104,7 @@ exports.getAllServices = async (req, res, next) => {
         status,
         search
       }
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -145,7 +145,7 @@ exports.getServiceById = async (req, res, next) => {
     const service = serviceQuery.rows[0];
     
     // Format service data for response
-    return {
+    return res.status(200).json({
       service: {
         id: service.id,
         name: service.name,
@@ -157,7 +157,7 @@ exports.getServiceById = async (req, res, next) => {
         created_at: formatDateSafely(service.created_at, 'dd.MM.yyyy'),
         updated_at: formatDateSafely(service.updated_at, 'dd.MM.yyyy')
       }
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -226,11 +226,11 @@ exports.createService = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(201).json({
       success: true,
       serviceId: result.rows[0].id,
       message: 'Service created successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -315,11 +315,11 @@ exports.updateService = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(200).json({
       success: true,
       serviceId: id,
       message: 'Service updated successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -380,11 +380,11 @@ exports.toggleServiceStatus = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(200).json({
       success: true,
       serviceId: id,
       message: `Service ${aktiv ? 'activated' : 'deactivated'} successfully`
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -465,7 +465,7 @@ exports.getServiceStatistics = async (req, res, next) => {
       values: [id]
     });
     
-    return {
+    return res.status(200).json({
       statistics: {
         name: serviceQuery.rows[0].name,
         gesamtumsatz: revenueQuery.rows[0].gesamtumsatz || 0,
@@ -480,7 +480,7 @@ exports.getServiceStatistics = async (req, res, next) => {
           umsatz: parseFloat(row.umsatz)
         }))
       }
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -529,7 +529,7 @@ exports.exportServices = async (req, res, next) => {
     const result = await pool.query(query);
     
     // Use export service to generate the appropriate format
-    return await exportService.generateExport(result.rows, format, {
+    const exportData = await exportService.generateExport(result.rows, format, {
       filename: 'dienstleistungen-export',
       title: 'Dienstleistungen - Rising BSM',
       columns: [
@@ -548,6 +548,14 @@ exports.exportServices = async (req, res, next) => {
       ],
       filters: { status }
     });
+
+    if (format === 'json') {
+      return res.status(200).json(exportData);
+    } else {
+      res.setHeader('Content-Type', exportData.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${exportData.filename}"`);
+      return res.status(200).send(exportData.buffer);
+    }
   } catch (error) {
     next(error);
   }

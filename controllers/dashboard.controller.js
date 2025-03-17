@@ -8,10 +8,11 @@ const { getNotifications } = require('../utils/helpers');
 const { formatDateSafely, formatRelativeTime, formatDateWithLabel } = require('../utils/formatters');
 const { format } = require('date-fns');
 
+
 /**
  * Get dashboard data including statistics, charts, and recent activities
  */
-exports.getDashboardData = async (req) => {
+exports.getDashboardData = async (req, res, next) => {
   try {
     // Get notifications
     const notifications = await getNotifications(req);
@@ -46,7 +47,7 @@ exports.getDashboardData = async (req) => {
       statistics: 'active'
     };
     
-    return {
+    return res.status(200).json({
       stats,
       chartFilters,
       charts,
@@ -54,10 +55,10 @@ exports.getDashboardData = async (req) => {
       recentRequests,
       upcomingAppointments,
       systemStatus
-    };
+    });
   } catch (error) {
     console.error('Error loading dashboard data:', error);
-    throw error;
+    next(error);
   }
 };
 
@@ -400,138 +401,146 @@ async function getUpcomingAppointments() {
 /**
  * Global search across all entities
  */
-exports.globalSearch = async (query) => {
-  if (!query || query.trim().length < 2) {
-    return {
-      customers: [],
-      projects: [],
-      appointments: [],
-      requests: [],
-      services: []
-    };
-  }
-  
+exports.globalSearch = async (req, res, next) => {
   try {
-    const searchTerm = `%${query.toLowerCase()}%`;
+    const query = req.query.q;
     
-    // Execute all search queries in parallel
-    const [
-      customerResults,
-      projectResults,
-      appointmentResults,
-      requestResults,
-      serviceResults
-    ] = await Promise.all([
-      // Search customers
-      pool.query(`
-        SELECT id, name, email, firma, telefon, status
-        FROM kunden 
-        WHERE 
-          LOWER(name) LIKE $1 OR 
-          LOWER(email) LIKE $1 OR
-          LOWER(firma) LIKE $1
-        LIMIT 5
-      `, [searchTerm]),
-      
-      // Search projects
-      pool.query(`
-        SELECT p.id, p.titel, p.status, p.start_datum, k.name as kunde_name
-        FROM projekte p
-        LEFT JOIN kunden k ON p.kunde_id = k.id
-        WHERE LOWER(p.titel) LIKE $1
-        LIMIT 5
-      `, [searchTerm]),
-      
-      // Search appointments
-      pool.query(`
-        SELECT t.id, t.titel, t.status, t.termin_datum, k.name as kunde_name
-        FROM termine t
-        LEFT JOIN kunden k ON t.kunde_id = k.id
-        WHERE LOWER(t.titel) LIKE $1
-        LIMIT 5
-      `, [searchTerm]),
-      
-      // Search requests
-      pool.query(`
-        SELECT id, name, email, service, status, created_at
-        FROM kontaktanfragen
-        WHERE LOWER(name) LIKE $1 OR LOWER(email) LIKE $1
-        LIMIT 5
-      `, [searchTerm]),
-      
-      // Search services
-      pool.query(`
-        SELECT id, name, beschreibung, preis_basis, einheit, aktiv
-        FROM dienstleistungen
-        WHERE LOWER(name) LIKE $1 OR LOWER(beschreibung) LIKE $1
-        LIMIT 5
-      `, [searchTerm])
-    ]);
+    if (!query || query.trim().length < 2) {
+      return res.status(200).json({
+        customers: [],
+        projects: [],
+        appointments: [],
+        requests: [],
+        services: []
+      });
+    }
     
-    // Format and return results
-    return {
-      customers: customerResults.rows.map(customer => ({
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        firma: customer.firma,
-        telefon: customer.telefon,
-        status: customer.status,
-        type: 'Kunde',
-        url: `/dashboard/kunden/${customer.id}`
-      })),
+    try {
+      const searchTerm = `%${query.toLowerCase()}%`;
       
-      projects: projectResults.rows.map(project => ({
-        id: project.id,
-        title: project.titel,
-        status: project.status,
-        date: formatDateSafely(project.start_datum, 'dd.MM.yyyy'),
-        kunde: project.kunde_name,
-        type: 'Projekt',
-        url: `/dashboard/projekte/${project.id}`
-      })),
+      // Execute all search queries in parallel
+      const [
+        customerResults,
+        projectResults,
+        appointmentResults,
+        requestResults,
+        serviceResults
+      ] = await Promise.all([
+        // Search customers
+        pool.query(`
+          SELECT id, name, email, firma, telefon, status
+          FROM kunden 
+          WHERE 
+            LOWER(name) LIKE $1 OR 
+            LOWER(email) LIKE $1 OR
+            LOWER(firma) LIKE $1
+          LIMIT 5
+        `, [searchTerm]),
+        
+        // Search projects
+        pool.query(`
+          SELECT p.id, p.titel, p.status, p.start_datum, k.name as kunde_name
+          FROM projekte p
+          LEFT JOIN kunden k ON p.kunde_id = k.id
+          WHERE LOWER(p.titel) LIKE $1
+          LIMIT 5
+        `, [searchTerm]),
+        
+        // Search appointments
+        pool.query(`
+          SELECT t.id, t.titel, t.status, t.termin_datum, k.name as kunde_name
+          FROM termine t
+          LEFT JOIN kunden k ON t.kunde_id = k.id
+          WHERE LOWER(t.titel) LIKE $1
+          LIMIT 5
+        `, [searchTerm]),
+        
+        // Search requests
+        pool.query(`
+          SELECT id, name, email, service, status, created_at
+          FROM kontaktanfragen
+          WHERE LOWER(name) LIKE $1 OR LOWER(email) LIKE $1
+          LIMIT 5
+        `, [searchTerm]),
+        
+        // Search services
+        pool.query(`
+          SELECT id, name, beschreibung, preis_basis, einheit, aktiv
+          FROM dienstleistungen
+          WHERE LOWER(name) LIKE $1 OR LOWER(beschreibung) LIKE $1
+          LIMIT 5
+        `, [searchTerm])
+      ]);
       
-      appointments: appointmentResults.rows.map(appointment => ({
-        id: appointment.id,
-        title: appointment.titel,
-        status: appointment.status,
-        date: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy, HH:mm'),
-        kunde: appointment.kunde_name,
-        type: 'Termin',
-        url: `/dashboard/termine/${appointment.id}`
-      })),
-      
-      requests: requestResults.rows.map(request => ({
-        id: request.id,
-        name: request.name,
-        email: request.email,
-        status: request.status,
-        date: formatDateSafely(request.created_at, 'dd.MM.yyyy'),
-        type: 'Anfrage',
-        url: `/dashboard/requests/${request.id}`
-      })),
-      
-      services: serviceResults.rows.map(service => ({
-        id: service.id,
-        name: service.name,
-        preis: service.preis_basis,
-        einheit: service.einheit,
-        aktiv: service.aktiv,
-        type: 'Dienstleistung',
-        url: `/dashboard/dienste/${service.id}`
-      }))
-    };
+      // Format and return results
+      return res.status(200).json({
+        customers: customerResults.rows.map(customer => ({
+          id: customer.id,
+          name: customer.name,
+          email: customer.email,
+          firma: customer.firma,
+          telefon: customer.telefon,
+          status: customer.status,
+          type: 'Kunde',
+          url: `/dashboard/kunden/${customer.id}`
+        })),
+        
+        projects: projectResults.rows.map(project => ({
+          id: project.id,
+          title: project.titel,
+          status: project.status,
+          date: formatDateSafely(project.start_datum, 'dd.MM.yyyy'),
+          kunde: project.kunde_name,
+          type: 'Projekt',
+          url: `/dashboard/projekte/${project.id}`
+        })),
+        
+        appointments: appointmentResults.rows.map(appointment => ({
+          id: appointment.id,
+          title: appointment.titel,
+          status: appointment.status,
+          date: formatDateSafely(appointment.termin_datum, 'dd.MM.yyyy, HH:mm'),
+          kunde: appointment.kunde_name,
+          type: 'Termin',
+          url: `/dashboard/termine/${appointment.id}`
+        })),
+        
+        requests: requestResults.rows.map(request => ({
+          id: request.id,
+          name: request.name,
+          email: request.email,
+          status: request.status,
+          date: formatDateSafely(request.created_at, 'dd.MM.yyyy'),
+          type: 'Anfrage',
+          url: `/dashboard/requests/${request.id}`
+        })),
+        
+        services: serviceResults.rows.map(service => ({
+          id: service.id,
+          name: service.name,
+          preis: service.preis_basis,
+          einheit: service.einheit,
+          aktiv: service.aktiv,
+          type: 'Dienstleistung',
+          url: `/dashboard/dienste/${service.id}`
+        }))
+      });
+    } catch (error) {
+      console.error('Error performing global search:', error);
+      throw error;
+    }
   } catch (error) {
     console.error('Error performing global search:', error);
-    throw error;
+    next(error);
   }
 };
 
 /**
  * Get all notifications for a user
  */
-exports.getNotifications = async (userId) => {
+exports.getNotifications = async (req, res, next) => {
   try {
+    const userId = req.session.user.id;
     // Get notifications from database
     const notificationsQuery = await pool.query(`
       SELECT
@@ -601,18 +610,20 @@ exports.getNotifications = async (userId) => {
       };
     });
     
-    return { notifications };
+    return res.status(200).json({ notifications });
   } catch (error) {
     console.error('Error fetching notifications:', error);
-    throw error;
+    next(error);
   }
 };
 
 /**
  * Mark notifications as read
  */
-exports.markNotificationsRead = async (userId, notificationId, markAll) => {
+exports.markNotificationsRead = async (req, res, next) => {
   try {
+    const userId = req.session.user.id;
+    const { notificationId, markAll } = req.body;
     let result;
     
     if (markAll) {
@@ -638,13 +649,13 @@ exports.markNotificationsRead = async (userId, notificationId, markAll) => {
     // Clear cache
     cacheService.delete(`notifications_${userId}`);
     
-    return {
+    return res.status(200).json({
       success: true,
       count: result.rowCount,
       message: markAll ? 'All notifications marked as read' : 'Notification marked as read'
-    };
+    });
   } catch (error) {
     console.error('Error marking notifications as read:', error);
-    throw error;
+    next(error);
   }
 };

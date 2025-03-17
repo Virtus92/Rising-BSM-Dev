@@ -66,7 +66,10 @@ exports.login = async (req, res, next) => {
       [user.id, 'login', req.ip]
     );
 
-    return { user: sessionUser, remember: remember === 'on' };
+    return res.status(200).json({ 
+      user: sessionUser, 
+      remember: remember === 'on' 
+    });
   } catch (error) {
     next(error);
   }
@@ -97,10 +100,10 @@ exports.forgotPassword = async (req, res, next) => {
 
     // For security reasons, always return success even if user not found
     if (result.rows.length === 0) {
-      return {
+      return res.status(200).json({
         success: true,
         message: 'If an account with this email exists, password reset instructions have been sent'
-      };
+      });
     }
 
     const user = result.rows[0];
@@ -125,13 +128,13 @@ exports.forgotPassword = async (req, res, next) => {
     );
 
     // Return token and user email for the email service to handle
-    return {
+    return res.status(200).json({
       success: true,
       userId: user.id,
       email: user.email,
       token: resetToken,
       message: 'If an account with this email exists, password reset instructions have been sent'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -170,11 +173,11 @@ exports.validateResetToken = async (req, res, next) => {
       throw error;
     }
 
-    return {
+    return res.status(200).json({
       success: true,
       userId: result.rows[0].id,
       email: result.rows[0].email
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -248,10 +251,10 @@ exports.resetPassword = async (req, res, next) => {
       [userId, 'password_reset', req.ip]
     );
 
-    return {
+    return res.status(200).json({
       success: true,
       message: 'Password has been reset successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -271,7 +274,7 @@ exports.logout = async (req, res, next) => {
       );
     }
 
-    return { success: true };
+    return res.status(200).json({ success: true });
   } catch (error) {
     next(error);
   }

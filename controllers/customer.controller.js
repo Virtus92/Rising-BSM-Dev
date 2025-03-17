@@ -1,4 +1,4 @@
- /**
+/**
  * Customer Controller
  * Handles all customer-related business logic
  */
@@ -21,21 +21,21 @@ exports.getAllCustomers = async (req, res, next) => {
     let paramCounter = 1;
 
     if (status) {
-      whereClauses.push(`status = $${paramCounter++}`);
+      whereClauses.push(`status = $${paramCounter++} /* ${status} */`);
       queryParams.push(status);
     }
 
     if (type) {
-      whereClauses.push(`kundentyp = $${paramCounter++}`);
+      whereClauses.push(`kundentyp = $${paramCounter++} /* ${type} */`);
       queryParams.push(type);
     }
 
     if (search) {
       const searchTerm = `%${search}%`;
       whereClauses.push(`
-        (LOWER(name) LIKE $${paramCounter} OR 
-         LOWER(firma) LIKE $${paramCounter} OR 
-         LOWER(email) LIKE $${paramCounter})
+        (LOWER(name) LIKE $${paramCounter} /* ${searchTerm} */ OR 
+         LOWER(firma) LIKE $${paramCounter} /* ${searchTerm} */ OR 
+         LOWER(email) LIKE $${paramCounter} /* ${searchTerm} */)
       `);
       queryParams.push(searchTerm);
       paramCounter++;
@@ -116,7 +116,7 @@ exports.getAllCustomers = async (req, res, next) => {
     const totalPages = Math.ceil(total / limit);
 
     // Return data object for rendering or JSON response
-    const data = {
+    return res.status(200).json({
       customers,
       pagination: {
         current: parseInt(page),
@@ -134,9 +134,7 @@ exports.getAllCustomers = async (req, res, next) => {
         month: formatDateSafely(row.month, 'MM/yyyy'),
         customer_count: parseInt(row.customer_count)
       }))
-    };
-
-    return data;
+    });
   } catch (error) {
     next(error);
   }
@@ -230,7 +228,7 @@ exports.getCustomerById = async (req, res, next) => {
       })
     };
     
-    return result;
+    return res.status(200).json(result);
   } catch (error) {
     next(error);
   }
@@ -302,11 +300,11 @@ exports.createCustomer = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(201).json({
       success: true,
       customerId: result.rows[0].id,
       message: 'Customer created successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -401,11 +399,11 @@ exports.updateCustomer = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(200).json({
       success: true,
       customerId: id,
       message: 'Customer updated successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -466,11 +464,11 @@ exports.addCustomerNote = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(200).json({
       success: true,
       customerId: id,
       message: 'Note added successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -519,11 +517,11 @@ exports.updateCustomerStatus = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(200).json({
       success: true,
       customerId: id,
       message: 'Customer status updated successfully'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -585,10 +583,10 @@ exports.deleteCustomer = async (req, res, next) => {
       ]
     });
 
-    return {
+    return res.status(200).json({
       success: true,
       message: 'Customer successfully deleted'
-    };
+    });
   } catch (error) {
     next(error);
   }
@@ -638,7 +636,7 @@ exports.exportCustomers = async (req, res, next) => {
     const result = await pool.query(query);
     
     // Use export service to generate the appropriate format
-    return await exportService.generateExport(result.rows, format, {
+    const exportData = await exportService.generateExport(result.rows, format, {
       filename: 'kunden-export',
       title: 'Kundenliste - Rising BSM',
       columns: [
@@ -662,6 +660,8 @@ exports.exportCustomers = async (req, res, next) => {
       ],
       filters: { status, type }
     });
+
+    return res.status(200).json(exportData);
   } catch (error) {
     next(error);
   }
