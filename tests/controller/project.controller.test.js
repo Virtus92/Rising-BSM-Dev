@@ -1,12 +1,13 @@
 const projectController = require('../../controllers/project.controller');
 const pool = require('../../services/db.service');
 const exportService = require('../../services/export.service');
+const formatters = require('../../utils/formatters');
 
 // Mock dependencies
 jest.mock('../../services/db.service');
 jest.mock('../../services/export.service');
 jest.mock('../../utils/formatters', () => ({
-    formatDateSafely: jest.fn(date => date ? 'formatted-date' : null)
+    formatDateSafely: jest.fn((date, format) => date ? 'formatted-date' : null)
 }));
 jest.mock('../../utils/helpers', () => ({
     getProjektStatusInfo: jest.fn(status => {
@@ -110,6 +111,169 @@ describe('Project Controller', () => {
 
             // Assert
             expect(next).toHaveBeenCalledWith(error);
+        });
+
+        it('should filter projects by kunde_id', async () => {
+            // Setup
+            req.query = { kunde_id: '5' };
+            
+            pool.query.mockResolvedValueOnce({
+                rows: []
+            });
+            pool.query.mockResolvedValueOnce({
+                rows: [{ total: '0' }]
+            });
+
+            // Execute
+            await projectController.getAllProjects(req, res, next);
+
+            // Assert
+            expect(pool.query).toHaveBeenCalledTimes(2);
+            expect(pool.query.mock.calls[0][1]).toContain('5');
+            expect(res.status).toHaveBeenCalledWith(200);
+        });
+
+        it('should filter projects by search term', async () => {
+            // Setup
+            const searchTerm = 'project';
+            req.query = { search: searchTerm };
+            
+            pool.query.mockResolvedValueOnce({
+                rows: []
+            });
+            pool.query.mockResolvedValueOnce({
+                rows: [{ total: '0' }]
+            });
+
+            // Execute
+            await projectController.getAllProjects(req, res, next);
+
+            // Assert
+            expect(pool.query).toHaveBeenCalledTimes(2);
+            expect(pool.query.mock.calls[0][1]).toContain(`%${searchTerm}%`);
+            expect(res.status).toHaveBeenCalledWith(200);
+        });
+
+        it('should apply multiple filters together', async () => {
+            // Setup
+            req.query = { 
+                status: 'neu',
+                kunde_id: '10',
+                search: 'test' 
+            };
+            
+            pool.query.mockResolvedValueOnce({
+                rows: []
+            });
+            pool.query.mockResolvedValueOnce({
+                rows: [{ total: '0' }]
+            });
+
+            // Execute
+            await projectController.getAllProjects(req, res, next);
+
+            // Assert
+            expect(pool.query).toHaveBeenCalledTimes(2);
+            expect(pool.query.mock.calls[0][1]).toContain('neu');
+            expect(pool.query.mock.calls[0][1]).toContain('10');
+            expect(pool.query.mock.calls[0][1]).toContain('%test%');
+            expect(res.status).toHaveBeenCalledWith(200);
+        });
+
+        it('should format end_datum properly', async () => {
+            // Setup
+            formatters.formatDateSafely.mockImplementationOnce((date) => date ? 'formatted-date' : '-');
+            
+            pool.query.mockResolvedValueOnce({
+                rows: [
+                    { id: 1, titel: 'Project 1', status: 'neu', end_datum: '2023-02-01' }
+                ]
+            });
+            pool.query.mockResolvedValueOnce({
+                rows: [{ total: '1' }]
+            });
+
+            // Execute
+            await projectController.getAllProjects(req, res, next);
+
+            // Assert
+            expect(formatters.formatDateSafely).toHaveBeenCalledWith('2023-02-01', 'dd.MM.yyyy');
+            expect(res.status).toHaveBeenCalledWith(200);
+        });
+
+        it('should handle null end_datum properly', async () => {
+            // Setup
+            formatters.formatDateSafely.mockImplementationOnce((date) => date ? 'formatted-date' : null);
+            
+            pool.query.mockResolvedValueOnce({
+                rows: [
+                    { id: 1, titel: 'Project 1', status: 'neu', end_datum: null }
+                ]
+            });
+            pool.query.mockResolvedValueOnce({
+                rows: [{ total: '1' }]
+            });
+
+            // Execute
+            await projectController.getAllProjects(req, res, next);
+
+            // Assert
+            expect(formatters.formatDateSafely).toHaveBeenCalledWith(undefined, 'dd.MM.yyyy');
+            expect(res.status).toHaveBeenCalledWith(200);
+        });
+
+        it('should parse betrag as float when present', async () => {
+            // Setup
+            pool.query.mockResolvedValueOnce({
+                rows: [
+                    { id: 1, titel: 'Project 1', status: 'neu', betrag: '1234.56' }
+                ]
+            });
+            pool.query.mockResolvedValueOnce({
+                rows: [{ total: '1' }]
+            });
+
+            // Execute
+            await projectController.getAllProjects(req, res, next);
+
+            // Assert
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    projects: expect.arrayContaining([
+                        expect.objectContaining({
+                            betrag: 1234.56
+                        })
+                    ])
+                })
+            );
+        });
+
+        it('should handle null betrag properly', async () => {
+            // Setup
+            pool.query.mockResolvedValueOnce({
+                rows: [
+                    { id: 1, titel: 'Project 1', status: 'neu', betrag: null }
+                ]
+            });
+            pool.query.mockResolvedValueOnce({
+                rows: [{ total: '1' }]
+            });
+
+            // Execute
+            await projectController.getAllProjects(req, res, next);
+
+            // Assert
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    projects: expect.arrayContaining([
+                        expect.objectContaining({
+                            betrag: null
+                        })
+                    ])
+                })
+            );
         });
     });
 
@@ -256,6 +420,57 @@ describe('Project Controller', () => {
                 })
             );
         });
+
+        it('should validate required fields', async () => {
+            // Setup
+            req.params = { id: '5' };
+            req.body = {}; // Missing title and start_datum
+            
+            // Execute
+            await projectController.updateProject(req, res, next);
+            
+            // Assert
+            expect(next).toHaveBeenCalledWith(
+            expect.objectContaining({
+                message: 'Title and start date are required fields',
+                statusCode: 400
+            })
+            );
+        });
+        
+        it('should validate title field is present', async () => {
+            // Setup
+            req.params = { id: '5' };
+            req.body = { start_datum: '2023-02-15' }; // Missing title
+            
+            // Execute
+            await projectController.updateProject(req, res, next);
+            
+            // Assert
+            expect(next).toHaveBeenCalledWith(
+            expect.objectContaining({
+                message: 'Title and start date are required fields',
+                statusCode: 400
+            })
+            );
+        });
+        
+        it('should validate start_datum field is present', async () => {
+            // Setup
+            req.params = { id: '5' };
+            req.body = { titel: 'Updated Project' }; // Missing start_datum
+            
+            // Execute
+            await projectController.updateProject(req, res, next);
+            
+            // Assert
+            expect(next).toHaveBeenCalledWith(
+            expect.objectContaining({
+                message: 'Title and start date are required fields',
+                statusCode: 400
+            })
+            );
+        });
     });
 
     describe('updateProjectStatus', () => {
@@ -365,6 +580,137 @@ describe('Project Controller', () => {
             // Assert
             expect(res.json).toHaveBeenCalledWith(mockData);
         });
+
+        it('should filter exports by kunde_id', async () => {
+            // Setup
+            req.query = { 
+            format: 'excel',
+            kunde_id: '7'
+            };
+            
+            pool.query.mockResolvedValueOnce({
+            rows: [{ id: 1, titel: 'Project 1', kunde_id: 7 }]
+            });
+
+            exportService.generateExport.mockResolvedValueOnce({
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            filename: 'projekte-export.xlsx',
+            buffer: Buffer.from('test')
+            });
+
+            // Execute
+            await projectController.exportProjects(req, res, next);
+
+            // Assert
+            expect(pool.query).toHaveBeenCalledTimes(1);
+            expect(pool.query.mock.calls[0][0].values).toContain('7');
+            expect(exportService.generateExport).toHaveBeenCalledTimes(1);
+            expect(res.setHeader).toHaveBeenCalledTimes(2);
+        });
+
+        it('should handle multiple export filters together', async () => {
+            // Setup
+            req.query = { 
+            format: 'excel',
+            status: 'neu',
+            kunde_id: '9'
+            };
+            
+            pool.query.mockResolvedValueOnce({
+            rows: []
+            });
+
+            exportService.generateExport.mockResolvedValueOnce({
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            filename: 'projekte-export.xlsx',
+            buffer: Buffer.from('test')
+            });
+
+            // Execute
+            await projectController.exportProjects(req, res, next);
+
+            // Assert
+            expect(pool.query).toHaveBeenCalledTimes(1);
+            expect(pool.query.mock.calls[0][0].values).toContain('neu');
+            expect(pool.query.mock.calls[0][0].values).toContain('9');
+            expect(exportService.generateExport).toHaveBeenCalledWith(
+            expect.any(Array),
+            'excel',
+            expect.objectContaining({
+                filters: { status: 'neu', kunde_id: '9' }
+            })
+            );
+        });
+
+        it('should handle export errors', async () => {
+            // Setup
+            req.query = { format: 'excel' };
+            
+            const error = new Error('Export error');
+            pool.query.mockRejectedValueOnce(error);
+
+            // Execute
+            await projectController.exportProjects(req, res, next);
+
+            // Assert
+            expect(next).toHaveBeenCalledWith(error);
+            expect(res.status).not.toHaveBeenCalled();
+        });
+
+        it('should apply default values when exporting projects', async () => {
+            // Setup
+            req.query = { format: 'excel' };
+        
+            pool.query.mockResolvedValueOnce({
+            rows: [{ 
+            id: 1, 
+            titel: 'Project 1', 
+            start_datum: null, 
+            end_datum: null, 
+            betrag: null, 
+            status: 'neu',
+            kunde_id: null,
+            dienstleistung_id: null,
+            beschreibung: null
+            }]
+            });
+        
+            exportService.generateExport.mockResolvedValueOnce({
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            filename: 'projekte-export.xlsx',
+            buffer: Buffer.from('test')
+            });
+        
+            // Execute
+            await projectController.exportProjects(req, res, next);
+        
+            // Assert
+            expect(pool.query).toHaveBeenCalledTimes(1);
+            expect(exportService.generateExport).toHaveBeenCalledWith(
+            expect.arrayContaining([
+            expect.objectContaining({
+            id: 1,
+            titel: 'Project 1',
+            start_datum: null,
+            end_datum: null,
+            betrag: null,
+            status: 'neu',
+            kunde_id: null,
+            dienstleistung_id: null,
+            beschreibung: null
+            })
+            ]),
+            'excel',
+            expect.objectContaining({
+            filename: 'projekte-export',
+            title: 'Projektliste - Rising BSM',
+            filters: { status: undefined, kunde_id: undefined }
+            })
+            );
+            expect(res.setHeader).toHaveBeenCalledTimes(2);
+            expect(res.send).toHaveBeenCalledWith(Buffer.from('test'));
+        });
+        
     });
 
     describe('addProjectNote', () => {

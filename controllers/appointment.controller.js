@@ -387,6 +387,58 @@ exports.updateAppointment = async (req, res, next) => {
 };
 
 /**
+ * Delete an existing appointment
+ */
+exports.deleteAppointment = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        // Check if appointment exists
+        const checkResult = await pool.query({
+            text: 'SELECT id FROM termine WHERE id = $1',
+            values: [id]
+        });
+
+        if (checkResult.rows.length === 0) {
+            const error = new Error(`Appointment with ID ${id} not found`);
+            error.statusCode = 404;
+            throw error;
+        }
+
+        // Delete appointment from database
+        await pool.query({
+            text: 'DELETE FROM termine WHERE id = $1',
+            values: [id]
+        });
+
+        // Log activity
+        await pool.query({
+            text: `
+        INSERT INTO termin_log (
+          termin_id, benutzer_id, benutzer_name, aktion, details
+        ) VALUES ($1, $2, $3, $4, $5)
+      `,
+            values: [
+                id,
+                req.session.user.id,
+                req.session.user.name,
+                'deleted',
+                'Appointment deleted'
+            ]
+        });
+
+        return {
+            success: true,
+            appointmentId: id,
+            message: 'Appointment deleted successfully'
+        };
+    } catch (error) {
+        next(error);
+        return undefined;
+    }
+};
+
+/**
  * Update appointment status
  */
 exports.updateAppointmentStatus = async (req, res, next) => {
@@ -539,13 +591,15 @@ exports.exportAppointments = async (req, res, next) => {
     
     // Date range filter
     if (start_date) {
+      const startDate = new Date(start_date);
       conditions.push(`termin_datum >= $${paramCounter++}`);
-      params.push(new Date(start_date));
+      params.push(startDate);
     }
     
     if (end_date) {
+      const endDate = new Date(end_date);
       conditions.push(`termin_datum <= $${paramCounter++}`);
-      params.push(new Date(end_date));
+      params.push(endDate);
     }
     
     // Status filter

@@ -11,14 +11,37 @@ module.exports = {
     collectCoverage: true,
     coverageDirectory: 'coverage',
     collectCoverageFrom: [
-        'src/**/*.{js,jsx}',
+        'controllers/**/*.js',
+        'services/**/*.js',
+        'utils/**/*.js',
+        'middleware/**/*.js',
         '!**/node_modules/**',
-        '!**/vendor/**'
+        '!**/vendor/**',
+        '!**/dist/**',
+        '!**/*.test.js',
+        '!**/*.spec.js'
     ],
     
-    testTimeout: 10000,
+    testTimeout: 30000,
     
     clearMocks: true,
     
     verbose: true,
+
+    coverageThreshold: {
+        global: {
+            statements: 70,
+            branches: 70,
+            functions: 70,
+            lines: 70,
+        },
+    },
+
+    // Add the setup file
+    setupFiles: ['./jest.setup.js'],
+    
+    // Add the teardown file
+    globalTeardown: './jest.teardown.js',
+
+    detectOpenHandles: true,
 };

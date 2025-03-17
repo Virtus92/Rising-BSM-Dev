@@ -1,4 +1,3 @@
- 
 /**
  * Cache Service
  * Provides a centralized caching mechanism for expensive operations
@@ -6,6 +5,9 @@
 
 // In-memory cache storage
 const cacheStore = {};
+
+// Store the interval ID so we can clear it
+let cleanupIntervalId = null;
 
 /**
  * Get data from cache or execute function to get fresh data
@@ -125,4 +127,18 @@ exports.cleanup = () => {
 };
 
 // Run cleanup periodically (every 5 minutes)
-setInterval(exports.cleanup, 5 * 60 * 1000);
+if (process.env.NODE_ENV !== 'test') {
+  cleanupIntervalId = setInterval(exports.cleanup, 5 * 60 * 1000);
+} else {
+  console.log('Cache service cleanup interval not started in test environment');
+}
+
+// Add a method to stop the interval (for testing purposes)
+exports.stopCleanupInterval = () => {
+  if (cleanupIntervalId) {
+    clearInterval(cleanupIntervalId);
+    cleanupIntervalId = null;
+    return true;
+  }
+  return false;
+};

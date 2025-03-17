@@ -259,4 +259,162 @@ describe('Settings Controller', () => {
             }));
         });
     });
+
+    describe('updateSystemSettings', () => {
+        beforeEach(() => {
+            // Set admin role for most tests
+            mockReq.session.user.role = 'admin';
+            mockReq.body = {
+                settings: {
+                    'smtp_host': 'new.smtp.example.com',
+                    'max_login_attempts': '3'
+                }
+            };
+        });
+
+        it('should update system settings for admin users', async () => {
+            // Mock update queries
+            pool.query.mockResolvedValue({});
+
+            const result = await settingsController.updateSystemSettings(mockReq, mockRes, mockNext);
+
+            expect(pool.query).toHaveBeenCalledTimes(3); // Two updates and one log entry
+            expect(result).toEqual({
+                success: true,
+                message: 'System settings updated successfully'
+            });
+        });
+
+        it('should throw error for non-admin users', async () => {
+            // Set non-admin role
+            mockReq.session.user.role = 'user';
+
+            await settingsController.updateSystemSettings(mockReq, mockRes, mockNext);
+
+            expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+                message: 'Unauthorized access to system settings',
+                statusCode: 403
+            }));
+        });
+
+        it('should throw error for invalid settings data', async () => {
+            mockReq.body = { settings: null };
+
+            await settingsController.updateSystemSettings(mockReq, mockRes, mockNext);
+
+            expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+                message: 'Invalid settings data',
+                statusCode: 400
+            }));
+        });
+
+        it('should call next with error on failure', async () => {
+            const testError = new Error('Test error');
+            pool.query.mockRejectedValueOnce(testError);
+
+            await settingsController.updateSystemSettings(mockReq, mockRes, mockNext);
+
+            expect(mockNext).toHaveBeenCalledWith(testError);
+        });
+    });
+
+    describe('updateBackupSettings', () => {
+        beforeEach(() => {
+            // Set admin role for most tests
+            mockReq.session.user.role = 'admin';
+            mockReq.body = {
+                automatisch: true,
+                intervall: 'woechentlich',
+                zeit: '04:00',
+                aufbewahrung: 30
+            };
+        });
+
+        it('should update backup settings for admin users', async () => {
+            // Mock insert query and update query
+            pool.query.mockResolvedValue({});
+
+            const result = await settingsController.updateBackupSettings(mockReq, mockRes, mockNext);
+
+            expect(pool.query).toHaveBeenCalledTimes(3); // Insert, update, and log
+            expect(result).toEqual({
+                success: true,
+                message: 'Backup settings updated successfully'
+            });
+        });
+
+        it('should throw error for non-admin users', async () => {
+            // Set non-admin role
+            mockReq.session.user.role = 'user';
+
+            await settingsController.updateBackupSettings(mockReq, mockRes, mockNext);
+
+            expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+                message: 'Unauthorized access to backup settings',
+                statusCode: 403
+            }));
+        });
+
+        it('should throw error for missing required fields', async () => {
+            mockReq.body = { automatisch: true }; // Missing intervall and zeit
+
+            await settingsController.updateBackupSettings(mockReq, mockRes, mockNext);
+
+            expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+                message: 'Backup interval and time are required',
+                statusCode: 400
+            }));
+        });
+
+        it('should call next with error on failure', async () => {
+            const testError = new Error('Test error');
+            pool.query.mockRejectedValueOnce(testError);
+
+            await settingsController.updateBackupSettings(mockReq, mockRes, mockNext);
+
+            expect(mockNext).toHaveBeenCalledWith(testError);
+        });
+    });
+
+    describe('triggerManualBackup', () => {
+        beforeEach(() => {
+            // Set admin role for most tests
+            mockReq.session.user.role = 'admin';
+        });
+
+        it('should trigger manual backup for admin users', async () => {
+            // Mock database queries
+            pool.query.mockResolvedValue({});
+
+            const result = await settingsController.triggerManualBackup(mockReq, mockRes, mockNext);
+
+            expect(pool.query).toHaveBeenCalledTimes(2); // Backup log and system log
+            expect(result).toEqual({
+                success: true,
+                message: 'Backup process initiated',
+                status: 'pending'
+            });
+        });
+
+        it('should throw error for non-admin users', async () => {
+            // Set non-admin role
+            mockReq.session.user.role = 'user';
+
+            await settingsController.triggerManualBackup(mockReq, mockRes, mockNext);
+
+            expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+                message: 'Unauthorized access to backup functionality',
+                statusCode: 403
+            }));
+        });
+
+        it('should call next with error on failure', async () => {
+            const testError = new Error('Test error');
+            pool.query.mockRejectedValueOnce(testError);
+
+            await settingsController.triggerManualBackup(mockReq, mockRes, mockNext);
+
+            expect(mockNext).toHaveBeenCalledWith(testError);
+        });
+    });
 });

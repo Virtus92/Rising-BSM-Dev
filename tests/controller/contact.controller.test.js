@@ -53,7 +53,7 @@ describe('Contact Controller', () => {
         pool.query.mockImplementation((query) => {
             if (query.text && query.text.includes('INSERT INTO kontaktanfragen')) {
                 return Promise.resolve({ rows: [{ id: 1 }] });
-            } else if (query === 'SELECT id FROM benutzer WHERE rolle IN (\'admin\', \'manager\')') {
+            } else if (query.text && query.text.includes("SELECT id FROM benutzer WHERE rolle IN ('admin', 'manager')")) {
                 return Promise.resolve({ rows: [{ id: 1 }, { id: 2 }] });
             } else if (query.text && query.text.includes('SELECT * FROM kontaktanfragen')) {
                 return Promise.resolve({ rows: [{ id: 1, name: 'Test User', email: 'test@example.com' }] });
@@ -148,6 +148,170 @@ describe('Contact Controller', () => {
                 success: false,
                 errors: { message: 'Message must be at least 10 characters long' }
             });
+        });
+
+        test('should create notifications for all admin users', async () => {
+            // Define admin users
+            const adminUsers = [{ id: 101 }, { id: 202 }, { id: 303 }];
+            const requestId = 456;
+
+            
+            // Reset the query mock and create a more specific implementation
+            pool.query.mockReset();
+            pool.query.mockImplementation((query) => {
+                // Log the query to see what's coming in
+                console.log("Query received:", query);
+                
+                // Handle as object or string
+                const queryText = typeof query === 'object' ? query.text : query;
+                
+                // Normalize the query text by removing extra whitespace
+                const normalizedText = queryText.replace(/\s+/g, ' ').trim();
+                console.log("Normalized query:", normalizedText);
+                
+                if (normalizedText.includes('INSERT INTO kontaktanfragen')) {
+                    console.log("Returning inserted request with ID:", requestId);
+                    return Promise.resolve({ rows: [{ id: requestId }] });
+                } 
+                
+                // More flexible matching for the admin query
+                if (normalizedText.includes('SELECT id FROM benutzer') && 
+                    normalizedText.includes('rolle IN') && 
+                    (normalizedText.includes('admin') || normalizedText.includes('manager'))) {
+                    
+                    return Promise.resolve({ rows: adminUsers });
+                }
+                
+                return Promise.resolve({ rows: [] });
+            });
+            
+            // Reset notification service mock
+            NotificationService.create.mockReset();
+            const notificationCalls = [];
+            
+            NotificationService.create.mockImplementation((data) => {
+                notificationCalls.push({...data}); // Store a copy of the data
+                console.log(`Mock call ${notificationCalls.length} with type: ${data.type}, userId: ${data.userId}`);
+                return Promise.resolve({ success: true });
+            });
+            
+            await contactController.submitContact(mockRequest, mockResponse, next);
+            
+            console.log(`Total mock calls: ${notificationCalls.length}`);
+            console.log(`Expected calls: ${adminUsers.length + 1}`);
+            
+            // Verify total calls
+            expect(notificationCalls.length).toBe(adminUsers.length + 1);
+            
+            // Check admin notifications
+            const adminNotifications = notificationCalls.filter(call => 
+                call.type === 'anfrage'
+            );
+            expect(adminNotifications.length).toBe(adminUsers.length);
+            
+            // Verify admin user IDs were included correctly
+            adminUsers.forEach(admin => {
+                const found = adminNotifications.some(notification => 
+                    notification.userId === admin.id
+                );
+                expect(found).toBe(true);
+            });
+            
+            // Verify confirmation notification
+            const confirmationNotifications = notificationCalls.filter(call => 
+                call.type === 'contact_confirmation'
+            );
+            expect(confirmationNotifications.length).toBe(1);
+        });
+        
+        test('should return 500 JSON response for XHR requests on generic errors', async () => {
+            // Mock a generic error (not the specific 23505 error)
+            pool.query.mockRejectedValueOnce(new Error('Generic database error'));
+            
+            // Set request as XHR
+            mockRequest.xhr = true;
+            
+            await contactController.submitContact(mockRequest, mockResponse, next);
+            
+            expect(mockResponse.status).toHaveBeenCalledWith(500);
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: false,
+                message: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.'
+            });
+        });
+        
+        test('should return 500 JSON response when Accept header includes application/json', async () => {
+            // Mock a generic error
+            pool.query.mockRejectedValueOnce(new Error('Generic database error'));
+            
+            // Set XHR to false but include application/json in Accept header
+            mockRequest.xhr = false;
+            mockRequest.headers.accept = 'application/json';
+            
+            await contactController.submitContact(mockRequest, mockResponse, next);
+            
+            expect(mockResponse.status).toHaveBeenCalledWith(500);
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: false,
+                message: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.'
+            });
+        });
+
+        test('should map notifications for each admin with correct parameters', async () => {
+            // Define admin users
+            const adminUsers = [{ id: 101 }, { id: 202 }, { id: 303 }];
+            const requestId = 456;
+            
+           // Reset the query mock and create a more specific implementation
+           pool.query.mockReset();
+           pool.query.mockImplementation((query) => {
+               // Log the query to see what's coming in
+               console.log("Query received:", query);
+               
+               // Handle as object or string
+               const queryText = typeof query === 'object' ? query.text : query;
+               
+               // Normalize the query text by removing extra whitespace
+               const normalizedText = queryText.replace(/\s+/g, ' ').trim();
+               console.log("Normalized query:", normalizedText);
+               
+               if (normalizedText.includes('INSERT INTO kontaktanfragen')) {
+                   console.log("Returning inserted request with ID:", requestId);
+                   return Promise.resolve({ rows: [{ id: requestId }] });
+               } 
+               
+               // More flexible matching for the admin query
+               if (normalizedText.includes('SELECT id FROM benutzer') && 
+                   normalizedText.includes('rolle IN') && 
+                   (normalizedText.includes('admin') || normalizedText.includes('manager'))) {
+                   
+                   return Promise.resolve({ rows: adminUsers });
+               }
+               
+               return Promise.resolve({ rows: [] });
+           });
+            
+            await contactController.submitContact(mockRequest, mockResponse, next);
+            
+            // Verify notification service was called exactly once for each admin plus confirmation
+            expect(NotificationService.create).toHaveBeenCalledTimes(adminUsers.length + 1);
+            
+            // Verify the notification parameters for each admin
+            for (let i = 0; i < adminUsers.length; i++) {
+                const expectedNotification = {
+                    type: 'anfrage',
+                    title: 'Neue Kontaktanfrage',
+                    message: `Neue Anfrage von ${mockRequest.body.name} über ${mockRequest.body.service}`,
+                    referenceId: requestId,
+                    referenceType: 'kontaktanfragen',
+                    userId: adminUsers[i].id
+                };
+                
+                expect(NotificationService.create.mock.calls[i][0]).toEqual(expectedNotification);
+            }
+            
+            // Also verify the confirmation notification was called with different parameters
+            expect(NotificationService.create.mock.calls[adminUsers.length][0]).toHaveProperty('type', 'contact_confirmation');
         });
     });
 

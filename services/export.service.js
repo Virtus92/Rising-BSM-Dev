@@ -19,7 +19,7 @@ exports.generateExport = async (data, formatType, options) => {
   switch (formatType) {
     case 'csv':
       return generateCsvExport(data, columns, filename);
-    case 'excel':
+    case 'xlsx':
       return await generateExcelExport(data, columns, filename, title, filters);
     case 'pdf':
       return await generatePdfExport(data, columns, filename, title, filters);
@@ -52,7 +52,7 @@ function generateCsvExport(data, columns, filename) {
       
       // Apply format function if provided
       if (column.format && typeof column.format === 'function') {
-        value = column.format(value);
+        value = column.format(value, row);
       } else if (value === null || value === undefined) {
         value = column.default || '';
       }

@@ -105,6 +105,81 @@ describe('Customer Controller', () => {
             expect(firstQueryCall).toContain('privat');
             expect(firstQueryCall).toContain('%test%');
         });
+
+        it('should handle errors properly', async () => {
+            // Arrange
+            const error = new Error('Database error');
+            pool.query.mockRejectedValue(error);
+
+            // Act
+            await customerController.getAllCustomers(req, res, next);
+
+            // Assert
+            expect(next).toHaveBeenCalledWith(error);
+        });
+
+        it('should format customer data correctly', async () => {
+            // Arrange
+            req.query = { page: 1, limit: 10 };
+            
+            const testDate = new Date('2023-01-15');
+            
+            pool.query
+              .mockResolvedValueOnce({
+                rows: [
+                  { 
+                    id: 1, 
+                    name: 'Test Customer', 
+                    firma: 'Test Company', 
+                    email: 'test@example.com', 
+                    status: 'aktiv', 
+                    kundentyp: 'privat', 
+                    created_at: testDate
+                  }
+                ]
+              })
+              .mockResolvedValueOnce({
+                rows: [{ total: '1' }]
+              })
+              .mockResolvedValueOnce({
+                rows: [{ total: 1, privat: 1, geschaeft: 0, aktiv: 1 }]
+              })
+              .mockResolvedValueOnce({
+                rows: [{ month: testDate, customer_count: '1' }]
+              });
+
+            // Act
+            await customerController.getAllCustomers(req, res, next);
+
+            // Assert
+            expect(formatDateSafely).toHaveBeenCalledWith(testDate, 'dd.MM.yyyy');
+            expect(res.json).toHaveBeenCalled();
+            const customer = res.json.mock.calls[0][0].customers[0];
+            expect(customer.statusLabel).toBe('Aktiv');
+            expect(customer.statusClass).toBe('success');
+            expect(customer.kundentypLabel).toBe('Privatkunde');
+        });
+
+        it('should handle empty result sets', async () => {
+            // Arrange
+            req.query = { page: 1, limit: 10 };
+            
+            pool.query
+              .mockResolvedValueOnce({ rows: [] })
+              .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+              .mockResolvedValueOnce({ rows: [{ total: 0, privat: 0, geschaeft: 0, aktiv: 0 }] })
+              .mockResolvedValueOnce({ rows: [] });
+
+            // Act
+            await customerController.getAllCustomers(req, res, next);
+
+            // Assert
+            expect(res.status).toHaveBeenCalledWith(200);
+            const response = res.json.mock.calls[0][0];
+            expect(response.customers).toEqual([]);
+            expect(response.pagination.totalRecords).toBe(0);
+        });
+
     });
 
     describe('getCustomerById', () => {
@@ -216,6 +291,22 @@ describe('Customer Controller', () => {
             expect(next).toHaveBeenCalled();
             expect(next.mock.calls[0][0].statusCode).toBe(400);
         });
+
+        it('should return 404 if customer not found', async () => {
+            // Arrange
+            req.params = { id: 999 };
+            req.body = { notiz: 'Test note' };
+            
+            pool.query.mockResolvedValueOnce({ rows: [] }); // Customer not found
+
+            // Act
+            await customerController.addCustomerNote(req, res, next);
+
+            // Assert
+            expect(next).toHaveBeenCalled();
+            expect(next.mock.calls[0][0].statusCode).toBe(404);
+            expect(next.mock.calls[0][0].message).toContain('Customer with ID 999 not found');
+        });
     });
 
     describe('updateCustomerStatus', () => {
@@ -246,6 +337,32 @@ describe('Customer Controller', () => {
             // Assert
             expect(next).toHaveBeenCalled();
             expect(next.mock.calls[0][0].statusCode).toBe(400);
+        });
+
+        it('should validate required fields', async () => {
+            // Arrange
+            req.body = { id: 1 }; // Missing status field
+            
+            // Act
+            await customerController.updateCustomerStatus(req, res, next);
+            
+            // Assert
+            expect(next).toHaveBeenCalled();
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
+            expect(next.mock.calls[0][0].message).toBe('Customer ID and status are required');
+        });
+        
+        it('should validate customer ID', async () => {
+            // Arrange
+            req.body = { status: 'aktiv' }; // Missing id field
+            
+            // Act
+            await customerController.updateCustomerStatus(req, res, next);
+            
+            // Assert
+            expect(next).toHaveBeenCalled();
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
+            expect(next.mock.calls[0][0].message).toBe('Customer ID and status are required');
         });
     });
 
@@ -282,6 +399,19 @@ describe('Customer Controller', () => {
             // Assert
             expect(next).toHaveBeenCalled();
             expect(next.mock.calls[0][0].statusCode).toBe(400);
+        });
+
+        it('should validate customer ID for deletion', async () => {
+            // Arrange
+            req.body = {}; // Missing id field
+            
+            // Act
+            await customerController.deleteCustomer(req, res, next);
+            
+            // Assert
+            expect(next).toHaveBeenCalled();
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
+            expect(next.mock.calls[0][0].message).toBe('Customer ID is required');
         });
     });
 
@@ -331,6 +461,94 @@ describe('Customer Controller', () => {
             // Assert
             expect(next).toHaveBeenCalledWith(error);
         });
+
+        it('should pass correct column formatters to exportService', async () => {
+            // Arrange
+            req.query = { format: 'xlsx' };
+            const mockCustomer = { 
+                id: 1, 
+                name: 'Test Customer',
+                kundentyp: 'geschaeft',
+                status: 'aktiv',
+                created_at: new Date('2023-05-15'),
+                newsletter: true
+            };
+            pool.query.mockResolvedValue({ rows: [mockCustomer] });
+            
+            // Act
+            await customerController.exportCustomers(req, res, next);
+            
+            // Assert
+            expect(exportService.generateExport).toHaveBeenCalled();
+            
+            // Extract the columns configuration passed to generateExport
+            const columnsConfig = exportService.generateExport.mock.calls[0][2].columns;
+            
+            // Find the specific columns we want to test
+            const kundentypColumn = columnsConfig.find(col => col.key === 'kundentyp');
+            const statusColumn = columnsConfig.find(col => col.key === 'status');
+            const createdAtColumn = columnsConfig.find(col => col.key === 'created_at');
+            const newsletterColumn = columnsConfig.find(col => col.key === 'newsletter');
+            
+            // Test formatters
+            expect(kundentypColumn.format('geschaeft')).toBe('Geschäftskunde');
+            expect(kundentypColumn.format('privat')).toBe('Privatkunde');
+            
+            expect(statusColumn.format('aktiv')).toBe('Aktiv');
+            expect(statusColumn.format('inaktiv')).toBe('Inaktiv');
+            
+            // For created_at, we need to verify it calls formatDateSafely
+            expect(createdAtColumn.format(mockCustomer.created_at)).toBe('01.01.2023');
+            expect(formatDateSafely).toHaveBeenCalledWith(
+                mockCustomer.created_at, 
+                'dd.MM.yyyy'
+            );
+            
+            expect(newsletterColumn.format(true)).toBe('Ja');
+            expect(newsletterColumn.format(false)).toBe('Nein');
+        });
+
+        it('should exclude deleted customers by default in export', async () => {
+            // Arrange
+            req.query = { format: 'csv' };
+            pool.query.mockResolvedValue({ rows: [] });
+            
+            // Act
+            await customerController.exportCustomers(req, res, next);
+            
+            // Assert
+            expect(pool.query).toHaveBeenCalled();
+            const queryText = pool.query.mock.calls[0][0].text;
+            expect(queryText).toContain(`status != 'geloescht'`);
+        });
+
+        it('should include all columns in export with correct widths', async () => {
+            // Arrange
+            req.query = { format: 'xlsx' };
+            pool.query.mockResolvedValue({ rows: [] });
+            
+            // Act
+            await customerController.exportCustomers(req, res, next);
+            
+            // Assert
+            const columnsConfig = exportService.generateExport.mock.calls[0][2].columns;
+            
+            // Check all required columns are present with correct widths
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'ID', key: 'id', width: 10 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'Name', key: 'name', width: 20 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'Firma', key: 'firma', width: 20 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'E-Mail', key: 'email', width: 25 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'Telefon', key: 'telefon', width: 15 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'Adresse', key: 'adresse', width: 25 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'PLZ', key: 'plz', width: 10 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'Ort', key: 'ort', width: 15 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'Land', key: 'land', width: 15 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'Kundentyp', key: 'kundentyp', width: 15 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'Status', key: 'status', width: 12 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'Erstellt am', key: 'created_at', width: 18 }));
+            expect(columnsConfig).toContainEqual(expect.objectContaining({ header: 'Newsletter', key: 'newsletter', width: 12 }));
+        });
+
     });
 
     describe('updateCustomer', () => {

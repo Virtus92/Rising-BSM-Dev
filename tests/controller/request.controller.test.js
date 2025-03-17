@@ -37,7 +37,7 @@ describe('Request Controller', () => {
       req.query = { status: 'neu', service: 'facility', date: '2023-01-01', search: 'john', page: '2', limit: '5' };
       
       const mockRequests = [
-        { id: 1, name: 'John Doe', email: 'john@example.com', service: 'facility', status: 'neu', created_at: new Date() }
+      { id: 1, name: 'John Doe', email: 'john@example.com', service: 'facility', status: 'neu', created_at: new Date() }
       ];
       
       pool.query.mockResolvedValueOnce({ rows: mockRequests });
@@ -47,27 +47,60 @@ describe('Request Controller', () => {
 
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
-        requests: expect.arrayContaining([
-          expect.objectContaining({
-            id: 1,
-            name: 'John Doe',
-            email: 'john@example.com'
-          })
-        ]),
-        pagination: {
-          current: 2,
-          limit: 5,
-          total: 3,
-          totalRecords: 15
-        },
-        filters: {
-          status: 'neu',
-          service: 'facility',
-          date: '2023-01-01',
-          search: 'john'
-        }
+      requests: expect.arrayContaining([
+        expect.objectContaining({
+        id: 1,
+        name: 'John Doe',
+        email: 'john@example.com'
+        })
+      ]),
+      pagination: {
+        current: 2,
+        limit: 5,
+        total: 3,
+        totalRecords: 15
+      },
+      filters: {
+        status: 'neu',
+        service: 'facility',
+        date: '2023-01-01',
+        search: 'john'
+      }
       });
     });
+
+    test('should return requests with moving service label', async () => {
+      req.query = { service: 'moving' };
+      const mockRequests = [
+      { id: 2, name: 'Jane Doe', email: 'jane@example.com', service: 'moving', status: 'neu', created_at: new Date() }
+      ];
+      pool.query.mockResolvedValueOnce({ rows: mockRequests });
+      pool.query.mockResolvedValueOnce({ rows: [{ total: '1' }] });
+    
+      await requestController.getAllRequests(req, res, next);
+    
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      requests: expect.arrayContaining([
+        expect.objectContaining({
+        id: 2,
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        serviceLabel: 'Umzüge & Transporte'
+        })
+      ])
+      }));
+    });
+
+    test('should handle errors and pass them to the next middleware', async () => {
+      pool.query.mockRejectedValueOnce(new Error('Database error'));
+
+      await requestController.getAllRequests(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(expect.any(Error));
+    });
+
+
   });
 
   describe('getRequestById', () => {
@@ -202,6 +235,143 @@ describe('Request Controller', () => {
         })
       );
     });
+
+    test('should return 404 if request does not exist when adding note', async () => {
+      req.params = { id: '999' };
+      req.body = { note: 'Test note' };
+      pool.query.mockResolvedValueOnce({ rows: [] });
+
+      await requestController.addRequestNote(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 404,
+        message: 'Request with ID 999 not found'
+      })
+      );
+    });
+  });
+
+    describe('exportRequests', () => {
+    test('should export requests with proper filters', async () => {
+      req.query = { 
+      format: 'json', 
+      dateFrom: '2023-01-01', 
+      dateTo: '2023-12-31',
+      status: ['neu', 'in_bearbeitung'] 
+      };
+      
+      pool.query.mockResolvedValueOnce({ 
+      rows: [
+        { id: 1, name: 'John Doe', email: 'john@example.com', service: 'facility', status: 'neu', created_at: new Date() }
+      ] 
+      });
+      
+      const mockExportData = { data: 'exported data' };
+      exportService.generateExport.mockResolvedValueOnce(mockExportData);
+
+      await requestController.exportRequests(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(mockExportData);
+    });
+
+    test('should handle errors during export', async () => {
+      req.query = { format: 'json' };
+      pool.query.mockRejectedValueOnce(new Error('Export failed'));
+
+      await requestController.exportRequests(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(expect.any(Error));
+    });
+
+    test('should set headers and send buffer for non-JSON formats', async () => {
+      req.query = { format: 'xlsx' };
+      pool.query.mockResolvedValueOnce({ rows: [] });
+      const mockExportData = { 
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      filename: 'anfragen-export.xlsx',
+      buffer: Buffer.from('test data')
+      };
+      exportService.generateExport.mockResolvedValueOnce(mockExportData);
+
+      await requestController.exportRequests(req, res, next);
+
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', mockExportData.contentType);
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Disposition', `attachment; filename="${mockExportData.filename}"`);
+      expect(res.send).toHaveBeenCalledWith(mockExportData.buffer);
+    });
+
+    test('should handle single status filter for export', async () => {
+      req.query = { format: 'json', status: 'neu' };
+      pool.query.mockResolvedValueOnce({ rows: [] });
+      exportService.generateExport.mockResolvedValueOnce({});
+
+      await requestController.exportRequests(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalled();
+    });
+
+    test('should handle no filters for export', async () => {
+      req.query = { format: 'json' };
+      pool.query.mockResolvedValueOnce({ rows: [] });
+      exportService.generateExport.mockResolvedValueOnce({});
+
+      await requestController.exportRequests(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalled();
+    });
+
+    test('should handle errors during export', async () => {
+      req.query = { format: 'json' };
+      pool.query.mockRejectedValueOnce(new Error('Export failed'));
+
+      await requestController.exportRequests(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(expect.any(Error));
+    });
+
+    test('should set headers and send buffer for non-JSON formats', async () => {
+      req.query = { format: 'xlsx' };
+      pool.query.mockResolvedValueOnce({ rows: [] });
+      const mockExportData = { 
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      filename: 'anfragen-export.xlsx',
+      buffer: Buffer.from('test data')
+      };
+      exportService.generateExport.mockResolvedValueOnce(mockExportData);
+
+      await requestController.exportRequests(req, res, next);
+
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', mockExportData.contentType);
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Disposition', `attachment; filename="${mockExportData.filename}"`);
+      expect(res.send).toHaveBeenCalledWith(mockExportData.buffer);
+    });
+
+    test('should handle single status filter for export', async () => {
+      req.query = { format: 'json', status: 'neu' };
+      pool.query.mockResolvedValueOnce({ rows: [] });
+      exportService.generateExport.mockResolvedValueOnce({});
+
+      await requestController.exportRequests(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalled();
+    });
+
+    test('should handle no filters for export', async () => {
+      req.query = { format: 'json' };
+      pool.query.mockResolvedValueOnce({ rows: [] });
+      exportService.generateExport.mockResolvedValueOnce({});
+
+      await requestController.exportRequests(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalled();
+    });
+
   });
 
   describe('exportRequests', () => {

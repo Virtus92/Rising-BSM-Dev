@@ -66,6 +66,54 @@ describe('Service Controller', () => {
 
       expect(next).toHaveBeenCalledWith(error);
     });
+
+    test('should return all services without filters', async () => {
+      const mockServices = [
+      { id: 1, name: 'Service 1', beschreibung: 'Description 1', preis_basis: '100.00', einheit: 'h', mwst_satz: '20', aktiv: true, created_at: new Date(), updated_at: new Date() }
+      ];
+      
+      pool.query.mockResolvedValueOnce({ rows: mockServices });
+      pool.query.mockResolvedValueOnce({ rows: [{ total: '1' }] });
+
+      await serviceController.getAllServices(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      services: expect.arrayContaining([expect.objectContaining({ id: 1, name: 'Service 1' })]),
+      pagination: expect.any(Object),
+      filters: expect.any(Object)
+      }));
+    });
+
+    test('should apply "aktiv" status filter', async () => {
+      req.query = { status: 'aktiv' };
+      const mockServices = [{ id: 1, name: 'Service 1', beschreibung: 'Description 1', preis_basis: '100.00', einheit: 'h', mwst_satz: '20', aktiv: true, created_at: new Date(), updated_at: new Date() }];
+      pool.query.mockResolvedValueOnce({ rows: mockServices });
+      pool.query.mockResolvedValueOnce({ rows: [{ total: '1' }] });
+
+      await serviceController.getAllServices(req, res, next);
+      expect(pool.query).toHaveBeenCalled();
+    });
+
+    test('should apply "inaktiv" status filter', async () => {
+      req.query = { status: 'inaktiv' };
+      const mockServices = [{ id: 1, name: 'Service 1', beschreibung: 'Description 1', preis_basis: '100.00', einheit: 'h', mwst_satz: '20', aktiv: false, created_at: new Date(), updated_at: new Date() }];
+      pool.query.mockResolvedValueOnce({ rows: mockServices });
+      pool.query.mockResolvedValueOnce({ rows: [{ total: '1' }] });
+
+      await serviceController.getAllServices(req, res, next);
+      expect(pool.query).toHaveBeenCalled();
+    });
+
+    test('should apply search filter', async () => {
+      req.query = { search: 'Service 1' };
+      const mockServices = [{ id: 1, name: 'Service 1', beschreibung: 'Description 1', preis_basis: '100.00', einheit: 'h', mwst_satz: '20', aktiv: true, created_at: new Date(), updated_at: new Date() }];
+      pool.query.mockResolvedValueOnce({ rows: mockServices });
+      pool.query.mockResolvedValueOnce({ rows: [{ total: '1' }] });
+
+      await serviceController.getAllServices(req, res, next);
+      expect(pool.query).toHaveBeenCalled();
+    });
   });
 
   describe('getServiceById', () => {
@@ -201,6 +249,24 @@ describe('Service Controller', () => {
           statusCode: 404,
           message: 'Service with ID 999 not found'
         })
+      );
+    });
+
+    test('should return 400 when required fields are missing', async () => {
+      req.params = { id: '1' };
+      req.body = {
+      beschreibung: 'Updated Description',
+      mwst_satz: '20',
+      aktiv: true
+      };
+
+      await serviceController.updateService(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 400,
+        message: 'Name, base price and unit are required fields'
+      })
       );
     });
   });
@@ -345,6 +411,57 @@ describe('Service Controller', () => {
       expect(res.setHeader).toHaveBeenCalledWith('Content-Disposition', `attachment; filename="${mockExportData.filename}"`);
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.send).toHaveBeenCalledWith(mockExportData.buffer);
+    });
+
+    test('should apply status filter for export', async () => {
+      req.query = { format: 'json', status: 'inaktiv' };
+      
+      pool.query.mockResolvedValueOnce({ 
+        rows: [
+          { id: 1, name: 'Service 1', beschreibung: 'Description', preis_basis: '100.00', einheit: 'h', mwst_satz: '20', aktiv: false, created_at: new Date() }
+        ] 
+      });
+      
+      const mockExportData = { data: 'exported data' };
+      exportService.generateExport.mockResolvedValueOnce(mockExportData);
+
+      await serviceController.exportServices(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(mockExportData);
+    });
+
+    test('should handle no data found for export', async () => {
+      req.query = { format: 'json', status: 'aktiv' };
+      
+      pool.query.mockResolvedValueOnce({ rows: [] });
+      exportService.generateExport.mockResolvedValueOnce({ data: [] });
+      
+      await serviceController.exportServices(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ data: [] });
+    });
+
+    test('should handle errors during export', async () => {
+      req.query = { format: 'json', status: 'aktiv' };
+      const error = new Error('Export error');
+      pool.query.mockResolvedValueOnce({ rows: [] });
+      exportService.generateExport.mockRejectedValueOnce(error);
+
+      await serviceController.exportServices(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(error);
+    });
+
+    test('should handle database errors when fetching services for export', async () => {
+      req.query = { format: 'json', status: 'aktiv' };
+      const error = new Error('Database error');
+      pool.query.mockRejectedValueOnce(error);
+
+      await serviceController.exportServices(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(error);
     });
   });
 });
