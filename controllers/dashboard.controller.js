@@ -47,7 +47,8 @@ exports.getDashboardData = async (req, res, next) => {
       statistics: 'active'
     };
     
-    return res.status(200).json({
+    // Create data object
+    const data = {
       stats,
       chartFilters,
       charts,
@@ -55,10 +56,25 @@ exports.getDashboardData = async (req, res, next) => {
       recentRequests,
       upcomingAppointments,
       systemStatus
-    });
+    };
+    
+    // Check if function is called as API middleware or directly
+    if (!res) {
+      return data; // Return data directly when called with just req
+    }
+    
+    // If used as middleware, send JSON response
+    return res.status(200).json(data);
   } catch (error) {
     console.error('Error loading dashboard data:', error);
-    next(error);
+    
+    // Check if next is available (called as middleware)
+    if (typeof next === 'function') {
+      next(error);
+    } else {
+      // If called directly, throw the error for the caller to handle
+      throw error;
+    }
   }
 };
 

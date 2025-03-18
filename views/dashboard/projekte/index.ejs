@@ -558,57 +558,130 @@
     }
     
     function updateProjectStatus(id, status) {
-      // CSRF-Token aus dem Meta-Tag abrufen
-      const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+      // Use the getCsrfToken helper function we defined
+      const csrfToken = getCsrfToken();
+      
+      // Show loading indicator
+      showToast('info', 'Status wird aktualisiert...', 'loading');
       
       fetch('/dashboard/projekte/update-status', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'CSRF-Token': csrfToken
         },
         body: JSON.stringify({ id, status })
       })
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+        return response.json();
+      })
       .then(data => {
         if (data.success) {
+          // Hide loading toast and show success toast
+          hideToast('loading');
           showToast('success', 'Status erfolgreich aktualisiert');
+          
+          // Update UI without page reload
+          const statusElement = document.querySelector(`[data-project-id="${id}"] .status-badge`);
+          if (statusElement) {
+            // Update the status badge class and text
+            statusElement.className = `badge bg-${getStatusClass(status)} status-badge`;
+            statusElement.textContent = getStatusLabel(status);
+          }
         } else {
-          showToast('error', 'Fehler beim Aktualisieren des Status');
+          hideToast('loading');
+          showToast('error', data.error || 'Fehler beim Aktualisieren des Status');
         }
       })
       .catch(error => {
         console.error('Error:', error);
-        showToast('error', 'Fehler beim Aktualisieren des Status');
+        hideToast('loading');
+        showToast('error', `Fehler beim Aktualisieren des Status: ${error.message}`);
       });
     }
-    
-    function showToast(type, message) {
-      const toastContainer = document.getElementById('toastContainer');
+
+    // Helper function to get status class
+    function getStatusClass(status) {
+      switch(status) {
+        case 'neu': return 'secondary';
+        case 'in_bearbeitung': return 'primary';
+        case 'abgeschlossen': return 'success';
+        case 'storniert': return 'danger';
+        default: return 'secondary';
+      }
+    }
+
+    // Helper function to get status label
+    function getStatusLabel(status) {
+      switch(status) {
+        case 'neu': return 'Neu';
+        case 'in_bearbeitung': return 'In Bearbeitung';
+        case 'abgeschlossen': return 'Abgeschlossen';
+        case 'storniert': return 'Storniert';
+        default: return 'Unbekannt';
+      }
+    }
+
+    // Improved toast system with support for multiple toasts
+    let toastCounter = 0;
+    const toasts = {};
+
+    function showToast(type, message, id = null) {
+      // Use provided ID or generate a new one
+      const toastId = id || `toast-${toastCounter++}`;
+      
+      // Create toast container if it doesn't exist
+      let toastContainer = document.getElementById('toastContainer');
       if (!toastContainer) {
-        const container = document.createElement('div');
-        container.id = 'toastContainer';
-        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        document.body.appendChild(container);
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toastContainer';
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(toastContainer);
       }
       
-      const toast = document.createElement('div');
-      toast.className = `toast align-items-center border-0 bg-${type === 'success' ? 'success' : 'danger'} text-white`;
-      toast.setAttribute('role', 'alert');
-      toast.setAttribute('aria-live', 'assertive');
-      toast.setAttribute('aria-atomic', 'true');
-      toast.innerHTML = `
-        <div class="d-flex">
-          <div class="toast-body">
-            ${message}
+      // Create or update toast
+      let toast = toasts[toastId];
+      if (!toast) {
+        // Create new toast element
+        const toastElement = document.createElement('div');
+        toastElement.className = `toast align-items-center border-0 bg-${type === 'success' ? 'success' : (type === 'info' ? 'info' : 'danger')} text-white`;
+        toastElement.setAttribute('role', 'alert');
+        toastElement.setAttribute('aria-live', 'assertive');
+        toastElement.setAttribute('aria-atomic', 'true');
+        toastElement.id = toastId;
+        
+        toastElement.innerHTML = `
+          <div class="d-flex">
+            <div class="toast-body">
+              ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
           </div>
-          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-        </div>
-      `;
+        `;
+        
+        toastContainer.appendChild(toastElement);
+        toast = new bootstrap.Toast(toastElement, { autohide: type !== 'info' });
+        toasts[toastId] = toast;
+      } else {
+        // Update existing toast
+        const toastElement = document.getElementById(toastId);
+        toastElement.querySelector('.toast-body').textContent = message;
+        toastElement.className = `toast align-items-center border-0 bg-${type === 'success' ? 'success' : (type === 'info' ? 'info' : 'danger')} text-white`;
+      }
       
-      document.getElementById('toastContainer').appendChild(toast);
-      const bsToast = new bootstrap.Toast(toast);
-      bsToast.show();
+      toast.show();
+      return toastId;
+    }
+
+    function hideToast(id) {
+      if (toasts[id]) {
+        toasts[id].hide();
+        delete toasts[id];
+      }
     }
   });
 </script>

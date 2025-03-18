@@ -24,10 +24,27 @@ services:
         condition: service_healthy
     environment:
       - NODE_ENV=production
+      - PORT=3000
+      - SESSION_SECRET=your_session_secret
+      # Add other necessary environment variables here
     ports:
       - "3000:3000"
     volumes:
       - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    depends_on:
+      - app
 
 volumes:
   postgres_data:

@@ -137,6 +137,47 @@ describe('Auth Controller', () => {
             });
         });
 
+        test('should successfully log in and set session data', async () => {
+            // Setup request with valid credentials
+            req.body = { email: 'user@example.com', password: 'password123' };
+            
+            // Mock database response with active user
+            pool.query.mockResolvedValueOnce({
+                rows: [{
+                    id: 1,
+                    email: 'user@example.com',
+                    passwort: 'hashedpassword',
+                    name: 'Test User',
+                    rolle: 'user',
+                    status: 'aktiv'
+                }]
+            });
+            
+            // Mock successful password comparison
+            bcrypt.compare.mockResolvedValueOnce(true);
+            
+            // Mock activity logging
+            pool.query.mockResolvedValueOnce({ rowCount: 1 });
+            
+            await authController.login(req, res, next);
+            
+            // Verify session is set correctly
+            expect(req.session.user).toEqual({
+                id: 1,
+                email: 'user@example.com',
+                name: 'Test User',
+                role: 'user',
+                initials: 'TU'
+            });
+            
+            // Verify response was successful
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                user: expect.any(Object),
+                remember: false
+            }));
+        });
+
         test('should handle remember me functionality', async () => {
             req.body = { email: 'user@example.com', password: 'password123', remember: 'on' };
             pool.query.mockResolvedValueOnce({

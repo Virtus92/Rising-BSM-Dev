@@ -1,6 +1,26 @@
 </main>
 </div>
 
+<script>
+  // Helper function to get CSRF token
+  function getCsrfToken() {
+    // Try to get token from meta tag first
+    const metaToken = document.querySelector('meta[name="csrf-token"]');
+    if (metaToken) {
+      return metaToken.getAttribute('content');
+    }
+    
+    // Fall back to getting from a form input if available
+    const tokenInput = document.querySelector('input[name="_csrf"]');
+    if (tokenInput) {
+      return tokenInput.value;
+    }
+    
+    console.error('CSRF token not found. API requests may fail.');
+    return '';
+  }
+</script>
+
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 

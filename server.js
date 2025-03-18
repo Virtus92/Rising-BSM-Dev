@@ -9,15 +9,53 @@ const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const flash = require('connect-flash');
 const csrf = require('@dr.pogodin/csurf');
+const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // Database connection
 const pool = require('./services/db.service').pool;
 
+// CORS
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
 // Middleware imports
 const errorMiddleware = require('./middleware/error.middleware');
+
+// Middleware to check if setup is completed
+const setupCompletedMiddleware = async (req, res, next) => {
+  try {
+    // Skip for setup and public routes
+    if (req.path === '/setup' || req.path === '/login' || req.path === '/' || req.path.startsWith('/public')) {
+      return next();
+    }
+
+    // Get database connection
+    const pool = require('./services/db.service');
+    
+    // Check if setup is complete
+    const setupCheck = await pool.query(
+      "SELECT wert FROM system_settings WHERE schluessel = 'setup_complete'"
+    );
+    
+    // If setup isn't complete, redirect to setup
+    if (setupCheck.rowCount === 0 || setupCheck.rows[0].wert !== 'true') {
+      return res.redirect('/setup');
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Setup check middleware error:', error);
+    next();
+  }
+};
+
 
 // Routes imports
 const indexRoutes = require('./routes/index');
@@ -91,6 +129,8 @@ app.use(session({
 // Flash messages
 app.use(flash());
 
+app.use(setupCompletedMiddleware);
+
 // Rate limiters
 const contactLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -142,7 +182,7 @@ app.use(errorMiddleware.errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  // console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });
 
 // Process error handling

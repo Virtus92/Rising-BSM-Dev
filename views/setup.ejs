@@ -2,13 +2,20 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>System Setup - Rising BSM</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/zxcvbn@4.4.2/dist/zxcvbn.js"></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
     <div class="w-full max-w-md">
-        <form action="/setup" method="POST" class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-            <h2 class="text-2xl mb-6 text-center">Rising BSM - Ersteinrichtung</h2>
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-blue-600">Rising BSM</h1>
+            <p class="text-gray-600">Business Service Management System</p>
+        </div>
+        
+        <form action="/setup" method="POST" class="bg-white shadow-lg rounded-lg px-8 pt-6 pb-8 mb-4">
+            <h2 class="text-2xl mb-6 text-center font-bold text-gray-800">Ersteinrichtung</h2>
             
             <% if (locals.error) { %>
                 <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
@@ -16,51 +23,131 @@
                 </div>
             <% } %>
 
-            <h3 class="text-lg mb-4">Admin-Benutzer</h3>
+            <!-- CSRF Token -->
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+            <h3 class="text-lg mb-4 font-semibold text-gray-700 border-b pb-2">Admin-Benutzer</h3>
             <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">Name</label>
-                <input type="text" name="name" required 
-                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="name">Name</label>
+                <input type="text" id="name" name="name" required value="<%= locals.name || '' %>"
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring focus:border-blue-300">
             </div>
             
             <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">E-Mail</label>
-                <input type="email" name="email" required 
-                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="email">E-Mail</label>
+                <input type="email" id="email" name="email" required value="<%= locals.email || '' %>"
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring focus:border-blue-300">
             </div>
             
             <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">Passwort</label>
-                <input type="password" name="password" required 
-                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Passwort</label>
+                <input type="password" id="password" name="password" required
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring focus:border-blue-300">
+                <div id="password-strength" class="mt-2 text-sm"></div>
             </div>
             
             <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">Passwort bestätigen</label>
-                <input type="password" name="confirm_password" required 
-                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="confirm_password">Passwort bestätigen</label>
+                <input type="password" id="confirm_password" name="confirm_password" required
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring focus:border-blue-300">
+                <p id="password-match" class="text-sm mt-1 hidden text-red-500">Passwörter stimmen nicht überein</p>
             </div>
 
-            <h3 class="text-lg mb-4 mt-6">Unternehmenseinstellungen</h3>
+            <h3 class="text-lg mb-4 mt-6 font-semibold text-gray-700 border-b pb-2">Unternehmenseinstellungen</h3>
             <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">Unternehmensname</label>
-                <input type="text" name="company_name" required 
-                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="company_name">Unternehmensname</label>
+                <input type="text" id="company_name" name="company_name" required value="<%= locals.company_name || '' %>"
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring focus:border-blue-300">
             </div>
             
             <div class="mb-6">
-                <label class="block text-gray-700 text-sm font-bold mb-2">Unternehmens-E-Mail</label>
-                <input type="email" name="company_email" required 
-                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="company_email">Unternehmens-E-Mail</label>
+                <input type="email" id="company_email" name="company_email" required value="<%= locals.company_email || '' %>"
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring focus:border-blue-300">
             </div>
             
             <div class="flex items-center justify-center">
-                <button type="submit" 
-                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                <button type="submit" id="submit-btn"
+                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-200">
                     System initialisieren
                 </button>
             </div>
         </form>
+        
+        <div class="text-center text-sm text-gray-500">
+            <p>© <%= new Date().getFullYear() %> Rising BSM. Alle Rechte vorbehalten.</p>
+        </div>
     </div>
+
+    <script>
+        // Password strength check
+        const passwordInput = document.getElementById('password');
+        const strengthMeter = document.getElementById('password-strength');
+        const confirmPassword = document.getElementById('confirm_password');
+        const passwordMatch = document.getElementById('password-match');
+        const submitBtn = document.getElementById('submit-btn');
+
+        passwordInput.addEventListener('input', function() {
+            const password = passwordInput.value;
+            if (password.length === 0) {
+                strengthMeter.innerHTML = '';
+                return;
+            }
+            
+            const result = zxcvbn(password);
+            let strengthText = '';
+            let strengthClass = '';
+            
+            switch(result.score) {
+                case 0:
+                case 1:
+                    strengthText = 'Sehr schwach';
+                    strengthClass = 'text-red-600';
+                    break;
+                case 2:
+                    strengthText = 'Schwach';
+                    strengthClass = 'text-orange-500';
+                    break;
+                case 3:
+                    strengthText = 'Gut';
+                    strengthClass = 'text-yellow-500';
+                    break;
+                case 4:
+                    strengthText = 'Stark';
+                    strengthClass = 'text-green-500';
+                    break;
+            }
+            
+            strengthMeter.innerHTML = `Passwort-Stärke: <span class="${strengthClass}">${strengthText}</span>`;
+            if (result.feedback.warning) {
+                strengthMeter.innerHTML += `<p class="text-gray-600 mt-1">${result.feedback.warning}</p>`;
+            }
+        });
+
+        // Check passwords match
+        function checkPasswordsMatch() {
+            if (confirmPassword.value && passwordInput.value !== confirmPassword.value) {
+                passwordMatch.classList.remove('hidden');
+                return false;
+            } else {
+                passwordMatch.classList.add('hidden');
+                return true;
+            }
+        }
+
+        confirmPassword.addEventListener('input', checkPasswordsMatch);
+        passwordInput.addEventListener('input', function() {
+            if (confirmPassword.value) {
+                checkPasswordsMatch();
+            }
+        });
+
+        // Form validation
+        document.querySelector('form').addEventListener('submit', function(e) {
+            if (!checkPasswordsMatch()) {
+                e.preventDefault();
+            }
+        });
+    </script>
 </body>
 </html>

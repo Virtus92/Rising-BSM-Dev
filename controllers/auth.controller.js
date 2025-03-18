@@ -67,6 +67,9 @@ exports.login = async (req, res, next) => {
       [user.id, 'login', req.ip]
     );
 
+    // Set session data
+    req.session.user = sessionUser;
+
     return res.status(200).json({ 
       user: sessionUser, 
       remember: remember === 'on' 

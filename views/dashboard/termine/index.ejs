@@ -357,77 +357,135 @@
       initializeCalendar();
     });
     
-    function initializeCalendar() {
-      const calendarEl = document.getElementById('calendar');
-      if (!calendarEl._calendar) {
-        const calendar = new FullCalendar.Calendar(calendarEl, {
-          initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
-          locale: 'de',
-          headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,listWeek'
-          },
-          // Use the new endpoint
-          events: '/dashboard/termine/calendar-events',
-          eventTimeFormat: {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-          },
-          // Enhanced event rendering
-          eventDidMount: function(info) {
-            // Add tooltips to events
-            if (info.event.extendedProps) {
-              const props = info.event.extendedProps;
-              let tooltipContent = `
-                <div class="fc-tooltip-header">${info.event.title}</div>
-                <div class="fc-tooltip-time">${info.timeText}</div>
-              `;
-              
-              if (props.kunde) {
-                tooltipContent += `<div class="fc-tooltip-customer">Kunde: ${props.kunde}</div>`;
-              }
-              
-              if (props.ort) {
-                tooltipContent += `<div class="fc-tooltip-location">Ort: ${props.ort}</div>`;
-              }
-              
-              if (props.statusText) {
-                tooltipContent += `<div class="fc-tooltip-status">Status: ${props.statusText}</div>`;
-              }
-              
-              // Initialize tooltip (using Bootstrap's tooltip if available)
-              if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
-                new bootstrap.Tooltip(info.el, {
-                  title: tooltipContent,
-                  html: true,
-                  placement: 'top',
-                  container: 'body'
-                });
-              }
+    // Replace the calendar initialization in views/dashboard/termine/index.ejs
+
+function initializeCalendar() {
+  const calendarEl = document.getElementById('calendar');
+    if (!calendarEl._calendar) {
+      // Show loading indicator
+      calendarEl.innerHTML = `
+        <div class="d-flex align-items-center justify-content-center" style="height: 300px;">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <span class="ms-2">Kalender wird geladen...</span>
+        </div>
+      `;
+      
+      // Initialize the calendar with proper API integration
+      const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
+        locale: 'de',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek,listWeek'
+        },
+        
+        // Use the calendar events API with proper headers
+        events: {
+          url: '/dashboard/termine/calendar-events',
+          method: 'GET',
+          extraParams: function() {
+            // Add any filter parameters if needed
+            const params = {};
+            const statusFilter = document.getElementById('statusFilter');
+            if (statusFilter && statusFilter.value) {
+              params.status = statusFilter.value;
             }
+            return params;
           },
-          eventClick: function(info) {
-            info.jsEvent.preventDefault(); // Prevent default browser behavior
-            window.location.href = `/dashboard/termine/${info.event.id}`;
+          headers: {
+            'Accept': 'application/json',
+            'CSRF-Token': getCsrfToken()
           },
-          dayMaxEvents: true, // Allow "more" link when too many events
-          height: 'auto',
-          // Handle window resize - better responsive behavior
-          windowResize: function(view) {
-            if (window.innerWidth < 768) {
-              calendar.changeView('listWeek');
-            } else {
-              calendar.changeView('dayGridMonth');
+          failure: function(error) {
+            console.error('Error loading calendar events:', error);
+            // Show error message in calendar
+            calendarEl.innerHTML = `
+              <div class="alert alert-danger m-3">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Fehler beim Laden der Termine. Bitte versuchen Sie es später erneut.
+              </div>
+            `;
+          }
+        },
+        
+        eventTimeFormat: {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        },
+        
+        // Enhanced event rendering
+        eventDidMount: function(info) {
+                    // Add tooltips to events
+          if (info.event.extendedProps) {
+            const props = info.event.extendedProps;
+            let tooltipContent = `
+              <div class="fc-tooltip-header">${info.event.title}</div>
+              <div class="fc-tooltip-time">${info.timeText}</div>
+            `;
+            
+            if (props.kunde) {
+              tooltipContent += `<div class="fc-tooltip-customer">Kunde: ${props.kunde}</div>`;
+            }
+            
+            if (props.ort) {
+              tooltipContent += `<div class="fc-tooltip-location">Ort: ${props.ort}</div>`;
+            }
+            
+            if (props.status) {
+              tooltipContent += `<div class="fc-tooltip-status">Status: ${props.status}</div>`;
+            }
+            
+            // Initialize tooltip (using Bootstrap's tooltip if available)
+            if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+              new bootstrap.Tooltip(info.el, {
+                title: tooltipContent,
+                html: true,
+                placement: 'top',
+                container: 'body'
+              });
             }
           }
-        });
+        },
         
-        calendarEl._calendar = calendar;
-        calendar.render();
-      }
+        eventClick: function(info) {
+          info.jsEvent.preventDefault(); // Prevent default browser behavior
+          window.location.href = `/dashboard/termine/${info.event.id}`;
+        },
+        
+        dayMaxEvents: true, // Allow "more" link when too many events
+        height: 'auto',
+        
+        // Handle window resize - better responsive behavior
+        windowResize: function(view) {
+          if (window.innerWidth < 768) {
+            calendar.changeView('listWeek');
+          } else {
+            calendar.changeView('dayGridMonth');
+          }
+        },
+        
+        // Loading state handling
+        loading: function(isLoading) {
+          if (!isLoading) {
+            // Clear the loading indicator once loaded
+            calendarEl.querySelector('.spinner-border')?.parentElement?.remove();
+          }
+        }
+      });
+      
+      calendarEl._calendar = calendar;
+      calendar.render();
+      
+      // Add refresh button functionality
+      document.getElementById('refreshCalendarBtn')?.addEventListener('click', function() {
+        calendar.refetchEvents();
+      });
     }
+  }
   });
 </script>
 
