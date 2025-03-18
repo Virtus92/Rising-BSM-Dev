@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>System Setup - Rising BSM</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="w-full max-w-md">
+        <form action="/setup" method="POST" class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+            <h2 class="text-2xl mb-6 text-center">Rising BSM - Ersteinrichtung</h2>
+            
+            <% if (locals.error) { %>
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+                    <%= error %>
+                </div>
+            <% } %>
+
+            <h3 class="text-lg mb-4">Admin-Benutzer</h3>
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Name</label>
+                <input type="text" name="name" required 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">E-Mail</label>
+                <input type="email" name="email" required 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Passwort</label>
+                <input type="password" name="password" required 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Passwort bestätigen</label>
+                <input type="password" name="confirm_password" required 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+            </div>
+
+            <h3 class="text-lg mb-4 mt-6">Unternehmenseinstellungen</h3>
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Unternehmensname</label>
+                <input type="text" name="company_name" required 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Unternehmens-E-Mail</label>
+                <input type="email" name="company_email" required 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+            </div>
+            
+            <div class="flex items-center justify-center">
+                <button type="submit" 
+                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    System initialisieren
+                </button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

@@ -25,7 +25,13 @@ exports.getOrExecute = async (key, fn, ttl = 300) => {
   }
   
   // Execute function to get fresh data
-  const data = await fn();
+  let data;
+  try {
+    data = await fn();
+  } catch (error) {
+    console.error(`Error executing cache callback for key "${key}":`, error);
+    throw error; // Propagate the error to the caller
+  }
   
   // Store in cache
   cacheStore[key] = {

@@ -4,18 +4,19 @@ services:
     image: postgres:13
     environment:
       POSTGRES_DB: rising_bsm
-      POSTGRES_USER: rising_user
+      POSTGRES_USER: rising_bsm
       POSTGRES_PASSWORD: your_secure_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db-init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rising_user"]
+      test: ["CMD-SHELL", "pg_isready -U rising_bsm"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   app:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     depends_on:

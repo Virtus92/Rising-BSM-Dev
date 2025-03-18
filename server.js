@@ -30,6 +30,7 @@ const serviceRoutes = require('./routes/service.routes');
 const requestRoutes = require('./routes/request.routes');
 const profileRoutes = require('./routes/profile.routes');
 const settingsRoutes = require('./routes/settings.routes');
+const setupRoutes = require('./routes/setup.routes');
 // const blogRoutes = require('./routes/blog.routes');
 
 // Configure view engine
@@ -119,6 +120,7 @@ app.use('/dashboard', getNewRequestsCountMiddleware);
 // Apply routes
 app.use('/', indexRoutes);
 app.use('/', authRoutes);
+app.use('/', setupRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/dashboard/kunden', customerRoutes);
 app.use('/dashboard/projekte', projectRoutes);
