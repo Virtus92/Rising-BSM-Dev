@@ -1,194 +1,200 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  Home, Users, Calendar, BarChart2, Settings, Package, 
-  FileText, Truck, Snowflake, ChevronDown, HelpCircle
+  Home, 
+  Users, 
+  Calendar, 
+  Inbox, 
+  Briefcase, 
+  Package, 
+  Settings, 
+  ChevronDown,
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react';
-
-interface NavItem {
-  name: string;
-  href: string;
-  icon: React.ReactNode;
-  submenu?: NavItem[];
-}
 
 const DashboardSidebar = () => {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(true);
-  const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   
-  // Effect to collapse sidebar on mobile
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setIsOpen(false);
-      } else {
-        setIsOpen(true);
-      }
-    };
-    
-    // Initial setup
-    handleResize();
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  
-  // Close mobile sidebar on navigation
-  useEffect(() => {
-    if (window.innerWidth < 768) {
-      setIsOpen(false);
-    }
-  }, [pathname]);
-  
-  const toggleSubmenu = (name: string) => {
-    if (expandedMenu === name) {
-      setExpandedMenu(null);
-    } else {
-      setExpandedMenu(name);
-    }
+  const toggleSubmenu = (key: string) => {
+    setOpenSubmenu(prev => prev === key ? null : key);
   };
   
-  // Navigation items with potential submenus
-  const navigation: NavItem[] = [
-    { 
-      name: 'Dashboard', 
-      href: '/dashboard', 
-      icon: <Home className="h-5 w-5" /> 
+  const isActive = (path: string) => {
+    return pathname === path;
+  };
+  
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const menuItems = [
+    {
+      title: 'Dashboard',
+      icon: <Home className="w-5 h-5" />,
+      path: '/dashboard',
     },
-    { 
-      name: 'Kunden', 
-      href: '/dashboard/customers', 
-      icon: <Users className="h-5 w-5" /> 
+    {
+      title: 'Kunden',
+      icon: <Users className="w-5 h-5" />,
+      path: '/dashboard/customers',
     },
-    { 
-      name: 'Termine', 
-      href: '/dashboard/appointments', 
-      icon: <Calendar className="h-5 w-5" /> 
+    {
+      title: 'Termine',
+      icon: <Calendar className="w-5 h-5" />,
+      path: '/dashboard/appointments',
     },
-    { 
-      name: 'Leistungen', 
-      href: '#', 
-      icon: <Package className="h-5 w-5" />,
+    {
+      title: 'Anfragen',
+      icon: <Inbox className="w-5 h-5" />,
+      path: '/dashboard/requests',
+    },
+    {
+      title: 'Projekte',
+      icon: <Briefcase className="w-5 h-5" />,
+      path: '/dashboard/projects',
+    },
+    {
+      title: 'Leistungen',
+      icon: <Package className="w-5 h-5" />,
+      path: '/dashboard/services',
       submenu: [
-        { name: 'Facility Management', href: '/dashboard/services/facility', icon: <FileText className="h-5 w-5" /> },
-        { name: 'Umzüge & Transporte', href: '/dashboard/services/moving', icon: <Truck className="h-5 w-5" /> },
-        { name: 'Sommer- & Winterdienst', href: '/dashboard/services/winter', icon: <Snowflake className="h-5 w-5" /> },
+        { title: 'Alle Leistungen', path: '/dashboard/services' },
+        { title: 'Neue Leistung', path: '/dashboard/services/new' },
+        { title: 'Statistiken', path: '/dashboard/services/statistics' },
       ]
     },
-    { 
-      name: 'Berichte', 
-      href: '/dashboard/reports', 
-      icon: <BarChart2 className="h-5 w-5" /> 
-    },
-    { 
-      name: 'Einstellungen', 
-      href: '/dashboard/settings', 
-      icon: <Settings className="h-5 w-5" /> 
-    },
-    { 
-      name: 'Hilfe', 
-      href: '/dashboard/help', 
-      icon: <HelpCircle className="h-5 w-5" /> 
+    {
+      title: 'Einstellungen',
+      icon: <Settings className="w-5 h-5" />,
+      path: '/dashboard/settings',
     },
   ];
-  
-  // Check if a link is active
-  const isLinkActive = (href: string) => {
-    const currentPath = pathname ?? '';
-    return currentPath === href || currentPath.startsWith(`${href}/`);
-  };
-  
-  // Check if a submenu should be expanded because a child is active
-  const shouldExpandSubmenu = (submenu?: NavItem[]) => {
-    if (!submenu) return false;
-    return submenu.some(item => isLinkActive(item.href));
-  };
-  
+
   return (
-    <aside 
-      className={`fixed inset-y-0 left-0 transform ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      } md:translate-x-0 md:overflow-y-auto z-30 w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 transition-transform duration-300 ease-in-out flex flex-col pt-16`}
-    >
-      <div className="flex-1 overflow-y-auto py-4 px-3">
-        <ul className="space-y-2">
-          {navigation.map((item) => (
-            <li key={item.name}>
-              {item.submenu ? (
-                // If item has submenu
-                <div className="mb-2">
-                  <button
-                    className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md ${
-                      expandedMenu === item.name || shouldExpandSubmenu(item.submenu)
-                        ? 'text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-900/10'
-                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700'
-                    }`}
-                    onClick={() => toggleSubmenu(item.name)}
-                  >
-                    <div className="flex items-center">
-                      {item.icon}
-                      <span className="ml-3">{item.name}</span>
-                    </div>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${
-                      expandedMenu === item.name || shouldExpandSubmenu(item.submenu) ? 'rotate-180' : ''
-                    }`} />
-                  </button>
-                  
-                  {/* Submenu */}
-                  <div className={`mt-1 pl-4 transition-all ${
-                    expandedMenu === item.name || shouldExpandSubmenu(item.submenu) ? 'max-h-96' : 'max-h-0 overflow-hidden'
-                  }`}>
-                    <ul className="space-y-1 border-l border-gray-200 dark:border-slate-700 pl-2">
-                      {item.submenu.map((subitem) => (
-                        <li key={subitem.name}>
-                          <Link 
-                            href={subitem.href}
-                            className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                              isLinkActive(subitem.href)
-                                ? 'text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-900/10'
-                                : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700'
-                            }`}
-                          >
-                            {subitem.icon}
-                            <span className="ml-3">{subitem.name}</span>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                // Regular item without submenu
-                <Link
-                  href={item.href}
-                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                    isLinkActive(item.href)
-                      ? 'text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-900/10'
-                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  {item.icon}
-                  <span className="ml-3">{item.name}</span>
-                </Link>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
-      
-      <div className="p-4 border-t border-gray-200 dark:border-slate-700">
-        <Link 
-          href="/"
-          className="flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-500"
+    <>
+      {/* Mobile Menu Toggle Button */}
+      <div className="lg:hidden fixed top-4 left-4 z-40">
+        <button
+          onClick={toggleMobileMenu}
+          className="bg-white dark:bg-slate-800 p-2 rounded-md shadow-md text-gray-600 dark:text-gray-300 focus:outline-none"
+          aria-label="Toggle menu"
         >
-          <span>Zurück zur Website</span>
-        </Link>
+          {isMobileMenuOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
+        </button>
       </div>
-    </aside>
+
+      {/* Sidebar */}
+      <aside
+        className={`bg-white dark:bg-slate-800 w-64 shadow-md z-30 transition-all duration-300 ease-in-out ${
+          isMobileMenuOpen 
+            ? 'fixed inset-y-0 left-0 translate-x-0 lg:relative lg:translate-x-0' 
+            : 'fixed -translate-x-full lg:relative lg:translate-x-0'
+        }`}
+      >
+        {/* Logo */}
+        <div className="flex items-center justify-center h-16 border-b border-gray-200 dark:border-gray-700">
+          <Link href="/" className="text-2xl font-bold text-green-600 dark:text-green-500">
+            Rising BSM
+          </Link>
+        </div>
+
+        {/* Navigation */}
+        <nav className="mt-6 px-4">
+          <ul className="space-y-2">
+            {menuItems.map((item) => (
+              <li key={item.title}>
+                {item.submenu ? (
+                  <div>
+                    <button
+                      onClick={() => toggleSubmenu(item.title)}
+                      className={`flex items-center justify-between w-full p-2 rounded-md text-sm font-medium ${
+                          pathname?.startsWith(item.path)
+                            ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-500'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                      <div className="flex items-center">
+                        {item.icon}
+                        <span className="ml-3">{item.title}</span>
+                      </div>
+                      <ChevronDown 
+                        className={`w-4 h-4 transition-transform ${
+                          openSubmenu === item.title ? 'transform rotate-180' : ''
+                        }`} 
+                      />
+                    </button>
+                    
+                    {openSubmenu === item.title && (
+                      <ul className="mt-1 pl-6 space-y-1">
+                        {item.submenu.map((subItem) => (
+                          <li key={subItem.title}>
+                            <Link
+                              href={subItem.path}
+                              className={`block p-2 rounded-md text-sm ${
+                                isActive(subItem.path)
+                                  ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-500'
+                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                              }`}
+                              onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                              {subItem.title}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <Link
+                    href={item.path}
+                    className={`flex items-center p-2 rounded-md text-sm font-medium ${
+                      isActive(item.path)
+                        ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-500'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    {item.icon}
+                    <span className="ml-3">{item.title}</span>
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {/* Logout Button */}
+        <div className="px-4 mt-8">
+          <button 
+            className="flex items-center w-full p-2 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+            onClick={() => console.log('Logout')}
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="ml-3">Abmelden</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Overlay for mobile menu */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+          onClick={toggleMobileMenu}
+          aria-hidden="true"
+        />
+      )}
+    </>
   );
 };
 

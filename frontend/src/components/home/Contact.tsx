@@ -53,18 +53,19 @@ const Contact = () => {
     setFormStatus('submitting');
     
     try {
-      // Send the form data to our API route, which forwards to the backend
-      const response = await fetch('/api/contact', {
+      // Send form data directly to the backend
+      const response = await fetch('http://localhost:5000/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
       
-      const result = await response.json();
-      
       if (!response.ok) {
-        throw new Error(result.message || 'Ein Fehler ist aufgetreten.');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Ein Fehler ist aufgetreten.');
       }
+      
+      const result = await response.json();
       
       setFormStatus('success');
       
