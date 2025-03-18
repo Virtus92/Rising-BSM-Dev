@@ -5,6 +5,9 @@
     "main": "server.js",
     "scripts": {
         "start": "node server.js",
+        "dev": "nodemon server.js",
+        "db:migrate": "psql -h localhost -U rising_user -d rising_bsm -f db-init.sql",
+        "db:init": "psql -h localhost -U rising_user -d rising_bsm -f db-init.sql",
         "test": "jest",
         "test:detect": "jest --detectOpenHandles",
         "test:coverage": "jest --coverage",
