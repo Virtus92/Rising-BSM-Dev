@@ -316,3 +316,58 @@ exports.validateInput = (data, schema) => {
     }, {})
   };
 };
+
+/**
+ * Validate password strength
+ * @param {string} password - Password to validate
+ * @param {object} options - Validation options
+ * @returns {object} - Validation result
+ */
+exports.validatePassword = (password, options = {}) => {
+  const {
+    required = true,
+    minLength = 12,
+    requireUppercase = true,
+    requireLowercase = true,
+    requireNumbers = true,
+    requireSpecialChars = true
+  } = options;
+
+  const errors = [];
+
+  // Handle null or undefined
+  if (password === null || password === undefined) {
+    if (required) {
+      errors.push('Password is required');
+    }
+    return { isValid: errors.length === 0, errors, value: password };
+  }
+
+  // Length validation
+  if (password.length < minLength) {
+    errors.push(`Password must be at least ${minLength} characters long`);
+  }
+
+  // Character type validations
+  if (requireUppercase && !/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter');
+  }
+
+  if (requireLowercase && !/[a-z]/.test(password)) {
+    errors.push('Password must contain at least one lowercase letter');
+  }
+
+  if (requireNumbers && !/[0-9]/.test(password)) {
+    errors.push('Password must contain at least one number');
+  }
+
+  if (requireSpecialChars && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    errors.push('Password must contain at least one special character');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    value: password
+  };
+};

@@ -5,6 +5,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const pool = require('../services/db.service');
+const { validatePassword } = require('../utils/validators');
 
 /**
  * Handle user login
@@ -204,8 +205,10 @@ exports.resetPassword = async (req, res, next) => {
       throw error;
     }
 
-    if (password.length < 8) {
-      const error = new Error('Password must be at least 8 characters long');
+    // Use the comprehensive password validation function
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      const error = new Error(passwordValidation.errors[0]); // Use the first error message
       error.statusCode = 400;
       throw error;
     }

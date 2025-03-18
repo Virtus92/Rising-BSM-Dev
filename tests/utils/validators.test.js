@@ -249,4 +249,71 @@ describe('Validation Utilities', () => {
             });
         });
     });
+
+    describe('validatePassword', () => {
+        it('should validate a strong password that meets all requirements', () => {
+            const result = validators.validatePassword('StrongP@ssw0rd');
+            expect(result.isValid).toBe(true);
+            expect(result.errors).toEqual([]);
+            expect(result.value).toBe('StrongP@ssw0rd');
+        });
+
+        it('should invalidate a password that is too short', () => {
+            const result = validators.validatePassword('Short1!');
+            expect(result.isValid).toBe(false);
+            expect(result.errors).toContain('Password must be at least 12 characters long');
+        });
+
+        it('should invalidate a password without uppercase letters', () => {
+            const result = validators.validatePassword('nouppercasep@ss123');
+            expect(result.isValid).toBe(false);
+            expect(result.errors).toContain('Password must contain at least one uppercase letter');
+        });
+
+        it('should invalidate a password without lowercase letters', () => {
+            const result = validators.validatePassword('NOLOWERCASE123@!');
+            expect(result.isValid).toBe(false);
+            expect(result.errors).toContain('Password must contain at least one lowercase letter');
+        });
+
+        it('should invalidate a password without numbers', () => {
+            const result = validators.validatePassword('NoNumbersHere@!');
+            expect(result.isValid).toBe(false);
+            expect(result.errors).toContain('Password must contain at least one number');
+        });
+
+        it('should invalidate a password without special characters', () => {
+            const result = validators.validatePassword('NoSpecialChars123');
+            expect(result.isValid).toBe(false);
+            expect(result.errors).toContain('Password must contain at least one special character');
+        });
+
+        it('should handle null password when required', () => {
+            const result = validators.validatePassword(null);
+            expect(result.isValid).toBe(false);
+            expect(result.errors).toContain('Password is required');
+        });
+
+        it('should accept null password when not required', () => {
+            const result = validators.validatePassword(null, { required: false });
+            expect(result.isValid).toBe(true);
+            expect(result.errors).toEqual([]);
+        });
+
+        it('should respect custom minimum length', () => {
+            const result = validators.validatePassword('StrongP@ss1', { minLength: 10 });
+            expect(result.isValid).toBe(true);
+            expect(result.errors).toEqual([]);
+        });
+
+        it('should respect disabled character requirements', () => {
+            const result = validators.validatePassword('onlylowercase', {
+                requireUppercase: false,
+                requireNumbers: false,
+                requireSpecialChars: false,
+            });
+            expect(result.isValid).toBe(true);
+            expect(result.errors).toEqual([]);
+        });
+    });
 });

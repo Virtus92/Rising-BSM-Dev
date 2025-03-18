@@ -347,13 +347,26 @@ describe('Auth Controller', () => {
 
             expect(next).toHaveBeenCalledWith(expect.objectContaining({
                 statusCode: 400,
-                message: 'Password must be at least 8 characters long'
+                message: 'Password must be at least 12 characters long'
+            }));
+        });
+
+        test('should return error when password does not meet complexity requirements', async () => {
+            req.params = { token: 'validtoken' };
+            req.body = { password: 'longpassword123', confirmPassword: 'longpassword123' };
+
+            await authController.resetPassword(req, res, next);
+
+            expect(next).toHaveBeenCalledWith(expect.objectContaining({
+                statusCode: 400,
+                message: expect.stringContaining('Password must contain')
             }));
         });
 
         test('should return success when password is reset', async () => {
             req.params = { token: 'validtoken' };
-            req.body = { password: 'newpassword123', confirmPassword: 'newpassword123' };
+            // Use a password that meets all validation requirements
+            req.body = { password: 'NewP@ssword123', confirmPassword: 'NewP@ssword123' };
 
             const mockHashUpdate = {
                 update: jest.fn().mockReturnThis(),
