@@ -1,4 +1,4 @@
-const cacheService = require('./services/cache.service');
+const cacheService = require('./backend/services/cache.service');
 
 module.exports = async () => {
   // Stop the cleanup interval

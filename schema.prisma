@@ -1,0 +1,389 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Service {
+  id            Int                @id @default(autoincrement())
+  name          String             @db.VarChar(100)
+  description   String?            @map("beschreibung") @db.Text
+  priceBase     Decimal?           @map("preis_basis") @db.Decimal
+  vatRate       Decimal            @default(20.00) @map("mwst_satz") @db.Decimal
+  active        Boolean            @default(true) @map("aktiv")
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime           @default(now()) @map("updated_at") @db.Timestamp(6)
+  unit          String?            @map("einheit") @db.VarChar(20)
+  invoicePositions InvoicePosition[]
+  projects      Project[]
+
+  @@map("dienstleistungen")
+}
+
+model InvoicePosition {
+  id             Int       @id @default(autoincrement())
+  invoiceId      Int       @map("rechnung_id")
+  serviceId      Int       @map("dienstleistung_id")
+  quantity       Int       @map("anzahl")
+  unitPrice      Decimal   @map("einzelpreis") @db.Decimal
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamp(6)
+  Invoice        Invoice   @relation(fields: [invoiceId], references: [id])
+  Service        Service @relation(fields: [serviceId], references: [id])
+
+  @@map("rechnungspositionen")
+}
+
+model RequestNote {
+  id          Int      @id @default(autoincrement())
+  requestId   Int      @map("anfrage_id")
+  userId      Int      @map("benutzer_id")
+  createdAt   DateTime @default(now()) @map("erstellt_am") @db.Timestamp(6)
+  userName    String   @map("benutzer_name") @db.VarChar(100)
+  text        String   @db.Text
+
+  @@map("anfragen_notizen")
+}
+
+model AppointmentNote {
+  id          Int      @id @default(autoincrement())
+  appointmentId Int      @map("termin_id")
+  userId      Int      @map("benutzer_id")
+  createdAt   DateTime @default(now()) @map("erstellt_am") @db.Timestamp(6)
+  userName    String   @map("benutzer_name") @db.VarChar(100)
+  text        String   @db.Text
+
+  @@map("termin_notizen")
+}
+
+model Customer {
+  id         Int       @id @default(autoincrement())
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  newsletter Boolean   @default(false)
+  name       String    @db.VarChar(100)
+  company    String?   @map("firma") @db.VarChar(100)
+  email      String?   @db.VarChar(100)
+  phone      String?   @map("telefon") @db.VarChar(30)
+  address    String?   @map("adresse") @db.Text
+  postalCode String?   @map("plz") @db.VarChar(10)
+  city       String?   @map("ort") @db.VarChar(100)
+  country    String?   @default("Österreich") @map("land") @db.VarChar(100)
+  notes      String?   @map("notizen") @db.Text
+  status     String    @default("aktiv") @db.VarChar(20)
+  type       String    @default("privat") @map("kundentyp") @db.VarChar(20)
+  projects   Project[]
+  appointments Appointment[]
+  invoices     Invoice[]
+
+  @@map("kunden")
+}
+
+model UserSettings {
+  id                      Int      @id @default(autoincrement())
+  userId            Int      @map("benutzer_id") @unique
+  darkMode                Boolean  @default(false) @map("dark_mode")
+  emailNotifications Boolean  @default(true) @map("benachrichtigungen_email")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt             DateTime @default(now()) @map("updated_at") @db.Timestamp(6)
+  pushNotifications Boolean  @default(false) @map("benachrichtigungen_push")
+  language              String   @default("de") @map("sprache") @db.VarChar(10)
+  notificationInterval String   @default("sofort") @map("benachrichtigungen_intervall") @db.VarChar(20)
+  User                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("benutzer_einstellungen")
+}
+
+model ServiceLog {
+  id             Int      @id @default(autoincrement())
+  serviceId      Int      @map("dienstleistung_id")
+  createdAt      DateTime @default(now()) @map("erstellt_am") @db.Timestamp(6)
+  userId         Int?      @map("benutzer_id")
+  action         String   @map("aktion") @db.VarChar(255)
+  details        String?   @db.Text
+  userName       String?   @map("benutzer_name") @db.VarChar(255)
+
+  @@map("dienstleistungen_log")
+}
+
+model BlogPost {
+  id            Int      @id @default(autoincrement())
+  authorId      Int?     @map("author_id")
+  publishedAt   DateTime? @map("published_at") @db.Timestamp(6)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+  title         String   @db.VarChar(255)
+  slug          String   @db.VarChar(255)
+  content       String   @db.Text
+  excerpt       String?   @db.Text
+  featuredImage String?   @map("featured_image") @db.VarChar(255)
+  status        String   @default("draft") @db.VarChar(50)
+  seoTitle      String?   @map("seo_title") @db.VarChar(255)
+  seoDescription String?   @map("seo_description") @db.Text
+  seoKeywords   String?   @map("seo_keywords") @db.Text
+  categories BlogPostCategory[]
+  tags       BlogPostTag[]
+
+  @@map("blog_posts")
+}
+
+model BlogCategory {
+  id          Int      @id @default(autoincrement())
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  name        String   @db.VarChar(100)
+  slug        String   @db.VarChar(100)
+  description String?   @db.Text
+  posts BlogPostCategory[]
+
+  @@map("blog_categories")
+}
+
+model BlogPostCategory {
+  postId     Int @map("post_id")
+  categoryId Int @map("category_id")
+  post     BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category BlogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([postId, categoryId])
+  @@map("blog_post_categories")
+}
+
+model BlogTag {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  name      String   @db.VarChar(100)
+  slug      String   @db.VarChar(100)
+  posts     BlogPostTag[]
+
+  @@map("blog_tags")
+}
+
+model BlogPostTag {
+  postId Int @map("post_id")
+  tagId  Int @map("tag_id")
+  post BlogPost @relation(fields: [postId], references: [id])
+  tag  BlogTag @relation(fields: [tagId], references: [id])
+
+  @@id([postId, tagId])
+  @@map("blog_post_tags")
+}
+
+model BlogSeoKeyword {
+  id            Int      @id @default(autoincrement())
+  searchVolume  Int?     @map("search_volume")
+  currentRanking Int?     @map("current_ranking")
+  targetPostId  Int?     @map("target_post_id")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+  keyword       String   @db.VarChar(255)
+
+  @@map("blog_seo_keywords")
+}
+
+model BlogAnalytics {
+  id             Int      @id @default(autoincrement())
+  postId         Int?     @map("post_id")
+  views          Int      @default(0)
+  uniqueVisitors Int      @default(0) @map("unique_visitors")
+  date           DateTime @db.Date
+
+  @@map("blog_analytics")
+}
+
+model BlogAiRequest {
+  id            Int       @id @default(autoincrement())
+  resultPostId  Int?      @map("result_post_id")
+  requestedBy   Int?      @map("requested_by")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamp(6)
+  status        String    @default("pending") @db.VarChar(50)
+  targetAudience String?   @map("target_audience") @db.VarChar(100)
+  tone          String?   @db.VarChar(100)
+  topic         String    @db.VarChar(255)
+  keywords      String?   @db.Text
+
+  @@map("blog_ai_requests")
+}
+
+model Invoice {
+  id              Int                @id @default(autoincrement())
+  projectId       Int?               @map("projekt_id")
+  customerId      Int?               @map("kunde_id")
+  amount          Decimal            @map("betrag") @db.Decimal
+  vatAmount       Decimal            @map("mwst_betrag") @db.Decimal
+  totalAmount     Decimal            @map("gesamtbetrag") @db.Decimal
+  invoiceDate     DateTime           @map("rechnungsdatum") @db.Date
+  dueDate         DateTime           @map("faelligkeitsdatum") @db.Date
+  paidAt          DateTime?          @map("bezahlt_am") @db.Timestamp(6)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamp(6)
+  status          String             @default("offen") @db.VarChar(20)
+  invoiceNumber   String             @map("rechnungsnummer") @db.VarChar(50)
+  invoicePositions InvoicePosition[]
+  Project         Project?           @relation(fields: [projectId], references: [id])
+  Customer        Customer?          @relation(fields: [customerId], references: [id])
+
+  @@map("rechnungen")
+}
+
+model UserSession {
+  sid    String   @id @db.VarChar
+  sess   Json
+  expire DateTime @db.Timestamp(6)
+
+  @@map("user_sessions")
+}
+
+model ProjectNote {
+  id          Int      @id @default(autoincrement())
+  projectId   Int?      @map("projekt_id")
+  userId      Int?      @map("benutzer_id")
+  createdAt   DateTime @default(now()) @map("erstellt_am") @db.Timestamp(6)
+  userName    String   @map("benutzer_name") @db.Text
+  text        String   @db.Text
+
+  @@map("projekt_notizen")
+}
+
+model CustomerLog {
+  id          Int      @id @default(autoincrement())
+  customerId  Int      @map("kunde_id")
+  userId      Int?     @map("benutzer_id")
+  createdAt   DateTime @default(now()) @map("erstellt_am") @db.Timestamp(6)
+  userName    String   @map("benutzer_name") @db.Text
+  action      String   @map("aktion") @db.Text
+  details     String?   @db.Text
+
+  @@map("kunden_log")
+}
+
+model UserActivity {
+  id         Int       @id @default(autoincrement())
+  userId      Int       @map("benutzer_id")
+  timestamp   DateTime? @default(now()) @map("zeitstempel") @db.Timestamp(6)
+  activity    String    @map("aktivitaet") @db.VarChar(255)
+  ipAddress   String?   @map("ip_adresse") @db.VarChar(255)
+  User       User @relation(fields: [userId], references: [id])
+
+  @@map("benutzer_aktivitaet")
+}
+
+model RequestLog {
+  id          Int      @id @default(autoincrement())
+  requestId   Int      @map("anfrage_id")
+  userId      Int      @map("benutzer_id")
+  createdAt   DateTime @default(now()) @map("erstellt_am") @db.Timestamp(6)
+  details     String?   @db.Text
+  userName    String   @map("benutzer_name") @db.VarChar(255)
+  action      String   @map("aktion") @db.VarChar(255)
+
+  @@map("anfragen_log")
+}
+
+model Project {
+  id             Int       @id @default(autoincrement())
+  customerId     Int?      @map("kunde_id")
+  serviceId      Int?      @map("dienstleistung_id")
+  startDate      DateTime? @map("start_datum") @db.Date
+  endDate        DateTime? @map("end_datum") @db.Date
+  amount         Decimal?  @map("betrag") @db.Decimal
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+  createdBy      Int?      @map("erstellt_von")
+  title          String    @map("titel") @db.VarChar(200)
+  description    String?   @map("beschreibung") @db.Text
+  status         String    @default("neu") @db.VarChar(20)
+  Customer       Customer? @relation(fields: [customerId], references: [id])
+  Service        Service? @relation(fields: [serviceId], references: [id])
+  User           User? @relation(fields: [createdBy], references: [id])
+  invoices       Invoice[]
+  appointments   Appointment[]
+
+  @@map("projekte")
+}
+
+model User {
+  id             Int       @id @default(autoincrement())
+  createdAt      DateTime  @default(now()) @map("erstellt_am") @db.Timestamp(6)
+  updatedAt      DateTime  @updatedAt @map("aktualisiert_am") @db.Timestamp(6)
+  updatedAt2     DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+  name           String    @db.VarChar(100)
+  email          String    @db.VarChar(100) @unique
+  password       String    @map("passwort") @db.VarChar(100)
+  role           String    @map("rolle") @default("mitarbeiter") @db.VarChar(20)
+  phone          String?   @db.VarChar(30)
+  status         String    @default("aktiv") @db.Text
+  profilePicture String?   @map("profilbild") @db.VarChar(255)
+  settings       UserSettings?
+  activities     UserActivity[]
+  projects       Project[]
+  appointments   Appointment[]
+
+  @@map("benutzer")
+}
+
+model Appointment {
+  id          Int       @id @default(autoincrement())
+  customerId     Int?      @map("kunde_id")
+  projectId   Int?      @map("projekt_id")
+  appointmentDate DateTime  @map("termin_datum") @db.Timestamp(6)
+  duration      Int?      @map("dauer")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+  createdBy   Int?      @map("erstellt_von")
+  title       String    @map("titel") @db.VarChar(200)
+  location    String?   @map("ort") @db.VarChar(200)
+  description String?   @map("beschreibung") @db.Text
+  status      String    @default("geplant") @db.VarChar(20)
+  Customer    Customer? @relation(fields: [customerId], references: [id])
+  Project     Project?  @relation(fields: [projectId], references: [id])
+  User        User?     @relation(fields: [createdBy], references: [id])
+
+  @@map("termine")
+}
+
+model ContactRequest {
+  id          Int       @id @default(autoincrement())
+  processorId Int?      @map("bearbeiter_id")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+  name        String    @db.VarChar(100)
+  email       String    @db.VarChar(100)
+  phone       String?   @db.VarChar(30)
+  service     String    @db.VarChar(50)
+  message     String    @db.Text
+  status      String    @default("neu") @db.VarChar(20)
+  ipAddress   String?   @map("ip_adresse") @db.VarChar(255)
+
+  @@map("kontaktanfragen")
+}
+
+model AppointmentLog {
+  id          Int      @id @default(autoincrement())
+  appointmentId Int      @map("termin_id")
+  userId      Int      @map("benutzer_id")
+  createdAt   DateTime @default(now()) @map("erstellt_am") @db.Timestamp(6)
+  action      String   @map("aktion") @db.Text
+  details     String?   @db.Text
+  userName    String   @map("benutzer_name") @db.Text
+
+  @@map("termin_log")
+}
+
+model Notification {
+  id          Int       @id @default(autoincrement())
+  userId      Int?      @map("benutzer_id")
+  referenceId Int?      @map("referenz_id")
+  read        Boolean   @default(false) @map("gelesen")
+  createdAt   DateTime  @default(now()) @map("erstellt_am") @db.Timestamp(6)
+  type        String    @map("typ") @db.VarChar(20)
+  title       String    @map("titel") @db.VarChar(100)
+  message     String?   @map("nachricht") @db.Text
+  referenceType String?   @map("referenz_typ") @db.VarChar(50)
+  description String?   @map("beschreibung") @db.Text
+
+  @@map("benachrichtigungen")
+}

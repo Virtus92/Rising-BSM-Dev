@@ -4,14 +4,14 @@
     "description": "Moderne Website für Rising BSM mit Node.js, Express und Tailwind CSS",
     "main": "server.js",
     "scripts": {
-        "start": "node server.js",
-        "dev": "nodemon server.js",
+        "start": "node backend/server.js",
+        "server": "nodemon backend/server.js",
+        "client": "cd frontend && npm run dev",
+        "dev": "concurrently \"npm run server\" \"npm run client\"",
         "db:migrate": "psql -h localhost -U rising_user -d rising_bsm -f db-init.sql",
         "db:init": "psql -h localhost -U rising_user -d rising_bsm -f db-init.sql",
         "test": "jest",
-        "test:detect": "jest --detectOpenHandles",
         "test:coverage": "jest --coverage",
-        "test:debug": "jest --coverage --detectOpenHandles --runInBand",
         "build-js": "uglifyjs public/scripts/scripts.js -o public/scripts/scripts.min.js"
     },
     "keywords": [
@@ -24,6 +24,7 @@
     ],
     "dependencies": {
         "@dr.pogodin/csurf": "^1.14.1",
+        "@prisma/client": "^6.5.0",
         "@testing-library/jest-dom": "github:testing-library/jest-dom",
         "axios": "^1.8.2",
         "bcrypt": "^5.1.1",
@@ -41,6 +42,7 @@
         "express-session": "^1.18.1",
         "express-validator": "^7.2.1",
         "helmet": "^8.0.0",
+        "jsonwebtoken": "^9.0.2",
         "multer": "^1.4.5-lts.1",
         "pdfkit": "^0.16.0",
         "pg": "^8.13.3",
@@ -49,9 +51,23 @@
         "zxcvbn": "^4.4.2"
     },
     "devDependencies": {
+        "@types/bcryptjs": "^2.4.6",
+        "@types/cookie-parser": "^1.4.8",
+        "@types/express": "^5.0.0",
+        "@types/express-session": "^1.18.1",
+        "@types/node": "^22.13.10",
+        "@typescript-eslint/eslint-plugin": "^8.26.1",
+        "@typescript-eslint/parser": "^8.26.1",
+        "concurrently": "^9.1.2",
         "cross-env": "^7.0.3",
+        "eslint": "^9.22.0",
+        "eslint-config-prettier": "^10.1.1",
         "jest": "^29.7.0",
+        "nodemon": "^3.1.9",
+        "prettier": "^3.5.3",
+        "prisma": "^6.5.0",
         "supertest": "^7.0.0",
+        "typescript": "^5.8.2",
         "uglify-js": "^3.19.3"
     }
 }

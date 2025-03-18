@@ -11,15 +11,13 @@ module.exports = {
     collectCoverage: true,
     coverageDirectory: 'coverage',
     collectCoverageFrom: [
-        'controllers/**/*.js',
-        'services/**/*.js',
-        'utils/**/*.js',
-        'middleware/**/*.js',
+        '**/*.{js,jsx,ts,tsx}',
+        '!**/*.d.ts',
         '!**/node_modules/**',
-        '!**/vendor/**',
-        '!**/dist/**',
-        '!**/*.test.js',
-        '!**/*.spec.js'
+        '!**/.next/**',
+        '!**/coverage/**',
+        '!**/jest.config.js',
+        '!**/jest.setup.js',
     ],
     
     testTimeout: 30000,
