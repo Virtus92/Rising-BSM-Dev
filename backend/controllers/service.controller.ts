@@ -350,24 +350,49 @@ export const getServiceStatistics = asyncHandler(async (req: Request, res: Respo
       }
     }),
     
-    // Top customers for this service (raw query)
-    prisma.$queryRaw`
-      SELECT 
-        c.id, 
-        c.name, 
-        SUM(ip.quantity * ip.unitPrice) as total_amount
-      FROM 
-        "InvoicePosition" ip
-        JOIN "Invoice" i ON ip."invoiceId" = i.id
-        JOIN "Customer" c ON i."customerId" = c.id
-      WHERE 
-        ip."serviceId" = ${serviceId}
-      GROUP BY 
-        c.id, c.name
-      ORDER BY 
-        total_amount DESC
-      LIMIT 5
-    `
+    // Top customers for this service (using Prisma instead of raw SQL)
+    prisma.invoicePosition.groupBy({
+      by: ['invoiceId'],
+      where: { serviceId },
+      _sum: {
+        quantity: true,
+        unitPrice: true
+      },
+      orderBy: {
+        _sum: {
+          unitPrice: 'desc'
+        }
+      },
+      take: 5
+    }).then(async (results) => {
+      // Get invoice IDs
+      const invoiceIds = results.map(item => item.invoiceId);
+      
+      // Get customer information from invoices
+      const invoices = await prisma.invoice.findMany({
+        where: {
+          id: { in: invoiceIds }
+        },
+        include: {
+          Customer: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+      
+      // Map the results to the expected format
+      return results.map(item => {
+        const invoice = invoices.find(inv => inv.id === item.invoiceId);
+        return {
+          id: invoice?.Customer?.id || 0,
+          name: invoice?.Customer?.name || 'Unknown',
+          total_amount: Number(item._sum.quantity || 0) * Number(item._sum.unitPrice || 0)
+        };
+      }).sort((a, b) => b.total_amount - a.total_amount);
+    })
   ]);
   
   // Calculate total revenue

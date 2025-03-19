@@ -2,6 +2,14 @@ import { Router, Request, Response } from 'express';
 import { isNotAuthenticated } from '../middleware/auth.middleware';
 import * as authController from '../controllers/auth.controller';
 
+declare global {
+  namespace Express {
+    interface Request {
+      csrfToken(): string;
+    }
+  }
+}
+
 const router = Router();
 
 /**
@@ -27,7 +35,7 @@ router.post('/login', isNotAuthenticated, authController.login);
  * @route   GET /logout
  * @desc    Process logout
  */
-router.get('/logout', authController.logout);
+router.post('/logout', authController.logout);
 
 /**
  * @route   GET /forgot-password

@@ -202,7 +202,6 @@ export const validateResetToken = asyncHandler(async (req: Request, res: Respons
 /**
  * Reset password
  */
-<<<<<<< HEAD
 export const resetPassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { token } = req.params;
   const { password, confirmPassword } = req.body;
@@ -269,83 +268,10 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response): P
     message: 'Password has been reset successfully'
   });
 });
-=======
-export const resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { token } = req.params;
-    const { password, confirmPassword } = req.body as PasswordResetData;
-    
-    // Input validation
-    if (!password || !confirmPassword) {
-      throw new ValidationError('Please enter and confirm your new password');
-    }
-    
-    if (password !== confirmPassword) {
-      throw new ValidationError('Passwords do not match');
-    }
-
-    // Use the comprehensive password validation function
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.isValid) {
-      throw new ValidationError(passwordValidation.errors[0]); // Use the first error message
-    }
-
-    // Hash the token from the URL
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(token)
-      .digest('hex');
-
-    // Find user with this token and valid expiry
-    const user = await prisma.user.findFirst({
-      where: {
-        resetToken: hashedToken,
-        resetTokenExpiry: { gt: new Date() }
-      }
-    });
-
-    if (!user) {
-      throw new ValidationError('Invalid or expired token');
-    }
-
-    // Hash new password
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-    // Update user's password and clear reset token
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        resetToken: null,
-        resetTokenExpiry: null,
-        updatedAt: new Date()
-      }
-    });
-
-    // Log password reset activity
-    await prisma.userActivity.create({
-      data: {
-        userId: user.id,
-        activity: 'password_reset',
-        ipAddress: req.ip
-      }
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Password has been reset successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
->>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
 
 /**
  * Refresh access token using refresh token
  */
-<<<<<<< HEAD
 export const refreshToken = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { refreshToken } = req.body;
   
@@ -410,82 +336,11 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response): Pr
     expiresIn: tokens.expiresIn
   });
 });
-=======
-export const refreshToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { refreshToken } = req.body;
-    
-    if (!refreshToken) {
-      throw new ValidationError('Refresh token is required');
-    }
-    
-    // Verify refresh token
-    const tokenPayload = await prisma.refreshToken.findFirst({
-      where: {
-        token: refreshToken,
-        expires: { gt: new Date() }
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            status: true
-          }
-        }
-      }
-    });
-    
-    if (!tokenPayload || !tokenPayload.user || tokenPayload.user.status !== 'aktiv') {
-      throw new UnauthorizedError('Invalid or expired refresh token');
-    }
-    
-    // Generate new tokens
-    const tokens = generateAuthTokens({
-      userId: tokenPayload.user.id,
-      role: tokenPayload.user.role,
-      name: tokenPayload.user.name,
-      email: tokenPayload.user.email
-    });
-    
-    // Optionally, implement refresh token rotation for better security
-    if (config.JWT_REFRESH_TOKEN_ROTATION) {
-      // Invalidate the old refresh token
-      await prisma.refreshToken.delete({
-        where: { id: tokenPayload.id }
-      });
-      
-      // Store the new refresh token
-      await prisma.refreshToken.create({
-        data: {
-          userId: tokenPayload.user.id,
-          token: tokens.refreshToken,
-          expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-          createdByIp: req.ip
-        }
-      });
-    }
-    
-    // Return new tokens
-    res.status(200).json({
-      success: true,
-      accessToken: tokens.accessToken,
-      refreshToken: config.JWT_REFRESH_TOKEN_ROTATION ? tokens.refreshToken : refreshToken,
-      expiresIn: tokens.expiresIn
-    });
-  } catch (error) {
-    next(error);
-  }
-};
->>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
 
 /**
  * Log out user
  * Invalidates the refresh token to effectively log out
  */
-<<<<<<< HEAD
 export const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { refreshToken } = req.body;
   
@@ -521,35 +376,3 @@ export const logout = asyncHandler(async (req: AuthenticatedRequest, res: Respon
     message: 'Logged out successfully'
   });
 });
-=======
-export const logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { refreshToken } = req.body;
-    
-    if (refreshToken) {
-      // Find and remove the refresh token
-      await prisma.refreshToken.deleteMany({
-        where: { token: refreshToken }
-      });
-    }
-    
-    // Log logout activity if user is in request
-    if (req.user?.id) {
-      await prisma.userActivity.create({
-        data: {
-          userId: req.user.id,
-          activity: 'logout',
-          ipAddress: req.ip
-        }
-      });
-    }
-    
-    res.status(200).json({ 
-      success: true,
-      message: 'Logged out successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
->>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e

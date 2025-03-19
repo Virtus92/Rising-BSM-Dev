@@ -322,33 +322,45 @@ async function getChartData(revenueFilter: string, servicesFilter: string): Prom
         startDate.setHours(0, 0, 0, 0);
     }
     
-    // Use raw SQL with Prisma for complex aggregation
-    type ServiceRevenue = {
-      service_name: string;
-      summe: string;
-    };
+    // Use Prisma for complex aggregation
+    const servicesRevenue = await prisma.invoicePosition.groupBy({
+      by: ['serviceId'],
+      where: {
+        invoice: {
+          invoiceDate: {
+            gte: startDate
+          }
+        }
+      },
+      _sum: {
+        quantity: true,
+        unitPrice: true
+      },
+      orderBy: {
+        _sum: {
+          quantity: 'desc'
+        }
+      },
+      take: 4
+    });
     
-    const servicesRevenue = await prisma.$queryRaw<ServiceRevenue[]>`
-      SELECT 
-        s.name as service_name,
-        SUM(ip.quantity * ip.unitPrice) as summe
-      FROM 
-        "InvoicePosition" ip
-        JOIN "Service" s ON ip."serviceId" = s.id
-        JOIN "Invoice" i ON ip."invoiceId" = i.id
-      WHERE 
-        s.name IS NOT NULL 
-        AND i."invoiceDate" >= ${startDate}
-      GROUP BY 
-        s.name
-      ORDER BY 
-        summe DESC
-      LIMIT 4
-    `;
+    const serviceNames = await prisma.service.findMany({
+      where: {
+        id: {
+          in: servicesRevenue.map(item => item.serviceId)
+        }
+      },
+      select: {
+        id: true,
+        name: true
+      }
+    });
+    
+    const serviceNameMap = new Map(serviceNames.map(service => [service.id, service.name]));
     
     return {
-      labels: servicesRevenue.map(item => item.service_name),
-      data: servicesRevenue.map(item => parseFloat(item.summe))
+      labels: servicesRevenue.map(item => serviceNameMap.get(item.serviceId) || 'Unknown'),
+      data: servicesRevenue.map(item => parseFloat((item._sum.quantity! * item._sum.unitPrice!).toFixed(2)))
     };
   }, 600); // Cache for 10 minutes
   

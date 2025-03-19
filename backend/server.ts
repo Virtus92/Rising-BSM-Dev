@@ -1,3 +1,4 @@
+// server.ts (partial update)
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -9,10 +10,9 @@ import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import PgSession from 'connect-pg-simple';
 import flash from 'connect-flash';
+import csurf from '@dr.pogodin/csurf';
 import cors from 'cors';
 import { Pool } from 'pg';
-import passport from 'passport';
-import csurf from '@dr.pogodin/csurf';
 
 import config from './config';
 
@@ -25,10 +25,11 @@ declare module 'express-session' {
 
 // Create Express app
 const app: Express = express();
-const PORT = process.env.PORT || 5000;
+const port = process.env.PORT || 5000;
 
 // Database connection
 import prisma from './utils/prisma.utils';
+
 
 // Import middleware
 import * as errorMiddleware from './middleware/error.middleware';
@@ -61,11 +62,9 @@ const setupCompletedMiddleware = async (req: Request, res: Response, next: NextF
 
 // Import routes
 import apiRoutes from './routes/api.routes';
-
-// Import route modules
 import indexRoutes from './routes/index';
 import authRoutes from './routes/auth.routes';
-import dashboardRoutes from './routes/dashboard.routes';
+import dashboardRoutes from './routes/dashboard.routes'; 
 import customerRoutes from './routes/customer.routes';
 import projectRoutes from './routes/project.routes';
 import appointmentRoutes from './routes/appointment.routes';
@@ -74,6 +73,7 @@ import requestRoutes from './routes/request.routes';
 import profileRoutes from './routes/profile.routes';
 import settingsRoutes from './routes/settings.routes';
 import setupRoutes from './routes/setup.routes';
+import { submitContact } from './controllers/contact.controller';
 
 // Apply middleware
 // CORS
@@ -196,7 +196,7 @@ app.use(errorMiddleware.notFoundHandler);
 app.use(errorMiddleware.errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+app.listen(port, () => {
   console.log(`Server running at http://localhost:${PORT}`);
   console.log(`Environment: ${config.NODE_ENV}`);
 });
