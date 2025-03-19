@@ -11,7 +11,7 @@ RUN npm install
 # Copy the rest of the application
 COPY . .
 
-# Build Next.js app
+# Build TypeScript code
 RUN npm run build
 
 # Command to run the app

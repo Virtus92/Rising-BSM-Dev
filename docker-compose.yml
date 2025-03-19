@@ -1,50 +1,67 @@
 version: '3.8'
+
 services:
-  postgres:
+  # Database service
+  db:
     image: postgres:13
+    container_name: rising-bsm-db
     environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: rising_bsm
-      POSTGRES_USER: rising_bsm
-      POSTGRES_PASSWORD: your_secure_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db-init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rising_bsm"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - SESSION_SECRET=your_session_secret
-      # Add other necessary environment variables here
     ports:
-      - "3000:3000"
-    volumes:
-      - ./logs:/app/logs
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - "5432:5432"
+    networks:
+      - rising-bsm-network
 
+  # Backend service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rising-bsm-backend
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/rising_bsm
+      - JWT_SECRET=your-default-super-secret-key-change-in-production
+      - JWT_REFRESH_SECRET=your-refresh-default-key-change-in-production
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - rising-bsm-network
+    command: npm run dev
+
+  # Frontend service
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: rising-bsm-frontend
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://backend:5000
     ports:
-      - "3001:3000"
+      - "3000:3000"
     depends_on:
-      - app
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - rising-bsm-network
+    command: npm run dev
+
+networks:
+  rising-bsm-network:
+    driver: bridge
 
 volumes:
   postgres_data:
