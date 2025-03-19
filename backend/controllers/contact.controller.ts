@@ -11,24 +11,24 @@ export const submitContact = asyncHandler(async (req: Request, res: Response, ne
   // Input validation schema
   const validationSchema = {
     name: {
-      type: 'text',
+      type: 'text' as const,
       required: true,
       minLength: 2,
       maxLength: 100,
     },
     email: {
-      type: 'email',
+      type: 'email' as const,
     },
     phone: {
-      type: 'phone',
+      type: 'phone' as const,
       required: false,
     },
     service: {
-      type: 'text',
+      type: 'text' as const,
       required: true,
     },
     message: {
-      type: 'text',
+      type: 'text' as const,
       required: true,
       minLength: 10,
       maxLength: 1000,
@@ -81,7 +81,20 @@ export const submitContact = asyncHandler(async (req: Request, res: Response, ne
   if (!adminUsers || adminUsers.length === 0) {
     console.warn('No admin users found to notify.');
   } else {
-    adminUsers.forEach((admin) => {
+    interface AdminUser {
+      id: number;
+    }
+
+    interface ContactNotification {
+      userId: number | null;
+      type: string;
+      title: string;
+      message: string;
+      referenceId: number;
+      referenceType: string;
+    }
+
+    adminUsers.forEach((admin: AdminUser) => {
       notifications.push({
         userId: admin.id,
         type: 'anfrage',
@@ -89,7 +102,7 @@ export const submitContact = asyncHandler(async (req: Request, res: Response, ne
         message: `Neue Anfrage von ${name} über ${service}`,
         referenceId: requestId,
         referenceType: 'kontaktanfragen',
-      });
+      } as ContactNotification);
     });
   }
 
@@ -109,7 +122,7 @@ export const submitContact = asyncHandler(async (req: Request, res: Response, ne
   );
 
   // Respond based on request type
-  if (req.xhr || req.headers.accept.includes('application/json')) {
+  if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
     return res.status(201).json({
       success: true,
       message: 'Ihre Anfrage wurde erfolgreich übermittelt. Wir melden uns bald bei Ihnen.',

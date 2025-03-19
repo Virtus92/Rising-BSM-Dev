@@ -207,7 +207,7 @@ async function generateExcelExport(
     data: buffer,
     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     filename: `${filename}.xlsx`,
-    buffer: buffer as Buffer
+    buffer: buffer as unknown as Buffer<ArrayBufferLike>
   };
 }
 

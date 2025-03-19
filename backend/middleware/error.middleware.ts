@@ -6,6 +6,7 @@ import config from '../config';
  * Global error handler middleware
  * Handles all unhandled errors from routes and controllers
  */
+
 export const errorHandler = (
   err: Error, 
   req: Request, 
@@ -24,11 +25,10 @@ export const errorHandler = (
     console.error(err.stack);
   }
   
-  // Handle API requests
   if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
-    return res.status(statusCode).json(createErrorResponse(err));
+    res.status(statusCode).json(createErrorResponse(err));
+    return;
   }
-  
   // Handle CSRF errors
   if ((err as any).code === 'EBADCSRFTOKEN') {
     if (req.flash) {
@@ -105,11 +105,12 @@ export const csrfErrorHandler = (
   
   // For API requests
   if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
-    return res.status(403).json({
+    res.status(403).json({
       success: false,
       error: 'CSRF token verification failed',
       message: 'Sicherheitstoken ungültig oder abgelaufen. Bitte laden Sie die Seite neu und versuchen Sie es erneut.'
     });
+    return;
   }
   
   // For regular requests

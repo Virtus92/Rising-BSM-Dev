@@ -1,6 +1,8 @@
 // controllers/appointment.controller.ts
 import { Request, Response } from 'express';
+import { ParamsDictionary } from 'express-serve-static-core';
 import prisma from '../utils/prisma.utils';
+import { PrismaClient } from '@prisma/client';
 import { formatDateSafely } from '../utils/formatters';
 import { getTerminStatusInfo } from '../utils/helpers';
 import { 
@@ -182,8 +184,9 @@ export const getAllAppointments = asyncHandler(async (req: Request, res: Respons
 /**
  * Get appointment by ID with related data
  */
+
 export const getAppointmentById = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { id }: { id: string } = req.params;
+  const id = req.params.id;
   const appointmentId: number = Number(id);
   
   if (isNaN(appointmentId)) {
@@ -318,7 +321,7 @@ export const createAppointment = asyncHandler(async (req: AuthenticatedRequest, 
  * Update an existing appointment
  */
 export const updateAppointment = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { id }: { id: string } = req.params;
+  const id = req.params.id;
   const appointmentId: number = Number(id);
   
   if (isNaN(appointmentId)) {
@@ -467,7 +470,7 @@ export const updateAppointmentStatus = asyncHandler(async (req: AuthenticatedReq
   }
   
   // Use a transaction for status update and optional note
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>) => {
     // Update status in database
     await tx.appointment.update({
       where: { id: appointmentId },

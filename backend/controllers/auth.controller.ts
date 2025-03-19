@@ -83,7 +83,7 @@ export const login = asyncHandler(async (req: Request, res: Response): Promise<v
     name: user.name,
     email: user.email,
     role: user.role,
-    initials: user.name.split(' ').map(n => n[0]).join('')
+    initials: user.name.split(' ').map((n: string) => n[0]).join('')
   };
 
   // Set user in session for backward compatibility
