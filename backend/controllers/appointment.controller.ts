@@ -211,7 +211,6 @@ export const createAppointment = asyncHandler(async (req: AuthenticatedRequest, 
     status 
   } = req.body;
 
-<<<<<<< HEAD
   // Validate inputs
   const dateValidation = validateDate(termin_datum, { required: true });
   const timeValidation = validateTimeFormat(termin_zeit, { required: true });
@@ -226,50 +225,6 @@ export const createAppointment = asyncHandler(async (req: AuthenticatedRequest, 
     if (termin_zeit && !timeValidation.isValid) errorMessages.push(timeValidation.errors.join(', '));
     
     throw new ValidationError(`Validation failed: ${errorMessages.join('; ')}`, errorMessages);
-=======
-    // Validate inputs
-    const dateValidation = validateDate(termin_datum, { required: true });
-    const timeValidation = validateTimeFormat(termin_zeit, { required: true });
-
-    // Validation
-    if (!titel || !termin_datum || !termin_zeit || !dateValidation.isValid || !timeValidation.isValid) {
-      const errorMessages: string[] = [];
-      if (!titel) errorMessages.push('Title is required');
-      if (!termin_datum) errorMessages.push('Date is required');
-      if (!termin_zeit) errorMessages.push('Time is required');
-      if (termin_datum && !dateValidation.isValid) errorMessages.push(dateValidation.errors.join(', '));
-      if (termin_zeit && !timeValidation.isValid) errorMessages.push(timeValidation.errors.join(', '));
-
-      const error: any = new Error(`Validation failed: ${errorMessages.join('; ')}`);
-      error.statusCode = 400;
-      throw error;
-    }
-
-    // Combine date and time
-    const appointmentDate = new Date(`${termin_datum}T${termin_zeit}`);
-
-    const appointment = await prisma.appointment.create({
-      data: {
-        title: titel,
-        customerId: kunde_id ? Number(kunde_id) : null,
-        projectId: projekt_id ? Number(projekt_id) : null,
-        appointmentDate: appointmentDate,
-        duration: dauer ? Number(dauer) : 60,
-        location: ort || null,
-        description: beschreibung || null,
-        status: status || 'geplant',
-        createdBy: req.session.user?.id,
-      },
-    });
-
-    return res.status(201).json({
-      success: true,
-      appointmentId: appointment.id,
-      message: 'Appointment created successfully',
-    });
-  } catch (error: any) {
-    next(error);
->>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
   }
   
   // Combine date and time
