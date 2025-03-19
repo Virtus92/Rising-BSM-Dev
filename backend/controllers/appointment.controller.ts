@@ -167,7 +167,7 @@ export const createAppointment = async (req: Request, res: Response, next: NextF
 
     // Validation
     if (!titel || !termin_datum || !termin_zeit || !dateValidation.isValid || !timeValidation.isValid) {
-      const errorMessages = [];
+      const errorMessages: string[] = [];
       if (!titel) errorMessages.push('Title is required');
       if (!termin_datum) errorMessages.push('Date is required');
       if (!termin_zeit) errorMessages.push('Time is required');

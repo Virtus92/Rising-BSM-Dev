@@ -1,6 +1,25 @@
 import jwt from 'jsonwebtoken';
 import { UnauthorizedError } from './errors';
 
+// Load environment variables with fallbacks
+const JWT_SECRET = process.env.JWT_SECRET || 'your-default-super-secret-key-that-should-be-in-env';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-super-secret-key-that-should-be-in-env';
+const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+
+// Check for missing environment variables in development
+if (process.env.NODE_ENV === 'development') {
+  if (process.env.JWT_SECRET === undefined) {
+    console.warn('⚠️ Warning: JWT_SECRET is not set in environment variables');
+  }
+  if (process.env.JWT_REFRESH_SECRET === undefined) {
+    console.warn('⚠️ Warning: JWT_REFRESH_SECRET is not set in environment variables');
+  }
+}
+
+/**
+ * User payload structure for JWT tokens
+ */
 export interface TokenPayload {
   userId: number;
   role: string;
@@ -8,6 +27,9 @@ export interface TokenPayload {
   name?: string;
 }
 
+/**
+ * Response structure for token generation
+ */
 export interface TokenResult {
   accessToken: string;
   refreshToken: string;
@@ -20,29 +42,22 @@ export interface TokenResult {
  * @returns JWT token string
  */
 export const generateToken = (payload: TokenPayload): string => {
-  if (!process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET environment variable is not set');
-  }
-  
   return jwt.sign(
     payload,
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
   );
 };
 
 /**
  * Verify and decode JWT token
  * @param token JWT token to verify
- * @returns Decoded token payload or null if invalid
+ * @returns Decoded token payload
+ * @throws UnauthorizedError if token is invalid or expired
  */
 export const verifyToken = (token: string): TokenPayload => {
   try {
-    if (!process.env.JWT_SECRET) {
-      throw new Error('JWT_SECRET environment variable is not set');
-    }
-    
-    return jwt.verify(token, process.env.JWT_SECRET) as TokenPayload;
+    return jwt.verify(token, JWT_SECRET) as TokenPayload;
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
       throw new UnauthorizedError('Invalid token');
@@ -60,14 +75,10 @@ export const verifyToken = (token: string): TokenPayload => {
  * @returns Refresh token string
  */
 export const generateRefreshToken = (userId: number): string => {
-  if (!process.env.JWT_REFRESH_SECRET) {
-    throw new Error('JWT_REFRESH_SECRET environment variable is not set');
-  }
-  
   return jwt.sign(
     { userId },
-    process.env.JWT_REFRESH_SECRET,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
+    JWT_REFRESH_SECRET,
+    { expiresIn: JWT_REFRESH_EXPIRES_IN }
   );
 };
 
@@ -75,14 +86,11 @@ export const generateRefreshToken = (userId: number): string => {
  * Verify refresh token
  * @param token Refresh token to verify
  * @returns User ID from token
+ * @throws UnauthorizedError if token is invalid or expired
  */
 export const verifyRefreshToken = (token: string): number => {
   try {
-    if (!process.env.JWT_REFRESH_SECRET) {
-      throw new Error('JWT_REFRESH_SECRET environment variable is not set');
-    }
-    
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET) as { userId: number };
+    const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as { userId: number };
     return decoded.userId;
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
@@ -104,15 +112,42 @@ export const generateAuthTokens = (payload: TokenPayload): TokenResult => {
   const accessToken = generateToken(payload);
   const refreshToken = generateRefreshToken(payload.userId);
   
-  // Calculate expiration time in seconds
-  const expiresIn = parseInt(
-    process.env.JWT_EXPIRES_IN?.replace(/\D/g, '') || '3600',
-    10
-  );
+  // Parse expiration time from JWT_EXPIRES_IN
+  let expiresIn = 3600; // Default to 1 hour in seconds
+  
+  const expiresMatch = JWT_EXPIRES_IN.match(/^(\d+)([smhd])$/);
+  if (expiresMatch) {
+    const value = parseInt(expiresMatch[1]);
+    const unit = expiresMatch[2];
+    
+    switch (unit) {
+      case 's': expiresIn = value; break;
+      case 'm': expiresIn = value * 60; break;
+      case 'h': expiresIn = value * 60 * 60; break;
+      case 'd': expiresIn = value * 24 * 60 * 60; break;
+    }
+  }
   
   return {
     accessToken,
     refreshToken,
     expiresIn
   };
+};
+
+/**
+ * Extract token from authorization header
+ * @param authHeader Authorization header value
+ * @returns Token or null if not found
+ */
+export const extractTokenFromHeader = (authHeader?: string): string | null => {
+  if (!authHeader) return null;
+  
+  // Check for Bearer token format
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') {
+    return null;
+  }
+  
+  return parts[1];
 };
