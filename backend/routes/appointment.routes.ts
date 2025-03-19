@@ -2,6 +2,11 @@ import { Router, Request, Response } from 'express';
 import { isAuthenticated } from '../middleware/auth.middleware';
 import * as appointmentController from '../controllers/appointment.controller';
 import { validateAppointment } from '../middleware/validation.middleware';
+import { ParamsDictionary } from 'express-serve-static-core';
+
+interface AppointmentParams extends ParamsDictionary {
+  id: string;
+}
 
 const router = Router();
 
@@ -18,7 +23,7 @@ router.get('/', appointmentController.getAllAppointments);
  * @route   GET /dashboard/termine/:id
  * @desc    Get appointment by ID
  */
-router.get('/:id', appointmentController.getAppointmentById);
+router.get<AppointmentParams>('/:id', appointmentController.getAppointmentById);
 
 /**
  * @route   POST /dashboard/termine
@@ -30,12 +35,12 @@ router.post('/', validateAppointment, appointmentController.createAppointment);
  * @route   PUT /dashboard/termine/:id
  * @desc    Update an existing appointment
  */
-router.put('/:id', validateAppointment, appointmentController.updateAppointment);
+router.put<AppointmentParams>('/:id', validateAppointment, appointmentController.updateAppointment);
 
 /**
- * @route   DELETE /dashboard/termine
+ * @route   DELETE /dashboard/termine/:id
  * @desc    Delete an appointment
  */
-router.delete('/', appointmentController.deleteAppointment);
+router.delete<AppointmentParams>('/:id', appointmentController.deleteAppointment);
 
 export default router;

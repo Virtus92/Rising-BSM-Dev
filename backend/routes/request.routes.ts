@@ -1,6 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { isAuthenticated } from '../middleware/auth.middleware';
 import * as requestController from '../controllers/request.controller';
+import { ParamsDictionary } from 'express-serve-static-core';
+
+interface RequestParams extends ParamsDictionary {
+  id: string;
+}
 
 const router = Router();
 
@@ -17,7 +22,7 @@ router.get('/', requestController.getAllRequests);
  * @route   GET /dashboard/requests/:id
  * @desc    Get request by ID with related data
  */
-router.get('/:id', requestController.getRequestById);
+router.get<RequestParams>('/:id', requestController.getRequestById);
 
 /**
  * @route   POST /dashboard/requests/status
@@ -29,7 +34,7 @@ router.post('/status', requestController.updateRequestStatus);
  * @route   POST /dashboard/requests/:id/notes
  * @desc    Add a note to a request
  */
-router.post('/:id/notes', requestController.addRequestNote);
+router.post<RequestParams>('/:id/notes', requestController.addRequestNote);
 
 /**
  * @route   GET /dashboard/requests/export

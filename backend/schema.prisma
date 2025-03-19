@@ -97,6 +97,8 @@ model Customer {
   appointments Appointment[]
   invoices     Invoice[]
 
+  @@index([email])
+  @@index([status])
   @@map("kunden")
 }
 
@@ -361,6 +363,10 @@ model Appointment {
   Project     Project?  @relation(fields: [projectId], references: [id])
   User        User?     @relation(fields: [createdBy], references: [id])
 
+  @@index([customerId])
+  @@index([appointmentDate])
+  @@index([status])
+  
   @@map("termine")
 }
 

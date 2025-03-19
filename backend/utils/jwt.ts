@@ -45,7 +45,7 @@ export const generateToken = (payload: TokenPayload): string => {
   return jwt.sign(
     payload,
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
+    { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions
   );
 };
 
@@ -78,7 +78,7 @@ export const generateRefreshToken = (userId: number): string => {
   return jwt.sign(
     { userId },
     JWT_REFRESH_SECRET,
-    { expiresIn: JWT_REFRESH_EXPIRES_IN }
+    { expiresIn: JWT_REFRESH_EXPIRES_IN } as jwt.SignOptions
   );
 };
 

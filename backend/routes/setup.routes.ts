@@ -1,18 +1,24 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { isAuthenticated, isAdmin } from '../middleware/auth.middleware';
 import * as settingsController from '../controllers/settings.controller';
+import { body, validationResult } from 'express-validator';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
 
+const prisma = new PrismaClient();
 const router = Router();
+
 // Middleware to check if setup is needed
-const setupRequired = async (req, res, next) => {
+const setupRequired = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Check if any users exist
-   // const userCheck = await pool.query('SELECT COUNT(*) FROM benutzer');
-   // 
-   // if (parseInt(userCheck.rows[0].count) > 0) {
-   //   req.flash('info', 'Setup wurde bereits durchgeführt.');
-   //   return res.redirect('/login');
-   // }
+    // Check if any users exist using Prisma
+    const userCount = await prisma.user.count();
+    
+    if (userCount > 0) {
+      req.flash('info', 'Setup wurde bereits durchgeführt.');
+      return res.redirect('/login');
+    }
     
     next();
   } catch (error) {
@@ -24,7 +30,7 @@ const setupRequired = async (req, res, next) => {
 };
 
 // Apply the middleware to both GET and POST routes
-router.get('/setup', setupRequired, async (req, res) => {
+router.get('/setup', setupRequired, async (req: Request, res: Response) => {
   try {
     res.render('setup', { 
       title: 'Ersteinrichtung - Rising BSM',
@@ -58,7 +64,7 @@ const setupValidation = [
   body('company_email').trim().isEmail().withMessage('Gültige Unternehmens-E-Mail erforderlich')
 ];
 
-router.post('/setup', setupRequired, setupValidation, async (req, res) => {
+router.post('/setup', setupRequired, setupValidation, async (req: Request, res: Response) => {
   const { 
     name, 
     email, 
@@ -81,40 +87,61 @@ router.post('/setup', setupRequired, setupValidation, async (req, res) => {
   }
 
   try {
-    // Use db.service transaction method instead of direct pool.connect
-    await pool.transaction(async (client) => {
-      // Passwort hashen
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
+    // Use Prisma transaction instead of pool.transaction
+    // Define interfaces for our data structures
+    interface User {
+      name: string;
+      email: string;
+      password: string;
+      role: string;
+      status: string;
+    }
+    
+    interface SystemSetting {
+      key: string;
+      value: string;
+    }
 
-      // Ersten Admin-Benutzer anlegen
-      const userQuery = `
-        INSERT INTO benutzer 
-        (name, email, passwort, rolle, status) 
-        VALUES ($1, $2, $3, 'admin', 'aktiv') 
-        RETURNING id
-      `;
-      const userResult = await client.query(userQuery, [name, email, hashedPassword]);
-      const userId = userResult.rows[0].id;
+    let createdUser;
 
-      // Unternehmenseinstellungen speichern
-      const settingsQuery = `
-        INSERT INTO system_settings 
-        (schluessel, wert) 
-        VALUES 
-        ('company_name', $1),
-        ('company_email', $2),
-        ('setup_complete', 'true'),
-        ('setup_date', $3)
-      `;
-      await client.query(settingsQuery, [
-        company_name, 
-        company_email,
-        new Date().toISOString()
-      ]);
+    await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>) => {
+      // Hash password
+      const salt: string = await bcrypt.genSalt(10);
+      const hashedPassword: string = await bcrypt.hash(password, salt);
+
+      // Create first admin user using Prisma
+      createdUser = await tx.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: 'admin',
+          status: 'active'
+        }
+      });
+
+      // Save company settings using Prisma
+      await tx.systemSetting.createMany({
+        data: [
+          { key: 'company_name', value: company_name },
+          { key: 'company_email', value: company_email },
+          { key: 'setup_complete', value: 'true' },
+          { key: 'setup_date', value: new Date().toISOString() }
+        ] as SystemSetting[]
+      });
     });
     
-    // Redirect zur Login-Seite
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: createdUser.id, email: createdUser.email, role: createdUser.role },
+      process.env.JWT_SECRET || 'defaultsecret',
+      { expiresIn: '24h' }
+    );
+    
+    // Save token in session or cookie if needed
+    // req.session.token = token;
+    
+    // Redirect to login page
     req.flash('success', 'Setup erfolgreich abgeschlossen. Bitte melden Sie sich an.');
     res.redirect('/login');
   } catch (error) {

@@ -5,16 +5,17 @@ import prisma from '../utils/prisma.utils';
 import { validateInput, validatePassword } from '../utils/validators';
 import { UnauthorizedError, ValidationError, NotFoundError } from '../utils/errors';
 import { generateAuthTokens, verifyToken } from '../utils/jwt';
-import { asyncHandler } from '../utils/errors';
+import { asyncHandler } from '../utils/asyncHandler';
 import config from '../config';
 import { AuthenticatedRequest } from '../types/authenticated-request';
+import { LoginData } from '../types/data-models';
 
 /**
  * Handle user login with JWT authentication
  */
 export const login = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   // Validate input
-  const { email, password, remember } = req.body;
+  const { email, password, remember } = req.body as LoginData;
 
   if (!email || !password) {
     throw new ValidationError('Email and password are required');

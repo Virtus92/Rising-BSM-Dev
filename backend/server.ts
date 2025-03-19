@@ -1,11 +1,11 @@
-// server.ts (partial update)
+// server.ts
 import dotenv from 'dotenv';
 dotenv.config();
 
 import express, { Express, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import { rateLimit } from 'express-rate-limit'; // Fix import syntax
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import PgSession from 'connect-pg-simple';
@@ -15,21 +15,24 @@ import cors from 'cors';
 import { Pool } from 'pg';
 
 import config from './config';
+import prisma from './utils/prisma.utils';
 
-// Extend the session interface to include user information
+// Define session user type
 declare module 'express-session' {
   interface SessionData {
-    user: { id: string, username: string } | null;
+    user?: {
+      id: number;
+      name: string;
+      email: string;
+      role: string;
+      initials: string;
+    };
   }
 }
 
 // Create Express app
 const app: Express = express();
-const port = process.env.PORT || 5000;
-
-// Database connection
-import prisma from './utils/prisma.utils';
-
+const port = config.PORT;
 
 // Import middleware
 import * as errorMiddleware from './middleware/error.middleware';
@@ -44,12 +47,12 @@ const setupCompletedMiddleware = async (req: Request, res: Response, next: NextF
     }
 
     // Check if setup is complete using Prisma
-    const setupSetting = await prisma.systemSetting.findFirst({
-      where: { key: 'setup_complete' }
-    });
+    const setupSetting = await prisma.$queryRaw<{key: string, value: string}[]>`
+      SELECT * FROM system_settings WHERE key = 'setup_complete'
+    `;
     
     // If setup isn't complete, redirect to setup
-    if (!setupSetting || setupSetting.value !== 'true') {
+    if (!setupSetting || setupSetting.length === 0 || setupSetting[0].value !== 'true') {
       return res.redirect('/setup');
     }
     
@@ -165,14 +168,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Apply API routes first - these use the new TypeScript controllers
+// Apply API routes
 app.use('/api', apiRoutes);
 
-// For other routes, we'll continue using the existing JavaScript routes until migrated
-// This is a temporary solution during migration
-// We'll need to import these properly once converted to TypeScript
-
-// Apply the existing JavaScript routes
+// Apply web routes
 app.use('/', indexRoutes);
 app.use('/', authRoutes);
 app.use('/setup', setupRoutes);
@@ -186,7 +185,7 @@ app.use('/dashboard/profile', profileRoutes);
 app.use('/dashboard/settings', settingsRoutes);
 
 // Contact form route with rate limiting
-app.post('/contact', contactLimiter, require('./controllers/contact.controller').submitContact);
+app.post('/contact', contactLimiter, submitContact);
 
 // CSRF protection
 app.use(csurf());
@@ -197,7 +196,7 @@ app.use(errorMiddleware.errorHandler);
 
 // Start server
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${port}`);
   console.log(`Environment: ${config.NODE_ENV}`);
 });
 

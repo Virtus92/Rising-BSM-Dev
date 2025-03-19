@@ -1,6 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { isNotAuthenticated } from '../middleware/auth.middleware';
 import * as authController from '../controllers/auth.controller';
+import { ParamsDictionary } from 'express-serve-static-core';
+
+interface TokenParams extends ParamsDictionary {
+  token: string;
+}
 
 declare global {
   namespace Express {
@@ -60,13 +65,13 @@ router.post('/forgot-password', isNotAuthenticated, authController.forgotPasswor
  * @route   GET /reset-password/:token
  * @desc    Render reset password page
  */
-router.get('/reset-password/:token', isNotAuthenticated, authController.validateResetToken);
+router.get<TokenParams>('/reset-password/:token', isNotAuthenticated, authController.validateResetToken);
 
 /**
  * @route   POST /reset-password/:token
  * @desc    Process reset password
  */
-router.post('/reset-password/:token', isNotAuthenticated, authController.resetPassword);
+router.post<TokenParams>('/reset-password/:token', isNotAuthenticated, authController.resetPassword);
 
 /**
  * @route   POST /refresh-token

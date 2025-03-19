@@ -29,6 +29,32 @@ interface ServiceFilterOptions {
   limit?: number;
 }
 
+// Define validation schema type
+interface ValidationRule {
+  type: string;
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+}
+
+interface ValidationSchema {
+  [key: string]: ValidationRule;
+}
+
+interface ServiceRecord {
+  id: number;
+  name: string;
+  description: string | null;
+  priceBase: number | bigint;
+  unit: string | null;
+  vatRate: number | bigint;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /**
  * Get all services with optional filtering
  */
@@ -74,7 +100,7 @@ export const getAllServices = asyncHandler(async (req: Request, res: Response): 
   ]);
 
   // Format service data
-  const formattedServices = services.map(service => ({
+  const formattedServices = services.map((service: ServiceRecord): Record<string, any> => ({
     id: service.id,
     name: service.name,
     beschreibung: service.description,
@@ -148,7 +174,7 @@ export const getServiceById = asyncHandler(async (req: Request, res: Response): 
  */
 export const createService = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   // Validation schema
-  const validationSchema = {
+  const validationSchema: ValidationSchema = {
     name: { type: 'text', required: true, minLength: 2 },
     beschreibung: { type: 'text', required: false },
     preis_basis: { type: 'numeric', required: true, min: 0 },
@@ -199,15 +225,15 @@ export const createService = asyncHandler(async (req: AuthenticatedRequest, res:
  * Update an existing service
  */
 export const updateService = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
-  const serviceId = Number(id);
+  const { id }: { id: string } = req.params;
+  const serviceId: number = Number(id);
   
   if (isNaN(serviceId)) {
     throw new BadRequestError('Invalid service ID');
   }
 
   // Validation schema
-  const validationSchema = {
+  const validationSchema: ValidationSchema = {
     name: { type: 'text', required: true, minLength: 2 },
     beschreibung: { type: 'text', required: false },
     preis_basis: { type: 'numeric', required: true, min: 0 },

@@ -3,7 +3,10 @@ import { isAuthenticated } from '../middleware/auth.middleware';
 import * as profileController from '../controllers/profile.controller';
 import multer from 'multer';
 import path from 'path';
+import { ParamsDictionary } from 'express-serve-static-core';
 
+// Since this file doesn't use :id parameters in routes, we can remove this interface
+// or keep it for potential future use, but with proper typing
 const router = Router();
 
 // Configure file upload for profile pictures

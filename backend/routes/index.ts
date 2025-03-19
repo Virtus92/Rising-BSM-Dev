@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import * as contactController from '../controllers/contact.controller';
+import { ParamsDictionary } from 'express-serve-static-core';
 
 const router = Router();
 

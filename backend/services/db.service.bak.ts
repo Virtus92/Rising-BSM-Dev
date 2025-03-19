@@ -37,71 +37,58 @@ type QueryParams = any[] | Record<string, any>;
  * @throws DatabaseError
  */
 export const query = async <T = any>(
-  query: string | QueryConfig,
-  params: QueryParams = []
-): Promise<QueryResult<T>> => {
-  const client = await pool.connect();
+  queryText: string,
+  params: any[] = []
+): Promise<{ rows: T[], rowCount: number }> => {
+  console.warn('⚠️ Warning: Legacy db.query is being used. Consider migrating to Prisma directly.');
+  
   try {
-    // Handle both string queries and object queries
-    if (typeof query === 'string') {
-      return await client.query(query, params);
-    } else {
-      return await client.query(query);
-    }
+    // Execute raw query using Prisma
+    const result = await prisma.$queryRawUnsafe<T[]>(queryText, ...params);
+    
+    return {
+      rows: result,
+      rowCount: result.length
+    };
   } catch (error) {
     throw new DatabaseError(
       `Database query failed: ${(error as Error).message}`,
-      { query, params, error }
+      { query: queryText, params, error }
     );
-  } finally {
-    client.release();
   }
 };
 
-/**
- * Execute multiple queries in a transaction
- * @param callback Function that receives a client and executes queries
- * @returns Result of the callback function
- * @throws DatabaseError
- */
+// Wrapper for transaction support
 export const transaction = async <T>(
-  callback: (client: PoolClient) => Promise<T>
+  callback: (client: any) => Promise<T>
 ): Promise<T> => {
-  const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    
-    const result = await callback(client);
-    
-    await client.query('COMMIT');
-    return result;
+    return await prisma.$transaction(async (prismaClient) => {
+      return callback(prismaClient);
+    });
   } catch (error) {
-    await client.query('ROLLBACK');
     throw new DatabaseError(
       `Transaction failed: ${(error as Error).message}`,
       { error }
     );
-  } finally {
-    client.release();
   }
 };
 
-/**
- * Get a single row by ID
- * @param table Table name
- * @param id ID to look up
- * @param idColumn Column name for ID
- * @returns Row object or null if not found
- * @throws DatabaseError
- */
+// Legacy getById implementation
 export const getById = async <T = Record<string, any>>(
   table: string, 
   id: number | string, 
   idColumn = 'id'
 ): Promise<T | null> => {
   try {
-    const result = await query<T>(`SELECT * FROM ${table} WHERE ${idColumn} = $1`, [id]);
-    return result.rows.length > 0 ? result.rows[0] : null;
+    const whereClause: any = {};
+    whereClause[idColumn] = typeof id === 'string' ? parseInt(id, 10) : id;
+    
+    const result = await prisma[table].findUnique({
+      where: whereClause
+    });
+    
+    return result as T;
   } catch (error) {
     throw new DatabaseError(
       `Failed to get row by ID: ${(error as Error).message}`,
@@ -321,7 +308,7 @@ export const db = {
   getById,
   insert,
   update,
-  delete: deleteById, // Renamed function to avoid JS reserved keyword
+  delete: deleteById,
   findBy,
   countBy
 };

@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { isAuthenticated, isAdmin } from '../middleware/auth.middleware';
 import * as settingsController from '../controllers/settings.controller';
+import { ParamsDictionary } from 'express-serve-static-core';
 
+// No route parameters are actually used in this file
 const router = Router();
 
 // Apply authentication middleware to all routes

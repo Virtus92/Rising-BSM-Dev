@@ -2,6 +2,11 @@ import { Router, Request, Response } from 'express';
 import { isAuthenticated } from '../middleware/auth.middleware';
 import * as dashboardController from '../controllers/dashboard.controller';
 import { prepareDashboardContextMiddleware } from '../middleware/dashboard.middleware';
+import { ParamsDictionary } from 'express-serve-static-core';
+
+interface NotificationParams extends ParamsDictionary {
+  id: string;  // Not optional
+}
 
 const router = Router();
 

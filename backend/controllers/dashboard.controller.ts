@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import prisma from '../utils/prisma.utils';
 import { format } from 'date-fns';
 import cache from '../services/cache.service';
-import { getNotifications } from '../utils/helpers';
+import { getNotifications as getHelperNotifications } from '../utils/helpers';
 import { formatDateSafely, formatRelativeTime, formatDateWithLabel } from '../utils/formatters';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AuthenticatedRequest } from '../types/authenticated-request';
@@ -54,51 +54,61 @@ interface DateRangeResult {
  * Get dashboard data including statistics, charts, and recent activities
  */
 export const getDashboardData = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  // Get notifications
-  const notifications = await getNotifications(req);
+  const userId = (req as AuthenticatedRequest).user?.id;
   
-  // Calculate date range filters
-  const revenueFilter = req.query.revenueFilter as string || 'Letzten 6 Monate';
-  const servicesFilter = req.query.servicesFilter as string || 'Diesen Monat';
+  // Create cache key that includes user ID for personalization
+  const cacheKey = `dashboard_data_${userId || 'guest'}_${new Date().toISOString().slice(0, 10)}`;
+  
+  // Get dashboard data with improved caching
+  const dashboardData = await cache.getOrExecute(cacheKey, async () => {
+    // Get notifications
+    const notifications = await getHelperNotifications(req);
+    
+    // Calculate date range filters
+    const revenueFilter = req.query.revenueFilter as string || 'Letzten 6 Monate';
+    const servicesFilter = req.query.servicesFilter as string || 'Diesen Monat';
 
-  // Chart filter options
-  const chartFilters = {
-    revenue: {
-      selected: revenueFilter,
-      options: ['Letzten 30 Tage', 'Letzten 3 Monate', 'Letzten 6 Monate', 'Dieses Jahr']
-    },
-    services: {
-      selected: servicesFilter,
-      options: ['Diese Woche', 'Diesen Monat', 'Dieses Quartal', 'Dieses Jahr']
-    }
-  };
+    // Chart filter options
+    const chartFilters = {
+      revenue: {
+        selected: revenueFilter,
+        options: ['Letzten 30 Tage', 'Letzten 3 Monate', 'Letzten 6 Monate', 'Dieses Jahr']
+      },
+      services: {
+        selected: servicesFilter,
+        options: ['Diese Woche', 'Diesen Monat', 'Dieses Quartal', 'Dieses Jahr']
+      }
+    };
 
-  // Get dashboard data
-  const stats = await getDashboardStats();
-  const recentRequests = await getRecentRequests();
-  const upcomingAppointments = await getUpcomingAppointments();
-  const charts = await getChartData(revenueFilter, servicesFilter);
+    // Get all dashboard data in parallel for performance
+    const [stats, recentRequests, upcomingAppointments, charts] = await Promise.all([
+      getDashboardStats(),
+      getRecentRequests(),
+      getUpcomingAppointments(),
+      getChartData(revenueFilter, servicesFilter)
+    ]);
+    
+    // System status information
+    const systemStatus = {
+      database: 'online',
+      lastUpdate: format(new Date(), 'dd.MM.yyyy, HH:mm:ss'),
+      processing: 'active',
+      statistics: 'active'
+    };
+    
+    // Return aggregated data
+    return {
+      stats,
+      chartFilters,
+      charts,
+      notifications,
+      recentRequests,
+      upcomingAppointments,
+      systemStatus
+    };
+  }, 300); // Cache for 5 minutes
   
-  // System status information
-  const systemStatus: SystemStatus = {
-    database: 'online',
-    lastUpdate: format(new Date(), 'dd.MM.yyyy, HH:mm:ss'),
-    processing: 'active',
-    statistics: 'active'
-  };
-  
-  // Create data object
-  const data: DashboardData = {
-    stats,
-    chartFilters,
-    charts,
-    notifications,
-    recentRequests,
-    upcomingAppointments,
-    systemStatus
-  };
-  
-  res.status(200).json(data);
+  res.status(200).json(dashboardData);
 });
 
 /**

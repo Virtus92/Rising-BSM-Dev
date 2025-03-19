@@ -2,6 +2,11 @@ import { Router, Request, Response } from 'express';
 import { isAuthenticated } from '../middleware/auth.middleware';
 import * as projectController from '../controllers/project.controller';
 import { validateProject } from '../middleware/validation.middleware';
+import { ParamsDictionary } from 'express-serve-static-core';
+
+interface ProjectParams extends ParamsDictionary {
+  id: string;
+}
 
 const router = Router();
 
@@ -18,7 +23,7 @@ router.get('/', projectController.getAllProjects);
  * @route   GET /dashboard/projekte/:id
  * @desc    Display project details
  */
-router.get('/:id', projectController.getProjectById);
+router.get<ProjectParams>('/:id', projectController.getProjectById);
 
 /**
  * @route   POST /dashboard/projekte/neu
@@ -30,7 +35,7 @@ router.post('/neu', validateProject, projectController.createProject);
  * @route   PUT /dashboard/projekte/:id
  * @desc    Update a project
  */
-router.put('/:id', validateProject, projectController.updateProject);
+router.put<ProjectParams>('/:id', validateProject, projectController.updateProject);
 
 /**
  * @route   POST /dashboard/projekte/update-status
@@ -42,7 +47,7 @@ router.post('/update-status', projectController.updateProjectStatus);
  * @route   POST /dashboard/projekte/:id/notes
  * @desc    Add a note to a project
  */
-router.post('/:id/notes', projectController.addProjectNote);
+router.post<ProjectParams>('/:id/notes', projectController.addProjectNote);
 
 /**
  * @route   GET /dashboard/projekte/export

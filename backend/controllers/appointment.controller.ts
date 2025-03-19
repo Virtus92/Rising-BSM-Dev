@@ -34,6 +34,55 @@ interface AppointmentFilterOptions {
   limit?: number;
 }
 
+// Define validation schema type
+interface ValidationRule {
+  type: string;
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+}
+
+interface ValidationSchema {
+  [key: string]: ValidationRule;
+}
+
+// Define types for database records
+interface AppointmentRecord {
+  id: number;
+  title: string;
+  customerId: number | null;
+  projectId: number | null;
+  appointmentDate: Date;
+  duration: number;
+  location: string | null;
+  description: string | null;
+  status: string;
+  createdBy: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  Customer?: {
+    id: number;
+    name: string;
+    [key: string]: any;
+  } | null;
+  Project?: {
+    id: number;
+    title: string;
+    [key: string]: any;
+  } | null;
+}
+
+interface AppointmentNote {
+  id: number;
+  appointmentId: number;
+  userId: number | null;
+  userName: string;
+  text: string;
+  createdAt: Date;
+}
+
 /**
  * Get all appointments with optional filtering
  */
@@ -48,9 +97,9 @@ export const getAllAppointments = asyncHandler(async (req: Request, res: Respons
   } = req.query as unknown as AppointmentFilterOptions;
 
   // Validate and sanitize pagination parameters
-  const pageNumber = Math.max(1, Number(page) || 1);
-  const pageSize = Math.min(config.MAX_PAGE_SIZE, Math.max(1, Number(limit) || config.DEFAULT_PAGE_SIZE));
-  const skip = (pageNumber - 1) * pageSize;
+  const pageNumber: number = Math.max(1, Number(page) || 1);
+  const pageSize: number = Math.min(config.MAX_PAGE_SIZE, Math.max(1, Number(limit) || config.DEFAULT_PAGE_SIZE));
+  const skip: number = (pageNumber - 1) * pageSize;
 
   // Build filter conditions
   const where: any = {};
@@ -89,7 +138,7 @@ export const getAllAppointments = asyncHandler(async (req: Request, res: Respons
   ]);
 
   // Format appointment data
-  const formattedAppointments = appointments.map(appointment => {
+  const formattedAppointments = appointments.map((appointment: AppointmentRecord): Record<string, any> => {
     const statusInfo = getTerminStatusInfo(appointment.status);
     return {
       id: appointment.id,
@@ -110,7 +159,7 @@ export const getAllAppointments = asyncHandler(async (req: Request, res: Respons
   });
 
   // Calculate pagination data
-  const totalPages = Math.ceil(totalCount / pageSize);
+  const totalPages: number = Math.ceil(totalCount / pageSize);
 
   // Return data object for rendering or JSON response
   res.status(200).json({
@@ -134,8 +183,8 @@ export const getAllAppointments = asyncHandler(async (req: Request, res: Respons
  * Get appointment by ID with related data
  */
 export const getAppointmentById = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
-  const appointmentId = Number(id);
+  const { id }: { id: string } = req.params;
+  const appointmentId: number = Number(id);
   
   if (isNaN(appointmentId)) {
     throw new BadRequestError('Invalid appointment ID');
@@ -181,7 +230,7 @@ export const getAppointmentById = asyncHandler(async (req: Request, res: Respons
       statusLabel: statusInfo.label,
       statusClass: statusInfo.className
     },
-    notes: notes.map(note => ({
+    notes: notes.map((note: AppointmentNote): Record<string, any> => ({
       id: note.id,
       text: note.text,
       formattedDate: formatDateSafely(note.createdAt, 'dd.MM.yyyy, HH:mm'),
@@ -209,7 +258,7 @@ export const createAppointment = asyncHandler(async (req: AuthenticatedRequest, 
     ort, 
     beschreibung, 
     status 
-  } = req.body;
+  }: AppointmentData = req.body;
 
   // Validate inputs
   const dateValidation = validateDate(termin_datum, { required: true });
@@ -217,7 +266,7 @@ export const createAppointment = asyncHandler(async (req: AuthenticatedRequest, 
   
   // Validation
   if (!titel || !termin_datum || !termin_zeit || !dateValidation.isValid || !timeValidation.isValid) {
-    const errorMessages = [];
+    const errorMessages: string[] = [];
     if (!titel) errorMessages.push('Title is required');
     if (!termin_datum) errorMessages.push('Date is required');
     if (!termin_zeit) errorMessages.push('Time is required');
@@ -228,7 +277,7 @@ export const createAppointment = asyncHandler(async (req: AuthenticatedRequest, 
   }
   
   // Combine date and time
-  const appointmentDate = new Date(`${termin_datum}T${termin_zeit}`);
+  const appointmentDate: Date = new Date(`${termin_datum}T${termin_zeit}`);
   
   // Insert appointment into database
   const newAppointment = await prisma.appointment.create({
@@ -269,8 +318,8 @@ export const createAppointment = asyncHandler(async (req: AuthenticatedRequest, 
  * Update an existing appointment
  */
 export const updateAppointment = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
-  const appointmentId = Number(id);
+  const { id }: { id: string } = req.params;
+  const appointmentId: number = Number(id);
   
   if (isNaN(appointmentId)) {
     throw new BadRequestError('Invalid appointment ID');
@@ -286,7 +335,7 @@ export const updateAppointment = asyncHandler(async (req: AuthenticatedRequest, 
     ort, 
     beschreibung, 
     status
-  } = req.body;
+  }: AppointmentData = req.body;
   
   // Validation
   if (!titel || !termin_datum || !termin_zeit) {

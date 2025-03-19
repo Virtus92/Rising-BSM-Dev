@@ -3,7 +3,7 @@
  * Common utility functions used across the application
  */
 import { cache } from '../services/cache.service';
-import { db } from '../services/db.service';
+import { db } from '../services/db.service.bak';
 
 /**
  * Status information with label and class name
@@ -147,61 +147,57 @@ export const getNotifications = async (req: any): Promise<NotificationsResult> =
     
     // Try to get from cache first
     return await cache.getOrExecute(cacheKey, async () => {
-      // Get notifications from database
-      const notificationsQuery = await db.query(`
-        SELECT
-          id,
-          typ,
-          titel,
-          erstellt_am,
-          gelesen,
-          referenz_id
-        FROM
-          benachrichtigungen
-        WHERE
-          benutzer_id = $1
-        ORDER BY
-          erstellt_am DESC
-        LIMIT 5
-      `, [userId]);
+      // Get notifications using Prisma
+      const notifications = await prisma.notification.findMany({
+        where: {
+          userId: Number(userId)
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: 5
+      });
       
       // Get unread count
-      const unreadCountQuery = await db.query(`
-        SELECT COUNT(*) FROM benachrichtigungen 
-        WHERE benutzer_id = $1 AND gelesen = false
-      `, [userId]);
+      const unreadCount = await prisma.notification.count({
+        where: {
+          userId: Number(userId),
+          read: false
+        }
+      });
       
       // Get total count
-      const totalCountQuery = await db.query(`
-        SELECT COUNT(*) FROM benachrichtigungen 
-        WHERE benutzer_id = $1
-      `, [userId]);
+      const totalCount = await prisma.notification.count({
+        where: {
+          userId: Number(userId)
+        }
+      });
       
       // Format notifications
-      const items = notificationsQuery.rows.map(n => {
+      const items = notifications.map(n => {
         const { formatRelativeTime } = require('./formatters');
         
         return {
           id: n.id,
-          title: n.titel,
-          type: n.typ === 'anfrage' ? 'success' : 
-                n.typ === 'termin' ? 'primary' : 
-                n.typ === 'warnung' ? 'warning' : 'info',
-          icon: n.typ === 'anfrage' ? 'envelope' : 
-                n.typ === 'termin' ? 'calendar-check' : 
-                n.typ === 'warnung' ? 'exclamation-triangle' : 'bell',
-          time: formatRelativeTime(n.erstellt_am),
-          link: n.typ === 'anfrage' ? `/dashboard/requests/${n.referenz_id}` :
-                n.typ === 'termin' ? `/dashboard/termine/${n.referenz_id}` :
-                n.typ === 'projekt' ? `/dashboard/projekte/${n.referenz_id}` :
+          title: n.title,
+          type: n.type === 'anfrage' ? 'success' : 
+                n.type === 'termin' ? 'primary' : 
+                n.type === 'warnung' ? 'warning' : 'info',
+          icon: n.type === 'anfrage' ? 'envelope' : 
+                n.type === 'termin' ? 'calendar-check' : 
+                n.type === 'warnung' ? 'exclamation-triangle' : 'bell',
+          time: formatRelativeTime(n.createdAt),
+          link: n.type === 'anfrage' ? `/dashboard/requests/${n.referenceId}` :
+                n.type === 'termin' ? `/dashboard/termine/${n.referenceId}` :
+                n.type === 'projekt' ? `/dashboard/projekte/${n.referenceId}` :
                 '/dashboard/notifications'
         };
       });
       
       return {
         items,
-        unreadCount: parseInt(unreadCountQuery.rows[0].count || '0'),
-        totalCount: parseInt(totalCountQuery.rows[0].count || '0')
+        unreadCount,
+        totalCount
       };
     }, 30); // Cache for 30 seconds
   } catch (error) {
