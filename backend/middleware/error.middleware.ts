@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError, ValidationError, createErrorResponse } from '../utils/errors';
 import config from '../config';
+import { AuthenticatedRequest } from '../types/authenticated-request';
 
 /**
  * Global error handler middleware
@@ -45,6 +46,9 @@ export const errorHandler = (
     return res.redirect((err as any).redirect);
   }
   
+  // Get user from the request (if it exists)
+  const user = (req as AuthenticatedRequest).user;
+  
   // Handle regular requests based on error type
   if (statusCode === 404) {
     return res.status(404).render('error', {
@@ -52,7 +56,7 @@ export const errorHandler = (
       statusCode: 404,
       message: 'Die angeforderte Seite wurde nicht gefunden.',
       error: config.SHOW_STACK_TRACES ? err : {},
-      user: req.user
+      user: user
     });
   }
   
@@ -64,7 +68,7 @@ export const errorHandler = (
       message: message,
       errors: err.errors,
       error: config.SHOW_STACK_TRACES ? err : {},
-      user: req.user
+      user: user
     });
   }
   
@@ -76,9 +80,10 @@ export const errorHandler = (
       ? 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.' 
       : message,
     error: config.SHOW_STACK_TRACES ? err : {},
-    user: req.user
+    user: user
   });
 };
+
 
 /**
  * 404 Not Found handler

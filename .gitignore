@@ -15771,3 +15771,7 @@ backend/dist/utils/asyncHandler.js
 backend/dist/utils/asyncHandler.js.map
 backend/dist/utils/validation-types.d.ts
 backend/dist/utils/validation-types.js.map
+backend/dist/server.js
+backend/dist/server.js.map
+backend/dist/middleware/error.middleware.js
+backend/dist/middleware/error.middleware.js.map
