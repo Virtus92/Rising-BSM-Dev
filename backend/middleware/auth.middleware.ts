@@ -1,193 +1,255 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken, TokenPayload } from '../utils/jwt';
+import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors';
+import { AuthUser, AuthenticatedRequest } from '../types/authenticated-request';
+import prisma from '../utils/prisma.utils';
 
-// Extend Express Request type to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: TokenPayload;
-    }
-  }
-}
+// Environment configuration
+const AUTH_MODE = process.env.AUTH_MODE || 'dual'; // 'session', 'jwt', or 'dual'
 
 /**
- * Middleware to check if the user is authenticated via JWT
+ * Authentication middleware that supports both session and JWT authentication
+ * Attaches user object to request if authenticated
  */
-export const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
+export const authenticate = async (
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+): Promise<void> => {
   try {
-    // Get token from Authorization header
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-    
-    // Check for token
-    if (!token) {
-      throw new UnauthorizedError('Authentication required');
+    // Strategy 1: Check JWT token in Authorization header
+    if (AUTH_MODE === 'jwt' || AUTH_MODE === 'dual') {
+      const authHeader = req.headers.authorization;
+      const token = extractTokenFromHeader(authHeader);
+      
+      if (token) {
+        try {
+          const payload = verifyToken(token);
+          
+          // Fetch up-to-date user information from database
+          const user = await prisma.user.findUnique({
+            where: { id: payload.userId },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+              status: true
+            }
+          });
+          
+          if (user && user.status === 'aktiv') {
+            (req as AuthenticatedRequest).user = {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: user.role
+            };
+            return next();
+          }
+        } catch (error) {
+          // If in dual mode, continue to try session authentication
+          if (AUTH_MODE !== 'dual') {
+            throw error;
+          }
+        }
+      }
     }
     
-    // Verify token
-    const payload = verifyToken(token);
+    // Strategy 2: Check session-based authentication
+    if (AUTH_MODE === 'session' || AUTH_MODE === 'dual') {
+      if (req.session && req.session.user) {
+        // Optional: Verify session user is still valid in database
+        (req as AuthenticatedRequest).user = {
+          id: req.session.user.id,
+          name: req.session.user.name,
+          email: req.session.user.email,
+          role: req.session.user.role
+        };
+        return next();
+      }
+    }
     
-    // Set user in request
-    req.user = payload;
-    next();
+    // If no authentication is found
+    if (AUTH_MODE === 'dual') {
+      throw new UnauthorizedError('Authentication required');
+    } else if (AUTH_MODE === 'jwt') {
+      throw new UnauthorizedError('Valid JWT token required');
+    } else {
+      throw new UnauthorizedError('Valid session required');
+    }
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
+    next(error);
+  }
+};
+
+/**
+ * Middleware to check if the user is authenticated
+ * If not, redirects to login page or returns 401
+ */
+export const isAuthenticated = (
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+): void => {
+  authenticate(req, res, (err?: Error) => {
+    if (err) {
       // For API requests, return 401 Unauthorized
       if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
         return res.status(401).json({
           success: false,
-          message: error.message,
+          message: 'Authentication required',
           redirect: '/login'
         });
       }
       
       // For regular requests, redirect to login page
-      if (req.flash) {
-        req.flash('error', error.message);
-      }
       return res.redirect('/login');
     }
     
-    next(error);
-  }
+    next();
+  });
 };
 
 /**
- * Middleware to check if the user has admin role
+ * Middleware to check if the authenticated user has admin privileges
  */
-export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // First ensure the user is authenticated
-    if (!req.user) {
-      throw new UnauthorizedError('Authentication required');
+export const isAdmin = (
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+): void => {
+  authenticate(req, res, (err?: Error) => {
+    if (err) {
+      // Reuse isAuthenticated logic for unauthenticated users
+      return isAuthenticated(req, res, next);
     }
+    
+    const authReq = req as AuthenticatedRequest;
     
     // Check for admin role
-    if (req.user.role !== 'admin') {
-      throw new ForbiddenError('Admin privileges required');
+    if (authReq.user?.role === 'admin') {
+      return next();
     }
     
-    next();
-  } catch (error) {
-    if (error instanceof ForbiddenError) {
-      // For API requests, return 403 Forbidden
-      if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
-        return res.status(403).json({
-          success: false,
-          message: error.message,
-          redirect: '/dashboard'
-        });
-      }
-      
-      // For regular requests, redirect with flash message
-      if (req.flash) {
-        req.flash('error', 'Sie haben keine Berechtigung für diesen Bereich.');
-      }
-      return res.redirect('/dashboard');
+    // Not an admin - forbidden
+    const forbiddenError = new ForbiddenError('Admin privileges required');
+    
+    // For API requests, return 403 Forbidden
+    if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
+      return res.status(403).json({
+        success: false,
+        message: forbiddenError.message,
+        redirect: '/dashboard'
+      });
     }
     
-    next(error);
-  }
+    // For regular requests, redirect with flash message
+    if (req.flash) {
+      req.flash('error', 'Sie haben keine Berechtigung für diesen Bereich.');
+    }
+    return res.redirect('/dashboard');
+  });
 };
 
 /**
- * Middleware to check if the user has manager role (manager or admin)
+ * Middleware to check if the authenticated user has manager privileges (manager or admin)
  */
-export const isManager = (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // First ensure the user is authenticated
-    if (!req.user) {
-      throw new UnauthorizedError('Authentication required');
+export const isManager = (
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+): void => {
+  authenticate(req, res, (err?: Error) => {
+    if (err) {
+      // Reuse isAuthenticated logic for unauthenticated users
+      return isAuthenticated(req, res, next);
     }
+    
+    const authReq = req as AuthenticatedRequest;
     
     // Check for manager or admin role
-    if (!['admin', 'manager'].includes(req.user.role)) {
-      throw new ForbiddenError('Manager privileges required');
+    if (authReq.user?.role === 'admin' || authReq.user?.role === 'manager') {
+      return next();
     }
     
-    next();
-  } catch (error) {
-    if (error instanceof ForbiddenError) {
-      // For API requests, return 403 Forbidden
-      if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
-        return res.status(403).json({
-          success: false,
-          message: error.message,
-          redirect: '/dashboard'
-        });
-      }
-      
-      // For regular requests, redirect with flash message
-      if (req.flash) {
-        req.flash('error', 'Sie haben keine Berechtigung für diesen Bereich.');
-      }
-      return res.redirect('/dashboard');
+    // Not a manager - forbidden
+    const forbiddenError = new ForbiddenError('Manager privileges required');
+    
+    // For API requests, return 403 Forbidden
+    if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
+      return res.status(403).json({
+        success: false,
+        message: forbiddenError.message,
+        redirect: '/dashboard'
+      });
     }
     
-    next(error);
-  }
+    // For regular requests, redirect with flash message
+    if (req.flash) {
+      req.flash('error', 'Sie haben keine Berechtigung für diesen Bereich.');
+    }
+    return res.redirect('/dashboard');
+  });
 };
 
 /**
- * Middleware to check if the user has employee privileges (or higher)
+ * Middleware to check if the authenticated user has employee privileges (or higher)
  */
-export const isEmployee = (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // First ensure the user is authenticated
-    if (!req.user) {
-      throw new UnauthorizedError('Authentication required');
+export const isEmployee = (
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+): void => {
+  authenticate(req, res, (err?: Error) => {
+    if (err) {
+      // Reuse isAuthenticated logic for unauthenticated users
+      return isAuthenticated(req, res, next);
     }
+    
+    const authReq = req as AuthenticatedRequest;
     
     // Check for employee, manager or admin role
-    if (!['admin', 'manager', 'employee', 'mitarbeiter'].includes(req.user.role)) {
-      throw new ForbiddenError('Employee privileges required');
+    if (['admin', 'manager', 'employee', 'mitarbeiter'].includes(authReq.user?.role || '')) {
+      return next();
     }
     
-    next();
-  } catch (error) {
-    if (error instanceof ForbiddenError) {
-      // For API requests, return 403 Forbidden
-      if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
-        return res.status(403).json({
-          success: false,
-          message: error.message,
-          redirect: '/dashboard'
-        });
-      }
-      
-      // For regular requests, redirect with flash message
-      if (req.flash) {
-        req.flash('error', 'Sie haben keine Berechtigung für diesen Bereich.');
-      }
-      return res.redirect('/dashboard');
+    // Not an employee - forbidden
+    const forbiddenError = new ForbiddenError('Employee privileges required');
+    
+    // For API requests, return 403 Forbidden
+    if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
+      return res.status(403).json({
+        success: false,
+        message: forbiddenError.message,
+        redirect: '/dashboard'
+      });
     }
     
-    next(error);
-  }
+    // For regular requests, redirect with flash message
+    if (req.flash) {
+      req.flash('error', 'Sie haben keine Berechtigung für diesen Bereich.');
+    }
+    return res.redirect('/dashboard');
+  });
 };
 
 /**
  * Middleware to check if the user is not authenticated
  * Used for login/register pages to prevent authenticated users from accessing them
  */
-export const isNotAuthenticated = (req: Request, res: Response, next: NextFunction) => {
-  // Check for JWT token
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (token) {
-    try {
-      // If token is valid, user is authenticated
-      verifyToken(token);
-      return res.redirect('/dashboard');
-    } catch (error) {
-      // If token is invalid, proceed to login page
-      next();
-      return;
+export const isNotAuthenticated = (
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+): void => {
+  authenticate(req, res, (err?: Error) => {
+    if (err) {
+      // If authentication fails, user is not authenticated
+      return next();
     }
-  }
-  
-  // No token, proceed to login page
-  next();
+    
+    // User is authenticated, redirect to dashboard
+    return res.redirect('/dashboard');
+  });
 };

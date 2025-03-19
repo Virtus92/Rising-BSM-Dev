@@ -7,6 +7,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+model RefreshToken {
+  id            Int       @id @default(autoincrement())
+  token         String    @unique
+  expires       DateTime
+  createdAt     DateTime  @default(now())
+  createdByIp   String?
+  revoked       Boolean   @default(false)
+  revokedAt     DateTime?
+  revokedByIp   String?
+  replacedByToken String?
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+
 model Service {
   id            Int                @id @default(autoincrement())
   name          String             @db.VarChar(100)
@@ -318,6 +336,7 @@ model User {
   status         String    @default("aktiv") @db.Text
   profilePicture String?   @map("profilbild") @db.VarChar(255)
   settings       UserSettings?
+  refreshTokens RefreshToken[]
   activities     UserActivity[]
   projects       Project[]
   appointments   Appointment[]
