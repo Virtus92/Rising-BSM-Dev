@@ -1,5 +1,6 @@
 // controllers/project.controller.ts
 import { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
 import prisma from '../utils/prisma.utils';
 import { formatDateSafely } from '../utils/formatters';
 import { getProjektStatusInfo, getTerminStatusInfo } from '../utils/helpers';
@@ -12,6 +13,7 @@ import { validateInput } from '../utils/validators';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AuthenticatedRequest } from '../types/authenticated-request';
 import config from '../config';
+import { ValidationSchema, convertValidationSchema } from '../utils/validation-types';
 
 // Type definitions
 interface ProjectData {
@@ -85,7 +87,19 @@ export const getAllProjects = asyncHandler(async (req: Request, res: Response): 
   ]);
 
   // Format project data
-  const formattedProjects = projects.map(project => {
+  interface ProjectRecord {
+    id: number;
+    title: string;
+    customerId: number | null;
+    Customer: { name: string } | null;
+    Service: { name: string } | null;
+    startDate: Date;
+    endDate: Date | null;
+    status: string;
+    amount: number | null;
+  }
+  
+  const formattedProjects = projects.map((project: ProjectRecord) => {
     const statusInfo = getProjektStatusInfo(project.status);
     return {
       id: project.id,
@@ -163,6 +177,20 @@ export const getProjectById = asyncHandler(async (req: Request, res: Response): 
   ]);
   
   // Format project data for response
+  interface AppointmentRecord {
+    id: number;
+    title: string;
+    appointmentDate: Date;
+    status: string;
+  }
+  
+  interface NoteRecord {
+    id: number;
+    text: string;
+    createdAt: Date;
+    userName: string;
+  }
+  
   const result = {
     project: {
       id: project.id,
@@ -179,7 +207,7 @@ export const getProjectById = asyncHandler(async (req: Request, res: Response): 
       statusLabel: statusInfo.label,
       statusClass: statusInfo.className
     },
-    appointments: appointments.map(appointment => {
+    appointments: appointments.map((appointment: AppointmentRecord) => {
       const appointmentStatus = getTerminStatusInfo(appointment.status);
       return {
         id: appointment.id,
@@ -189,7 +217,7 @@ export const getProjectById = asyncHandler(async (req: Request, res: Response): 
         statusClass: appointmentStatus.className
       };
     }),
-    notes: notes.map(note => ({
+    notes: notes.map((note: NoteRecord) => ({
       id: note.id,
       text: note.text,
       formattedDate: formatDateSafely(note.createdAt, 'dd.MM.yyyy, HH:mm'),
@@ -207,8 +235,8 @@ export const getProjectById = asyncHandler(async (req: Request, res: Response): 
  * Create a new project
  */
 export const createProject = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  // Validate input using validator utility
-  const validationSchema = {
+  // Create validation schema with correct typing
+  const validationSchema: ValidationSchema = {
     titel: { type: 'text', required: true, minLength: 2 },
     kunde_id: { type: 'text', required: false },
     dienstleistung_id: { type: 'text', required: false },
@@ -219,9 +247,13 @@ export const createProject = asyncHandler(async (req: AuthenticatedRequest, res:
     status: { type: 'text', required: false }
   };
 
+  // Convert the schema to the base validation schema format
+  const baseSchema = convertValidationSchema(validationSchema);
+
+  // Validate with the converted schema
   const { validatedData } = validateInput<ProjectData>(
     req.body, 
-    validationSchema,
+    baseSchema,
     { throwOnError: true }
   );
   
@@ -286,7 +318,7 @@ export const updateProject = asyncHandler(async (req: AuthenticatedRequest, res:
   }
 
   // Validate input using validator utility
-  const validationSchema = {
+  const validationSchema: ValidationSchema = {
     titel: { type: 'text', required: true, minLength: 2 },
     kunde_id: { type: 'text', required: false },
     dienstleistung_id: { type: 'text', required: false },
@@ -297,9 +329,11 @@ export const updateProject = asyncHandler(async (req: AuthenticatedRequest, res:
     status: { type: 'text', required: false }
   };
 
+  const baseSchema = convertValidationSchema(validationSchema);
+
   const { validatedData } = validateInput<ProjectData>(
     req.body, 
-    validationSchema,
+    baseSchema,
     { throwOnError: true }
   );
 
@@ -380,7 +414,7 @@ export const updateProjectStatus = asyncHandler(async (req: AuthenticatedRequest
   }
   
   // Use a transaction for status update and optional note
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: PrismaClient) => {
     // Update status in database
     await tx.project.update({
       where: { id: projectId },

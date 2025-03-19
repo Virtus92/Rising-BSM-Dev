@@ -1,5 +1,5 @@
 // controllers/dashboard.controller.ts
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import prisma from '../utils/prisma.utils';
 import { format } from 'date-fns';
 import cache from '../services/cache.service';
@@ -53,7 +53,7 @@ interface DateRangeResult {
 /**
  * Get dashboard data including statistics, charts, and recent activities
  */
-export const getDashboardData = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+export const getDashboardData = asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const userId = (req as AuthenticatedRequest).user?.id;
   
   // Create cache key that includes user ID for personalization
@@ -80,9 +80,28 @@ export const getDashboardData = asyncHandler(async (req: Request, res: Response)
       }
     };
 
+    // For getDashboardStats, create a wrapper function that works with our modified signature
+    const getStats = async () => {
+      // Create a mock request and response for getDashboardStats
+      const mockReq = {} as Request;
+      let statsData: any;
+      const mockRes = {
+        status: () => ({
+          json: (data: any) => {
+            statsData = data;
+            return mockRes;
+          }
+        })
+      } as unknown as Response;
+      
+      // Call getDashboardStats with our mock objects
+      await getDashboardStats(mockReq, mockRes, (() => {}) as NextFunction);
+      return statsData;
+    };
+
     // Get all dashboard data in parallel for performance
     const [stats, recentRequests, upcomingAppointments, charts] = await Promise.all([
-      getDashboardStats(),
+      getStats(),
       getRecentRequests(),
       getUpcomingAppointments(),
       getChartData(revenueFilter, servicesFilter)
@@ -114,8 +133,8 @@ export const getDashboardData = asyncHandler(async (req: Request, res: Response)
 /**
  * Get dashboard statistics (used by both API and main dashboard)
  */
-export const getDashboardStats = asyncHandler(async (): Promise<any> => {
-  return await cache.getOrExecute('dashboard_stats', async () => {
+export const getDashboardStats = asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const stats = await cache.getOrExecute('dashboard_stats', async () => {
     // New requests stats
     const newRequestsCount = await prisma.contactRequest.count({
       where: { status: 'neu' }
@@ -234,7 +253,30 @@ export const getDashboardStats = asyncHandler(async (): Promise<any> => {
       monthlyRevenue: { amount: monthlyRevenue, trend: monthlyRevenueTrend }
     };
   }, 300); // Cache for 5 minutes
+
+  res.status(200).json(stats);
 });
+
+// Add interface for Invoice
+interface Invoice {
+  invoiceDate: Date;
+  amount: number;
+}
+
+// Add interface for service revenue item
+interface ServiceRevenueItem {
+  serviceId: number;
+  _sum: {
+    quantity: number | null;
+    unitPrice: number | null;
+  }
+}
+
+// Add interface for service item
+interface ServiceItem {
+  id: number;
+  name: string;
+}
 
 /**
  * Get data for dashboard charts
@@ -263,7 +305,7 @@ async function getChartData(revenueFilter: string, servicesFilter: string): Prom
     // Group by time period and format for chart
     const groupedData = new Map<string, number>();
     
-    invoices.forEach(invoice => {
+    invoices.forEach((invoice: Invoice) => {
       let groupKey: string;
       const date = new Date(invoice.invoiceDate);
       
@@ -357,7 +399,7 @@ async function getChartData(revenueFilter: string, servicesFilter: string): Prom
     const serviceNames = await prisma.service.findMany({
       where: {
         id: {
-          in: servicesRevenue.map(item => item.serviceId)
+          in: servicesRevenue.map((item: ServiceRevenueItem) => item.serviceId)
         }
       },
       select: {
@@ -366,11 +408,11 @@ async function getChartData(revenueFilter: string, servicesFilter: string): Prom
       }
     });
     
-    const serviceNameMap = new Map(serviceNames.map(service => [service.id, service.name]));
+    const serviceNameMap = new Map(serviceNames.map((service: ServiceItem) => [service.id, service.name]));
     
     return {
-      labels: servicesRevenue.map(item => serviceNameMap.get(item.serviceId) || 'Unknown'),
-      data: servicesRevenue.map(item => parseFloat((item._sum.quantity! * item._sum.unitPrice!).toFixed(2)))
+      labels: servicesRevenue.map((item: ServiceRevenueItem) => serviceNameMap.get(item.serviceId) || 'Unknown'),
+      data: servicesRevenue.map((item: ServiceRevenueItem) => parseFloat((item._sum.quantity! * item._sum.unitPrice!).toFixed(2)))
     };
   }, 600); // Cache for 10 minutes
   
@@ -418,6 +460,16 @@ function calculateDateRange(filter: string): DateRangeResult {
   return { startDate, groupBy, dateFormat };
 }
 
+// Define interface for requests
+interface ContactRequest {
+  id: number;
+  name: string;
+  email: string;
+  service: string;
+  status: string;
+  createdAt: Date;
+}
+
 /**
  * Get recent requests for dashboard
  */
@@ -430,7 +482,7 @@ async function getRecentRequests(): Promise<any[]> {
       });
       
       // Format requests
-      return requests.map(request => {
+      return requests.map((request: ContactRequest) => {
         let statusClass: string;
         let statusLabel: string;
         
@@ -485,6 +537,17 @@ async function getRecentRequests(): Promise<any[]> {
   }
 }
 
+// Define interface for appointments
+interface Appointment {
+  id: number;
+  title: string;
+  appointmentDate: Date;
+  status: string;
+  Customer?: {
+    name: string;
+  } | null;
+}
+
 /**
  * Get upcoming appointments for dashboard
  */
@@ -507,7 +570,7 @@ async function getUpcomingAppointments(): Promise<any[]> {
       });
       
       // Format appointments
-      return appointments.map(appointment => {
+      return appointments.map((appointment: Appointment) => {
         const datumObj = new Date(appointment.appointmentDate);
         const dateInfo = formatDateWithLabel(datumObj);
         
@@ -527,10 +590,38 @@ async function getUpcomingAppointments(): Promise<any[]> {
   }
 }
 
+// Add interfaces for entities used in globalSearch
+interface Customer {
+  id: number;
+  name: string;
+  email: string | null;
+  company: string | null;
+  phone: string | null;
+  status: string;
+}
+
+interface Project {
+  id: number;
+  title: string;
+  status: string;
+  startDate: Date;
+  Customer?: {
+    name: string;
+  } | null;
+}
+
+interface Service {
+  id: number;
+  name: string;
+  priceBase: number;
+  unit: string | null;
+  active: boolean;
+}
+
 /**
  * Global search across all entities
  */
-export const globalSearch = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+export const globalSearch = asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const query = req.query.q as string;
   
   if (!query || query.trim().length < 2) {
@@ -608,7 +699,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response): Pr
     
     // Format and return results
     res.status(200).json({
-      customers: customers.map(customer => ({
+      customers: customers.map((customer: Customer) => ({
         id: customer.id,
         name: customer.name,
         email: customer.email || '',
@@ -619,7 +710,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response): Pr
         url: `/dashboard/kunden/${customer.id}`
       })),
       
-      projects: projects.map(project => ({
+      projects: projects.map((project: Project) => ({
         id: project.id,
         title: project.title,
         status: project.status,
@@ -629,7 +720,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response): Pr
         url: `/dashboard/projekte/${project.id}`
       })),
       
-      appointments: appointments.map(appointment => ({
+      appointments: appointments.map((appointment: Appointment) => ({
         id: appointment.id,
         title: appointment.title,
         status: appointment.status,
@@ -639,7 +730,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response): Pr
         url: `/dashboard/termine/${appointment.id}`
       })),
       
-      requests: requests.map(request => ({
+      requests: requests.map((request: ContactRequest) => ({
         id: request.id,
         name: request.name,
         email: request.email,
@@ -649,7 +740,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response): Pr
         url: `/dashboard/requests/${request.id}`
       })),
       
-      services: services.map(service => ({
+      services: services.map((service: Service) => ({
         id: service.id,
         name: service.name,
         preis: service.priceBase,
@@ -665,10 +756,21 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response): Pr
   }
 });
 
+// Define interface for notifications
+interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  read: boolean;
+  createdAt: Date;
+  referenceId: number | null;
+}
+
 /**
  * Get all notifications for a user
  */
-export const getNotifications = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const getNotifications = asyncHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   if (!req.user) {
     res.status(401).json({
       success: false,
@@ -686,7 +788,7 @@ export const getNotifications = asyncHandler(async (req: AuthenticatedRequest, r
   });
   
   // Format notifications
-  const formattedNotifications = notifications.map(notification => {
+  const formattedNotifications = notifications.map((notification: Notification) => {
     // Determine type and icon
     let type: string;
     let icon: string;
@@ -744,7 +846,7 @@ export const getNotifications = asyncHandler(async (req: AuthenticatedRequest, r
 /**
  * Mark notifications as read
  */
-export const markNotificationsRead = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const markNotificationsRead = asyncHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   if (!req.user) {
     res.status(401).json({
       success: false,

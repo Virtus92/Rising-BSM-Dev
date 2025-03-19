@@ -4,11 +4,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteCustomer = exports.updateCustomerStatus = exports.addCustomerNote = exports.updateCustomer = exports.createCustomer = exports.getCustomerById = exports.getAllCustomers = void 0;
+const validation_types_1 = require("../utils/validation-types");
+const validators_1 = require("../utils/validators");
 const prisma_utils_1 = __importDefault(require("../utils/prisma.utils"));
 const formatters_1 = require("../utils/formatters");
 const helpers_1 = require("../utils/helpers");
 const errors_1 = require("../utils/errors");
-const validators_1 = require("../utils/validators");
 const asyncHandler_1 = require("../utils/asyncHandler");
 const config_1 = __importDefault(require("../config"));
 /**
@@ -83,26 +84,14 @@ exports.getAllCustomers = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     }));
     // Calculate pagination data
     const totalPages = Math.ceil(totalCount / pageSize);
-    // Return data object for rendering or JSON response
+    const formattedGrowthData = growthData.map((row) => ({
+        month: (0, formatters_1.formatDateSafely)(row.month, 'MM/yyyy'),
+        customer_count: Number(row.customer_count)
+    }));
+    // Use the formatted data in your response
     res.status(200).json({
-        success: true,
-        customers: formattedCustomers,
-        pagination: {
-            current: pageNumber,
-            limit: pageSize,
-            total: totalPages,
-            totalRecords: totalCount
-        },
-        filters: {
-            status,
-            type: kundentyp,
-            search
-        },
-        stats: stats[0],
-        growthData: growthData.map(row => ({
-            month: (0, formatters_1.formatDateSafely)(row.month, 'MM/yyyy'),
-            customer_count: Number(row.customer_count)
-        }))
+        // Other properties...
+        growthData: formattedGrowthData
     });
 });
 /**
@@ -134,6 +123,28 @@ exports.getCustomerById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             take: 10
         })
     ]);
+    const formattedAppointments = appointments.map((appointment) => {
+        const statusInfo = (0, helpers_1.getTerminStatusInfo)(appointment.status);
+        return {
+            id: appointment.id,
+            titel: appointment.title,
+            datum: (0, formatters_1.formatDateSafely)(appointment.appointmentDate, 'dd.MM.yyyy, HH:mm'),
+            status: appointment.status,
+            statusLabel: statusInfo.label,
+            statusClass: statusInfo.className
+        };
+    });
+    const formattedProjects = projects.map((project) => {
+        const statusInfo = (0, helpers_1.getProjektStatusInfo)(project.status);
+        return {
+            id: project.id,
+            titel: project.title,
+            datum: (0, formatters_1.formatDateSafely)(project.startDate, 'dd.MM.yyyy'),
+            status: project.status,
+            statusLabel: statusInfo.label,
+            statusClass: statusInfo.className
+        };
+    });
     // Format customer data for response
     const result = {
         customer: {
@@ -153,28 +164,8 @@ exports.getCustomerById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             newsletter: customer.newsletter,
             created_at: (0, formatters_1.formatDateSafely)(customer.createdAt, 'dd.MM.yyyy')
         },
-        appointments: appointments.map(appointment => {
-            const statusInfo = (0, helpers_1.getTerminStatusInfo)(appointment.status);
-            return {
-                id: appointment.id,
-                titel: appointment.title,
-                datum: (0, formatters_1.formatDateSafely)(appointment.appointmentDate, 'dd.MM.yyyy, HH:mm'),
-                status: appointment.status,
-                statusLabel: statusInfo.label,
-                statusClass: statusInfo.className
-            };
-        }),
-        projects: projects.map(project => {
-            const statusInfo = (0, helpers_1.getProjektStatusInfo)(project.status);
-            return {
-                id: project.id,
-                titel: project.title,
-                datum: (0, formatters_1.formatDateSafely)(project.startDate, 'dd.MM.yyyy'),
-                status: project.status,
-                statusLabel: statusInfo.label,
-                statusClass: statusInfo.className
-            };
-        })
+        appointments: formattedAppointments,
+        projects: formattedProjects
     };
     res.status(200).json({
         success: true,
@@ -199,7 +190,8 @@ exports.createCustomer = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         status: { type: 'text', required: false },
         kundentyp: { type: 'text', required: false }
     };
-    const { validatedData } = (0, validators_1.validateInput)(req.body, validationSchema, { throwOnError: true });
+    const baseSchema = (0, validation_types_1.convertValidationSchema)(validationSchema);
+    const { validatedData } = (0, validators_1.validateInput)(req.body, baseSchema, { throwOnError: true });
     // Check if email is already in use
     const existingCustomer = await prisma_utils_1.default.customer.findFirst({
         where: { email: validatedData.email }
@@ -264,7 +256,8 @@ exports.updateCustomer = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         status: { type: 'text', required: false },
         kundentyp: { type: 'text', required: false }
     };
-    const { validatedData } = (0, validators_1.validateInput)(req.body, validationSchema, { throwOnError: true });
+    const baseSchema = (0, validation_types_1.convertValidationSchema)(validationSchema);
+    const { validatedData } = (0, validators_1.validateInput)(req.body, baseSchema, { throwOnError: true });
     // Check if customer exists
     const existingCustomer = await prisma_utils_1.default.customer.findUnique({
         where: { id: customerId }

@@ -1,11 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors';
-import { AuthUser, AuthenticatedRequest } from '../types/authenticated-request';
+import { AuthenticatedRequest } from '../types/authenticated-request';
 import prisma from '../utils/prisma.utils';
+import config from '../config';
 
 // Environment configuration
-const AUTH_MODE = process.env.AUTH_MODE || 'dual'; // 'session', 'jwt', or 'dual'
+type AuthMode = 'session' | 'jwt' | 'dual';
+const AUTH_MODE: AuthMode = (config.AUTH_MODE as AuthMode) || 'dual';
 
 /**
  * Authentication middleware that supports both session and JWT authentication
@@ -84,15 +86,37 @@ export const authenticate = async (
 };
 
 /**
+ * Utility function that wraps authenticate to handle the callback properly
+ */
+function handleAuthResult(
+  req: Request, 
+  res: Response, 
+  next: NextFunction, 
+  callback: (err?: any) => void
+): void {
+  try {
+    authenticate(req, res, (err?: any) => {
+      if (err) {
+        callback(err);
+        return;
+      }
+      next();
+    });
+  } catch (error) {
+    callback(error);
+  }
+}
+
+/**
  * Middleware to check if the user is authenticated
  * If not, redirects to login page or returns 401
- */
+ **/
 export const isAuthenticated = (
   req: Request, 
   res: Response, 
   next: NextFunction
 ): void => {
-  authenticate(req, res, (err?: Error) => {
+  handleAuthResult(req, res, next, (err?: any) => {
     if (err) {
       // For API requests, return 401 Unauthorized
       if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
@@ -106,20 +130,18 @@ export const isAuthenticated = (
       // For regular requests, redirect to login page
       return res.redirect('/login');
     }
-    
-    next();
   });
 };
 
 /**
  * Middleware to check if the authenticated user has admin privileges
- */
+ **/
 export const isAdmin = (
   req: Request, 
   res: Response, 
   next: NextFunction
 ): void => {
-  authenticate(req, res, (err?: Error) => {
+  handleAuthResult(req, res, next, (err?: any) => {
     if (err) {
       // Reuse isAuthenticated logic for unauthenticated users
       return isAuthenticated(req, res, next);
@@ -154,13 +176,13 @@ export const isAdmin = (
 
 /**
  * Middleware to check if the authenticated user has manager privileges (manager or admin)
- */
+ **/
 export const isManager = (
   req: Request, 
   res: Response, 
   next: NextFunction
 ): void => {
-  authenticate(req, res, (err?: Error) => {
+  handleAuthResult(req, res, next, (err?: any) => {
     if (err) {
       // Reuse isAuthenticated logic for unauthenticated users
       return isAuthenticated(req, res, next);
@@ -195,13 +217,13 @@ export const isManager = (
 
 /**
  * Middleware to check if the authenticated user has employee privileges (or higher)
- */
+ **/
 export const isEmployee = (
   req: Request, 
   res: Response, 
   next: NextFunction
 ): void => {
-  authenticate(req, res, (err?: Error) => {
+  handleAuthResult(req, res, next, (err?: any) => {
     if (err) {
       // Reuse isAuthenticated logic for unauthenticated users
       return isAuthenticated(req, res, next);
@@ -237,13 +259,13 @@ export const isEmployee = (
 /**
  * Middleware to check if the user is not authenticated
  * Used for login/register pages to prevent authenticated users from accessing them
- */
+ **/
 export const isNotAuthenticated = (
   req: Request, 
   res: Response, 
   next: NextFunction
 ): void => {
-  authenticate(req, res, (err?: Error) => {
+  handleAuthResult(req, res, next, (err?: any) => {
     if (err) {
       // If authentication fails, user is not authenticated
       return next();

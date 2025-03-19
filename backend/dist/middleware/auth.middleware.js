@@ -7,8 +7,8 @@ exports.isNotAuthenticated = exports.isEmployee = exports.isManager = exports.is
 const jwt_1 = require("../utils/jwt");
 const errors_1 = require("../utils/errors");
 const prisma_utils_1 = __importDefault(require("../utils/prisma.utils"));
-// Environment configuration
-const AUTH_MODE = process.env.AUTH_MODE || 'dual'; // 'session', 'jwt', or 'dual'
+const config_1 = __importDefault(require("../config"));
+const AUTH_MODE = config_1.default.AUTH_MODE || 'dual';
 /**
  * Authentication middleware that supports both session and JWT authentication
  * Attaches user object to request if authenticated
@@ -81,11 +81,28 @@ const authenticate = async (req, res, next) => {
 };
 exports.authenticate = authenticate;
 /**
+ * Utility function that wraps authenticate to handle the callback properly
+ */
+function handleAuthResult(req, res, next, callback) {
+    try {
+        (0, exports.authenticate)(req, res, (err) => {
+            if (err) {
+                callback(err);
+                return;
+            }
+            next();
+        });
+    }
+    catch (error) {
+        callback(error);
+    }
+}
+/**
  * Middleware to check if the user is authenticated
  * If not, redirects to login page or returns 401
- */
+ **/
 const isAuthenticated = (req, res, next) => {
-    (0, exports.authenticate)(req, res, (err) => {
+    handleAuthResult(req, res, next, (err) => {
         if (err) {
             // For API requests, return 401 Unauthorized
             if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
@@ -98,15 +115,14 @@ const isAuthenticated = (req, res, next) => {
             // For regular requests, redirect to login page
             return res.redirect('/login');
         }
-        next();
     });
 };
 exports.isAuthenticated = isAuthenticated;
 /**
  * Middleware to check if the authenticated user has admin privileges
- */
+ **/
 const isAdmin = (req, res, next) => {
-    (0, exports.authenticate)(req, res, (err) => {
+    handleAuthResult(req, res, next, (err) => {
         if (err) {
             // Reuse isAuthenticated logic for unauthenticated users
             return (0, exports.isAuthenticated)(req, res, next);
@@ -136,9 +152,9 @@ const isAdmin = (req, res, next) => {
 exports.isAdmin = isAdmin;
 /**
  * Middleware to check if the authenticated user has manager privileges (manager or admin)
- */
+ **/
 const isManager = (req, res, next) => {
-    (0, exports.authenticate)(req, res, (err) => {
+    handleAuthResult(req, res, next, (err) => {
         if (err) {
             // Reuse isAuthenticated logic for unauthenticated users
             return (0, exports.isAuthenticated)(req, res, next);
@@ -168,9 +184,9 @@ const isManager = (req, res, next) => {
 exports.isManager = isManager;
 /**
  * Middleware to check if the authenticated user has employee privileges (or higher)
- */
+ **/
 const isEmployee = (req, res, next) => {
-    (0, exports.authenticate)(req, res, (err) => {
+    handleAuthResult(req, res, next, (err) => {
         if (err) {
             // Reuse isAuthenticated logic for unauthenticated users
             return (0, exports.isAuthenticated)(req, res, next);
@@ -201,9 +217,9 @@ exports.isEmployee = isEmployee;
 /**
  * Middleware to check if the user is not authenticated
  * Used for login/register pages to prevent authenticated users from accessing them
- */
+ **/
 const isNotAuthenticated = (req, res, next) => {
-    (0, exports.authenticate)(req, res, (err) => {
+    handleAuthResult(req, res, next, (err) => {
         if (err) {
             // If authentication fails, user is not authenticated
             return next();

@@ -152,9 +152,9 @@ export const getSystemSettings = asyncHandler(async (req: AuthenticatedRequest, 
     ORDER BY kategorie, einstellung
   `;
   
-  // Group settings by category
+  // Group settings by category with explicit typing
   const settingsByCategory: SystemSettings = {};
-  settingsQuery.forEach(setting => {
+  settingsQuery.forEach((setting: SystemSetting) => {
     if (!settingsByCategory[setting.kategorie]) {
       settingsByCategory[setting.kategorie] = [];
     }
@@ -253,8 +253,16 @@ export const getBackupSettings = asyncHandler(async (req: AuthenticatedRequest, 
     status: 'nicht_ausgefuehrt'
   };
   
-  // Get recent backups
-  const backupsQuery = await prisma.$queryRaw<any[]>`
+  // Get recent backups with explicit typing
+  interface BackupRecord {
+    id: number;
+    dateiname: string;
+    groesse: string;
+    erstellt_am: Date;
+    status: string;
+  }
+  
+  const backupsQuery = await prisma.$queryRaw<BackupRecord[]>`
     SELECT * FROM backup_log
     ORDER BY erstellt_am DESC
     LIMIT 10
@@ -269,7 +277,7 @@ export const getBackupSettings = asyncHandler(async (req: AuthenticatedRequest, 
       letzte_ausfuehrung: backupSettings.letzte_ausfuehrung,
       status: backupSettings.status
     },
-    backups: backupsQuery.map(backup => ({
+    backups: backupsQuery.map((backup: BackupRecord) => ({
       id: backup.id,
       dateiname: backup.dateiname,
       groesse: backup.groesse,

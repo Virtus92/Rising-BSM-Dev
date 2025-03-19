@@ -50,14 +50,20 @@ export const getUserProfile = asyncHandler(async (req: AuthenticatedRequest, res
     notificationInterval: 'sofort'
   };
   
-  // Get recent activity
+  // Get user activity with type
+  interface ActivityItem {
+    activity: string;
+    ipAddress: string | null;
+    timestamp: Date;
+  }
+  
   const activity = await prisma.userActivity.findMany({
     where: { userId },
     orderBy: { timestamp: 'desc' },
     take: 5
   });
   
-  // Format data for response
+  // Format data for response with explicit typing
   res.status(200).json({
     user: {
       id: user.id,
@@ -75,7 +81,7 @@ export const getUserProfile = asyncHandler(async (req: AuthenticatedRequest, res
       benachrichtigungen_push: userSettings.pushNotifications || false,
       benachrichtigungen_intervall: userSettings.notificationInterval || 'sofort'
     },
-    activity: activity.map(item => ({
+    activity: activity.map((item: ActivityItem) => ({
       type: item.activity,
       ip: item.ipAddress || '',
       date: formatDateSafely(item.timestamp, 'dd.MM.yyyy, HH:mm')
@@ -133,6 +139,7 @@ export const updateProfile = asyncHandler(async (req: AuthenticatedRequest, res:
     }
   });
   
+  
   // Return updated user data for session
   res.status(200).json({
     success: true,
@@ -141,7 +148,7 @@ export const updateProfile = asyncHandler(async (req: AuthenticatedRequest, res:
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
-      initials: updatedUser.name.split(' ').map(n => n[0]).join('')
+      initials: updatedUser.name.split(' ').map((n: string) => n[0]).join('')
     },
     message: 'Profile updated successfully'
   });

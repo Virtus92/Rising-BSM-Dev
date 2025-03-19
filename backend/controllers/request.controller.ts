@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma.utils';
 import { formatDateSafely } from '../utils/formatters';
@@ -73,8 +74,17 @@ export const getAllRequests = asyncHandler(async (req: Request, res: Response): 
     prisma.contactRequest.count({ where })
   ]);
 
-  // Format request data
-  const formattedRequests = requests.map(request => {
+  // Format request data with explicit typing
+  interface RequestRecord {
+    id: number;
+    name: string;
+    email: string;
+    service: string;
+    createdAt: Date;
+    status: string;
+  }
+  
+  const formattedRequests = requests.map((request: RequestRecord) => {
     const statusInfo = getAnfrageStatusInfo(request.status);
     return {
       id: request.id,
@@ -133,7 +143,13 @@ export const getRequestById = asyncHandler(async (req: Request, res: Response): 
   
   const statusInfo = getAnfrageStatusInfo(request.status);
 
-  // Get notes for this request
+  interface NoteRecord {
+    id: number;
+    text: string;
+    createdAt: Date;
+    userName: string;
+  }
+  
   const notes = await prisma.requestNote.findMany({
     where: { requestId },
     orderBy: { createdAt: 'desc' }
@@ -142,30 +158,15 @@ export const getRequestById = asyncHandler(async (req: Request, res: Response): 
   // Format request data for response
   const result = {
     request: {
-      id: request.id,
-      name: request.name,
-      email: request.email,
-      phone: request.phone || 'Nicht angegeben',
-      serviceLabel: request.service === 'facility' ? 'Facility Management' : 
-                   request.service === 'moving' ? 'Umzüge & Transporte' : 
-                   request.service === 'winter' ? 'Winterdienst' : 'Sonstiges',
-      message: request.message,
-      formattedDate: formatDateSafely(request.createdAt, 'dd.MM.yyyy, HH:mm'),
-      status: statusInfo.label,
-      statusClass: statusInfo.className
+      // ... existing properties ...
     },
-    notes: notes.map(note => ({
+    notes: notes.map((note: NoteRecord) => ({
       id: note.id,
       text: note.text,
       formattedDate: formatDateSafely(note.createdAt, 'dd.MM.yyyy, HH:mm'),
       benutzer: note.userName
     }))
   };
-  
-  res.status(200).json({
-    success: true,
-    ...result
-  });
 });
 
 /**
@@ -199,8 +200,7 @@ export const updateRequestStatus = asyncHandler(async (req: AuthenticatedRequest
     throw new NotFoundError(`Request with ID ${requestId} not found`);
   }
   
-  // Use a transaction for status update and optional note
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: PrismaClient) => {
     // Update status in database
     await tx.contactRequest.update({
       where: { id: requestId },
@@ -234,12 +234,6 @@ export const updateRequestStatus = asyncHandler(async (req: AuthenticatedRequest
         }
       });
     }
-  });
-
-  res.status(200).json({
-    success: true,
-    requestId,
-    message: 'Request status updated successfully'
   });
 });
 

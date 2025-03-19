@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.groupBy = exports.truncateHtml = exports.sanitizeLikeString = exports.parseFilters = exports.getNewRequestsCount = exports.getNotifications = exports.generateId = exports.getBenutzerStatusInfo = exports.getProjektStatusInfo = exports.getTerminStatusInfo = exports.getAnfrageStatusInfo = void 0;
 /**
@@ -7,6 +10,7 @@ exports.groupBy = exports.truncateHtml = exports.sanitizeLikeString = exports.pa
  */
 const cache_service_1 = require("../services/cache.service");
 const db_service_bak_1 = require("../services/db.service.bak");
+const prisma_utils_1 = __importDefault(require("./prisma.utils"));
 /**
  * Get status information for a request
  * @param status Status code
@@ -95,7 +99,7 @@ const getNotifications = async (req) => {
         // Try to get from cache first
         return await cache_service_1.cache.getOrExecute(cacheKey, async () => {
             // Get notifications using Prisma
-            const notifications = await prisma.notification.findMany({
+            const notifications = await prisma_utils_1.default.notification.findMany({
                 where: {
                     userId: Number(userId)
                 },
@@ -105,20 +109,20 @@ const getNotifications = async (req) => {
                 take: 5
             });
             // Get unread count
-            const unreadCount = await prisma.notification.count({
+            const unreadCount = await prisma_utils_1.default.notification.count({
                 where: {
                     userId: Number(userId),
                     read: false
                 }
             });
             // Get total count
-            const totalCount = await prisma.notification.count({
+            const totalCount = await prisma_utils_1.default.notification.count({
                 where: {
                     userId: Number(userId)
                 }
             });
             // Format notifications
-            const items = notifications.map(n => {
+            const items = notifications.map((n) => {
                 const { formatRelativeTime } = require('./formatters');
                 return {
                     id: n.id,

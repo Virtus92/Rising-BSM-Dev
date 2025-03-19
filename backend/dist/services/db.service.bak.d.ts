@@ -1,8 +1,10 @@
 /**
- * Database service
+ * LEGACY Database service - scheduled for removal
  * Provides a centralized interface for all database operations
+ * @deprecated Use Prisma client directly instead of this service
  */
-import { Pool } from 'pg';
+import { Pool, QueryResultRow } from 'pg';
+import { PrismaClient } from '@prisma/client';
 /**
  * Execute a query with parameters
  * @param query SQL query string or object with text and values
@@ -10,11 +12,11 @@ import { Pool } from 'pg';
  * @returns Query result
  * @throws DatabaseError
  */
-export declare const query: <T = any>(queryText: string, params?: any[]) => Promise<{
+export declare const query: <T extends Record<string, any>>(queryText: string, params?: any[]) => Promise<{
     rows: T[];
     rowCount: number;
 }>;
-export declare const transaction: <T>(callback: (client: any) => Promise<T>) => Promise<T>;
+export declare const transaction: <T>(callback: (client: PrismaClient) => Promise<T>) => Promise<T>;
 export declare const getById: <T = Record<string, any>>(table: string, id: number | string, idColumn?: string) => Promise<T | null>;
 /**
  * Insert a row and return the created object
@@ -24,7 +26,7 @@ export declare const getById: <T = Record<string, any>>(table: string, id: numbe
  * @returns Created row
  * @throws DatabaseError
  */
-export declare const insert: <T = Record<string, any>>(table: string, data: Record<string, any>, returning?: string) => Promise<T>;
+export declare const insert: <T extends QueryResultRow = Record<string, any>>(table: string, data: Record<string, any>, returning?: string) => Promise<T>;
 /**
  * Update a row by ID and return the updated object
  * @param table Table name
@@ -35,7 +37,7 @@ export declare const insert: <T = Record<string, any>>(table: string, data: Reco
  * @returns Updated row
  * @throws DatabaseError
  */
-export declare const update: <T = Record<string, any>>(table: string, id: number | string, data: Record<string, any>, idColumn?: string, returning?: string) => Promise<T>;
+export declare const update: <T extends QueryResultRow = Record<string, any>>(table: string, id: number | string, data: Record<string, any>, idColumn?: string, returning?: string) => Promise<T>;
 /**
  * Delete a row by ID
  * @param table Table name
@@ -53,7 +55,7 @@ export declare const deleteById: (table: string, id: number | string, idColumn?:
  * @returns Array of matching rows
  * @throws DatabaseError
  */
-export declare const findBy: <T = Record<string, any>>(table: string, criteria?: Record<string, any>, options?: {
+export declare const findBy: <T extends Record<string, any> = Record<string, any>>(table: string, criteria?: Record<string, any>, options?: {
     limit?: number;
     offset?: number;
     orderBy?: string;
@@ -69,16 +71,16 @@ export declare const findBy: <T = Record<string, any>>(table: string, criteria?:
 export declare const countBy: (table: string, criteria?: Record<string, any>) => Promise<number>;
 export declare const db: {
     pool: Pool;
-    query: <T = any>(queryText: string, params?: any[]) => Promise<{
+    query: <T extends Record<string, any>>(queryText: string, params?: any[]) => Promise<{
         rows: T[];
         rowCount: number;
     }>;
-    transaction: <T>(callback: (client: any) => Promise<T>) => Promise<T>;
+    transaction: <T>(callback: (client: PrismaClient) => Promise<T>) => Promise<T>;
     getById: <T = Record<string, any>>(table: string, id: number | string, idColumn?: string) => Promise<T | null>;
-    insert: <T = Record<string, any>>(table: string, data: Record<string, any>, returning?: string) => Promise<T>;
-    update: <T = Record<string, any>>(table: string, id: number | string, data: Record<string, any>, idColumn?: string, returning?: string) => Promise<T>;
+    insert: <T extends QueryResultRow = Record<string, any>>(table: string, data: Record<string, any>, returning?: string) => Promise<T>;
+    update: <T extends QueryResultRow = Record<string, any>>(table: string, id: number | string, data: Record<string, any>, idColumn?: string, returning?: string) => Promise<T>;
     delete: (table: string, id: number | string, idColumn?: string) => Promise<boolean>;
-    findBy: <T = Record<string, any>>(table: string, criteria?: Record<string, any>, options?: {
+    findBy: <T extends Record<string, any> = Record<string, any>>(table: string, criteria?: Record<string, any>, options?: {
         limit?: number;
         offset?: number;
         orderBy?: string;

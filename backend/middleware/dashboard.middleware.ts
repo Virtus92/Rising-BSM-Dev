@@ -32,15 +32,16 @@ export const getNewRequestsCountMiddleware = async (
  * Retrieves and attaches user notifications to the request object
  */
 export const attachNotificationsMiddleware = async (
-  req: AuthenticatedRequest, 
+  req: Request, 
   res: Response, 
   next: NextFunction
 ): Promise<void> => {
   try {
+    const authReq = req as AuthenticatedRequest;
     // Only attach notifications if user is authenticated
-    if (req.user) {
+    if (authReq.user) {
       const notificationsData = await notificationService.getNotifications(
-        req.user.id, 
+        authReq.user.id, 
         { limit: 5, unreadOnly: true }
       );
       
@@ -65,16 +66,17 @@ export const attachNotificationsMiddleware = async (
  * Logs route access and potentially other user interactions
  */
 export const logUserActivityMiddleware = async (
-  req: AuthenticatedRequest, 
+  req: Request, 
   res: Response, 
   next: NextFunction
 ): Promise<void> => {
   try {
+    const authReq = req as AuthenticatedRequest;
     // Only log for authenticated users
-    if (req.user) {
+    if (authReq.user) {
       await prisma.userActivity.create({
         data: {
-          userId: req.user.id,
+          userId: authReq.user.id,
           activity: 'route_access',
           ipAddress: req.ip || '0.0.0.0',
           // Add additional info if needed

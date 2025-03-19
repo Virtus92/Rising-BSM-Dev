@@ -1,9 +1,12 @@
-import { ValidationRule, ValidationSchema } from './validators';
-export interface ExtendedValidationRule extends ValidationRule {
-    type: ValidationRule['type'] | string;
+/**
+ * Utility for extending validation types to support string literals
+ */
+import { ValidationRule as BaseValidationRule, ValidationSchema as BaseValidationSchema } from './validators';
+export interface ValidationRule extends Omit<BaseValidationRule, 'type'> {
+    type: BaseValidationRule['type'] | string;
 }
-export interface ExtendedValidationSchema {
-    [key: string]: ExtendedValidationRule;
+export interface ValidationSchema {
+    [key: string]: ValidationRule;
 }
-
-export declare function convertValidationSchema(schema: ExtendedValidationSchema): ValidationSchema;
+export declare function convertValidationSchema(schema: ValidationSchema): BaseValidationSchema;
+export declare function isValidType(type: string): type is BaseValidationRule['type'];

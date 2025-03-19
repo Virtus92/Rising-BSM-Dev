@@ -20,9 +20,9 @@ const errorHandler = (err, req, res, next) => {
     if (config_1.default.IS_DEVELOPMENT) {
         console.error(err.stack);
     }
-    // Handle API requests
     if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
-        return res.status(statusCode).json((0, errors_1.createErrorResponse)(err));
+        res.status(statusCode).json((0, errors_1.createErrorResponse)(err));
+        return;
     }
     // Handle CSRF errors
     if (err.code === 'EBADCSRFTOKEN') {
@@ -90,11 +90,12 @@ const csrfErrorHandler = (err, req, res, next) => {
     }
     // For API requests
     if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
-        return res.status(403).json({
+        res.status(403).json({
             success: false,
             error: 'CSRF token verification failed',
             message: 'Sicherheitstoken ungültig oder abgelaufen. Bitte laden Sie die Seite neu und versuchen Sie es erneut.'
         });
+        return;
     }
     // For regular requests
     if (req.flash) {

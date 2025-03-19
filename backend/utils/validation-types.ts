@@ -1,24 +1,32 @@
-import { ValidationRule, ValidationSchema } from './validators';
+/**
+ * Utility for extending validation types to support string literals
+ */
+import { ValidationRule as BaseValidationRule, ValidationSchema as BaseValidationSchema } from './validators';
 
 // Allow string literals for validation rule types
-export interface ExtendedValidationRule extends Omit<ValidationRule, 'type'> {
-  type: ValidationRule['type'] | string;
+export interface ValidationRule extends Omit<BaseValidationRule, 'type'> {
+  type: BaseValidationRule['type'] | string;
 }
 
-export interface ExtendedValidationSchema {
-  [key: string]: ExtendedValidationRule;
+export interface ValidationSchema {
+  [key: string]: ValidationRule;
 }
 
 // Helper function to convert extended schema to standard schema
-export function convertValidationSchema(schema: ExtendedValidationSchema): ValidationSchema {
-  const converted: ValidationSchema = {};
+export function convertValidationSchema(schema: ValidationSchema): BaseValidationSchema {
+  const converted: BaseValidationSchema = {};
   
   for (const [key, rule] of Object.entries(schema)) {
     converted[key] = {
       ...rule,
-      type: rule.type as ValidationRule['type']
+      type: rule.type as BaseValidationRule['type']
     };
   }
   
   return converted;
+}
+
+// Type guard to ensure validation schema types are correct
+export function isValidType(type: string): type is BaseValidationRule['type'] {
+  return ['text', 'email', 'phone', 'date', 'numeric', 'password', 'time'].includes(type);
 }

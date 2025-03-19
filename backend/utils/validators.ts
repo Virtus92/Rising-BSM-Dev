@@ -545,3 +545,47 @@ export const validateInput = <T extends Record<string, any>>(
     validatedData: validatedData as T
   };
 };
+
+/**
+ * Environment validation helper
+ * @param key Environment variable key
+ * @param defaultValue Default value if not provided
+ * @param validator Optional validation function
+ */
+function env<T>(
+  key: string, 
+  defaultValue: T, 
+  validator?: (value: any) => boolean
+): T {
+  const value = process.env[key];
+  
+  if (value === undefined) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`⚠️ Warning: ${key} is not set in environment variables, using default: ${defaultValue}`);
+    }
+    return defaultValue;
+  }
+  
+  // Attempt to convert the string value to the correct type based on defaultValue
+  let convertedValue: any;
+  
+  if (typeof defaultValue === 'number') {
+    convertedValue = Number(value);
+    if (isNaN(convertedValue)) {
+      console.warn(`⚠️ Warning: ${key} value "${value}" is not a valid number, using default: ${defaultValue}`);
+      return defaultValue;
+    }
+  } else if (typeof defaultValue === 'boolean') {
+    convertedValue = value.toLowerCase() === 'true';
+  } else {
+    convertedValue = value;
+  }
+  
+  // Apply validator if provided
+  if (validator && !validator(convertedValue)) {
+    console.warn(`⚠️ Warning: ${key} value "${value}" failed validation, using default: ${defaultValue}`);
+    return defaultValue;
+  }
+  
+  return convertedValue as T;
+}

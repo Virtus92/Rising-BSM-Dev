@@ -1,15 +1,15 @@
-// server.ts
 import dotenv from 'dotenv';
 dotenv.config();
 
 import express, { Express, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import helmet from 'helmet';
-import { rateLimit } from 'express-rate-limit'; // Fix import syntax
+import { rateLimit } from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import PgSession from 'connect-pg-simple';
 import flash from 'connect-flash';
+// @ts-ignore
 import csurf from '@dr.pogodin/csurf';
 import cors from 'cors';
 import { Pool } from 'pg';
@@ -47,12 +47,12 @@ const setupCompletedMiddleware = async (req: Request, res: Response, next: NextF
     }
 
     // Check if setup is complete using Prisma
-    const setupSetting = await prisma.$queryRaw<{key: string, value: string}[]>`
+    const setupSetting = await prisma.$queryRaw`
       SELECT * FROM system_settings WHERE key = 'setup_complete'
     `;
     
     // If setup isn't complete, redirect to setup
-    if (!setupSetting || setupSetting.length === 0 || setupSetting[0].value !== 'true') {
+    if (!setupSetting || (Array.isArray(setupSetting) && setupSetting.length === 0)) {
       return res.redirect('/setup');
     }
     

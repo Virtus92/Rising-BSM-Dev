@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { isAuthenticated } from '../middleware/auth.middleware';
 import * as dashboardController from '../controllers/dashboard.controller';
-import { prepareDashboardContextMiddleware } from '../middleware/dashboard.middleware';
 import { ParamsDictionary } from 'express-serve-static-core';
+import * as dashboardMiddleware from '../middleware/dashboard.middleware';
 
 interface NotificationParams extends ParamsDictionary {
   id: string;  // Not optional
@@ -13,8 +13,11 @@ const router = Router();
 // Apply authentication middleware to all dashboard routes
 router.use(isAuthenticated);
 
-// Apply dashboard context middleware
-router.use(prepareDashboardContextMiddleware);
+// Apply each middleware separately to avoid array issues
+// This fixes the TypeScript error with prepareDashboardContextMiddleware
+router.use(dashboardMiddleware.getNewRequestsCountMiddleware);
+router.use(dashboardMiddleware.attachNotificationsMiddleware);
+router.use(dashboardMiddleware.logUserActivityMiddleware);
 
 /**
  * @route   GET /dashboard

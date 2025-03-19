@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const express_validator_1 = require("express-validator");
-const bcrypt_1 = __importDefault(require("bcrypt"));
+const bcryptjs_1 = __importDefault(require("bcryptjs")); // Changed from bcrypt to bcryptjs
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
@@ -77,11 +77,11 @@ router.post('/setup', setupRequired, setupValidation, async (req, res) => {
         });
     }
     try {
-        let createdUser;
+        let createdUser = null;
         await prisma.$transaction(async (tx) => {
             // Hash password
-            const salt = await bcrypt_1.default.genSalt(10);
-            const hashedPassword = await bcrypt_1.default.hash(password, salt);
+            const salt = await bcryptjs_1.default.genSalt(10);
+            const hashedPassword = await bcryptjs_1.default.hash(password, salt);
             // Create first admin user using Prisma
             createdUser = await tx.user.create({
                 data: {
@@ -102,18 +102,20 @@ router.post('/setup', setupRequired, setupValidation, async (req, res) => {
                 ]
             });
         });
-        // Generate JWT token
-        const token = jsonwebtoken_1.default.sign({ id: createdUser.id, email: createdUser.email, role: createdUser.role }, process.env.JWT_SECRET || 'defaultsecret', { expiresIn: '24h' });
-        // Save token in session or cookie if needed
-        // req.session.token = token;
+        // Generate JWT token only if we have a created user
+        if (createdUser) {
+            const token = jsonwebtoken_1.default.sign({ id: createdUser.id, email: createdUser.email, role: createdUser.role }, process.env.JWT_SECRET || 'defaultsecret', { expiresIn: '24h' });
+            // Save token in session or cookie if needed
+            // req.session.token = token;
+        }
         // Redirect to login page
         req.flash('success', 'Setup erfolgreich abgeschlossen. Bitte melden Sie sich an.');
         res.redirect('/login');
     }
-    catch (error) {
+    catch (error) { // Explicitly type error as any to access message
         console.error('Setup error:', error);
         res.render('setup', {
-            error: 'Ein Fehler ist aufgetreten: ' + error.message,
+            error: 'Ein Fehler ist aufgetreten: ' + (error.message || 'Unbekannter Fehler'),
             name,
             email,
             company_name,

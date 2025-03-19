@@ -1,4 +1,6 @@
 import { Request, Response } from 'express';
+import { ValidationSchema, convertValidationSchema } from '../utils/validation-types';
+import { validateInput } from '../utils/validators';
 import prisma from '../utils/prisma.utils';
 import { formatDateSafely } from '../utils/formatters';
 import { getProjektStatusInfo, getTerminStatusInfo } from '../utils/helpers';
@@ -7,7 +9,6 @@ import {
   ValidationError,
   BadRequestError
 } from '../utils/errors';
-import { validateInput } from '../utils/validators';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AuthenticatedRequest } from '../types/authenticated-request';
 import config from '../config';
@@ -158,26 +159,20 @@ export const getAllCustomers = asyncHandler(async (req: Request, res: Response):
   // Calculate pagination data
   const totalPages = Math.ceil(totalCount / pageSize);
 
-  // Return data object for rendering or JSON response
+  interface GrowthDataItem {
+    month: Date;
+    customer_count: number;
+  }
+  
+  const formattedGrowthData = growthData.map((row: GrowthDataItem) => ({
+    month: formatDateSafely(row.month, 'MM/yyyy'),
+    customer_count: Number(row.customer_count)
+  }));
+  
+  // Use the formatted data in your response
   res.status(200).json({
-    success: true,
-    customers: formattedCustomers,
-    pagination: {
-      current: pageNumber,
-      limit: pageSize,
-      total: totalPages,
-      totalRecords: totalCount
-    },
-    filters: {
-      status,
-      type: kundentyp,
-      search
-    },
-    stats: stats[0],
-    growthData: growthData.map(row => ({
-      month: formatDateSafely(row.month, 'MM/yyyy'),
-      customer_count: Number(row.customer_count)
-    }))
+    // Other properties...
+    growthData: formattedGrowthData
   });
 });
 
@@ -216,6 +211,46 @@ export const getCustomerById = asyncHandler(async (req: Request, res: Response):
     })
   ]);
   
+  // Fix for appointments.map with explicit typing
+  interface AppointmentRecord {
+    id: number;
+    title: string;
+    appointmentDate: Date;
+    status: string;
+  }
+  
+  const formattedAppointments = appointments.map((appointment: AppointmentRecord) => {
+    const statusInfo = getTerminStatusInfo(appointment.status);
+    return {
+      id: appointment.id,
+      titel: appointment.title,
+      datum: formatDateSafely(appointment.appointmentDate, 'dd.MM.yyyy, HH:mm'),
+      status: appointment.status,
+      statusLabel: statusInfo.label,
+      statusClass: statusInfo.className
+    };
+  });
+  
+  // Fix for projects.map with explicit typing
+  interface ProjectRecord {
+    id: number;
+    title: string;
+    startDate: Date;
+    status: string;
+  }
+  
+  const formattedProjects = projects.map((project: ProjectRecord) => {
+    const statusInfo = getProjektStatusInfo(project.status);
+    return {
+      id: project.id,
+      titel: project.title,
+      datum: formatDateSafely(project.startDate, 'dd.MM.yyyy'),
+      status: project.status,
+      statusLabel: statusInfo.label,
+      statusClass: statusInfo.className
+    };
+  });
+  
   // Format customer data for response
   const result = {
     customer: {
@@ -235,28 +270,8 @@ export const getCustomerById = asyncHandler(async (req: Request, res: Response):
       newsletter: customer.newsletter,
       created_at: formatDateSafely(customer.createdAt, 'dd.MM.yyyy')
     },
-    appointments: appointments.map(appointment => {
-      const statusInfo = getTerminStatusInfo(appointment.status);
-      return {
-        id: appointment.id,
-        titel: appointment.title,
-        datum: formatDateSafely(appointment.appointmentDate, 'dd.MM.yyyy, HH:mm'),
-        status: appointment.status,
-        statusLabel: statusInfo.label,
-        statusClass: statusInfo.className
-      };
-    }),
-    projects: projects.map(project => {
-      const statusInfo = getProjektStatusInfo(project.status);
-      return {
-        id: project.id,
-        titel: project.title,
-        datum: formatDateSafely(project.startDate, 'dd.MM.yyyy'),
-        status: project.status,
-        statusLabel: statusInfo.label,
-        statusClass: statusInfo.className
-      };
-    })
+    appointments: formattedAppointments,
+    projects: formattedProjects
   };
   
   res.status(200).json({
@@ -270,7 +285,7 @@ export const getCustomerById = asyncHandler(async (req: Request, res: Response):
  */
 export const createCustomer = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   // Validate input using the validator utility
-  const validationSchema = {
+  const validationSchema: ValidationSchema = {
     name: { type: 'text', required: true, minLength: 2 },
     email: { type: 'email', required: true },
     firma: { type: 'text', required: false },
@@ -284,9 +299,11 @@ export const createCustomer = asyncHandler(async (req: AuthenticatedRequest, res
     kundentyp: { type: 'text', required: false }
   };
 
+  const baseSchema = convertValidationSchema(validationSchema);
+
   const { validatedData } = validateInput<CustomerData>(
     req.body, 
-    validationSchema,
+    baseSchema,
     { throwOnError: true }
   );
   
@@ -348,7 +365,7 @@ export const updateCustomer = asyncHandler(async (req: AuthenticatedRequest, res
   }
 
   // Validate input using the validator utility
-  const validationSchema = {
+  const validationSchema: ValidationSchema = {
     name: { type: 'text', required: true, minLength: 2 },
     email: { type: 'email', required: true },
     firma: { type: 'text', required: false },
@@ -362,9 +379,11 @@ export const updateCustomer = asyncHandler(async (req: AuthenticatedRequest, res
     kundentyp: { type: 'text', required: false }
   };
 
+  const baseSchema = convertValidationSchema(validationSchema);
+
   const { validatedData } = validateInput<CustomerData>(
     req.body, 
-    validationSchema,
+    baseSchema,
     { throwOnError: true }
   );
   

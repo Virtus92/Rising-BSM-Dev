@@ -53,7 +53,7 @@ exports.getAllAppointments = (0, asyncHandler_1.asyncHandler)(async (req, res) =
         prisma_utils_1.default.appointment.count({ where })
     ]);
     // Format appointment data
-    const formattedAppointments = appointments.map(appointment => {
+    const formattedAppointments = appointments.map((appointment) => {
         const statusInfo = (0, helpers_1.getTerminStatusInfo)(appointment.status);
         return {
             id: appointment.id,
@@ -95,7 +95,7 @@ exports.getAllAppointments = (0, asyncHandler_1.asyncHandler)(async (req, res) =
  * Get appointment by ID with related data
  */
 exports.getAppointmentById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    const { id } = req.params;
+    const id = req.params.id;
     const appointmentId = Number(id);
     if (isNaN(appointmentId)) {
         throw new errors_1.BadRequestError('Invalid appointment ID');
@@ -136,7 +136,7 @@ exports.getAppointmentById = (0, asyncHandler_1.asyncHandler)(async (req, res) =
             statusLabel: statusInfo.label,
             statusClass: statusInfo.className
         },
-        notes: notes.map(note => ({
+        notes: notes.map((note) => ({
             id: note.id,
             text: note.text,
             formattedDate: (0, formatters_1.formatDateSafely)(note.createdAt, 'dd.MM.yyyy, HH:mm'),
@@ -209,7 +209,7 @@ exports.createAppointment = (0, asyncHandler_1.asyncHandler)(async (req, res) =>
  * Update an existing appointment
  */
 exports.updateAppointment = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    const { id } = req.params;
+    const id = req.params.id;
     const appointmentId = Number(id);
     if (isNaN(appointmentId)) {
         throw new errors_1.BadRequestError('Invalid appointment ID');

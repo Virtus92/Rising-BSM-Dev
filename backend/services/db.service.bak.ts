@@ -1,9 +1,12 @@
 /**
- * Database service
+ * LEGACY Database service - scheduled for removal
  * Provides a centralized interface for all database operations
+ * @deprecated Use Prisma client directly instead of this service
  */
-import { Pool, PoolClient, QueryConfig, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg';
 import { DatabaseError } from '../utils/errors';
+import prisma from '../utils/prisma.utils';
+import { PrismaClient } from '@prisma/client';
 
 // Create a new connection pool
 const pool = new Pool({
@@ -36,7 +39,7 @@ type QueryParams = any[] | Record<string, any>;
  * @returns Query result
  * @throws DatabaseError
  */
-export const query = async <T = any>(
+export const query = async <T extends Record<string, any>>(
   queryText: string,
   params: any[] = []
 ): Promise<{ rows: T[], rowCount: number }> => {
@@ -44,7 +47,8 @@ export const query = async <T = any>(
   
   try {
     // Execute raw query using Prisma
-    const result = await prisma.$queryRawUnsafe<T[]>(queryText, ...params);
+    // Type casting is used here because of typing limitations
+    const result = await prisma.$queryRawUnsafe(queryText, ...params) as T[];
     
     return {
       rows: result,
@@ -60,10 +64,10 @@ export const query = async <T = any>(
 
 // Wrapper for transaction support
 export const transaction = async <T>(
-  callback: (client: any) => Promise<T>
+  callback: (client: PrismaClient) => Promise<T>
 ): Promise<T> => {
   try {
-    return await prisma.$transaction(async (prismaClient) => {
+    return await prisma.$transaction(async (prismaClient: PrismaClient) => {
       return callback(prismaClient);
     });
   } catch (error) {
@@ -105,7 +109,7 @@ export const getById = async <T = Record<string, any>>(
  * @returns Created row
  * @throws DatabaseError
  */
-export const insert = async <T = Record<string, any>>(
+export const insert = async <T extends QueryResultRow = Record<string, any>>(
   table: string, 
   data: Record<string, any>, 
   returning = '*'
@@ -143,7 +147,7 @@ export const insert = async <T = Record<string, any>>(
  * @returns Updated row
  * @throws DatabaseError
  */
-export const update = async <T = Record<string, any>>(
+export const update = async <T extends QueryResultRow = Record<string, any>>(
   table: string, 
   id: number | string, 
   data: Record<string, any>, 
@@ -215,7 +219,7 @@ export const deleteById = async (
  * @returns Array of matching rows
  * @throws DatabaseError
  */
-export const findBy = async <T = Record<string, any>>(
+export const findBy = async <T extends Record<string, any> = Record<string, any>>(
   table: string,
   criteria: Record<string, any> = {},
   options: { 

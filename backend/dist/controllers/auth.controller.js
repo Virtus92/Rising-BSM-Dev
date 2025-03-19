@@ -74,7 +74,7 @@ exports.login = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        initials: user.name.split(' ').map(n => n[0]).join('')
+        initials: user.name.split(' ').map((n) => n[0]).join('')
     };
     // Set user in session for backward compatibility
     if (req.session) {

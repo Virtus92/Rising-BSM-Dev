@@ -36,13 +36,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// server.ts
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const express_1 = __importDefault(require("express"));
 const path_1 = __importDefault(require("path"));
 const helmet_1 = __importDefault(require("helmet"));
-const express_rate_limit_1 = require("express-rate-limit"); // Fix import syntax
+const express_rate_limit_1 = require("express-rate-limit");
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const express_session_1 = __importDefault(require("express-session"));
 const connect_pg_simple_1 = __importDefault(require("connect-pg-simple"));
@@ -69,7 +68,7 @@ const setupCompletedMiddleware = async (req, res, next) => {
       SELECT * FROM system_settings WHERE key = 'setup_complete'
     `;
         // If setup isn't complete, redirect to setup
-        if (!setupSetting || setupSetting.length === 0 || setupSetting[0].value !== 'true') {
+        if (!setupSetting || (Array.isArray(setupSetting) && setupSetting.length === 0)) {
             return res.redirect('/setup');
         }
         next();

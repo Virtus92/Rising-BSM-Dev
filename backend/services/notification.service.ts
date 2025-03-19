@@ -168,8 +168,19 @@ class NotificationService {
         }
       });
 
+      interface NotificationData {
+        id: number;
+        title: string;
+        message: string | null;
+        type: string;
+        read: boolean;
+        createdAt: Date;
+        referenceId: number | null;
+        referenceType: string | null;
+      }
+      
       // Format notifications
-      const formattedNotifications = notifications.map(notification => ({
+      const formattedNotifications = notifications.map((notification: NotificationData) => ({
         id: notification.id,
         type: this.mapNotificationType(notification.type),
         title: notification.title,
@@ -180,6 +191,7 @@ class NotificationService {
         isRead: notification.read,
         link: this.generateNotificationLink(notification)
       }));
+      
 
       const result = {
         notifications: formattedNotifications,

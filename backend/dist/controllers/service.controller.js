@@ -10,6 +10,7 @@ const errors_1 = require("../utils/errors");
 const validators_1 = require("../utils/validators");
 const asyncHandler_1 = require("../utils/asyncHandler");
 const config_1 = __importDefault(require("../config"));
+const validation_types_1 = require("../utils/validation-types");
 /**
  * Get all services with optional filtering
  */
@@ -45,7 +46,7 @@ exports.getAllServices = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         prisma_utils_1.default.service.count({ where })
     ]);
     // Format service data
-    const formattedServices = services.map(service => ({
+    const formattedServices = services.map((service) => ({
         id: service.id,
         name: service.name,
         beschreibung: service.description,
@@ -119,7 +120,9 @@ exports.createService = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         mwst_satz: { type: 'numeric', required: false },
         aktiv: { type: 'text', required: false }
     };
-    const { validatedData } = (0, validators_1.validateInput)(req.body, validationSchema, { throwOnError: true });
+    // Convert to base schema
+    const baseSchema = (0, validation_types_1.convertValidationSchema)(validationSchema);
+    const { validatedData } = (0, validators_1.validateInput)(req.body, baseSchema, { throwOnError: true });
     // Insert service into database
     const newService = await prisma_utils_1.default.service.create({
         data: {
@@ -167,7 +170,9 @@ exports.updateService = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         mwst_satz: { type: 'numeric', required: false },
         aktiv: { type: 'text', required: false }
     };
-    const { validatedData } = (0, validators_1.validateInput)(req.body, validationSchema, { throwOnError: true });
+    // Convert to base schema
+    const baseSchema = (0, validation_types_1.convertValidationSchema)(validationSchema);
+    const { validatedData } = (0, validators_1.validateInput)(req.body, baseSchema, { throwOnError: true });
     // Check if service exists
     const service = await prisma_utils_1.default.service.findUnique({
         where: { id: serviceId }
@@ -291,7 +296,7 @@ exports.getServiceStatistics = (0, asyncHandler_1.asyncHandler)(async (req, res)
             take: 5
         }).then(async (results) => {
             // Get invoice IDs
-            const invoiceIds = results.map(item => item.invoiceId);
+            const invoiceIds = results.map((item) => item.invoiceId);
             // Get customer information from invoices
             const invoices = await prisma_utils_1.default.invoice.findMany({
                 where: {
@@ -306,15 +311,6 @@ exports.getServiceStatistics = (0, asyncHandler_1.asyncHandler)(async (req, res)
                     }
                 }
             });
-            // Map the results to the expected format
-            return results.map(item => {
-                const invoice = invoices.find(inv => inv.id === item.invoiceId);
-                return {
-                    id: invoice?.Customer?.id || 0,
-                    name: invoice?.Customer?.name || 'Unknown',
-                    total_amount: Number(item._sum.quantity || 0) * Number(item._sum.unitPrice || 0)
-                };
-            }).sort((a, b) => b.total_amount - a.total_amount);
         })
     ]);
     // Calculate total revenue
@@ -340,7 +336,7 @@ exports.getServiceStatistics = (0, asyncHandler_1.asyncHandler)(async (req, res)
         statistics: {
             name: service.name,
             gesamtumsatz: totalRevenue,
-            rechnungsanzahl: new Set(invoicePositions.map(p => p.invoiceId)).size,
+            rechnungsanzahl: new Set(invoicePositions.map((p) => p.invoiceId)).size,
             monatlicheUmsaetze: monthlyRevenue,
             topKunden: Array.isArray(topCustomers) ? topCustomers.map((customer) => ({
                 kundenId: customer.id,

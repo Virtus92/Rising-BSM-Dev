@@ -36,12 +36,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const dashboardController = __importStar(require("../controllers/dashboard.controller"));
-const dashboard_middleware_1 = require("../middleware/dashboard.middleware");
+const dashboardMiddleware = __importStar(require("../middleware/dashboard.middleware"));
 const router = (0, express_1.Router)();
 // Apply authentication middleware to all dashboard routes
 router.use(auth_middleware_1.isAuthenticated);
-// Apply dashboard context middleware
-router.use(dashboard_middleware_1.prepareDashboardContextMiddleware);
+// Apply each middleware separately to avoid array issues
+// This fixes the TypeScript error with prepareDashboardContextMiddleware
+router.use(dashboardMiddleware.getNewRequestsCountMiddleware);
+router.use(dashboardMiddleware.attachNotificationsMiddleware);
+router.use(dashboardMiddleware.logUserActivityMiddleware);
 /**
  * @route   GET /dashboard
  * @desc    Dashboard home page with stats and overview

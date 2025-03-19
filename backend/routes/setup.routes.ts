@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { isAuthenticated, isAdmin } from '../middleware/auth.middleware';
 import * as settingsController from '../controllers/settings.controller';
 import { body, validationResult } from 'express-validator';
-import bcrypt from 'bcrypt';
+import bcryptjs from 'bcryptjs'; // Changed from bcrypt to bcryptjs
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 
@@ -102,12 +102,12 @@ router.post('/setup', setupRequired, setupValidation, async (req: Request, res: 
       value: string;
     }
 
-    let createdUser;
+    let createdUser: any = null;
 
-    await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>) => {
+    await prisma.$transaction(async (tx: any) => {
       // Hash password
-      const salt: string = await bcrypt.genSalt(10);
-      const hashedPassword: string = await bcrypt.hash(password, salt);
+      const salt: string = await bcryptjs.genSalt(10);
+      const hashedPassword: string = await bcryptjs.hash(password, salt);
 
       // Create first admin user using Prisma
       createdUser = await tx.user.create({
@@ -127,27 +127,29 @@ router.post('/setup', setupRequired, setupValidation, async (req: Request, res: 
           { key: 'company_email', value: company_email },
           { key: 'setup_complete', value: 'true' },
           { key: 'setup_date', value: new Date().toISOString() }
-        ] as SystemSetting[]
+        ]
       });
     });
     
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: createdUser.id, email: createdUser.email, role: createdUser.role },
-      process.env.JWT_SECRET || 'defaultsecret',
-      { expiresIn: '24h' }
-    );
-    
-    // Save token in session or cookie if needed
-    // req.session.token = token;
+    // Generate JWT token only if we have a created user
+    if (createdUser) {
+      const token = jwt.sign(
+        { id: createdUser.id, email: createdUser.email, role: createdUser.role },
+        process.env.JWT_SECRET || 'defaultsecret',
+        { expiresIn: '24h' }
+      );
+      
+      // Save token in session or cookie if needed
+      // req.session.token = token;
+    }
     
     // Redirect to login page
     req.flash('success', 'Setup erfolgreich abgeschlossen. Bitte melden Sie sich an.');
     res.redirect('/login');
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error as any to access message
     console.error('Setup error:', error);
     res.render('setup', { 
-      error: 'Ein Fehler ist aufgetreten: ' + error.message,
+      error: 'Ein Fehler ist aufgetreten: ' + (error.message || 'Unbekannter Fehler'),
       name, 
       email, 
       company_name, 

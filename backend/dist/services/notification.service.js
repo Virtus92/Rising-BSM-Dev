@@ -98,7 +98,7 @@ class NotificationService {
                 }
             });
             // Format notifications
-            const formattedNotifications = notifications.map(notification => ({
+            const formattedNotifications = notifications.map((notification) => ({
                 id: notification.id,
                 type: this.mapNotificationType(notification.type),
                 title: notification.title,

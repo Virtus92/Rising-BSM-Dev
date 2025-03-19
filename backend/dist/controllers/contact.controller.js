@@ -101,7 +101,7 @@ exports.submitContact = (0, asyncHandler_1.asyncHandler)(async (req, res, next) 
     // Send all notifications in parallel using Promise.all
     await Promise.all(notifications.map((notification) => notification_service_1.default.create(notification)));
     // Respond based on request type
-    if (req.xhr || req.headers.accept.includes('application/json')) {
+    if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
         return res.status(201).json({
             success: true,
             message: 'Ihre Anfrage wurde erfolgreich übermittelt. Wir melden uns bald bei Ihnen.',

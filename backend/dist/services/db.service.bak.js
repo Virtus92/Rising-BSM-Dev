@@ -1,12 +1,17 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.db = exports.countBy = exports.findBy = exports.deleteById = exports.update = exports.insert = exports.getById = exports.transaction = exports.query = void 0;
 /**
- * Database service
+ * LEGACY Database service - scheduled for removal
  * Provides a centralized interface for all database operations
+ * @deprecated Use Prisma client directly instead of this service
  */
 const pg_1 = require("pg");
 const errors_1 = require("../utils/errors");
+const prisma_utils_1 = __importDefault(require("../utils/prisma.utils"));
 // Create a new connection pool
 const pool = new pg_1.Pool({
     max: 20,
@@ -35,7 +40,8 @@ const query = async (queryText, params = []) => {
     console.warn('⚠️ Warning: Legacy db.query is being used. Consider migrating to Prisma directly.');
     try {
         // Execute raw query using Prisma
-        const result = await prisma.$queryRawUnsafe(queryText, ...params);
+        // Type casting is used here because of typing limitations
+        const result = await prisma_utils_1.default.$queryRawUnsafe(queryText, ...params);
         return {
             rows: result,
             rowCount: result.length
@@ -49,7 +55,7 @@ exports.query = query;
 // Wrapper for transaction support
 const transaction = async (callback) => {
     try {
-        return await prisma.$transaction(async (prismaClient) => {
+        return await prisma_utils_1.default.$transaction(async (prismaClient) => {
             return callback(prismaClient);
         });
     }
@@ -63,7 +69,7 @@ const getById = async (table, id, idColumn = 'id') => {
     try {
         const whereClause = {};
         whereClause[idColumn] = typeof id === 'string' ? parseInt(id, 10) : id;
-        const result = await prisma[table].findUnique({
+        const result = await prisma_utils_1.default[table].findUnique({
             where: whereClause
         });
         return result;

@@ -31,9 +31,10 @@ exports.getNewRequestsCountMiddleware = getNewRequestsCountMiddleware;
  */
 const attachNotificationsMiddleware = async (req, res, next) => {
     try {
+        const authReq = req;
         // Only attach notifications if user is authenticated
-        if (req.user) {
-            const notificationsData = await notification_service_1.default.getNotifications(req.user.id, { limit: 5, unreadOnly: true });
+        if (authReq.user) {
+            const notificationsData = await notification_service_1.default.getNotifications(authReq.user.id, { limit: 5, unreadOnly: true });
             req.notifications = notificationsData.notifications;
             req.unreadNotificationsCount = notificationsData.unreadCount;
         }
@@ -57,11 +58,12 @@ exports.attachNotificationsMiddleware = attachNotificationsMiddleware;
  */
 const logUserActivityMiddleware = async (req, res, next) => {
     try {
+        const authReq = req;
         // Only log for authenticated users
-        if (req.user) {
+        if (authReq.user) {
             await prisma_utils_1.default.userActivity.create({
                 data: {
-                    userId: req.user.id,
+                    userId: authReq.user.id,
                     activity: 'route_access',
                     ipAddress: req.ip || '0.0.0.0',
                     // Add additional info if needed

@@ -7,7 +7,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 /**
  * Submit contact form
  */
-export const submitContact = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+export const submitContact = asyncHandler<Request, Response | void>(async (req: Request, res: Response, next: NextFunction) => {
   // Input validation schema
   const validationSchema = {
     name: {
@@ -138,7 +138,7 @@ export const submitContact = asyncHandler(async (req: Request, res: Response, ne
 /**
  * Get contact request by ID
  */
-export const getContactRequest = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+export const getContactRequest = asyncHandler<Request, Response>(async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
 
   const contactRequest = await prisma.contactRequest.findUnique({

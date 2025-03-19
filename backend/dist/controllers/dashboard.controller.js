@@ -13,7 +13,7 @@ const asyncHandler_1 = require("../utils/asyncHandler");
 /**
  * Get dashboard data including statistics, charts, and recent activities
  */
-exports.getDashboardData = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+exports.getDashboardData = (0, asyncHandler_1.asyncHandler)(async (req, res, next) => {
     const userId = req.user?.id;
     // Create cache key that includes user ID for personalization
     const cacheKey = `dashboard_data_${userId || 'guest'}_${new Date().toISOString().slice(0, 10)}`;
@@ -35,9 +35,26 @@ exports.getDashboardData = (0, asyncHandler_1.asyncHandler)(async (req, res) => 
                 options: ['Diese Woche', 'Diesen Monat', 'Dieses Quartal', 'Dieses Jahr']
             }
         };
+        // For getDashboardStats, create a wrapper function that works with our modified signature
+        const getStats = async () => {
+            // Create a mock request and response for getDashboardStats
+            const mockReq = {};
+            let statsData;
+            const mockRes = {
+                status: () => ({
+                    json: (data) => {
+                        statsData = data;
+                        return mockRes;
+                    }
+                })
+            };
+            // Call getDashboardStats with our mock objects
+            await (0, exports.getDashboardStats)(mockReq, mockRes, (() => { }));
+            return statsData;
+        };
         // Get all dashboard data in parallel for performance
         const [stats, recentRequests, upcomingAppointments, charts] = await Promise.all([
-            (0, exports.getDashboardStats)(),
+            getStats(),
             getRecentRequests(),
             getUpcomingAppointments(),
             getChartData(revenueFilter, servicesFilter)
@@ -65,8 +82,8 @@ exports.getDashboardData = (0, asyncHandler_1.asyncHandler)(async (req, res) => 
 /**
  * Get dashboard statistics (used by both API and main dashboard)
  */
-exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async () => {
-    return await cache_service_1.default.getOrExecute('dashboard_stats', async () => {
+exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async (req, res, next) => {
+    const stats = await cache_service_1.default.getOrExecute('dashboard_stats', async () => {
         // New requests stats
         const newRequestsCount = await prisma_utils_1.default.contactRequest.count({
             where: { status: 'neu' }
@@ -168,6 +185,7 @@ exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async () => {
             monthlyRevenue: { amount: monthlyRevenue, trend: monthlyRevenueTrend }
         };
     }, 300); // Cache for 5 minutes
+    res.status(200).json(stats);
 });
 /**
  * Get data for dashboard charts
@@ -193,7 +211,7 @@ async function getChartData(revenueFilter, servicesFilter) {
         });
         // Group by time period and format for chart
         const groupedData = new Map();
-        invoices.forEach(invoice => {
+        invoices.forEach((invoice) => {
             let groupKey;
             const date = new Date(invoice.invoiceDate);
             // Group by requested period
@@ -280,7 +298,7 @@ async function getChartData(revenueFilter, servicesFilter) {
         const serviceNames = await prisma_utils_1.default.service.findMany({
             where: {
                 id: {
-                    in: servicesRevenue.map(item => item.serviceId)
+                    in: servicesRevenue.map((item) => item.serviceId)
                 }
             },
             select: {
@@ -288,10 +306,10 @@ async function getChartData(revenueFilter, servicesFilter) {
                 name: true
             }
         });
-        const serviceNameMap = new Map(serviceNames.map(service => [service.id, service.name]));
+        const serviceNameMap = new Map(serviceNames.map((service) => [service.id, service.name]));
         return {
-            labels: servicesRevenue.map(item => serviceNameMap.get(item.serviceId) || 'Unknown'),
-            data: servicesRevenue.map(item => parseFloat((item._sum.quantity * item._sum.unitPrice).toFixed(2)))
+            labels: servicesRevenue.map((item) => serviceNameMap.get(item.serviceId) || 'Unknown'),
+            data: servicesRevenue.map((item) => parseFloat((item._sum.quantity * item._sum.unitPrice).toFixed(2)))
         };
     }, 600); // Cache for 10 minutes
     return {
@@ -345,7 +363,7 @@ async function getRecentRequests() {
                 take: 5
             });
             // Format requests
-            return requests.map(request => {
+            return requests.map((request) => {
                 let statusClass;
                 let statusLabel;
                 switch (request.status) {
@@ -418,7 +436,7 @@ async function getUpcomingAppointments() {
                 take: 5
             });
             // Format appointments
-            return appointments.map(appointment => {
+            return appointments.map((appointment) => {
                 const datumObj = new Date(appointment.appointmentDate);
                 const dateInfo = (0, formatters_1.formatDateWithLabel)(datumObj);
                 return {
@@ -440,7 +458,7 @@ async function getUpcomingAppointments() {
 /**
  * Global search across all entities
  */
-exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res, next) => {
     const query = req.query.q;
     if (!query || query.trim().length < 2) {
         res.status(200).json({
@@ -510,7 +528,7 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         ]);
         // Format and return results
         res.status(200).json({
-            customers: customers.map(customer => ({
+            customers: customers.map((customer) => ({
                 id: customer.id,
                 name: customer.name,
                 email: customer.email || '',
@@ -520,7 +538,7 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
                 type: 'Kunde',
                 url: `/dashboard/kunden/${customer.id}`
             })),
-            projects: projects.map(project => ({
+            projects: projects.map((project) => ({
                 id: project.id,
                 title: project.title,
                 status: project.status,
@@ -529,7 +547,7 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
                 type: 'Projekt',
                 url: `/dashboard/projekte/${project.id}`
             })),
-            appointments: appointments.map(appointment => ({
+            appointments: appointments.map((appointment) => ({
                 id: appointment.id,
                 title: appointment.title,
                 status: appointment.status,
@@ -538,7 +556,7 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
                 type: 'Termin',
                 url: `/dashboard/termine/${appointment.id}`
             })),
-            requests: requests.map(request => ({
+            requests: requests.map((request) => ({
                 id: request.id,
                 name: request.name,
                 email: request.email,
@@ -547,7 +565,7 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
                 type: 'Anfrage',
                 url: `/dashboard/requests/${request.id}`
             })),
-            services: services.map(service => ({
+            services: services.map((service) => ({
                 id: service.id,
                 name: service.name,
                 preis: service.priceBase,
@@ -566,7 +584,7 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
 /**
  * Get all notifications for a user
  */
-exports.getNotifications = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+exports.getNotifications = (0, asyncHandler_1.asyncHandler)(async (req, res, next) => {
     if (!req.user) {
         res.status(401).json({
             success: false,
@@ -581,7 +599,7 @@ exports.getNotifications = (0, asyncHandler_1.asyncHandler)(async (req, res) => 
         orderBy: { createdAt: 'desc' }
     });
     // Format notifications
-    const formattedNotifications = notifications.map(notification => {
+    const formattedNotifications = notifications.map((notification) => {
         // Determine type and icon
         let type;
         let icon;
@@ -634,7 +652,7 @@ exports.getNotifications = (0, asyncHandler_1.asyncHandler)(async (req, res) => 
 /**
  * Mark notifications as read
  */
-exports.markNotificationsRead = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+exports.markNotificationsRead = (0, asyncHandler_1.asyncHandler)(async (req, res, next) => {
     if (!req.user) {
         res.status(401).json({
             success: false,

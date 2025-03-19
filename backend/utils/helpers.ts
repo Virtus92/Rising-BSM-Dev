@@ -4,6 +4,7 @@
  */
 import { cache } from '../services/cache.service';
 import { db } from '../services/db.service.bak';
+import prisma from './prisma.utils';
 
 /**
  * Status information with label and class name
@@ -173,8 +174,16 @@ export const getNotifications = async (req: any): Promise<NotificationsResult> =
         }
       });
       
+      interface NotificationData {
+        id: number;
+        title: string;
+        type: string;
+        createdAt: Date;
+        referenceId: number | null;
+      }
+
       // Format notifications
-      const items = notifications.map(n => {
+      const items = notifications.map((n: NotificationData) => {
         const { formatRelativeTime } = require('./formatters');
         
         return {
@@ -193,7 +202,7 @@ export const getNotifications = async (req: any): Promise<NotificationsResult> =
                 '/dashboard/notifications'
         };
       });
-      
+
       return {
         items,
         unreadCount,

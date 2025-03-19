@@ -50,8 +50,7 @@ exports.getAllRequests = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         }),
         prisma_utils_1.default.contactRequest.count({ where })
     ]);
-    // Format request data
-    const formattedRequests = requests.map(request => {
+    const formattedRequests = requests.map((request) => {
         const statusInfo = (0, helpers_1.getAnfrageStatusInfo)(request.status);
         return {
             id: request.id,
@@ -102,7 +101,6 @@ exports.getRequestById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         throw new errors_1.NotFoundError(`Request with ID ${requestId} not found`);
     }
     const statusInfo = (0, helpers_1.getAnfrageStatusInfo)(request.status);
-    // Get notes for this request
     const notes = await prisma_utils_1.default.requestNote.findMany({
         where: { requestId },
         orderBy: { createdAt: 'desc' }
@@ -110,29 +108,15 @@ exports.getRequestById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     // Format request data for response
     const result = {
         request: {
-            id: request.id,
-            name: request.name,
-            email: request.email,
-            phone: request.phone || 'Nicht angegeben',
-            serviceLabel: request.service === 'facility' ? 'Facility Management' :
-                request.service === 'moving' ? 'Umzüge & Transporte' :
-                    request.service === 'winter' ? 'Winterdienst' : 'Sonstiges',
-            message: request.message,
-            formattedDate: (0, formatters_1.formatDateSafely)(request.createdAt, 'dd.MM.yyyy, HH:mm'),
-            status: statusInfo.label,
-            statusClass: statusInfo.className
+        // ... existing properties ...
         },
-        notes: notes.map(note => ({
+        notes: notes.map((note) => ({
             id: note.id,
             text: note.text,
             formattedDate: (0, formatters_1.formatDateSafely)(note.createdAt, 'dd.MM.yyyy, HH:mm'),
             benutzer: note.userName
         }))
     };
-    res.status(200).json({
-        success: true,
-        ...result
-    });
 });
 /**
  * Update request status
@@ -158,7 +142,6 @@ exports.updateRequestStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) 
     if (!request) {
         throw new errors_1.NotFoundError(`Request with ID ${requestId} not found`);
     }
-    // Use a transaction for status update and optional note
     await prisma_utils_1.default.$transaction(async (tx) => {
         // Update status in database
         await tx.contactRequest.update({
@@ -191,11 +174,6 @@ exports.updateRequestStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) 
                 }
             });
         }
-    });
-    res.status(200).json({
-        success: true,
-        requestId,
-        message: 'Request status updated successfully'
     });
 });
 /**

@@ -11,6 +11,7 @@ const errors_1 = require("../utils/errors");
 const validators_1 = require("../utils/validators");
 const asyncHandler_1 = require("../utils/asyncHandler");
 const config_1 = __importDefault(require("../config"));
+const validation_types_1 = require("../utils/validation-types");
 /**
  * Get all projects with optional filtering
  */
@@ -49,8 +50,7 @@ exports.getAllProjects = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         }),
         prisma_utils_1.default.project.count({ where })
     ]);
-    // Format project data
-    const formattedProjects = projects.map(project => {
+    const formattedProjects = projects.map((project) => {
         const statusInfo = (0, helpers_1.getProjektStatusInfo)(project.status);
         return {
             id: project.id,
@@ -117,7 +117,6 @@ exports.getProjectById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             orderBy: { createdAt: 'desc' }
         })
     ]);
-    // Format project data for response
     const result = {
         project: {
             id: project.id,
@@ -134,7 +133,7 @@ exports.getProjectById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             statusLabel: statusInfo.label,
             statusClass: statusInfo.className
         },
-        appointments: appointments.map(appointment => {
+        appointments: appointments.map((appointment) => {
             const appointmentStatus = (0, helpers_1.getTerminStatusInfo)(appointment.status);
             return {
                 id: appointment.id,
@@ -144,7 +143,7 @@ exports.getProjectById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
                 statusClass: appointmentStatus.className
             };
         }),
-        notes: notes.map(note => ({
+        notes: notes.map((note) => ({
             id: note.id,
             text: note.text,
             formattedDate: (0, formatters_1.formatDateSafely)(note.createdAt, 'dd.MM.yyyy, HH:mm'),
@@ -160,7 +159,7 @@ exports.getProjectById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
  * Create a new project
  */
 exports.createProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    // Validate input using validator utility
+    // Create validation schema with correct typing
     const validationSchema = {
         titel: { type: 'text', required: true, minLength: 2 },
         kunde_id: { type: 'text', required: false },
@@ -171,7 +170,10 @@ exports.createProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         beschreibung: { type: 'text', required: false },
         status: { type: 'text', required: false }
     };
-    const { validatedData } = (0, validators_1.validateInput)(req.body, validationSchema, { throwOnError: true });
+    // Convert the schema to the base validation schema format
+    const baseSchema = (0, validation_types_1.convertValidationSchema)(validationSchema);
+    // Validate with the converted schema
+    const { validatedData } = (0, validators_1.validateInput)(req.body, baseSchema, { throwOnError: true });
     // Insert project into database using Prisma
     const newProject = await prisma_utils_1.default.project.create({
         data: {
@@ -237,7 +239,8 @@ exports.updateProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         beschreibung: { type: 'text', required: false },
         status: { type: 'text', required: false }
     };
-    const { validatedData } = (0, validators_1.validateInput)(req.body, validationSchema, { throwOnError: true });
+    const baseSchema = (0, validation_types_1.convertValidationSchema)(validationSchema);
+    const { validatedData } = (0, validators_1.validateInput)(req.body, baseSchema, { throwOnError: true });
     // Check if project exists
     const project = await prisma_utils_1.default.project.findUnique({
         where: { id: projectId }

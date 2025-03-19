@@ -1,5 +1,6 @@
 // controllers/service.controller.ts
 import { Request, Response } from 'express';
+import { ValidationSchema, ValidationRule } from '../utils/validators';
 import prisma from '../utils/prisma.utils';
 import { formatDateSafely, formatCurrency } from '../utils/formatters';
 import { 
@@ -11,6 +12,7 @@ import { validateInput } from '../utils/validators';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AuthenticatedRequest } from '../types/authenticated-request';
 import config from '../config';
+import { convertValidationSchema } from '../utils/validation-types';
 
 // Type definitions
 interface ServiceData {
@@ -29,18 +31,9 @@ interface ServiceFilterOptions {
   limit?: number;
 }
 
-// Define validation schema type
-interface ValidationRule {
-  type: string;
-  required?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  min?: number;
-  max?: number;
-}
-
-interface ValidationSchema {
-  [key: string]: ValidationRule;
+interface MonthRevenue {
+  monat: string;
+  umsatz: number;
 }
 
 interface ServiceRecord {
@@ -183,9 +176,12 @@ export const createService = asyncHandler(async (req: AuthenticatedRequest, res:
     aktiv: { type: 'text', required: false }
   };
 
+  // Convert to base schema
+  const baseSchema = convertValidationSchema(validationSchema);
+
   const { validatedData } = validateInput<ServiceData>(
     req.body, 
-    validationSchema,
+    baseSchema,
     { throwOnError: true }
   );
 
@@ -225,7 +221,7 @@ export const createService = asyncHandler(async (req: AuthenticatedRequest, res:
  * Update an existing service
  */
 export const updateService = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { id }: { id: string } = req.params;
+  const { id } = req.params;
   const serviceId: number = Number(id);
   
   if (isNaN(serviceId)) {
@@ -242,9 +238,12 @@ export const updateService = asyncHandler(async (req: AuthenticatedRequest, res:
     aktiv: { type: 'text', required: false }
   };
 
+  // Convert to base schema
+  const baseSchema = convertValidationSchema(validationSchema);
+
   const { validatedData } = validateInput<ServiceData>(
     req.body, 
-    validationSchema,
+    baseSchema,
     { throwOnError: true }
   );
 
@@ -363,6 +362,35 @@ export const getServiceStatistics = asyncHandler(async (req: Request, res: Respo
     throw new NotFoundError(`Service with ID ${serviceId} not found`);
   }
   
+  interface InvoicePosition {
+    invoiceId: number;
+    serviceId: number;
+    quantity: number;
+    unitPrice: number;
+    Invoice?: {
+      id: number;
+      invoiceDate: Date;
+      Customer?: {
+        id: number;
+        name: string;
+      }
+    }
+  }
+  
+  interface ResultItem {
+    invoiceId: number;
+    _sum: {
+      quantity: number | null;
+      unitPrice: number | null;
+    }
+  }
+  
+  interface CustomerTotal {
+    id: number;
+    name: string;
+    total_amount: number;
+  }
+  
   // Execute statistics queries in parallel
   const [
     invoicePositions,
@@ -390,9 +418,9 @@ export const getServiceStatistics = asyncHandler(async (req: Request, res: Respo
         }
       },
       take: 5
-    }).then(async (results) => {
+    }).then(async (results: ResultItem[]) => {
       // Get invoice IDs
-      const invoiceIds = results.map(item => item.invoiceId);
+      const invoiceIds = results.map((item: ResultItem) => item.invoiceId);
       
       // Get customer information from invoices
       const invoices = await prisma.invoice.findMany({
@@ -409,26 +437,21 @@ export const getServiceStatistics = asyncHandler(async (req: Request, res: Respo
         }
       });
       
-      // Map the results to the expected format
-      return results.map(item => {
-        const invoice = invoices.find(inv => inv.id === item.invoiceId);
-        return {
-          id: invoice?.Customer?.id || 0,
-          name: invoice?.Customer?.name || 'Unknown',
-          total_amount: Number(item._sum.quantity || 0) * Number(item._sum.unitPrice || 0)
-        };
-      }).sort((a, b) => b.total_amount - a.total_amount);
+      interface MonthRevenue {
+        monat: string;
+        umsatz: number;
+      }
     })
   ]);
   
   // Calculate total revenue
   const totalRevenue = invoicePositions.reduce(
-    (sum, pos) => sum + (Number(pos.quantity) * Number(pos.unitPrice)),
+    (sum: number, pos: InvoicePosition) => sum + (Number(pos.quantity) * Number(pos.unitPrice)),
     0
   );
   
   // Group by month for monthly revenue
-  const invoicesByMonth = invoicePositions.reduce((acc, pos) => {
+  const invoicesByMonth = invoicePositions.reduce((acc: Record<string, { monat: string, umsatz: number }>, pos: InvoicePosition) => {
     if (!pos.Invoice || !pos.Invoice.invoiceDate) return acc;
     
     const date = new Date(pos.Invoice.invoiceDate);
@@ -443,9 +466,14 @@ export const getServiceStatistics = asyncHandler(async (req: Request, res: Respo
     
     acc[monthKey].umsatz += Number(pos.quantity) * Number(pos.unitPrice);
     return acc;
-  }, {} as Record<string, { monat: string, umsatz: number }>);
+  }, {});
   
-  const monthlyRevenue = Object.values(invoicesByMonth).sort((a, b) => 
+  interface MonthRevenue {
+    monat: string;
+    umsatz: number;
+  }
+  
+  const monthlyRevenue = (Object.values(invoicesByMonth) as MonthRevenue[]).sort((a, b) => 
     a.monat.localeCompare(b.monat)
   );
   
@@ -454,7 +482,7 @@ export const getServiceStatistics = asyncHandler(async (req: Request, res: Respo
     statistics: {
       name: service.name,
       gesamtumsatz: totalRevenue,
-      rechnungsanzahl: new Set(invoicePositions.map(p => p.invoiceId)).size,
+      rechnungsanzahl: new Set(invoicePositions.map((p: InvoicePosition) => p.invoiceId)).size,
       monatlicheUmsaetze: monthlyRevenue,
       topKunden: Array.isArray(topCustomers) ? topCustomers.map((customer: any) => ({
         kundenId: customer.id,
