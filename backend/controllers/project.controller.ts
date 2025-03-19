@@ -1,10 +1,15 @@
+<<<<<<< HEAD
 // controllers/project.controller.ts
 import { Request, Response } from 'express';
+=======
+import { Request, Response, NextFunction } from 'express';
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
 import prisma from '../utils/prisma.utils';
 import { formatDateSafely } from '../utils/formatters';
 import { getProjektStatusInfo, getTerminStatusInfo } from '../utils/helpers';
 import { 
   NotFoundError, 
+<<<<<<< HEAD
   ValidationError,
   BadRequestError
 } from '../utils/errors';
@@ -14,6 +19,19 @@ import { AuthenticatedRequest } from '../types/authenticated-request';
 import config from '../config';
 
 // Type definitions
+=======
+  ValidationError, 
+  BadRequestError,
+  DatabaseError
+} from '../utils/errors';
+import { validateInput } from '../utils/validators';
+import { Prisma } from '@prisma/client';
+import { AuthenticatedRequest } from '../types/authenticated-request';
+import { asyncHandler } from '../utils/errors';
+import config from '../config';
+
+// Types
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
 interface ProjectData {
   titel: string;
   kunde_id?: string | number | null;
@@ -52,7 +70,11 @@ export const getAllProjects = asyncHandler(async (req: Request, res: Response): 
   const skip = (pageNumber - 1) * pageSize;
 
   // Build filter conditions
+<<<<<<< HEAD
   const where: any = {};
+=======
+  const where: Prisma.ProjectWhereInput = {};
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
   
   if (status) {
     where.status = status;
@@ -107,7 +129,10 @@ export const getAllProjects = asyncHandler(async (req: Request, res: Response): 
 
   // Return data object for rendering or JSON response
   res.status(200).json({
+<<<<<<< HEAD
     success: true,
+=======
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
     projects: formattedProjects,
     pagination: {
       current: pageNumber,
@@ -138,13 +163,21 @@ export const getProjectById = asyncHandler(async (req: Request, res: Response): 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
+<<<<<<< HEAD
       Customer: true,
       Service: true
+=======
+      Customer: true
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
     }
   });
   
   if (!project) {
+<<<<<<< HEAD
     throw new NotFoundError(`Project with ID ${projectId} not found`);
+=======
+    throw new NotFoundError(`Project with ID ${projectId}`);
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
   }
   
   const statusInfo = getProjektStatusInfo(project.status);
@@ -169,8 +202,11 @@ export const getProjectById = asyncHandler(async (req: Request, res: Response): 
       titel: project.title,
       kunde_id: project.customerId,
       kunde_name: project.Customer?.name || 'Kein Kunde zugewiesen',
+<<<<<<< HEAD
       dienstleistung_id: project.serviceId,
       dienstleistung: project.Service?.name || 'Nicht zugewiesen',
+=======
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
       start_datum: formatDateSafely(project.startDate, 'dd.MM.yyyy'),
       end_datum: project.endDate ? formatDateSafely(project.endDate, 'dd.MM.yyyy') : 'Nicht festgelegt',
       betrag: project.amount ? Number(project.amount) : null,
@@ -197,10 +233,14 @@ export const getProjectById = asyncHandler(async (req: Request, res: Response): 
     }))
   };
   
+<<<<<<< HEAD
   res.status(200).json({
     success: true,
     ...result
   });
+=======
+  res.status(200).json(result);
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
 });
 
 /**
@@ -246,7 +286,11 @@ export const createProject = asyncHandler(async (req: AuthenticatedRequest, res:
       data: {
         projectId: newProject.id,
         userId: req.user.id,
+<<<<<<< HEAD
         userName: req.user.name || 'Unknown',
+=======
+        userName: req.user.name,
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
         action: 'created',
         details: 'Project created'
       }
@@ -260,8 +304,12 @@ export const createProject = asyncHandler(async (req: AuthenticatedRequest, res:
           type: 'projekt',
           title: 'Neues Projekt erstellt',
           message: `Ein neues Projekt "${validatedData.titel}" wurde angelegt.`,
+<<<<<<< HEAD
           referenceId: newProject.id,
           referenceType: 'projekte'
+=======
+          referenceId: newProject.id
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
         }
       });
     }
@@ -309,7 +357,11 @@ export const updateProject = asyncHandler(async (req: AuthenticatedRequest, res:
   });
 
   if (!project) {
+<<<<<<< HEAD
     throw new NotFoundError(`Project with ID ${projectId} not found`);
+=======
+    throw new NotFoundError(`Project with ID ${projectId}`);
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
   }
   
   // Update project in database
@@ -334,7 +386,11 @@ export const updateProject = asyncHandler(async (req: AuthenticatedRequest, res:
       data: {
         projectId,
         userId: req.user.id,
+<<<<<<< HEAD
         userName: req.user.name || 'Unknown',
+=======
+        userName: req.user.name,
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
         action: 'updated',
         details: 'Project updated'
       }
@@ -376,7 +432,11 @@ export const updateProjectStatus = asyncHandler(async (req: AuthenticatedRequest
   });
   
   if (!project) {
+<<<<<<< HEAD
     throw new NotFoundError(`Project with ID ${projectId} not found`);
+=======
+    throw new NotFoundError(`Project with ID ${projectId}`);
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
   }
   
   // Use a transaction for status update and optional note
@@ -396,7 +456,11 @@ export const updateProjectStatus = asyncHandler(async (req: AuthenticatedRequest
         data: {
           projectId,
           userId: req.user.id,
+<<<<<<< HEAD
           userName: req.user.name || 'Unknown',
+=======
+          userName: req.user.name,
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
           text: note
         }
       });
@@ -408,7 +472,11 @@ export const updateProjectStatus = asyncHandler(async (req: AuthenticatedRequest
         data: {
           projectId,
           userId: req.user.id,
+<<<<<<< HEAD
           userName: req.user.name || 'Unknown',
+=======
+          userName: req.user.name,
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
           action: 'status_changed',
           details: `Status changed to: ${status}`
         }
@@ -445,14 +513,22 @@ export const addProjectNote = asyncHandler(async (req: AuthenticatedRequest, res
   });
 
   if (!project) {
+<<<<<<< HEAD
     throw new NotFoundError(`Project with ID ${projectId} not found`);
+=======
+    throw new NotFoundError(`Project with ID ${projectId}`);
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
   }
   
   // Insert note into database
   await prisma.projectNote.create({
     data: {
       projectId,
+<<<<<<< HEAD
       userId: req.user?.id || null,
+=======
+      userId: req.user?.id,
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
       userName: req.user?.name || 'Unknown',
       text: note
     }
@@ -464,7 +540,11 @@ export const addProjectNote = asyncHandler(async (req: AuthenticatedRequest, res
       data: {
         projectId,
         userId: req.user.id,
+<<<<<<< HEAD
         userName: req.user.name || 'Unknown',
+=======
+        userName: req.user.name,
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
         action: 'note_added',
         details: 'Note added to project'
       }
@@ -476,4 +556,18 @@ export const addProjectNote = asyncHandler(async (req: AuthenticatedRequest, res
     projectId,
     message: 'Note added successfully'
   });
+<<<<<<< HEAD
+=======
+});
+
+/**
+ * Export projects data
+ */
+export const exportProjects = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  // Since the export service requires updates for Prisma compatibility,
+  // we'll return a not implemented response for now
+  res.status(501).json({ 
+    message: 'Export functionality is being migrated to TypeScript and Prisma' 
+  });
+>>>>>>> 57c63076e7a48e59f64029633461f8c382a7f69e
 });
