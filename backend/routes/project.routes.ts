@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { isAuthenticated } from '../middleware/auth.middleware';
 import * as projectController from '../controllers/project.controller';
 import { validateProject } from '../middleware/validation.middleware';

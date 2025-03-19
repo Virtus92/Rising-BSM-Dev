@@ -1,195 +1,329 @@
 /**
- * Custom error classes for standardized error handling
+ * Database service
+ * Provides a centralized interface for all database operations
  */
+import { Pool, PoolClient, QueryConfig, QueryResult } from 'pg';
+import { DatabaseError } from '../utils/errors';
+
+// Create a new connection pool
+const pool = new Pool({
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_DATABASE,
+  password: process.env.DB_PASSWORD,
+  port: parseInt(process.env.DB_PORT || '5432'),
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+});
+
+// Handle pool errors
+pool.on('error', (err: Error) => {
+  console.error('Unexpected database pool error', err);
+  process.exit(-1);
+});
 
 /**
- * Base application error with additional metadata
+ * Type for query parameters
  */
-export class AppError extends Error {
-    statusCode: number;
-    isOperational: boolean;
-    details?: any;
+type QueryParams = any[] | Record<string, any>;
+
+/**
+ * Execute a query with parameters
+ * @param query SQL query string or object with text and values
+ * @param params Query parameters (if query is a string)
+ * @returns Query result
+ * @throws DatabaseError
+ */
+export const query = async <T = any>(
+  query: string | QueryConfig,
+  params: QueryParams = []
+): Promise<QueryResult<T>> => {
+  const client = await pool.connect();
+  try {
+    // Handle both string queries and object queries
+    if (typeof query === 'string') {
+      return await client.query(query, params);
+    } else {
+      return await client.query(query);
+    }
+  } catch (error) {
+    throw new DatabaseError(
+      `Database query failed: ${(error as Error).message}`,
+      { query, params, error }
+    );
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Execute multiple queries in a transaction
+ * @param callback Function that receives a client and executes queries
+ * @returns Result of the callback function
+ * @throws DatabaseError
+ */
+export const transaction = async <T>(
+  callback: (client: PoolClient) => Promise<T>
+): Promise<T> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
     
-    constructor(message: string, statusCode: number, details?: any) {
-      super(message);
-      this.statusCode = statusCode;
-      this.isOperational = true;
-      this.details = details;
-      
-      Error.captureStackTrace(this, this.constructor);
-      
-      // Set the prototype explicitly to ensure instanceof works correctly
-      Object.setPrototypeOf(this, AppError.prototype);
-    }
-  }
-  
-  /**
-   * Validation error for form/data validation failures
-   */
-  export class ValidationError extends AppError {
-    errors: string[];
+    const result = await callback(client);
     
-    constructor(message: string, errors: string[] = []) {
-      super(message, 400);
-      this.errors = errors;
-      
-      // Set the prototype explicitly to ensure instanceof works correctly
-      Object.setPrototypeOf(this, ValidationError.prototype);
-    }
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw new DatabaseError(
+      `Transaction failed: ${(error as Error).message}`,
+      { error }
+    );
+  } finally {
+    client.release();
   }
-  
-  /**
-   * Not found error for resource lookups
-   */
-  export class NotFoundError extends AppError {
-    resource: string;
+};
+
+/**
+ * Get a single row by ID
+ * @param table Table name
+ * @param id ID to look up
+ * @param idColumn Column name for ID
+ * @returns Row object or null if not found
+ * @throws DatabaseError
+ */
+export const getById = async <T = Record<string, any>>(
+  table: string, 
+  id: number | string, 
+  idColumn = 'id'
+): Promise<T | null> => {
+  try {
+    const result = await query<T>(`SELECT * FROM ${table} WHERE ${idColumn} = $1`, [id]);
+    return result.rows.length > 0 ? result.rows[0] : null;
+  } catch (error) {
+    throw new DatabaseError(
+      `Failed to get row by ID: ${(error as Error).message}`,
+      { table, id, idColumn, error }
+    );
+  }
+};
+
+/**
+ * Insert a row and return the created object
+ * @param table Table name
+ * @param data Object with column:value pairs to insert
+ * @param returning What to return
+ * @returns Created row
+ * @throws DatabaseError
+ */
+export const insert = async <T = Record<string, any>>(
+  table: string, 
+  data: Record<string, any>, 
+  returning = '*'
+): Promise<T> => {
+  try {
+    const columns = Object.keys(data);
+    const values = Object.values(data);
     
-    constructor(resource: string) {
-      super(`${resource} not found`, 404);
-      this.resource = resource;
-      
-      // Set the prototype explicitly to ensure instanceof works correctly
-      Object.setPrototypeOf(this, NotFoundError.prototype);
-    }
-  }
-  
-  /**
-   * Unauthorized error for authentication failures
-   */
-  export class UnauthorizedError extends AppError {
-    constructor(message: string = 'Unauthorized access') {
-      super(message, 401);
-      
-      // Set the prototype explicitly to ensure instanceof works correctly
-      Object.setPrototypeOf(this, UnauthorizedError.prototype);
-    }
-  }
-  
-  /**
-   * Forbidden error for authorization failures
-   */
-  export class ForbiddenError extends AppError {
-    constructor(message: string = 'Forbidden access') {
-      super(message, 403);
-      
-      // Set the prototype explicitly to ensure instanceof works correctly
-      Object.setPrototypeOf(this, ForbiddenError.prototype);
-    }
-  }
-  
-  /**
-   * Database error for database operation failures
-   */
-  export class DatabaseError extends AppError {
-    constructor(message: string = 'Database operation failed', details?: any) {
-      super(message, 500, details);
-      
-      // Set the prototype explicitly to ensure instanceof works correctly
-      Object.setPrototypeOf(this, DatabaseError.prototype);
-    }
-  }
-  
-  /**
-   * Service unavailable error for temporary service outages
-   */
-  export class ServiceUnavailableError extends AppError {
-    constructor(message: string = 'Service temporarily unavailable') {
-      super(message, 503);
-      
-      // Set the prototype explicitly to ensure instanceof works correctly
-      Object.setPrototypeOf(this, ServiceUnavailableError.prototype);
-    }
-  }
-  
-  /**
-   * Conflict error for resource conflicts
-   */
-  export class ConflictError extends AppError {
-    constructor(message: string = 'Resource conflict') {
-      super(message, 409);
-      
-      // Set the prototype explicitly to ensure instanceof works correctly
-      Object.setPrototypeOf(this, ConflictError.prototype);
-    }
-  }
-  
-  /**
-   * Bad request error for malformed requests
-   */
-  export class BadRequestError extends AppError {
-    constructor(message: string = 'Bad request') {
-      super(message, 400);
-      
-      // Set the prototype explicitly to ensure instanceof works correctly
-      Object.setPrototypeOf(this, BadRequestError.prototype);
-    }
-  }
-  
-  /**
-   * Too many requests error for rate limiting
-   */
-  export class TooManyRequestsError extends AppError {
-    constructor(message: string = 'Too many requests') {
-      super(message, 429);
-      
-      // Set the prototype explicitly to ensure instanceof works correctly
-      Object.setPrototypeOf(this, TooManyRequestsError.prototype);
-    }
-  }
-  
-  /**
-   * Response interface for standardized error responses
-   */
-  export interface ErrorResponse {
-    success: false;
-    error: string;
-    statusCode: number;
-    errors?: string[];
-    stack?: string;
-    details?: any;
-  }
-  
-  /**
-   * Create a standardized error response object
-   * @param error Error instance
-   * @returns Standardized error response object
-   */
-  export const createErrorResponse = (error: Error): ErrorResponse => {
-    const statusCode = error instanceof AppError ? error.statusCode : 500;
-    const message = error.message || 'An unexpected error occurred';
+    const placeholders = columns.map((_, index) => `$${index + 1}`).join(', ');
+    const columnList = columns.join(', ');
     
-    const response: ErrorResponse = {
-      success: false,
-      error: message,
-      statusCode
-    };
+    const query = `
+      INSERT INTO ${table} (${columnList})
+      VALUES (${placeholders})
+      RETURNING ${returning}
+    `;
     
-    if (error instanceof ValidationError) {
-      response.errors = error.errors;
+    const result = await pool.query<T>(query, values);
+    return result.rows[0];
+  } catch (error) {
+    throw new DatabaseError(
+      `Insert operation failed: ${(error as Error).message}`,
+      { table, data, error }
+    );
+  }
+};
+
+/**
+ * Update a row by ID and return the updated object
+ * @param table Table name
+ * @param id ID of row to update
+ * @param data Object with column:value pairs to update
+ * @param idColumn Column name for ID
+ * @param returning What to return
+ * @returns Updated row
+ * @throws DatabaseError
+ */
+export const update = async <T = Record<string, any>>(
+  table: string, 
+  id: number | string, 
+  data: Record<string, any>, 
+  idColumn = 'id', 
+  returning = '*'
+): Promise<T> => {
+  try {
+    const columns = Object.keys(data);
+    const values = Object.values(data);
+    
+    const setClause = columns
+      .map((column, index) => `${column} = $${index + 1}`)
+      .join(', ');
+    
+    const query = `
+      UPDATE ${table}
+      SET ${setClause}
+      WHERE ${idColumn} = $${columns.length + 1}
+      RETURNING ${returning}
+    `;
+    
+    const result = await pool.query<T>(query, [...values, id]);
+    
+    if (result.rows.length === 0) {
+      throw new Error(`Record with ID ${id} not found`);
     }
     
-    if (error instanceof AppError && error.details) {
-      response.details = error.details;
+    return result.rows[0];
+  } catch (error) {
+    throw new DatabaseError(
+      `Update operation failed: ${(error as Error).message}`,
+      { table, id, data, error }
+    );
+  }
+};
+
+/**
+ * Delete a row by ID
+ * @param table Table name
+ * @param id ID of row to delete
+ * @param idColumn Column name for ID
+ * @returns True if deleted, false if not found
+ * @throws DatabaseError
+ */
+export const deleteById = async (
+  table: string, 
+  id: number | string, 
+  idColumn = 'id'
+): Promise<boolean> => {
+  try {
+    const result = await query(
+      `DELETE FROM ${table} WHERE ${idColumn} = $1 RETURNING ${idColumn}`, 
+      [id]
+    );
+    return result.rowCount > 0;
+  } catch (error) {
+    throw new DatabaseError(
+      `Delete operation failed: ${(error as Error).message}`,
+      { table, id, error }
+    );
+  }
+};
+
+/**
+ * Find rows by custom criteria
+ * @param table Table name
+ * @param criteria Object with column:value pairs as criteria
+ * @param options Query options (limit, offset, orderBy)
+ * @returns Array of matching rows
+ * @throws DatabaseError
+ */
+export const findBy = async <T = Record<string, any>>(
+  table: string,
+  criteria: Record<string, any> = {},
+  options: { 
+    limit?: number; 
+    offset?: number; 
+    orderBy?: string;
+    orderDirection?: 'ASC' | 'DESC'
+  } = {}
+): Promise<T[]> => {
+  try {
+    const { limit, offset, orderBy = 'id', orderDirection = 'ASC' } = options;
+    
+    const columns = Object.keys(criteria);
+    const values = Object.values(criteria);
+    
+    let whereClause = '';
+    if (columns.length > 0) {
+      const conditions = columns
+        .map((column, index) => `${column} = $${index + 1}`)
+        .join(' AND ');
+      whereClause = `WHERE ${conditions}`;
     }
     
-    if (process.env.NODE_ENV !== 'production') {
-      response.stack = error.stack;
+    // Build pagination and order
+    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const offsetClause = offset ? `OFFSET ${offset}` : '';
+    const orderClause = `ORDER BY ${orderBy} ${orderDirection}`;
+    
+    const queryText = `
+      SELECT * FROM ${table}
+      ${whereClause}
+      ${orderClause}
+      ${limitClause}
+      ${offsetClause}
+    `;
+    
+    const result = await query<T>(queryText, values);
+    return result.rows;
+  } catch (error) {
+    throw new DatabaseError(
+      `Find operation failed: ${(error as Error).message}`,
+      { table, criteria, options, error }
+    );
+  }
+};
+
+/**
+ * Count rows by custom criteria
+ * @param table Table name
+ * @param criteria Object with column:value pairs as criteria
+ * @returns Count of matching rows
+ * @throws DatabaseError
+ */
+export const countBy = async (
+  table: string,
+  criteria: Record<string, any> = {}
+): Promise<number> => {
+  try {
+    const columns = Object.keys(criteria);
+    const values = Object.values(criteria);
+    
+    let whereClause = '';
+    if (columns.length > 0) {
+      const conditions = columns
+        .map((column, index) => `${column} = $${index + 1}`)
+        .join(' AND ');
+      whereClause = `WHERE ${conditions}`;
     }
     
-    return response;
-  };
-  
-  /**
-   * Error handler for async functions
-   * @param fn Async function to wrap
-   * @returns Wrapped function that handles errors
-   */
-  export const asyncErrorHandler = (fn: Function) => {
-    return async (req: any, res: any, next: any) => {
-      try {
-        await fn(req, res, next);
-      } catch (error) {
-        next(error);
-      }
-    };
-  };
+    const queryText = `
+      SELECT COUNT(*) FROM ${table}
+      ${whereClause}
+    `;
+    
+    const result = await query<{ count: string }>(queryText, values);
+    return parseInt(result.rows[0].count, 10);
+  } catch (error) {
+    throw new DatabaseError(
+      `Count operation failed: ${(error as Error).message}`,
+      { table, criteria, error }
+    );
+  }
+};
+
+// Singleton export pattern
+export const db = {
+  pool,
+  query,
+  transaction,
+  getById,
+  insert,
+  update,
+  delete: deleteById, // Renamed function to avoid JS reserved keyword
+  findBy,
+  countBy
+};
+
+export default db;

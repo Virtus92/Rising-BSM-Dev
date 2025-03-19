@@ -2,7 +2,7 @@
     "name": "rising-bsm-backend",
     "version": "1.0.0",
     "description": "Backend for Rising BSM business management system",
-    "main": "dist/server.ts",
+    "main": "dist/server.js",
     "scripts": {
       "start": "node dist/server.ts",
       "dev": "nodemon src/server.ts",

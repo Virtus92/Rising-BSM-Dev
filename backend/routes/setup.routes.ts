@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { isAuthenticated, isAdmin } from '../middleware/auth.middleware';
 import * as settingsController from '../controllers/settings.controller';
+import express, { Request, Response } from 'express';
 
 const router = Router();
 

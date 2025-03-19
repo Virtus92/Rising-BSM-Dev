@@ -4,8 +4,8 @@
     "description": "Moderne Website für Rising BSM mit Node.js, Express und Tailwind CSS",
     "main": "server.js",
     "scripts": {
-        "start": "node backend/server.js",
-        "server": "nodemon backend/server.js",
+        "start": "ts-node backend/server.ts",
+        "server": "ts-node backend/server.ts",
         "client": "cd frontend && npm run dev",
         "dev": "concurrently \"npm run server\" \"npm run client\"",
         "db:migrate": "psql -h localhost -U rising_user -d rising_bsm -f db-init.sql",
@@ -26,6 +26,7 @@
         "@dr.pogodin/csurf": "^1.14.1",
         "@prisma/client": "^6.5.0",
         "@testing-library/jest-dom": "github:testing-library/jest-dom",
+        "@types/passport": "^1.0.17",
         "axios": "^1.8.2",
         "bcrypt": "^5.1.1",
         "bcryptjs": "^3.0.2",
@@ -44,6 +45,7 @@
         "helmet": "^8.0.0",
         "jsonwebtoken": "^9.0.2",
         "multer": "^1.4.5-lts.1",
+        "passport": "^0.7.0",
         "pdfkit": "^0.16.0",
         "pg": "^8.13.3",
         "slugify": "^1.6.6",
@@ -67,6 +69,8 @@
         "prettier": "^3.5.3",
         "prisma": "^6.5.0",
         "supertest": "^7.0.0",
+        "ts-node": "^10.9.2",
+        "tsx": "^4.19.3",
         "typescript": "^5.8.2",
         "uglify-js": "^3.19.3"
     }

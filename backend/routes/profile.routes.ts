@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { isAuthenticated } from '../middleware/auth.middleware';
 import * as profileController from '../controllers/profile.controller';
 import multer from 'multer';

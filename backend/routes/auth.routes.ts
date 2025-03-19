@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { isNotAuthenticated } from '../middleware/auth.middleware';
 import * as authController from '../controllers/auth.controller';
 
@@ -8,7 +8,7 @@ const router = Router();
  * @route   GET /login
  * @desc    Render login page
  */
-router.get('/login', isNotAuthenticated, (req, res) => {
+router.get('/login', isNotAuthenticated, (req: Request, res: Response) => {
   res.render('login', {
     title: 'Login - Rising BSM',
     error: req.flash('error')[0] || null,
@@ -33,7 +33,7 @@ router.get('/logout', authController.logout);
  * @route   GET /forgot-password
  * @desc    Render forgot password page
  */
-router.get('/forgot-password', isNotAuthenticated, (req, res) => {
+router.get('/forgot-password', isNotAuthenticated, (req: Request, res: Response) => {
   res.render('forgot-password', {
     title: 'Passwort vergessen - Rising BSM',
     error: req.flash('error')[0] || null,

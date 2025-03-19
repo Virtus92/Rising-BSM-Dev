@@ -9,11 +9,19 @@ import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import PgSession from 'connect-pg-simple';
 import flash from 'connect-flash';
-import csurf from '@dr.pogodin/csurf';
 import cors from 'cors';
 import { Pool } from 'pg';
+import passport from 'passport';
+import csurf from '@dr.pogodin/csurf';
 
 import config from './config';
+
+// Extend the session interface to include user information
+declare module 'express-session' {
+  interface SessionData {
+    user: { id: string, username: string } | null;
+  }
+}
 
 // Create Express app
 const app: Express = express();
@@ -53,8 +61,19 @@ const setupCompletedMiddleware = async (req: Request, res: Response, next: NextF
 
 // Import routes
 import apiRoutes from './routes/api.routes';
-// Instead of requiring all routes individually, we'll import them here
-// We'll assume routes are being transformed to TypeScript gradually
+
+// Import route modules
+import indexRoutes from './routes/index';
+import authRoutes from './routes/auth.routes';
+import dashboardRoutes from './routes/dashboard.routes';
+import customerRoutes from './routes/customer.routes';
+import projectRoutes from './routes/project.routes';
+import appointmentRoutes from './routes/appointment.routes';
+import serviceRoutes from './routes/service.routes';
+import requestRoutes from './routes/request.routes';
+import profileRoutes from './routes/profile.routes';
+import settingsRoutes from './routes/settings.routes';
+import setupRoutes from './routes/setup.routes';
 
 // Apply middleware
 // CORS
@@ -140,15 +159,6 @@ const contactLimiter = rateLimit({
   message: { success: false, error: 'Too many requests. Please try again later.' }
 });
 
-// CSRF protection
-app.use(csurf());
-
-// Make CSRF token available to views
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.locals.csrfToken = req.csrfToken();
-  next();
-});
-
 // Make user information available to views
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.locals.user = req.session?.user || null;
@@ -161,22 +171,11 @@ app.use('/api', apiRoutes);
 // For other routes, we'll continue using the existing JavaScript routes until migrated
 // This is a temporary solution during migration
 // We'll need to import these properly once converted to TypeScript
-const indexRoutes = require('./routes/index');
-const authRoutes = require('./routes/auth.routes');
-const dashboardRoutes = require('./routes/dashboard.routes');
-const customerRoutes = require('./routes/customer.routes');
-const projectRoutes = require('./routes/project.routes');
-const appointmentRoutes = require('./routes/appointment.routes');
-const serviceRoutes = require('./routes/service.routes');
-const requestRoutes = require('./routes/request.routes');
-const profileRoutes = require('./routes/profile.routes');
-const settingsRoutes = require('./routes/settings.routes');
-const setupRoutes = require('./routes/setup.routes');
 
 // Apply the existing JavaScript routes
 app.use('/', indexRoutes);
 app.use('/', authRoutes);
-app.use('/', setupRoutes);
+app.use('/setup', setupRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/dashboard/kunden', customerRoutes);
 app.use('/dashboard/projekte', projectRoutes);
@@ -189,9 +188,11 @@ app.use('/dashboard/settings', settingsRoutes);
 // Contact form route with rate limiting
 app.post('/contact', contactLimiter, require('./controllers/contact.controller').submitContact);
 
+// CSRF protection
+app.use(csurf());
+
 // Error handling middleware
 app.use(errorMiddleware.notFoundHandler);
-app.use(errorMiddleware.csrfErrorHandler);
 app.use(errorMiddleware.errorHandler);
 
 // Start server
