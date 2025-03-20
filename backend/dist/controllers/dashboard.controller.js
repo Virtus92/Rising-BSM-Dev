@@ -10,6 +10,7 @@ const cache_service_1 = __importDefault(require("../services/cache.service"));
 const helpers_1 = require("../utils/helpers");
 const formatters_1 = require("../utils/formatters");
 const asyncHandler_1 = require("../utils/asyncHandler");
+const type_helpers_1 = require("../utils/type-helpers");
 /**
  * Get dashboard data including statistics, charts, and recent activities
  */
@@ -176,7 +177,7 @@ exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async (req, res, ne
             Math.round(((totalCustomers - customersLastYear) / customersLastYear) * 100) : 0;
         const monthlyRevenue = currentMonthRevenue._sum.amount || 0;
         const prevMonthRevenueAmount = prevMonthRevenue._sum.amount || 0;
-        const monthlyRevenueTrend = prevMonthRevenueAmount > 0 ?
+        const monthlyRevenueTrend = Number(prevMonthRevenueAmount) > 0 ?
             Math.round(((Number(monthlyRevenue) - Number(prevMonthRevenueAmount)) / Number(prevMonthRevenueAmount)) * 100) : 0;
         return {
             newRequests: { count: newRequestsCount, trend: newRequestsTrend },
@@ -278,7 +279,7 @@ async function getChartData(revenueFilter, servicesFilter) {
         const servicesRevenue = await prisma_utils_1.default.invoicePosition.groupBy({
             by: ['serviceId'],
             where: {
-                invoice: {
+                Invoice: {
                     invoiceDate: {
                         gte: startDate
                     }
@@ -308,8 +309,12 @@ async function getChartData(revenueFilter, servicesFilter) {
         });
         const serviceNameMap = new Map(serviceNames.map((service) => [service.id, service.name]));
         return {
-            labels: servicesRevenue.map((item) => serviceNameMap.get(item.serviceId) || 'Unknown'),
-            data: servicesRevenue.map((item) => parseFloat((item._sum.quantity * item._sum.unitPrice).toFixed(2)))
+            labels: (0, type_helpers_1.typeSafeMap)(servicesRevenue, item => serviceNameMap.get(item.serviceId) || 'Unknown'),
+            data: (0, type_helpers_1.typeSafeMap)(servicesRevenue, item => {
+                const quantity = item._sum?.quantity ?? 0;
+                const unitPrice = item._sum?.unitPrice ?? 0;
+                return (0, type_helpers_1.toNumber)(quantity) * (0, type_helpers_1.toNumber)(unitPrice);
+            })
         };
     }, 600); // Cache for 10 minutes
     return {
@@ -671,8 +676,7 @@ exports.markNotificationsRead = (0, asyncHandler_1.asyncHandler)(async (req, res
                 read: false
             },
             data: {
-                read: true,
-                updatedAt: new Date()
+                read: true
             }
         });
         updatedCount = result.count;
@@ -685,8 +689,7 @@ exports.markNotificationsRead = (0, asyncHandler_1.asyncHandler)(async (req, res
                 userId
             },
             data: {
-                read: true,
-                updatedAt: new Date()
+                read: true
             }
         });
         updatedCount = result.count;

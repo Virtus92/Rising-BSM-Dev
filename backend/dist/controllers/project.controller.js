@@ -57,13 +57,13 @@ exports.getAllProjects = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             titel: project.title,
             kunde_id: project.customerId,
             kunde_name: project.Customer?.name || 'Kein Kunde zugewiesen',
-            dienstleistung: project.Service?.name || 'Nicht zugewiesen',
-            start_datum: (0, formatters_1.formatDateSafely)(project.startDate, 'dd.MM.yyyy'),
-            end_datum: project.endDate ? (0, formatters_1.formatDateSafely)(project.endDate, 'dd.MM.yyyy') : '-',
+            dienstleistung: project.Service?.name || 'Keine Dienstleistung',
+            start_datum: (0, formatters_1.formatDateSafely)(project.startDate || new Date(), 'dd.MM.yyyy'),
+            end_datum: (0, formatters_1.formatDateSafely)(project.endDate || new Date(), 'dd.MM.yyyy'),
             status: project.status,
             statusLabel: statusInfo.label,
             statusClass: statusInfo.className,
-            betrag: project.amount ? Number(project.amount) : null
+            betrag: project.amount
         };
     });
     // Calculate pagination data

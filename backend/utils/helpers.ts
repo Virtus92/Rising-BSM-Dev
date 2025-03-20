@@ -3,7 +3,6 @@
  * Common utility functions used across the application
  */
 import { cache } from '../services/cache.service';
-import { db } from '../services/db.service.bak';
 import prisma from './prisma.utils';
 
 /**
@@ -224,12 +223,11 @@ export const getNewRequestsCount = async (): Promise<number> => {
     const cacheKey = 'new_requests_count';
     
     return await cache.getOrExecute(cacheKey, async () => {
-      const result = await db.query(`
-        SELECT COUNT(*) FROM kontaktanfragen 
-        WHERE status = 'neu'
-      `);
+      const count = await prisma.contactRequest.count({
+        where: { status: 'neu' }
+      });
       
-      return parseInt(result.rows[0].count || '0');
+      return count;
     }, 60); // Cache for 1 minute
   } catch (error) {
     console.error('Error counting new requests:', error);

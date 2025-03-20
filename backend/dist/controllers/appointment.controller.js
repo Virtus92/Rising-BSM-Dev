@@ -65,7 +65,7 @@ exports.getAllAppointments = (0, asyncHandler_1.asyncHandler)(async (req, res) =
             termin_datum: appointment.appointmentDate,
             dateFormatted: (0, formatters_1.formatDateSafely)(appointment.appointmentDate, 'dd.MM.yyyy'),
             timeFormatted: (0, formatters_1.formatDateSafely)(appointment.appointmentDate, 'HH:mm'),
-            dauer: appointment.duration || 60,
+            dauer: appointment.duration !== null ? appointment.duration : 60,
             ort: appointment.location || 'Nicht angegeben',
             status: appointment.status,
             statusLabel: statusInfo.label,
@@ -129,7 +129,7 @@ exports.getAppointmentById = (0, asyncHandler_1.asyncHandler)(async (req, res) =
             termin_datum: appointment.appointmentDate,
             dateFormatted: (0, formatters_1.formatDateSafely)(appointment.appointmentDate, 'dd.MM.yyyy'),
             timeFormatted: (0, formatters_1.formatDateSafely)(appointment.appointmentDate, 'HH:mm'),
-            dauer: appointment.duration || 60,
+            dauer: appointment.duration !== null ? appointment.duration : 60,
             ort: appointment.location || 'Nicht angegeben',
             beschreibung: appointment.description || 'Keine Beschreibung vorhanden',
             status: appointment.status,
@@ -325,7 +325,6 @@ exports.updateAppointmentStatus = (0, asyncHandler_1.asyncHandler)(async (req, r
     }
     // Use a transaction for status update and optional note
     await prisma_utils_1.default.$transaction(async (tx) => {
-        // Update status in database
         await tx.appointment.update({
             where: { id: appointmentId },
             data: {
@@ -383,17 +382,17 @@ exports.addAppointmentNote = (0, asyncHandler_1.asyncHandler)(async (req, res) =
     if (!appointment) {
         throw new errors_1.NotFoundError(`Appointment with ID ${appointmentId} not found`);
     }
-    // Insert note into database
-    await prisma_utils_1.default.appointmentNote.create({
-        data: {
-            appointmentId,
-            userId: req.user?.id || null,
-            userName: req.user?.name || 'Unknown',
-            text: note
-        }
-    });
-    // Log the note addition
+    // Insert note into database - only create if userId exists
     if (req.user?.id) {
+        await prisma_utils_1.default.appointmentNote.create({
+            data: {
+                appointmentId,
+                userId: req.user.id, // userId is required by schema
+                userName: req.user.name || 'Unknown',
+                text: note
+            }
+        });
+        // Log the note addition
         await prisma_utils_1.default.appointmentLog.create({
             data: {
                 appointmentId,
@@ -403,6 +402,10 @@ exports.addAppointmentNote = (0, asyncHandler_1.asyncHandler)(async (req, res) =
                 details: 'Note added to appointment'
             }
         });
+    }
+    else {
+        // Handle the case where there's no user ID available
+        console.warn('Note added without user context');
     }
     res.status(201).json({
         success: true,

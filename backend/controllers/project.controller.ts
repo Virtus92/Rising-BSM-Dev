@@ -91,28 +91,30 @@ export const getAllProjects = asyncHandler(async (req: Request, res: Response): 
     id: number;
     title: string;
     customerId: number | null;
-    Customer: { name: string } | null;
-    Service: { name: string } | null;
-    startDate: Date;
+    serviceId: number | null;
+    startDate: Date | null; // Allow null here
     endDate: Date | null;
     status: string;
     amount: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+    // ...other properties...
   }
   
-  const formattedProjects = projects.map((project: ProjectRecord) => {
+  const formattedProjects = projects.map((project: any): Record<string, any> => {
     const statusInfo = getProjektStatusInfo(project.status);
     return {
       id: project.id,
       titel: project.title,
       kunde_id: project.customerId,
       kunde_name: project.Customer?.name || 'Kein Kunde zugewiesen',
-      dienstleistung: project.Service?.name || 'Nicht zugewiesen',
-      start_datum: formatDateSafely(project.startDate, 'dd.MM.yyyy'),
-      end_datum: project.endDate ? formatDateSafely(project.endDate, 'dd.MM.yyyy') : '-',
+      dienstleistung: project.Service?.name || 'Keine Dienstleistung',
+      start_datum: formatDateSafely(project.startDate || new Date(), 'dd.MM.yyyy'),
+      end_datum: formatDateSafely(project.endDate || new Date(), 'dd.MM.yyyy'),
       status: project.status,
       statusLabel: statusInfo.label,
       statusClass: statusInfo.className,
-      betrag: project.amount ? Number(project.amount) : null
+      betrag: project.amount
     };
   });
 
@@ -414,7 +416,7 @@ export const updateProjectStatus = asyncHandler(async (req: AuthenticatedRequest
   }
   
   // Use a transaction for status update and optional note
-  await prisma.$transaction(async (tx: PrismaClient) => {
+  await prisma.$transaction(async (tx: any) => {
     // Update status in database
     await tx.project.update({
       where: { id: projectId },

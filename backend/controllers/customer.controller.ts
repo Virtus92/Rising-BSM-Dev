@@ -238,8 +238,9 @@ export const getCustomerById = asyncHandler(async (req: Request, res: Response):
     startDate: Date;
     status: string;
   }
+   
   
-  const formattedProjects = projects.map((project: ProjectRecord) => {
+  const formattedProjects = projects.map((project: any) => {
     const statusInfo = getProjektStatusInfo(project.status);
     return {
       id: project.id,

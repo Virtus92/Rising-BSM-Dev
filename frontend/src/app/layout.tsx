@@ -5,8 +5,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Rising BSM - Ihre Allround-Experten',
-  description: 'Facility Management, Umzüge & Transporte, Winterdienst - Maßgeschneiderte Lösungen für Ihr Anliegen.',
+  title: 'RISING BSM - Ihre Allround-Experten',
+  description: 'Facility Management - Maßgeschneiderte Lösungen für Ihr Anliegen.',
 };
 
 export default function RootLayout({

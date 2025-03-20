@@ -1,4 +1,3 @@
-// controllers/dashboard.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../utils/prisma.utils';
 import { format } from 'date-fns';
@@ -7,6 +6,7 @@ import { getNotifications as getHelperNotifications } from '../utils/helpers';
 import { formatDateSafely, formatRelativeTime, formatDateWithLabel } from '../utils/formatters';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AuthenticatedRequest } from '../types/authenticated-request';
+import { typeSafeMap, toNumber } from '../utils/type-helpers';
 
 interface ChartFilterOptions {
   selected: string;
@@ -243,7 +243,7 @@ export const getDashboardStats = asyncHandler(async (req: Request, res: Response
     
     const monthlyRevenue = currentMonthRevenue._sum.amount || 0;
     const prevMonthRevenueAmount = prevMonthRevenue._sum.amount || 0;
-    const monthlyRevenueTrend = prevMonthRevenueAmount > 0 ?
+    const monthlyRevenueTrend = Number(prevMonthRevenueAmount) > 0 ?
       Math.round(((Number(monthlyRevenue) - Number(prevMonthRevenueAmount)) / Number(prevMonthRevenueAmount)) * 100) : 0;
     
     return {
@@ -257,18 +257,12 @@ export const getDashboardStats = asyncHandler(async (req: Request, res: Response
   res.status(200).json(stats);
 });
 
-// Add interface for Invoice
-interface Invoice {
-  invoiceDate: Date;
-  amount: number;
-}
-
 // Add interface for service revenue item
 interface ServiceRevenueItem {
   serviceId: number;
-  _sum: {
-    quantity: number | null;
-    unitPrice: number | null;
+  _sum?: {
+    quantity?: number | null;
+    unitPrice?: number | null | any;
   }
 }
 
@@ -305,7 +299,7 @@ async function getChartData(revenueFilter: string, servicesFilter: string): Prom
     // Group by time period and format for chart
     const groupedData = new Map<string, number>();
     
-    invoices.forEach((invoice: Invoice) => {
+    invoices.forEach((invoice: any) => {
       let groupKey: string;
       const date = new Date(invoice.invoiceDate);
       
@@ -378,7 +372,7 @@ async function getChartData(revenueFilter: string, servicesFilter: string): Prom
     const servicesRevenue = await prisma.invoicePosition.groupBy({
       by: ['serviceId'],
       where: {
-        invoice: {
+        Invoice: {
           invoiceDate: {
             gte: startDate
           }
@@ -408,12 +402,19 @@ async function getChartData(revenueFilter: string, servicesFilter: string): Prom
       }
     });
     
-    const serviceNameMap = new Map(serviceNames.map((service: ServiceItem) => [service.id, service.name]));
+    const serviceNameMap = new Map<number, string>(serviceNames.map((service: ServiceItem) => [service.id, service.name]));
     
-    return {
-      labels: servicesRevenue.map((item: ServiceRevenueItem) => serviceNameMap.get(item.serviceId) || 'Unknown'),
-      data: servicesRevenue.map((item: ServiceRevenueItem) => parseFloat((item._sum.quantity! * item._sum.unitPrice!).toFixed(2)))
-    };
+    
+return {
+  labels: typeSafeMap<any, string>(servicesRevenue, 
+    item => serviceNameMap.get(item.serviceId) || 'Unknown'),
+  data: typeSafeMap<any, number>(servicesRevenue, 
+    item => {
+      const quantity = item._sum?.quantity ?? 0;
+      const unitPrice = item._sum?.unitPrice ?? 0;
+      return toNumber(quantity) * toNumber(unitPrice);
+    })
+};
   }, 600); // Cache for 10 minutes
   
   return {
@@ -699,7 +700,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response, nex
     
     // Format and return results
     res.status(200).json({
-      customers: customers.map((customer: Customer) => ({
+      customers: customers.map((customer: any) => ({
         id: customer.id,
         name: customer.name,
         email: customer.email || '',
@@ -710,7 +711,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response, nex
         url: `/dashboard/kunden/${customer.id}`
       })),
       
-      projects: projects.map((project: Project) => ({
+      projects: projects.map((project: any) => ({
         id: project.id,
         title: project.title,
         status: project.status,
@@ -720,7 +721,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response, nex
         url: `/dashboard/projekte/${project.id}`
       })),
       
-      appointments: appointments.map((appointment: Appointment) => ({
+      appointments: appointments.map((appointment: any) => ({
         id: appointment.id,
         title: appointment.title,
         status: appointment.status,
@@ -730,7 +731,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response, nex
         url: `/dashboard/termine/${appointment.id}`
       })),
       
-      requests: requests.map((request: ContactRequest) => ({
+      requests: requests.map((request: any) => ({
         id: request.id,
         name: request.name,
         email: request.email,
@@ -740,7 +741,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response, nex
         url: `/dashboard/requests/${request.id}`
       })),
       
-      services: services.map((service: Service) => ({
+      services: services.map((service: any) => ({
         id: service.id,
         name: service.name,
         preis: service.priceBase,
@@ -788,7 +789,7 @@ export const getNotifications = asyncHandler(async (req: AuthenticatedRequest, r
   });
   
   // Format notifications
-  const formattedNotifications = notifications.map((notification: Notification) => {
+  const formattedNotifications = notifications.map((notification: any) => {
     // Determine type and icon
     let type: string;
     let icon: string;
@@ -867,8 +868,7 @@ export const markNotificationsRead = asyncHandler(async (req: AuthenticatedReque
         read: false
       },
       data: {
-        read: true,
-        updatedAt: new Date()
+        read: true
       }
     });
     
@@ -881,8 +881,7 @@ export const markNotificationsRead = asyncHandler(async (req: AuthenticatedReque
         userId
       },
       data: {
-        read: true,
-        updatedAt: new Date()
+        read: true
       }
     });
     

@@ -9,7 +9,6 @@ exports.groupBy = exports.truncateHtml = exports.sanitizeLikeString = exports.pa
  * Common utility functions used across the application
  */
 const cache_service_1 = require("../services/cache.service");
-const db_service_bak_1 = require("../services/db.service.bak");
 const prisma_utils_1 = __importDefault(require("./prisma.utils"));
 /**
  * Get status information for a request
@@ -161,11 +160,10 @@ const getNewRequestsCount = async () => {
     try {
         const cacheKey = 'new_requests_count';
         return await cache_service_1.cache.getOrExecute(cacheKey, async () => {
-            const result = await db_service_bak_1.db.query(`
-        SELECT COUNT(*) FROM kontaktanfragen 
-        WHERE status = 'neu'
-      `);
-            return parseInt(result.rows[0].count || '0');
+            const count = await prisma_utils_1.default.contactRequest.count({
+                where: { status: 'neu' }
+            });
+            return count;
         }, 60); // Cache for 1 minute
     }
     catch (error) {

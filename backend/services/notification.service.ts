@@ -142,7 +142,7 @@ class NotificationService {
       };
 
       // Execute queries in parallel
-      const [notifications, counts] = await Promise.all([
+      const [notifications, totalCount] = await Promise.all([
         // Get notifications
         prisma.notification.findMany({
           where,
@@ -151,13 +151,8 @@ class NotificationService {
           skip: offset
         }),
         
-        // Get counts
-        prisma.notification.groupBy({
-          by: [],
-          where,
-          _count: { _all: true },
-          having: {}
-        })
+        // Get count directly instead of using groupBy
+        prisma.notification.count({ where })
       ]);
 
       // Get unread count
@@ -195,7 +190,7 @@ class NotificationService {
 
       const result = {
         notifications: formattedNotifications,
-        total: counts.length > 0 ? counts[0]._count._all : 0,
+        total: totalCount,
         unreadCount
       };
 
@@ -232,8 +227,7 @@ class NotificationService {
           id: { in: ids }
         },
         data: {
-          read: true,
-          updatedAt: new Date()
+          read: true
         }
       });
 
@@ -265,8 +259,7 @@ class NotificationService {
           read: false
         },
         data: {
-          read: true,
-          updatedAt: new Date()
+          read: true
         }
       });
 
@@ -356,6 +349,22 @@ class NotificationService {
       default:
         return '/dashboard/notifications';
     }
+  }
+}
+
+// Fix the _count property issue
+export async function getUnreadNotificationsCount(userId: number): Promise<number> {
+  try {
+    // Use count directly instead of groupBy for simplicity
+    return await prisma.notification.count({
+      where: {
+        userId,
+        read: false
+      }
+    });
+  } catch (error) {
+    console.error('Error getting unread notification count:', error);
+    return 0;
   }
 }
 

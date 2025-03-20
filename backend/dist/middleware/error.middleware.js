@@ -38,6 +38,8 @@ const errorHandler = (err, req, res, next) => {
         }
         return res.redirect(err.redirect);
     }
+    // Get user from the request (if it exists)
+    const user = req.user;
     // Handle regular requests based on error type
     if (statusCode === 404) {
         return res.status(404).render('error', {
@@ -45,7 +47,7 @@ const errorHandler = (err, req, res, next) => {
             statusCode: 404,
             message: 'Die angeforderte Seite wurde nicht gefunden.',
             error: config_1.default.SHOW_STACK_TRACES ? err : {},
-            user: req.user
+            user: user
         });
     }
     // For validation errors
@@ -56,7 +58,7 @@ const errorHandler = (err, req, res, next) => {
             message: message,
             errors: err.errors,
             error: config_1.default.SHOW_STACK_TRACES ? err : {},
-            user: req.user
+            user: user
         });
     }
     // For all other errors
@@ -67,7 +69,7 @@ const errorHandler = (err, req, res, next) => {
             ? 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.'
             : message,
         error: config_1.default.SHOW_STACK_TRACES ? err : {},
-        user: req.user
+        user: user
     });
 };
 exports.errorHandler = errorHandler;

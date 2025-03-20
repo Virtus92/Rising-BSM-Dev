@@ -97,5 +97,6 @@ declare class NotificationService {
      */
     private generateNotificationLink;
 }
+export declare function getUnreadNotificationsCount(userId: number): Promise<number>;
 export declare const notificationService: NotificationService;
 export default notificationService;

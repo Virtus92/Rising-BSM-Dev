@@ -57,7 +57,7 @@ interface AppointmentRecord {
   customerId: number | null;
   projectId: number | null;
   appointmentDate: Date;
-  duration: number;
+  duration: number | null;
   location: string | null;
   description: string | null;
   status: string;
@@ -140,7 +140,7 @@ export const getAllAppointments = asyncHandler(async (req: Request, res: Respons
   ]);
 
   // Format appointment data
-  const formattedAppointments = appointments.map((appointment: AppointmentRecord): Record<string, any> => {
+  const formattedAppointments = appointments.map((appointment: any): Record<string, any> => {
     const statusInfo = getTerminStatusInfo(appointment.status);
     return {
       id: appointment.id,
@@ -152,7 +152,7 @@ export const getAllAppointments = asyncHandler(async (req: Request, res: Respons
       termin_datum: appointment.appointmentDate,
       dateFormatted: formatDateSafely(appointment.appointmentDate, 'dd.MM.yyyy'),
       timeFormatted: formatDateSafely(appointment.appointmentDate, 'HH:mm'),
-      dauer: appointment.duration || 60,
+      dauer: appointment.duration !== null ? appointment.duration : 60,
       ort: appointment.location || 'Nicht angegeben',
       status: appointment.status,
       statusLabel: statusInfo.label,
@@ -226,7 +226,7 @@ export const getAppointmentById = asyncHandler(async (req: Request, res: Respons
       termin_datum: appointment.appointmentDate,
       dateFormatted: formatDateSafely(appointment.appointmentDate, 'dd.MM.yyyy'),
       timeFormatted: formatDateSafely(appointment.appointmentDate, 'HH:mm'),
-      dauer: appointment.duration || 60,
+      dauer: appointment.duration !== null ? appointment.duration : 60,
       ort: appointment.location || 'Nicht angegeben',
       beschreibung: appointment.description || 'Keine Beschreibung vorhanden',
       status: appointment.status,
@@ -470,8 +470,7 @@ export const updateAppointmentStatus = asyncHandler(async (req: AuthenticatedReq
   }
   
   // Use a transaction for status update and optional note
-  await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>) => {
-    // Update status in database
+  await prisma.$transaction(async (tx: any) => {
     await tx.appointment.update({
       where: { id: appointmentId },
       data: {
@@ -538,18 +537,18 @@ export const addAppointmentNote = asyncHandler(async (req: AuthenticatedRequest,
     throw new NotFoundError(`Appointment with ID ${appointmentId} not found`);
   }
   
-  // Insert note into database
-  await prisma.appointmentNote.create({
-    data: {
-      appointmentId,
-      userId: req.user?.id || null,
-      userName: req.user?.name || 'Unknown',
-      text: note
-    }
-  });
-  
-  // Log the note addition
+  // Insert note into database - only create if userId exists
   if (req.user?.id) {
+    await prisma.appointmentNote.create({
+      data: {
+        appointmentId,
+        userId: req.user.id, // userId is required by schema
+        userName: req.user.name || 'Unknown',
+        text: note
+      }
+    });
+    
+    // Log the note addition
     await prisma.appointmentLog.create({
       data: {
         appointmentId,
@@ -559,6 +558,9 @@ export const addAppointmentNote = asyncHandler(async (req: AuthenticatedRequest,
         details: 'Note added to appointment'
       }
     });
+  } else {
+    // Handle the case where there's no user ID available
+    console.warn('Note added without user context');
   }
 
   res.status(201).json({

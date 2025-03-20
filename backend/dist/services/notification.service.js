@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.notificationService = void 0;
+exports.getUnreadNotificationsCount = getUnreadNotificationsCount;
 /**
  * Notification Service
  * Manages notification creation, sending, and tracking
@@ -74,7 +75,7 @@ class NotificationService {
                 ...(type ? { type } : {})
             };
             // Execute queries in parallel
-            const [notifications, counts] = await Promise.all([
+            const [notifications, totalCount] = await Promise.all([
                 // Get notifications
                 prisma_utils_1.default.notification.findMany({
                     where,
@@ -82,13 +83,8 @@ class NotificationService {
                     take: limit,
                     skip: offset
                 }),
-                // Get counts
-                prisma_utils_1.default.notification.groupBy({
-                    by: [],
-                    where,
-                    _count: { _all: true },
-                    having: {}
-                })
+                // Get count directly instead of using groupBy
+                prisma_utils_1.default.notification.count({ where })
             ]);
             // Get unread count
             const unreadCount = await prisma_utils_1.default.notification.count({
@@ -111,7 +107,7 @@ class NotificationService {
             }));
             const result = {
                 notifications: formattedNotifications,
-                total: counts.length > 0 ? counts[0]._count._all : 0,
+                total: totalCount,
                 unreadCount
             };
             // Cache the result
@@ -142,8 +138,7 @@ class NotificationService {
                     id: { in: ids }
                 },
                 data: {
-                    read: true,
-                    updatedAt: new Date()
+                    read: true
                 }
             });
             // Clear cache for this user
@@ -171,8 +166,7 @@ class NotificationService {
                     read: false
                 },
                 data: {
-                    read: true,
-                    updatedAt: new Date()
+                    read: true
                 }
             });
             // Clear cache for this user
@@ -250,6 +244,22 @@ class NotificationService {
             default:
                 return '/dashboard/notifications';
         }
+    }
+}
+// Fix the _count property issue
+async function getUnreadNotificationsCount(userId) {
+    try {
+        // Use count directly instead of groupBy for simplicity
+        return await prisma_utils_1.default.notification.count({
+            where: {
+                userId,
+                read: false
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error getting unread notification count:', error);
+        return 0;
     }
 }
 // Export singleton instance

@@ -54,7 +54,9 @@ export const getUserProfile = asyncHandler(async (req: AuthenticatedRequest, res
   interface ActivityItem {
     activity: string;
     ipAddress: string | null;
-    timestamp: Date;
+    timestamp: Date | null;
+    userId: number;
+    id: number;
   }
   
   const activity = await prisma.userActivity.findMany({
@@ -81,10 +83,10 @@ export const getUserProfile = asyncHandler(async (req: AuthenticatedRequest, res
       benachrichtigungen_push: userSettings.pushNotifications || false,
       benachrichtigungen_intervall: userSettings.notificationInterval || 'sofort'
     },
-    activity: activity.map((item: ActivityItem) => ({
+    activity: activity.map((item: { activity: string; ipAddress: string | null; timestamp: Date | null; userId: number; id: number; }) => ({
       type: item.activity,
       ip: item.ipAddress || '',
-      date: formatDateSafely(item.timestamp, 'dd.MM.yyyy, HH:mm')
+      date: formatDateSafely(item.timestamp!, 'dd.MM.yyyy, HH:mm')
     }))
   });
 });

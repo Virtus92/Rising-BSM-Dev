@@ -40,9 +40,9 @@ interface ServiceRecord {
   id: number;
   name: string;
   description: string | null;
-  priceBase: number | bigint;
+  priceBase: any; // Changed from number | bigint to any to handle Prisma Decimal
   unit: string | null;
-  vatRate: number | bigint;
+  vatRate: any; // Changed from number | bigint to any to handle Prisma Decimal
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -93,7 +93,7 @@ export const getAllServices = asyncHandler(async (req: Request, res: Response): 
   ]);
 
   // Format service data
-  const formattedServices = services.map((service: ServiceRecord): Record<string, any> => ({
+  const formattedServices = services.map((service: any): Record<string, any> => ({
     id: service.id,
     name: service.name,
     beschreibung: service.description,
@@ -418,7 +418,7 @@ export const getServiceStatistics = asyncHandler(async (req: Request, res: Respo
         }
       },
       take: 5
-    }).then(async (results: ResultItem[]) => {
+    }).then(async (results: any) => {
       // Get invoice IDs
       const invoiceIds = results.map((item: ResultItem) => item.invoiceId);
       
@@ -446,12 +446,12 @@ export const getServiceStatistics = asyncHandler(async (req: Request, res: Respo
   
   // Calculate total revenue
   const totalRevenue = invoicePositions.reduce(
-    (sum: number, pos: InvoicePosition) => sum + (Number(pos.quantity) * Number(pos.unitPrice)),
+    (sum: number, pos: any) => sum + (Number(pos.quantity) * Number(pos.unitPrice)),
     0
   );
   
   // Group by month for monthly revenue
-  const invoicesByMonth = invoicePositions.reduce((acc: Record<string, { monat: string, umsatz: number }>, pos: InvoicePosition) => {
+  const invoicesByMonth = invoicePositions.reduce((acc: Record<string, { monat: string, umsatz: number }>, pos: any) => {
     if (!pos.Invoice || !pos.Invoice.invoiceDate) return acc;
     
     const date = new Date(pos.Invoice.invoiceDate);
@@ -473,16 +473,16 @@ export const getServiceStatistics = asyncHandler(async (req: Request, res: Respo
     umsatz: number;
   }
   
-  const monthlyRevenue = (Object.values(invoicesByMonth) as MonthRevenue[]).sort((a, b) => 
-    a.monat.localeCompare(b.monat)
-  );
+  const monthlyRevenue = Object.values(invoicesByMonth) as MonthRevenue[];
+  
+  monthlyRevenue.sort((a, b) => a.monat.localeCompare(b.monat));
   
   res.status(200).json({
     success: true,
     statistics: {
       name: service.name,
       gesamtumsatz: totalRevenue,
-      rechnungsanzahl: new Set(invoicePositions.map((p: InvoicePosition) => p.invoiceId)).size,
+      rechnungsanzahl: new Set(invoicePositions.map((p: any) => p.invoiceId)).size,
       monatlicheUmsaetze: monthlyRevenue,
       topKunden: Array.isArray(topCustomers) ? topCustomers.map((customer: any) => ({
         kundenId: customer.id,

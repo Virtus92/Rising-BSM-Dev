@@ -46,6 +46,7 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const express_session_1 = __importDefault(require("express-session"));
 const connect_pg_simple_1 = __importDefault(require("connect-pg-simple"));
 const connect_flash_1 = __importDefault(require("connect-flash"));
+// @ts-ignore
 const csurf_1 = __importDefault(require("@dr.pogodin/csurf"));
 const cors_1 = __importDefault(require("cors"));
 const pg_1 = require("pg");

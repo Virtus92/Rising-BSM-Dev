@@ -6,9 +6,9 @@ import About from '@/components/home/About';
 import Contact from '@/components/home/Contact';
 
 export const metadata = {
-  title: 'Rising BSM - Ihre Allround-Experten',
-  description: 'Facility Management, Umzüge & Transporte, Winterdienst - Maßgeschneiderte Lösungen für Ihr Anliegen.',
-  keywords: ['Facility Management', 'Umzüge', 'Transporte', 'Winterdienst', 'Hausbetreuung', 'Linz', 'Österreich'],
+  title: 'RISING BSM - Ihre Allround-Experten',
+  description: 'Facility Management - Maßgeschneiderte Lösungen für Ihr Anliegen.',
+  keywords: ['Facility Management', 'Winterdienst', 'Hausbetreuung', 'Linz', 'Österreich'],
 };
 
 export default function Home() {

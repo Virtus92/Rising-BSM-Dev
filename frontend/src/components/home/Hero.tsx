@@ -68,13 +68,11 @@ const Hero = () => {
           isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         }`}>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
-            Rising BSM – Ihre Allround-Experten
+            RISING BSM – Ihre Allround-Experten
           </h1>
           
           <ul className="text-xl md:text-2xl text-white space-y-1 mb-8">
             <li>Facility Management</li>
-            <li>Umzüge & Transporte</li>
-            <li>Winterdienst</li>
           </ul>
           
           <p className="text-xl text-white mb-10">
@@ -91,7 +89,7 @@ const Hero = () => {
             </Link>
             
             <a 
-              href="tel:+491234567890" 
+              href="tel:+431234567890" 
               className="bg-transparent border-2 border-white hover:bg-white/10 text-white px-6 py-3 rounded-md transition flex items-center justify-center space-x-2 text-lg"
             >
               <Phone size={20} />

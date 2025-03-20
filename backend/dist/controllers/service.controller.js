@@ -330,7 +330,8 @@ exports.getServiceStatistics = (0, asyncHandler_1.asyncHandler)(async (req, res)
         acc[monthKey].umsatz += Number(pos.quantity) * Number(pos.unitPrice);
         return acc;
     }, {});
-    const monthlyRevenue = Object.values(invoicesByMonth).sort((a, b) => a.monat.localeCompare(b.monat));
+    const monthlyRevenue = Object.values(invoicesByMonth);
+    monthlyRevenue.sort((a, b) => a.monat.localeCompare(b.monat));
     res.status(200).json({
         success: true,
         statistics: {

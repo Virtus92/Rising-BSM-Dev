@@ -151,12 +151,12 @@ exports.updateRequestStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) 
                 updatedAt: new Date()
             }
         });
-        // Add note if provided
+        // Add note if provided and user exists
         if (note && note.trim() !== '' && req.user?.id) {
             await tx.requestNote.create({
                 data: {
                     requestId,
-                    userId: req.user.id,
+                    userId: req.user.id, // Required field
                     userName: req.user.name || 'Unknown',
                     text: note
                 }
@@ -196,17 +196,17 @@ exports.addRequestNote = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     if (!request) {
         throw new errors_1.NotFoundError(`Request with ID ${requestId} not found`);
     }
-    // Insert note into database
-    await prisma_utils_1.default.requestNote.create({
-        data: {
-            requestId,
-            userId: req.user?.id || null,
-            userName: req.user?.name || 'Unknown',
-            text: note
-        }
-    });
-    // Log the note addition
+    // Insert note into database - only if userId exists
     if (req.user?.id) {
+        await prisma_utils_1.default.requestNote.create({
+            data: {
+                requestId,
+                userId: req.user.id, // Required field
+                userName: req.user?.name || 'Unknown',
+                text: note
+            }
+        });
+        // Log the note addition
         await prisma_utils_1.default.requestLog.create({
             data: {
                 requestId,
@@ -216,6 +216,10 @@ exports.addRequestNote = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
                 details: 'Note added to request'
             }
         });
+    }
+    else {
+        // Handle case where no user ID is available
+        console.warn('Note added without user context');
     }
     res.status(201).json({
         success: true,
