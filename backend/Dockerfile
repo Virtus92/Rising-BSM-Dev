@@ -11,6 +11,7 @@ RUN npm install
 
 # Copy Prisma schema and generate client
 COPY prisma ./prisma/
+RUN npx prisma migrate dev --name init
 RUN npx prisma generate
 
 # Copy the rest of the application

@@ -58,8 +58,8 @@ export const IS_DEVELOPMENT = NODE_ENV === 'development';
 export const IS_TEST = NODE_ENV === 'test';
 
 // Server settings
-export const PORT = env<number>('PORT', 5000);
-export const HOST = env<string>('HOST', 'localhost');
+export const PORT = env<number>('BACKEND_PORT', 5000);
+export const HOST = env<string>('BACKEND_HOST', 'localhost');
 export const API_PREFIX = env<string>('API_PREFIX', '/api/v1');
 
 // Security settings
