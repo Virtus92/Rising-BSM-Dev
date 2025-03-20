@@ -4,13 +4,13 @@
     "description": "Backend for Rising BSM business management system",
     "main": "dist/server.js",
     "scripts": {
-        "start": "node dist/server.ts",
-        "dev": "nodemon src/server.ts",
+        "start": "node dist/server.js",
+        "dev": "ts-node-dev --respawn --transpile-only server.ts",
+        "build": "tsc -p tsconfig.json",
+        "prisma:generate": "prisma generate",
         "dev:ts": "ts-node-dev --respawn --transpile-only server.ts",
-        "build": "tsc",
         "build:watch": "tsc -w",
         "migrate": "prisma migrate dev",
-        "prisma:generate": "prisma generate",
         "test": "jest",
         "lint": "eslint . --ext .ts",
         "format": "prettier --write ."

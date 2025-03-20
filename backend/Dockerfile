@@ -8,14 +8,20 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy the rest of the application
-COPY . .
+# Copy TypeScript config
+COPY tsconfig.json ./
 
-# Generate Prisma client
+# Copy prisma schema separately
+COPY prisma ./prisma/
+
+# Generate Prisma client before copying the rest of the app
 RUN npx prisma generate
 
 # Build TypeScript code
 RUN npm run build
 
+# Expose the application port
+EXPOSE 5000
+
 # Command to run the app
-CMD ["npm", "start"]
+CMD ["npm", "run", "dev"]
