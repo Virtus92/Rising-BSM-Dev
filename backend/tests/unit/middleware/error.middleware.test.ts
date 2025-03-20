@@ -13,10 +13,13 @@ describe('Error Middleware', () => {
       method: 'GET',
       originalUrl: '/test'
     };
+    
+    // Fix response mock with type assertions
     res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
+      status: jest.fn().mockReturnThis() as any,
+      json: jest.fn() as any
     };
+    
     next = jest.fn();
     
     // Spy on console.error to silence it during tests
@@ -71,9 +74,17 @@ describe('Error Middleware', () => {
     test('should create 404 error and pass to next middleware', () => {
       notFoundHandler(req as Request, res as Response, next);
       
-      expect(next).toHaveBeenCalledWith(expect.any(AppError));
-      expect(next.mock.calls[0][0].statusCode).toBe(404);
-      expect(next.mock.calls[0][0].message).toContain('Resource not found: GET /test');
+      // Safe type assertion - check that next was called
+      expect(next).toHaveBeenCalled();
+      
+      // Get the error and check properties safely
+      const error = next.mock.calls[0][0];
+      expect(error instanceof AppError).toBe(true);
+      
+      // Now that we've verified it's an AppError, we can check properties
+      const appError = error as AppError;
+      expect(appError.statusCode).toBe(404);
+      expect(appError.message).toContain('Resource not found: GET /test');
     });
   });
 });

@@ -60,16 +60,13 @@ const swaggerOptions = {
   ],
 };
 
-// Initialize swagger-jsdoc
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
-
 /**
  * Configure Swagger documentation
  * @param app Express application
  */
 export const setupSwagger = (app: Express): void => {
-  // Serve Swagger documentation
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  // Fix the type issue with swaggerUi.serve
+  app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerSpec));
 
   // Serve Swagger spec as JSON
   app.get('/api-docs.json', (req, res) => {

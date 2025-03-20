@@ -4,6 +4,7 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import config from '../../config';
 import { describe, test, expect, jest } from '@jest/globals';
+import { Express } from 'express';
 
 // Mock swagger-jsdoc
 jest.mock('swagger-jsdoc', () => jest.fn().mockReturnValue({}));
@@ -26,11 +27,11 @@ jest.spyOn(console, 'log').mockImplementation(() => {});
 
 describe('Swagger Configuration', () => {
   test('should initialize swagger-jsdoc with correct options', () => {
-    // Call setupSwagger with a mock Express app
+    // Create a properly typed mock Express app
     const app = {
       use: jest.fn(),
       get: jest.fn()
-    };
+    } as unknown as Express;
     
     setupSwagger(app);
     
@@ -51,7 +52,7 @@ describe('Swagger Configuration', () => {
     const app = {
       use: jest.fn(),
       get: jest.fn()
-    };
+    } as unknown as Express;
     
     setupSwagger(app);
     
@@ -62,7 +63,7 @@ describe('Swagger Configuration', () => {
     const app = {
       use: jest.fn(),
       get: jest.fn()
-    };
+    } as unknown as Express;
     
     setupSwagger(app);
     
@@ -73,7 +74,7 @@ describe('Swagger Configuration', () => {
     const app = {
       use: jest.fn(),
       get: jest.fn()
-    };
+    } as unknown as Express;
     
     setupSwagger(app);
     

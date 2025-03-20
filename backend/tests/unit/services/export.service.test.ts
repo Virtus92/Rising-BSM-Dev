@@ -1,8 +1,18 @@
-import { generateExport, ExportFormat, ExportColumn } from '../../services/export.service';
+import { generateExport } from '../../../services/export.service';
 import Excel from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { describe, test, expect, jest } from '@jest/globals';
 
+// Define needed types locally if module can't be found
+type ExportFormat = 'csv' | 'xlsx' | 'pdf' | 'json';
+interface ExportColumn {
+  header: string;
+  key: string;
+  width?: number;
+  hidden?: boolean;
+  format?: (value: any, row?: any) => any;
+  default?: any;
+}
 // Mock Excel and PDFDocument
 jest.mock('exceljs', () => {
   return {

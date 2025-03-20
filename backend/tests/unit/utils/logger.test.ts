@@ -1,16 +1,12 @@
 import logger, { debug, info, warn, error, httpRequest } from '../../../utils/logger';
 import config from '../../../config';
-import { describe, test, expect, beforeEach, afterEach, jest, SpyInstance } from '@jest/globals';
+import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 
-// Mock config
-jest.mock('../../config', () => ({
-  LOG_LEVEL: 'info'
-}));
 describe('Logger Utility', () => {
-  let consoleDebugSpy: SpyInstance;
-  let consoleInfoSpy: SpyInstance;
-  let consoleWarnSpy: SpyInstance;
-  let consoleErrorSpy: SpyInstance;
+  let consoleDebugSpy: jest.SpyInstance;
+  let consoleInfoSpy: jest.SpyInstance;
+  let consoleWarnSpy: jest.SpyInstance;
+  let consoleErrorSpy: jest.SpyInstance;
   
   beforeEach(() => {
     // Spy on console methods to check if they're called

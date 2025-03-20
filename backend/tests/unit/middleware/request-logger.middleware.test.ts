@@ -1,10 +1,11 @@
+
 import { Request, Response } from 'express';
 import { requestLogger } from '../../../middleware/request-logger.middleware';
 import logger from '../../../utils/logger';
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 
 // Mock logger
-jest.mock('../../utils/logger', () => ({
+jest.mock('../../../utils/logger', () => ({
   httpRequest: jest.fn(),
   __esModule: true,
   default: {
@@ -23,10 +24,10 @@ describe('Request Logger Middleware', () => {
     req = {
       path: '/test',
       method: 'GET'
-    };
+    } as Partial<Request>;
     
     res = {
-      on: jest.fn(),
+      on: jest.fn() as any,
       statusCode: 200
     };
     
@@ -49,7 +50,7 @@ describe('Request Logger Middleware', () => {
     requestLogger(req as Request, res as Response, next);
     
     // Get the finish handler and call it
-    const finishHandler = (res.on as jest.Mock).mock.calls[0][1];
+    const finishHandler = (res.on as jest.Mock).mock.calls[0][1] as () => void;
     finishHandler();
     
     expect(logger.httpRequest).toHaveBeenCalledWith(
@@ -60,7 +61,8 @@ describe('Request Logger Middleware', () => {
   });
   
   test('should skip logging for health check endpoints', () => {
-    req.path = '/health';
+    // Create a new object instead of modifying read-only property
+    req = { ...req, path: '/health' } as Partial<Request>;
     
     requestLogger(req as Request, res as Response, next);
     
@@ -68,7 +70,7 @@ describe('Request Logger Middleware', () => {
     expect(next).toHaveBeenCalled();
     
     // Also test API health endpoint
-    req.path = '/api/v1/health';
+    req = { ...req, path: '/api/v1/health' } as Partial<Request>;
     
     requestLogger(req as Request, res as Response, next);
     

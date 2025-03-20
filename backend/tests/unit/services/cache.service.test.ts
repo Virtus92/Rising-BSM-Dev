@@ -54,7 +54,7 @@ import {
     describe('getOrExecute', () => {
       test('should execute function and cache result when key not found', async () => {
         const testData = { id: 1, name: 'Test' };
-        const mockFn = jest.fn().mockResolvedValue(testData);
+        const mockFn = jest.fn().mockResolvedValue(testData) as jest.Mock<Promise<typeof testData>>;
         
         const result = await getOrExecute('test-key', mockFn);
         
@@ -70,7 +70,7 @@ import {
         const testData = { id: 1, name: 'Test' };
         set('cached-key', testData);
         
-        const mockFn = jest.fn();
+        const mockFn = jest.fn() as jest.Mock<Promise<typeof testData>>;
         
         const result = await getOrExecute('cached-key', mockFn);
         
@@ -80,7 +80,7 @@ import {
       
       test('should propagate errors from executed function', async () => {
         const mockError = new Error('Test error');
-        const mockFn = jest.fn().mockRejectedValue(mockError);
+        const mockFn = jest.fn().mockRejectedValue(mockError) as jest.Mock<Promise<any>>;
         
         await expect(getOrExecute('error-key', mockFn)).rejects.toThrow(mockError);
       });
@@ -163,17 +163,23 @@ import {
     
   describe('cleanup interval', () => {
     test('should start and stop cleanup interval', () => {
-      // Mock setInterval and clearInterval
+      // Store original functions
       const originalSetInterval = global.setInterval;
       const originalClearInterval = global.clearInterval;
       
-      global.setInterval = jest.fn().mockReturnValue(123);
-      global.clearInterval = jest.fn();
+      // Create mocks
+      const mockIntervalId = {} as NodeJS.Timeout;
+      const mockSetInterval = jest.fn().mockReturnValue(mockIntervalId);
+      const mockClearInterval = jest.fn();
+      
+      // Replace global functions
+      global.setInterval = mockSetInterval as any;
+      global.clearInterval = mockClearInterval as any;
       
       // Start interval
       const startResult = startCleanupInterval();
       expect(startResult).toBe(true);
-      expect(global.setInterval).toHaveBeenCalled();
+      expect(mockSetInterval).toHaveBeenCalled();
       
       // Try to start again (should return false)
       const startAgainResult = startCleanupInterval();
@@ -182,7 +188,7 @@ import {
       // Stop interval
       const stopResult = stopCleanupInterval();
       expect(stopResult).toBe(true);
-      expect(global.clearInterval).toHaveBeenCalledWith(123);
+      expect(mockClearInterval).toHaveBeenCalledWith(mockIntervalId);
       
       // Try to stop again (should return false)
       const stopAgainResult = stopCleanupInterval();

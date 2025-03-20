@@ -3,8 +3,21 @@ import { cache } from '../../../services/cache.service';
 import { prisma } from '../../../utils/prisma.utils';
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 
+// Define notification type
+interface MockNotification {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  read: boolean;
+  createdAt: Date;
+  userId: number;
+  referenceId?: number | null;
+  referenceType?: string | null;
+}
+
 // Mock cache service
-jest.mock('../../services/cache.service', () => ({
+jest.mock('../../../services/cache.service', () => ({
   cache: {
     get: jest.fn(),
     set: jest.fn(),
@@ -13,7 +26,7 @@ jest.mock('../../services/cache.service', () => ({
 }));
 
 // Mock Prisma
-jest.mock('../../utils/prisma.utils', () => ({
+jest.mock('../../../utils/prisma.utils', () => ({
   prisma: {
     notification: {
       create: jest.fn(),
@@ -25,7 +38,7 @@ jest.mock('../../utils/prisma.utils', () => ({
 }));
 
 // Mock formatters
-jest.mock('../../utils/formatters', () => ({
+jest.mock('../../../utils/formatters', () => ({
   formatRelativeTime: jest.fn().mockReturnValue('5 minutes ago')
 }));
 
@@ -43,12 +56,13 @@ describe('Notification Service', () => {
         message: 'You have a new request'
       };
       
+      // Type the mock implementation with the correct return type
       (prisma.notification.create as jest.Mock).mockResolvedValue({
         id: 123,
         ...notificationData,
         read: false,
         createdAt: new Date()
-      });
+      } as MockNotification);
       
       const result = await notificationService.create(notificationData);
       
@@ -119,9 +133,10 @@ describe('Notification Service', () => {
           type: 'anfrage',
           read: false,
           createdAt: new Date(),
+          userId: 1,
           referenceId: 123,
           referenceType: 'request'
-        }
+        } as MockNotification
       ]);
       
       (prisma.notification.count as jest.Mock)
@@ -289,7 +304,7 @@ describe('Notification Service', () => {
     });
     
     test('should handle errors gracefully', async () => {
-      (prisma.notification.count as jest.Mock).mockRejectedValue(new Error('Database error'));
+      (prisma.notification.count as jest.Mock).mockRejectedValue(new Error('Database error') as never);
       
       // Spy on console.error to silence it
       jest.spyOn(console, 'error').mockImplementation(() => {});
