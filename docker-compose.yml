@@ -19,28 +19,27 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend service
+  # API service
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: rising-bsm-backend
+    container_name: rising-bsm-api
     env_file:
-      - ./.env
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-      - /app/prisma/generated
+      - .env
     ports:
-      - "5000:5000"
+      - "${PORT}:5000"
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
     networks:
       - rising-bsm-network
     command: >
-      sh -c "chmod +x ./wait-for-db.sh && ./wait-for-db.sh && npm run dev"
-
+      sh -c "npx prisma generate && npm run dev"
+  
   # Frontend service 
   frontend:
     build:

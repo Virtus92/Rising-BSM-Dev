@@ -1,18 +1,7 @@
 import { Router } from 'express';
-import { isAuthenticated, isAdmin } from '../middleware/auth.middleware';
-import { ParamsDictionary } from 'express-serve-static-core';
-
-// Define param interfaces for API routes
-interface IdParam extends ParamsDictionary {
-  id: string;
-}
-
-interface TokenParam extends ParamsDictionary {
-  token: string;
-}
+import { authenticate, isAdmin } from '../middleware/auth.middleware';
 
 // Import controllers
-import * as authController from '../controllers/auth.controller';
 import * as customerController from '../controllers/customer.controller';
 import * as projectController from '../controllers/project.controller';
 import * as appointmentController from '../controllers/appointment.controller';
@@ -20,67 +9,74 @@ import * as serviceController from '../controllers/service.controller';
 import * as requestController from '../controllers/request.controller';
 import * as profileController from '../controllers/profile.controller';
 import * as dashboardController from '../controllers/dashboard.controller';
+import * as settingsController from '../controllers/settings.controller';
 
 const router = Router();
 
-// Auth routes
-router.post('/auth/login', authController.login);
-router.post('/auth/refresh-token', authController.refreshToken);
-router.post('/auth/forgot-password', authController.forgotPassword);
-router.get<TokenParam>('/auth/reset-token/:token', authController.validateResetToken);
-router.post<TokenParam>('/auth/reset-password/:token', authController.resetPassword);
-router.post('/auth/logout', isAuthenticated, authController.logout);
+// Customers
+router.get('/customers', authenticate, customerController.getAllCustomers);
+router.get('/customers/:id', authenticate, customerController.getCustomerById);
+router.post('/customers', authenticate, customerController.createCustomer);
+router.put('/customers/:id', authenticate, customerController.updateCustomer);
+router.patch('/customers/status', authenticate, customerController.updateCustomerStatus);
+router.post('/customers/:id/notes', authenticate, customerController.addCustomerNote);
+router.delete('/customers/:id', authenticate, customerController.deleteCustomer);
 
-// Customer routes
-router.get('/customers', isAuthenticated, customerController.getAllCustomers);
-router.get<IdParam>('/customers/:id', isAuthenticated, customerController.getCustomerById);
-router.post('/customers', isAuthenticated, customerController.createCustomer);
-router.put<IdParam>('/customers/:id', isAuthenticated, customerController.updateCustomer);
-router.post('/customers/status', isAuthenticated, customerController.updateCustomerStatus);
-router.post<IdParam>('/customers/:id/notes', isAuthenticated, customerController.addCustomerNote);
-router.delete('/customers', isAuthenticated, customerController.deleteCustomer);
+// Projects
+router.get('/projects', authenticate, projectController.getAllProjects);
+router.get('/projects/:id', authenticate, projectController.getProjectById);
+router.post('/projects', authenticate, projectController.createProject);
+router.put('/projects/:id', authenticate, projectController.updateProject);
+router.patch('/projects/:id/status', authenticate, projectController.updateProjectStatus);
+router.post('/projects/:id/notes', authenticate, projectController.addProjectNote);
+router.get('/projects/export', authenticate, projectController.exportProjects);
 
-// Project routes
-router.get('/projects', isAuthenticated, projectController.getAllProjects);
-router.get<IdParam>('/projects/:id', isAuthenticated, projectController.getProjectById);
-router.post('/projects', isAuthenticated, projectController.createProject);
-router.put<IdParam>('/projects/:id', isAuthenticated, projectController.updateProject);
-router.post('/projects/status', isAuthenticated, projectController.updateProjectStatus);
-router.post<IdParam>('/projects/:id/notes', isAuthenticated, projectController.addProjectNote);
+// Appointments
+router.get('/appointments', authenticate, appointmentController.getAllAppointments);
+router.get('/appointments/:id', authenticate, appointmentController.getAppointmentById);
+router.post('/appointments', authenticate, appointmentController.createAppointment);
+router.put('/appointments/:id', authenticate, appointmentController.updateAppointment);
+router.patch('/appointments/:id/status', authenticate, appointmentController.updateAppointmentStatus);
+router.post('/appointments/:id/notes', authenticate, appointmentController.addAppointmentNote);
+router.delete('/appointments/:id', authenticate, appointmentController.deleteAppointment);
 
-// Appointment routes
-router.get('/appointments', isAuthenticated, appointmentController.getAllAppointments);
-router.get<IdParam>('/appointments/:id', isAuthenticated, appointmentController.getAppointmentById);
-router.post('/appointments', isAuthenticated, appointmentController.createAppointment);
-router.put<IdParam>('/appointments/:id', isAuthenticated, appointmentController.updateAppointment);
-router.post('/appointments/status', isAuthenticated, appointmentController.updateAppointmentStatus);
-router.post<IdParam>('/appointments/:id/notes', isAuthenticated, appointmentController.addAppointmentNote);
-router.delete<IdParam>('/appointments/:id', isAuthenticated, appointmentController.deleteAppointment);
+// Services
+router.get('/services', authenticate, serviceController.getAllServices);
+router.get('/services/:id', authenticate, serviceController.getServiceById);
+router.post('/services', authenticate, serviceController.createService);
+router.put('/services/:id', authenticate, serviceController.updateService);
+router.patch('/services/:id/status', authenticate, serviceController.toggleServiceStatus);
+router.get('/services/:id/statistics', authenticate, serviceController.getServiceStatistics);
 
-// Service routes
-router.get('/services', isAuthenticated, serviceController.getAllServices);
-router.get<IdParam>('/services/:id', isAuthenticated, serviceController.getServiceById);
-router.post('/services', isAuthenticated, serviceController.createService);
-router.put<IdParam>('/services/:id', isAuthenticated, serviceController.updateService);
-router.post<IdParam>('/services/:id/status', isAuthenticated, serviceController.toggleServiceStatus);
-router.get<IdParam>('/services/:id/statistics', isAuthenticated, serviceController.getServiceStatistics);
+// Requests (contact requests)
+router.get('/requests', authenticate, requestController.getAllRequests);
+router.get('/requests/:id', authenticate, requestController.getRequestById);
+router.patch('/requests/:id/status', authenticate, requestController.updateRequestStatus);
+router.post('/requests/:id/notes', authenticate, requestController.addRequestNote);
+router.get('/requests/export', authenticate, requestController.exportRequests);
 
-// Request routes (contact requests)
-router.get('/requests', isAuthenticated, requestController.getAllRequests);
-router.get<IdParam>('/requests/:id', isAuthenticated, requestController.getRequestById);
-router.post('/requests/status', isAuthenticated, requestController.updateRequestStatus);
-router.post<IdParam>('/requests/:id/notes', isAuthenticated, requestController.addRequestNote);
+// Profile
+router.get('/profile', authenticate, profileController.getUserProfile);
+router.put('/profile', authenticate, profileController.updateProfile);
+router.patch('/profile/password', authenticate, profileController.updatePassword);
+router.patch('/profile/picture', authenticate, profileController.updateProfilePicture);
+router.patch('/profile/notifications', authenticate, profileController.updateNotificationSettings);
 
-// Profile routes
-router.get('/profile', isAuthenticated, profileController.getUserProfile);
-router.put('/profile', isAuthenticated, profileController.updateProfile);
-router.post('/profile/password', isAuthenticated, profileController.updatePassword);
-router.post('/profile/notifications', isAuthenticated, profileController.updateNotificationSettings);
+// Dashboard
+router.get('/dashboard/stats', authenticate, dashboardController.getDashboardStats);
+router.get('/dashboard/search', authenticate, dashboardController.globalSearch);
+router.get('/dashboard/notifications', authenticate, dashboardController.getNotifications);
+router.post('/dashboard/notifications/mark-read', authenticate, dashboardController.markNotificationsRead);
 
-// Dashboard routes
-router.get('/dashboard/stats', isAuthenticated, dashboardController.getDashboardStats);
-router.get('/dashboard/search', isAuthenticated, dashboardController.globalSearch);
-router.get('/dashboard/notifications', isAuthenticated, dashboardController.getNotifications);
-router.post('/dashboard/notifications/mark-read', isAuthenticated, dashboardController.markNotificationsRead);
+// Settings (admin only)
+router.get('/settings/system', authenticate, isAdmin, settingsController.getSystemSettings);
+router.put('/settings/system', authenticate, isAdmin, settingsController.updateSystemSettings);
+router.get('/settings/backup', authenticate, isAdmin, settingsController.getBackupSettings);
+router.put('/settings/backup', authenticate, isAdmin, settingsController.updateBackupSettings);
+router.post('/settings/backup/trigger', authenticate, isAdmin, settingsController.triggerManualBackup);
+
+// User settings
+router.get('/settings', authenticate, settingsController.getUserSettings);
+router.put('/settings', authenticate, settingsController.updateUserSettings);
 
 export default router;

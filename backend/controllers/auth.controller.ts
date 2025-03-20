@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { prisma } from '../utils/prisma.utils';
+import prisma from '../utils/prisma.utils';
 import { validateInput, validatePassword } from '../utils/validators';
 import { UnauthorizedError, ValidationError, NotFoundError } from '../utils/errors';
-import { generateAuthTokens, verifyToken } from '../utils/jwt';
+import { generateAuthTokens, verifyRefreshToken } from '../utils/jwt';
 import { asyncHandler } from '../utils/asyncHandler';
 import config from '../config';
 import { AuthenticatedRequest } from '../types/authenticated-request';
@@ -85,11 +85,6 @@ export const login = asyncHandler(async (req: Request, res: Response): Promise<v
     role: user.role,
     initials: user.name.split(' ').map((n: string) => n[0]).join('')
   };
-
-  // Set user in session for backward compatibility
-  if (req.session) {
-    req.session.user = userData;
-  }
 
   // Return tokens and user data
   res.status(200).json({ 
@@ -359,15 +354,6 @@ export const logout = asyncHandler(async (req: AuthenticatedRequest, res: Respon
         userId: req.user.id,
         activity: 'logout',
         ipAddress: req.ip || '0.0.0.0'
-      }
-    });
-  }
-  
-  // Clear session for backward compatibility
-  if (req.session) {
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Session destruction error:', err);
       }
     });
   }

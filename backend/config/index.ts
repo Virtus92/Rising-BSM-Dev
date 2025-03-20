@@ -1,6 +1,6 @@
 /**
  * Application Configuration
- * Centralizes all environment variables and configuration settings
+ * Centralizes all environment variables and configuration settings for the API
  */
 
 // Load environment variables
@@ -58,27 +58,28 @@ export const IS_DEVELOPMENT = NODE_ENV === 'development';
 export const IS_TEST = NODE_ENV === 'test';
 
 // Server settings
-export const PORT = env<number>('BACKEND_PORT', 5000);
-export const HOST = env<string>('BACKEND_HOST', 'localhost');
-export const API_PREFIX = env<string>('API_PREFIX', '/api');
-export const FRONTEND_URL = env<string>('FRONTEND_URL', 'http://localhost:3000');
+export const PORT = env<number>('PORT', 5000);
+export const HOST = env<string>('HOST', 'localhost');
+export const API_PREFIX = env<string>('API_PREFIX', '/api/v1');
 
 // Security settings
 export const CORS_ENABLED = env<boolean>('CORS_ENABLED', true);
-export const CORS_ORIGINS = env<string>('CORS_ORIGINS', FRONTEND_URL)
+export const CORS_ORIGINS = env<string>('CORS_ORIGINS', 'http://localhost:3000')
   .split(',')
   .map(origin => origin.trim());
 
 // Authentication settings
-export const AUTH_MODE = env<'jwt'>('AUTH_MODE', 'jwt');
 export const JWT_SECRET = env<string>('JWT_SECRET', 'your-default-super-secret-key-change-in-production');
 export const JWT_EXPIRES_IN = env<string>('JWT_EXPIRES_IN', '1h');
 export const JWT_REFRESH_SECRET = env<string>('JWT_REFRESH_SECRET', 'your-refresh-default-key-change-in-production');
 export const JWT_REFRESH_EXPIRES_IN = env<string>('JWT_REFRESH_EXPIRES_IN', '7d');
 export const JWT_REFRESH_TOKEN_ROTATION = env<boolean>('JWT_REFRESH_TOKEN_ROTATION', true);
 export const VERIFY_JWT_USER_IN_DB = env<boolean>('VERIFY_JWT_USER_IN_DB', true);
-export const SESSION_SECRET = env<string>('SESSION_SECRET', 'session-secret-change-in-production');
-export const SESSION_MAX_AGE = env<number>('SESSION_MAX_AGE', 24 * 60 * 60 * 1000); // 1 day in ms
+
+// Rate limiting
+export const RATE_LIMIT_WINDOW_MS = env<number>('RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000); // 15 minutes
+export const RATE_LIMIT_MAX = env<number>('RATE_LIMIT_MAX', 100);
+export const RATE_LIMIT_STANDARDIZE = env<boolean>('RATE_LIMIT_STANDARDIZE', true);
  
 // Database settings
 export const DB_HOST = env<string>('DB_HOST', 'localhost');
@@ -101,8 +102,16 @@ export const CACHE_ENABLED = env<boolean>('CACHE_ENABLED', true);
 export const DEFAULT_CACHE_TTL = env<number>('DEFAULT_CACHE_TTL', 300); // 5 minutes
 export const CACHE_CHECK_PERIOD = env<number>('CACHE_CHECK_PERIOD', 60 * 1000); // 1 minute
 
+// Uploads
+export const UPLOAD_DIR = env<string>('UPLOAD_DIR', 'uploads');
+export const MAX_FILE_SIZE = env<number>('MAX_FILE_SIZE', 5 * 1024 * 1024); // 5MB
+
 // Error settings
 export const SHOW_STACK_TRACES = env<boolean>('SHOW_STACK_TRACES', !IS_PRODUCTION);
+
+// Log level
+export const LOG_LEVEL = env<string>('LOG_LEVEL', IS_PRODUCTION ? 'info' : 'debug');
+export const LOG_FORMAT = env<string>('LOG_FORMAT', 'combined');
 
 // Export all configurations as a single object
 export default {
@@ -113,18 +122,17 @@ export default {
   PORT,
   HOST,
   API_PREFIX,
-  FRONTEND_URL,
   CORS_ENABLED,
   CORS_ORIGINS,
-  AUTH_MODE,
   JWT_SECRET,
   JWT_EXPIRES_IN,
   JWT_REFRESH_SECRET,
   JWT_REFRESH_EXPIRES_IN,
   JWT_REFRESH_TOKEN_ROTATION,
   VERIFY_JWT_USER_IN_DB,
-  SESSION_SECRET,
-  SESSION_MAX_AGE,
+  RATE_LIMIT_WINDOW_MS,
+  RATE_LIMIT_MAX,
+  RATE_LIMIT_STANDARDIZE,
   DB_HOST,
   DB_PORT,
   DB_NAME,
@@ -137,5 +145,9 @@ export default {
   CACHE_ENABLED,
   DEFAULT_CACHE_TTL,
   CACHE_CHECK_PERIOD,
-  SHOW_STACK_TRACES
+  UPLOAD_DIR,
+  MAX_FILE_SIZE,
+  SHOW_STACK_TRACES,
+  LOG_LEVEL,
+  LOG_FORMAT
 };

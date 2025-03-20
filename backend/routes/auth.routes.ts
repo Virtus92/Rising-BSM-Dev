@@ -1,82 +1,15 @@
-import { Router, Request, Response } from 'express';
-import { isNotAuthenticated } from '../middleware/auth.middleware';
+import { Router } from 'express';
 import * as authController from '../controllers/auth.controller';
-import { ParamsDictionary } from 'express-serve-static-core';
-
-interface TokenParams extends ParamsDictionary {
-  token: string;
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      csrfToken(): string;
-    }
-  }
-}
+import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
-/**
- * @route   GET /login
- * @desc    Render login page
- */
-router.get('/login', isNotAuthenticated, (req: Request, res: Response) => {
-  res.render('login', {
-    title: 'Login - Rising BSM',
-    error: req.flash('error')[0] || null,
-    success: req.flash('success')[0] || null,
-    csrfToken: req.csrfToken()
-  });
-});
-
-/**
- * @route   POST /login
- * @desc    Process login
- */
-router.post('/login', isNotAuthenticated, authController.login);
-
-/**
- * @route   GET /logout
- * @desc    Process logout
- */
-router.post('/logout', authController.logout);
-
-/**
- * @route   GET /forgot-password
- * @desc    Render forgot password page
- */
-router.get('/forgot-password', isNotAuthenticated, (req: Request, res: Response) => {
-  res.render('forgot-password', {
-    title: 'Passwort vergessen - Rising BSM',
-    error: req.flash('error')[0] || null,
-    success: req.flash('success')[0] || null,
-    csrfToken: req.csrfToken()
-  });
-});
-
-/**
- * @route   POST /forgot-password
- * @desc    Process forgot password request
- */
-router.post('/forgot-password', isNotAuthenticated, authController.forgotPassword);
-
-/**
- * @route   GET /reset-password/:token
- * @desc    Render reset password page
- */
-router.get<TokenParams>('/reset-password/:token', isNotAuthenticated, authController.validateResetToken);
-
-/**
- * @route   POST /reset-password/:token
- * @desc    Process reset password
- */
-router.post<TokenParams>('/reset-password/:token', isNotAuthenticated, authController.resetPassword);
-
-/**
- * @route   POST /refresh-token
- * @desc    Refresh access token
- */
+// Authentication routes
+router.post('/login', authController.login);
 router.post('/refresh-token', authController.refreshToken);
+router.post('/forgot-password', authController.forgotPassword);
+router.get('/reset-token/:token', authController.validateResetToken);
+router.post('/reset-password/:token', authController.resetPassword);
+router.post('/logout', authenticate, authController.logout);
 
 export default router;
