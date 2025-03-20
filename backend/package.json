@@ -6,9 +6,8 @@
     "scripts": {
         "start": "node dist/server.js",
         "dev": "ts-node-dev --respawn --transpile-only server.ts",
-        "build": "tsc -p tsconfig.json",
         "prisma:generate": "prisma generate",
-        "dev:ts": "ts-node-dev --respawn --transpile-only server.ts",
+        "build": "tsc -p tsconfig.json",
         "build:watch": "tsc -w",
         "migrate": "prisma migrate dev",
         "test": "jest",
