@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client';
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma.utils';
 import { formatDateSafely } from '../utils/formatters';

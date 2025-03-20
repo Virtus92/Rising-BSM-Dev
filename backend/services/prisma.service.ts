@@ -1,19 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../utils/prisma.utils';
 
-// Prevent multiple instances of Prisma Client in development
-declare global {
-  var prisma: PrismaClient | undefined;
-}
-
-export const prisma = global.prisma || new PrismaClient({
-  log: process.env.NODE_ENV === 'development' 
-    ? ['query', 'error', 'warn'] 
-    : ['error'],
-});
-
-if (process.env.NODE_ENV !== 'production') {
-  global.prisma = prisma;
-}
+// Re-export the singleton instance
+export { prisma };
 
 // Graceful shutdown
 process.on('beforeExit', async () => {

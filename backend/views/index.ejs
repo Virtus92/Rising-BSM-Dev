@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title><%= title %></title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .status-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .status-ok { background-color: #e6f3e6; }
+        .status-error { background-color: #f3e6e6; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 10px; 
+            text-align: left; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Rising BSM - Systemdiagnose</h1>
+
+    <section>
+        <h2>Systemstatus</h2>
+        <div class="status-grid">
+            <div class="status-card <%= systemStatus.databaseStatus === 'OK' ? 'status-ok' : 'status-error' %>">
+                <h3>Datenbank</h3>
+                <p>Status: <%= systemStatus.databaseStatus %></p>
+            </div>
+            <div class="status-card">
+                <h3>Benutzer</h3>
+                <p>Anzahl: <%= systemStatus.totalUsers %></p>
+            </div>
+            <div class="status-card">
+                <h3>Kontaktanfragen</h3>
+                <p>Anzahl: <%= systemStatus.totalContactRequests %></p>
+            </div>
+            <div class="status-card">
+                <h3>Projekte</h3>
+                <p>Anzahl: <%= systemStatus.totalProjects %></p>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>API-Endpunkte</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Methode</th>
+                    <th>Pfad</th>
+                    <th>Beschreibung</th>
+                    <th>Aktion</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% apiEndpoints.forEach(function(endpoint) { %>
+                <tr>
+                    <td><%= endpoint.method %></td>
+                    <td><%= endpoint.path %></td>
+                    <td><%= endpoint.description %></td>
+                    <td>
+                        <a href="<%= endpoint.testLink %>">Testen</a>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h2>Systemumgebung</h2>
+        <pre><%= JSON.stringify(systemStatus, null, 2) %></pre>
+    </section>
+</body>
+</html>

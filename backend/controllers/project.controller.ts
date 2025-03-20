@@ -1,6 +1,5 @@
 // controllers/project.controller.ts
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import prisma from '../utils/prisma.utils';
 import { formatDateSafely } from '../utils/formatters';
 import { getProjektStatusInfo, getTerminStatusInfo } from '../utils/helpers';

@@ -27,12 +27,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: rising-bsm-backend
+    env_file:
+      - ./.env
     environment:
-      - NODE_ENV=development
-      - PORT=5000
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/rising_bsm?schema=public
-      - JWT_SECRET=your-default-super-secret-key-change-in-production
-      - JWT_REFRESH_SECRET=your-refresh-default-key-change-in-production
+    - DATABASE_URL=postgresql://postgres:postgres@db:5432/rising_bsm?schema=public
     ports:
       - "5000:5000"
     depends_on:
@@ -41,6 +39,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - /app/prisma/generated
     networks:
       - rising-bsm-network
     command: >
@@ -52,6 +51,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: rising-bsm-frontend
+    env_file:
+      - ./.env
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:5000

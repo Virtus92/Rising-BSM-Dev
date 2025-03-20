@@ -1,8 +1,6 @@
 // controllers/appointment.controller.ts
 import { Request, Response } from 'express';
-import { ParamsDictionary } from 'express-serve-static-core';
 import prisma from '../utils/prisma.utils';
-import { PrismaClient } from '@prisma/client';
 import { formatDateSafely } from '../utils/formatters';
 import { getTerminStatusInfo } from '../utils/helpers';
 import { 

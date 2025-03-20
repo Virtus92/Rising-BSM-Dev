@@ -1,27 +1,39 @@
-FROM node:18-alpine
+FROM node:18-slim
+
+# Debian-basierte Pakete für Prisma installieren
+RUN apt-get update && apt-get install -y \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json
+# Kopieren Sie package.json und package-lock.json
 COPY package*.json ./
 
-# Install dependencies
+# Abhängigkeiten installieren
 RUN npm install
 
-# Copy TypeScript config
+# TypeScript-Konfiguration kopieren
 COPY tsconfig.json ./
 
-# Copy prisma schema separately
+# Prisma-Schema kopieren
 COPY prisma ./prisma/
 
-# Generate Prisma client before copying the rest of the app
+# Prisma Client generieren
 RUN npx prisma generate
 
-# Build TypeScript code
+# Den Rest der App kopieren
+COPY . .
+
+# TypeScript-Code kompilieren
 RUN npm run build
 
-# Expose the application port
+# Port freigeben
 EXPOSE 5000
 
-# Command to run the app
+# Für Entwicklung
 CMD ["npm", "run", "dev"]
+
+# Für Produktion
+# CMD ["npm", "start"]
