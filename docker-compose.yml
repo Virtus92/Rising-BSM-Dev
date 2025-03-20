@@ -27,6 +27,10 @@ services:
     container_name: rising-bsm-backend
     env_file:
       - ./.env
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - /app/prisma/generated
     ports:
       - "5000:5000"
     depends_on:
@@ -34,6 +38,8 @@ services:
         condition: service_healthy
     networks:
       - rising-bsm-network
+    command: >
+      sh -c "chmod +x ./wait-for-db.sh && ./wait-for-db.sh && npm run dev"
 
   # Frontend service 
   frontend:
