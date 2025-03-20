@@ -3,7 +3,7 @@
  * Common utility functions used across the application
  */
 import { cache } from '../services/cache.service';
-import prisma from './prisma.utils';
+import { prisma } from './prisma.utils';
 
 /**
  * Status information with label and class name

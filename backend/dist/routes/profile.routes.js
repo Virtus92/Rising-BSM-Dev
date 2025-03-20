@@ -41,10 +41,7 @@ const auth_middleware_1 = require("../middleware/auth.middleware");
 const profileController = __importStar(require("../controllers/profile.controller"));
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
-// Since this file doesn't use :id parameters in routes, we can remove this interface
-// or keep it for potential future use, but with proper typing
 const router = (0, express_1.Router)();
-// Configure file upload for profile pictures
 const storage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
         cb(null, path_1.default.join(__dirname, '../public/uploads/profile'));
@@ -57,7 +54,7 @@ const storage = multer_1.default.diskStorage({
 });
 const upload = (0, multer_1.default)({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedTypes = /jpeg|jpg|png|gif/;
         const extname = allowedTypes.test(path_1.default.extname(file.originalname).toLowerCase());
@@ -70,32 +67,11 @@ const upload = (0, multer_1.default)({
         }
     }
 });
-// Apply authentication middleware to all routes
 router.use(auth_middleware_1.isAuthenticated);
-/**
- * @route   GET /dashboard/profile
- * @desc    Get user profile data
- */
 router.get('/', profileController.getUserProfile);
-/**
- * @route   PUT /dashboard/profile
- * @desc    Update user profile
- */
 router.put('/', profileController.updateProfile);
-/**
- * @route   POST /dashboard/profile/password
- * @desc    Update user password
- */
 router.post('/password', profileController.updatePassword);
-/**
- * @route   POST /dashboard/profile/picture
- * @desc    Update profile picture
- */
 router.post('/picture', upload.single('profile_picture'), profileController.updateProfilePicture);
-/**
- * @route   POST /dashboard/profile/notifications
- * @desc    Update notification settings
- */
 router.post('/notifications', profileController.updateNotificationSettings);
 exports.default = router;
 //# sourceMappingURL=profile.routes.js.map

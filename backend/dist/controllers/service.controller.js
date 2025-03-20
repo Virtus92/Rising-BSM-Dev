@@ -4,24 +4,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getServiceStatistics = exports.toggleServiceStatus = exports.updateService = exports.createService = exports.getServiceById = exports.getAllServices = void 0;
-const prisma_utils_1 = __importDefault(require("../utils/prisma.utils"));
+const prisma_utils_1 = require("../utils/prisma.utils");
 const formatters_1 = require("../utils/formatters");
 const errors_1 = require("../utils/errors");
 const validators_1 = require("../utils/validators");
 const asyncHandler_1 = require("../utils/asyncHandler");
 const config_1 = __importDefault(require("../config"));
 const validation_types_1 = require("../utils/validation-types");
-/**
- * Get all services with optional filtering
- */
 exports.getAllServices = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    // Extract filter parameters
     const { status, search, page = 1, limit = config_1.default.DEFAULT_PAGE_SIZE } = req.query;
-    // Validate and sanitize pagination parameters
     const pageNumber = Math.max(1, Number(page) || 1);
     const pageSize = Math.min(config_1.default.MAX_PAGE_SIZE, Math.max(1, Number(limit) || config_1.default.DEFAULT_PAGE_SIZE));
     const skip = (pageNumber - 1) * pageSize;
-    // Build filter conditions
     const where = {};
     if (status === 'aktiv') {
         where.active = true;
@@ -35,17 +29,15 @@ exports.getAllServices = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             { description: { contains: search, mode: 'insensitive' } }
         ];
     }
-    // Execute queries in parallel
     const [services, totalCount] = await Promise.all([
-        prisma_utils_1.default.service.findMany({
+        prisma_utils_1.prisma.service.findMany({
             where,
             orderBy: { name: 'asc' },
             take: pageSize,
             skip
         }),
-        prisma_utils_1.default.service.count({ where })
+        prisma_utils_1.prisma.service.count({ where })
     ]);
-    // Format service data
     const formattedServices = services.map((service) => ({
         id: service.id,
         name: service.name,
@@ -57,9 +49,7 @@ exports.getAllServices = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         created_at: (0, formatters_1.formatDateSafely)(service.createdAt, 'dd.MM.yyyy'),
         updated_at: (0, formatters_1.formatDateSafely)(service.updatedAt, 'dd.MM.yyyy')
     }));
-    // Calculate pagination data
     const totalPages = Math.ceil(totalCount / pageSize);
-    // Return data object for rendering or JSON response
     res.status(200).json({
         success: true,
         services: formattedServices,
@@ -75,23 +65,18 @@ exports.getAllServices = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         }
     });
 });
-/**
- * Get service by ID
- */
 exports.getServiceById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id } = req.params;
     const serviceId = Number(id);
     if (isNaN(serviceId)) {
         throw new errors_1.BadRequestError('Invalid service ID');
     }
-    // Get service details
-    const service = await prisma_utils_1.default.service.findUnique({
+    const service = await prisma_utils_1.prisma.service.findUnique({
         where: { id: serviceId }
     });
     if (!service) {
         throw new errors_1.NotFoundError(`Service with ID ${serviceId} not found`);
     }
-    // Format service data for response
     res.status(200).json({
         success: true,
         service: {
@@ -107,11 +92,7 @@ exports.getServiceById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         }
     });
 });
-/**
- * Create a new service
- */
 exports.createService = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    // Validation schema
     const validationSchema = {
         name: { type: 'text', required: true, minLength: 2 },
         beschreibung: { type: 'text', required: false },
@@ -120,11 +101,9 @@ exports.createService = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         mwst_satz: { type: 'numeric', required: false },
         aktiv: { type: 'text', required: false }
     };
-    // Convert to base schema
     const baseSchema = (0, validation_types_1.convertValidationSchema)(validationSchema);
     const { validatedData } = (0, validators_1.validateInput)(req.body, baseSchema, { throwOnError: true });
-    // Insert service into database
-    const newService = await prisma_utils_1.default.service.create({
+    const newService = await prisma_utils_1.prisma.service.create({
         data: {
             name: validatedData.name,
             description: validatedData.beschreibung || null,
@@ -134,9 +113,8 @@ exports.createService = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             active: validatedData.aktiv === 'on' || validatedData.aktiv === true
         }
     });
-    // Log the activity
     if (req.user?.id) {
-        await prisma_utils_1.default.serviceLog.create({
+        await prisma_utils_1.prisma.serviceLog.create({
             data: {
                 serviceId: newService.id,
                 userId: req.user.id,
@@ -152,16 +130,12 @@ exports.createService = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         message: 'Service created successfully'
     });
 });
-/**
- * Update an existing service
- */
 exports.updateService = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id } = req.params;
     const serviceId = Number(id);
     if (isNaN(serviceId)) {
         throw new errors_1.BadRequestError('Invalid service ID');
     }
-    // Validation schema
     const validationSchema = {
         name: { type: 'text', required: true, minLength: 2 },
         beschreibung: { type: 'text', required: false },
@@ -170,18 +144,15 @@ exports.updateService = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         mwst_satz: { type: 'numeric', required: false },
         aktiv: { type: 'text', required: false }
     };
-    // Convert to base schema
     const baseSchema = (0, validation_types_1.convertValidationSchema)(validationSchema);
     const { validatedData } = (0, validators_1.validateInput)(req.body, baseSchema, { throwOnError: true });
-    // Check if service exists
-    const service = await prisma_utils_1.default.service.findUnique({
+    const service = await prisma_utils_1.prisma.service.findUnique({
         where: { id: serviceId }
     });
     if (!service) {
         throw new errors_1.NotFoundError(`Service with ID ${serviceId} not found`);
     }
-    // Update service in database
-    const updatedService = await prisma_utils_1.default.service.update({
+    const updatedService = await prisma_utils_1.prisma.service.update({
         where: { id: serviceId },
         data: {
             name: validatedData.name,
@@ -193,9 +164,8 @@ exports.updateService = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             updatedAt: new Date()
         }
     });
-    // Log the activity
     if (req.user?.id) {
-        await prisma_utils_1.default.serviceLog.create({
+        await prisma_utils_1.prisma.serviceLog.create({
             data: {
                 serviceId,
                 userId: req.user.id,
@@ -211,9 +181,6 @@ exports.updateService = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         message: 'Service updated successfully'
     });
 });
-/**
- * Toggle service status (active/inactive)
- */
 exports.toggleServiceStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id } = req.params;
     const serviceId = Number(id);
@@ -221,25 +188,22 @@ exports.toggleServiceStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) 
     if (isNaN(serviceId)) {
         throw new errors_1.BadRequestError('Invalid service ID');
     }
-    // Check if service exists
-    const service = await prisma_utils_1.default.service.findUnique({
+    const service = await prisma_utils_1.prisma.service.findUnique({
         where: { id: serviceId }
     });
     if (!service) {
         throw new errors_1.NotFoundError(`Service with ID ${serviceId} not found`);
     }
     const newStatus = aktiv === 'on' || aktiv === true;
-    // Update service status in database
-    await prisma_utils_1.default.service.update({
+    await prisma_utils_1.prisma.service.update({
         where: { id: serviceId },
         data: {
             active: newStatus,
             updatedAt: new Date()
         }
     });
-    // Log the activity
     if (req.user?.id) {
-        await prisma_utils_1.default.serviceLog.create({
+        await prisma_utils_1.prisma.serviceLog.create({
             data: {
                 serviceId,
                 userId: req.user.id,
@@ -255,33 +219,26 @@ exports.toggleServiceStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) 
         message: `Service ${newStatus ? 'activated' : 'deactivated'} successfully`
     });
 });
-/**
- * Get service statistics
- */
 exports.getServiceStatistics = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id } = req.params;
     const serviceId = Number(id);
     if (isNaN(serviceId)) {
         throw new errors_1.BadRequestError('Invalid service ID');
     }
-    // Validate service exists
-    const service = await prisma_utils_1.default.service.findUnique({
+    const service = await prisma_utils_1.prisma.service.findUnique({
         where: { id: serviceId }
     });
     if (!service) {
         throw new errors_1.NotFoundError(`Service with ID ${serviceId} not found`);
     }
-    // Execute statistics queries in parallel
     const [invoicePositions, topCustomers] = await Promise.all([
-        // Total revenue for this service
-        prisma_utils_1.default.invoicePosition.findMany({
+        prisma_utils_1.prisma.invoicePosition.findMany({
             where: { serviceId },
             include: {
                 Invoice: true
             }
         }),
-        // Top customers for this service (using Prisma instead of raw SQL)
-        prisma_utils_1.default.invoicePosition.groupBy({
+        prisma_utils_1.prisma.invoicePosition.groupBy({
             by: ['invoiceId'],
             where: { serviceId },
             _sum: {
@@ -295,10 +252,8 @@ exports.getServiceStatistics = (0, asyncHandler_1.asyncHandler)(async (req, res)
             },
             take: 5
         }).then(async (results) => {
-            // Get invoice IDs
             const invoiceIds = results.map((item) => item.invoiceId);
-            // Get customer information from invoices
-            const invoices = await prisma_utils_1.default.invoice.findMany({
+            const invoices = await prisma_utils_1.prisma.invoice.findMany({
                 where: {
                     id: { in: invoiceIds }
                 },
@@ -313,9 +268,7 @@ exports.getServiceStatistics = (0, asyncHandler_1.asyncHandler)(async (req, res)
             });
         })
     ]);
-    // Calculate total revenue
     const totalRevenue = invoicePositions.reduce((sum, pos) => sum + (Number(pos.quantity) * Number(pos.unitPrice)), 0);
-    // Group by month for monthly revenue
     const invoicesByMonth = invoicePositions.reduce((acc, pos) => {
         if (!pos.Invoice || !pos.Invoice.invoiceDate)
             return acc;

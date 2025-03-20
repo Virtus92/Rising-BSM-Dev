@@ -1,13 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.prisma = void 0;
 const client_1 = require("@prisma/client");
-// Create a new PrismaClient if one doesn't exist, or use the existing one
-const prisma = global.prisma || new client_1.PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+exports.prisma = global.prisma || new client_1.PrismaClient({
+    log: process.env.NODE_ENV === 'development'
+        ? ['query', 'error', 'warn']
+        : ['error'],
 });
-// In development, store the instance on the global object to prevent multiple instances
 if (process.env.NODE_ENV !== 'production') {
-    global.prisma = prisma;
+    global.prisma = exports.prisma;
 }
-exports.default = prisma;
+process.on('beforeExit', async () => {
+    await exports.prisma.$disconnect();
+});
+exports.default = exports.prisma;
 //# sourceMappingURL=prisma.utils.js.map

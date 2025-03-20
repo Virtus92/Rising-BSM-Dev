@@ -36,44 +36,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const settingsController = __importStar(require("../controllers/settings.controller"));
-// No route parameters are actually used in this file
 const router = (0, express_1.Router)();
-// Apply authentication middleware to all routes
 router.use(auth_middleware_1.isAuthenticated);
-/**
- * @route   GET /dashboard/settings
- * @desc    Display user settings
- */
 router.get('/', settingsController.getUserSettings);
-/**
- * @route   PUT /dashboard/settings
- * @desc    Update user settings
- */
 router.put('/', settingsController.updateUserSettings);
-/**
- * @route   GET /dashboard/settings/system
- * @desc    Display system settings (admin only)
- */
 router.get('/system', auth_middleware_1.isAdmin, settingsController.getSystemSettings);
-/**
- * @route   PUT /dashboard/settings/system
- * @desc    Update system settings (admin only)
- */
 router.put('/system', auth_middleware_1.isAdmin, settingsController.updateSystemSettings);
-/**
- * @route   GET /dashboard/settings/backup
- * @desc    Display backup settings (admin only)
- */
 router.get('/backup', auth_middleware_1.isAdmin, settingsController.getBackupSettings);
-/**
- * @route   PUT /dashboard/settings/backup
- * @desc    Update backup settings (admin only)
- */
 router.put('/backup', auth_middleware_1.isAdmin, settingsController.updateBackupSettings);
-/**
- * @route   POST /dashboard/settings/backup/trigger
- * @desc    Trigger manual backup (admin only)
- */
 router.post('/backup/trigger', auth_middleware_1.isAdmin, settingsController.triggerManualBackup);
 exports.default = router;
 //# sourceMappingURL=settings.routes.js.map

@@ -2,7 +2,7 @@
  * Notification Service
  * Manages notification creation, sending, and tracking
  */
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import { formatRelativeTime } from '../utils/formatters';
 import { cache } from './cache.service';
 import config from '../config';

@@ -4,7 +4,7 @@ import * as settingsController from '../controllers/settings.controller';
 import { body, validationResult } from 'express-validator';
 import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 
 const router = Router();
 

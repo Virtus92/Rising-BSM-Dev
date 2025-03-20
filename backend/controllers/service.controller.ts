@@ -1,7 +1,7 @@
 // controllers/service.controller.ts
 import { Request, Response } from 'express';
 import { ValidationSchema, ValidationRule } from '../utils/validators';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import { formatDateSafely, formatCurrency } from '../utils/formatters';
 import { 
   NotFoundError, 

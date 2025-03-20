@@ -1,24 +1,23 @@
-import { PrismaClient } from '../prisma/generated/client';
+import { PrismaClient } from '@prisma/client'
 
-// Logging settings
-const prismaLogging: Prisma.LogLevel[] = process.env.NODE_ENV === 'development' 
-  ? ['warn', 'error'] 
-  : ['error'];
-
-// Create a new PrismaClient if one doesn't exist
-const prisma = new PrismaClient({
-  log: prismaLogging,
+declare global {
+  var prisma: PrismaClient | undefined;
+}
+  
+// Initialize Prisma client
+export const prisma = global.prisma || new PrismaClient({
+  log: process.env.NODE_ENV === 'development' 
+    ? ['query', 'error', 'warn'] 
+    : ['error'],
 });
 
-// Handle disconnection on shutdown
+if (process.env.NODE_ENV !== 'production') {
+  global.prisma = prisma;
+}
+
+// Graceful shutdown
 process.on('beforeExit', async () => {
   await prisma.$disconnect();
 });
 
-// This ensures unhandled rejections don't crash the app
-process.on('unhandledRejection', async (err) => {
-  console.error('Unhandled rejection in Prisma client:', err);
-});
-
-// Export the client
 export default prisma;

@@ -4,28 +4,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.markNotificationsRead = exports.getNotifications = exports.globalSearch = exports.getDashboardStats = exports.getDashboardData = void 0;
-const prisma_utils_1 = __importDefault(require("../utils/prisma.utils"));
+const prisma_utils_1 = require("../utils/prisma.utils");
 const date_fns_1 = require("date-fns");
 const cache_service_1 = __importDefault(require("../services/cache.service"));
 const helpers_1 = require("../utils/helpers");
 const formatters_1 = require("../utils/formatters");
 const asyncHandler_1 = require("../utils/asyncHandler");
 const type_helpers_1 = require("../utils/type-helpers");
-/**
- * Get dashboard data including statistics, charts, and recent activities
- */
 exports.getDashboardData = (0, asyncHandler_1.asyncHandler)(async (req, res, next) => {
     const userId = req.user?.id;
-    // Create cache key that includes user ID for personalization
     const cacheKey = `dashboard_data_${userId || 'guest'}_${new Date().toISOString().slice(0, 10)}`;
-    // Get dashboard data with improved caching
     const dashboardData = await cache_service_1.default.getOrExecute(cacheKey, async () => {
-        // Get notifications
         const notifications = await (0, helpers_1.getNotifications)(req);
-        // Calculate date range filters
         const revenueFilter = req.query.revenueFilter || 'Letzten 6 Monate';
         const servicesFilter = req.query.servicesFilter || 'Diesen Monat';
-        // Chart filter options
         const chartFilters = {
             revenue: {
                 selected: revenueFilter,
@@ -36,9 +28,7 @@ exports.getDashboardData = (0, asyncHandler_1.asyncHandler)(async (req, res, nex
                 options: ['Diese Woche', 'Diesen Monat', 'Dieses Quartal', 'Dieses Jahr']
             }
         };
-        // For getDashboardStats, create a wrapper function that works with our modified signature
         const getStats = async () => {
-            // Create a mock request and response for getDashboardStats
             const mockReq = {};
             let statsData;
             const mockRes = {
@@ -49,25 +39,21 @@ exports.getDashboardData = (0, asyncHandler_1.asyncHandler)(async (req, res, nex
                     }
                 })
             };
-            // Call getDashboardStats with our mock objects
             await (0, exports.getDashboardStats)(mockReq, mockRes, (() => { }));
             return statsData;
         };
-        // Get all dashboard data in parallel for performance
         const [stats, recentRequests, upcomingAppointments, charts] = await Promise.all([
             getStats(),
             getRecentRequests(),
             getUpcomingAppointments(),
             getChartData(revenueFilter, servicesFilter)
         ]);
-        // System status information
         const systemStatus = {
             database: 'online',
             lastUpdate: (0, date_fns_1.format)(new Date(), 'dd.MM.yyyy, HH:mm:ss'),
             processing: 'active',
             statistics: 'active'
         };
-        // Return aggregated data
         return {
             stats,
             chartFilters,
@@ -77,35 +63,30 @@ exports.getDashboardData = (0, asyncHandler_1.asyncHandler)(async (req, res, nex
             upcomingAppointments,
             systemStatus
         };
-    }, 300); // Cache for 5 minutes
+    }, 300);
     res.status(200).json(dashboardData);
 });
-/**
- * Get dashboard statistics (used by both API and main dashboard)
- */
 exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async (req, res, next) => {
     const stats = await cache_service_1.default.getOrExecute('dashboard_stats', async () => {
-        // New requests stats
-        const newRequestsCount = await prisma_utils_1.default.contactRequest.count({
+        const newRequestsCount = await prisma_utils_1.prisma.contactRequest.count({
             where: { status: 'neu' }
         });
-        const currentWeekRequests = await prisma_utils_1.default.contactRequest.count({
+        const currentWeekRequests = await prisma_utils_1.prisma.contactRequest.count({
             where: {
                 createdAt: {
-                    gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // 7 days ago
+                    gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
                 }
             }
         });
-        const prevWeekRequests = await prisma_utils_1.default.contactRequest.count({
+        const prevWeekRequests = await prisma_utils_1.prisma.contactRequest.count({
             where: {
                 createdAt: {
-                    gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days ago
-                    lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // 7 days ago
+                    gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+                    lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
                 }
             }
         });
-        // Active projects stats
-        const activeProjects = await prisma_utils_1.default.project.count({
+        const activeProjects = await prisma_utils_1.prisma.project.count({
             where: {
                 status: {
                     in: ['neu', 'in_bearbeitung']
@@ -117,14 +98,14 @@ exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async (req, res, ne
         currentMonth.setHours(0, 0, 0, 0);
         const prevMonth = new Date(currentMonth);
         prevMonth.setMonth(prevMonth.getMonth() - 1);
-        const currentMonthProjects = await prisma_utils_1.default.project.count({
+        const currentMonthProjects = await prisma_utils_1.prisma.project.count({
             where: {
                 createdAt: {
                     gte: currentMonth
                 }
             }
         });
-        const prevMonthProjects = await prisma_utils_1.default.project.count({
+        const prevMonthProjects = await prisma_utils_1.prisma.project.count({
             where: {
                 createdAt: {
                     gte: prevMonth,
@@ -132,13 +113,12 @@ exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async (req, res, ne
                 }
             }
         });
-        // Total customers stats
-        const totalCustomers = await prisma_utils_1.default.customer.count({
+        const totalCustomers = await prisma_utils_1.prisma.customer.count({
             where: { status: 'aktiv' }
         });
         const oneYearAgo = new Date();
         oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-        const customersLastYear = await prisma_utils_1.default.customer.count({
+        const customersLastYear = await prisma_utils_1.prisma.customer.count({
             where: {
                 createdAt: {
                     lt: oneYearAgo
@@ -146,8 +126,7 @@ exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async (req, res, ne
                 status: 'aktiv'
             }
         });
-        // Monthly revenue stats
-        const currentMonthRevenue = await prisma_utils_1.default.invoice.aggregate({
+        const currentMonthRevenue = await prisma_utils_1.prisma.invoice.aggregate({
             _sum: {
                 amount: true
             },
@@ -157,7 +136,7 @@ exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async (req, res, ne
                 }
             }
         });
-        const prevMonthRevenue = await prisma_utils_1.default.invoice.aggregate({
+        const prevMonthRevenue = await prisma_utils_1.prisma.invoice.aggregate({
             _sum: {
                 amount: true
             },
@@ -168,7 +147,6 @@ exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async (req, res, ne
                 }
             }
         });
-        // Calculate trends
         const newRequestsTrend = prevWeekRequests > 0 ?
             Math.round(((currentWeekRequests - prevWeekRequests) / prevWeekRequests) * 100) : 0;
         const activeProjectsTrend = prevMonthProjects > 0 ?
@@ -185,20 +163,14 @@ exports.getDashboardStats = (0, asyncHandler_1.asyncHandler)(async (req, res, ne
             totalCustomers: { count: totalCustomers, trend: totalCustomersTrend },
             monthlyRevenue: { amount: monthlyRevenue, trend: monthlyRevenueTrend }
         };
-    }, 300); // Cache for 5 minutes
+    }, 300);
     res.status(200).json(stats);
 });
-/**
- * Get data for dashboard charts
- */
 async function getChartData(revenueFilter, servicesFilter) {
-    // Revenue chart data
     const cacheKey = `revenue_chart_${revenueFilter}`;
     const revenueData = await cache_service_1.default.getOrExecute(cacheKey, async () => {
-        // Calculate date range based on filter
         const { startDate, groupBy, dateFormat } = calculateDateRange(revenueFilter);
-        // Query for revenue chart using Prisma
-        const invoices = await prisma_utils_1.default.invoice.findMany({
+        const invoices = await prisma_utils_1.prisma.invoice.findMany({
             where: {
                 invoiceDate: {
                     gte: startDate,
@@ -210,18 +182,15 @@ async function getChartData(revenueFilter, servicesFilter) {
                 amount: true
             }
         });
-        // Group by time period and format for chart
         const groupedData = new Map();
         invoices.forEach((invoice) => {
             let groupKey;
             const date = new Date(invoice.invoiceDate);
-            // Group by requested period
             switch (groupBy) {
                 case 'day':
                     groupKey = (0, date_fns_1.format)(date, 'dd.MM');
                     break;
                 case 'week':
-                    // Get week start date (Monday)
                     const weekStart = new Date(date);
                     const day = weekStart.getDay();
                     const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
@@ -232,7 +201,6 @@ async function getChartData(revenueFilter, servicesFilter) {
                 default:
                     groupKey = (0, date_fns_1.format)(date, 'MMM yy');
             }
-            // Sum amounts for the same period
             if (groupedData.has(groupKey)) {
                 groupedData.set(groupKey, groupedData.get(groupKey) + Number(invoice.amount));
             }
@@ -240,43 +208,35 @@ async function getChartData(revenueFilter, servicesFilter) {
                 groupedData.set(groupKey, Number(invoice.amount));
             }
         });
-        // Convert Map to sorted arrays
         const sortedEntries = Array.from(groupedData.entries())
             .sort((a, b) => a[0].localeCompare(b[0]));
         return {
             labels: sortedEntries.map(([label]) => label),
             data: sortedEntries.map(([_, amount]) => amount)
         };
-    }, 600); // Cache for 10 minutes
-    // Services chart data
+    }, 600);
     const servicesKey = `services_chart_${servicesFilter}`;
     const servicesData = await cache_service_1.default.getOrExecute(servicesKey, async () => {
-        // Determine date range for services filter
         let startDate = new Date();
         switch (servicesFilter) {
             case 'Diese Woche':
-                // Start of current week
                 startDate.setDate(startDate.getDate() - startDate.getDay() + (startDate.getDay() === 0 ? -6 : 1));
                 startDate.setHours(0, 0, 0, 0);
                 break;
             case 'Dieses Quartal':
-                // Start of current quarter
                 startDate.setMonth(Math.floor(startDate.getMonth() / 3) * 3, 1);
                 startDate.setHours(0, 0, 0, 0);
                 break;
             case 'Dieses Jahr':
-                // Start of current year
                 startDate.setMonth(0, 1);
                 startDate.setHours(0, 0, 0, 0);
                 break;
             case 'Diesen Monat':
             default:
-                // Start of current month
                 startDate.setDate(1);
                 startDate.setHours(0, 0, 0, 0);
         }
-        // Use Prisma for complex aggregation
-        const servicesRevenue = await prisma_utils_1.default.invoicePosition.groupBy({
+        const servicesRevenue = await prisma_utils_1.prisma.invoicePosition.groupBy({
             by: ['serviceId'],
             where: {
                 Invoice: {
@@ -296,7 +256,7 @@ async function getChartData(revenueFilter, servicesFilter) {
             },
             take: 4
         });
-        const serviceNames = await prisma_utils_1.default.service.findMany({
+        const serviceNames = await prisma_utils_1.prisma.service.findMany({
             where: {
                 id: {
                     in: servicesRevenue.map((item) => item.serviceId)
@@ -316,15 +276,12 @@ async function getChartData(revenueFilter, servicesFilter) {
                 return (0, type_helpers_1.toNumber)(quantity) * (0, type_helpers_1.toNumber)(unitPrice);
             })
         };
-    }, 600); // Cache for 10 minutes
+    }, 600);
     return {
         revenue: revenueData,
         services: servicesData
     };
 }
-/**
- * Helper function to calculate date range for charts
- */
 function calculateDateRange(filter) {
     const now = new Date();
     let startDate;
@@ -344,7 +301,7 @@ function calculateDateRange(filter) {
             dateFormat = 'DD.MM';
             break;
         case 'Dieses Jahr':
-            startDate = new Date(now.getFullYear(), 0, 1); // January 1st of current year
+            startDate = new Date(now.getFullYear(), 0, 1);
             groupBy = 'month';
             dateFormat = 'Mon YY';
             break;
@@ -357,17 +314,13 @@ function calculateDateRange(filter) {
     }
     return { startDate, groupBy, dateFormat };
 }
-/**
- * Get recent requests for dashboard
- */
 async function getRecentRequests() {
     try {
         return await cache_service_1.default.getOrExecute('recent_requests', async () => {
-            const requests = await prisma_utils_1.default.contactRequest.findMany({
+            const requests = await prisma_utils_1.prisma.contactRequest.findMany({
                 orderBy: { createdAt: 'desc' },
                 take: 5
             });
-            // Format requests
             return requests.map((request) => {
                 let statusClass;
                 let statusLabel;
@@ -388,7 +341,6 @@ async function getRecentRequests() {
                         statusLabel = 'Geschlossen';
                         statusClass = 'secondary';
                 }
-                // Map service type to label
                 let serviceLabel;
                 switch (request.service) {
                     case 'facility':
@@ -413,20 +365,17 @@ async function getRecentRequests() {
                     statusClass
                 };
             });
-        }, 120); // Cache for 2 minutes
+        }, 120);
     }
     catch (error) {
         console.error('Error fetching recent requests:', error);
         return [];
     }
 }
-/**
- * Get upcoming appointments for dashboard
- */
 async function getUpcomingAppointments() {
     try {
         return await cache_service_1.default.getOrExecute('upcoming_appointments', async () => {
-            const appointments = await prisma_utils_1.default.appointment.findMany({
+            const appointments = await prisma_utils_1.prisma.appointment.findMany({
                 where: {
                     appointmentDate: {
                         gte: new Date()
@@ -440,7 +389,6 @@ async function getUpcomingAppointments() {
                 },
                 take: 5
             });
-            // Format appointments
             return appointments.map((appointment) => {
                 const datumObj = new Date(appointment.appointmentDate);
                 const dateInfo = (0, formatters_1.formatDateWithLabel)(datumObj);
@@ -453,16 +401,13 @@ async function getUpcomingAppointments() {
                     time: (0, date_fns_1.format)(datumObj, 'HH:mm')
                 };
             });
-        }, 120); // Cache for 2 minutes
+        }, 120);
     }
     catch (error) {
         console.error('Error fetching upcoming appointments:', error);
         return [];
     }
 }
-/**
- * Global search across all entities
- */
 exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res, next) => {
     const query = req.query.q;
     if (!query || query.trim().length < 2) {
@@ -477,10 +422,8 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res, next) =
     }
     try {
         const searchTerm = `%${query.toLowerCase()}%`;
-        // Execute searches in parallel using Prisma
         const [customers, projects, appointments, requests, services] = await Promise.all([
-            // Search customers
-            prisma_utils_1.default.customer.findMany({
+            prisma_utils_1.prisma.customer.findMany({
                 where: {
                     OR: [
                         { name: { contains: query, mode: 'insensitive' } },
@@ -490,8 +433,7 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res, next) =
                 },
                 take: 5
             }),
-            // Search projects
-            prisma_utils_1.default.project.findMany({
+            prisma_utils_1.prisma.project.findMany({
                 where: {
                     title: { contains: query, mode: 'insensitive' }
                 },
@@ -500,8 +442,7 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res, next) =
                 },
                 take: 5
             }),
-            // Search appointments
-            prisma_utils_1.default.appointment.findMany({
+            prisma_utils_1.prisma.appointment.findMany({
                 where: {
                     title: { contains: query, mode: 'insensitive' }
                 },
@@ -510,8 +451,7 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res, next) =
                 },
                 take: 5
             }),
-            // Search requests
-            prisma_utils_1.default.contactRequest.findMany({
+            prisma_utils_1.prisma.contactRequest.findMany({
                 where: {
                     OR: [
                         { name: { contains: query, mode: 'insensitive' } },
@@ -520,8 +460,7 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res, next) =
                 },
                 take: 5
             }),
-            // Search services
-            prisma_utils_1.default.service.findMany({
+            prisma_utils_1.prisma.service.findMany({
                 where: {
                     OR: [
                         { name: { contains: query, mode: 'insensitive' } },
@@ -531,7 +470,6 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res, next) =
                 take: 5
             })
         ]);
-        // Format and return results
         res.status(200).json({
             customers: customers.map((customer) => ({
                 id: customer.id,
@@ -586,9 +524,6 @@ exports.globalSearch = (0, asyncHandler_1.asyncHandler)(async (req, res, next) =
         throw error;
     }
 });
-/**
- * Get all notifications for a user
- */
 exports.getNotifications = (0, asyncHandler_1.asyncHandler)(async (req, res, next) => {
     if (!req.user) {
         res.status(401).json({
@@ -598,14 +533,11 @@ exports.getNotifications = (0, asyncHandler_1.asyncHandler)(async (req, res, nex
         return;
     }
     const userId = req.user.id;
-    // Get notifications from database
-    const notifications = await prisma_utils_1.default.notification.findMany({
+    const notifications = await prisma_utils_1.prisma.notification.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' }
     });
-    // Format notifications
     const formattedNotifications = notifications.map((notification) => {
-        // Determine type and icon
         let type;
         let icon;
         switch (notification.type) {
@@ -625,7 +557,6 @@ exports.getNotifications = (0, asyncHandler_1.asyncHandler)(async (req, res, nex
                 type = 'info';
                 icon = 'bell';
         }
-        // Determine link based on type
         let link;
         switch (notification.type) {
             case 'anfrage':
@@ -654,9 +585,6 @@ exports.getNotifications = (0, asyncHandler_1.asyncHandler)(async (req, res, nex
     });
     res.status(200).json({ notifications: formattedNotifications });
 });
-/**
- * Mark notifications as read
- */
 exports.markNotificationsRead = (0, asyncHandler_1.asyncHandler)(async (req, res, next) => {
     if (!req.user) {
         res.status(401).json({
@@ -669,8 +597,7 @@ exports.markNotificationsRead = (0, asyncHandler_1.asyncHandler)(async (req, res
     const { notificationId, markAll } = req.body;
     let updatedCount = 0;
     if (markAll) {
-        // Mark all notifications as read
-        const result = await prisma_utils_1.default.notification.updateMany({
+        const result = await prisma_utils_1.prisma.notification.updateMany({
             where: {
                 userId,
                 read: false
@@ -682,8 +609,7 @@ exports.markNotificationsRead = (0, asyncHandler_1.asyncHandler)(async (req, res
         updatedCount = result.count;
     }
     else if (notificationId) {
-        // Mark specific notification as read
-        const result = await prisma_utils_1.default.notification.updateMany({
+        const result = await prisma_utils_1.prisma.notification.updateMany({
             where: {
                 id: Number(notificationId),
                 userId
@@ -697,7 +623,6 @@ exports.markNotificationsRead = (0, asyncHandler_1.asyncHandler)(async (req, res
     else {
         throw new Error('Either notification ID or mark all flag is required');
     }
-    // Clear cache
     cache_service_1.default.delete(`notifications_${userId}`);
     res.status(200).json({
         success: true,

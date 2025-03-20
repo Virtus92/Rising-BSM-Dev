@@ -1,7 +1,7 @@
 // controllers/profile.controller.ts
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import { formatDateSafely } from '../utils/formatters';
 import { ValidationError, BadRequestError, NotFoundError } from '../utils/errors';
 import { asyncHandler } from '../utils/asyncHandler';

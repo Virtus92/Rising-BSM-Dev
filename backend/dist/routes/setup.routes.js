@@ -5,16 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const express_validator_1 = require("express-validator");
-const bcryptjs_1 = __importDefault(require("bcryptjs")); // Changed from bcrypt to bcryptjs
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const client_1 = require("@prisma/client");
-const prisma = new client_1.PrismaClient();
+const prisma_utils_1 = require("../utils/prisma.utils");
 const router = (0, express_1.Router)();
-// Middleware to check if setup is needed
 const setupRequired = async (req, res, next) => {
     try {
-        // Check if any users exist using Prisma
-        const userCount = await prisma.user.count();
+        const userCount = await prisma_utils_1.prisma.user.count();
         if (userCount > 0) {
             req.flash('info', 'Setup wurde bereits durchgeführt.');
             return res.redirect('/login');
@@ -28,8 +25,7 @@ const setupRequired = async (req, res, next) => {
         });
     }
 };
-// Apply the middleware to both GET and POST routes
-router.get('/setup', setupRequired, async (req, res) => {
+router.get('/', setupRequired, async (req, res) => {
     try {
         res.render('setup', {
             title: 'Ersteinrichtung - Rising BSM',
@@ -38,7 +34,7 @@ router.get('/setup', setupRequired, async (req, res) => {
             email: '',
             company_name: '',
             company_email: '',
-            csrfToken: req.csrfToken()
+            csrfToken: req.csrfToken?.() || ''
         });
     }
     catch (error) {
@@ -48,7 +44,6 @@ router.get('/setup', setupRequired, async (req, res) => {
         });
     }
 });
-// Validation rules
 const setupValidation = [
     (0, express_validator_1.body)('name').trim().isLength({ min: 3 }).withMessage('Name muss mindestens 3 Zeichen lang sein'),
     (0, express_validator_1.body)('email').trim().isEmail().withMessage('Gültige E-Mail-Adresse erforderlich'),
@@ -62,9 +57,8 @@ const setupValidation = [
     (0, express_validator_1.body)('company_name').trim().isLength({ min: 2 }).withMessage('Unternehmensname erforderlich'),
     (0, express_validator_1.body)('company_email').trim().isEmail().withMessage('Gültige Unternehmens-E-Mail erforderlich')
 ];
-router.post('/setup', setupRequired, setupValidation, async (req, res) => {
+router.post('/', setupRequired, setupValidation, async (req, res) => {
     const { name, email, password, company_name, company_email } = req.body;
-    // Check for validation errors
     const errors = (0, express_validator_1.validationResult)(req);
     if (!errors.isEmpty()) {
         return res.render('setup', {
@@ -73,16 +67,14 @@ router.post('/setup', setupRequired, setupValidation, async (req, res) => {
             email,
             company_name,
             company_email,
-            csrfToken: req.csrfToken()
+            csrfToken: req.csrfToken?.() || ''
         });
     }
     try {
         let createdUser = null;
-        await prisma.$transaction(async (tx) => {
-            // Hash password
+        await prisma_utils_1.prisma.$transaction(async (tx) => {
             const salt = await bcryptjs_1.default.genSalt(10);
             const hashedPassword = await bcryptjs_1.default.hash(password, salt);
-            // Create first admin user using Prisma
             createdUser = await tx.user.create({
                 data: {
                     name,
@@ -92,7 +84,6 @@ router.post('/setup', setupRequired, setupValidation, async (req, res) => {
                     status: 'active'
                 }
             });
-            // Save company settings using Prisma
             await tx.systemSetting.createMany({
                 data: [
                     { key: 'company_name', value: company_name },
@@ -102,17 +93,13 @@ router.post('/setup', setupRequired, setupValidation, async (req, res) => {
                 ]
             });
         });
-        // Generate JWT token only if we have a created user
         if (createdUser) {
             const token = jsonwebtoken_1.default.sign({ id: createdUser.id, email: createdUser.email, role: createdUser.role }, process.env.JWT_SECRET || 'defaultsecret', { expiresIn: '24h' });
-            // Save token in session or cookie if needed
-            // req.session.token = token;
         }
-        // Redirect to login page
         req.flash('success', 'Setup erfolgreich abgeschlossen. Bitte melden Sie sich an.');
         res.redirect('/login');
     }
-    catch (error) { // Explicitly type error as any to access message
+    catch (error) {
         console.error('Setup error:', error);
         res.render('setup', {
             error: 'Ein Fehler ist aufgetreten: ' + (error.message || 'Unbekannter Fehler'),
@@ -120,7 +107,7 @@ router.post('/setup', setupRequired, setupValidation, async (req, res) => {
             email,
             company_name,
             company_email,
-            csrfToken: req.csrfToken()
+            csrfToken: req.csrfToken?.() || ''
         });
     }
 });

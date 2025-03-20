@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors';
 import { AuthenticatedRequest } from '../types/authenticated-request';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import config from '../config';
 
 // Environment configuration

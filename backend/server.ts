@@ -15,7 +15,7 @@ import cors from 'cors';
 import { Pool } from 'pg';
 
 import config from './config';
-import prisma from './utils/prisma.utils';
+import { prisma } from './utils/prisma.utils';
 
 // Define session user type
 declare module 'express-session' {
@@ -33,6 +33,9 @@ declare module 'express-session' {
 // Create Express app
 const app: Express = express();
 const port = config.PORT;
+
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
 // Import middleware
 import * as errorMiddleware from './middleware/error.middleware';
@@ -131,12 +134,11 @@ const pool = new Pool({
   ssl: config.DB_SSL ? { rejectUnauthorized: false } : false
 });
 
-// Configure session
 app.use(session({
   store: new pgSession({
     pool,
     tableName: 'user_sessions',
-    createTableIfMissing: true
+    createTableIfMissing: true // Ensure this is true
   }),
   secret: process.env.SESSION_SECRET || 'rising-bsm-super-secret',
   resave: false,

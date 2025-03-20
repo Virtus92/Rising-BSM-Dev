@@ -5,28 +5,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.notificationService = void 0;
 exports.getUnreadNotificationsCount = getUnreadNotificationsCount;
-/**
- * Notification Service
- * Manages notification creation, sending, and tracking
- */
-const prisma_utils_1 = __importDefault(require("../utils/prisma.utils"));
+const prisma_utils_1 = require("../utils/prisma.utils");
 const formatters_1 = require("../utils/formatters");
 const cache_service_1 = require("./cache.service");
 const config_1 = __importDefault(require("../config"));
-/**
- * Class that manages creation and retrieval of notifications
- */
 class NotificationService {
-    /**
-     * Create a new notification
-     * @param options Notification details
-     * @returns Created notification
-     */
     async create(options) {
         try {
             const { userId, type, title, message, referenceId = null, referenceType = null } = options;
-            // Insert notification into database
-            const notification = await prisma_utils_1.default.notification.create({
+            const notification = await prisma_utils_1.prisma.notification.create({
                 data: {
                     userId,
                     type,
@@ -37,7 +24,6 @@ class NotificationService {
                     read: false
                 }
             });
-            // Clear cache for this user
             if (userId) {
                 cache_service_1.cache.delete(`notifications_${userId}`);
             }
@@ -51,16 +37,9 @@ class NotificationService {
             return { id: 0, success: false };
         }
     }
-    /**
-     * Get notifications for a user
-     * @param userId User ID
-     * @param options Filtering and pagination options
-     * @returns Notifications and metadata
-     */
     async getNotifications(userId, options = {}) {
         try {
             const { limit = 10, offset = 0, unreadOnly = false, type = null } = options;
-            // Try to get from cache
             const cacheKey = `notifications_${userId}_${limit}_${offset}_${unreadOnly}_${type || 'all'}`;
             if (config_1.default.CACHE_ENABLED) {
                 const cachedResult = cache_service_1.cache.get(cacheKey);
@@ -68,32 +47,26 @@ class NotificationService {
                     return cachedResult;
                 }
             }
-            // Build Prisma where clause
             const where = {
                 userId,
                 ...(unreadOnly ? { read: false } : {}),
                 ...(type ? { type } : {})
             };
-            // Execute queries in parallel
             const [notifications, totalCount] = await Promise.all([
-                // Get notifications
-                prisma_utils_1.default.notification.findMany({
+                prisma_utils_1.prisma.notification.findMany({
                     where,
                     orderBy: { createdAt: 'desc' },
                     take: limit,
                     skip: offset
                 }),
-                // Get count directly instead of using groupBy
-                prisma_utils_1.default.notification.count({ where })
+                prisma_utils_1.prisma.notification.count({ where })
             ]);
-            // Get unread count
-            const unreadCount = await prisma_utils_1.default.notification.count({
+            const unreadCount = await prisma_utils_1.prisma.notification.count({
                 where: {
                     userId,
                     read: false
                 }
             });
-            // Format notifications
             const formattedNotifications = notifications.map((notification) => ({
                 id: notification.id,
                 type: this.mapNotificationType(notification.type),
@@ -110,9 +83,8 @@ class NotificationService {
                 total: totalCount,
                 unreadCount
             };
-            // Cache the result
             if (config_1.default.CACHE_ENABLED) {
-                cache_service_1.cache.set(cacheKey, result, 30); // Cache for 30 seconds
+                cache_service_1.cache.set(cacheKey, result, 30);
             }
             return result;
         }
@@ -121,18 +93,10 @@ class NotificationService {
             throw error;
         }
     }
-    /**
-     * Mark notifications as read
-     * @param userId User ID
-     * @param notificationIds Notification ID(s)
-     * @returns Update result
-     */
     async markAsRead(userId, notificationIds) {
         try {
-            // Normalize to array
             const ids = Array.isArray(notificationIds) ? notificationIds : [notificationIds];
-            // Update notifications
-            const result = await prisma_utils_1.default.notification.updateMany({
+            const result = await prisma_utils_1.prisma.notification.updateMany({
                 where: {
                     userId,
                     id: { in: ids }
@@ -141,7 +105,6 @@ class NotificationService {
                     read: true
                 }
             });
-            // Clear cache for this user
             cache_service_1.cache.delete(`notifications_${userId}`);
             return {
                 success: true,
@@ -153,14 +116,9 @@ class NotificationService {
             return { success: false, updatedCount: 0 };
         }
     }
-    /**
-     * Mark all notifications as read for a user
-     * @param userId User ID
-     * @returns Update result
-     */
     async markAllAsRead(userId) {
         try {
-            const result = await prisma_utils_1.default.notification.updateMany({
+            const result = await prisma_utils_1.prisma.notification.updateMany({
                 where: {
                     userId,
                     read: false
@@ -169,7 +127,6 @@ class NotificationService {
                     read: true
                 }
             });
-            // Clear cache for this user
             cache_service_1.cache.delete(`notifications_${userId}`);
             return {
                 success: true,
@@ -181,11 +138,6 @@ class NotificationService {
             return { success: false, updatedCount: 0 };
         }
     }
-    /**
-     * Map notification type to user-friendly representation
-     * @param type Notification type
-     * @returns Mapped notification type
-     */
     mapNotificationType(type) {
         const typeMap = {
             'anfrage': {
@@ -226,11 +178,6 @@ class NotificationService {
             color: 'secondary'
         };
     }
-    /**
-     * Generate notification link based on type
-     * @param notification Notification object
-     * @returns Notification link
-     */
     generateNotificationLink(notification) {
         switch (notification.type) {
             case 'anfrage':
@@ -246,11 +193,9 @@ class NotificationService {
         }
     }
 }
-// Fix the _count property issue
 async function getUnreadNotificationsCount(userId) {
     try {
-        // Use count directly instead of groupBy for simplicity
-        return await prisma_utils_1.default.notification.count({
+        return await prisma_utils_1.prisma.notification.count({
             where: {
                 userId,
                 read: false
@@ -262,7 +207,6 @@ async function getUnreadNotificationsCount(userId) {
         return 0;
     }
 }
-// Export singleton instance
 exports.notificationService = new NotificationService();
 exports.default = exports.notificationService;
 //# sourceMappingURL=notification.service.js.map

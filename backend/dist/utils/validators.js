@@ -6,44 +6,31 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateInput = exports.validatePassword = exports.validateNumeric = exports.validateTimeFormat = exports.validateDate = exports.validatePhone = exports.validateEmail = exports.validateText = void 0;
 const validator_1 = __importDefault(require("validator"));
 const errors_1 = require("./errors");
-/**
- * Validate and sanitize text input
- * @param input Input text to validate
- * @param options Validation options
- * @returns Validation result
- */
 const validateText = (input, options = {}) => {
     const { required = false, minLength = 0, maxLength = 500, trim = true, escape = true, pattern } = options;
     const errors = [];
-    // Handle null or undefined
     if (input === null || input === undefined) {
         if (required) {
             errors.push('Input is required');
         }
         return { isValid: !required, errors, value: '' };
     }
-    // Ensure input is a string
     const strInput = String(input);
     const value = trim ? strInput.trim() : strInput;
-    // Check if empty
     if (value === '' && required) {
         errors.push('Input cannot be empty');
     }
-    // Length validation
     if (value.length < minLength) {
         errors.push(`Input must be at least ${minLength} characters long`);
     }
     if (value.length > maxLength) {
         errors.push(`Input must not exceed ${maxLength} characters`);
     }
-    // Pattern validation
     if (pattern && !pattern.test(value)) {
         errors.push(`Input does not match the required pattern`);
     }
-    // Escape if requested
     let sanitizedValue = value;
     if (escape) {
-        // Custom escaping without escaping forward slashes
         sanitizedValue = sanitizedValue
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
@@ -57,32 +44,23 @@ const validateText = (input, options = {}) => {
     };
 };
 exports.validateText = validateText;
-/**
- * Validate email address
- * @param email Email to validate
- * @param options Validation options
- * @returns Validation result
- */
 const validateEmail = (email, options = {}) => {
     const { required = false } = options;
     const errors = [];
-    // Handle null, undefined or empty
     if (!email) {
         if (required) {
             errors.push('Email address is required');
         }
         return { isValid: !required, errors, value: '' };
     }
-    // Check if email is valid
     if (!validator_1.default.isEmail(email)) {
         errors.push('Invalid email address format');
         return {
             isValid: false,
             errors,
-            value: String(email) // Return original value for invalid emails
+            value: String(email)
         };
     }
-    // Normalize and sanitize email
     const sanitizedEmail = validator_1.default.normalizeEmail(email) || email.toLowerCase();
     return {
         isValid: true,
@@ -91,25 +69,16 @@ const validateEmail = (email, options = {}) => {
     };
 };
 exports.validateEmail = validateEmail;
-/**
- * Validate phone number
- * @param phone Phone number to validate
- * @param options Validation options
- * @returns Validation result
- */
 const validatePhone = (phone, options = {}) => {
     const { required = false } = options;
     const errors = [];
-    // Handle null, undefined or empty
     if (!phone) {
         if (required) {
             errors.push('Phone number is required');
         }
         return { isValid: !required, errors, value: '' };
     }
-    // Remove non-digit characters for validation
     const cleanedPhone = String(phone).replace(/\D/g, '');
-    // Basic phone number validation
     if (cleanedPhone && !validator_1.default.isMobilePhone(cleanedPhone, 'any', { strictMode: false })) {
         errors.push('Invalid phone number format');
     }
@@ -120,16 +89,9 @@ const validatePhone = (phone, options = {}) => {
     };
 };
 exports.validatePhone = validatePhone;
-/**
- * Validate date
- * @param date Date to validate
- * @param options Validation options
- * @returns Validation result
- */
 const validateDate = (date, options = {}) => {
     const { required = false, pastAllowed = true, futureAllowed = true, beforeDate, afterDate } = options;
     const errors = [];
-    // Handle null or undefined
     if (date === null || date === undefined || (typeof date === 'string' && date.trim() === '')) {
         if (required) {
             errors.push('Date is required');
@@ -138,9 +100,7 @@ const validateDate = (date, options = {}) => {
     }
     let parsedDate;
     try {
-        // Convert to Date object if string
         parsedDate = date instanceof Date ? date : new Date(date);
-        // Check if date is valid
         if (isNaN(parsedDate.getTime())) {
             throw new Error('Invalid date');
         }
@@ -150,15 +110,12 @@ const validateDate = (date, options = {}) => {
         return { isValid: false, errors, value: null };
     }
     const now = new Date();
-    // Past date validation
     if (!pastAllowed && parsedDate < now) {
         errors.push('Date cannot be in the past');
     }
-    // Future date validation
     if (!futureAllowed && parsedDate > now) {
         errors.push('Date cannot be in the future');
     }
-    // Before date validation
     if (beforeDate) {
         const compareDate = beforeDate instanceof Date ? beforeDate : new Date(beforeDate);
         if (!isNaN(compareDate.getTime()) && parsedDate > compareDate) {
@@ -166,7 +123,6 @@ const validateDate = (date, options = {}) => {
                 beforeDate.toLocaleDateString() : beforeDate}`);
         }
     }
-    // After date validation
     if (afterDate) {
         const compareDate = afterDate instanceof Date ? afterDate : new Date(afterDate);
         if (!isNaN(compareDate.getTime()) && parsedDate < compareDate) {
@@ -181,26 +137,18 @@ const validateDate = (date, options = {}) => {
     };
 };
 exports.validateDate = validateDate;
-/**
- * Validate time format (24-hour format: HH:MM by default)
- * @param time Time string to validate
- * @param options Validation options
- * @returns Validation result
- */
 const validateTimeFormat = (time, options = {}) => {
     const { required = false, format = '24h' } = options;
     const errors = [];
-    // Handle null, undefined or empty
     if (!time) {
         if (required) {
             errors.push('Time is required');
         }
         return { isValid: !required, errors, value: '' };
     }
-    // Choose regex based on format
     const timeRegex = format === '24h'
-        ? /^([01]\d|2[0-3]):([0-5]\d)$/ // 24-hour format (HH:MM)
-        : /^(0?[1-9]|1[0-2]):([0-5]\d)\s?(AM|PM|am|pm)$/; // 12-hour format (HH:MM AM/PM)
+        ? /^([01]\d|2[0-3]):([0-5]\d)$/
+        : /^(0?[1-9]|1[0-2]):([0-5]\d)\s?(AM|PM|am|pm)$/;
     if (!timeRegex.test(String(time))) {
         errors.push(`Invalid time format. Use ${format === '24h' ? '24-hour format (HH:MM)' :
             '12-hour format (HH:MM AM/PM)'}`);
@@ -212,42 +160,29 @@ const validateTimeFormat = (time, options = {}) => {
     };
 };
 exports.validateTimeFormat = validateTimeFormat;
-/**
- * Validate numeric values
- * @param value Numeric value to validate
- * @param options Validation options
- * @returns Validation result
- */
 const validateNumeric = (value, options = {}) => {
     const { required = false, min = -Infinity, max = Infinity, integer = false, positive = false, negative = false } = options;
     const errors = [];
-    // Handle null, undefined or empty
     if (value === null || value === undefined || value === '') {
         if (required) {
             errors.push('Numeric value is required');
         }
         return { isValid: !required, errors, value: null };
     }
-    // Convert to number
     const numericValue = typeof value === 'number' ? value : Number(value);
-    // Check if numeric
     if (isNaN(numericValue)) {
         errors.push('Value must be a number');
         return { isValid: false, errors, value: null };
     }
-    // Integer validation
     if (integer && !Number.isInteger(numericValue)) {
         errors.push('Value must be an integer');
     }
-    // Min value validation
     if (numericValue < min) {
         errors.push(`Value must be at least ${min}`);
     }
-    // Max value validation
     if (numericValue > max) {
         errors.push(`Value must not exceed ${max}`);
     }
-    // Positive/negative validation
     if (positive && numericValue <= 0) {
         errors.push('Value must be positive');
     }
@@ -261,27 +196,18 @@ const validateNumeric = (value, options = {}) => {
     };
 };
 exports.validateNumeric = validateNumeric;
-/**
- * Validate password strength
- * @param password Password to validate
- * @param options Validation options
- * @returns Validation result
- */
 const validatePassword = (password, options = {}) => {
     const { required = true, minLength = 12, requireUppercase = true, requireLowercase = true, requireNumbers = true, requireSpecialChars = true } = options;
     const errors = [];
-    // Handle null, undefined or empty
     if (!password) {
         if (required) {
             errors.push('Password is required');
         }
         return { isValid: !required, errors, value: '' };
     }
-    // Length validation
     if (password.length < minLength) {
         errors.push(`Password must be at least ${minLength} characters long`);
     }
-    // Character type validations
     if (requireUppercase && !/[A-Z]/.test(password)) {
         errors.push('Password must contain at least one uppercase letter');
     }
@@ -301,13 +227,6 @@ const validatePassword = (password, options = {}) => {
     };
 };
 exports.validatePassword = validatePassword;
-/**
- * Comprehensive input validation
- * @param data Input data to validate
- * @param schema Validation schema
- * @param options Additional options for validation
- * @returns Validation result for the entire object
- */
 const validateInput = (data, schema, options = {}) => {
     const { throwOnError = false } = options;
     const validationResults = {};
@@ -358,12 +277,6 @@ const validateInput = (data, schema, options = {}) => {
     };
 };
 exports.validateInput = validateInput;
-/**
- * Environment validation helper
- * @param key Environment variable key
- * @param defaultValue Default value if not provided
- * @param validator Optional validation function
- */
 function env(key, defaultValue, validator) {
     const value = process.env[key];
     if (value === undefined) {
@@ -372,7 +285,6 @@ function env(key, defaultValue, validator) {
         }
         return defaultValue;
     }
-    // Attempt to convert the string value to the correct type based on defaultValue
     let convertedValue;
     if (typeof defaultValue === 'number') {
         convertedValue = Number(value);
@@ -387,7 +299,6 @@ function env(key, defaultValue, validator) {
     else {
         convertedValue = value;
     }
-    // Apply validator if provided
     if (validator && !validator(convertedValue)) {
         console.warn(`⚠️ Warning: ${key} value "${value}" failed validation, using default: ${defaultValue}`);
         return defaultValue;

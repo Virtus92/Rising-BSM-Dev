@@ -38,42 +38,13 @@ const auth_middleware_1 = require("../middleware/auth.middleware");
 const projectController = __importStar(require("../controllers/project.controller"));
 const validation_middleware_1 = require("../middleware/validation.middleware");
 const router = (0, express_1.Router)();
-// Apply authentication middleware to all routes
 router.use(auth_middleware_1.isAuthenticated);
-/**
- * @route   GET /dashboard/projekte
- * @desc    Display list of projects with optional filtering
- */
 router.get('/', projectController.getAllProjects);
-/**
- * @route   GET /dashboard/projekte/:id
- * @desc    Display project details
- */
 router.get('/:id', projectController.getProjectById);
-/**
- * @route   POST /dashboard/projekte/neu
- * @desc    Create a new project
- */
 router.post('/neu', validation_middleware_1.validateProject, projectController.createProject);
-/**
- * @route   PUT /dashboard/projekte/:id
- * @desc    Update a project
- */
 router.put('/:id', validation_middleware_1.validateProject, projectController.updateProject);
-/**
- * @route   POST /dashboard/projekte/update-status
- * @desc    Update project status
- */
 router.post('/update-status', projectController.updateProjectStatus);
-/**
- * @route   POST /dashboard/projekte/:id/notes
- * @desc    Add a note to a project
- */
 router.post('/:id/notes', projectController.addProjectNote);
-/**
- * @route   GET /dashboard/projekte/export
- * @desc    Export projects in various formats
- */
 router.get('/export', projectController.exportProjects);
 exports.default = router;
 //# sourceMappingURL=project.routes.js.map

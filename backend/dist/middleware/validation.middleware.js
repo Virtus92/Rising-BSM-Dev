@@ -3,13 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateContactForm = exports.validateStatusUpdate = exports.validateService = exports.validateAppointment = exports.validateProject = exports.validateCustomer = void 0;
 const validators_1 = require("../utils/validators");
 const errors_1 = require("../utils/errors");
-/**
- * Validates customer data
- */
 const validateCustomer = (req, res, next) => {
     try {
         const { name, email, firma, telefon, adresse, plz, ort, notizen, newsletter, status, kundentyp } = req.body;
-        // Validation schema
         const validationSchema = {
             name: { type: 'text', required: true, minLength: 2 },
             email: { type: 'email', required: true },
@@ -24,7 +20,6 @@ const validateCustomer = (req, res, next) => {
             kundentyp: { type: 'text', required: false }
         };
         const { isValid, errors } = (0, validators_1.validateInput)(req.body, validationSchema);
-        // If there are validation errors
         if (!isValid) {
             throw new errors_1.ValidationError('Validation failed: ' + errors.join('. '), errors);
         }
@@ -35,14 +30,10 @@ const validateCustomer = (req, res, next) => {
     }
 };
 exports.validateCustomer = validateCustomer;
-/**
- * Validates project data
- */
 const validateProject = (req, res, next) => {
     try {
         const { titel, start_datum, end_datum } = req.body;
         const errors = [];
-        // Required fields
         if (!titel || typeof titel !== 'string' || titel.trim() === '') {
             errors.push('Title is required');
         }
@@ -55,7 +46,6 @@ const validateProject = (req, res, next) => {
                 errors.push('Please enter a valid start date');
             }
         }
-        // Optional end date should be after start date
         if (end_datum && start_datum) {
             const startDateValidation = (0, validators_1.validateDate)(start_datum);
             const endDateValidation = (0, validators_1.validateDate)(end_datum);
@@ -67,7 +57,6 @@ const validateProject = (req, res, next) => {
                 }
             }
         }
-        // If there are validation errors
         if (errors.length > 0) {
             throw new errors_1.ValidationError('Validation failed: ' + errors.join('. '), errors);
         }
@@ -78,14 +67,10 @@ const validateProject = (req, res, next) => {
     }
 };
 exports.validateProject = validateProject;
-/**
- * Validates appointment data
- */
 const validateAppointment = (req, res, next) => {
     try {
         const { titel, termin_datum, termin_zeit } = req.body;
         const errors = [];
-        // Required fields
         if (!titel || typeof titel !== 'string' || titel.trim() === '') {
             errors.push('Title is required');
         }
@@ -104,7 +89,6 @@ const validateAppointment = (req, res, next) => {
         else if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(termin_zeit)) {
             errors.push('Please enter a valid time (HH:MM)');
         }
-        // Validate the date is not in the past
         if (termin_datum && termin_zeit) {
             try {
                 const now = new Date();
@@ -117,7 +101,6 @@ const validateAppointment = (req, res, next) => {
                 errors.push('Invalid appointment date or time format');
             }
         }
-        // If there are validation errors
         if (errors.length > 0) {
             throw new errors_1.ValidationError('Validation failed: ' + errors.join('. '), errors);
         }
@@ -128,14 +111,10 @@ const validateAppointment = (req, res, next) => {
     }
 };
 exports.validateAppointment = validateAppointment;
-/**
- * Validates service data
- */
 const validateService = (req, res, next) => {
     try {
         const { name, preis_basis, einheit } = req.body;
         const errors = [];
-        // Required fields
         if (!name || typeof name !== 'string' || name.trim() === '') {
             errors.push('Name is required');
         }
@@ -148,7 +127,6 @@ const validateService = (req, res, next) => {
         if (!einheit || typeof einheit !== 'string' || einheit.trim() === '') {
             errors.push('Unit is required');
         }
-        // If there are validation errors
         if (errors.length > 0) {
             throw new errors_1.ValidationError('Validation failed: ' + errors.join('. '), errors);
         }
@@ -159,21 +137,16 @@ const validateService = (req, res, next) => {
     }
 };
 exports.validateService = validateService;
-/**
- * Validates request status update
- */
 const validateStatusUpdate = (req, res, next) => {
     try {
         const { id, status } = req.body;
         const errors = [];
-        // Required fields
         if (!id) {
             errors.push('ID is required');
         }
         if (!status || typeof status !== 'string') {
             errors.push('Status is required');
         }
-        // If there are validation errors
         if (errors.length > 0) {
             throw new errors_1.ValidationError('Validation failed: ' + errors.join('. '), errors);
         }
@@ -184,12 +157,8 @@ const validateStatusUpdate = (req, res, next) => {
     }
 };
 exports.validateStatusUpdate = validateStatusUpdate;
-/**
- * Validates contact form submission
- */
 const validateContactForm = (req, res, next) => {
     try {
-        // Validation schema for contact form
         const validationSchema = {
             name: {
                 type: 'text',
@@ -215,7 +184,6 @@ const validateContactForm = (req, res, next) => {
                 maxLength: 1000,
             },
         };
-        // Validate input
         const validationResult = (0, validators_1.validateInput)(req.body, validationSchema);
         if (!validationResult.isValid) {
             throw new errors_1.ValidationError('Validation failed', validationResult.errors);

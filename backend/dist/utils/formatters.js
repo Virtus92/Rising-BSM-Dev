@@ -1,19 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.formatPhone = exports.formatFileSize = exports.formatPercentage = exports.formatNumber = exports.formatCurrency = exports.formatDateWithLabel = exports.formatRelativeTime = exports.formatDateSafely = void 0;
-/**
- * Formatter utilities
- * Functions for consistent data formatting across the application
- */
 const date_fns_1 = require("date-fns");
 const locale_1 = require("date-fns/locale");
-/**
- * Format a date safely to a specific format
- * @param date The date to format
- * @param formatString Format string for date-fns
- * @param defaultValue Value to return if date is invalid
- * @returns Formatted date or default value
- */
 const formatDateSafely = (date, formatString, defaultValue = 'Unbekannt') => {
     try {
         if (!date)
@@ -31,12 +20,6 @@ const formatDateSafely = (date, formatString, defaultValue = 'Unbekannt') => {
     }
 };
 exports.formatDateSafely = formatDateSafely;
-/**
- * Format a date as a relative time string
- * @param date The date to format
- * @param options Options for formatDistanceToNow
- * @returns Relative time string
- */
 const formatRelativeTime = (date, options = {}) => {
     try {
         if (!date)
@@ -58,11 +41,6 @@ const formatRelativeTime = (date, options = {}) => {
     }
 };
 exports.formatRelativeTime = formatRelativeTime;
-/**
- * Format a date with a special label for today/tomorrow
- * @param date The date to format
- * @returns Date information with label and class
- */
 const formatDateWithLabel = (date) => {
     try {
         if (!date)
@@ -104,12 +82,6 @@ const formatDateWithLabel = (date) => {
     }
 };
 exports.formatDateWithLabel = formatDateWithLabel;
-/**
- * Format a currency amount
- * @param amount The amount to format
- * @param currency Currency code
- * @returns Formatted currency string
- */
 const formatCurrency = (amount, currency = 'EUR') => {
     try {
         if (amount === null || amount === undefined)
@@ -125,12 +97,6 @@ const formatCurrency = (amount, currency = 'EUR') => {
     }
 };
 exports.formatCurrency = formatCurrency;
-/**
- * Format a number with thousand separators
- * @param number The number to format
- * @param decimals Number of decimal places
- * @returns Formatted number
- */
 const formatNumber = (number, decimals = 2) => {
     try {
         if (number === null || number === undefined)
@@ -146,12 +112,6 @@ const formatNumber = (number, decimals = 2) => {
     }
 };
 exports.formatNumber = formatNumber;
-/**
- * Format a percentage
- * @param value Value to format as percentage
- * @param decimals Number of decimal places
- * @returns Formatted percentage
- */
 const formatPercentage = (value, decimals = 1) => {
     try {
         if (value === null || value === undefined)
@@ -168,11 +128,6 @@ const formatPercentage = (value, decimals = 1) => {
     }
 };
 exports.formatPercentage = formatPercentage;
-/**
- * Format a file size
- * @param bytes Size in bytes
- * @returns Formatted file size
- */
 const formatFileSize = (bytes) => {
     try {
         if (bytes === null || bytes === undefined)
@@ -190,16 +145,10 @@ const formatFileSize = (bytes) => {
     }
 };
 exports.formatFileSize = formatFileSize;
-/**
- * Format a phone number
- * @param number Phone number to format
- * @returns Formatted phone number
- */
 const formatPhone = (number) => {
     try {
         if (!number)
             return '-';
-        // Basic phone formatting - this could be improved with libphonenumber
         const digits = number.replace(/\D/g, '');
         if (digits.length <= 4) {
             return digits;

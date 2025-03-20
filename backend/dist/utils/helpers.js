@@ -1,20 +1,8 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.groupBy = exports.truncateHtml = exports.sanitizeLikeString = exports.parseFilters = exports.getNewRequestsCount = exports.getNotifications = exports.generateId = exports.getBenutzerStatusInfo = exports.getProjektStatusInfo = exports.getTerminStatusInfo = exports.getAnfrageStatusInfo = void 0;
-/**
- * Helper utilities
- * Common utility functions used across the application
- */
 const cache_service_1 = require("../services/cache.service");
-const prisma_utils_1 = __importDefault(require("./prisma.utils"));
-/**
- * Get status information for a request
- * @param status Status code
- * @returns Status label and class name
- */
+const prisma_utils_1 = require("./prisma.utils");
 const getAnfrageStatusInfo = (status) => {
     const statusMap = {
         'neu': { label: 'Neu', className: 'warning' },
@@ -25,11 +13,6 @@ const getAnfrageStatusInfo = (status) => {
     return statusMap[status] || { label: 'Unbekannt', className: 'secondary' };
 };
 exports.getAnfrageStatusInfo = getAnfrageStatusInfo;
-/**
- * Get status information for an appointment
- * @param status Status code
- * @returns Status label and class name
- */
 const getTerminStatusInfo = (status) => {
     const statusMap = {
         'geplant': { label: 'Geplant', className: 'warning' },
@@ -40,11 +23,6 @@ const getTerminStatusInfo = (status) => {
     return statusMap[status] || { label: 'Unbekannt', className: 'secondary' };
 };
 exports.getTerminStatusInfo = getTerminStatusInfo;
-/**
- * Get status information for a project
- * @param status Status code
- * @returns Status label and class name
- */
 const getProjektStatusInfo = (status) => {
     const statusMap = {
         'neu': { label: 'Neu', className: 'info' },
@@ -55,11 +33,6 @@ const getProjektStatusInfo = (status) => {
     return statusMap[status] || { label: 'Unbekannt', className: 'secondary' };
 };
 exports.getProjektStatusInfo = getProjektStatusInfo;
-/**
- * Get status information for a user
- * @param status Status code
- * @returns Status label and class name
- */
 const getBenutzerStatusInfo = (status) => {
     const statusMap = {
         'aktiv': { label: 'Aktiv', className: 'success' },
@@ -69,11 +42,6 @@ const getBenutzerStatusInfo = (status) => {
     return statusMap[status] || { label: 'Unbekannt', className: 'secondary' };
 };
 exports.getBenutzerStatusInfo = getBenutzerStatusInfo;
-/**
- * Generate unique ID
- * @param length Length of ID
- * @returns Random ID
- */
 const generateId = (length = 8) => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let id = '';
@@ -83,11 +51,6 @@ const generateId = (length = 8) => {
     return id;
 };
 exports.generateId = generateId;
-/**
- * Get notifications for current user
- * @param req Express request object
- * @returns Notifications with unread count
- */
 const getNotifications = async (req) => {
     if (!req.session || !req.session.user) {
         return { items: [], unreadCount: 0, totalCount: 0 };
@@ -95,10 +58,8 @@ const getNotifications = async (req) => {
     try {
         const userId = req.session.user.id;
         const cacheKey = `notifications_${userId}`;
-        // Try to get from cache first
         return await cache_service_1.cache.getOrExecute(cacheKey, async () => {
-            // Get notifications using Prisma
-            const notifications = await prisma_utils_1.default.notification.findMany({
+            const notifications = await prisma_utils_1.prisma.notification.findMany({
                 where: {
                     userId: Number(userId)
                 },
@@ -107,20 +68,17 @@ const getNotifications = async (req) => {
                 },
                 take: 5
             });
-            // Get unread count
-            const unreadCount = await prisma_utils_1.default.notification.count({
+            const unreadCount = await prisma_utils_1.prisma.notification.count({
                 where: {
                     userId: Number(userId),
                     read: false
                 }
             });
-            // Get total count
-            const totalCount = await prisma_utils_1.default.notification.count({
+            const totalCount = await prisma_utils_1.prisma.notification.count({
                 where: {
                     userId: Number(userId)
                 }
             });
-            // Format notifications
             const items = notifications.map((n) => {
                 const { formatRelativeTime } = require('./formatters');
                 return {
@@ -144,7 +102,7 @@ const getNotifications = async (req) => {
                 unreadCount,
                 totalCount
             };
-        }, 30); // Cache for 30 seconds
+        }, 30);
     }
     catch (error) {
         console.error('Error fetching notifications:', error);
@@ -152,19 +110,15 @@ const getNotifications = async (req) => {
     }
 };
 exports.getNotifications = getNotifications;
-/**
- * Count new requests
- * @returns Count of new requests
- */
 const getNewRequestsCount = async () => {
     try {
         const cacheKey = 'new_requests_count';
         return await cache_service_1.cache.getOrExecute(cacheKey, async () => {
-            const count = await prisma_utils_1.default.contactRequest.count({
+            const count = await prisma_utils_1.prisma.contactRequest.count({
                 where: { status: 'neu' }
             });
             return count;
-        }, 60); // Cache for 1 minute
+        }, 60);
     }
     catch (error) {
         console.error('Error counting new requests:', error);
@@ -172,18 +126,10 @@ const getNewRequestsCount = async () => {
     }
 };
 exports.getNewRequestsCount = getNewRequestsCount;
-/**
- * Parse query filters
- * @param query Express req.query object
- * @param defaults Default filter values
- * @returns Parsed filters
- */
 const parseFilters = (query, defaults = {}) => {
     const filters = { ...defaults };
-    // Add pagination
     filters.page = parseInt(query.page) || 1;
     filters.limit = parseInt(query.limit) || 20;
-    // Add sorting
     if (query.sort) {
         const [field, direction] = query.sort.split(':');
         filters.sort = {
@@ -191,10 +137,8 @@ const parseFilters = (query, defaults = {}) => {
             direction: (direction || 'asc').toUpperCase()
         };
     }
-    // Add date range
     if (query.start_date) {
         filters.start_date = new Date(query.start_date);
-        // Default end_date to today if not provided
         if (!query.end_date) {
             filters.end_date = new Date();
         }
@@ -202,54 +146,31 @@ const parseFilters = (query, defaults = {}) => {
     if (query.end_date) {
         filters.end_date = new Date(query.end_date);
     }
-    // Add search term
     if (query.search) {
         filters.search = query.search.trim();
     }
-    // Add status
     if (query.status) {
         filters.status = query.status;
     }
-    // Add type
     if (query.type) {
         filters.type = query.type;
     }
     return filters;
 };
 exports.parseFilters = parseFilters;
-/**
- * Sanitize a string for use in SQL LIKE clause
- * @param str String to sanitize
- * @returns Sanitized string
- */
 const sanitizeLikeString = (str) => {
     if (!str)
         return '';
-    // Escape special characters in LIKE pattern
     return str.replace(/[%_\\]/g, '\\$&');
 };
 exports.sanitizeLikeString = sanitizeLikeString;
-/**
- * Truncate HTML string and close any open tags
- * @param html HTML string to truncate
- * @param maxLength Maximum length
- * @returns Truncated HTML with closed tags
- */
 const truncateHtml = (html, maxLength) => {
     if (!html || html.length <= maxLength) {
         return html || '';
     }
-    // Simple truncation for now
-    // A more complex version would properly close HTML tags
     return html.substring(0, maxLength) + '...';
 };
 exports.truncateHtml = truncateHtml;
-/**
- * Group array by key
- * @param array Array to group
- * @param key Property to group by
- * @returns Grouped object
- */
 const groupBy = (array, key) => {
     return array.reduce((result, item) => {
         const groupKey = String(item[key]);

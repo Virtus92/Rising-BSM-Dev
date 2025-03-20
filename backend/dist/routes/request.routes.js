@@ -37,32 +37,11 @@ const express_1 = require("express");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const requestController = __importStar(require("../controllers/request.controller"));
 const router = (0, express_1.Router)();
-// Apply authentication middleware to all routes
 router.use(auth_middleware_1.isAuthenticated);
-/**
- * @route   GET /dashboard/requests
- * @desc    Get all requests with optional filtering
- */
 router.get('/', requestController.getAllRequests);
-/**
- * @route   GET /dashboard/requests/:id
- * @desc    Get request by ID with related data
- */
 router.get('/:id', requestController.getRequestById);
-/**
- * @route   POST /dashboard/requests/status
- * @desc    Update request status
- */
 router.post('/status', requestController.updateRequestStatus);
-/**
- * @route   POST /dashboard/requests/:id/notes
- * @desc    Add a note to a request
- */
 router.post('/:id/notes', requestController.addRequestNote);
-/**
- * @route   GET /dashboard/requests/export
- * @desc    Export requests in various formats
- */
 router.get('/export', requestController.exportRequests);
 exports.default = router;
 //# sourceMappingURL=request.routes.js.map

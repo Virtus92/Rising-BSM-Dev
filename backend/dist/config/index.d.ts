@@ -1,7 +1,3 @@
-/**
- * Application Configuration
- * Centralizes all environment variables and configuration settings
- */
 export declare const NODE_ENV: string;
 export declare const IS_PRODUCTION: boolean;
 export declare const IS_DEVELOPMENT: boolean;

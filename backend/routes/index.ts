@@ -17,7 +17,7 @@ const contactLimiter = rateLimit({
  * @desc    Home page
  */
 router.get('/', (req: Request, res: Response) => {
-  res.render('index', { 
+  res.render('index.ejs', { 
     title: 'Rising BSM – Ihre Allround-Experten',
     user: req.session?.user || null
   });
@@ -28,7 +28,7 @@ router.get('/', (req: Request, res: Response) => {
  * @desc    Imprint page
  */
 router.get('/impressum', (req: Request, res: Response) => {
-  res.render('impressum', { 
+  res.render('impressum.ejs', { 
     title: 'Rising BSM – Impressum',
     user: req.session?.user || null
   });
@@ -39,7 +39,7 @@ router.get('/impressum', (req: Request, res: Response) => {
  * @desc    Privacy policy page
  */
 router.get('/datenschutz', (req: Request, res: Response) => {
-  res.render('datenschutz', { 
+  res.render('datenschutz.ejs', { 
     title: 'Rising BSM – Datenschutz',
     user: req.session?.user || null
   });
@@ -50,7 +50,7 @@ router.get('/datenschutz', (req: Request, res: Response) => {
  * @desc    Terms and conditions page
  */
 router.get('/agb', (req: Request, res: Response) => {
-  res.render('agb', { 
+  res.render('agb.ejs', { 
     title: 'Rising BSM – AGB',
     user: req.session?.user || null
   });

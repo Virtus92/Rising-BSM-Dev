@@ -1,6 +1,6 @@
 // middleware/dashboard.middleware.ts
 import { Request, Response, NextFunction } from 'express';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import notificationService from '../services/notification.service';
 import { AuthenticatedRequest } from '../types/authenticated-request';
 

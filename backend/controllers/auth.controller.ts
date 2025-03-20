@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import { validateInput, validatePassword } from '../utils/validators';
 import { UnauthorizedError, ValidationError, NotFoundError } from '../utils/errors';
 import { generateAuthTokens, verifyToken } from '../utils/jwt';

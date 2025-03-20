@@ -1,30 +1,9 @@
-/**
- * Validation middleware for input data
- */
 import { Request, Response, NextFunction } from 'express';
-/**
- * Validates customer data
- */
 export declare const validateCustomer: (req: Request, res: Response, next: NextFunction) => void;
-/**
- * Validates project data
- */
 export declare const validateProject: (req: Request, res: Response, next: NextFunction) => void;
-/**
- * Validates appointment data
- */
 export declare const validateAppointment: (req: Request, res: Response, next: NextFunction) => void;
-/**
- * Validates service data
- */
 export declare const validateService: (req: Request, res: Response, next: NextFunction) => void;
-/**
- * Validates request status update
- */
 export declare const validateStatusUpdate: (req: Request, res: Response, next: NextFunction) => void;
-/**
- * Validates contact form submission
- */
 export declare const validateContactForm: (req: Request, res: Response, next: NextFunction) => void;
 declare const _default: {
     validateCustomer: (req: Request, res: Response, next: NextFunction) => void;

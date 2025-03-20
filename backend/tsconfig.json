@@ -6,6 +6,7 @@
     "moduleResolution": "node",
     "outDir": "./dist",
     "rootDir": "./",
+    "removeComments": true,
     "typeRoots": ["./node_modules/@types", "./types"],
     "strict": true,
     "esModuleInterop": true,
@@ -15,8 +16,12 @@
     "sourceMap": true,
     "declaration": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
+    "paths": {
+      "@prisma/client": ["./prisma/generated/client"]
+    }
   },
-  "include": ["**/*.ts", "types/custom.d.ts"],
+  "include": ["**/*.ts", "types/custom.d.ts", "prisma/generated/client/**/*"],
   "exclude": ["node_modules", "**/*.test.ts", "dist"]
 }

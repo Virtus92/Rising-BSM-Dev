@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import NotificationService from '../services/notification.service';
 import { validateInput } from '../utils/validators';
 import { asyncHandler } from '../utils/asyncHandler';

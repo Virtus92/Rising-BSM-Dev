@@ -38,32 +38,11 @@ const auth_middleware_1 = require("../middleware/auth.middleware");
 const appointmentController = __importStar(require("../controllers/appointment.controller"));
 const validation_middleware_1 = require("../middleware/validation.middleware");
 const router = (0, express_1.Router)();
-// Apply authentication middleware to all routes
 router.use(auth_middleware_1.isAuthenticated);
-/**
- * @route   GET /dashboard/termine
- * @desc    Get all appointments
- */
 router.get('/', appointmentController.getAllAppointments);
-/**
- * @route   GET /dashboard/termine/:id
- * @desc    Get appointment by ID
- */
 router.get('/:id', appointmentController.getAppointmentById);
-/**
- * @route   POST /dashboard/termine
- * @desc    Create a new appointment
- */
 router.post('/', validation_middleware_1.validateAppointment, appointmentController.createAppointment);
-/**
- * @route   PUT /dashboard/termine/:id
- * @desc    Update an existing appointment
- */
 router.put('/:id', validation_middleware_1.validateAppointment, appointmentController.updateAppointment);
-/**
- * @route   DELETE /dashboard/termine/:id
- * @desc    Delete an appointment
- */
 router.delete('/:id', appointmentController.deleteAppointment);
 exports.default = router;
 //# sourceMappingURL=appointment.routes.js.map

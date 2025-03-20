@@ -1,6 +1,3 @@
-/**
- * Standard API response types for consistent frontend integration
- */
 export interface SuccessResponse<T = any> {
     success: true;
     data: T;

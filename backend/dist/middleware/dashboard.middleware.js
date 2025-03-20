@@ -4,15 +4,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.prepareDashboardContextMiddleware = exports.logUserActivityMiddleware = exports.attachNotificationsMiddleware = exports.getNewRequestsCountMiddleware = void 0;
-const prisma_utils_1 = __importDefault(require("../utils/prisma.utils"));
+const prisma_utils_1 = require("../utils/prisma.utils");
 const notification_service_1 = __importDefault(require("../services/notification.service"));
-/**
- * Middleware to get new requests count
- * Attaches the count of new contact requests to the request object
- */
 const getNewRequestsCountMiddleware = async (req, res, next) => {
     try {
-        const count = await prisma_utils_1.default.contactRequest.count({
+        const count = await prisma_utils_1.prisma.contactRequest.count({
             where: { status: 'neu' }
         });
         req.newRequestsCount = count;
@@ -25,14 +21,9 @@ const getNewRequestsCountMiddleware = async (req, res, next) => {
     }
 };
 exports.getNewRequestsCountMiddleware = getNewRequestsCountMiddleware;
-/**
- * Middleware to attach user notifications
- * Retrieves and attaches user notifications to the request object
- */
 const attachNotificationsMiddleware = async (req, res, next) => {
     try {
         const authReq = req;
-        // Only attach notifications if user is authenticated
         if (authReq.user) {
             const notificationsData = await notification_service_1.default.getNotifications(authReq.user.id, { limit: 5, unreadOnly: true });
             req.notifications = notificationsData.notifications;
@@ -52,22 +43,15 @@ const attachNotificationsMiddleware = async (req, res, next) => {
     }
 };
 exports.attachNotificationsMiddleware = attachNotificationsMiddleware;
-/**
- * Middleware to log user activity
- * Logs route access and potentially other user interactions
- */
 const logUserActivityMiddleware = async (req, res, next) => {
     try {
         const authReq = req;
-        // Only log for authenticated users
         if (authReq.user) {
-            await prisma_utils_1.default.userActivity.create({
+            await prisma_utils_1.prisma.userActivity.create({
                 data: {
                     userId: authReq.user.id,
                     activity: 'route_access',
                     ipAddress: req.ip || '0.0.0.0',
-                    // Add additional info if needed
-                    // route: req.path
                 }
             });
         }
@@ -79,10 +63,6 @@ const logUserActivityMiddleware = async (req, res, next) => {
     }
 };
 exports.logUserActivityMiddleware = logUserActivityMiddleware;
-/**
- * Middleware to prepare dashboard context
- * Combines multiple dashboard-related data preparation steps
- */
 exports.prepareDashboardContextMiddleware = [
     exports.getNewRequestsCountMiddleware,
     exports.attachNotificationsMiddleware,

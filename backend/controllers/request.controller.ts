@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import { formatDateSafely } from '../utils/formatters';
 import { getAnfrageStatusInfo } from '../utils/helpers';
 import { NotFoundError, ValidationError, BadRequestError } from '../utils/errors';

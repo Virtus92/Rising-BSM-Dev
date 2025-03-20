@@ -37,10 +37,6 @@ const express_1 = require("express");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const authController = __importStar(require("../controllers/auth.controller"));
 const router = (0, express_1.Router)();
-/**
- * @route   GET /login
- * @desc    Render login page
- */
 router.get('/login', auth_middleware_1.isNotAuthenticated, (req, res) => {
     res.render('login', {
         title: 'Login - Rising BSM',
@@ -49,20 +45,8 @@ router.get('/login', auth_middleware_1.isNotAuthenticated, (req, res) => {
         csrfToken: req.csrfToken()
     });
 });
-/**
- * @route   POST /login
- * @desc    Process login
- */
 router.post('/login', auth_middleware_1.isNotAuthenticated, authController.login);
-/**
- * @route   GET /logout
- * @desc    Process logout
- */
 router.post('/logout', authController.logout);
-/**
- * @route   GET /forgot-password
- * @desc    Render forgot password page
- */
 router.get('/forgot-password', auth_middleware_1.isNotAuthenticated, (req, res) => {
     res.render('forgot-password', {
         title: 'Passwort vergessen - Rising BSM',
@@ -71,25 +55,9 @@ router.get('/forgot-password', auth_middleware_1.isNotAuthenticated, (req, res) 
         csrfToken: req.csrfToken()
     });
 });
-/**
- * @route   POST /forgot-password
- * @desc    Process forgot password request
- */
 router.post('/forgot-password', auth_middleware_1.isNotAuthenticated, authController.forgotPassword);
-/**
- * @route   GET /reset-password/:token
- * @desc    Render reset password page
- */
 router.get('/reset-password/:token', auth_middleware_1.isNotAuthenticated, authController.validateResetToken);
-/**
- * @route   POST /reset-password/:token
- * @desc    Process reset password
- */
 router.post('/reset-password/:token', auth_middleware_1.isNotAuthenticated, authController.resetPassword);
-/**
- * @route   POST /refresh-token
- * @desc    Refresh access token
- */
 router.post('/refresh-token', authController.refreshToken);
 exports.default = router;
 //# sourceMappingURL=auth.routes.js.map

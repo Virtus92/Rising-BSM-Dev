@@ -38,42 +38,13 @@ const auth_middleware_1 = require("../middleware/auth.middleware");
 const customerController = __importStar(require("../controllers/customer.controller"));
 const validation_middleware_1 = require("../middleware/validation.middleware");
 const router = (0, express_1.Router)();
-// Apply authentication middleware to all routes
 router.use(auth_middleware_1.isAuthenticated);
-/**
- * @route   GET /dashboard/kunden
- * @desc    Get all customers
- */
 router.get('/', customerController.getAllCustomers);
-/**
- * @route   GET /dashboard/kunden/:id
- * @desc    Get customer by ID
- */
 router.get('/:id', customerController.getCustomerById);
-/**
- * @route   POST /dashboard/kunden
- * @desc    Create a new customer
- */
 router.post('/', validation_middleware_1.validateCustomer, customerController.createCustomer);
-/**
- * @route   PUT /dashboard/kunden/:id
- * @desc    Update an existing customer
- */
 router.put('/:id', validation_middleware_1.validateCustomer, customerController.updateCustomer);
-/**
- * @route   POST /dashboard/kunden/status
- * @desc    Update customer status
- */
 router.post('/status', customerController.updateCustomerStatus);
-/**
- * @route   POST /dashboard/kunden/:id/notes
- * @desc    Add a note to a customer
- */
 router.post('/:id/notes', customerController.addCustomerNote);
-/**
- * @route   DELETE /dashboard/kunden
- * @desc    Delete a customer (mark as deleted)
- */
 router.delete('/', customerController.deleteCustomer);
 exports.default = router;
 //# sourceMappingURL=customer.routes.js.map

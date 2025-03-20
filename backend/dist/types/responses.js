@@ -1,12 +1,8 @@
 "use strict";
-/**
- * Standard API response types for consistent frontend integration
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createSuccessResponse = createSuccessResponse;
 exports.createErrorResponse = createErrorResponse;
 exports.createPaginatedResponse = createPaginatedResponse;
-// Create a standardized success response
 function createSuccessResponse(data, message, meta) {
     return {
         success: true,
@@ -18,7 +14,6 @@ function createSuccessResponse(data, message, meta) {
         }
     };
 }
-// Create a standardized error response
 function createErrorResponse(error, errors, code, meta) {
     return {
         success: false,
@@ -31,7 +26,6 @@ function createErrorResponse(error, errors, code, meta) {
         }
     };
 }
-// Create a paginated response
 function createPaginatedResponse(data, pagination, message, meta) {
     return createSuccessResponse(data, message, {
         ...meta,

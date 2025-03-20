@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.exportProjects = exports.addProjectNote = exports.updateProjectStatus = exports.updateProject = exports.createProject = exports.getProjectById = exports.getAllProjects = void 0;
-const prisma_utils_1 = __importDefault(require("../utils/prisma.utils"));
+const prisma_utils_1 = require("../utils/prisma.utils");
 const formatters_1 = require("../utils/formatters");
 const helpers_1 = require("../utils/helpers");
 const errors_1 = require("../utils/errors");
@@ -12,17 +12,11 @@ const validators_1 = require("../utils/validators");
 const asyncHandler_1 = require("../utils/asyncHandler");
 const config_1 = __importDefault(require("../config"));
 const validation_types_1 = require("../utils/validation-types");
-/**
- * Get all projects with optional filtering
- */
 exports.getAllProjects = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    // Extract filter parameters
     const { status, kunde_id, search, page = 1, limit = config_1.default.DEFAULT_PAGE_SIZE } = req.query;
-    // Validate and sanitize pagination parameters
     const pageNumber = Math.max(1, Number(page) || 1);
     const pageSize = Math.min(config_1.default.MAX_PAGE_SIZE, Math.max(1, Number(limit) || config_1.default.DEFAULT_PAGE_SIZE));
     const skip = (pageNumber - 1) * pageSize;
-    // Build filter conditions
     const where = {};
     if (status) {
         where.status = status;
@@ -36,9 +30,8 @@ exports.getAllProjects = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             { Customer: { name: { contains: search, mode: 'insensitive' } } }
         ];
     }
-    // Execute queries in parallel
     const [projects, totalCount] = await Promise.all([
-        prisma_utils_1.default.project.findMany({
+        prisma_utils_1.prisma.project.findMany({
             where,
             include: {
                 Customer: true,
@@ -48,7 +41,7 @@ exports.getAllProjects = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             take: pageSize,
             skip
         }),
-        prisma_utils_1.default.project.count({ where })
+        prisma_utils_1.prisma.project.count({ where })
     ]);
     const formattedProjects = projects.map((project) => {
         const statusInfo = (0, helpers_1.getProjektStatusInfo)(project.status);
@@ -66,9 +59,7 @@ exports.getAllProjects = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             betrag: project.amount
         };
     });
-    // Calculate pagination data
     const totalPages = Math.ceil(totalCount / pageSize);
-    // Return data object for rendering or JSON response
     res.status(200).json({
         success: true,
         projects: formattedProjects,
@@ -85,17 +76,13 @@ exports.getAllProjects = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         }
     });
 });
-/**
- * Get project by ID with related data
- */
 exports.getProjectById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id } = req.params;
     const projectId = Number(id);
     if (isNaN(projectId)) {
         throw new errors_1.BadRequestError('Invalid project ID');
     }
-    // Get project details
-    const project = await prisma_utils_1.default.project.findUnique({
+    const project = await prisma_utils_1.prisma.project.findUnique({
         where: { id: projectId },
         include: {
             Customer: true,
@@ -106,13 +93,12 @@ exports.getProjectById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         throw new errors_1.NotFoundError(`Project with ID ${projectId} not found`);
     }
     const statusInfo = (0, helpers_1.getProjektStatusInfo)(project.status);
-    // Get appointments and notes in parallel
     const [appointments, notes] = await Promise.all([
-        prisma_utils_1.default.appointment.findMany({
+        prisma_utils_1.prisma.appointment.findMany({
             where: { projectId },
             orderBy: { appointmentDate: 'asc' }
         }),
-        prisma_utils_1.default.projectNote.findMany({
+        prisma_utils_1.prisma.projectNote.findMany({
             where: { projectId },
             orderBy: { createdAt: 'desc' }
         })
@@ -155,11 +141,7 @@ exports.getProjectById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         ...result
     });
 });
-/**
- * Create a new project
- */
 exports.createProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    // Create validation schema with correct typing
     const validationSchema = {
         titel: { type: 'text', required: true, minLength: 2 },
         kunde_id: { type: 'text', required: false },
@@ -170,12 +152,9 @@ exports.createProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         beschreibung: { type: 'text', required: false },
         status: { type: 'text', required: false }
     };
-    // Convert the schema to the base validation schema format
     const baseSchema = (0, validation_types_1.convertValidationSchema)(validationSchema);
-    // Validate with the converted schema
     const { validatedData } = (0, validators_1.validateInput)(req.body, baseSchema, { throwOnError: true });
-    // Insert project into database using Prisma
-    const newProject = await prisma_utils_1.default.project.create({
+    const newProject = await prisma_utils_1.prisma.project.create({
         data: {
             title: validatedData.titel,
             customerId: validatedData.kunde_id ? Number(validatedData.kunde_id) : null,
@@ -188,9 +167,8 @@ exports.createProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             createdBy: req.user?.id || null
         }
     });
-    // Log the activity
     if (req.user?.id) {
-        await prisma_utils_1.default.projectLog.create({
+        await prisma_utils_1.prisma.projectLog.create({
             data: {
                 projectId: newProject.id,
                 userId: req.user.id,
@@ -199,9 +177,8 @@ exports.createProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
                 details: 'Project created'
             }
         });
-        // Create notification for customer if assigned
         if (validatedData.kunde_id) {
-            await prisma_utils_1.default.notification.create({
+            await prisma_utils_1.prisma.notification.create({
                 data: {
                     userId: Number(validatedData.kunde_id),
                     type: 'projekt',
@@ -219,16 +196,12 @@ exports.createProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         message: 'Project created successfully'
     });
 });
-/**
- * Update an existing project
- */
 exports.updateProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id } = req.params;
     const projectId = Number(id);
     if (isNaN(projectId)) {
         throw new errors_1.BadRequestError('Invalid project ID');
     }
-    // Validate input using validator utility
     const validationSchema = {
         titel: { type: 'text', required: true, minLength: 2 },
         kunde_id: { type: 'text', required: false },
@@ -241,15 +214,13 @@ exports.updateProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     };
     const baseSchema = (0, validation_types_1.convertValidationSchema)(validationSchema);
     const { validatedData } = (0, validators_1.validateInput)(req.body, baseSchema, { throwOnError: true });
-    // Check if project exists
-    const project = await prisma_utils_1.default.project.findUnique({
+    const project = await prisma_utils_1.prisma.project.findUnique({
         where: { id: projectId }
     });
     if (!project) {
         throw new errors_1.NotFoundError(`Project with ID ${projectId} not found`);
     }
-    // Update project in database
-    const updatedProject = await prisma_utils_1.default.project.update({
+    const updatedProject = await prisma_utils_1.prisma.project.update({
         where: { id: projectId },
         data: {
             title: validatedData.titel,
@@ -263,9 +234,8 @@ exports.updateProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             updatedAt: new Date()
         }
     });
-    // Log the activity
     if (req.user?.id) {
-        await prisma_utils_1.default.projectLog.create({
+        await prisma_utils_1.prisma.projectLog.create({
             data: {
                 projectId,
                 userId: req.user.id,
@@ -281,33 +251,25 @@ exports.updateProject = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         message: 'Project updated successfully'
     });
 });
-/**
- * Update project status
- */
 exports.updateProjectStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id, status, note } = req.body;
     const projectId = Number(id);
     if (isNaN(projectId)) {
         throw new errors_1.BadRequestError('Invalid project ID');
     }
-    // Validation
     if (!status) {
         throw new errors_1.ValidationError('Status is required', ['Status is required']);
     }
-    // Check valid status values
     if (!['neu', 'in_bearbeitung', 'abgeschlossen', 'storniert'].includes(status)) {
         throw new errors_1.ValidationError('Invalid status value', ['Status must be one of: neu, in_bearbeitung, abgeschlossen, storniert']);
     }
-    // Check if project exists
-    const project = await prisma_utils_1.default.project.findUnique({
+    const project = await prisma_utils_1.prisma.project.findUnique({
         where: { id: projectId }
     });
     if (!project) {
         throw new errors_1.NotFoundError(`Project with ID ${projectId} not found`);
     }
-    // Use a transaction for status update and optional note
-    await prisma_utils_1.default.$transaction(async (tx) => {
-        // Update status in database
+    await prisma_utils_1.prisma.$transaction(async (tx) => {
         await tx.project.update({
             where: { id: projectId },
             data: {
@@ -315,7 +277,6 @@ exports.updateProjectStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) 
                 updatedAt: new Date()
             }
         });
-        // Add note if provided
         if (note && note.trim() !== '' && req.user?.id) {
             await tx.projectNote.create({
                 data: {
@@ -326,7 +287,6 @@ exports.updateProjectStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) 
                 }
             });
         }
-        // Log the status change
         if (req.user?.id) {
             await tx.projectLog.create({
                 data: {
@@ -345,9 +305,6 @@ exports.updateProjectStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) 
         message: 'Project status updated successfully'
     });
 });
-/**
- * Add a note to project
- */
 exports.addProjectNote = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id } = req.params;
     const projectId = Number(id);
@@ -358,15 +315,13 @@ exports.addProjectNote = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     if (!note || note.trim() === '') {
         throw new errors_1.ValidationError('Note cannot be empty', ['Note cannot be empty']);
     }
-    // Check if project exists
-    const project = await prisma_utils_1.default.project.findUnique({
+    const project = await prisma_utils_1.prisma.project.findUnique({
         where: { id: projectId }
     });
     if (!project) {
         throw new errors_1.NotFoundError(`Project with ID ${projectId} not found`);
     }
-    // Insert note into database
-    await prisma_utils_1.default.projectNote.create({
+    await prisma_utils_1.prisma.projectNote.create({
         data: {
             projectId,
             userId: req.user?.id || null,
@@ -374,9 +329,8 @@ exports.addProjectNote = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             text: note
         }
     });
-    // Log the note addition
     if (req.user?.id) {
-        await prisma_utils_1.default.projectLog.create({
+        await prisma_utils_1.prisma.projectLog.create({
             data: {
                 projectId,
                 userId: req.user.id,
@@ -392,12 +346,7 @@ exports.addProjectNote = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         message: 'Note added successfully'
     });
 });
-/**
- * Export projects data
- */
 exports.exportProjects = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    // Since the export service requires updates for Prisma compatibility,
-    // we'll return a not implemented response for now
     res.status(501).json({
         message: 'Export functionality is being migrated to TypeScript and Prisma'
     });

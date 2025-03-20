@@ -4,23 +4,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.exportRequests = exports.addRequestNote = exports.updateRequestStatus = exports.getRequestById = exports.getAllRequests = void 0;
-const prisma_utils_1 = __importDefault(require("../utils/prisma.utils"));
+const prisma_utils_1 = require("../utils/prisma.utils");
 const formatters_1 = require("../utils/formatters");
 const helpers_1 = require("../utils/helpers");
 const errors_1 = require("../utils/errors");
 const asyncHandler_1 = require("../utils/asyncHandler");
 const config_1 = __importDefault(require("../config"));
-/**
- * Get all requests with optional filtering
- */
 exports.getAllRequests = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    // Extract filter parameters
     const { status, service, date, search, page = 1, limit = config_1.default.DEFAULT_PAGE_SIZE } = req.query;
-    // Validate and sanitize pagination parameters
     const pageNumber = Math.max(1, Number(page) || 1);
     const pageSize = Math.min(config_1.default.MAX_PAGE_SIZE, Math.max(1, Number(limit) || config_1.default.DEFAULT_PAGE_SIZE));
     const skip = (pageNumber - 1) * pageSize;
-    // Build filter conditions
     const where = {};
     if (status) {
         where.status = status;
@@ -40,15 +34,14 @@ exports.getAllRequests = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             { email: { contains: search, mode: 'insensitive' } }
         ];
     }
-    // Execute queries in parallel
     const [requests, totalCount] = await Promise.all([
-        prisma_utils_1.default.contactRequest.findMany({
+        prisma_utils_1.prisma.contactRequest.findMany({
             where,
             orderBy: { createdAt: 'desc' },
             take: pageSize,
             skip
         }),
-        prisma_utils_1.default.contactRequest.count({ where })
+        prisma_utils_1.prisma.contactRequest.count({ where })
     ]);
     const formattedRequests = requests.map((request) => {
         const statusInfo = (0, helpers_1.getAnfrageStatusInfo)(request.status);
@@ -64,9 +57,7 @@ exports.getAllRequests = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
             statusClass: statusInfo.className
         };
     });
-    // Calculate pagination data
     const totalPages = Math.ceil(totalCount / pageSize);
-    // Return data object for rendering or JSON response
     res.status(200).json({
         success: true,
         requests: formattedRequests,
@@ -84,32 +75,25 @@ exports.getAllRequests = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         }
     });
 });
-/**
- * Get request by ID with related data
- */
 exports.getRequestById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id } = req.params;
     const requestId = Number(id);
     if (isNaN(requestId)) {
         throw new errors_1.BadRequestError('Invalid request ID');
     }
-    // Get request details
-    const request = await prisma_utils_1.default.contactRequest.findUnique({
+    const request = await prisma_utils_1.prisma.contactRequest.findUnique({
         where: { id: requestId }
     });
     if (!request) {
         throw new errors_1.NotFoundError(`Request with ID ${requestId} not found`);
     }
     const statusInfo = (0, helpers_1.getAnfrageStatusInfo)(request.status);
-    const notes = await prisma_utils_1.default.requestNote.findMany({
+    const notes = await prisma_utils_1.prisma.requestNote.findMany({
         where: { requestId },
         orderBy: { createdAt: 'desc' }
     });
-    // Format request data for response
     const result = {
-        request: {
-        // ... existing properties ...
-        },
+        request: {},
         notes: notes.map((note) => ({
             id: note.id,
             text: note.text,
@@ -118,32 +102,25 @@ exports.getRequestById = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         }))
     };
 });
-/**
- * Update request status
- */
 exports.updateRequestStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id, status, note } = req.body;
     const requestId = Number(id);
     if (isNaN(requestId)) {
         throw new errors_1.BadRequestError('Invalid request ID');
     }
-    // Validation
     if (!status) {
         throw new errors_1.ValidationError('Status is required', ['Status is required']);
     }
-    // Check valid status values
     if (!['neu', 'in_bearbeitung', 'beantwortet', 'geschlossen'].includes(status)) {
         throw new errors_1.ValidationError('Invalid status value', ['Status must be one of: neu, in_bearbeitung, beantwortet, geschlossen']);
     }
-    // Check if request exists
-    const request = await prisma_utils_1.default.contactRequest.findUnique({
+    const request = await prisma_utils_1.prisma.contactRequest.findUnique({
         where: { id: requestId }
     });
     if (!request) {
         throw new errors_1.NotFoundError(`Request with ID ${requestId} not found`);
     }
-    await prisma_utils_1.default.$transaction(async (tx) => {
-        // Update status in database
+    await prisma_utils_1.prisma.$transaction(async (tx) => {
         await tx.contactRequest.update({
             where: { id: requestId },
             data: {
@@ -151,18 +128,16 @@ exports.updateRequestStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) 
                 updatedAt: new Date()
             }
         });
-        // Add note if provided and user exists
         if (note && note.trim() !== '' && req.user?.id) {
             await tx.requestNote.create({
                 data: {
                     requestId,
-                    userId: req.user.id, // Required field
+                    userId: req.user.id,
                     userName: req.user.name || 'Unknown',
                     text: note
                 }
             });
         }
-        // Log the status change
         if (req.user?.id) {
             await tx.requestLog.create({
                 data: {
@@ -176,9 +151,6 @@ exports.updateRequestStatus = (0, asyncHandler_1.asyncHandler)(async (req, res) 
         }
     });
 });
-/**
- * Add a note to request
- */
 exports.addRequestNote = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { id } = req.params;
     const requestId = Number(id);
@@ -189,25 +161,22 @@ exports.addRequestNote = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     if (!note || note.trim() === '') {
         throw new errors_1.ValidationError('Note cannot be empty', ['Note cannot be empty']);
     }
-    // Check if request exists
-    const request = await prisma_utils_1.default.contactRequest.findUnique({
+    const request = await prisma_utils_1.prisma.contactRequest.findUnique({
         where: { id: requestId }
     });
     if (!request) {
         throw new errors_1.NotFoundError(`Request with ID ${requestId} not found`);
     }
-    // Insert note into database - only if userId exists
     if (req.user?.id) {
-        await prisma_utils_1.default.requestNote.create({
+        await prisma_utils_1.prisma.requestNote.create({
             data: {
                 requestId,
-                userId: req.user.id, // Required field
+                userId: req.user.id,
                 userName: req.user?.name || 'Unknown',
                 text: note
             }
         });
-        // Log the note addition
-        await prisma_utils_1.default.requestLog.create({
+        await prisma_utils_1.prisma.requestLog.create({
             data: {
                 requestId,
                 userId: req.user.id,
@@ -218,7 +187,6 @@ exports.addRequestNote = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         });
     }
     else {
-        // Handle case where no user ID is available
         console.warn('Note added without user context');
     }
     res.status(201).json({
@@ -227,12 +195,7 @@ exports.addRequestNote = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         message: 'Note added successfully'
     });
 });
-/**
- * Export requests data
- */
 exports.exportRequests = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    // Since the export service requires updates for Prisma compatibility,
-    // we'll return a not implemented response for now
     res.status(501).json({
         message: 'Export functionality is being migrated to TypeScript and Prisma'
     });

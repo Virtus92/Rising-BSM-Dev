@@ -51,7 +51,7 @@ export const errorHandler = (
   
   // Handle regular requests based on error type
   if (statusCode === 404) {
-    return res.status(404).render('error', {
+    return res.status(404).render('error.ejs', {
       title: 'Seite nicht gefunden - Rising BSM',
       statusCode: 404,
       message: 'Die angeforderte Seite wurde nicht gefunden.',
@@ -62,7 +62,7 @@ export const errorHandler = (
   
   // For validation errors
   if (err instanceof ValidationError) {
-    return res.status(400).render('error', {
+    return res.status(400).render('error.ejs', {
       title: 'Validation Error - Rising BSM',
       statusCode: 400,
       message: message,
@@ -73,7 +73,7 @@ export const errorHandler = (
   }
   
   // For all other errors
-  res.status(statusCode).render('error', {
+  res.status(statusCode).render('error.ejs', {
     title: 'Fehler - Rising BSM',
     statusCode,
     message: config.IS_PRODUCTION 
@@ -82,7 +82,7 @@ export const errorHandler = (
     error: config.SHOW_STACK_TRACES ? err : {},
     user: user
   });
-};
+}
 
 
 /**

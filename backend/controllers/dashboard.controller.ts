@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import { format } from 'date-fns';
 import cache from '../services/cache.service';
 import { getNotifications as getHelperNotifications } from '../utils/helpers';

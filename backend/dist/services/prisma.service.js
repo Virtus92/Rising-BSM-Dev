@@ -1,17 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.prisma = void 0;
-const client_1 = require("@prisma/client");
-exports.prisma = global.prisma || new client_1.PrismaClient({
-    log: process.env.NODE_ENV === 'development'
-        ? ['query', 'error', 'warn']
-        : ['error'],
-});
-if (process.env.NODE_ENV !== 'production') {
-    global.prisma = exports.prisma;
-}
-// Graceful shutdown
+const prisma_utils_1 = require("../utils/prisma.utils");
+Object.defineProperty(exports, "prisma", { enumerable: true, get: function () { return prisma_utils_1.prisma; } });
 process.on('beforeExit', async () => {
-    await exports.prisma.$disconnect();
+    await prisma_utils_1.prisma.$disconnect();
 });
 //# sourceMappingURL=prisma.service.js.map

@@ -1,7 +1,7 @@
 // controllers/settings.controller.ts
 import { Request, Response } from 'express';
 import path from 'path';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import { ForbiddenError, BadRequestError } from '../utils/errors';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AuthenticatedRequest } from '../types/authenticated-request';

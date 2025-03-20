@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { ValidationSchema, convertValidationSchema } from '../utils/validation-types';
 import { validateInput } from '../utils/validators';
-import prisma from '../utils/prisma.utils';
+import { prisma } from '../utils/prisma.utils';
 import { formatDateSafely } from '../utils/formatters';
 import { getProjektStatusInfo, getTerminStatusInfo } from '../utils/helpers';
 import { 
