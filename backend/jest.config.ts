@@ -1,28 +1,29 @@
-import type { Config } from 'jest';
-
-const config: Config = {
+exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/src'],
-  testMatch: ['**/__tests__/**/*.ts', '**/?(*.)+(spec|test).ts'],
+  roots: ['<rootDir>/tests'],
+  modulePaths: ['<rootDir>'],
+  testMatch: ['**/tests/**/*.test.ts'],
   transform: {
-    '^.+\\.ts$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
-    }],
+    '^.+\\.tsx?$': 'ts-jest'
   },
   collectCoverage: true,
   coverageDirectory: 'coverage',
-  collectCoverageFrom: [
-    '**/*.ts',
-    '!**/node_modules/**',
-    '!**/dist/**',
-    '!**/__tests__/**',
-    '!**/types/**'
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/tests/',
+    '/dist/'
   ],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  transformIgnorePatterns: [
+    'node_modules/(?!(.*)/)'
+  ],
+  globals: {
+    'ts-jest': {
+      tsconfig: 'tsconfig.json'
+    }
+  },
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1'
+    '^@/(.*)$': '<rootDir>/$1'
   }
 };
-
-export default config;

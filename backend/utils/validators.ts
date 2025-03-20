@@ -552,7 +552,7 @@ export const validateInput = <T extends Record<string, any>>(
  * @param defaultValue Default value if not provided
  * @param validator Optional validation function
  */
-function env<T>(
+export function env<T>(
   key: string, 
   defaultValue: T, 
   validator?: (value: any) => boolean

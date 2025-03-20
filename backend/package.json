@@ -11,6 +11,8 @@
         "build:watch": "tsc -w",
         "migrate": "prisma migrate dev",
         "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
         "lint": "eslint . --ext .ts",
         "format": "prettier --write ."
     },
@@ -41,6 +43,9 @@
         "validator": "^13.9.0"
     },
     "devDependencies": {
+        "@babel/core": "^7.23.2",
+        "@babel/preset-env": "^7.23.2",
+        "@babel/preset-typescript": "^7.23.2",
         "@types/bcryptjs": "^2.4.2",
         "@types/connect-flash": "^0.0.37",
         "@types/connect-pg-simple": "^7.0.3",
@@ -50,6 +55,7 @@
         "@types/express-session": "^1.17.7",
         "@types/jest": "^29.5.14",
         "@types/jsonwebtoken": "^9.0.9",
+        "@types/mocha": "^10.0.10",
         "@types/mock-fs": "^4.13.4",
         "@types/multer": "^1.4.7",
         "@types/node": "^18.15.11",

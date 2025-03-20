@@ -1,4 +1,3 @@
-// controllers/settings.controller.ts
 import { Request, Response } from 'express';
 import path from 'path';
 import { prisma } from '../utils/prisma.utils';
