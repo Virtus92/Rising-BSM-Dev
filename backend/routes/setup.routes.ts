@@ -2,11 +2,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { isAuthenticated, isAdmin } from '../middleware/auth.middleware';
 import * as settingsController from '../controllers/settings.controller';
 import { body, validationResult } from 'express-validator';
-import bcryptjs from 'bcryptjs'; // Changed from bcrypt to bcryptjs
+import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../utils/prisma.utils';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 // Middleware to check if setup is needed
@@ -30,7 +29,7 @@ const setupRequired = async (req: Request, res: Response, next: NextFunction) =>
 };
 
 // Apply the middleware to both GET and POST routes
-router.get('/setup', setupRequired, async (req: Request, res: Response) => {
+router.get('/', setupRequired, async (req: Request, res: Response) => {
   try {
     res.render('setup', { 
       title: 'Ersteinrichtung - Rising BSM',
@@ -39,7 +38,7 @@ router.get('/setup', setupRequired, async (req: Request, res: Response) => {
       email: '',
       company_name: '',
       company_email: '',
-      csrfToken: req.csrfToken()
+      csrfToken: req.csrfToken?.() || ''
     });
   } catch (error) {
     console.error('Setup error:', error);
@@ -64,7 +63,7 @@ const setupValidation = [
   body('company_email').trim().isEmail().withMessage('Gültige Unternehmens-E-Mail erforderlich')
 ];
 
-router.post('/setup', setupRequired, setupValidation, async (req: Request, res: Response) => {
+router.post('/', setupRequired, setupValidation, async (req: Request, res: Response) => {
   const { 
     name, 
     email, 
@@ -82,7 +81,7 @@ router.post('/setup', setupRequired, setupValidation, async (req: Request, res: 
       email, 
       company_name, 
       company_email,
-      csrfToken: req.csrfToken()
+      csrfToken: req.csrfToken?.() || ''
     });
   }
 
@@ -154,7 +153,7 @@ router.post('/setup', setupRequired, setupValidation, async (req: Request, res: 
       email, 
       company_name, 
       company_email,
-      csrfToken: req.csrfToken()
+      csrfToken: req.csrfToken?.() || ''
     });
   }
 });

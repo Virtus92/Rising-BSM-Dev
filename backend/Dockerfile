@@ -1,32 +1,21 @@
-FROM node:18-bookworm
+FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package*.json ./
+# Install OpenSSL which is needed by Prisma
+RUN apk add --no-cache openssl
 
-# Install dependencies
+# Copy package files and install dependencies
+COPY package*.json ./
 RUN npm install
 
-# Copy prisma schema first
-COPY tsconfig.json ./
+# Copy Prisma schema and generate client
 COPY prisma ./prisma/
-
-# Update schema for the correct OpenSSL version
-RUN sed -i 's/binaryTargets = \[.*\]/binaryTargets = ["native", "windows", "debian-openssl-3.0.x"]/g' ./prisma/schema.prisma || echo "Sed command failed, check your schema.prisma file format"
-
-# Generate Prisma client
 RUN npx prisma generate
 
 # Copy the rest of the application
 COPY . .
 
-# Expose the application port
+# Expose port and start application
 EXPOSE 5000
-
-# Command to run the app
-CMD ["npx", "ts-node-dev", "--respawn", "--transpile-only", "server.ts"]
-
-
-# Für Produktion
-# CMD ["npm", "start"]
+CMD ["npm", "run", "dev"]

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Database service
   db:
@@ -28,29 +26,25 @@ services:
       dockerfile: Dockerfile
     container_name: rising-bsm-backend
     env_file:
-      - .env
+      - ./.env
     ports:
-      - "${BACKEND_PORT:-5000}:5000"
+      - "5000:5000"
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
     networks:
       - rising-bsm-network
-    command: >
-      sh -c "npx prisma generate && npm run dev"
 
-  # Frontend service
+  # Frontend service 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: rising-bsm-frontend
     env_file:
-      - .env
+      - ./.env
     ports:
-      - "${FRONTEND_PORT}:3000"
+      - "3000:3000"
     depends_on:
       - backend
     volumes:

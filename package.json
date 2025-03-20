@@ -56,8 +56,9 @@
     "devDependencies": {
         "@types/bcryptjs": "^2.4.6",
         "@types/cookie-parser": "^1.4.8",
-        "@types/express": "^5.0.0",
+        "@types/express": "^5.0.1",
         "@types/express-session": "^1.18.1",
+        "@types/jsonwebtoken": "^9.0.9",
         "@types/node": "^22.13.10",
         "@typescript-eslint/eslint-plugin": "^8.26.1",
         "@typescript-eslint/parser": "^8.26.1",

@@ -1,18 +1,24 @@
 import { PrismaClient } from '../prisma/generated/client';
 
-// Use a global variable to cache the Prisma instance
-declare global {
-  var prisma: PrismaClient | undefined;
-}
+// Logging settings
+const prismaLogging: Prisma.LogLevel[] = process.env.NODE_ENV === 'development' 
+  ? ['warn', 'error'] 
+  : ['error'];
 
-// Create a new PrismaClient if one doesn't exist, or use the existing one
-const prisma = global.prisma || new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+// Create a new PrismaClient if one doesn't exist
+const prisma = new PrismaClient({
+  log: prismaLogging,
 });
 
-// In development, store the instance on the global object to prevent multiple instances
-if (process.env.NODE_ENV !== 'production') {
-  global.prisma = prisma;
-}
+// Handle disconnection on shutdown
+process.on('beforeExit', async () => {
+  await prisma.$disconnect();
+});
 
+// This ensures unhandled rejections don't crash the app
+process.on('unhandledRejection', async (err) => {
+  console.error('Unhandled rejection in Prisma client:', err);
+});
+
+// Export the client
 export default prisma;
