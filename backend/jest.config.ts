@@ -1,29 +1,33 @@
-exports = {
+import type { Config } from 'jest';
+
+const config: Config = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/tests'],
-  modulePaths: ['<rootDir>'],
-  testMatch: ['**/tests/**/*.test.ts'],
+  roots: ['<rootDir>'],
+  testMatch: ['**/__tests__/**/*.ts', '**/*.test.ts'],
   transform: {
-    '^.+\\.tsx?$': 'ts-jest'
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: 'tsconfig.json',
+    }],
   },
+  moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   collectCoverage: true,
   coverageDirectory: 'coverage',
-  coveragePathIgnorePatterns: [
-    '/node_modules/',
-    '/tests/',
-    '/dist/'
+  collectCoverageFrom: [
+    '**/*.ts',
+    '!**/node_modules/**',
+    '!**/dist/**',
+    '!**/__tests__/**',
+    '!**/types/**',
+    '!**/prisma/generated/**'
   ],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  transformIgnorePatterns: [
-    'node_modules/(?!(.*)/)'
-  ],
-  globals: {
-    'ts-jest': {
-      tsconfig: 'tsconfig.json'
-    }
-  },
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1'
-  }
+  },
+  transformIgnorePatterns: [
+    '/node_modules/(?!your-module-that-needs-transforming)'
+  ]
 };
+
+export default config;
