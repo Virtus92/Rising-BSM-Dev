@@ -1,6 +1,4 @@
-import type { Config } from 'jest';
-
-const config: Config = {
+export default {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>'],
@@ -29,5 +27,3 @@ const config: Config = {
     '/node_modules/(?!your-module-that-needs-transforming)'
   ]
 };
-
-export default config;

@@ -12,7 +12,6 @@ import {
   groupBy
 } from '../../../utils/helpers';
 import { cache } from '../../../services/cache.service';
-import { prisma } from '../../../utils/prisma.utils';
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 
 // Mock cache service
@@ -25,16 +24,10 @@ jest.mock('../../../services/cache.service', () => ({
 }));
 
 // Mock Prisma
+import { prismaMock } from '../../mocks/prisma.mock';
+
 jest.mock('../../../utils/prisma.utils', () => ({
-  prisma: {
-    notification: {
-      findMany: jest.fn(),
-      count: jest.fn()
-    },
-    contactRequest: {
-      count: jest.fn()
-    }
-  }
+  prisma: prismaMock
 }));
 
 describe('Helper Utilities', () => {

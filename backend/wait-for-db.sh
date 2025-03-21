@@ -3,8 +3,10 @@
 
 set -e
 
-echo "Running prisma generate..."
+echo "Running prisma migrations..."
+npx prisma migrate dev --name init
 npx prisma generate
+npm run dev
 
 echo "Checking database status..."
 if npx prisma migrate status | grep -q "Database schema is not empty"; then
@@ -21,6 +23,8 @@ if npx prisma migrate status | grep -q "Database schema is not empty"; then
 else
   echo "Running prisma migrate deploy..."
   npx prisma migrate deploy
-fi
+
+echo "Starting the application..."
+npm run dev
 
 exec "$@"

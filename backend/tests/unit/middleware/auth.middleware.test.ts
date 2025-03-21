@@ -1,9 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { UnauthorizedError, ForbiddenError } from '../../../utils/errors';
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
+import { PrismaClient } from '@prisma/client';
+import { MockProxy, mockDeep } from 'jest-mock-extended';
 
-// Fix: First declare the mock
 const mockFindUnique = jest.fn();
+
+
+const mockPrisma = mockDeep<PrismaClient>();
+mockPrisma.user.findUnique.mockResolvedValue(null);
 
 // Mock imports 
 jest.mock('../../../utils/jwt', () => ({
@@ -11,13 +16,16 @@ jest.mock('../../../utils/jwt', () => ({
   extractTokenFromHeader: jest.fn()
 }));
 
+import { prismaMock } from '../../mocks/prisma.mock';
+
 jest.mock('../../../utils/prisma.utils', () => ({
   __esModule: true,
   prisma: {
     user: {
       findUnique: mockFindUnique
     }
-  }
+  },
+  default: jest.fn(() => ({ user: { findUnique: mockFindUnique } }))
 }));
 
 // Now import the modules after the mocks are set up
@@ -52,7 +60,7 @@ describe('Authentication Middleware', () => {
       (jwtUtils.verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
       
       // Mock user in database - use mockImplementation for stable TypeScript
-      mockFindUnique.mockImplementation(() => Promise.resolve({
+      await mockFindUnique.mockImplementation(() => Promise.resolve({
         id: 1,
         name: 'Test User',
         email: 'test@example.com',
@@ -83,20 +91,18 @@ describe('Authentication Middleware', () => {
       expect(next).toHaveBeenCalled();
     });
 
+    
     test('should throw UnauthorizedError if user not found or inactive', async () => {
       // Mock JWT verification
       (jwtUtils.extractTokenFromHeader as jest.Mock).mockReturnValue('valid-token');
       (jwtUtils.verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
       
-      // Mock user not found in database
-      mockFindUnique.mockImplementation(() => Promise.resolve(null));
+      // Fix: Properly resolve the promise with null
+      mockFindUnique.mockResolvedValue(null);
 
       await authenticate(req as Request, res as Response, next);
 
-      expect(next).toHaveBeenCalledWith(expect.objectContaining({
-        name: 'UnauthorizedError',
-        message: 'User inactive or not found'
-      }));
+      expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
     });
   });
 

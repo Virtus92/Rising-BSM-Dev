@@ -1,3 +1,20 @@
+// Import must come after mocking setup
+jest.mock('express', () => {
+  const mockRouter = {
+    get: jest.fn().mockReturnThis(),
+    post: jest.fn().mockReturnThis(),
+    put: jest.fn().mockReturnThis(),
+    patch: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis()
+  };
+  
+  return {
+    Router: jest.fn(() => mockRouter)
+  };
+});
+
+// Now import the modules
+import '../../../routes/auth.routes';
 import { Router } from 'express';
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 
@@ -7,11 +24,6 @@ const mockRouter = {
   post: jest.fn(),
   put: jest.fn()
 };
-
-// Mock Express Router - important to do this before requiring the file
-jest.mock('express', () => ({
-  Router: jest.fn(() => mockRouter)
-}));
 
 // Mock middleware
 jest.mock('../../../middleware/auth.middleware', () => ({

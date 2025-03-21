@@ -11,8 +11,9 @@ RUN npm install
 
 # Copy Prisma schema and generate client
 COPY prisma ./prisma/
-RUN npx prisma migrate dev --name init
-RUN npx prisma generate
+
+# Set the DATABASE_URL environment variable for the build process
+ENV DATABASE_URL=postgresql://postgres:postgres@db:5432/rising_bsm?schema=public
 
 # Copy the rest of the application
 COPY . .
@@ -21,4 +22,4 @@ RUN chmod +x wait-for-db.sh
 
 # Expose port and start application
 EXPOSE 5000
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "build:dev"]

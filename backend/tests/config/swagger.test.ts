@@ -10,7 +10,7 @@ jest.mock('swagger-jsdoc', () => jest.fn(() => mockSwaggerSpec));
 // Mock swagger-ui-express
 jest.mock('swagger-ui-express', () => ({
   serve: [],
-  setup: jest.fn()
+  setup: jest.fn().mockReturnValue(jest.fn())
 }));
 
 // Mock config

@@ -76,8 +76,7 @@ export const setupSwagger = (app: Express): void => {
   // Generate swagger specification
   const swaggerSpec = swaggerJsdoc(swaggerOptions);
   
-  // Fix the type issue with swaggerUi.serve by using 'as any'
-  app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerSpec));
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   // Serve Swagger spec as JSON
   app.get('/api-docs.json', (req, res) => {

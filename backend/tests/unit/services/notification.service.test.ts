@@ -1,6 +1,6 @@
 import { notificationService, getUnreadNotificationsCount } from '../../../services/notification.service';
 import { cache } from '../../../services/cache.service';
-import { prisma } from '../../../utils/prisma.utils';
+import { prismaMock } from '../../mocks/prisma.mock';
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 
 // Define notification type
@@ -27,14 +27,7 @@ jest.mock('../../../services/cache.service', () => ({
 
 // Mock Prisma
 jest.mock('../../../utils/prisma.utils', () => ({
-  prisma: {
-    notification: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-      count: jest.fn(),
-      updateMany: jest.fn()
-    }
-  }
+  prisma: prismaMock
 }));
 
 // Mock formatters
