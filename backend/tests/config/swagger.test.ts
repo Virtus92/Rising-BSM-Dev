@@ -13,6 +13,10 @@ jest.mock('swagger-ui-express', () => ({
   setup: jest.fn().mockReturnValue(jest.fn())
 }));
 
+jest.mock('../../package.json', () => {
+  throw new Error('Could not load package.json');
+}, { virtual: true });
+
 // Mock config
 jest.mock('../../config', () => ({
   PORT: 5000,
@@ -176,7 +180,7 @@ describe('Swagger Configuration', () => {
     (console.error as jest.Mock).mockClear();
     
     // Create a proper package.json mock that throws an error
-    jest.doMock('../package.json', () => {
+    jest.doMock('../../package.json', () => {
       throw new Error('Could not load package.json');
     });
     

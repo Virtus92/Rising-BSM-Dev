@@ -7,21 +7,21 @@ import { rateLimit } from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
-import config from './config';
-import prisma from './utils/prisma.utils';
+import config from './config/index.js';
+import prisma from './utils/prisma.utils.js';
 
 // Create Express app
 const app: Express = express();
 const port = config.PORT;
 
 // Import middleware
-import * as errorMiddleware from './middleware/error.middleware';
-import { authenticate } from './middleware/auth.middleware';
+import * as errorMiddleware from './middleware/error.middleware.js';
+import { authenticate } from './middleware/auth.middleware.js';
 
 // Import routes
-import apiRoutes from './routes/api.routes';
-import authRoutes from './routes/auth.routes'; 
-import { submitContact } from './controllers/contact.controller';
+import apiRoutes from './routes/api.routes.js';
+import authRoutes from './routes/auth.routes.js'; 
+import { submitContact } from './controllers/contact.controller.js';
 
 // Apply middleware
 // CORS
@@ -56,13 +56,13 @@ const contactLimiter = rateLimit({
 });
 
 // Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Add request logging middleware in development
 if (config.IS_DEVELOPMENT) {
-  app.use((req: Request, res: Response, next: NextFunction) => {
+  app.use((req: Request, _res: Response, next: NextFunction) => {
     console.log(`${req.method} ${req.url}`);
     next();
   });

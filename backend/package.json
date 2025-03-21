@@ -1,9 +1,9 @@
 {
-    "name": "rising-bsm-backend",
+    "name": "rising-bsm-api",
     "version": "1.0.0",
-    "description": "Backend for Rising BSM business management system",
-    "main": "dist/server.js",
     "type": "module",
+    "description": "Rising BSM API",
+    "main": "dist/server.js",
     "scripts": {
         "prisma:generate": "prisma generate",
         "build": "tsc -p tsconfig.json",

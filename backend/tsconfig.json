@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
+    "module": "NodeNext",
     "lib": ["ESNext"],
-    "moduleResolution": "node",
+    "moduleResolution": "NodeNext",
     "outDir": "./dist",
     "rootDir": "./",
     "removeComments": true,
@@ -22,6 +22,6 @@
       "@prisma/client": ["./prisma/generated/client"]
     }
   },
-  "include": ["**/*.ts", "types/custom.d.ts", "prisma/generated/client/**/*", "jest.setup.ts", "jest.config.ts"],
+  "include": ["**/*.ts"],
   "exclude": ["node_modules", "**/*.test.ts", "dist"]
 }

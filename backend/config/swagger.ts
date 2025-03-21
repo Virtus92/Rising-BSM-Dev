@@ -4,25 +4,25 @@ import swaggerUi from 'swagger-ui-express';
 import config from './index';
 import path from 'path';
 
-// Try to load package.json but handle if it's not available
-let packageInfo = { name: 'Rising BSM API', version: '1.0.0', description: 'Business Service Management API' };
+let packageInfo;
 try {
-  // This might fail in tests
   packageInfo = require('../package.json');
 } catch (error) {
   console.error('Could not load package.json, using defaults');
+  packageInfo = {
+    name: 'Rising BSM API',
+    version: '1.0.0',
+    description: 'Business Service Management API'
+  };
 }
 
-const { name, version, description } = packageInfo;
-
-// Define Swagger options
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: name,
-      version,
-      description,
+      title: packageInfo.name,
+      version: packageInfo.version,
+      description: packageInfo.description,
       license: {
         name: 'MIT',
         url: 'https://opensource.org/licenses/MIT',
