@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { errorHandler, notFoundHandler } from '../../../middleware/error.middleware';
 import { AppError, ValidationError } from '../../../utils/errors';
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import config from '../../../config';
 
 describe('Error Middleware', () => {
   let req: Partial<Request>;
@@ -67,6 +68,70 @@ describe('Error Middleware', () => {
         success: false,
         error: 'Something went wrong'
       }));
+    });
+
+    test('should use default message when error.message is empty', () => {
+      const error = new Error();
+      error.message = '';
+      
+      errorHandler(error, req as Request, res as Response, next);
+      
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: 'An unexpected error occurred',
+        statusCode: 500
+      }));
+    });
+    
+    test('should log stack trace in development environment', () => {
+      // Save original value
+      const originalIsDevValue = config.IS_DEVELOPMENT;
+      
+      // Mock config for development
+      Object.defineProperty(config, 'IS_DEVELOPMENT', {
+        value: true,
+        configurable: true
+      });
+      
+      const error = new Error('Test error');
+      const consoleErrorSpy = jest.spyOn(console, 'error');
+      
+      errorHandler(error, req as Request, res as Response, next);
+      
+      // Verify stack trace was logged
+      expect(consoleErrorSpy).toHaveBeenCalledWith(error.stack);
+      
+      // Restore original value
+      Object.defineProperty(config, 'IS_DEVELOPMENT', {
+        value: originalIsDevValue,
+        configurable: true
+      });
+    });
+    
+    test('should not log stack trace in production environment', () => {
+      // Save original value
+      const originalIsDevValue = config.IS_DEVELOPMENT;
+      
+      // Mock config for production
+      Object.defineProperty(config, 'IS_DEVELOPMENT', {
+        value: false,
+        configurable: true
+      });
+      
+      const error = new Error('Test error');
+      const consoleErrorSpy = jest.spyOn(console, 'error');
+      
+      errorHandler(error, req as Request, res as Response, next);
+      
+      // Check that stack trace was not logged
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(error.stack);
+      
+      // Restore original value
+      Object.defineProperty(config, 'IS_DEVELOPMENT', {
+        value: originalIsDevValue,
+        configurable: true
+      });
     });
   });
   

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { validateCustomer, validateProject, validateAppointment, validateService, validateContactForm } from '../../../middleware/validation.middleware';
+import { validateCustomer, validateProject, validateAppointment, validateService, validateContactForm, validateStatusUpdate } from '../../../middleware/validation.middleware';
 import { ValidationError } from '../../../utils/errors';
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 
@@ -206,6 +206,59 @@ describe('Validation Middleware', () => {
       };
       
       validateContactForm(req as Request, res as Response, next);
+      
+      expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+    });
+  });
+
+  describe('validateStatusUpdate', () => {
+    test('should validate valid status update data', () => {
+      req = {
+        body: {
+          id: 123,
+          status: 'active'
+        }
+      };
+      
+      validateStatusUpdate(req as Request, res as Response, next);
+      
+      expect(next).toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalledWith(expect.any(Error));
+    });
+    
+    test('should reject status update without id', () => {
+      req = {
+        body: {
+          status: 'active'
+        }
+      };
+      
+      validateStatusUpdate(req as Request, res as Response, next);
+      
+      expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+    });
+    
+    test('should reject status update without status', () => {
+      req = {
+        body: {
+          id: 123
+        }
+      };
+      
+      validateStatusUpdate(req as Request, res as Response, next);
+      
+      expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+    });
+    
+    test('should reject status update with non-string status', () => {
+      req = {
+        body: {
+          id: 123,
+          status: 123 // Non-string status
+        }
+      };
+      
+      validateStatusUpdate(req as Request, res as Response, next);
       
       expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
     });

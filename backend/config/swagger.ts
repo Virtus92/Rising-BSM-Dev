@@ -35,11 +35,11 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: `http://localhost:${config.PORT}${config.API_PREFIX}`,
+        url: `${config.PORT}${config.API_PREFIX}`,
         description: 'Development server',
       },
       {
-        url: `https://api.risingbsm.com${config.API_PREFIX}`,
+        url: `${config.API_PREFIX}`,
         description: 'Production server',
       },
     ],

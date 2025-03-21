@@ -85,6 +85,30 @@ describe('Cache Service', () => {
       
       await expect(getOrExecute('error-key', mockFn)).rejects.toThrow(mockError);
     });
+
+    test('should execute function again when cache is expired', async () => {
+      const initialData = { id: 1, name: 'Initial' };
+      const updatedData = { id: 1, name: 'Updated' };
+      
+      // Set with very short TTL
+      set('expired-cache-key', initialData, 0.01); // 10ms TTL
+      
+      // Wait for expiration
+      await new Promise(resolve => setTimeout(resolve, 20));
+      
+      // Function should be called since cache is expired
+      const mockFn = () => Promise.resolve(updatedData);
+      
+      const result = await getOrExecute('expired-cache-key', mockFn);
+      
+      // Should return the fresh data from function execution
+      expect(result).toEqual(updatedData);
+      expect(result).not.toEqual(initialData);
+      
+      // Cache should be updated with new data
+      const cachedData = get('expired-cache-key');
+      expect(cachedData).toEqual(updatedData);
+    });
   });
   
   describe('deleteCache', () => {

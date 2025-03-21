@@ -192,6 +192,109 @@ describe('Notification Service', () => {
         updatedCount: 0
       });
     });
+
+    test('should apply filter options correctly', async () => {
+      cache.get.mockReturnValue(null);
+      
+      const options = {
+        limit: 5,
+        offset: 10,
+        unreadOnly: true,
+        type: 'termin'
+      };
+      
+      mockNotificationFindMany.mockResolvedValue([]);
+      mockNotificationCount.mockResolvedValueOnce(3); // Total count
+      mockNotificationCount.mockResolvedValueOnce(2); // Unread count
+      
+      await notificationService.getNotifications(1, options);
+      
+      expect(mockNotificationFindMany).toHaveBeenCalledWith({
+        where: {
+          userId: 1,
+          read: false,
+          type: 'termin'
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        skip: 10
+      });
+    });
+    
+    test('should properly map notification types and generate links', async () => {
+      cache.get.mockReturnValue(null);
+      
+      const mockNotifications = [
+        {
+          id: 1,
+          title: 'Anfrage Test',
+          message: 'Test message',
+          type: 'anfrage',
+          read: false,
+          createdAt: new Date(),
+          userId: 1,
+          referenceId: 123,
+          referenceType: 'request'
+        },
+        {
+          id: 2,
+          title: 'Termin Test',
+          message: 'Test message',
+          type: 'termin',
+          read: true,
+          createdAt: new Date(),
+          userId: 1,
+          referenceId: 456,
+          referenceType: 'appointment'
+        },
+        {
+          id: 3,
+          title: 'Unknown Type',
+          message: 'Test message',
+          type: 'unknown',
+          read: false,
+          createdAt: new Date(),
+          userId: 1,
+          referenceId: null,
+          referenceType: null
+        }
+      ];
+      
+      mockNotificationFindMany.mockResolvedValue(mockNotifications);
+      mockNotificationCount.mockResolvedValueOnce(3); // Total count
+      mockNotificationCount.mockResolvedValueOnce(2); // Unread count
+      
+      const result = await notificationService.getNotifications(1);
+      
+      // Check type mapping for 'anfrage'
+      expect(result.notifications[0].type).toEqual({
+        key: 'request',
+        label: 'Anfrage',
+        icon: 'envelope',
+        color: 'info'
+      });
+      
+      // Check type mapping for 'termin'
+      expect(result.notifications[1].type).toEqual({
+        key: 'appointment',
+        label: 'Termin',
+        icon: 'calendar',
+        color: 'primary'
+      });
+      
+      // Check type mapping for unknown type
+      expect(result.notifications[2].type).toEqual({
+        key: 'default',
+        label: 'Benachrichtigung',
+        icon: 'info-circle',
+        color: 'secondary'
+      });
+      
+      // Check links
+      expect(result.notifications[0].link).toBe('/dashboard/requests/123');
+      expect(result.notifications[1].link).toBe('/dashboard/termine/456');
+      expect(result.notifications[2].link).toBe('/dashboard/notifications');
+    });
   });
   
   describe('markAllAsRead', () => {
@@ -215,6 +318,82 @@ describe('Notification Service', () => {
         success: true,
         updatedCount: 5
       });
+    });
+
+    test('should handle errors gracefully', async () => {
+      mockNotificationUpdateMany.mockRejectedValue(new Error('Database error'));
+      
+      // Spy on console.error
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      
+      const result = await notificationService.markAllAsRead(1);
+      
+      expect(result).toEqual({
+        success: false,
+        updatedCount: 0
+      });
+      expect(console.error).toHaveBeenCalled();
+    });
+  });
+  
+  describe('markAsRead', () => {
+    test('should mark a single notification as read', async () => {
+      mockNotificationUpdateMany.mockResolvedValue({ count: 1 });
+      
+      const result = await notificationService.markAsRead(1, 123);
+      
+      expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+        where: {
+          userId: 1,
+          id: { in: [123] }
+        },
+        data: {
+          read: true
+        }
+      });
+      
+      expect(cache.delete).toHaveBeenCalledWith(`notifications_1`);
+      expect(result).toEqual({
+        success: true,
+        updatedCount: 1
+      });
+    });
+    
+    test('should mark multiple notifications as read', async () => {
+      mockNotificationUpdateMany.mockResolvedValue({ count: 3 });
+      
+      const result = await notificationService.markAsRead(1, [123, 456, 789]);
+      
+      expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+        where: {
+          userId: 1,
+          id: { in: [123, 456, 789] }
+        },
+        data: {
+          read: true
+        }
+      });
+      
+      expect(cache.delete).toHaveBeenCalledWith(`notifications_1`);
+      expect(result).toEqual({
+        success: true,
+        updatedCount: 3
+      });
+    });
+    
+    test('should handle errors gracefully', async () => {
+      mockNotificationUpdateMany.mockRejectedValue(new Error('Database error'));
+      
+      // Spy on console.error
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      
+      const result = await notificationService.markAsRead(1, 123);
+      
+      expect(result).toEqual({
+        success: false,
+        updatedCount: 0
+      });
+      expect(console.error).toHaveBeenCalled();
     });
   });
   

@@ -90,4 +90,118 @@ describe('Swagger Configuration', () => {
     
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('/api-docs'));
   });
+
+  test('should configure security schemes correctly', () => {
+    const app = {
+      use: jest.fn(),
+      get: jest.fn()
+    } as unknown as Express;
+    
+    setupSwagger(app);
+    
+    expect(swaggerJsdoc).toHaveBeenCalledWith(expect.objectContaining({
+      definition: expect.objectContaining({
+        components: expect.objectContaining({
+          securitySchemes: expect.objectContaining({
+            bearerAuth: expect.objectContaining({
+              type: 'http',
+              scheme: 'bearer',
+              bearerFormat: 'JWT'
+            })
+          })
+        }),
+        security: expect.arrayContaining([
+          expect.objectContaining({
+            bearerAuth: expect.any(Array)
+          })
+        ])
+      })
+    }));
+  });
+
+  test('should configure API paths pattern correctly', () => {
+    const app = {
+      use: jest.fn(),
+      get: jest.fn()
+    } as unknown as Express;
+    
+    setupSwagger(app);
+    
+    expect(swaggerJsdoc).toHaveBeenCalledWith(expect.objectContaining({
+      apis: expect.arrayContaining([
+        expect.stringContaining('routes'),
+        expect.stringContaining('controllers'),
+        expect.stringContaining('models')
+      ])
+    }));
+  });
+
+  test('should handle JSON route response correctly', () => {
+    const app = {
+      use: jest.fn(),
+      get: jest.fn()
+    } as unknown as Express;
+    
+    setupSwagger(app);
+    
+    // Extract the handler function that was registered
+    const [path, handler] = (app.get as jest.Mock).mock.calls[0] as [string, (req: any, res: any) => void];
+    expect(path).toBe('/api-docs.json');
+    
+    // Mock request and response objects
+    const req = {};
+    const res = {
+      setHeader: jest.fn(),
+      send: jest.fn()
+    };
+    
+    // Call the handler function
+    handler(req, res);
+    
+    // Verify response handling
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/json');
+    expect(res.send).toHaveBeenCalledWith(mockSwaggerSpec);
+  });
+});
+
+// Moving the test for package.json loading failure to its own describe block for isolation
+describe('Swagger Configuration', () => {
+  // ...existing code...
+
+  test('should handle package.json loading failures gracefully', () => {
+    // Reset modules to get a fresh import
+    jest.resetModules();
+    
+    // Clear any previous mock calls
+    (console.error as jest.Mock).mockClear();
+    
+    // Create a proper package.json mock that throws an error
+    jest.doMock('../package.json', () => {
+      throw new Error('Could not load package.json');
+    });
+    
+    // Re-import the module after setting up the mock
+    const { setupSwagger } = require('../../config/swagger');
+    
+    const app = {
+      use: jest.fn(),
+      get: jest.fn()
+    } as unknown as Express;
+    
+    setupSwagger(app);
+    
+    // Verify fallback values are used
+    expect(console.error).toHaveBeenCalledWith('Could not load package.json, using defaults');
+    expect(swaggerJsdoc).toHaveBeenCalledWith(expect.objectContaining({
+      definition: expect.objectContaining({
+        info: expect.objectContaining({
+          title: 'Rising BSM API',
+          version: '1.0.0',
+          description: 'Business Service Management API'
+        })
+      })
+    }));
+  });
+
+  // ...existing code...
 });

@@ -37,7 +37,7 @@ export const authenticate = async (
             status: true
           }
         });
-        
+
         if (!user || user.status !== 'aktiv') {
           throw new UnauthorizedError('User inactive or not found');
         }
