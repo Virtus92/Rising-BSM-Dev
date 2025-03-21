@@ -8,8 +8,8 @@
         "prisma:generate": "prisma generate",
         "build": "tsc -p tsconfig.json",
         "start": "node dist/server.js",
-        "dev": "ts-node-dev --respawn --transpile-only server.ts",
-        "build:dev": "sh wait-for-db.sh && ts-node-dev --respawn --transpile-only server.ts",
+        "dev": "tsx watch server.ts",
+        "build:dev": "sh wait-for-db.sh && tsx watch server.ts",
         "build:watch": "tsc -w",
         "migrate": "prisma migrate dev",
         "test": "jest",
@@ -79,6 +79,7 @@
         "ts-jest": "^29.2.6",
         "ts-node": "^10.9.1",
         "ts-node-dev": "^2.0.0",
-        "typescript": "^5.0.4"
+        "typescript": "^5.0.4",
+        "tsx": "^4.19.3"
     }
 }
