@@ -1,15 +1,14 @@
 import { Router } from 'express';
-import * as authController from '../controllers/auth.controller';
+import { login, refreshToken, forgotPassword, validateResetToken, resetPassword, logout } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Authentication routes
-router.post('/login', authController.login);
-router.post('/refresh-token', authController.refreshToken);
-router.post('/forgot-password', authController.forgotPassword);
-router.get('/reset-token/:token', authController.validateResetToken);
-router.post('/reset-password/:token', authController.resetPassword);
-router.post('/logout', authenticate, authController.logout);
+router.post('/login', login);
+router.post('/refresh-token', refreshToken);
+router.post('/forgot-password', forgotPassword);
+router.get('/reset-token/:token', validateResetToken);
+router.post('/reset-password/:token', resetPassword);
+router.post('/logout', authenticate, logout);
 
 export default router;

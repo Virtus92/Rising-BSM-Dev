@@ -1,114 +1,134 @@
-// Import must come after mocking setup
-jest.mock('express', () => {
-  const mockRouter = {
-    get: jest.fn().mockReturnThis(),
-    post: jest.fn().mockReturnThis(),
-    put: jest.fn().mockReturnThis(),
-    patch: jest.fn().mockReturnThis(),
-    delete: jest.fn().mockReturnThis()
-  };
-  
-  return {
-    Router: jest.fn(() => mockRouter)
-  };
-});
-
-// Now import the modules
-import '../../../routes/api.routes';
-import { Router } from 'express';
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
+import { Router } from 'express';
 
-// Create a strongly typed mock router
-const mockRouter = {
-  get: jest.fn(),
-  post: jest.fn(),
-  put: jest.fn(),
-  patch: jest.fn(),
-  delete: jest.fn()
+// First, clear the module cache to ensure our mocks will be used
+jest.resetModules();
+
+// Create mock router instance
+const mockRouterInstance = {  
+  get: jest.fn().mockReturnThis(),
+  post: jest.fn().mockReturnThis(),
+  put: jest.fn().mockReturnThis(),
+  patch: jest.fn().mockReturnThis(),
+  delete: jest.fn().mockReturnThis()
 };
 
+// Create a mock router function that returns the mock instance
+const mockRouter = jest.fn().mockImplementation(() => mockRouterInstance);
+
+// Mock Express FIRST - before any imports that would use it
+jest.mock('express', () => ({
+  Router: mockRouter
+}));
+
 // Mock middleware
+const mockAuthenticate = jest.fn();
+const mockIsAdmin = jest.fn();
+
 jest.mock('../../../middleware/auth.middleware', () => ({
-  authenticate: jest.fn(),
-  isAdmin: jest.fn(),
-  isManager: jest.fn(),
-  isEmployee: jest.fn()
+  authenticate: mockAuthenticate,
+  isAdmin: mockIsAdmin
 }));
 
-// Mock controllers to avoid testing real functionality
+// Mock controller functions
+const mockGetAllCustomers = jest.fn();
+const mockGetCustomerById = jest.fn();
+const mockCreateCustomer = jest.fn();
+const mockUpdateCustomer = jest.fn();
+const mockUpdateCustomerStatus = jest.fn();
+const mockAddCustomerNote = jest.fn();
+const mockDeleteCustomer = jest.fn();
+const mockGetSystemSettings = jest.fn();
+const mockUpdateSystemSettings = jest.fn();
+const mockGetBackupSettings = jest.fn();
+const mockUpdateBackupSettings = jest.fn();
+const mockTriggerManualBackup = jest.fn();
+const mockGetUserSettings = jest.fn();
+const mockUpdateUserSettings = jest.fn();
+
+// Mock all necessary controllers to prevent errors
 jest.mock('../../../controllers/customer.controller', () => ({
-  getAllCustomers: jest.fn(),
-  getCustomerById: jest.fn(),
-  createCustomer: jest.fn(),
-  updateCustomer: jest.fn(),
-  updateCustomerStatus: jest.fn(),
-  addCustomerNote: jest.fn(),
-  deleteCustomer: jest.fn()
+  getAllCustomers: mockGetAllCustomers,
+  getCustomerById: mockGetCustomerById,
+  createCustomer: mockCreateCustomer,
+  updateCustomer: mockUpdateCustomer,
+  updateCustomerStatus: mockUpdateCustomerStatus,
+  addCustomerNote: mockAddCustomerNote,
+  deleteCustomer: mockDeleteCustomer
 }));
 
-// Mock PrismaClient to avoid database connection issues
-jest.mock('@prisma/client', () => {
-  const mockPrismaClient = jest.fn(() => ({}));
-  return { PrismaClient: mockPrismaClient };
-});
-jest.mock('../../../utils/prisma.utils', () => ({
-  prisma: {},
-  __esModule: true
+jest.mock('../../../controllers/settings.controller', () => ({
+  getSystemSettings: mockGetSystemSettings,
+  updateSystemSettings: mockUpdateSystemSettings,
+  getBackupSettings: mockGetBackupSettings,
+  updateBackupSettings: mockUpdateBackupSettings,
+  triggerManualBackup: mockTriggerManualBackup,
+  getUserSettings: mockGetUserSettings,
+  updateUserSettings: mockUpdateUserSettings
 }));
 
-// Import directly for testing - don't call require yet
-import { authenticate, isAdmin } from '../../../middleware/auth.middleware';
+// Mock all other controllers with empty objects to prevent errors
+jest.mock('../../../controllers/project.controller', () => ({}));
+jest.mock('../../../controllers/appointment.controller', () => ({}));
+jest.mock('../../../controllers/service.controller', () => ({}));
+jest.mock('../../../controllers/request.controller', () => ({}));
+jest.mock('../../../controllers/profile.controller', () => ({}));
+jest.mock('../../../controllers/dashboard.controller', () => ({}));
 
-// Load the routes
-jest.doMock('../../../routes/api.routes', () => {
-  const router = { use: jest.fn() };
-  mockRouter.get.mockImplementation((path, ...handlers) => {
-    // For test purposes, store the route information
-    router.use(path, ...handlers);
-    return router;
-  });
-  return router;
-});
-
-// Now force the route registration
-require('../../../routes/api.routes');
+// Import the module under test AFTER setting up all mocks
+let apiRoutes: Router;
 
 describe('API Routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Import the routes within each test to ensure mocks are applied
+    apiRoutes = require('../../../routes/api.routes').default;
   });
 
   test('should be an Express router', () => {
-      expect(Router).toHaveBeenCalled();
+    // Verify Router was called when the module was imported
+    expect(mockRouter).toHaveBeenCalled();
+    expect(apiRoutes).toBe(mockRouterInstance);
   });
   
   test('should register customer routes with authentication', () => {
-    mockRouter.get.mockImplementationOnce((path, ...handlers) => {
-      if (path === '/customers') {
-        expect(handlers).toContain(authenticate);
-      }
-      return mockRouter;
-    });
-
-    // Re-register routes
-    const routes = require('../../../routes/api.routes');
+    // Find the calls to mockRouterInstance.get with '/customers'
+    const customersRoute = mockRouterInstance.get.mock.calls.find(
+      call => call[0] === '/customers'
+    );
     
-    // Manually simulate route registration since we can't actually execute the route setup
-    mockRouter.get('/customers', authenticate, jest.fn());
+    // Verify the route was registered with authentication
+    expect(customersRoute).toBeDefined();
+    if (customersRoute) {
+      expect(customersRoute[1]).toBe(mockAuthenticate);
+      expect(customersRoute[2]).toBe(mockGetAllCustomers);
+    }
     
-    // Verify at least one correct route was registered
-    expect(mockRouter.get).toHaveBeenCalledWith('/customers', authenticate, expect.any(Function));
+    // Find the call to mockRouterInstance.get with '/customers/:id'
+    const customerByIdRoute = mockRouterInstance.get.mock.calls.find(
+      call => call[0] === '/customers/:id'
+    );
+    
+    // Verify the route was registered with authentication
+    expect(customerByIdRoute).toBeDefined();
+    if (customerByIdRoute) {
+      expect(customerByIdRoute[1]).toBe(mockAuthenticate);
+      expect(customerByIdRoute[2]).toBe(mockGetCustomerById);
+    }
   });
   
   test('should register admin-only routes with isAdmin middleware', () => {
-    // Manually create a route with isAdmin
-    mockRouter.get('/settings/system', authenticate, isAdmin, jest.fn());
-    
-    // Find routes that use isAdmin middleware
-    const adminRoutes = mockRouter.get.mock.calls.filter(call => 
-      call.includes(isAdmin)
+    // Find the calls to routes with admin middleware
+    const adminRoute = mockRouterInstance.get.mock.calls.find(
+      call => call[0] === '/settings/system'
     );
     
-    expect(adminRoutes.length).toBeGreaterThan(0);
+    // Verify the route was registered with admin middleware
+    expect(adminRoute).toBeDefined();
+    if (adminRoute) {
+      expect(adminRoute[1]).toBe(mockAuthenticate);
+      expect(adminRoute[2]).toBe(mockIsAdmin);
+      expect(adminRoute[3]).toBe(mockGetSystemSettings);
+    }
   });
 });

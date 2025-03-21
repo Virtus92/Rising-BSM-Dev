@@ -1,7 +1,4 @@
-/**
- * Swagger/OpenAPI Configuration
- */
-import { Express } from 'express';
+import { Express, RequestHandler } from 'express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import config from './index';
@@ -76,7 +73,7 @@ export const setupSwagger = (app: Express): void => {
   // Generate swagger specification
   const swaggerSpec = swaggerJsdoc(swaggerOptions);
   
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerSpec) as any);
 
   // Serve Swagger spec as JSON
   app.get('/api-docs.json', (req, res) => {
