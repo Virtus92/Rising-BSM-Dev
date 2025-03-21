@@ -160,17 +160,17 @@ describe('Contact Controller', () => {
             pool.query.mockReset();
             pool.query.mockImplementation((query) => {
                 // Log the query to see what's coming in
-                // // console.log("Query received:", query);
+                // console.log("Query received:", query);
                 
                 // Handle as object or string
                 const queryText = typeof query === 'object' ? query.text : query;
                 
                 // Normalize the query text by removing extra whitespace
                 const normalizedText = queryText.replace(/\s+/g, ' ').trim();
-                // // console.log("Normalized query:", normalizedText);
+                // console.log("Normalized query:", normalizedText);
                 
                 if (normalizedText.includes('INSERT INTO kontaktanfragen')) {
-                    // // console.log("Returning inserted request with ID:", requestId);
+                    // console.log("Returning inserted request with ID:", requestId);
                     return Promise.resolve({ rows: [{ id: requestId }] });
                 } 
                 
@@ -191,14 +191,14 @@ describe('Contact Controller', () => {
             
             NotificationService.create.mockImplementation((data) => {
                 notificationCalls.push({...data}); // Store a copy of the data
-                // // console.log(`Mock call ${notificationCalls.length} with type: ${data.type}, userId: ${data.userId}`);
+                // console.log(`Mock call ${notificationCalls.length} with type: ${data.type}, userId: ${data.userId}`);
                 return Promise.resolve({ success: true });
             });
             
             await contactController.submitContact(mockRequest, mockResponse, next);
             
-            // // console.log(`Total mock calls: ${notificationCalls.length}`);
-            // // console.log(`Expected calls: ${adminUsers.length + 1}`);
+            // console.log(`Total mock calls: ${notificationCalls.length}`);
+            // console.log(`Expected calls: ${adminUsers.length + 1}`);
             
             // Verify total calls
             expect(notificationCalls.length).toBe(adminUsers.length + 1);
@@ -266,17 +266,17 @@ describe('Contact Controller', () => {
            pool.query.mockReset();
            pool.query.mockImplementation((query) => {
                // Log the query to see what's coming in
-               // // console.log("Query received:", query);
+               // console.log("Query received:", query);
                
                // Handle as object or string
                const queryText = typeof query === 'object' ? query.text : query;
                
                // Normalize the query text by removing extra whitespace
                const normalizedText = queryText.replace(/\s+/g, ' ').trim();
-               // // console.log("Normalized query:", normalizedText);
+               // console.log("Normalized query:", normalizedText);
                
                if (normalizedText.includes('INSERT INTO kontaktanfragen')) {
-                   // // console.log("Returning inserted request with ID:", requestId);
+                   // console.log("Returning inserted request with ID:", requestId);
                    return Promise.resolve({ rows: [{ id: requestId }] });
                } 
                

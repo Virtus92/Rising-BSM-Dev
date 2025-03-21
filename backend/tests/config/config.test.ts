@@ -1,4 +1,3 @@
-// tests/config/config.test.ts
 import { mockEnvironment } from '../mocks/environment.mock';
 import * as configModule from '../../config';
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';

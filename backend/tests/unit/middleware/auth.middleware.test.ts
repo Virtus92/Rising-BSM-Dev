@@ -1,23 +1,28 @@
 import { Request, Response, NextFunction } from 'express';
 import { UnauthorizedError, ForbiddenError } from '../../../utils/errors';
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { PrismaClient } from '@prisma/client';
-import { MockProxy, mockDeep } from 'jest-mock-extended';
-
-const mockFindUnique = jest.fn();
+import { createTypedMock } from '../../mocks/jest-utils';
 
 
-const mockPrisma = mockDeep<PrismaClient>();
-mockPrisma.user.findUnique.mockResolvedValue(null);
+// Define User type
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+}
 
-// Mock imports 
+// Create a simple mock function without complex generic typing
+const mockFindUnique = createTypedMock<User | null>();
+
+// Mock JWT utilities
 jest.mock('../../../utils/jwt', () => ({
   verifyToken: jest.fn(),
   extractTokenFromHeader: jest.fn()
 }));
 
-import { prismaMock } from '../../mocks/prisma.mock';
-
+// Mock Prisma utilities
 jest.mock('../../../utils/prisma.utils', () => ({
   __esModule: true,
   prisma: {
@@ -25,10 +30,14 @@ jest.mock('../../../utils/prisma.utils', () => ({
       findUnique: mockFindUnique
     }
   },
-  default: jest.fn(() => ({ user: { findUnique: mockFindUnique } }))
+  default: {
+    user: {
+      findUnique: mockFindUnique
+    }
+  }
 }));
 
-// Now import the modules after the mocks are set up
+// Import after mocks are set up
 import { authenticate, isAdmin, isManager, isEmployee } from '../../../middleware/auth.middleware';
 import * as jwtUtils from '../../../utils/jwt';
 
@@ -59,14 +68,14 @@ describe('Authentication Middleware', () => {
       (jwtUtils.extractTokenFromHeader as jest.Mock).mockReturnValue('valid-token');
       (jwtUtils.verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
       
-      // Mock user in database - use mockImplementation for stable TypeScript
-      await mockFindUnique.mockImplementation(() => Promise.resolve({
+      // Mock user in database with correct typing
+      mockFindUnique.mockResolvedValue({
         id: 1,
         name: 'Test User',
         email: 'test@example.com',
         role: 'admin',
         status: 'aktiv'
-      }));
+      });
 
       await authenticate(req as Request, res as Response, next);
 
@@ -91,13 +100,12 @@ describe('Authentication Middleware', () => {
       expect(next).toHaveBeenCalled();
     });
 
-    
     test('should throw UnauthorizedError if user not found or inactive', async () => {
       // Mock JWT verification
       (jwtUtils.extractTokenFromHeader as jest.Mock).mockReturnValue('valid-token');
       (jwtUtils.verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
       
-      // Fix: Properly resolve the promise with null
+      // Return null for user lookup
       mockFindUnique.mockResolvedValue(null);
 
       await authenticate(req as Request, res as Response, next);
