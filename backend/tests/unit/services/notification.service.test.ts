@@ -7,7 +7,7 @@ import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 interface MockNotification {
   id: number;
   title: string;
-  message: string;
+  message: string | null;
   type: string;
   read: boolean;
   createdAt: Date;
@@ -57,12 +57,12 @@ describe('Notification Service', () => {
       };
       
       // Type the mock implementation with the correct return type
-      (prisma.notification.create as jest.Mock).mockResolvedValue({
+      (prisma.notification.create as jest.Mock).mockImplementation(() => Promise.resolve({
         id: 123,
         ...notificationData,
         read: false,
         createdAt: new Date()
-      } as MockNotification);
+      }));
       
       const result = await notificationService.create(notificationData);
       
@@ -90,7 +90,7 @@ describe('Notification Service', () => {
         message: 'You have a new request'
       };
       
-      (prisma.notification.create as jest.Mock).mockRejectedValue(new Error('Database error'));
+      (prisma.notification.create as jest.Mock).mockImplementation(() => Promise.reject(new Error('Database error')));
       
       // Spy on console.error to silence it
       jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -125,7 +125,7 @@ describe('Notification Service', () => {
     test('should fetch notifications from database if not cached', async () => {
       (cache.get as jest.Mock).mockReturnValue(null);
       
-      (prisma.notification.findMany as jest.Mock).mockResolvedValue([
+      (prisma.notification.findMany as jest.Mock).mockImplementation(() => Promise.resolve([
         {
           id: 1,
           title: 'Test Notification',
@@ -136,12 +136,12 @@ describe('Notification Service', () => {
           userId: 1,
           referenceId: 123,
           referenceType: 'request'
-        } as MockNotification
-      ]);
+        }
+      ]));
       
       (prisma.notification.count as jest.Mock)
-        .mockResolvedValueOnce(5) // Total count
-        .mockResolvedValueOnce(3); // Unread count
+        .mockImplementationOnce(() => Promise.resolve(5)) // Total count
+        .mockImplementationOnce(() => Promise.resolve(3)); // Unread count
       
       const result = await notificationService.getNotifications(1);
       
@@ -157,10 +157,10 @@ describe('Notification Service', () => {
     test('should apply filters correctly', async () => {
       (cache.get as jest.Mock).mockReturnValue(null);
       
-      (prisma.notification.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.notification.findMany as jest.Mock).mockImplementation(() => Promise.resolve([]));
       (prisma.notification.count as jest.Mock)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockImplementationOnce(() => Promise.resolve(0))
+        .mockImplementationOnce(() => Promise.resolve(0));
       
       await notificationService.getNotifications(1, {
         limit: 5,
@@ -182,7 +182,7 @@ describe('Notification Service', () => {
     
     test('should handle errors gracefully', async () => {
       (cache.get as jest.Mock).mockReturnValue(null);
-      (prisma.notification.findMany as jest.Mock).mockRejectedValue(new Error('Database error'));
+      (prisma.notification.findMany as jest.Mock).mockImplementation(() => Promise.reject(new Error('Database error')));
       
       // Spy on console.error to silence it
       jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -194,7 +194,7 @@ describe('Notification Service', () => {
   
   describe('markAsRead', () => {
     test('should mark single notification as read', async () => {
-      (prisma.notification.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (prisma.notification.updateMany as jest.Mock).mockImplementation(() => Promise.resolve({ count: 1 }));
       
       const result = await notificationService.markAsRead(1, 123);
       
@@ -216,7 +216,7 @@ describe('Notification Service', () => {
     });
     
     test('should mark multiple notifications as read', async () => {
-      (prisma.notification.updateMany as jest.Mock).mockResolvedValue({ count: 3 });
+      (prisma.notification.updateMany as jest.Mock).mockImplementation(() => Promise.resolve({ count: 3 }));
       
       const result = await notificationService.markAsRead(1, [123, 456, 789]);
       
@@ -234,7 +234,7 @@ describe('Notification Service', () => {
     });
     
     test('should handle errors gracefully', async () => {
-      (prisma.notification.updateMany as jest.Mock).mockRejectedValue(new Error('Database error'));
+      (prisma.notification.updateMany as jest.Mock).mockImplementation(() => Promise.reject(new Error('Database error')));
       
       // Spy on console.error to silence it
       jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -251,7 +251,7 @@ describe('Notification Service', () => {
   
   describe('markAllAsRead', () => {
     test('should mark all notifications as read', async () => {
-      (prisma.notification.updateMany as jest.Mock).mockResolvedValue({ count: 5 });
+      (prisma.notification.updateMany as jest.Mock).mockImplementation(() => Promise.resolve({ count: 5 }));
       
       const result = await notificationService.markAllAsRead(1);
       
@@ -273,7 +273,7 @@ describe('Notification Service', () => {
     });
     
     test('should handle errors gracefully', async () => {
-      (prisma.notification.updateMany as jest.Mock).mockRejectedValue(new Error('Database error'));
+      (prisma.notification.updateMany as jest.Mock).mockImplementation(() => Promise.reject(new Error('Database error')));
       
       // Spy on console.error to silence it
       jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -289,7 +289,7 @@ describe('Notification Service', () => {
   
   describe('getUnreadNotificationsCount', () => {
     test('should return unread notification count', async () => {
-      (prisma.notification.count as jest.Mock).mockResolvedValue(3);
+      (prisma.notification.count as jest.Mock).mockImplementation(() => Promise.resolve(3));
       
       const count = await getUnreadNotificationsCount(1);
       
@@ -304,7 +304,7 @@ describe('Notification Service', () => {
     });
     
     test('should handle errors gracefully', async () => {
-      (prisma.notification.count as jest.Mock).mockRejectedValue(new Error('Database error') as never);
+      (prisma.notification.count as jest.Mock).mockImplementation(() => Promise.reject(new Error('Database error')));
       
       // Spy on console.error to silence it
       jest.spyOn(console, 'error').mockImplementation(() => {});

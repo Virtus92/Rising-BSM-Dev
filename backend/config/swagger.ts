@@ -6,9 +6,17 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import config from './index';
 import path from 'path';
-import packageJson from '../package.json';
 
-const { name, version, description } = packageJson;
+// Try to load package.json but handle if it's not available
+let packageInfo = { name: 'Rising BSM API', version: '1.0.0', description: 'Business Service Management API' };
+try {
+  // This might fail in tests
+  packageInfo = require('../package.json');
+} catch (error) {
+  console.error('Could not load package.json, using defaults');
+}
+
+const { name, version, description } = packageInfo;
 
 // Define Swagger options
 const swaggerOptions = {
@@ -65,7 +73,10 @@ const swaggerOptions = {
  * @param app Express application
  */
 export const setupSwagger = (app: Express): void => {
-  // Fix the type issue with swaggerUi.serve
+  // Generate swagger specification
+  const swaggerSpec = swaggerJsdoc(swaggerOptions);
+  
+  // Fix the type issue with swaggerUi.serve by using 'as any'
   app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerSpec));
 
   // Serve Swagger spec as JSON

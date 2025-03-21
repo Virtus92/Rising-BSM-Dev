@@ -2,11 +2,18 @@ import logger, { debug, info, warn, error, httpRequest } from '../../../utils/lo
 import config from '../../../config';
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 
+// Mock the config module
+jest.mock('../../../config', () => ({
+  LOG_LEVEL: 'info', // Set to info for testing
+  IS_DEVELOPMENT: false
+}));
+
 describe('Logger Utility', () => {
-  let consoleDebugSpy: jest.SpyInstance;
-  let consoleInfoSpy: jest.SpyInstance;
-  let consoleWarnSpy: jest.SpyInstance;
-  let consoleErrorSpy: jest.SpyInstance;
+  // Fix: Remove the SpyInstance type which isn't available in the jest namespace
+  let consoleDebugSpy: any;
+  let consoleInfoSpy: any;
+  let consoleWarnSpy: any;
+  let consoleErrorSpy: any;
   
   beforeEach(() => {
     // Spy on console methods to check if they're called

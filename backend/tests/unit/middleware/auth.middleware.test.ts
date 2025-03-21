@@ -1,20 +1,16 @@
-// tests/unit/middleware/auth.middleware.test.ts
-import { Request, Response } from 'express';
-import { authenticate, isAdmin, isManager, isEmployee } from '../../../middleware/auth.middleware';
+import { Request, Response, NextFunction } from 'express';
 import { UnauthorizedError, ForbiddenError } from '../../../utils/errors';
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 
-// Fix the import path and mock structure
+// Fix: First declare the mock
+const mockFindUnique = jest.fn();
+
+// Mock imports 
 jest.mock('../../../utils/jwt', () => ({
   verifyToken: jest.fn(),
   extractTokenFromHeader: jest.fn()
 }));
 
-// Import the mocked module
-import * as jwtUtils from '../../../utils/jwt';
-
-// Fix the prisma mock
-const mockFindUnique = jest.fn();
 jest.mock('../../../utils/prisma.utils', () => ({
   __esModule: true,
   prisma: {
@@ -23,6 +19,10 @@ jest.mock('../../../utils/prisma.utils', () => ({
     }
   }
 }));
+
+// Now import the modules after the mocks are set up
+import { authenticate, isAdmin, isManager, isEmployee } from '../../../middleware/auth.middleware';
+import * as jwtUtils from '../../../utils/jwt';
 
 describe('Authentication Middleware', () => {
   let req: Partial<Request>;
@@ -51,14 +51,14 @@ describe('Authentication Middleware', () => {
       (jwtUtils.extractTokenFromHeader as jest.Mock).mockReturnValue('valid-token');
       (jwtUtils.verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
       
-      // Mock user in database
-      mockFindUnique.mockResolvedValue({
+      // Mock user in database - use mockImplementation for stable TypeScript
+      mockFindUnique.mockImplementation(() => Promise.resolve({
         id: 1,
         name: 'Test User',
         email: 'test@example.com',
         role: 'admin',
         status: 'aktiv'
-      });
+      }));
 
       await authenticate(req as Request, res as Response, next);
 
@@ -89,7 +89,7 @@ describe('Authentication Middleware', () => {
       (jwtUtils.verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
       
       // Mock user not found in database
-      mockFindUnique.mockResolvedValue(null);
+      mockFindUnique.mockImplementation(() => Promise.resolve(null));
 
       await authenticate(req as Request, res as Response, next);
 
@@ -97,20 +97,6 @@ describe('Authentication Middleware', () => {
         name: 'UnauthorizedError',
         message: 'User inactive or not found'
       }));
-    });
-  });
-
-    test('should throw UnauthorizedError if user not found or inactive', async () => {
-      // Mock JWT verification
-      (jwtUtils.extractTokenFromHeader as jest.Mock).mockReturnValue('valid-token');
-      (jwtUtils.verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
-      
-      // Mock user not found in database
-      (prismaMock.user.findUnique as jest.Mock<any>).mockResolvedValue(null);
-
-      await authenticate(req as Request, res as Response, next);
-
-      expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
     });
   });
 

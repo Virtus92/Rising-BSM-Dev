@@ -197,6 +197,7 @@ describe('Formatter Utilities', () => {
         // Use a regex to be more flexible with the format
         expect(result).toMatch(/^75,57\s*%$/);
       });
+    });
     
     describe('formatFileSize', () => {
       test('should format bytes as human-readable size', () => {

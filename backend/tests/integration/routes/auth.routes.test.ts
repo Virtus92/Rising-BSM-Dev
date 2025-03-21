@@ -1,8 +1,5 @@
-import authRoutes from '../../../routes/auth.routes';
 import { Router } from 'express';
-import { authenticate } from '../../../middleware/auth.middleware';
-import * as authController from '../../../controllers/auth.controller';
-import { describe, test, expect, jest } from '@jest/globals';
+import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 
 // Create a strongly typed mock router
 const mockRouter = {
@@ -11,7 +8,7 @@ const mockRouter = {
   put: jest.fn()
 };
 
-// Mock Express Router
+// Mock Express Router - important to do this before requiring the file
 jest.mock('express', () => ({
   Router: jest.fn(() => mockRouter)
 }));
@@ -31,13 +28,30 @@ jest.mock('../../../controllers/auth.controller', () => ({
   logout: jest.fn()
 }));
 
+// Import directly for testing - don't call require yet
+import * as authController from '../../../controllers/auth.controller';
+import { authenticate } from '../../../middleware/auth.middleware';
+
+// Set up routes for the first time
+require('../../../routes/auth.routes');
+
 describe('Auth Routes', () => {
+  beforeEach(() => {
+    // Clear all mock calls
+    jest.clearAllMocks();
+    
+    // Execute the routes file again to register the routes
+    const routesModule = require('../../../routes/auth.routes');
+    if (typeof routesModule.default === 'function') {
+      routesModule.default();
+    }
+  });
+
   test('should be an Express router', () => {
     expect(Router).toHaveBeenCalled();
   });
   
   test('should register login route without authentication', () => {
-    // Use the strongly typed mock
     expect(mockRouter.post).toHaveBeenCalledWith('/login', authController.login);
   });
   

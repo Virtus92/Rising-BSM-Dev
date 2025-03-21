@@ -9,17 +9,17 @@ describe('Async Handler Utility', () => {
   
   beforeEach(() => {
     req = {};
-    // Fix response mock typing
     res = {
-      json: jest.fn().mockReturnThis() as any
+      json: jest.fn().mockReturnThis() as any,
+      status: jest.fn().mockReturnThis() as any
     };
+    
     next = jest.fn();
   });
   
   test('should execute async function and resolve normally', async () => {
     const mockData = { success: true };
-    // Type assertion to fix typing
-    const mockHandler = jest.fn().mockResolvedValue(mockData) as any;
+    const mockHandler = jest.fn(async () => mockData);
     const wrappedHandler = asyncHandler(mockHandler);
     
     await wrappedHandler(req as Request, res as Response, next);
@@ -30,8 +30,7 @@ describe('Async Handler Utility', () => {
   
   test('should catch errors and pass them to next', async () => {
     const error = new Error('Async error');
-    // Type assertion to fix typing
-    const mockHandler = jest.fn().mockRejectedValue(error) as any;
+    const mockHandler = jest.fn(async () => { throw error; });
     const wrappedHandler = asyncHandler(mockHandler);
     
     await wrappedHandler(req as Request, res as Response, next);
@@ -41,10 +40,9 @@ describe('Async Handler Utility', () => {
   });
   
   test('should work with functions that return a response', async () => {
-    // Type assertion to fix typing
-    const mockHandler = jest.fn().mockImplementation((_req, res) => {
-      return Promise.resolve(res.json({ success: true }));
-    }) as any;
+    const mockHandler = jest.fn(async (_req: Request, res: Response) => {
+      return res.json({ success: true });
+    });
     
     const wrappedHandler = asyncHandler(mockHandler);
     
