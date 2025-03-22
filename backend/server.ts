@@ -72,6 +72,22 @@ if (config.IS_DEVELOPMENT) {
 }
 
 if (config.IS_DEVELOPMENT) {
+
+  app.get('/dev-token', (req, res) => {
+    const devToken = generateAuthTokens({
+      userId: 1,
+      role: 'admin',
+      email: 'dev@example.com',
+      name: 'Developer'
+    });
+    
+    res.json({
+      message: 'Use this token for testing API endpoints in Swagger UI. Click the "Authorize" button at the top of the page and paste this token.',
+      token: devToken.accessToken,
+      expiresIn: devToken.expiresIn
+    });
+  });
+
   app.get('/dev-portal', (req, res) => {
     // Generate a development token with admin privileges
     const devToken = generateAuthTokens({
