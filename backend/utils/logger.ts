@@ -19,100 +19,92 @@ const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
 const CURRENT_LOG_LEVEL = config.LOG_LEVEL as LogLevel || 'info';
 
 /**
- * Format log message with timestamp and level
- * @param level Log level
- * @param message Log message
- * @param data Optional data to log
- * @returns Formatted log string
+ * Simple logger utility
+ * In a production environment, you might want to replace this with a more robust logging library
  */
-const formatLogMessage = (level: LogLevel, message: string, data?: any): string => {
-  const timestamp = new Date().toISOString();
-  return `[${timestamp}] [${level.toUpperCase()}] ${message}${data ? ` ${JSON.stringify(data)}` : ''}`;
-};
-
-/**
- * Determine if we should log at this level
- * @param level Log level to check
- * @returns True if this level should be logged
- */
-const shouldLog = (level: LogLevel): boolean => {
-  return LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[CURRENT_LOG_LEVEL];
-};
-
-/**
- * Log debug messages
- * @param message Log message
- * @param data Optional data to log
- */
-export const debug = (message: string, data?: any): void => {
-  if (shouldLog('debug')) {
-    console.debug(formatLogMessage('debug', message, data));
-  }
-};
-
-/**
- * Log info messages
- * @param message Log message
- * @param data Optional data to log
- */
-export const info = (message: string, data?: any): void => {
-  if (shouldLog('info')) {
-    console.info(formatLogMessage('info', message, data));
-  }
-};
-
-/**
- * Log warning messages
- * @param message Log message
- * @param data Optional data to log
- */
-export const warn = (message: string, data?: any): void => {
-  if (shouldLog('warn')) {
-    console.warn(formatLogMessage('warn', message, data));
-  }
-};
-
-/**
- * Log error messages
- * @param message Log message
- * @param error Error object or data
- */
-export const error = (message: string, error?: any): void => {
-  if (shouldLog('error')) {
-    console.error(formatLogMessage('error', message));
-    if (error) {
-      if (error instanceof Error) {
-        console.error(error.stack || error.message);
-      } else {
-        console.error(error);
-      }
+class Logger {
+  /**
+   * Log info level message
+   */
+  info(message: string, meta?: any): void {
+    if (this.shouldLog('info')) {
+      this.log('INFO', message, meta);
     }
   }
-};
-
-/**
- * Log HTTP requests
- * @param req Express request object
- * @param res Express response object
- * @param responseTime Response time in ms
- */
-export const httpRequest = (req: any, res: any, responseTime?: number): void => {
-  if (shouldLog('info')) {
-    const status = res.statusCode;
-    const method = req.method;
-    const url = req.originalUrl || req.url;
-    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    const userAgent = req.headers['user-agent'] || 'unknown';
-    
-    const logMessage = `${method} ${url} ${status} ${responseTime ? responseTime + 'ms' : ''} - ${ip} - ${userAgent}`;
-    info(logMessage);
+  
+  /**
+   * Log warning level message
+   */
+  warn(message: string, meta?: any): void {
+    if (this.shouldLog('warn')) {
+      this.log('WARN', message, meta);
+    }
   }
-};
+  
+  /**
+   * Log error level message
+   */
+  error(message: string, meta?: any): void {
+    if (this.shouldLog('error')) {
+      this.log('ERROR', message, meta);
+    }
+  }
+  
+  /**
+   * Log debug level message
+   */
+  debug(message: string, meta?: any): void {
+    if (this.shouldLog('debug')) {
+      this.log('DEBUG', message, meta);
+    }
+  }
+  
+  /**
+   * Log HTTP requests
+   */
+  httpRequest(req: any, res: any, responseTime?: number): void {
+    if (this.shouldLog('info')) {
+      const status = res.statusCode;
+      const method = req.method;
+      const url = req.originalUrl || req.url;
+      const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+      const userAgent = req.headers['user-agent'] || 'unknown';
+      
+      const logMessage = `${method} ${url} ${status} ${responseTime ? responseTime + 'ms' : ''} - ${ip} - ${userAgent}`;
+      this.info(logMessage);
+    }
+  }
+  
+  /**
+   * Determine if we should log at this level
+   */
+  private shouldLog(level: LogLevel): boolean {
+    return LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[CURRENT_LOG_LEVEL];
+  }
+  
+  /**
+   * Internal log method
+   */
+  private log(level: string, message: string, meta?: any): void {
+    const timestamp = new Date().toISOString();
+    const metaStr = meta ? JSON.stringify(meta, this.replacer) : '';
+    console.log(`[${timestamp}] [${level}] ${message} ${metaStr}`);
+  }
+  
+  /**
+   * JSON replacer to handle circular references
+   */
+  private replacer(key: string, value: any): any {
+    if (value instanceof Error) {
+      return {
+        message: value.message,
+        stack: value.stack,
+        ...value
+      };
+    }
+    return value;
+  }
+}
 
-export default {
-  debug,
-  info,
-  warn,
-  error,
-  httpRequest
-};
+// Export singleton instance
+export default new Logger();

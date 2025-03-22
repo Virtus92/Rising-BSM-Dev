@@ -3,7 +3,15 @@ import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
 
 // Import controllers
 import * as customerController from '../controllers/customer.controller.js';
-import * as projectController from '../controllers/project.controller.js';
+import {
+  getAllProjects,
+  getProjectById,
+  createProject,
+  updateProject,
+  updateProjectStatus,
+  addProjectNote,
+  exportProjects
+} from '../controllers/project.controller.js';
 import * as appointmentController from '../controllers/appointment.controller.js';
 import * as serviceController from '../controllers/service.controller.js';
 import * as requestController from '../controllers/request.controller.js';
@@ -23,13 +31,13 @@ router.post('/customers/:id/notes', authenticate, customerController.addCustomer
 router.delete('/customers/:id', authenticate, customerController.deleteCustomer);
 
 // Projects
-router.get('/projects', authenticate, projectController.getAllProjects);
-router.get('/projects/:id', authenticate, projectController.getProjectById);
-router.post('/projects', authenticate, projectController.createProject);
-router.put('/projects/:id', authenticate, projectController.updateProject);
-router.patch('/projects/:id/status', authenticate, projectController.updateProjectStatus);
-router.post('/projects/:id/notes', authenticate, projectController.addProjectNote);
-router.get('/projects/export', authenticate, projectController.exportProjects);
+router.get('/projects', authenticate, getAllProjects);
+router.get('/projects/:id', authenticate, getProjectById);
+router.post('/projects', authenticate, createProject);
+router.put('/projects/:id', authenticate, updateProject);
+router.patch('/projects/:id/status', authenticate, updateProjectStatus);
+router.post('/projects/:id/notes', authenticate, addProjectNote);
+router.get('/projects/export', authenticate, exportProjects);
 
 // Appointments
 router.get('/appointments', authenticate, appointmentController.getAllAppointments);

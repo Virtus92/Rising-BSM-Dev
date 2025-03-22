@@ -1,7 +1,6 @@
 /**
- * Types for validation schemas used throughout the application
+ * Validation-related types
  */
-
 export interface ValidationRule {
   type: string;
   required?: boolean;
