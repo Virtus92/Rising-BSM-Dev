@@ -1,0 +1,22 @@
+health:
+  get:
+    tags:
+      - System
+    summary: Health check
+    description: Check if the API is running
+    operationId: healthCheck
+    security: [] # No authentication required for health check
+    responses:
+      '200':
+        description: API is running
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: ok
+                timestamp:
+                  type: string
+                  format: date-time

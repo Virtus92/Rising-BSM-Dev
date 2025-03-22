@@ -8,14 +8,15 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { generateAuthTokens } from './utils/jwt.js';
 import config from './config/index.js';
-import { setupSwagger } from './config/swagger.js';
+import { initSwaggerDocs } from './config/swagger.js';
 import prisma from './utils/prisma.utils.js';
 
 // Create Express app
 const app: Express = express();
 const port = config.PORT;
 
-setupSwagger(app);
+// Initialize Swagger documentation
+initSwaggerDocs(app);
 
 // Import middleware
 import * as errorMiddleware from './middleware/error.middleware.js';
@@ -72,7 +73,6 @@ if (config.IS_DEVELOPMENT) {
 }
 
 if (config.IS_DEVELOPMENT) {
-
   app.get('/dev-token', (req, res) => {
     const devToken = generateAuthTokens({
       userId: 1,
@@ -175,6 +175,11 @@ app.use(errorMiddleware.errorHandler);
 app.listen(port, () => {
   console.log(`API Server running at http://localhost:${port}`);
   console.log(`Environment: ${config.NODE_ENV}`);
+  
+  if (config.IS_DEVELOPMENT) {
+    console.log(`API Documentation: http://localhost:${port}/api-docs`);
+    console.log(`Developer Portal: http://localhost:${port}/dev-portal`);
+  }
 });
 
 // Process error handling

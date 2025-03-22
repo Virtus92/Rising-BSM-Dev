@@ -1,0 +1,40 @@
+Pagination:
+  type: object
+  properties:
+    current:
+      type: integer
+      description: Current page number
+    limit:
+      type: integer
+      description: Items per page
+    total:
+      type: integer
+      description: Total number of pages
+    totalRecords:
+      type: integer
+      description: Total number of records
+
+MetaData:
+  type: object
+  properties:
+    pagination:
+      $ref: '#/Pagination'
+    timestamp:
+      type: string
+      format: date-time
+      description: Response timestamp
+
+SuccessResponse:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: true
+    data:
+      type: object
+      description: Response data
+    message:
+      type: string
+      description: Response message
+    meta:
+      $ref: '#/MetaData'

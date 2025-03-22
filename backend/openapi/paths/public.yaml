@@ -1,0 +1,65 @@
+contact:
+  post:
+    tags:
+      - Public
+    summary: Submit contact form
+    description: Send a contact request from the public website
+    operationId: submitContact
+    security: [] # No authentication required for public contact form
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+              - email
+              - service
+              - message
+            properties:
+              name:
+                type: string
+                minLength: 2
+                maxLength: 100
+              email:
+                type: string
+                format: email
+              phone:
+                type: string
+              service:
+                type: string
+                enum: [facility, moving, winter, other]
+              message:
+                type: string
+                minLength: 10
+                maxLength: 1000
+    responses:
+      '201':
+        description: Contact request submitted
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                requestId:
+                  type: integer
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '429':
+        description: Too many requests
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: false
+                error:
+                  type: string

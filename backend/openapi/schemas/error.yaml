@@ -1,0 +1,23 @@
+Error:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: false
+    error:
+      type: string
+      description: Main error message
+    statusCode:
+      type: integer
+      description: HTTP status code
+    errors:
+      type: array
+      items:
+        type: string
+      description: List of specific error messages
+    details:
+      type: object
+      description: Additional error context
+    stack:
+      type: string
+      description: Stack trace (only in development)
