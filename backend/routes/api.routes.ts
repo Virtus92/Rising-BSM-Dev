@@ -8,23 +8,23 @@ import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
 
 // Import route modules
 import projectRoutes from './project.routes.js';
+import customerRoutes from './customer.routes.js';
 // Import other route modules as they are implemented
-// import customerRoutes from './customer.routes';
-// import appointmentRoutes from './appointment.routes';
-// import serviceRoutes from './service.routes';
-// import requestRoutes from './request.routes';
-// import profileRoutes from './profile.routes';
-// import dashboardRoutes from './dashboard.routes';
-// import settingsRoutes from './settings.routes';
+// import appointmentRoutes from './appointment.routes.js';
+// import serviceRoutes from './service.routes.js';
+// import requestRoutes from './request.routes.js';
+// import profileRoutes from './profile.routes.js';
+// import dashboardRoutes from './dashboard.routes.js';
+// import settingsRoutes from './settings.routes.js';
 
 // Create router
 const router = Router();
 
 // Mount routes
 router.use('/projects', projectRoutes);
+router.use('/customers', customerRoutes);
 
 // Mount other routes as they are implemented
-// router.use('/customers', customerRoutes);
 // router.use('/appointments', appointmentRoutes);
 // router.use('/services', serviceRoutes);
 // router.use('/requests', requestRoutes);
