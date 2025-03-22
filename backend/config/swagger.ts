@@ -1,12 +1,22 @@
-import { Express, RequestHandler } from 'express';
+// In config/swagger.ts
+import { Express } from 'express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
-import config from './index';
-import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { readFileSync } from 'fs';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+
+const PROJECT_ROOT = process.cwd();
+
+// Load package.json for API information
 let packageInfo;
 try {
-  packageInfo = require('../package.json');
+  const packagePath = join(__dirname, '../package.json');
+  packageInfo = JSON.parse(readFileSync(packagePath, 'utf8'));
 } catch (error) {
   console.error('Could not load package.json, using defaults');
   packageInfo = {
@@ -16,6 +26,7 @@ try {
   };
 }
 
+// Enhanced Swagger options
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -35,12 +46,8 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: `${config.PORT}${config.API_PREFIX}`,
+        url: '/',
         description: 'Development server',
-      },
-      {
-        url: `${config.API_PREFIX}`,
-        description: 'Production server',
       },
     ],
     components: {
@@ -51,19 +58,118 @@ const swaggerOptions = {
           bearerFormat: 'JWT',
         },
       },
+      examples: {
+        UserLogin: {
+          value: {
+            email: "admin@example.com",
+            password: "Password123!"
+          }
+        }
+      }
     },
-    security: [
-      {
-        bearerAuth: [],
-      },
-    ],
+    security: [],  // Default to no security required (specify in individual routes)
   },
-  apis: [
-    path.join(__dirname, '../routes/*.ts'),
-    path.join(__dirname, '../controllers/*.ts'),
-    path.join(__dirname, '../models/*.ts'),
-  ],
+  apis: [join(PROJECT_ROOT, 'swagger-definitions.ts')]
 };
+
+// Add route documentation for authentication
+const authRoutesSpec = {
+  paths: {
+    '/api/v1/auth/login': {
+      post: {
+        tags: ['Authentication'],
+        summary: 'Login to get access token',
+        description: 'Authenticates user and returns JWT tokens',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email', 'password'],
+                properties: {
+                  email: {
+                    type: 'string',
+                    format: 'email'
+                  },
+                  password: {
+                    type: 'string',
+                    format: 'password'
+                  },
+                  remember: {
+                    type: 'boolean'
+                  }
+                }
+              },
+              example: {
+                email: "admin@example.com",
+                password: "Password123!",
+                remember: true
+              }
+            }
+          }
+        },
+        responses: {
+          '200': {
+            description: 'Successful authentication',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: {
+                      type: 'boolean',
+                      example: true
+                    },
+                    accessToken: {
+                      type: 'string'
+                    },
+                    refreshToken: {
+                      type: 'string'
+                    },
+                    expiresIn: {
+                      type: 'number'
+                    },
+                    user: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'number' },
+                        name: { type: 'string' },
+                        email: { type: 'string' },
+                        role: { type: 'string' }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          '401': {
+            description: 'Authentication failed',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: {
+                      type: 'boolean',
+                      example: false
+                    },
+                    error: {
+                      type: 'string',
+                      example: 'Invalid email or password'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
 
 /**
  * Configure Swagger documentation
@@ -71,9 +177,22 @@ const swaggerOptions = {
  */
 export const setupSwagger = (app: Express): void => {
   // Generate swagger specification
-  const swaggerSpec = swaggerJsdoc(swaggerOptions);
+  const swaggerSpec = swaggerJsdoc(swaggerOptions) as any;
   
-  app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerSpec) as any);
+  swaggerSpec.paths = {
+    ...swaggerSpec.paths,
+    ...authRoutesSpec.paths
+  };
+  
+  // Configure and set up Swagger UI
+  const swaggerUiOptions = {
+    explorer: true,
+    swaggerOptions: {
+      persistAuthorization: true,
+    }
+  };
+
+  app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerSpec, swaggerUiOptions) as any);
 
   // Serve Swagger spec as JSON
   app.get('/api-docs.json', (req, res) => {

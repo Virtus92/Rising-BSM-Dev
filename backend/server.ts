@@ -6,13 +6,16 @@ import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-
+import { generateAuthTokens } from './utils/jwt.js';
 import config from './config/index.js';
+import { setupSwagger } from './config/swagger.js';
 import prisma from './utils/prisma.utils.js';
 
 // Create Express app
 const app: Express = express();
 const port = config.PORT;
+
+setupSwagger(app);
 
 // Import middleware
 import * as errorMiddleware from './middleware/error.middleware.js';
@@ -65,6 +68,76 @@ if (config.IS_DEVELOPMENT) {
   app.use((req: Request, _res: Response, next: NextFunction) => {
     console.log(`${req.method} ${req.url}`);
     next();
+  });
+}
+
+if (config.IS_DEVELOPMENT) {
+  app.get('/dev-portal', (req, res) => {
+    // Generate a development token with admin privileges
+    const devToken = generateAuthTokens({
+      userId: 1,
+      role: 'admin',
+      name: 'Developer',
+      email: 'dev@example.com'
+    });
+    
+    // Render a simple HTML page with token and Swagger link
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Rising BSM API Developer Portal</title>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
+            .card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .btn { display: inline-block; background-color: #4CAF50; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; }
+            pre { background-color: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto; }
+            .copy-btn { background-color: #555; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+          </style>
+        </head>
+        <body>
+          <h1>Rising BSM API Developer Portal</h1>
+          
+          <div class="card">
+            <h2>API Documentation</h2>
+            <p>Explore and test the API using Swagger UI:</p>
+            <a href="/api-docs" class="btn" target="_blank">Open Swagger UI</a>
+          </div>
+          
+          <div class="card">
+            <h2>Authentication Token</h2>
+            <p>Use this token for testing API endpoints that require authentication:</p>
+            <pre id="token">${devToken.accessToken}</pre>
+            <button class="copy-btn" onclick="copyToken()">Copy Token</button>
+            <p>Token expires in: ${devToken.expiresIn} seconds</p>
+          </div>
+          
+          <div class="card">
+            <h2>Quick Instructions</h2>
+            <ol>
+              <li>Copy the authentication token above</li>
+              <li>Navigate to the Swagger UI using the button above</li>
+              <li>Click the "Authorize" button in Swagger UI</li>
+              <li>Paste the token in the value field (without "Bearer" prefix)</li>
+              <li>Click "Authorize" to apply the token</li>
+            </ol>
+          </div>
+          
+          <script>
+            function copyToken() {
+              const tokenElement = document.getElementById('token');
+              const range = document.createRange();
+              range.selectNode(tokenElement);
+              window.getSelection().removeAllRanges();
+              window.getSelection().addRange(range);
+              document.execCommand('copy');
+              window.getSelection().removeAllRanges();
+              alert('Token copied to clipboard!');
+            }
+          </script>
+        </body>
+      </html>
+    `);
   });
 }
 

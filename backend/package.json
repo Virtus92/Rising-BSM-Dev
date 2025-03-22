@@ -42,6 +42,8 @@
         "multer": "^1.4.5-lts.1",
         "pdfkit": "^0.13.0",
         "pg": "^8.10.0",
+        "swagger-jsdoc": "^6.2.8",
+        "swagger-ui-express": "^5.0.1",
         "validator": "^13.9.0"
     },
     "devDependencies": {
@@ -79,7 +81,7 @@
         "ts-jest": "^29.2.6",
         "ts-node": "^10.9.1",
         "ts-node-dev": "^2.0.0",
-        "typescript": "^5.0.4",
-        "tsx": "^4.19.3"
+        "tsx": "^4.19.3",
+        "typescript": "^5.0.4"
     }
 }
