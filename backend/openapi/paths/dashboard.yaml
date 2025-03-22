@@ -1,0 +1,201 @@
+dashboard-stats:
+  get:
+    tags:
+      - Dashboard
+    summary: Get dashboard statistics
+    description: Retrieve overview statistics for dashboard
+    operationId: getDashboardStats
+    responses:
+      '200':
+        description: Dashboard statistics
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newRequests:
+                  type: object
+                  properties:
+                    count:
+                      type: integer
+                    trend:
+                      type: integer
+                activeProjects:
+                  type: object
+                  properties:
+                    count:
+                      type: integer
+                    trend:
+                      type: integer
+                totalCustomers:
+                  type: object
+                  properties:
+                    count:
+                      type: integer
+                    trend:
+                      type: integer
+                monthlyRevenue:
+                  type: object
+                  properties:
+                    amount:
+                      type: number
+                    trend:
+                      type: integer
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+dashboard-notifications:
+  get:
+    tags:
+      - Dashboard
+    summary: Get user notifications
+    description: Retrieve notifications for current user
+    operationId: getNotifications
+    responses:
+      '200':
+        description: User notifications
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notifications:
+                  type: array
+                  items:
+                    $ref: '../schemas/models.yaml#/Notification'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+dashboard-search:
+  get:
+    tags:
+      - Dashboard
+    summary: Global search
+    description: Search across customers, projects, appointments, and services
+    operationId: globalSearch
+    parameters:
+      - in: query
+        name: query
+        required: true
+        schema:
+          type: string
+        description: Search query string
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          default: 10
+        description: Maximum results per category
+    responses:
+      '200':
+        description: Search results
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                customers:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      email:
+                        type: string
+                      type:
+                        type: string
+                      matchField:
+                        type: string
+                projects:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      title:
+                        type: string
+                      customer:
+                        type: string
+                      status:
+                        type: string
+                      matchField:
+                        type: string
+                appointments:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      title:
+                        type: string
+                      date:
+                        type: string
+                      status:
+                        type: string
+                      matchField:
+                        type: string
+                services:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      price:
+                        type: number
+                      matchField:
+                        type: string
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+dashboard-notifications-mark-read:
+  post:
+    tags:
+      - Dashboard
+    summary: Mark notifications as read
+    description: Mark one or more notifications as read
+    operationId: markNotificationsRead
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              notificationIds:
+                type: array
+                items:
+                  type: integer
+                description: Array of notification IDs to mark as read
+              all:
+                type: boolean
+                description: Set to true to mark all notifications as read
+    responses:
+      '200':
+        description: Notifications marked as read
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                count:
+                  type: integer
+                message:
+                  type: string
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'

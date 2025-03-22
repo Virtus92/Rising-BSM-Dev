@@ -1,28 +1,22 @@
-customers:
+projects:
   get:
     tags:
-      - Customers
-    summary: Get all customers
-    description: Retrieve list of customers with optional filtering
-    operationId: getAllCustomers
+      - Projects
+    summary: Get all projects
+    description: Retrieve list of projects with optional filtering
+    operationId: getAllProjects
     parameters:
       - in: query
         name: status
         schema:
           type: string
-          enum: [aktiv, inaktiv, geloescht]
+          enum: [neu, in_bearbeitung, abgeschlossen, storniert]
         description: Filter by status
-      - in: query
-        name: type
-        schema:
-          type: string
-          enum: [privat, geschaeft]
-        description: Filter by customer type
       - in: query
         name: search
         schema:
           type: string
-        description: Search term for name, email or company
+        description: Search term for title or description
       - in: query
         name: page
         schema:
@@ -37,7 +31,7 @@ customers:
         description: Items per page
     responses:
       '200':
-        description: List of customers
+        description: List of projects
         content:
           application/json:
             schema:
@@ -46,18 +40,16 @@ customers:
                 success:
                   type: boolean
                   example: true
-                customers:
+                projects:
                   type: array
                   items:
-                    $ref: '../schemas/models.yaml#/Customer'
+                    $ref: '../schemas/models.yaml#/Project'
                 pagination:
                   $ref: '../schemas/common.yaml#/Pagination'
                 filters:
                   type: object
                   properties:
                     status:
-                      type: string
-                    type:
                       type: string
                     search:
                       type: string
@@ -66,10 +58,10 @@ customers:
 
   post:
     tags:
-      - Customers
-    summary: Create new customer
-    description: Add a new customer
-    operationId: createCustomer
+      - Projects
+    summary: Create new project
+    description: Add a new project
+    operationId: createProject
     requestBody:
       required: true
       content:
@@ -77,49 +69,41 @@ customers:
           schema:
             type: object
             required:
-              - name
-              - email
+              - title
+              - startDate
             properties:
-              name:
+              title:
                 type: string
                 minLength: 2
-                description: Customer name
-              firma:
+                description: Project title
+              customerId:
+                type: integer
+                description: ID of the associated customer
+              serviceId:
+                type: integer
+                description: ID of the associated service
+              startDate:
                 type: string
-                description: Company name
-              email:
+                format: date
+                description: Project start date (YYYY-MM-DD)
+              endDate:
                 type: string
-                format: email
-                description: Customer email address
-              telefon:
+                format: date
+                description: Project end date (YYYY-MM-DD)
+              amount:
+                type: number
+                format: float
+                description: Project amount
+              description:
                 type: string
-                description: Phone number
-              adresse:
-                type: string
-                description: Street address
-              plz:
-                type: string
-                description: Postal code
-              ort:
-                type: string
-                description: City
-              notizen:
-                type: string
-                description: Notes about the customer
-              newsletter:
-                type: boolean
-                description: Newsletter subscription status
+                description: Project description
               status:
                 type: string
-                enum: [aktiv, inaktiv, geloescht]
-                description: Customer status
-              kundentyp:
-                type: string
-                enum: [privat, geschaeft]
-                description: Customer type
+                enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+                description: Project status
     responses:
       '201':
-        description: Customer created
+        description: Project created
         content:
           application/json:
             schema:
@@ -128,7 +112,7 @@ customers:
                 success:
                   type: boolean
                   example: true
-                customerId:
+                projectId:
                   type: integer
                 message:
                   type: string
@@ -137,23 +121,23 @@ customers:
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
-customers-id:
+projects-id:
   get:
     tags:
-      - Customers
-    summary: Get customer by ID
-    description: Retrieve detailed customer information
-    operationId: getCustomerById
+      - Projects
+    summary: Get project by ID
+    description: Retrieve detailed project information
+    operationId: getProjectById
     parameters:
       - in: path
         name: id
         required: true
         schema:
           type: integer
-        description: Customer ID
+        description: Project ID
     responses:
       '200':
-        description: Customer details
+        description: Project details
         content:
           application/json:
             schema:
@@ -162,42 +146,24 @@ customers-id:
                 success:
                   type: boolean
                   example: true
-                customer:
-                  $ref: '../schemas/models.yaml#/Customer'
-                appointments:
+                project:
+                  $ref: '../schemas/models.yaml#/Project'
+                notes:
                   type: array
                   items:
                     type: object
                     properties:
                       id:
                         type: integer
-                      title:
+                      text:
                         type: string
-                      date:
-                        type: string
-                      status:
-                        type: string
-                      statusLabel:
-                        type: string
-                      statusClass:
-                        type: string
-                projects:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
+                      userId:
                         type: integer
-                      title:
+                      userName:
                         type: string
-                      date:
+                      createdAt:
                         type: string
-                      status:
-                        type: string
-                      statusLabel:
-                        type: string
-                      statusClass:
-                        type: string
+                        format: date-time
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
@@ -205,17 +171,17 @@ customers-id:
 
   put:
     tags:
-      - Customers
-    summary: Update customer
-    description: Update an existing customer
-    operationId: updateCustomer
+      - Projects
+    summary: Update project
+    description: Update an existing project
+    operationId: updateProject
     parameters:
       - in: path
         name: id
         required: true
         schema:
           type: integer
-        description: Customer ID
+        description: Project ID
     requestBody:
       required: true
       content:
@@ -223,49 +189,41 @@ customers-id:
           schema:
             type: object
             required:
-              - name
-              - email
+              - title
+              - startDate
             properties:
-              name:
+              title:
                 type: string
                 minLength: 2
-                description: Customer name
-              firma:
+                description: Project title
+              customerId:
+                type: integer
+                description: ID of the associated customer
+              serviceId:
+                type: integer
+                description: ID of the associated service
+              startDate:
                 type: string
-                description: Company name
-              email:
+                format: date
+                description: Project start date (YYYY-MM-DD)
+              endDate:
                 type: string
-                format: email
-                description: Customer email address
-              telefon:
+                format: date
+                description: Project end date (YYYY-MM-DD)
+              amount:
+                type: number
+                format: float
+                description: Project amount
+              description:
                 type: string
-                description: Phone number
-              adresse:
-                type: string
-                description: Street address
-              plz:
-                type: string
-                description: Postal code
-              ort:
-                type: string
-                description: City
-              notizen:
-                type: string
-                description: Notes about the customer
-              newsletter:
-                type: boolean
-                description: Newsletter subscription status
+                description: Project description
               status:
                 type: string
-                enum: [aktiv, inaktiv, geloescht]
-                description: Customer status
-              kundentyp:
-                type: string
-                enum: [privat, geschaeft]
-                description: Customer type
+                enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+                description: Project status
     responses:
       '200':
-        description: Customer updated
+        description: Project updated
         content:
           application/json:
             schema:
@@ -274,7 +232,7 @@ customers-id:
                 success:
                   type: boolean
                   example: true
-                customerId:
+                projectId:
                   type: integer
                 message:
                   type: string
@@ -287,20 +245,20 @@ customers-id:
 
   delete:
     tags:
-      - Customers
-    summary: Delete customer
-    description: Mark customer as deleted (soft delete)
-    operationId: deleteCustomer
+      - Projects
+    summary: Delete project
+    description: Mark project as deleted (soft delete)
+    operationId: deleteProject
     parameters:
       - in: path
         name: id
         required: true
         schema:
           type: integer
-        description: Customer ID
+        description: Project ID
     responses:
       '200':
-        description: Customer deleted
+        description: Project deleted
         content:
           application/json:
             schema:
@@ -312,7 +270,7 @@ customers-id:
                 message:
                   type: string
       '400':
-        description: Cannot delete customer with related data
+        description: Cannot delete project with related data
         content:
           application/json:
             schema:
@@ -322,20 +280,20 @@ customers-id:
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
-customers-id-notes:
+projects-id-notes:
   post:
     tags:
-      - Customers
-    summary: Add note to customer
-    description: Add a new note to an existing customer
-    operationId: addCustomerNote
+      - Projects
+    summary: Add note to project
+    description: Add a new note to an existing project
+    operationId: addProjectNote
     parameters:
       - in: path
         name: id
         required: true
         schema:
           type: integer
-        description: Customer ID
+        description: Project ID
     requestBody:
       required: true
       content:
@@ -359,7 +317,7 @@ customers-id-notes:
                 success:
                   type: boolean
                   example: true
-                customerId:
+                projectId:
                   type: integer
                 message:
                   type: string
@@ -367,16 +325,21 @@ customers-id-notes:
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
-customers-status:
+projects-id-status:
   patch:
     tags:
-      - Customers
-    summary: Update customer status
-    description: Change the status of one or more customers
-    operationId: updateCustomerStatus
+      - Projects
+    summary: Update project status
+    description: Change the status of a project
+    operationId: updateProjectStatus
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Project ID
     requestBody:
       required: true
       content:
@@ -384,18 +347,12 @@ customers-status:
           schema:
             type: object
             required:
-              - customerIds
               - status
             properties:
-              customerIds:
-                type: array
-                items:
-                  type: integer
-                description: Array of customer IDs to update
               status:
                 type: string
-                enum: [aktiv, inaktiv, geloescht]
-                description: New customer status
+                enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+                description: New project status
     responses:
       '200':
         description: Status updated successfully
@@ -407,10 +364,62 @@ customers-status:
                 success:
                   type: boolean
                   example: true
-                count:
+                projectId:
                   type: integer
                 message:
                   type: string
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-export:
+  get:
+    tags:
+      - Projects
+    summary: Export projects
+    description: Export projects to a file (CSV or Excel)
+    operationId: exportProjects
+    parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum: [csv, excel]
+          default: excel
+        description: Export file format
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+        description: Filter by status
+      - in: query
+        name: startDate
+        schema:
+          type: string
+          format: date
+        description: Start date for filtering (YYYY-MM-DD)
+      - in: query
+        name: endDate
+        schema:
+          type: string
+          format: date
+        description: End date for filtering (YYYY-MM-DD)
+    responses:
+      '200':
+        description: File export successful
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema:
+              type: string
+              format: binary
+          text/csv:
+            schema:
+              type: string
+              format: binary
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':

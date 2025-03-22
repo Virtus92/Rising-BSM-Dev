@@ -1,15 +1,15 @@
 import { Router } from 'express';
-import { authenticate, isAdmin } from '../middleware/auth.middleware';
+import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
 
 // Import controllers
-import * as customerController from '../controllers/customer.controller';
-import * as projectController from '../controllers/project.controller';
-import * as appointmentController from '../controllers/appointment.controller';
-import * as serviceController from '../controllers/service.controller';
-import * as requestController from '../controllers/request.controller';
-import * as profileController from '../controllers/profile.controller';
-import * as dashboardController from '../controllers/dashboard.controller';
-import * as settingsController from '../controllers/settings.controller';
+import * as customerController from '../controllers/customer.controller.js';
+import * as projectController from '../controllers/project.controller.js';
+import * as appointmentController from '../controllers/appointment.controller.js';
+import * as serviceController from '../controllers/service.controller.js';
+import * as requestController from '../controllers/request.controller.js';
+import * as profileController from '../controllers/profile.controller.js';
+import * as dashboardController from '../controllers/dashboard.controller.js';
+import * as settingsController from '../controllers/settings.controller.js';
 
 const router = Router();
 

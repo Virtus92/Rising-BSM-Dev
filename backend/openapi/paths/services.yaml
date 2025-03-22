@@ -1,0 +1,338 @@
+services:
+  get:
+    tags:
+      - Services
+    summary: Get all services
+    description: Retrieve list of services with optional filtering
+    operationId: getAllServices
+    parameters:
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum: [aktiv, inaktiv]
+        description: Filter by status
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search term for service name
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+        description: Page number
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          default: 20
+        description: Items per page
+    responses:
+      '200':
+        description: List of services
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                services:
+                  type: array
+                  items:
+                    $ref: '../schemas/models.yaml#/Service'
+                pagination:
+                  $ref: '../schemas/common.yaml#/Pagination'
+                filters:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    search:
+                      type: string
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  post:
+    tags:
+      - Services
+    summary: Create new service
+    description: Add a new service
+    operationId: createService
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+              - priceBase
+              - unit
+            properties:
+              name:
+                type: string
+                minLength: 2
+                description: Service name
+              description:
+                type: string
+                description: Service description
+              priceBase:
+                type: number
+                format: float
+                description: Base price
+              unit:
+                type: string
+                description: Unit (e.g., hour, piece)
+              vatRate:
+                type: number
+                format: float
+                default: 20
+                description: VAT rate in percentage
+              active:
+                type: boolean
+                default: true
+                description: Service status
+    responses:
+      '201':
+        description: Service created
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                serviceId:
+                  type: integer
+                message:
+                  type: string
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+services-id:
+  get:
+    tags:
+      - Services
+    summary: Get service by ID
+    description: Retrieve detailed service information
+    operationId: getServiceById
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Service ID
+    responses:
+      '200':
+        description: Service details
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                service:
+                  $ref: '../schemas/models.yaml#/Service'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  put:
+    tags:
+      - Services
+    summary: Update service
+    description: Update an existing service
+    operationId: updateService
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Service ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+              - priceBase
+              - unit
+            properties:
+              name:
+                type: string
+                minLength: 2
+                description: Service name
+              description:
+                type: string
+                description: Service description
+              priceBase:
+                type: number
+                format: float
+                description: Base price
+              unit:
+                type: string
+                description: Unit (e.g., hour, piece)
+              vatRate:
+                type: number
+                format: float
+                description: VAT rate in percentage
+              active:
+                type: boolean
+                description: Service status
+    responses:
+      '200':
+        description: Service updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                serviceId:
+                  type: integer
+                message:
+                  type: string
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+services-id-status:
+  patch:
+    tags:
+      - Services
+    summary: Toggle service status
+    description: Enable or disable a service
+    operationId: toggleServiceStatus
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Service ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - active
+            properties:
+              active:
+                type: boolean
+                description: Service status (true=active, false=inactive)
+    responses:
+      '200':
+        description: Status updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                serviceId:
+                  type: integer
+                status:
+                  type: boolean
+                message:
+                  type: string
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+services-id-statistics:
+  get:
+    tags:
+      - Services
+    summary: Get service statistics
+    description: Retrieve usage and revenue statistics for a service
+    operationId: getServiceStatistics
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Service ID
+      - in: query
+        name: period
+        schema:
+          type: string
+          enum: [week, month, quarter, year]
+          default: month
+        description: Time period for statistics
+    responses:
+      '200':
+        description: Service statistics
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                service:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                usageStats:
+                  type: object
+                  properties:
+                    totalProjects:
+                      type: integer
+                    activeProjects:
+                      type: integer
+                    completedProjects:
+                      type: integer
+                revenueStats:
+                  type: object
+                  properties:
+                    totalRevenue:
+                      type: number
+                    avgProjectValue:
+                      type: number
+                    periodComparison:
+                      type: number
+                      description: Percentage change compared to previous period
+                timeDistribution:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      label:
+                        type: string
+                      value:
+                        type: number
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'

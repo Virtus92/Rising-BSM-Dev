@@ -1,0 +1,303 @@
+settings:
+  get:
+    tags:
+      - Settings
+    summary: Get user settings
+    description: Retrieve current user's settings
+    operationId: getUserSettings
+    responses:
+      '200':
+        description: User settings
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                settings:
+                  $ref: '../schemas/models.yaml#/UserSettings'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  put:
+    tags:
+      - Settings
+    summary: Update user settings
+    description: Update current user's settings
+    operationId: updateUserSettings
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              sprache:
+                type: string
+                enum: [de, en]
+              dark_mode:
+                type: boolean
+              benachrichtigungen_email:
+                type: boolean
+              benachrichtigungen_push:
+                type: boolean
+              benachrichtigungen_intervall:
+                type: string
+                enum: [sofort, taeglich, woechentlich]
+    responses:
+      '200':
+        description: Settings updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+settings-system:
+  get:
+    tags:
+      - Settings
+    summary: Get system settings
+    description: Retrieve system settings (admin only)
+    operationId: getSystemSettings
+    responses:
+      '200':
+        description: System settings
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                settings:
+                  type: object
+                  properties:
+                    siteTitle:
+                      type: string
+                    logo:
+                      type: string
+                    companyName:
+                      type: string
+                    companyAddress:
+                      type: string
+                    companyPhone:
+                      type: string
+                    companyEmail:
+                      type: string
+                    vatNumber:
+                      type: string
+                    defaultLanguage:
+                      type: string
+                    defaultVatRate:
+                      type: number
+                    systemEmail:
+                      type: string
+                    maintenanceMode:
+                      type: boolean
+                    emailNotifications:
+                      type: boolean
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+  put:
+    tags:
+      - Settings
+    summary: Update system settings
+    description: Update system settings (admin only)
+    operationId: updateSystemSettings
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              siteTitle:
+                type: string
+              logo:
+                type: string
+              companyName:
+                type: string
+              companyAddress:
+                type: string
+              companyPhone:
+                type: string
+              companyEmail:
+                type: string
+              vatNumber:
+                type: string
+              defaultLanguage:
+                type: string
+              defaultVatRate:
+                type: number
+              systemEmail:
+                type: string
+              maintenanceMode:
+                type: boolean
+              emailNotifications:
+                type: boolean
+    responses:
+      '200':
+        description: Settings updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+settings-backup:
+  get:
+    tags:
+      - Settings
+    summary: Get backup settings
+    description: Retrieve backup settings and history (admin only)
+    operationId: getBackupSettings
+    responses:
+      '200':
+        description: Backup settings and history
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                settings:
+                  type: object
+                  properties:
+                    autoBackup:
+                      type: boolean
+                    frequency:
+                      type: string
+                      enum: [daily, weekly, monthly]
+                    time:
+                      type: string
+                    keepCount:
+                      type: integer
+                    storageType:
+                      type: string
+                      enum: [local, cloud]
+                    lastBackup:
+                      type: string
+                      format: date-time
+                backups:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      filename:
+                        type: string
+                      size:
+                        type: integer
+                      createdAt:
+                        type: string
+                        format: date-time
+                      type:
+                        type: string
+                        enum: [auto, manual]
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+  put:
+    tags:
+      - Settings
+    summary: Update backup settings
+    description: Update backup settings (admin only)
+    operationId: updateBackupSettings
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              autoBackup:
+                type: boolean
+              frequency:
+                type: string
+                enum: [daily, weekly, monthly]
+              time:
+                type: string
+                pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
+              keepCount:
+                type: integer
+                minimum: 1
+              storageType:
+                type: string
+                enum: [local, cloud]
+    responses:
+      '200':
+        description: Settings updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+settings-backup-trigger:
+  post:
+    tags:
+      - Settings
+    summary: Trigger manual backup
+    description: Start a manual backup process (admin only)
+    operationId: triggerManualBackup
+    responses:
+      '200':
+        description: Backup triggered successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                backupId:
+                  type: string
+                message:
+                  type: string
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
