@@ -15,9 +15,6 @@ import prisma from './utils/prisma.utils.js';
 const app: Express = express();
 const port = config.PORT;
 
-// Initialize Swagger documentation
-initSwaggerDocs(app);
-
 // Import middleware
 import * as errorMiddleware from './middleware/error.middleware.js';
 import { authenticate } from './middleware/auth.middleware.js';
@@ -70,6 +67,14 @@ if (config.IS_DEVELOPMENT) {
     console.log(`${req.method} ${req.url}`);
     next();
   });
+}
+
+// Initialize Swagger documentation (after routes are defined)
+try {
+  initSwaggerDocs(app);
+} catch (error) {
+  console.error('Failed to initialize Swagger docs:', error);
+  console.log('Continuing without Swagger documentation');
 }
 
 if (config.IS_DEVELOPMENT) {
