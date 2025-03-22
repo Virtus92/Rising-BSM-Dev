@@ -1,0 +1,50 @@
+services:
+  # Test Database service
+  test-db:
+    image: postgres:13
+    container_name: rising-bsm-test-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rising_bsm_test
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts with dev environment
+    networks:
+      - rising-bsm-test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Test API service
+  test-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rising-bsm-test-api
+    env_file:
+      - ./.env.test
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@test-db:5432/rising_bsm_test?schema=public
+    ports:
+      - "5001:5000"  # Different port to avoid conflicts with dev environment
+    depends_on:
+      test-db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - rising-bsm-test-network
+    command: >
+      sh -c "npx prisma migrate reset --force && npx prisma db seed && npm run dev"
+
+networks:
+  rising-bsm-test-network:
+    driver: bridge
+
+volumes:
+  postgres_test_data:

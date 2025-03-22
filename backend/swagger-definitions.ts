@@ -17,13 +17,13 @@
  *         email:
  *           type: string
  *           format: email
- *           description: Customer email
+ *           description: Customer email address
  *         telefon:
  *           type: string
  *           description: Phone number
  *         adresse:
  *           type: string
- *           description: Address
+ *           description: Street address
  *         plz:
  *           type: string
  *           description: Postal code
@@ -32,30 +32,20 @@
  *           description: City
  *         notizen:
  *           type: string
- *           description: Notes
+ *           description: Notes about the customer
  *         newsletter:
  *           type: boolean
- *           description: Newsletter subscription
+ *           description: Newsletter subscription status
  *         status:
  *           type: string
  *           enum: [aktiv, inaktiv, geloescht]
- *           description: Status
+ *           default: aktiv
+ *           description: Customer status
  *         kundentyp:
  *           type: string
  *           enum: [privat, geschaeft]
+ *           default: privat
  *           description: Customer type
- *       example:
- *         name: "Max Mustermann"
- *         firma: "ABC GmbH"
- *         email: "max@example.com"
- *         telefon: "+43 123 456789"
- *         adresse: "Hauptstraße 1"
- *         plz: "1010"
- *         ort: "Wien"
- *         notizen: "VIP Kunde"
- *         newsletter: true
- *         status: "aktiv"
- *         kundentyp: "geschaeft"
  *
  *     Project:
  *       type: object
@@ -68,38 +58,30 @@
  *           description: Project title
  *         kunde_id:
  *           type: integer
- *           description: Customer ID
+ *           description: ID of the associated customer
  *         dienstleistung_id:
  *           type: integer
- *           description: Service ID
+ *           description: ID of the associated service
  *         start_datum:
  *           type: string
  *           format: date
- *           description: Start date
+ *           description: Project start date (YYYY-MM-DD)
  *         end_datum:
  *           type: string
  *           format: date
- *           description: End date
+ *           description: Project end date (YYYY-MM-DD)
  *         betrag:
  *           type: number
  *           format: float
  *           description: Project amount
  *         beschreibung:
  *           type: string
- *           description: Description
+ *           description: Project description
  *         status:
  *           type: string
  *           enum: [neu, in_bearbeitung, abgeschlossen, storniert]
- *           description: Status
- *       example:
- *         titel: "Website Relaunch"
- *         kunde_id: 1
- *         dienstleistung_id: 2
- *         start_datum: "2023-06-01"
- *         end_datum: "2023-08-31"
- *         betrag: 15000
- *         beschreibung: "Kompletter Relaunch der Unternehmenswebsite"
- *         status: "in_bearbeitung"
+ *           default: neu
+ *           description: Project status
  *
  *     Appointment:
  *       type: object
@@ -113,41 +95,33 @@
  *           description: Appointment title
  *         kunde_id:
  *           type: integer
- *           description: Customer ID
+ *           description: ID of the associated customer
  *         projekt_id:
  *           type: integer
- *           description: Project ID
+ *           description: ID of the associated project
  *         termin_datum:
  *           type: string
  *           format: date
- *           description: Appointment date
+ *           description: Appointment date (YYYY-MM-DD)
  *         termin_zeit:
  *           type: string
- *           pattern: '^\d{2}:\d{2}$'
- *           description: Appointment time (HH:MM)
+ *           pattern: "^([01]\\d|2[0-3]):([0-5]\\d)$"
+ *           description: Appointment time (HH:MM) in 24h format
  *         dauer:
  *           type: integer
+ *           default: 60
  *           description: Duration in minutes
  *         ort:
  *           type: string
- *           description: Location
+ *           description: Appointment location
  *         beschreibung:
  *           type: string
- *           description: Description
+ *           description: Appointment description
  *         status:
  *           type: string
  *           enum: [geplant, bestaetigt, abgeschlossen, storniert]
- *           description: Status
- *       example:
- *         titel: "Projektbesprechung"
- *         kunde_id: 1
- *         projekt_id: 2
- *         termin_datum: "2023-07-15"
- *         termin_zeit: "14:30"
- *         dauer: 60
- *         ort: "Büro Wien"
- *         beschreibung: "Besprechung der nächsten Schritte"
- *         status: "geplant"
+ *           default: geplant
+ *           description: Appointment status
  *
  *     Service:
  *       type: object
@@ -161,117 +135,63 @@
  *           description: Service name
  *         beschreibung:
  *           type: string
- *           description: Description
+ *           description: Service description
  *         preis_basis:
  *           type: number
  *           format: float
  *           description: Base price
  *         einheit:
  *           type: string
- *           description: Unit (e.g., hour, day, project)
+ *           description: Unit (e.g., hour, piece)
  *         mwst_satz:
  *           type: number
  *           format: float
- *           description: VAT rate
+ *           default: 20
+ *           description: VAT rate in percentage
  *         aktiv:
  *           type: boolean
- *           description: Active status
- *       example:
- *         name: "Webentwicklung"
- *         beschreibung: "Programmierung und Entwicklung von Webseiten"
- *         preis_basis: 120
- *         einheit: "Stunde"
- *         mwst_satz: 20
- *         aktiv: true
+ *           default: true
+ *           description: Service status
  *
- *     UserSettings:
+ *     ErrorResponse:
  *       type: object
  *       properties:
- *         sprache:
+ *         success:
+ *           type: boolean
+ *           example: false
+ *         error:
  *           type: string
- *           enum: [de, en]
- *           description: Language preference
- *         dark_mode:
- *           type: boolean
- *           description: Dark mode preference
- *         benachrichtigungen_email:
- *           type: boolean
- *           description: Email notifications
- *         benachrichtigungen_push:
- *           type: boolean
- *           description: Push notifications
- *         benachrichtigungen_intervall:
- *           type: string
- *           enum: [sofort, taeglich, woechentlich]
- *           description: Notification interval
- *       example:
- *         sprache: "de"
- *         dark_mode: true
- *         benachrichtigungen_email: true
- *         benachrichtigungen_push: false
- *         benachrichtigungen_intervall: "taeglich"
+ *         statusCode:
+ *           type: integer
+ *         errors:
+ *           type: array
+ *           items:
+ *             type: string
  *
- *     ContactRequest:
+ *     SuccessResponse:
  *       type: object
- *       required:
- *         - name
- *         - email
- *         - service
- *         - message
  *       properties:
- *         name:
- *           type: string
- *           description: Name of the contact
- *         email:
- *           type: string
- *           format: email
- *           description: Email address
- *         phone:
- *           type: string
- *           description: Phone number
- *         service:
- *           type: string
- *           description: Requested service
+ *         success:
+ *           type: boolean
+ *           example: true
  *         message:
  *           type: string
- *           description: Message content
- *       example:
- *         name: "John Doe"
- *         email: "john@example.com"
- *         phone: "+43 123 456789"
- *         service: "Webentwicklung"
- *         message: "Ich interessiere mich für eine neue Website für mein Unternehmen."
+ *         data:
+ *           type: object
  *
- *     BackupSettings:
- *       type: object
- *       properties:
- *         automatisch:
- *           type: boolean
- *           description: Automatic backup
- *         intervall:
- *           type: string
- *           enum: [taeglich, woechentlich, monatlich]
- *           description: Backup interval
- *         zeit:
- *           type: string
- *           pattern: '^\d{2}:\d{2}$'
- *           description: Backup time (HH:MM)
- *         aufbewahrung:
- *           type: integer
- *           description: Retention period in days
- *       example:
- *         automatisch: true
- *         intervall: "taeglich"
- *         zeit: "02:00"
- *         aufbewahrung: 30
- * 
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *
  * paths:
- *   # Authentication Endpoints
+ *   # Authentication endpoints
  *   /api/v1/auth/login:
  *     post:
  *       tags: [Authentication]
- *       summary: Login to get access token
- *       description: Authenticates user and returns JWT tokens
+ *       summary: Login user
+ *       description: Authenticate user and get access token
  *       requestBody:
  *         required: true
  *         content:
@@ -291,12 +211,12 @@
  *                 remember:
  *                   type: boolean
  *             example:
- *               email: "admin@example.com"
- *               password: "Password123!"
+ *               email: admin@example.com
+ *               password: AdminPass123!
  *               remember: true
  *       responses:
  *         200:
- *           description: Successful authentication
+ *           description: Login successful
  *           content:
  *             application/json:
  *               schema:
@@ -315,7 +235,7 @@
  *                     type: object
  *                     properties:
  *                       id:
- *                         type: number
+ *                         type: integer
  *                       name:
  *                         type: string
  *                       email:
@@ -323,24 +243,17 @@
  *                       role:
  *                         type: string
  *         401:
- *           description: Authentication failed
+ *           description: Invalid credentials
  *           content:
  *             application/json:
  *               schema:
- *                 type: object
- *                 properties:
- *                   success:
- *                     type: boolean
- *                     example: false
- *                   error:
- *                     type: string
- *                     example: 'Invalid email or password'
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/auth/refresh-token:
  *     post:
  *       tags: [Authentication]
- *       summary: Refresh JWT token
- *       description: Get new access token using a refresh token
+ *       summary: Refresh access token
+ *       description: Get new access token using refresh token
  *       requestBody:
  *         required: true
  *         content:
@@ -354,7 +267,7 @@
  *                   type: string
  *       responses:
  *         200:
- *           description: New tokens generated
+ *           description: Token refresh successful
  *           content:
  *             application/json:
  *               schema:
@@ -371,12 +284,16 @@
  *                     type: number
  *         401:
  *           description: Invalid refresh token
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/auth/forgot-password:
  *     post:
  *       tags: [Authentication]
  *       summary: Request password reset
- *       description: Request a password reset link
+ *       description: Send email with password reset link
  *       requestBody:
  *         required: true
  *         content:
@@ -391,13 +308,23 @@
  *                   format: email
  *       responses:
  *         200:
- *           description: Password reset request processed
+ *           description: Password reset instructions sent
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   message:
+ *                     type: string
  *
  *   /api/v1/auth/reset-token/{token}:
  *     get:
  *       tags: [Authentication]
  *       summary: Validate reset token
- *       description: Check if password reset token is valid
+ *       description: Check if reset token is valid
  *       parameters:
  *         - in: path
  *           name: token
@@ -407,14 +334,30 @@
  *       responses:
  *         200:
  *           description: Token is valid
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   userId:
+ *                     type: integer
+ *                   email:
+ *                     type: string
  *         400:
- *           description: Invalid or expired token
+ *           description: Invalid token
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/auth/reset-password/{token}:
  *     post:
  *       tags: [Authentication]
  *       summary: Reset password
- *       description: Reset password with token
+ *       description: Set new password using reset token
  *       parameters:
  *         - in: path
  *           name: token
@@ -440,14 +383,28 @@
  *       responses:
  *         200:
  *           description: Password reset successful
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input or token
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/auth/logout:
  *     post:
  *       tags: [Authentication]
- *       summary: Logout
- *       description: Invalidate the refresh token
+ *       summary: Logout user
+ *       description: Invalidate refresh token
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -461,27 +418,27 @@
  *                   type: string
  *       responses:
  *         200:
- *           description: Logged out successfully
+ *           description: Logout successful
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   message:
+ *                     type: string
  *
- *   # Customer Endpoints
+ *   # Customer endpoints
  *   /api/v1/customers:
  *     get:
  *       tags: [Customers]
  *       summary: Get all customers
- *       description: Retrieve a list of customers with pagination and filtering options
+ *       description: Retrieve list of customers with optional filtering
  *       security:
  *         - bearerAuth: []
  *       parameters:
- *         - in: query
- *           name: page
- *           schema:
- *             type: integer
- *           description: Page number
- *         - in: query
- *           name: limit
- *           schema:
- *             type: integer
- *           description: Items per page
  *         - in: query
  *           name: status
  *           schema:
@@ -498,7 +455,19 @@
  *           name: search
  *           schema:
  *             type: string
- *           description: Search term
+ *           description: Search term for name, email or company
+ *         - in: query
+ *           name: page
+ *           schema:
+ *             type: integer
+ *             default: 1
+ *           description: Page number
+ *         - in: query
+ *           name: limit
+ *           schema:
+ *             type: integer
+ *             default: 20
+ *           description: Items per page
  *       responses:
  *         200:
  *           description: List of customers
@@ -509,10 +478,11 @@
  *                 properties:
  *                   success:
  *                     type: boolean
+ *                     example: true
  *                   customers:
  *                     type: array
  *                     items:
- *                       $ref: '#/components/schemas/Customer'
+ *                       type: object
  *                   pagination:
  *                     type: object
  *                     properties:
@@ -524,12 +494,18 @@
  *                         type: integer
  *                       totalRecords:
  *                         type: integer
+ *                   filters:
+ *                     type: object
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     post:
  *       tags: [Customers]
  *       summary: Create new customer
- *       description: Add a new customer to the database
+ *       description: Add a new customer
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -548,20 +524,29 @@
  *                 properties:
  *                   success:
  *                     type: boolean
+ *                     example: true
  *                   customerId:
  *                     type: integer
  *                   message:
  *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/customers/{id}:
  *     get:
  *       tags: [Customers]
  *       summary: Get customer by ID
- *       description: Retrieve detailed information for a specific customer
+ *       description: Retrieve detailed customer information
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -570,6 +555,7 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Customer ID
  *       responses:
  *         200:
  *           description: Customer details
@@ -580,12 +566,29 @@
  *                 properties:
  *                   success:
  *                     type: boolean
+ *                     example: true
  *                   customer:
- *                     $ref: '#/components/schemas/Customer'
+ *                     type: object
+ *                   appointments:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   projects:
+ *                     type: array
+ *                     items:
+ *                       type: object
  *         404:
  *           description: Customer not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     put:
  *       tags: [Customers]
  *       summary: Update customer
@@ -598,6 +601,7 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Customer ID
  *       requestBody:
  *         required: true
  *         content:
@@ -606,17 +610,41 @@
  *               $ref: '#/components/schemas/Customer'
  *       responses:
  *         200:
- *           description: Customer updated successfully
+ *           description: Customer updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   customerId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
  *           description: Customer not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     delete:
  *       tags: [Customers]
  *       summary: Delete customer
- *       description: Mark customer as deleted (soft delete)
+ *       description: Mark customer as deleted
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -625,17 +653,39 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Customer ID
  *       responses:
  *         200:
- *           description: Customer deleted successfully
+ *           description: Customer deleted
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   message:
+ *                     type: string
+ *         400:
+ *           description: Cannot delete customer with related data
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
  *           description: Customer not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
- *         400:
- *           description: Cannot delete customer with active projects
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
- *   # Additional Customer Endpoints
  *   /api/v1/customers/{id}/notes:
  *     post:
  *       tags: [Customers]
@@ -649,28 +699,57 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Customer ID
  *       requestBody:
  *         required: true
  *         content:
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - notiz
  *               properties:
  *                 notiz:
  *                   type: string
  *       responses:
  *         200:
- *           description: Note added successfully
+ *           description: Note added
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   customerId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
+ *         400:
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
  *           description: Customer not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/customers/status:
  *     patch:
  *       tags: [Customers]
  *       summary: Update customer status
- *       description: Update the status of a customer
+ *       description: Change the status of a customer
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -679,39 +758,59 @@
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - id
+ *                 - status
  *               properties:
  *                 id:
  *                   type: integer
+ *                   description: Customer ID
  *                 status:
  *                   type: string
  *                   enum: [aktiv, inaktiv, geloescht]
  *       responses:
  *         200:
- *           description: Status updated successfully
+ *           description: Status updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   customerId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *         404:
+ *           description: Customer not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
- * 
- *   # Project Endpoints
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *
+ *   # Project endpoints
  *   /api/v1/projects:
  *     get:
  *       tags: [Projects]
  *       summary: Get all projects
- *       description: Retrieve a list of projects with pagination and filtering options
+ *       description: Retrieve list of projects with optional filtering
  *       security:
  *         - bearerAuth: []
  *       parameters:
- *         - in: query
- *           name: page
- *           schema:
- *             type: integer
- *           description: Page number
- *         - in: query
- *           name: limit
- *           schema:
- *             type: integer
- *           description: Items per page
  *         - in: query
  *           name: status
  *           schema:
@@ -727,7 +826,19 @@
  *           name: search
  *           schema:
  *             type: string
- *           description: Search term
+ *           description: Search term for project title
+ *         - in: query
+ *           name: page
+ *           schema:
+ *             type: integer
+ *             default: 1
+ *           description: Page number
+ *         - in: query
+ *           name: limit
+ *           schema:
+ *             type: integer
+ *             default: 20
+ *           description: Items per page
  *       responses:
  *         200:
  *           description: List of projects
@@ -738,10 +849,11 @@
  *                 properties:
  *                   success:
  *                     type: boolean
+ *                     example: true
  *                   projects:
  *                     type: array
  *                     items:
- *                       $ref: '#/components/schemas/Project'
+ *                       type: object
  *                   pagination:
  *                     type: object
  *                     properties:
@@ -753,12 +865,18 @@
  *                         type: integer
  *                       totalRecords:
  *                         type: integer
+ *                   filters:
+ *                     type: object
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     post:
  *       tags: [Projects]
  *       summary: Create new project
- *       description: Add a new project to the database
+ *       description: Add a new project
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -777,20 +895,29 @@
  *                 properties:
  *                   success:
  *                     type: boolean
+ *                     example: true
  *                   projectId:
  *                     type: integer
  *                   message:
  *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/projects/{id}:
  *     get:
  *       tags: [Projects]
  *       summary: Get project by ID
- *       description: Retrieve detailed information for a specific project
+ *       description: Retrieve detailed project information
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -799,13 +926,40 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Project ID
  *       responses:
  *         200:
- *           description: Successful operation
+ *           description: Project details
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   project:
+ *                     type: object
+ *                   appointments:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   notes:
+ *                     type: array
+ *                     items:
+ *                       type: object
  *         404:
  *           description: Project not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     put:
  *       tags: [Projects]
  *       summary: Update project
@@ -818,6 +972,7 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Project ID
  *       requestBody:
  *         required: true
  *         content:
@@ -826,19 +981,43 @@
  *               $ref: '#/components/schemas/Project'
  *       responses:
  *         200:
- *           description: Project updated successfully
+ *           description: Project updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   projectId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
  *           description: Project not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/projects/{id}/status:
  *     patch:
  *       tags: [Projects]
  *       summary: Update project status
- *       description: Update the status of a project
+ *       description: Change the status of a project
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -847,27 +1026,55 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Project ID
  *       requestBody:
  *         required: true
  *         content:
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - status
  *               properties:
  *                 status:
  *                   type: string
  *                   enum: [neu, in_bearbeitung, abgeschlossen, storniert]
  *                 note:
  *                   type: string
+ *                   description: Optional note about status change
  *       responses:
  *         200:
- *           description: Status updated successfully
+ *           description: Status updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   projectId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
  *           description: Project not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/projects/{id}/notes:
  *     post:
@@ -882,22 +1089,51 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Project ID
  *       requestBody:
  *         required: true
  *         content:
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - note
  *               properties:
  *                 note:
  *                   type: string
  *       responses:
  *         201:
- *           description: Note added successfully
+ *           description: Note added
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   projectId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
+ *         400:
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
  *           description: Project not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/projects/export:
  *     get:
@@ -913,31 +1149,56 @@
  *             type: string
  *             enum: [csv, xlsx, pdf, json]
  *           description: Export format
+ *         - in: query
+ *           name: status
+ *           schema:
+ *             type: string
+ *           description: Filter by status
+ *         - in: query
+ *           name: search
+ *           schema:
+ *             type: string
+ *           description: Search term
  *       responses:
  *         200:
  *           description: Export successful
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   data:
+ *                     type: object
+ *                     description: Export data
+ *         501:
+ *           description: Export functionality not implemented
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   message:
+ *                     type: string
+ *                     example: Export functionality is being migrated to TypeScript and Prisma
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
- *   # Appointment Endpoints
+ *   # Appointment endpoints
  *   /api/v1/appointments:
  *     get:
  *       tags: [Appointments]
  *       summary: Get all appointments
- *       description: Retrieve a list of appointments with pagination and filtering options
+ *       description: Retrieve list of appointments with optional filtering
  *       security:
  *         - bearerAuth: []
  *       parameters:
- *         - in: query
- *           name: page
- *           schema:
- *             type: integer
- *           description: Page number
- *         - in: query
- *           name: limit
- *           schema:
- *             type: integer
- *           description: Items per page
  *         - in: query
  *           name: status
  *           schema:
@@ -949,7 +1210,24 @@
  *           schema:
  *             type: string
  *             format: date
- *           description: Filter by date
+ *           description: Filter by date (YYYY-MM-DD)
+ *         - in: query
+ *           name: search
+ *           schema:
+ *             type: string
+ *           description: Search term for appointment title or customer
+ *         - in: query
+ *           name: page
+ *           schema:
+ *             type: integer
+ *             default: 1
+ *           description: Page number
+ *         - in: query
+ *           name: limit
+ *           schema:
+ *             type: integer
+ *             default: 20
+ *           description: Items per page
  *       responses:
  *         200:
  *           description: List of appointments
@@ -960,10 +1238,11 @@
  *                 properties:
  *                   success:
  *                     type: boolean
+ *                     example: true
  *                   appointments:
  *                     type: array
  *                     items:
- *                       $ref: '#/components/schemas/Appointment'
+ *                       type: object
  *                   pagination:
  *                     type: object
  *                     properties:
@@ -975,12 +1254,18 @@
  *                         type: integer
  *                       totalRecords:
  *                         type: integer
+ *                   filters:
+ *                     type: object
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     post:
  *       tags: [Appointments]
  *       summary: Create new appointment
- *       description: Add a new appointment to the database
+ *       description: Add a new appointment
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -999,20 +1284,29 @@
  *                 properties:
  *                   success:
  *                     type: boolean
+ *                     example: true
  *                   appointmentId:
  *                     type: integer
  *                   message:
  *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/appointments/{id}:
  *     get:
  *       tags: [Appointments]
  *       summary: Get appointment by ID
- *       description: Retrieve detailed information for a specific appointment
+ *       description: Retrieve detailed appointment information
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1021,13 +1315,36 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Appointment ID
  *       responses:
  *         200:
- *           description: Successful operation
+ *           description: Appointment details
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   appointment:
+ *                     type: object
+ *                   notes:
+ *                     type: array
+ *                     items:
+ *                       type: object
  *         404:
  *           description: Appointment not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     put:
  *       tags: [Appointments]
  *       summary: Update appointment
@@ -1040,6 +1357,7 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Appointment ID
  *       requestBody:
  *         required: true
  *         content:
@@ -1048,13 +1366,37 @@
  *               $ref: '#/components/schemas/Appointment'
  *       responses:
  *         200:
- *           description: Appointment updated successfully
+ *           description: Appointment updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   appointmentId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
  *           description: Appointment not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     delete:
  *       tags: [Appointments]
  *       summary: Delete appointment
@@ -1067,19 +1409,40 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Appointment ID
  *       responses:
  *         200:
- *           description: Appointment deleted successfully
+ *           description: Appointment deleted
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   appointmentId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         404:
  *           description: Appointment not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/appointments/{id}/status:
  *     patch:
  *       tags: [Appointments]
  *       summary: Update appointment status
- *       description: Update the status of an appointment
+ *       description: Change the status of an appointment
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1088,27 +1451,55 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Appointment ID
  *       requestBody:
  *         required: true
  *         content:
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - status
  *               properties:
  *                 status:
  *                   type: string
  *                   enum: [geplant, bestaetigt, abgeschlossen, storniert]
  *                 note:
  *                   type: string
+ *                   description: Optional note about status change
  *       responses:
  *         200:
- *           description: Status updated successfully
+ *           description: Status updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   appointmentId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
  *           description: Appointment not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/appointments/{id}/notes:
  *     post:
@@ -1123,57 +1514,122 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Appointment ID
  *       requestBody:
  *         required: true
  *         content:
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - note
  *               properties:
  *                 note:
  *                   type: string
  *       responses:
  *         201:
- *           description: Note added successfully
+ *           description: Note added
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   appointmentId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
+ *         400:
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
  *           description: Appointment not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
- *   # Service Endpoints
+ *   # Service endpoints
  *   /api/v1/services:
  *     get:
  *       tags: [Services]
  *       summary: Get all services
- *       description: Retrieve a list of services with pagination and filtering options
+ *       description: Retrieve list of services with optional filtering
  *       security:
  *         - bearerAuth: []
  *       parameters:
- *         - in: query
- *           name: page
- *           schema:
- *             type: integer
- *           description: Page number
- *         - in: query
- *           name: limit
- *           schema:
- *             type: integer
- *           description: Items per page
  *         - in: query
  *           name: status
  *           schema:
  *             type: string
  *             enum: [aktiv, inaktiv]
  *           description: Filter by status
+ *         - in: query
+ *           name: search
+ *           schema:
+ *             type: string
+ *           description: Search term for service name or description
+ *         - in: query
+ *           name: page
+ *           schema:
+ *             type: integer
+ *             default: 1
+ *           description: Page number
+ *         - in: query
+ *           name: limit
+ *           schema:
+ *             type: integer
+ *             default: 20
+ *           description: Items per page
  *       responses:
  *         200:
- *           description: Successful operation
+ *           description: List of services
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   services:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   pagination:
+ *                     type: object
+ *                     properties:
+ *                       current:
+ *                         type: integer
+ *                       limit:
+ *                         type: integer
+ *                       total:
+ *                         type: integer
+ *                       totalRecords:
+ *                         type: integer
+ *                   filters:
+ *                     type: object
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     post:
  *       tags: [Services]
  *       summary: Create new service
- *       description: Add a new service to the database
+ *       description: Add a new service
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -1181,33 +1637,40 @@
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 name:
- *                   type: string
- *                 beschreibung:
- *                   type: string
- *                 preis_basis:
- *                   type: number
- *                 einheit:
- *                   type: string
- *                 mwst_satz:
- *                   type: number
- *                 aktiv:
- *                   type: boolean
+ *               $ref: '#/components/schemas/Service'
  *       responses:
  *         201:
- *           description: Service created successfully
+ *           description: Service created
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   serviceId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/services/{id}:
  *     get:
  *       tags: [Services]
  *       summary: Get service by ID
- *       description: Retrieve detailed information for a specific service
+ *       description: Retrieve detailed service information
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1216,13 +1679,32 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Service ID
  *       responses:
  *         200:
- *           description: Successful operation
+ *           description: Service details
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   service:
+ *                     type: object
  *         404:
  *           description: Service not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     put:
  *       tags: [Services]
  *       summary: Update service
@@ -1235,40 +1717,52 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Service ID
  *       requestBody:
  *         required: true
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 name:
- *                   type: string
- *                 beschreibung:
- *                   type: string
- *                 preis_basis:
- *                   type: number
- *                 einheit:
- *                   type: string
- *                 mwst_satz:
- *                   type: number
- *                 aktiv:
- *                   type: boolean
+ *               $ref: '#/components/schemas/Service'
  *       responses:
  *         200:
- *           description: Service updated successfully
+ *           description: Service updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   serviceId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
  *           description: Service not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
- *
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ * 
  *   /api/v1/services/{id}/status:
  *     patch:
  *       tags: [Services]
  *       summary: Toggle service status
- *       description: Toggle between active and inactive status
+ *       description: Change service active/inactive status
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1277,28 +1771,51 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Service ID
  *       requestBody:
  *         required: true
  *         content:
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - aktiv
  *               properties:
  *                 aktiv:
  *                   type: boolean
  *       responses:
  *         200:
- *           description: Status updated successfully
+ *           description: Status updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   serviceId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         404:
  *           description: Service not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/services/{id}/statistics:
  *     get:
  *       tags: [Services]
  *       summary: Get service statistics
- *       description: Retrieve usage and revenue statistics for a specific service
+ *       description: Retrieve usage statistics for a service
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1307,33 +1824,42 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Service ID
  *       responses:
  *         200:
- *           description: Successful operation
+ *           description: Service statistics
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   statistics:
+ *                     type: object
  *         404:
  *           description: Service not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
- *
- *   # Request Endpoints
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ * 
+ *   # Request endpoints
  *   /api/v1/requests:
  *     get:
  *       tags: [Requests]
  *       summary: Get all contact requests
- *       description: Retrieve a list of contact requests with pagination and filtering options
+ *       description: Retrieve list of contact requests with optional filtering
  *       security:
  *         - bearerAuth: []
  *       parameters:
- *         - in: query
- *           name: page
- *           schema:
- *             type: integer
- *           description: Page number
- *         - in: query
- *           name: limit
- *           schema:
- *             type: integer
- *           description: Items per page
  *         - in: query
  *           name: status
  *           schema:
@@ -1344,18 +1870,70 @@
  *           name: service
  *           schema:
  *             type: string
- *           description: Filter by service
+ *           description: Filter by service type
+ *         - in: query
+ *           name: date
+ *           schema:
+ *             type: string
+ *             format: date
+ *           description: Filter by date
+ *         - in: query
+ *           name: search
+ *           schema:
+ *             type: string
+ *           description: Search term for name or email
+ *         - in: query
+ *           name: page
+ *           schema:
+ *             type: integer
+ *             default: 1
+ *           description: Page number
+ *         - in: query
+ *           name: limit
+ *           schema:
+ *             type: integer
+ *             default: 20
+ *           description: Items per page
  *       responses:
  *         200:
  *           description: List of contact requests
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   requests:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   pagination:
+ *                     type: object
+ *                     properties:
+ *                       current:
+ *                         type: integer
+ *                       limit:
+ *                         type: integer
+ *                       total:
+ *                         type: integer
+ *                       totalRecords:
+ *                         type: integer
+ *                   filters:
+ *                     type: object
  *         401:
  *           description: Unauthorized
- *
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ * 
  *   /api/v1/requests/{id}:
  *     get:
  *       tags: [Requests]
  *       summary: Get contact request by ID
- *       description: Retrieve detailed information for a specific contact request
+ *       description: Retrieve detailed contact request information
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1364,19 +1942,42 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Request ID
  *       responses:
  *         200:
- *           description: Contact request details
+ *           description: Request details
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   request:
+ *                     type: object
+ *                   notes:
+ *                     type: array
+ *                     items:
+ *                       type: object
  *         404:
- *           description: Contact request not found
+ *           description: Request not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/requests/{id}/status:
  *     patch:
  *       tags: [Requests]
  *       summary: Update request status
- *       description: Update the status of a contact request
+ *       description: Change the status of a contact request
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1385,28 +1986,57 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Request ID
  *       requestBody:
  *         required: true
  *         content:
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - status
  *               properties:
  *                 status:
  *                   type: string
  *                   enum: [neu, in_bearbeitung, beantwortet, geschlossen]
  *                 note:
  *                   type: string
+ *                   description: Optional note about status change
  *       responses:
  *         200:
- *           description: Status updated successfully
+ *           description: Status updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   requestId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
- *           description: Contact request not found
+ *           description: Request not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
- *
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ * 
+ * 
  *   /api/v1/requests/{id}/notes:
  *     post:
  *       tags: [Requests]
@@ -1420,28 +2050,57 @@
  *           required: true
  *           schema:
  *             type: integer
+ *           description: Request ID
  *       requestBody:
  *         required: true
  *         content:
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - note
  *               properties:
  *                 note:
  *                   type: string
  *       responses:
  *         201:
- *           description: Note added successfully
+ *           description: Note added
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   requestId:
+ *                     type: integer
+ *                   message:
+ *                     type: string
+ *         400:
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         404:
- *           description: Contact request not found
+ *           description: Request not found
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/requests/export:
  *     get:
  *       tags: [Requests]
  *       summary: Export requests
- *       description: Export contact requests in various formats
+ *       description: Export contact requests data in various formats
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1451,84 +2110,48 @@
  *             type: string
  *             enum: [csv, xlsx, pdf, json]
  *           description: Export format
+ *         - in: query
+ *           name: status
+ *           schema:
+ *             type: string
+ *           description: Filter by status
+ *         - in: query
+ *           name: search
+ *           schema:
+ *             type: string
+ *           description: Search term
  *       responses:
  *         200:
  *           description: Export successful
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   data:
+ *                     type: object
+ *                     description: Export data
+ *         501:
+ *           description: Export functionality not implemented
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   message:
+ *                     type: string
+ *                     example: Export functionality is being migrated to TypeScript and Prisma
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
- *   # Dashboard Endpoints
- *   /api/v1/dashboard/stats:
- *     get:
- *       tags: [Dashboard]
- *       summary: Get dashboard statistics
- *       description: Retrieve key metrics and statistics for the dashboard
- *       security:
- *         - bearerAuth: []
- *       responses:
- *         200:
- *           description: Dashboard statistics
- *         401:
- *           description: Unauthorized
- *
- *   /api/v1/dashboard/search:
- *     get:
- *       tags: [Dashboard]
- *       summary: Global search
- *       description: Search across all entities
- *       security:
- *         - bearerAuth: []
- *       parameters:
- *         - in: query
- *           name: q
- *           required: true
- *           schema:
- *             type: string
- *           description: Search query
- *       responses:
- *         200:
- *           description: Search results
- *         401:
- *           description: Unauthorized
- *
- *   /api/v1/dashboard/notifications:
- *     get:
- *       tags: [Dashboard]
- *       summary: Get notifications
- *       description: Retrieve user notifications
- *       security:
- *         - bearerAuth: []
- *       responses:
- *         200:
- *           description: List of notifications
- *         401:
- *           description: Unauthorized
- *
- *   /api/v1/dashboard/notifications/mark-read:
- *     post:
- *       tags: [Dashboard]
- *       summary: Mark notifications as read
- *       description: Mark one or all notifications as read
- *       security:
- *         - bearerAuth: []
- *       requestBody:
- *         required: true
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 notificationId:
- *                   type: integer
- *                 markAll:
- *                   type: boolean
- *       responses:
- *         200:
- *           description: Notifications marked as read
- *         401:
- *           description: Unauthorized
- *
- *   # Profile Endpoints
+ *   # Profile endpoints
  *   /api/v1/profile:
  *     get:
  *       tags: [Profile]
@@ -1539,11 +2162,43 @@
  *       responses:
  *         200:
  *           description: User profile data
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   user:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       telefon:
+ *                         type: string
+ *                       rolle:
+ *                         type: string
+ *                       profilbild:
+ *                         type: string
+ *                       seit:
+ *                         type: string
+ *                   settings:
+ *                     type: object
+ *                   activity:
+ *                     type: array
+ *                     items:
+ *                       type: object
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     put:
  *       tags: [Profile]
- *       summary: Update profile
+ *       summary: Update user profile
  *       description: Update current user profile information
  *       security:
  *         - bearerAuth: []
@@ -1553,20 +2208,44 @@
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - name
+ *                 - email
  *               properties:
  *                 name:
  *                   type: string
  *                 email:
  *                   type: string
+ *                   format: email
  *                 telefon:
  *                   type: string
  *       responses:
  *         200:
- *           description: Profile updated successfully
+ *           description: Profile updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   user:
+ *                     type: object
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/profile/password:
  *     patch:
@@ -1581,26 +2260,51 @@
  *           application/json:
  *             schema:
  *               type: object
+ *               required:
+ *                 - current_password
+ *                 - new_password
+ *                 - confirm_password
  *               properties:
  *                 current_password:
  *                   type: string
+ *                   format: password
  *                 new_password:
  *                   type: string
+ *                   format: password
  *                 confirm_password:
  *                   type: string
+ *                   format: password
  *       responses:
  *         200:
- *           description: Password updated successfully
+ *           description: Password updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/profile/picture:
  *     patch:
  *       tags: [Profile]
  *       summary: Update profile picture
- *       description: Upload a new profile picture
+ *       description: Upload and set a new profile picture
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -1609,23 +2313,45 @@
  *           multipart/form-data:
  *             schema:
  *               type: object
+ *               required:
+ *                 - file
  *               properties:
  *                 file:
  *                   type: string
  *                   format: binary
  *       responses:
  *         200:
- *           description: Profile picture updated successfully
+ *           description: Profile picture updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   imagePath:
+ *                     type: string
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid file
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/profile/notifications:
  *     patch:
  *       tags: [Profile]
  *       summary: Update notification settings
- *       description: Change notification preferences
+ *       description: Update user notification preferences
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -1644,13 +2370,222 @@
  *                   enum: [sofort, taeglich, woechentlich]
  *       responses:
  *         200:
- *           description: Notification settings updated successfully
+ *           description: Notification settings updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
- *   # Settings Endpoints
+ *   # Dashboard endpoints
+ *   /api/v1/dashboard/stats:
+ *     get:
+ *       tags: [Dashboard]
+ *       summary: Get dashboard statistics
+ *       description: Retrieve key statistics for dashboard
+ *       security:
+ *         - bearerAuth: []
+ *       responses:
+ *         200:
+ *           description: Dashboard statistics
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   newRequests:
+ *                     type: object
+ *                     properties:
+ *                       count:
+ *                         type: integer
+ *                       trend:
+ *                         type: integer
+ *                   activeProjects:
+ *                     type: object
+ *                     properties:
+ *                       count:
+ *                         type: integer
+ *                       trend:
+ *                         type: integer
+ *                   totalCustomers:
+ *                     type: object
+ *                     properties:
+ *                       count:
+ *                         type: integer
+ *                       trend:
+ *                         type: integer
+ *                   monthlyRevenue:
+ *                     type: object
+ *                     properties:
+ *                       amount:
+ *                         type: number
+ *                       trend:
+ *                         type: integer
+ *         401:
+ *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *
+ *   /api/v1/dashboard/search:
+ *     get:
+ *       tags: [Dashboard]
+ *       summary: Global search
+ *       description: Search across multiple entities
+ *       security:
+ *         - bearerAuth: []
+ *       parameters:
+ *         - in: query
+ *           name: q
+ *           required: true
+ *           schema:
+ *             type: string
+ *           description: Search query
+ *       responses:
+ *         200:
+ *           description: Search results
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   customers:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   projects:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   appointments:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   requests:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   services:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *         401:
+ *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *
+ *   /api/v1/dashboard/notifications:
+ *     get:
+ *       tags: [Dashboard]
+ *       summary: Get notifications
+ *       description: Retrieve user notifications
+ *       security:
+ *         - bearerAuth: []
+ *       responses:
+ *         200:
+ *           description: User notifications
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   notifications:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         title:
+ *                           type: string
+ *                         message:
+ *                           type: string
+ *                         type:
+ *                           type: string
+ *                         icon:
+ *                           type: string
+ *                         read:
+ *                           type: boolean
+ *                         time:
+ *                           type: string
+ *                         link:
+ *                           type: string
+ *         401:
+ *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *
+ *   /api/v1/dashboard/notifications/mark-read:
+ *     post:
+ *       tags: [Dashboard]
+ *       summary: Mark notifications as read
+ *       description: Mark one or all notifications as read
+ *       security:
+ *         - bearerAuth: []
+ *       requestBody:
+ *         required: true
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 notificationId:
+ *                   type: integer
+ *                   description: ID of specific notification to mark as read
+ *                 markAll:
+ *                   type: boolean
+ *                   description: Mark all notifications as read
+ *       responses:
+ *         200:
+ *           description: Notifications marked as read
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   count:
+ *                     type: integer
+ *                   message:
+ *                     type: string
+ *         400:
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *         401:
+ *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *
+ *   # Settings endpoints
  *   /api/v1/settings:
  *     get:
  *       tags: [Settings]
@@ -1661,8 +2596,30 @@
  *       responses:
  *         200:
  *           description: User settings
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   settings:
+ *                     type: object
+ *                     properties:
+ *                       sprache:
+ *                         type: string
+ *                       dark_mode:
+ *                         type: boolean
+ *                       benachrichtigungen_email:
+ *                         type: boolean
+ *                       benachrichtigungen_push:
+ *                         type: boolean
+ *                       benachrichtigungen_intervall:
+ *                         type: string
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     put:
  *       tags: [Settings]
  *       summary: Update user settings
@@ -1678,6 +2635,7 @@
  *               properties:
  *                 sprache:
  *                   type: string
+ *                   enum: [de, en]
  *                 dark_mode:
  *                   type: boolean
  *                 benachrichtigungen_email:
@@ -1686,13 +2644,32 @@
  *                   type: boolean
  *                 benachrichtigungen_intervall:
  *                   type: string
+ *                   enum: [sofort, taeglich, woechentlich]
  *       responses:
  *         200:
- *           description: Settings updated successfully
+ *           description: Settings updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   message:
+ *                     type: string
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/settings/system:
  *     get:
@@ -1704,10 +2681,25 @@
  *       responses:
  *         200:
  *           description: System settings
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   settings:
+ *                     type: object
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         403:
  *           description: Forbidden - Admin access required
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     put:
  *       tags: [Settings]
  *       summary: Update system settings
@@ -1725,28 +2717,77 @@
  *                   type: object
  *       responses:
  *         200:
- *           description: System settings updated successfully
- *         400:
- *           description: Invalid input
+ *           description: Settings updated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   message:
+ *                     type: string
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         403:
  *           description: Forbidden - Admin access required
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *
  *   /api/v1/settings/backup:
  *     get:
  *       tags: [Settings]
  *       summary: Get backup settings
- *       description: Retrieve backup settings (admin only)
+ *       description: Retrieve backup settings and history (admin only)
  *       security:
  *         - bearerAuth: []
  *       responses:
  *         200:
- *           description: Backup settings
+ *           description: Backup settings and history
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   settings:
+ *                     type: object
+ *                     properties:
+ *                       automatisch:
+ *                         type: boolean
+ *                       intervall:
+ *                         type: string
+ *                       zeit:
+ *                         type: string
+ *                       aufbewahrung:
+ *                         type: integer
+ *                       letzte_ausfuehrung:
+ *                         type: string
+ *                         format: date-time
+ *                       status:
+ *                         type: string
+ *                   backups:
+ *                     type: array
+ *                     items:
+ *                       type: object
  *         401:
  *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         403:
  *           description: Forbidden - Admin access required
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *     put:
  *       tags: [Settings]
  *       summary: Update backup settings
@@ -1758,47 +2799,21 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/BackupSettings'
+ *               type: object
+ *               properties:
+ *                 automatisch:
+ *                   type: boolean
+ *                 intervall:
+ *                   type: string
+ *                   enum: [taeglich, woechentlich, monatlich]
+ *                 zeit:
+ *                   type: string
+ *                   pattern: "^([01]\\d|2[0-3]):([0-5]\\d)$"
+ *                 aufbewahrung:
+ *                   type: integer
  *       responses:
  *         200:
- *           description: Backup settings updated successfully
- *         400:
- *           description: Invalid input
- *         401:
- *           description: Unauthorized
- *         403:
- *           description: Forbidden - Admin access required
- *
- *   /api/v1/settings/backup/trigger:
- *     post:
- *       tags: [Settings]
- *       summary: Trigger manual backup
- *       description: Start a manual backup (admin only)
- *       security:
- *         - bearerAuth: []
- *       responses:
- *         200:
- *           description: Backup process initiated
- *         401:
- *           description: Unauthorized
- *         403:
- *           description: Forbidden - Admin access required
- *
- *   # Contact Endpoint
- *   /api/v1/contact:
- *     post:
- *       tags: [Contact]
- *       summary: Submit contact form
- *       description: Send a contact request from the website
- *       requestBody:
- *         required: true
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ContactRequest'
- *       responses:
- *         201:
- *           description: Contact request received
+ *           description: Backup settings updated
  *           content:
  *             application/json:
  *               schema:
@@ -1806,13 +2821,151 @@
  *                 properties:
  *                   success:
  *                     type: boolean
+ *                     example: true
+ *                   message:
+ *                     type: string
+ *         400:
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *         401:
+ *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *         403:
+ *           description: Forbidden - Admin access required
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *
+ *   /api/v1/settings/backup/trigger:
+ *     post:
+ *       tags: [Settings]
+ *       summary: Trigger manual backup
+ *       description: Start a manual backup process (admin only)
+ *       security:
+ *         - bearerAuth: []
+ *       responses:
+ *         200:
+ *           description: Backup process initiated
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   message:
+ *                     type: string
+ *                   status:
+ *                     type: string
+ *         401:
+ *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *         403:
+ *           description: Forbidden - Admin access required
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *
+ *   # Contact endpoint
+ *   /api/v1/contact:
+ *     post:
+ *       tags: [Public]
+ *       summary: Submit contact form
+ *       description: Send a contact request from the public website
+ *       requestBody:
+ *         required: true
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required:
+ *                 - name
+ *                 - email
+ *                 - service
+ *                 - message
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   minLength: 2
+ *                   maxLength: 100
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                 phone:
+ *                   type: string
+ *                 service:
+ *                   type: string
+ *                   enum: [facility, moving, winter, other]
+ *                 message:
+ *                   type: string
+ *                   minLength: 10
+ *                   maxLength: 1000
+ *       responses:
+ *         201:
+ *           description: Contact request submitted
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: true
  *                   message:
  *                     type: string
  *                   requestId:
  *                     type: integer
  *         400:
- *           description: Invalid input
+ *           description: Validation error
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
  *         429:
  *           description: Too many requests
-  */
-export{};
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   success:
+ *                     type: boolean
+ *                     example: false
+ *                   error:
+ *                     type: string
+ *
+ * # Define tags
+ * tags:
+ *   - name: Authentication
+ *     description: Authentication and user access operations
+ *   - name: Customers
+ *     description: Customer management
+ *   - name: Projects
+ *     description: Project management
+ *   - name: Appointments
+ *     description: Appointment scheduling and management
+ *   - name: Services
+ *     description: Service management
+ *   - name: Requests
+ *     description: Contact request management
+ *   - name: Profile
+ *     description: User profile management
+ *   - name: Dashboard
+ *     description: Dashboard related operations
+ *   - name: Settings
+ *     description: User and system settings
+ *   - name: Public
+ *     description: Public accessible endpoints
+ */
