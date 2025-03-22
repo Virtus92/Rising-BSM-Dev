@@ -10,6 +10,9 @@ import { generateAuthTokens } from './utils/jwt.js';
 import config from './config/index.js';
 import { initSwaggerDocs } from './config/swagger.js';
 import prisma from './utils/prisma.utils.js';
+import { inject, cleanup } from './config/dependency-container.js';
+import { PrismaClient } from '@prisma/client';
+import logger from './utils/logger.js';
 
 // Create Express app
 const app: Express = express();
@@ -41,6 +44,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Request logging middleware in development
+if (config.IS_DEVELOPMENT) {
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    logger.debug(`${req.method} ${req.url}`);
+    next();
+  });
+}
+
 // Rate limiters
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -56,9 +67,16 @@ const contactLimiter = rateLimit({
   message: { success: false, error: 'Too many requests. Please try again later.' }
 });
 
+// Apply rate limiting to API routes
+app.use('/api', apiLimiter);
+
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
 
 // Add request logging middleware in development
@@ -176,35 +194,67 @@ app.post('/api/v1/contact', contactLimiter, submitContact);
 app.use(errorMiddleware.notFoundHandler);
 app.use(errorMiddleware.errorHandler);
 
-// Start server
-app.listen(port, () => {
-  console.log(`API Server running at http://localhost:${port}`);
-  console.log(`Environment: ${config.NODE_ENV}`);
+const server = app.listen(port, () => {
+  logger.info(`Server running at http://localhost:${port}`);
+  logger.info(`Environment: ${config.NODE_ENV}`);
   
   if (config.IS_DEVELOPMENT) {
-    console.log(`API Documentation: http://localhost:${port}/api-docs`);
-    console.log(`Developer Portal: http://localhost:${port}/dev-portal`);
+    logger.info(`API Documentation: http://localhost:${port}/api-docs`);
   }
 });
 
+// Test database connection
+let prismaClient = inject<PrismaClient>('PrismaClient');
+prismaClient.$connect()
+  .then(() => {
+    logger.info('Database connection established');
+  })
+  .catch((error) => {
+    logger.error('Database connection failed', { error });
+    process.exit(1);
+  });
+
+// Graceful shutdown
+const gracefulShutdown = async () => {
+  logger.info('Shutting down gracefully...');
+  
+  server.close(async () => {
+    logger.info('HTTP server closed');
+    
+    try {
+      // Cleanup resources
+      await cleanup();
+      logger.info('Resources cleaned up');
+      process.exit(0);
+    } catch (error) {
+      logger.error('Error during cleanup', { error });
+      process.exit(1);
+    }
+  });
+  
+  // Force shutdown after timeout
+  setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 30000); // 30 seconds timeout
+};
+
+// Handle termination signals
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
 // Process error handling
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error('Unhandled Rejection', { reason, promise });
+  // Don't exit immediately to give logger time to process
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  // Give the server time to log the error before shutting down
+  logger.error('Uncaught Exception', { error });
+  // Exit with error
   setTimeout(() => {
     process.exit(1);
   }, 1000);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  prisma.$disconnect().then(() => {
-    console.log('Database connections closed');
-    process.exit(0);
-  });
-});
+export default app;

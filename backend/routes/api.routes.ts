@@ -1,90 +1,62 @@
+/**
+ * API Routes
+ * 
+ * Main API router that combines all entity-specific routes.
+ */
 import { Router } from 'express';
 import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
 
-// Import controllers
-import * as customerController from '../controllers/customer.controller.js';
-import {
-  getAllProjects,
-  getProjectById,
-  createProject,
-  updateProject,
-  updateProjectStatus,
-  addProjectNote,
-  exportProjects
-} from '../controllers/project.controller.js';
-import * as appointmentController from '../controllers/appointment.controller.js';
-import * as serviceController from '../controllers/service.controller.js';
-import * as requestController from '../controllers/request.controller.js';
-import * as profileController from '../controllers/profile.controller.js';
-import * as dashboardController from '../controllers/dashboard.controller.js';
-import * as settingsController from '../controllers/settings.controller.js';
+// Import route modules
+import projectRoutes from './project.routes.js';
+// Import other route modules as they are implemented
+// import customerRoutes from './customer.routes';
+// import appointmentRoutes from './appointment.routes';
+// import serviceRoutes from './service.routes';
+// import requestRoutes from './request.routes';
+// import profileRoutes from './profile.routes';
+// import dashboardRoutes from './dashboard.routes';
+// import settingsRoutes from './settings.routes';
 
+// Create router
 const router = Router();
 
-// Customers
-router.get('/customers', authenticate, customerController.getAllCustomers);
-router.get('/customers/:id', authenticate, customerController.getCustomerById);
-router.post('/customers', authenticate, customerController.createCustomer);
-router.put('/customers/:id', authenticate, customerController.updateCustomer);
-router.patch('/customers/status', authenticate, customerController.updateCustomerStatus);
-router.post('/customers/:id/notes', authenticate, customerController.addCustomerNote);
-router.delete('/customers/:id', authenticate, customerController.deleteCustomer);
+// Mount routes
+router.use('/projects', projectRoutes);
 
-// Projects
-router.get('/projects', authenticate, getAllProjects);
-router.get('/projects/:id', authenticate, getProjectById);
-router.post('/projects', authenticate, createProject);
-router.put('/projects/:id', authenticate, updateProject);
-router.patch('/projects/:id/status', authenticate, updateProjectStatus);
-router.post('/projects/:id/notes', authenticate, addProjectNote);
-router.get('/projects/export', authenticate, exportProjects);
+// Mount other routes as they are implemented
+// router.use('/customers', customerRoutes);
+// router.use('/appointments', appointmentRoutes);
+// router.use('/services', serviceRoutes);
+// router.use('/requests', requestRoutes);
+// router.use('/profile', profileRoutes);
+// router.use('/dashboard', dashboardRoutes);
+// router.use('/settings', settingsRoutes);
 
-// Appointments
-router.get('/appointments', authenticate, appointmentController.getAllAppointments);
-router.get('/appointments/:id', authenticate, appointmentController.getAppointmentById);
-router.post('/appointments', authenticate, appointmentController.createAppointment);
-router.put('/appointments/:id', authenticate, appointmentController.updateAppointment);
-router.patch('/appointments/:id/status', authenticate, appointmentController.updateAppointmentStatus);
-router.post('/appointments/:id/notes', authenticate, appointmentController.addAppointmentNote);
-router.delete('/appointments/:id', authenticate, appointmentController.deleteAppointment);
+/**
+ * @route GET /api/v1/health
+ * @description Health check endpoint
+ * @access Public
+ */
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'API is operational',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
-// Services
-router.get('/services', authenticate, serviceController.getAllServices);
-router.get('/services/:id', authenticate, serviceController.getServiceById);
-router.post('/services', authenticate, serviceController.createService);
-router.put('/services/:id', authenticate, serviceController.updateService);
-router.patch('/services/:id/status', authenticate, serviceController.toggleServiceStatus);
-router.get('/services/:id/statistics', authenticate, serviceController.getServiceStatistics);
-
-// Requests (contact requests)
-router.get('/requests', authenticate, requestController.getAllRequests);
-router.get('/requests/:id', authenticate, requestController.getRequestById);
-router.patch('/requests/:id/status', authenticate, requestController.updateRequestStatus);
-router.post('/requests/:id/notes', authenticate, requestController.addRequestNote);
-router.get('/requests/export', authenticate, requestController.exportRequests);
-
-// Profile
-router.get('/profile', authenticate, profileController.getUserProfile);
-router.put('/profile', authenticate, profileController.updateProfile);
-router.patch('/profile/password', authenticate, profileController.updatePassword);
-router.patch('/profile/picture', authenticate, profileController.updateProfilePicture);
-router.patch('/profile/notifications', authenticate, profileController.updateNotificationSettings);
-
-// Dashboard
-router.get('/dashboard/stats', authenticate, dashboardController.getDashboardStats);
-router.get('/dashboard/search', authenticate, dashboardController.globalSearch);
-router.get('/dashboard/notifications', authenticate, dashboardController.getNotifications);
-router.post('/dashboard/notifications/mark-read', authenticate, dashboardController.markNotificationsRead);
-
-// Settings (admin only)
-router.get('/settings/system', authenticate, isAdmin, settingsController.getSystemSettings);
-router.put('/settings/system', authenticate, isAdmin, settingsController.updateSystemSettings);
-router.get('/settings/backup', authenticate, isAdmin, settingsController.getBackupSettings);
-router.put('/settings/backup', authenticate, isAdmin, settingsController.updateBackupSettings);
-router.post('/settings/backup/trigger', authenticate, isAdmin, settingsController.triggerManualBackup);
-
-// User settings
-router.get('/settings', authenticate, settingsController.getUserSettings);
-router.put('/settings', authenticate, settingsController.updateUserSettings);
+/**
+ * @route GET /api/v1/version
+ * @description Get API version
+ * @access Public
+ */
+router.get('/version', (req, res) => {
+  res.status(200).json({
+    version: process.env.npm_package_version || '1.0.0',
+    name: process.env.npm_package_name || 'rising-bsm-api',
+    timestamp: new Date().toISOString()
+  });
+});
 
 export default router;

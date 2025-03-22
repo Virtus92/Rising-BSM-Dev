@@ -1,41 +1,70 @@
+/**
+ * Project Controller
+ * 
+ * Controller for Project entity operations handling HTTP requests and responses.
+ */
 import { Request, Response } from 'express';
-import { asyncHandler } from '../utils/asyncHandler';
-import { AuthenticatedRequest } from '../types/authenticated-request';
-import { ResponseFactory } from '../utils/response.factory';
-import { BadRequestError } from '../utils/errors';
-import { ProjectService } from '../services/project.service';
+import { AuthenticatedRequest } from '../types/controller.types.js';
+import { asyncHandler } from '../utils/error-handler.js';
+import { ResponseFactory } from '../utils/response.factory.js';
+import { ProjectService, projectService } from '../services/project.service.js';
+import { 
+  ProjectCreateDTO, 
+  ProjectUpdateDTO, 
+  ProjectFilterDTO,
+  ProjectStatusUpdateDTO
+} from '../types/dtos/project.dto.js';
+import { BadRequestError } from '../utils/error-handler.js';
 
 /**
- * Project controller using the new service architecture
+ * Controller for Project entity operations
  */
 export class ProjectController {
-  private projectService: ProjectService;
-  
-  constructor() {
-    this.projectService = new ProjectService();
-  }
-  
+  /**
+   * Creates a new ProjectController instance
+   * @param service - ProjectService instance
+   */
+  constructor(private readonly service: ProjectService = projectService) {}
+
   /**
    * Get all projects with optional filtering
+   * @route GET /api/v1/projects
    */
   getAllProjects = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const filters = req.query;
+    // Extract query parameters as filter options
+    const filters: ProjectFilterDTO = {
+      status: req.query.status as string,
+      kunde_id: req.query.kunde_id ? Number(req.query.kunde_id) : undefined,
+      dienstleistung_id: req.query.dienstleistung_id ? Number(req.query.dienstleistung_id) : undefined,
+      start_datum_von: req.query.start_datum_von as string,
+      start_datum_bis: req.query.start_datum_bis as string,
+      search: req.query.search as string,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      sortBy: req.query.sortBy as string,
+      sortDirection: req.query.sortDirection as 'asc' | 'desc'
+    };
     
-    const result = await this.projectService.findAll(filters, {
-      page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 20
+    // Get projects from service
+    const result = await this.service.findAll(filters, {
+      page: filters.page,
+      limit: filters.limit,
+      orderBy: filters.sortBy,
+      orderDirection: filters.sortDirection
     });
     
+    // Send paginated response
     ResponseFactory.paginated(
-      res, 
-      result.projects, 
+      res,
+      result.data,
       result.pagination,
       'Projects retrieved successfully'
     );
   });
-  
+
   /**
    * Get project by ID with related data
+   * @route GET /api/v1/projects/:id
    */
   getProjectById = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
@@ -45,95 +74,164 @@ export class ProjectController {
       throw new BadRequestError('Invalid project ID');
     }
     
-    const result = await this.projectService.findById(projectId, {
+    // Get project with details from service
+    const result = await this.service.findByIdWithDetails(projectId, {
       throwIfNotFound: true
     });
     
+    // Send success response
     ResponseFactory.success(res, result, 'Project retrieved successfully');
   });
-  
+
   /**
    * Create a new project
+   * @route POST /api/v1/projects
    */
   createProject = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    const userId = req.user?.id;
+    // Extract create DTO from request body
+    const projectData: ProjectCreateDTO = req.body;
     
-    const result = await this.projectService.create(req.body, {
-      userId
+    // Create project with user context
+    const result = await this.service.create(projectData, {
+      userContext: req.user ? {
+        userId: req.user.id,
+        userName: req.user.name,
+        userRole: req.user.role,
+        ipAddress: req.ip
+      } : undefined
     });
     
+    // Send created response
     ResponseFactory.created(res, result, 'Project created successfully');
   });
-  
+
   /**
    * Update an existing project
+   * @route PUT /api/v1/projects/:id
    */
   updateProject = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
     const projectId = Number(id);
-    const userId = req.user?.id;
     
     if (isNaN(projectId)) {
       throw new BadRequestError('Invalid project ID');
     }
     
-    const result = await this.projectService.update(projectId, req.body, {
-      userId,
+    // Extract update DTO from request body
+    const projectData: ProjectUpdateDTO = req.body;
+    
+    // Update project with user context
+    const result = await this.service.update(projectId, projectData, {
+      userContext: req.user ? {
+        userId: req.user.id,
+        userName: req.user.name,
+        userRole: req.user.role,
+        ipAddress: req.ip
+      } : undefined,
       throwIfNotFound: true
     });
     
+    // Send success response
     ResponseFactory.success(res, result, 'Project updated successfully');
   });
-  
+
   /**
    * Update project status
+   * @route PATCH /api/v1/projects/:id/status
    */
   updateProjectStatus = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
-    const { status, note } = req.body;
     const projectId = Number(id);
-    const userId = req.user?.id;
     
     if (isNaN(projectId)) {
       throw new BadRequestError('Invalid project ID');
     }
     
-    const result = await this.projectService.updateStatus(projectId, status, note, {
-      userId,
-      throwIfNotFound: true
+    // Extract status update data
+    const { status, note }: ProjectStatusUpdateDTO = req.body;
+    
+    if (!status) {
+      throw new BadRequestError('Status is required');
+    }
+    
+    // Update status with user context
+    const result = await this.service.updateStatus(projectId, status, note || null, {
+      userContext: req.user ? {
+        userId: req.user.id,
+        userName: req.user.name,
+        userRole: req.user.role,
+        ipAddress: req.ip
+      } : undefined
     });
     
+    // Send success response
     ResponseFactory.success(res, result, 'Project status updated successfully');
   });
-  
+
   /**
    * Add a note to project
+   * @route POST /api/v1/projects/:id/notes
    */
   addProjectNote = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { id } = req.params;
-    const { note } = req.body;
     const projectId = Number(id);
-    const userId = req.user?.id;
     
     if (isNaN(projectId)) {
       throw new BadRequestError('Invalid project ID');
     }
     
-    const result = await this.projectService.addNote(projectId, note, {
-      userId
+    // Extract note text
+    const { note } = req.body;
+    
+    if (!note || typeof note !== 'string') {
+      throw new BadRequestError('Note text is required');
+    }
+    
+    // Add note with user context
+    const result = await this.service.addNote(projectId, note, {
+      userContext: req.user ? {
+        userId: req.user.id,
+        userName: req.user.name,
+        userRole: req.user.role,
+        ipAddress: req.ip
+      } : undefined
     });
     
+    // Send success response
     ResponseFactory.success(res, result, 'Note added successfully', 201);
   });
-  
+
+  /**
+   * Get project statistics
+   * @route GET /api/v1/projects/statistics
+   */
+  getProjectStatistics = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    // Extract filter parameters
+    const filters: Partial<ProjectFilterDTO> = {
+      status: req.query.status as string,
+      kunde_id: req.query.kunde_id ? Number(req.query.kunde_id) : undefined,
+      dienstleistung_id: req.query.dienstleistung_id ? Number(req.query.dienstleistung_id) : undefined,
+      start_datum_von: req.query.start_datum_von as string,
+      start_datum_bis: req.query.start_datum_bis as string
+    };
+    
+    // Get statistics from service
+    const statistics = await this.service.getStatistics(filters);
+    
+    // Send success response
+    ResponseFactory.success(res, statistics, 'Project statistics retrieved successfully');
+  });
+
   /**
    * Export projects data
+   * @route GET /api/v1/projects/export
    */
   exportProjects = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    // Since the export service requires updates for Prisma compatibility,
-    // we'll return a not implemented response for now
+    // This would typically integrate with an export service
+    // For now, return a simple not implemented response
     res.status(501).json({ 
-      message: 'Export functionality is being migrated to TypeScript and Prisma' 
+      success: false,
+      error: 'Export functionality is not implemented yet'
     });
   });
 }
@@ -149,5 +247,8 @@ export const {
   updateProject,
   updateProjectStatus,
   addProjectNote,
+  getProjectStatistics,
   exportProjects
 } = projectController;
+
+export default projectController;

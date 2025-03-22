@@ -1,5 +1,5 @@
 import validator from 'validator';
-import { ValidationError } from './errors';
+import { ValidationError } from './errors.js';
 
 /**
  * Base validation options interface

@@ -1,7 +1,8 @@
 /**
  * Utility for extending validation types to support string literals
  */
-import { ValidationRule as BaseValidationRule, ValidationSchema as BaseValidationSchema } from './validators';
+import { ValidationRule as BaseValidationRule, ValidationSchema as BaseValidationSchema } from './validators.js';
+
 
 // Allow string literals for validation rule types
 export interface ValidationRule extends Omit<BaseValidationRule, 'type'> {
