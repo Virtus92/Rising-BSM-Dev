@@ -2,20 +2,17 @@
 import { Express } from 'express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
-import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readFileSync } from 'fs';
+import config from './index.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-
+// Use __dirname directly if available, or process.cwd() as fallback
 const PROJECT_ROOT = process.cwd();
 
 // Load package.json for API information
 let packageInfo;
 try {
-  const packagePath = join(__dirname, '../package.json');
+  const packagePath = join(PROJECT_ROOT, 'package.json');
   packageInfo = JSON.parse(readFileSync(packagePath, 'utf8'));
 } catch (error) {
   console.error('Could not load package.json, using defaults');
@@ -46,7 +43,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: '/',
+        url: `http://localhost:${config.PORT}${config.API_PREFIX}`,
         description: 'Development server',
       },
     ],
@@ -67,9 +64,14 @@ const swaggerOptions = {
         }
       }
     },
-    security: [],  // Default to no security required (specify in individual routes)
+    security: [{ bearerAuth: [] }],  // Default security requirement
   },
-  apis: [join(PROJECT_ROOT, 'swagger-definitions.ts')]
+  apis: [
+    join(PROJECT_ROOT, 'backend/routes/**/*.ts'),
+    join(PROJECT_ROOT, 'backend/controllers/**/*.ts'),
+    join(PROJECT_ROOT, 'backend/models/**/*.ts'),
+    join(PROJECT_ROOT, 'swagger-definitions.ts')
+  ]
 };
 
 // Add route documentation for authentication
