@@ -508,7 +508,7 @@
  *           type: number
  *           format: float
  *           description: Unit price
- *
+ *         
  *     PaginationResult:
  *       type: object
  *       properties:
@@ -2560,7 +2560,7 @@
  *             application/json:
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
- *
+ * 
  *   /api/v1/services/{id}/status:
  *     patch:
  *       tags: [Services]
@@ -2683,7 +2683,7 @@
  *             application/json:
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
- *
+ * 
  *   # Request endpoints
  *   /api/v1/requests:
  *     get:
@@ -2775,7 +2775,7 @@
  *             application/json:
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
- *
+ * 
  *   /api/v1/requests/{id}:
  *     get:
  *       tags: [Requests]
@@ -2897,8 +2897,8 @@
  *             application/json:
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
- *
- *
+ * 
+ * 
  *   /api/v1/requests/{id}/notes:
  *     post:
  *       tags: [Requests]
@@ -3350,7 +3350,7 @@
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
  *
- *
+ * 
  *   /api/v1/dashboard/data:
  *     get:
  *       tags: [Dashboard]
@@ -3516,6 +3516,7 @@
  *                         type:
  *                           type: string
  *                         url:
+ *                           type: string
  *                   requests:
  *                     type: array
  *                     items:
@@ -3534,6 +3535,7 @@
  *                         type:
  *                           type: string
  *                         url:
+ *                           type: string
  *                   services:
  *                     type: array
  *                     items:
@@ -3552,6 +3554,7 @@
  *                         type:
  *                           type: string
  *                         url:
+ *                           type: string
  *         401:
  *           description: Unauthorized
  *           content:
@@ -3729,6 +3732,7 @@
  *                     type: boolean
  *                     example: true
  *                   message:
+ *                     type: string
  *         400:
  *           description: Validation error
  *           content:
@@ -3815,6 +3819,7 @@
  *                     type: boolean
  *                     example: true
  *                   message:
+ *                     type: string
  *         401:
  *           description: Unauthorized
  *           content:
@@ -3867,7 +3872,7 @@
  *                     items:
  *                       type: object
  *                       properties:
- *                         id:
+ *                         id: 
  *                           type: integer
  *                         dateiname:
  *                           type: string
@@ -3927,6 +3932,7 @@
  *                     type: boolean
  *                     example: true
  *                   message:
+ *                     type: string
  *         400:
  *           description: Validation error
  *           content:
@@ -3966,6 +3972,7 @@
  *                     type: boolean
  *                     example: true
  *                   message:
+ *                     type: string
  *                   status:
  *                     type: string
  *         401:
@@ -4028,6 +4035,7 @@
  *                     type: boolean
  *                     example: true
  *                   message:
+ *                     type: string
  *                   requestId:
  *                     type: integer
  *         400:
@@ -4048,7 +4056,7 @@
  *                     example: false
  *                   error:
  *                     type: string
- *
+ *   
  *   # Health check endpoint
  *   /health:
  *     get:
