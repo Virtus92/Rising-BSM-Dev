@@ -1,0 +1,26 @@
+{
+    "entryFile": "backend/server.ts",
+    "noImplicitAdditionalProperties": "throw-on-extras",
+    "controllerPathGlobs": ["backend/controllers/**/*.ts"],
+    "spec": {
+        "outputDirectory": "backend/generated",
+        "specVersion": 3,
+        "securityDefinitions": {
+        "jwt": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT"
+        }
+        }
+    },
+    "routes": {
+        "routesDir": "backend/generated",
+        "middleware": "express"
+    },
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+        "@/*": ["backend/*"]
+        }
+    }
+}

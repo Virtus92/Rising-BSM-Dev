@@ -43,6 +43,7 @@
         "pdfkit": "^0.13.0",
         "pg": "^8.10.0",
         "swagger-jsdoc": "^6.2.8",
+        "tsoa": "^6.6.0",
         "validator": "^13.9.0"
     },
     "devDependencies": {

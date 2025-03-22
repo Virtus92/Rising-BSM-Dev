@@ -27,6 +27,10 @@ services:
     container_name: rising-bsm-api
     env_file:
       - ./.env
+    environment:
+      - SWAGGER_ENABLED=true
+      - SWAGGER_HOST=api.example.com
+      - NODE_ENV=development  # Set to 'production' for production
     ports:
       - "5000:5000"
     depends_on:
@@ -38,7 +42,7 @@ services:
     networks:
       - rising-bsm-network
     command: >
-      sh -c "npx prisma generate && npm run dev"
+      sh -c "./docker-entrypoint.sh && npx prisma generate && npm run dev"
   
   # Frontend service 
   frontend:

@@ -1,208 +1,132 @@
-// In config/swagger.ts
-import { Express } from 'express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
-import { dirname, join } from 'path';
-import { readFileSync } from 'fs';
-import config from './index.js';
+import { Request, Response, Application } from 'express';
+import config from './swagger.config.js';
 
-// Use __dirname directly if available, or process.cwd() as fallback
-const PROJECT_ROOT = process.cwd();
+// Check if Swagger is enabled
+const isSwaggerEnabled = process.env.SWAGGER_ENABLED === 'true';
 
-// Load package.json for API information
-let packageInfo;
-try {
-  const packagePath = join(PROJECT_ROOT, 'package.json');
-  packageInfo = JSON.parse(readFileSync(packagePath, 'utf8'));
-} catch (error) {
-  console.error('Could not load package.json, using defaults');
-  packageInfo = {
-    name: 'Rising BSM API',
-    version: '1.0.0',
-    description: 'Business Service Management API'
+// Generate Swagger specification
+const swaggerSpec = swaggerJsdoc(config);
+
+// Setup Swagger middleware
+
+interface DevTokenResponse {
+  token: string;
+  instructions: string;
+}
+
+interface SwaggerOptions {
+  explorer: boolean;
+  customCss: string;
+  swaggerOptions: {
+    persistAuthorization: boolean;
   };
 }
 
-// Enhanced Swagger options
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: packageInfo.name,
-      version: packageInfo.version,
-      description: packageInfo.description,
-      license: {
-        name: 'MIT',
-        url: 'https://opensource.org/licenses/MIT',
-      },
-      contact: {
-        name: 'Rising BSM API Support',
-        url: 'https://www.risingbsm.com',
-        email: 'support@risingbsm.com',
-      },
-    },
-    servers: [
-      {
-        url: `http://localhost:${config.PORT}${config.API_PREFIX}`,
-        description: 'Development server',
-      },
-    ],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-        },
-      },
-      examples: {
-        UserLogin: {
-          value: {
-            email: "admin@example.com",
-            password: "Password123!"
-          }
-        }
-      }
-    },
-    security: [{ bearerAuth: [] }],  // Default security requirement
-  },
-  apis: [
-    join(PROJECT_ROOT, 'backend/routes/**/*.ts'),
-    join(PROJECT_ROOT, 'backend/controllers/**/*.ts'),
-    join(PROJECT_ROOT, 'backend/models/**/*.ts'),
-    join(PROJECT_ROOT, 'swagger-definitions.ts')
-  ]
-};
-
-// Add route documentation for authentication
-const authRoutesSpec = {
-  paths: {
-    '/api/v1/auth/login': {
-      post: {
-        tags: ['Authentication'],
-        summary: 'Login to get access token',
-        description: 'Authenticates user and returns JWT tokens',
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['email', 'password'],
-                properties: {
-                  email: {
-                    type: 'string',
-                    format: 'email'
-                  },
-                  password: {
-                    type: 'string',
-                    format: 'password'
-                  },
-                  remember: {
-                    type: 'boolean'
-                  }
-                }
-              },
-              example: {
-                email: "admin@example.com",
-                password: "Password123!",
-                remember: true
-              }
-            }
-          }
-        },
-        responses: {
-          '200': {
-            description: 'Successful authentication',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: {
-                      type: 'boolean',
-                      example: true
-                    },
-                    accessToken: {
-                      type: 'string'
-                    },
-                    refreshToken: {
-                      type: 'string'
-                    },
-                    expiresIn: {
-                      type: 'number'
-                    },
-                    user: {
-                      type: 'object',
-                      properties: {
-                        id: { type: 'number' },
-                        name: { type: 'string' },
-                        email: { type: 'string' },
-                        role: { type: 'string' }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          '401': {
-            description: 'Authentication failed',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: {
-                      type: 'boolean',
-                      example: false
-                    },
-                    error: {
-                      type: 'string',
-                      example: 'Invalid email or password'
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+export function setupSwagger(app: Application) {
+  // Skip setup if Swagger is disabled
+  if (!isSwaggerEnabled) {
+    console.log('⏭️ Swagger documentation disabled');
+    return;
   }
-};
 
-
-/**
- * Configure Swagger documentation
- * @param app Express application
- */
-export const setupSwagger = (app: Express): void => {
-  // Generate swagger specification
-  const swaggerSpec = swaggerJsdoc(swaggerOptions) as any;
-  
-  swaggerSpec.paths = {
-    ...swaggerSpec.paths,
-    ...authRoutesSpec.paths
-  };
-  
-  // Configure and set up Swagger UI
-  const swaggerUiOptions = {
+  // Serve Swagger UI
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     explorer: true,
+    customCss: '.swagger-ui .topbar { display: none }',
     swaggerOptions: {
       persistAuthorization: true,
     }
-  };
-
-  app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerSpec, swaggerUiOptions) as any);
-
-  // Serve Swagger spec as JSON
-  app.get('/api-docs.json', (req, res) => {
+  } as SwaggerOptions));
+  
+  // Serve Swagger specification
+  app.get('/swagger.json', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
   });
-
-  console.log(`📚 API Documentation available at /api-docs`);
-};
+  
+  // Development token endpoint
+  if (process.env.NODE_ENV !== 'production') {
+    app.get('/api-docs/dev-token', (req: Request, res: Response) => {
+      const jwt = require('jsonwebtoken');
+      const token: string = jwt.sign(
+        { userId: 1, role: 'admin', name: 'Developer' },
+        process.env.JWT_SECRET || 'dev-secret',
+        { expiresIn: '1h' }
+      );
+      
+      res.json({
+        token,
+        instructions: 'Click the Authorize button and enter this token with the "Bearer " prefix'
+      } as DevTokenResponse);
+    });
+    
+    // Add authentication helper to Swagger UI
+    const authHelper: string = `
+      <script>
+        window.onload = function() {
+          // Add helper button after some delay to ensure Swagger UI is loaded
+          setTimeout(function() {
+            // Create dev token button
+            var authBtn = document.createElement('button');
+            authBtn.innerHTML = 'Get Dev Token';
+            authBtn.className = 'btn authorize';
+            authBtn.style.marginLeft = '10px';
+            authBtn.onclick = function() {
+              fetch('/api-docs/dev-token')
+                .then(response => response.json())
+                .then(data => {
+                  // Copy to clipboard
+                  navigator.clipboard.writeText('Bearer ' + data.token)
+                    .then(() => {
+                      alert('Token copied to clipboard! Click "Authorize" and paste it.');
+                    });
+                });
+            };
+            
+            // Find the authorize button container and add our button
+            var authorizeBtn = document.querySelector('.swagger-ui .auth-wrapper .authorize');
+            if (authorizeBtn && authorizeBtn.parentNode) {
+              authorizeBtn.parentNode.appendChild(authBtn);
+            }
+          }, 1000);
+        }
+      </script>
+    `;
+    
+    // Inject the script into Swagger UI
+    const originalSetup = swaggerUi.setup;
+    swaggerUi.setup = (
+      spec?: any,
+      opts?: any,
+      options?: any,
+      customCss?: any,
+      customfavIcon?: any,
+      swaggerUrl?: any,
+      customSiteTitle?: any
+    ) => {
+      const originalResult = originalSetup(spec, opts, options, customCss, customfavIcon, swaggerUrl, customSiteTitle);
+      
+      return (req: Request, res: Response, next: any) => {
+        if (typeof originalResult === 'function') {
+          originalResult(req, res, next);
+        }
+        
+        // Add our script to the response
+        const originalSend = res.send;
+        res.send = function(body?: any): Response {
+          let modifiedBody: string = body;
+          if (body && typeof body === 'string' && body.includes('</body>')) {
+            modifiedBody = body.replace('</body>', authHelper + '</body>');
+          }
+          return originalSend.call(this, modifiedBody);
+        };
+      };
+    };
+  }
+  
+  console.log(`✅ Swagger documentation available at /api-docs (Host: ${process.env.SWAGGER_HOST || 'localhost:5000'})`);
+}
 
 export default setupSwagger;

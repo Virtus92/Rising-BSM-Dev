@@ -12,6 +12,9 @@
         "db:init": "psql -h localhost -U rising_user -d rising_bsm -f db-init.sql",
         "test": "jest",
         "test:coverage": "jest --coverage",
+        "swagger:generate": "tsoa spec-and-routes",
+        "prebuild": "npm run swagger:generate",
+        "predev": "npm run swagger:generate",
         "build-js": "uglifyjs public/scripts/scripts.js -o public/scripts/scripts.min.js"
     },
     "keywords": [
@@ -50,8 +53,7 @@
         "pdfkit": "^0.16.0",
         "pg": "^8.13.3",
         "slugify": "^1.6.6",
-        "swagger-jsdoc": "^6.2.8",
-        "swagger-ui-express": "^5.0.1",
+        "tsoa": "^6.6.0",
         "validator": "^13.12.0",
         "zxcvbn": "^4.4.2"
     },
