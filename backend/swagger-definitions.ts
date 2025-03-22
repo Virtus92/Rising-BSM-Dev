@@ -2,35 +2,110 @@
  * @swagger
  * components:
  *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - name
+ *         - email
+ *         - password
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: User ID (auto-generated)
+ *         name:
+ *           type: string
+ *           description: Full name of the user
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: Email address (must be unique)
+ *         password:
+ *           type: string
+ *           format: password
+ *           description: Password (min 8 characters, stored encrypted)
+ *         role:
+ *           type: string
+ *           enum: [admin, manager, employee]
+ *           default: employee
+ *           description: User role determining access permissions
+ *         phone:
+ *           type: string
+ *           description: Phone number
+ *         status:
+ *           type: string
+ *           enum: [active, inactive, blocked]
+ *           default: active
+ *           description: User account status
+ *         profilePicture:
+ *           type: string
+ *           description: Path to profile picture
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of user creation
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of last update
+ *
+ *     UserSettings:
+ *       type: object
+ *       properties:
+ *         language:
+ *           type: string
+ *           enum: [de, en]
+ *           default: en
+ *           description: User interface language preference
+ *         darkMode:
+ *           type: boolean
+ *           default: false
+ *           description: Dark mode enabled/disabled
+ *         emailNotifications:
+ *           type: boolean
+ *           default: true
+ *           description: Email notifications enabled/disabled
+ *         pushNotifications:
+ *           type: boolean
+ *           default: false
+ *           description: Push notifications enabled/disabled
+ *         notificationInterval:
+ *           type: string
+ *           enum: [immediate, daily, weekly]
+ *           default: immediate
+ *           description: Notification delivery interval
+ *
  *     Customer:
  *       type: object
  *       required:
  *         - name
  *         - email
  *       properties:
+ *         id:
+ *           type: integer
+ *           description: Customer ID (auto-generated)
  *         name:
  *           type: string
  *           description: Customer name
- *         firma:
+ *         company:
  *           type: string
  *           description: Company name
  *         email:
  *           type: string
  *           format: email
  *           description: Customer email address
- *         telefon:
+ *         phone:
  *           type: string
  *           description: Phone number
- *         adresse:
+ *         address:
  *           type: string
  *           description: Street address
- *         plz:
+ *         postalCode:
  *           type: string
  *           description: Postal code
- *         ort:
+ *         city:
  *           type: string
  *           description: City
- *         notizen:
+ *         notes:
  *           type: string
  *           description: Notes about the customer
  *         newsletter:
@@ -38,120 +113,442 @@
  *           description: Newsletter subscription status
  *         status:
  *           type: string
- *           enum: [aktiv, inaktiv, geloescht]
- *           default: aktiv
+ *           enum: [active, inactive, deleted]
+ *           default: active
  *           description: Customer status
- *         kundentyp:
+ *         type:
  *           type: string
- *           enum: [privat, geschaeft]
- *           default: privat
+ *           enum: [private, business]
+ *           default: private
  *           description: Customer type
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of customer creation
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of last update
  *
  *     Project:
  *       type: object
  *       required:
- *         - titel
- *         - start_datum
+ *         - title
+ *         - startDate
  *       properties:
- *         titel:
+ *         id:
+ *           type: integer
+ *           description: Project ID (auto-generated)
+ *         title:
  *           type: string
  *           description: Project title
- *         kunde_id:
+ *         customerId:
  *           type: integer
  *           description: ID of the associated customer
- *         dienstleistung_id:
+ *         serviceId:
  *           type: integer
  *           description: ID of the associated service
- *         start_datum:
+ *         startDate:
  *           type: string
  *           format: date
  *           description: Project start date (YYYY-MM-DD)
- *         end_datum:
+ *         endDate:
  *           type: string
  *           format: date
  *           description: Project end date (YYYY-MM-DD)
- *         betrag:
+ *         amount:
  *           type: number
  *           format: float
  *           description: Project amount
- *         beschreibung:
+ *         description:
  *           type: string
  *           description: Project description
  *         status:
  *           type: string
- *           enum: [neu, in_bearbeitung, abgeschlossen, storniert]
- *           default: neu
+ *           enum: [new, in_progress, completed, canceled]
+ *           default: new
  *           description: Project status
+ *         createdBy:
+ *           type: integer
+ *           description: ID of the user who created the project
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of project creation
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of last update
+ *
+ *     ProjectNote:
+ *       type: object
+ *       required:
+ *         - projectId
+ *         - text
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: Note ID (auto-generated)
+ *         projectId:
+ *           type: integer
+ *           description: ID of the associated project
+ *         userId:
+ *           type: integer
+ *           description: ID of the user who created the note
+ *         userName:
+ *           type: string
+ *           description: Name of the user who created the note
+ *         text:
+ *           type: string
+ *           description: Note content
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of note creation
  *
  *     Appointment:
  *       type: object
  *       required:
- *         - titel
- *         - termin_datum
- *         - termin_zeit
+ *         - title
+ *         - appointmentDate
  *       properties:
- *         titel:
+ *         id:
+ *           type: integer
+ *           description: Appointment ID (auto-generated)
+ *         title:
  *           type: string
  *           description: Appointment title
- *         kunde_id:
+ *         customerId:
  *           type: integer
  *           description: ID of the associated customer
- *         projekt_id:
+ *         projectId:
  *           type: integer
  *           description: ID of the associated project
- *         termin_datum:
+ *         appointmentDate:
  *           type: string
- *           format: date
- *           description: Appointment date (YYYY-MM-DD)
- *         termin_zeit:
- *           type: string
- *           pattern: "^([01]\\d|2[0-3]):([0-5]\\d)$"
- *           description: Appointment time (HH:MM) in 24h format
- *         dauer:
+ *           format: date-time
+ *           description: Appointment date and time
+ *         duration:
  *           type: integer
  *           default: 60
  *           description: Duration in minutes
- *         ort:
+ *         location:
  *           type: string
  *           description: Appointment location
- *         beschreibung:
+ *         description:
  *           type: string
  *           description: Appointment description
  *         status:
  *           type: string
- *           enum: [geplant, bestaetigt, abgeschlossen, storniert]
- *           default: geplant
+ *           enum: [planned, confirmed, completed, canceled]
+ *           default: planned
  *           description: Appointment status
+ *         createdBy:
+ *           type: integer
+ *           description: ID of the user who created the appointment
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of appointment creation
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of last update
+ *
+ *     AppointmentNote:
+ *       type: object
+ *       required:
+ *         - appointmentId
+ *         - text
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: Note ID (auto-generated)
+ *         appointmentId:
+ *           type: integer
+ *           description: ID of the associated appointment
+ *         userId:
+ *           type: integer
+ *           description: ID of the user who created the note
+ *         userName:
+ *           type: string
+ *           description: Name of the user who created the note
+ *         text:
+ *           type: string
+ *           description: Note content
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of note creation
  *
  *     Service:
  *       type: object
  *       required:
  *         - name
- *         - preis_basis
- *         - einheit
+ *         - priceBase
+ *         - unit
  *       properties:
+ *         id:
+ *           type: integer
+ *           description: Service ID (auto-generated)
  *         name:
  *           type: string
  *           description: Service name
- *         beschreibung:
+ *         description:
  *           type: string
  *           description: Service description
- *         preis_basis:
+ *         priceBase:
  *           type: number
  *           format: float
  *           description: Base price
- *         einheit:
+ *         unit:
  *           type: string
  *           description: Unit (e.g., hour, piece)
- *         mwst_satz:
+ *         vatRate:
  *           type: number
  *           format: float
  *           default: 20
  *           description: VAT rate in percentage
- *         aktiv:
+ *         active:
  *           type: boolean
  *           default: true
  *           description: Service status
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of service creation
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of last update
+ *
+ *     ContactRequest:
+ *       type: object
+ *       required:
+ *         - name
+ *         - email
+ *         - service
+ *         - message
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: Request ID (auto-generated)
+ *         name:
+ *           type: string
+ *           description: Contact name
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: Contact email
+ *         phone:
+ *           type: string
+ *           description: Contact phone number
+ *         service:
+ *           type: string
+ *           enum: [facility, moving, winter, other]
+ *           description: Requested service type
+ *         message:
+ *           type: string
+ *           description: Request message
+ *         status:
+ *           type: string
+ *           enum: [new, in_progress, answered, closed]
+ *           default: new
+ *           description: Request status
+ *         processorId:
+ *           type: integer
+ *           description: ID of the user processing the request
+ *         ipAddress:
+ *           type: string
+ *           description: IP address of submitter
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of request creation
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of last update
+ *
+ *     RequestNote:
+ *       type: object
+ *       required:
+ *         - requestId
+ *         - text
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: Note ID (auto-generated)
+ *         requestId:
+ *           type: integer
+ *           description: ID of the associated request
+ *         userId:
+ *           type: integer
+ *           description: ID of the user who created the note
+ *         userName:
+ *           type: string
+ *           description: Name of the user who created the note
+ *         text:
+ *           type: string
+ *           description: Note content
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of note creation
+ *
+ *     Notification:
+ *       type: object
+ *       required:
+ *         - type
+ *         - title
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: Notification ID (auto-generated)
+ *         userId:
+ *           type: integer
+ *           description: ID of the user receiving the notification
+ *         type:
+ *           type: string
+ *           enum: [request, appointment, project, warning, system]
+ *           description: Notification type
+ *         title:
+ *           type: string
+ *           description: Notification title
+ *         message:
+ *           type: string
+ *           description: Notification message
+ *         referenceId:
+ *           type: integer
+ *           description: ID of the referenced entity
+ *         referenceType:
+ *           type: string
+ *           description: Type of the referenced entity
+ *         read:
+ *           type: boolean
+ *           default: false
+ *           description: Whether the notification has been read
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of notification creation
+ *
+ *     Invoice:
+ *       type: object
+ *       required:
+ *         - invoiceNumber
+ *         - customerId
+ *         - amount
+ *         - invoiceDate
+ *         - dueDate
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: Invoice ID (auto-generated)
+ *         invoiceNumber:
+ *           type: string
+ *           description: Invoice number
+ *         projectId:
+ *           type: integer
+ *           description: Associated project ID
+ *         customerId:
+ *           type: integer
+ *           description: Customer ID
+ *         amount:
+ *           type: number
+ *           format: float
+ *           description: Net amount
+ *         vatAmount:
+ *           type: number
+ *           format: float
+ *           description: VAT amount
+ *         totalAmount:
+ *           type: number
+ *           format: float
+ *           description: Total amount including VAT
+ *         invoiceDate:
+ *           type: string
+ *           format: date
+ *           description: Invoice date
+ *         dueDate:
+ *           type: string
+ *           format: date
+ *           description: Due date
+ *         paidAt:
+ *           type: string
+ *           format: date-time
+ *           description: Payment date
+ *         status:
+ *           type: string
+ *           enum: [draft, sent, paid, overdue, canceled]
+ *           default: draft
+ *           description: Invoice status
+ *
+ *     InvoicePosition:
+ *       type: object
+ *       required:
+ *         - invoiceId
+ *         - serviceId
+ *         - quantity
+ *         - unitPrice
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: Position ID (auto-generated)
+ *         invoiceId:
+ *           type: integer
+ *           description: Associated invoice ID
+ *         serviceId:
+ *           type: integer
+ *           description: Service ID
+ *         quantity:
+ *           type: integer
+ *           description: Quantity
+ *         unitPrice:
+ *           type: number
+ *           format: float
+ *           description: Unit price
+ *
+ *     PaginationResult:
+ *       type: object
+ *       properties:
+ *         current:
+ *           type: integer
+ *           description: Current page number
+ *         limit:
+ *           type: integer
+ *           description: Items per page
+ *         total:
+ *           type: integer
+ *           description: Total number of pages
+ *         totalRecords:
+ *           type: integer
+ *           description: Total number of records
+ *
+ *     MetaData:
+ *       type: object
+ *       properties:
+ *         pagination:
+ *           $ref: '#/components/schemas/PaginationResult'
+ *         timestamp:
+ *           type: string
+ *           format: date-time
+ *           description: Response timestamp
+ *
+ *     StandardResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           description: Whether the operation was successful
+ *         data:
+ *           type: object
+ *           description: Response data
+ *         message:
+ *           type: string
+ *           description: Response message
+ *         meta:
+ *           $ref: '#/components/schemas/MetaData'
  *
  *     ErrorResponse:
  *       type: object
@@ -161,23 +558,31 @@
  *           example: false
  *         error:
  *           type: string
+ *           description: Error message
  *         statusCode:
  *           type: integer
+ *           description: HTTP status code
  *         errors:
  *           type: array
  *           items:
  *             type: string
+ *           description: List of specific error messages
+ *         details:
+ *           type: object
+ *           description: Additional error details
  *
- *     SuccessResponse:
+ *     Tokens:
  *       type: object
  *       properties:
- *         success:
- *           type: boolean
- *           example: true
- *         message:
+ *         accessToken:
  *           type: string
- *         data:
- *           type: object
+ *           description: JWT access token
+ *         refreshToken:
+ *           type: string
+ *           description: JWT refresh token
+ *         expiresIn:
+ *           type: integer
+ *           description: Token expiration time in seconds
  *
  *   securitySchemes:
  *     bearerAuth:
@@ -192,6 +597,7 @@
  *       tags: [Authentication]
  *       summary: Login user
  *       description: Authenticate user and get access token
+ *       operationId: login
  *       requestBody:
  *         required: true
  *         content:
@@ -254,6 +660,7 @@
  *       tags: [Authentication]
  *       summary: Refresh access token
  *       description: Get new access token using refresh token
+ *       operationId: refreshToken
  *       requestBody:
  *         required: true
  *         content:
@@ -294,6 +701,7 @@
  *       tags: [Authentication]
  *       summary: Request password reset
  *       description: Send email with password reset link
+ *       operationId: forgotPassword
  *       requestBody:
  *         required: true
  *         content:
@@ -325,12 +733,14 @@
  *       tags: [Authentication]
  *       summary: Validate reset token
  *       description: Check if reset token is valid
+ *       operationId: validateResetToken
  *       parameters:
  *         - in: path
  *           name: token
  *           required: true
  *           schema:
  *             type: string
+ *           description: Reset token
  *       responses:
  *         200:
  *           description: Token is valid
@@ -358,12 +768,14 @@
  *       tags: [Authentication]
  *       summary: Reset password
  *       description: Set new password using reset token
+ *       operationId: resetPassword
  *       parameters:
  *         - in: path
  *           name: token
  *           required: true
  *           schema:
  *             type: string
+ *           description: Reset token
  *       requestBody:
  *         required: true
  *         content:
@@ -377,6 +789,7 @@
  *                 password:
  *                   type: string
  *                   format: password
+ *                   minLength: 8
  *                 confirmPassword:
  *                   type: string
  *                   format: password
@@ -405,6 +818,7 @@
  *       tags: [Authentication]
  *       summary: Logout user
  *       description: Invalidate refresh token
+ *       operationId: logout
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -436,6 +850,7 @@
  *       tags: [Customers]
  *       summary: Get all customers
  *       description: Retrieve list of customers with optional filtering
+ *       operationId: getAllCustomers
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -443,13 +858,13 @@
  *           name: status
  *           schema:
  *             type: string
- *             enum: [aktiv, inaktiv, geloescht]
+ *             enum: [active, inactive, deleted]
  *           description: Filter by status
  *         - in: query
  *           name: type
  *           schema:
  *             type: string
- *             enum: [privat, geschaeft]
+ *             enum: [private, business]
  *           description: Filter by customer type
  *         - in: query
  *           name: search
@@ -482,20 +897,18 @@
  *                   customers:
  *                     type: array
  *                     items:
- *                       type: object
+ *                       $ref: '#/components/schemas/Customer'
  *                   pagination:
- *                     type: object
- *                     properties:
- *                       current:
- *                         type: integer
- *                       limit:
- *                         type: integer
- *                       total:
- *                         type: integer
- *                       totalRecords:
- *                         type: integer
+ *                     $ref: '#/components/schemas/PaginationResult'
  *                   filters:
  *                     type: object
+ *                     properties:
+ *                       status:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                       search:
+ *                         type: string
  *         401:
  *           description: Unauthorized
  *           content:
@@ -506,6 +919,7 @@
  *       tags: [Customers]
  *       summary: Create new customer
  *       description: Add a new customer
+ *       operationId: createCustomer
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -513,7 +927,48 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Customer'
+ *               type: object
+ *               required:
+ *                 - name
+ *                 - email
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   minLength: 2
+ *                   description: Customer name
+ *                 company:
+ *                   type: string
+ *                   description: Company name
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                   description: Customer email address
+ *                 phone:
+ *                   type: string
+ *                   description: Phone number
+ *                 address:
+ *                   type: string
+ *                   description: Street address
+ *                 postalCode:
+ *                   type: string
+ *                   description: Postal code
+ *                 city:
+ *                   type: string
+ *                   description: City
+ *                 notes:
+ *                   type: string
+ *                   description: Notes about the customer
+ *                 newsletter:
+ *                   type: boolean
+ *                   description: Newsletter subscription status
+ *                 status:
+ *                   type: string
+ *                   enum: [active, inactive, deleted]
+ *                   description: Customer status
+ *                 type:
+ *                   type: string
+ *                   enum: [private, business]
+ *                   description: Customer type
  *       responses:
  *         201:
  *           description: Customer created
@@ -547,6 +1002,7 @@
  *       tags: [Customers]
  *       summary: Get customer by ID
  *       description: Retrieve detailed customer information
+ *       operationId: getCustomerById
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -568,15 +1024,41 @@
  *                     type: boolean
  *                     example: true
  *                   customer:
- *                     type: object
+ *                     $ref: '#/components/schemas/Customer'
  *                   appointments:
  *                     type: array
  *                     items:
  *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         title:
+ *                           type: string
+ *                         date:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                         statusLabel:
+ *                           type: string
+ *                         statusClass:
+ *                           type: string
  *                   projects:
  *                     type: array
  *                     items:
  *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         title:
+ *                           type: string
+ *                         date:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                         statusLabel:
+ *                           type: string
+ *                         statusClass:
+ *                           type: string
  *         404:
  *           description: Customer not found
  *           content:
@@ -593,6 +1075,7 @@
  *       tags: [Customers]
  *       summary: Update customer
  *       description: Update an existing customer
+ *       operationId: updateCustomer
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -607,7 +1090,48 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Customer'
+ *               type: object
+ *               required:
+ *                 - name
+ *                 - email
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   minLength: 2
+ *                   description: Customer name
+ *                 company:
+ *                   type: string
+ *                   description: Company name
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                   description: Customer email address
+ *                 phone:
+ *                   type: string
+ *                   description: Phone number
+ *                 address:
+ *                   type: string
+ *                   description: Street address
+ *                 postalCode:
+ *                   type: string
+ *                   description: Postal code
+ *                 city:
+ *                   type: string
+ *                   description: City
+ *                 notes:
+ *                   type: string
+ *                   description: Notes about the customer
+ *                 newsletter:
+ *                   type: boolean
+ *                   description: Newsletter subscription status
+ *                 status:
+ *                   type: string
+ *                   enum: [active, inactive, deleted]
+ *                   description: Customer status
+ *                 type:
+ *                   type: string
+ *                   enum: [private, business]
+ *                   description: Customer type
  *       responses:
  *         200:
  *           description: Customer updated
@@ -644,7 +1168,8 @@
  *     delete:
  *       tags: [Customers]
  *       summary: Delete customer
- *       description: Mark customer as deleted
+ *       description: Mark customer as deleted (soft delete)
+ *       operationId: deleteCustomer
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -691,6 +1216,7 @@
  *       tags: [Customers]
  *       summary: Add note to customer
  *       description: Add a note to a specific customer
+ *       operationId: addCustomerNote
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -707,10 +1233,12 @@
  *             schema:
  *               type: object
  *               required:
- *                 - notiz
+ *                 - note
  *               properties:
- *                 notiz:
+ *                 note:
  *                   type: string
+ *                   minLength: 1
+ *                   description: Note content
  *       responses:
  *         200:
  *           description: Note added
@@ -750,6 +1278,7 @@
  *       tags: [Customers]
  *       summary: Update customer status
  *       description: Change the status of a customer
+ *       operationId: updateCustomerStatus
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -767,7 +1296,8 @@
  *                   description: Customer ID
  *                 status:
  *                   type: string
- *                   enum: [aktiv, inaktiv, geloescht]
+ *                   enum: [active, inactive, deleted]
+ *                   description: New status value
  *       responses:
  *         200:
  *           description: Status updated
@@ -808,6 +1338,7 @@
  *       tags: [Projects]
  *       summary: Get all projects
  *       description: Retrieve list of projects with optional filtering
+ *       operationId: getAllProjects
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -815,10 +1346,10 @@
  *           name: status
  *           schema:
  *             type: string
- *             enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+ *             enum: [new, in_progress, completed, canceled]
  *           description: Filter by status
  *         - in: query
- *           name: kunde_id
+ *           name: customerId
  *           schema:
  *             type: integer
  *           description: Filter by customer ID
@@ -854,19 +1385,29 @@
  *                     type: array
  *                     items:
  *                       type: object
+ *                       allOf:
+ *                         - $ref: '#/components/schemas/Project'
+ *                         - type: object
+ *                           properties:
+ *                             customerName:
+ *                               type: string
+ *                             serviceName:
+ *                               type: string
+ *                             statusLabel:
+ *                               type: string
+ *                             statusClass:
+ *                               type: string
  *                   pagination:
- *                     type: object
- *                     properties:
- *                       current:
- *                         type: integer
- *                       limit:
- *                         type: integer
- *                       total:
- *                         type: integer
- *                       totalRecords:
- *                         type: integer
+ *                     $ref: '#/components/schemas/PaginationResult'
  *                   filters:
  *                     type: object
+ *                     properties:
+ *                       status:
+ *                         type: string
+ *                       customerId:
+ *                         type: integer
+ *                       search:
+ *                         type: string
  *         401:
  *           description: Unauthorized
  *           content:
@@ -877,6 +1418,7 @@
  *       tags: [Projects]
  *       summary: Create new project
  *       description: Add a new project
+ *       operationId: createProject
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -884,7 +1426,40 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Project'
+ *               type: object
+ *               required:
+ *                 - title
+ *                 - startDate
+ *               properties:
+ *                 title:
+ *                   type: string
+ *                   minLength: 2
+ *                   description: Project title
+ *                 customerId:
+ *                   type: integer
+ *                   description: ID of the associated customer
+ *                 serviceId:
+ *                   type: integer
+ *                   description: ID of the associated service
+ *                 startDate:
+ *                   type: string
+ *                   format: date
+ *                   description: Project start date (YYYY-MM-DD)
+ *                 endDate:
+ *                   type: string
+ *                   format: date
+ *                   description: Project end date (YYYY-MM-DD)
+ *                 amount:
+ *                   type: number
+ *                   format: float
+ *                   description: Project amount
+ *                 description:
+ *                   type: string
+ *                   description: Project description
+ *                 status:
+ *                   type: string
+ *                   enum: [new, in_progress, completed, canceled]
+ *                   description: Project status
  *       responses:
  *         201:
  *           description: Project created
@@ -918,6 +1493,7 @@
  *       tags: [Projects]
  *       summary: Get project by ID
  *       description: Retrieve detailed project information
+ *       operationId: getProjectById
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -940,14 +1516,37 @@
  *                     example: true
  *                   project:
  *                     type: object
+ *                     allOf:
+ *                       - $ref: '#/components/schemas/Project'
+ *                       - type: object
+ *                         properties:
+ *                           customerName:
+ *                             type: string
+ *                           serviceName:
+ *                             type: string
+ *                           statusLabel:
+ *                             type: string
+ *                           statusClass:
+ *                             type: string
  *                   appointments:
  *                     type: array
  *                     items:
  *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         title:
+ *                           type: string
+ *                         date:
+ *                           type: string
+ *                         statusLabel:
+ *                           type: string
+ *                         statusClass:
+ *                           type: string
  *                   notes:
  *                     type: array
  *                     items:
- *                       type: object
+ *                       $ref: '#/components/schemas/ProjectNote'
  *         404:
  *           description: Project not found
  *           content:
@@ -964,6 +1563,7 @@
  *       tags: [Projects]
  *       summary: Update project
  *       description: Update an existing project
+ *       operationId: updateProject
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -978,7 +1578,40 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Project'
+ *               type: object
+ *               required:
+ *                 - title
+ *                 - startDate
+ *               properties:
+ *                 title:
+ *                   type: string
+ *                   minLength: 2
+ *                   description: Project title
+ *                 customerId:
+ *                   type: integer
+ *                   description: ID of the associated customer
+ *                 serviceId:
+ *                   type: integer
+ *                   description: ID of the associated service
+ *                 startDate:
+ *                   type: string
+ *                   format: date
+ *                   description: Project start date (YYYY-MM-DD)
+ *                 endDate:
+ *                   type: string
+ *                   format: date
+ *                   description: Project end date (YYYY-MM-DD)
+ *                 amount:
+ *                   type: number
+ *                   format: float
+ *                   description: Project amount
+ *                 description:
+ *                   type: string
+ *                   description: Project description
+ *                 status:
+ *                   type: string
+ *                   enum: [new, in_progress, completed, canceled]
+ *                   description: Project status
  *       responses:
  *         200:
  *           description: Project updated
@@ -1018,6 +1651,7 @@
  *       tags: [Projects]
  *       summary: Update project status
  *       description: Change the status of a project
+ *       operationId: updateProjectStatus
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1038,7 +1672,8 @@
  *               properties:
  *                 status:
  *                   type: string
- *                   enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+ *                   enum: [new, in_progress, completed, canceled]
+ *                   description: Project status
  *                 note:
  *                   type: string
  *                   description: Optional note about status change
@@ -1081,6 +1716,7 @@
  *       tags: [Projects]
  *       summary: Add note to project
  *       description: Add a note to a specific project
+ *       operationId: addProjectNote
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1101,6 +1737,8 @@
  *               properties:
  *                 note:
  *                   type: string
+ *                   minLength: 1
+ *                   description: Note content
  *       responses:
  *         201:
  *           description: Note added
@@ -1139,7 +1777,10 @@
  *     get:
  *       tags: [Projects]
  *       summary: Export projects
- *       description: Export projects data in various formats
+ *       description: |
+ *         Export projects data in various formats.
+ *         Note: This functionality is currently being migrated to TypeScript and Prisma.
+ *       operationId: exportProjects
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1196,6 +1837,7 @@
  *       tags: [Appointments]
  *       summary: Get all appointments
  *       description: Retrieve list of appointments with optional filtering
+ *       operationId: getAllAppointments
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1203,7 +1845,7 @@
  *           name: status
  *           schema:
  *             type: string
- *             enum: [geplant, bestaetigt, abgeschlossen, storniert]
+ *             enum: [planned, confirmed, completed, canceled]
  *           description: Filter by status
  *         - in: query
  *           name: date
@@ -1243,19 +1885,33 @@
  *                     type: array
  *                     items:
  *                       type: object
+ *                       allOf:
+ *                         - $ref: '#/components/schemas/Appointment'
+ *                         - type: object
+ *                           properties:
+ *                             customerName:
+ *                               type: string
+ *                             projectTitle:
+ *                               type: string
+ *                             dateFormatted:
+ *                               type: string
+ *                             timeFormatted:
+ *                               type: string
+ *                             statusLabel:
+ *                               type: string
+ *                             statusClass:
+ *                               type: string
  *                   pagination:
- *                     type: object
- *                     properties:
- *                       current:
- *                         type: integer
- *                       limit:
- *                         type: integer
- *                       total:
- *                         type: integer
- *                       totalRecords:
- *                         type: integer
+ *                     $ref: '#/components/schemas/PaginationResult'
  *                   filters:
  *                     type: object
+ *                     properties:
+ *                       status:
+ *                         type: string
+ *                       date:
+ *                         type: string
+ *                       search:
+ *                         type: string
  *         401:
  *           description: Unauthorized
  *           content:
@@ -1266,6 +1922,7 @@
  *       tags: [Appointments]
  *       summary: Create new appointment
  *       description: Add a new appointment
+ *       operationId: createAppointment
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -1273,7 +1930,40 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Appointment'
+ *               type: object
+ *               required:
+ *                 - title
+ *                 - appointmentDate
+ *               properties:
+ *                 title:
+ *                   type: string
+ *                   minLength: 2
+ *                   description: Appointment title
+ *                 customerId:
+ *                   type: integer
+ *                   description: ID of the associated customer
+ *                 projectId:
+ *                   type: integer
+ *                   description: ID of the associated project
+ *                 appointmentDate:
+ *                   type: string
+ *                   format: date-time
+ *                   description: Appointment date and time
+ *                 duration:
+ *                   type: integer
+ *                   default: 60
+ *                   description: Duration in minutes
+ *                 location:
+ *                   type: string
+ *                   description: Appointment location
+ *                 description:
+ *                   type: string
+ *                   description: Appointment description
+ *                 status:
+ *                   type: string
+ *                   enum: [planned, confirmed, completed, canceled]
+ *                   default: planned
+ *                   description: Appointment status
  *       responses:
  *         201:
  *           description: Appointment created
@@ -1307,6 +1997,7 @@
  *       tags: [Appointments]
  *       summary: Get appointment by ID
  *       description: Retrieve detailed appointment information
+ *       operationId: getAppointmentById
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1329,10 +2020,26 @@
  *                     example: true
  *                   appointment:
  *                     type: object
+ *                     allOf:
+ *                       - $ref: '#/components/schemas/Appointment'
+ *                       - type: object
+ *                         properties:
+ *                           customerName:
+ *                             type: string
+ *                           projectTitle:
+ *                             type: string
+ *                           dateFormatted:
+ *                             type: string
+ *                           timeFormatted:
+ *                             type: string
+ *                           statusLabel:
+ *                             type: string
+ *                           statusClass:
+ *                             type: string
  *                   notes:
  *                     type: array
  *                     items:
- *                       type: object
+ *                       $ref: '#/components/schemas/AppointmentNote'
  *         404:
  *           description: Appointment not found
  *           content:
@@ -1349,6 +2056,7 @@
  *       tags: [Appointments]
  *       summary: Update appointment
  *       description: Update an existing appointment
+ *       operationId: updateAppointment
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1363,7 +2071,39 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Appointment'
+ *               type: object
+ *               required:
+ *                 - title
+ *                 - appointmentDate
+ *               properties:
+ *                 title:
+ *                   type: string
+ *                   minLength: 2
+ *                   description: Appointment title
+ *                 customerId:
+ *                   type: integer
+ *                   description: ID of the associated customer
+ *                 projectId:
+ *                   type: integer
+ *                   description: ID of the associated project
+ *                 appointmentDate:
+ *                   type: string
+ *                   format: date-time
+ *                   description: Appointment date and time
+ *                 duration:
+ *                   type: integer
+ *                   default: 60
+ *                   description: Duration in minutes
+ *                 location:
+ *                   type: string
+ *                   description: Appointment location
+ *                 description:
+ *                   type: string
+ *                   description: Appointment description
+ *                 status:
+ *                   type: string
+ *                   enum: [planned, confirmed, completed, canceled]
+ *                   description: Appointment status
  *       responses:
  *         200:
  *           description: Appointment updated
@@ -1401,6 +2141,7 @@
  *       tags: [Appointments]
  *       summary: Delete appointment
  *       description: Delete an existing appointment
+ *       operationId: deleteAppointment
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1443,6 +2184,7 @@
  *       tags: [Appointments]
  *       summary: Update appointment status
  *       description: Change the status of an appointment
+ *       operationId: updateAppointmentStatus
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1463,7 +2205,8 @@
  *               properties:
  *                 status:
  *                   type: string
- *                   enum: [geplant, bestaetigt, abgeschlossen, storniert]
+ *                   enum: [planned, confirmed, completed, canceled]
+ *                   description: Appointment status
  *                 note:
  *                   type: string
  *                   description: Optional note about status change
@@ -1506,6 +2249,7 @@
  *       tags: [Appointments]
  *       summary: Add note to appointment
  *       description: Add a note to a specific appointment
+ *       operationId: addAppointmentNote
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1526,6 +2270,8 @@
  *               properties:
  *                 note:
  *                   type: string
+ *                   minLength: 1
+ *                   description: Note content
  *       responses:
  *         201:
  *           description: Note added
@@ -1566,6 +2312,7 @@
  *       tags: [Services]
  *       summary: Get all services
  *       description: Retrieve list of services with optional filtering
+ *       operationId: getAllServices
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1573,7 +2320,7 @@
  *           name: status
  *           schema:
  *             type: string
- *             enum: [aktiv, inaktiv]
+ *             enum: [active, inactive]
  *           description: Filter by status
  *         - in: query
  *           name: search
@@ -1606,20 +2353,16 @@
  *                   services:
  *                     type: array
  *                     items:
- *                       type: object
+ *                       $ref: '#/components/schemas/Service'
  *                   pagination:
- *                     type: object
- *                     properties:
- *                       current:
- *                         type: integer
- *                       limit:
- *                         type: integer
- *                       total:
- *                         type: integer
- *                       totalRecords:
- *                         type: integer
+ *                     $ref: '#/components/schemas/PaginationResult'
  *                   filters:
  *                     type: object
+ *                     properties:
+ *                       status:
+ *                         type: string
+ *                       search:
+ *                         type: string
  *         401:
  *           description: Unauthorized
  *           content:
@@ -1630,6 +2373,7 @@
  *       tags: [Services]
  *       summary: Create new service
  *       description: Add a new service
+ *       operationId: createService
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -1637,7 +2381,36 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Service'
+ *               type: object
+ *               required:
+ *                 - name
+ *                 - priceBase
+ *                 - unit
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   minLength: 2
+ *                   description: Service name
+ *                 description:
+ *                   type: string
+ *                   description: Service description
+ *                 priceBase:
+ *                   type: number
+ *                   format: float
+ *                   minimum: 0
+ *                   description: Base price
+ *                 unit:
+ *                   type: string
+ *                   description: Unit (e.g., hour, piece)
+ *                 vatRate:
+ *                   type: number
+ *                   format: float
+ *                   default: 20
+ *                   description: VAT rate in percentage
+ *                 active:
+ *                   type: boolean
+ *                   default: true
+ *                   description: Service status
  *       responses:
  *         201:
  *           description: Service created
@@ -1671,6 +2444,7 @@
  *       tags: [Services]
  *       summary: Get service by ID
  *       description: Retrieve detailed service information
+ *       operationId: getServiceById
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1692,7 +2466,7 @@
  *                     type: boolean
  *                     example: true
  *                   service:
- *                     type: object
+ *                     $ref: '#/components/schemas/Service'
  *         404:
  *           description: Service not found
  *           content:
@@ -1709,6 +2483,7 @@
  *       tags: [Services]
  *       summary: Update service
  *       description: Update an existing service
+ *       operationId: updateService
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1723,7 +2498,35 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Service'
+ *               type: object
+ *               required:
+ *                 - name
+ *                 - priceBase
+ *                 - unit
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   minLength: 2
+ *                   description: Service name
+ *                 description:
+ *                   type: string
+ *                   description: Service description
+ *                 priceBase:
+ *                   type: number
+ *                   format: float
+ *                   minimum: 0
+ *                   description: Base price
+ *                 unit:
+ *                   type: string
+ *                   description: Unit (e.g., hour, piece)
+ *                 vatRate:
+ *                   type: number
+ *                   format: float
+ *                   default: 20
+ *                   description: VAT rate in percentage
+ *                 active:
+ *                   type: boolean
+ *                   description: Service status
  *       responses:
  *         200:
  *           description: Service updated
@@ -1757,12 +2560,13 @@
  *             application/json:
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
- * 
+ *
  *   /api/v1/services/{id}/status:
  *     patch:
  *       tags: [Services]
  *       summary: Toggle service status
  *       description: Change service active/inactive status
+ *       operationId: toggleServiceStatus
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1779,10 +2583,11 @@
  *             schema:
  *               type: object
  *               required:
- *                 - aktiv
+ *                 - active
  *               properties:
- *                 aktiv:
+ *                 active:
  *                   type: boolean
+ *                   description: Active status
  *       responses:
  *         200:
  *           description: Status updated
@@ -1816,6 +2621,7 @@
  *       tags: [Services]
  *       summary: Get service statistics
  *       description: Retrieve usage statistics for a service
+ *       operationId: getServiceStatistics
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1838,6 +2644,33 @@
  *                     example: true
  *                   statistics:
  *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                       totalRevenue:
+ *                         type: number
+ *                       invoiceCount:
+ *                         type: integer
+ *                       monthlyRevenue:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             month:
+ *                               type: string
+ *                             revenue:
+ *                               type: number
+ *                       topCustomers:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             customerId:
+ *                               type: integer
+ *                             customerName:
+ *                               type: string
+ *                             revenue:
+ *                               type: number
  *         404:
  *           description: Service not found
  *           content:
@@ -1850,13 +2683,14 @@
  *             application/json:
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
- * 
+ *
  *   # Request endpoints
  *   /api/v1/requests:
  *     get:
  *       tags: [Requests]
  *       summary: Get all contact requests
  *       description: Retrieve list of contact requests with optional filtering
+ *       operationId: getAllRequests
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1864,12 +2698,13 @@
  *           name: status
  *           schema:
  *             type: string
- *             enum: [neu, in_bearbeitung, beantwortet, geschlossen]
+ *             enum: [new, in_progress, answered, closed]
  *           description: Filter by status
  *         - in: query
  *           name: service
  *           schema:
  *             type: string
+ *             enum: [facility, moving, winter, other]
  *           description: Filter by service type
  *         - in: query
  *           name: date
@@ -1909,31 +2744,44 @@
  *                     type: array
  *                     items:
  *                       type: object
+ *                       allOf:
+ *                         - $ref: '#/components/schemas/ContactRequest'
+ *                         - type: object
+ *                           properties:
+ *                             serviceLabel:
+ *                               type: string
+ *                             formattedDate:
+ *                               type: string
+ *                             statusLabel:
+ *                               type: string
+ *                             statusClass:
+ *                               type: string
  *                   pagination:
- *                     type: object
- *                     properties:
- *                       current:
- *                         type: integer
- *                       limit:
- *                         type: integer
- *                       total:
- *                         type: integer
- *                       totalRecords:
- *                         type: integer
+ *                     $ref: '#/components/schemas/PaginationResult'
  *                   filters:
  *                     type: object
+ *                     properties:
+ *                       status:
+ *                         type: string
+ *                       service:
+ *                         type: string
+ *                       date:
+ *                         type: string
+ *                       search:
+ *                         type: string
  *         401:
  *           description: Unauthorized
  *           content:
  *             application/json:
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
- * 
+ *
  *   /api/v1/requests/{id}:
  *     get:
  *       tags: [Requests]
  *       summary: Get contact request by ID
  *       description: Retrieve detailed contact request information
+ *       operationId: getRequestById
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1956,10 +2804,22 @@
  *                     example: true
  *                   request:
  *                     type: object
+ *                     allOf:
+ *                       - $ref: '#/components/schemas/ContactRequest'
+ *                       - type: object
+ *                         properties:
+ *                           serviceLabel:
+ *                             type: string
+ *                           formattedDate:
+ *                             type: string
+ *                           statusLabel:
+ *                             type: string
+ *                           statusClass:
+ *                             type: string
  *                   notes:
  *                     type: array
  *                     items:
- *                       type: object
+ *                       $ref: '#/components/schemas/RequestNote'
  *         404:
  *           description: Request not found
  *           content:
@@ -1978,6 +2838,7 @@
  *       tags: [Requests]
  *       summary: Update request status
  *       description: Change the status of a contact request
+ *       operationId: updateRequestStatus
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -1998,7 +2859,8 @@
  *               properties:
  *                 status:
  *                   type: string
- *                   enum: [neu, in_bearbeitung, beantwortet, geschlossen]
+ *                   enum: [new, in_progress, answered, closed]
+ *                   description: Request status
  *                 note:
  *                   type: string
  *                   description: Optional note about status change
@@ -2035,13 +2897,14 @@
  *             application/json:
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
- * 
- * 
+ *
+ *
  *   /api/v1/requests/{id}/notes:
  *     post:
  *       tags: [Requests]
  *       summary: Add note to request
  *       description: Add a note to a specific contact request
+ *       operationId: addRequestNote
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -2062,6 +2925,8 @@
  *               properties:
  *                 note:
  *                   type: string
+ *                   minLength: 1
+ *                   description: Note content
  *       responses:
  *         201:
  *           description: Note added
@@ -2096,11 +2961,14 @@
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
  *
- *   /api/v1/requests/export:
+ * /api/v1/requests/export:
  *     get:
  *       tags: [Requests]
  *       summary: Export requests
- *       description: Export contact requests data in various formats
+ *       description: |
+ *         Export contact requests data in various formats.
+ *         Note: This functionality is currently being migrated to TypeScript and Prisma.
+ *       operationId: exportRequests
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -2157,6 +3025,7 @@
  *       tags: [Profile]
  *       summary: Get user profile
  *       description: Retrieve current user profile information
+ *       operationId: getUserProfile
  *       security:
  *         - bearerAuth: []
  *       responses:
@@ -2186,10 +3055,28 @@
  *                         type: string
  *                   settings:
  *                     type: object
+ *                     properties:
+ *                       sprache:
+ *                         type: string
+ *                       dark_mode:
+ *                         type: boolean
+ *                       benachrichtigungen_email:
+ *                         type: boolean
+ *                       benachrichtigungen_push:
+ *                         type: boolean
+ *                       benachrichtigungen_intervall:
+ *                         type: string
  *                   activity:
  *                     type: array
  *                     items:
  *                       type: object
+ *                       properties:
+ *                         type:
+ *                           type: string
+ *                         ip:
+ *                           type: string
+ *                         date:
+ *                           type: string
  *         401:
  *           description: Unauthorized
  *           content:
@@ -2200,6 +3087,7 @@
  *       tags: [Profile]
  *       summary: Update user profile
  *       description: Update current user profile information
+ *       operationId: updateProfile
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -2214,6 +3102,7 @@
  *               properties:
  *                 name:
  *                   type: string
+ *                   minLength: 2
  *                 email:
  *                   type: string
  *                   format: email
@@ -2232,6 +3121,17 @@
  *                     example: true
  *                   user:
  *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       role:
+ *                         type: string
+ *                       initials:
+ *                         type: string
  *                   message:
  *                     type: string
  *         400:
@@ -2252,6 +3152,7 @@
  *       tags: [Profile]
  *       summary: Update password
  *       description: Change user password
+ *       operationId: updatePassword
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -2271,6 +3172,7 @@
  *                 new_password:
  *                   type: string
  *                   format: password
+ *                   minLength: 8
  *                 confirm_password:
  *                   type: string
  *                   format: password
@@ -2305,6 +3207,7 @@
  *       tags: [Profile]
  *       summary: Update profile picture
  *       description: Upload and set a new profile picture
+ *       operationId: updateProfilePicture
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -2352,6 +3255,7 @@
  *       tags: [Profile]
  *       summary: Update notification settings
  *       description: Update user notification preferences
+ *       operationId: updateNotificationSettings
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -2400,6 +3304,7 @@
  *       tags: [Dashboard]
  *       summary: Get dashboard statistics
  *       description: Retrieve key statistics for dashboard
+ *       operationId: getDashboardStats
  *       security:
  *         - bearerAuth: []
  *       responses:
@@ -2445,11 +3350,97 @@
  *               schema:
  *                 $ref: '#/components/schemas/ErrorResponse'
  *
+ *
+ *   /api/v1/dashboard/data:
+ *     get:
+ *       tags: [Dashboard]
+ *       summary: Get complete dashboard data
+ *       description: Retrieve all dashboard data including statistics, charts, and recent activities
+ *       operationId: getDashboardData
+ *       security:
+ *         - bearerAuth: []
+ *       parameters:
+ *         - in: query
+ *           name: revenueFilter
+ *           schema:
+ *             type: string
+ *             enum: ['Letzten 30 Tage', 'Letzten 3 Monate', 'Letzten 6 Monate', 'Dieses Jahr']
+ *           description: Filter for revenue chart
+ *         - in: query
+ *           name: servicesFilter
+ *           schema:
+ *             type: string
+ *             enum: ['Diese Woche', 'Diesen Monat', 'Dieses Quartal', 'Dieses Jahr']
+ *           description: Filter for services chart
+ *       responses:
+ *         200:
+ *           description: Complete dashboard data
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   stats:
+ *                     type: object
+ *                   chartFilters:
+ *                     type: object
+ *                     properties:
+ *                       revenue:
+ *                         type: object
+ *                       services:
+ *                         type: object
+ *                   charts:
+ *                     type: object
+ *                     properties:
+ *                       revenue:
+ *                         type: object
+ *                         properties:
+ *                           labels:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                           data:
+ *                             type: array
+ *                             items:
+ *                               type: number
+ *                       services:
+ *                         type: object
+ *                         properties:
+ *                           labels:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                           data:
+ *                             type: array
+ *                             items:
+ *                               type: number
+ *                   notifications:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   recentRequests:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   upcomingAppointments:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   systemStatus:
+ *                     type: object
+ *         401:
+ *           description: Unauthorized
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 $ref: '#/components/schemas/ErrorResponse'
+ *
  *   /api/v1/dashboard/search:
  *     get:
  *       tags: [Dashboard]
  *       summary: Global search
  *       description: Search across multiple entities
+ *       operationId: globalSearch
  *       security:
  *         - bearerAuth: []
  *       parameters:
@@ -2471,22 +3462,96 @@
  *                     type: array
  *                     items:
  *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         name:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         firma:
+ *                           type: string
+ *                         telefon:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                         type:
+ *                           type: string
+ *                         url:
+ *                           type: string
  *                   projects:
  *                     type: array
  *                     items:
  *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         title:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                         date:
+ *                           type: string
+ *                         kunde:
+ *                           type: string
+ *                         type:
+ *                           type: string
+ *                         url:
+ *                           type: string
  *                   appointments:
  *                     type: array
  *                     items:
  *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         title:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                         date:
+ *                           type: string
+ *                         kunde:
+ *                           type: string
+ *                         type:
+ *                           type: string
+ *                         url:
  *                   requests:
  *                     type: array
  *                     items:
  *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         name:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                         date:
+ *                           type: string
+ *                         type:
+ *                           type: string
+ *                         url:
  *                   services:
  *                     type: array
  *                     items:
  *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         name:
+ *                           type: string
+ *                         preis:
+ *                           type: number
+ *                         einheit:
+ *                           type: string
+ *                         aktiv:
+ *                           type: boolean
+ *                         type:
+ *                           type: string
+ *                         url:
  *         401:
  *           description: Unauthorized
  *           content:
@@ -2499,6 +3564,7 @@
  *       tags: [Dashboard]
  *       summary: Get notifications
  *       description: Retrieve user notifications
+ *       operationId: getNotifications
  *       security:
  *         - bearerAuth: []
  *       responses:
@@ -2528,6 +3594,9 @@
  *                           type: boolean
  *                         time:
  *                           type: string
+ *                         timestamp:
+ *                           type: string
+ *                           format: date-time
  *                         link:
  *                           type: string
  *         401:
@@ -2542,6 +3611,7 @@
  *       tags: [Dashboard]
  *       summary: Mark notifications as read
  *       description: Mark one or all notifications as read
+ *       operationId: markNotificationsRead
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -2591,6 +3661,7 @@
  *       tags: [Settings]
  *       summary: Get user settings
  *       description: Retrieve settings for current user
+ *       operationId: getUserSettings
  *       security:
  *         - bearerAuth: []
  *       responses:
@@ -2624,6 +3695,7 @@
  *       tags: [Settings]
  *       summary: Update user settings
  *       description: Update settings for current user
+ *       operationId: updateUserSettings
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -2657,7 +3729,6 @@
  *                     type: boolean
  *                     example: true
  *                   message:
- *                     type: string
  *         400:
  *           description: Validation error
  *           content:
@@ -2676,6 +3747,7 @@
  *       tags: [Settings]
  *       summary: Get system settings
  *       description: Retrieve system settings (admin only)
+ *       operationId: getSystemSettings
  *       security:
  *         - bearerAuth: []
  *       responses:
@@ -2688,6 +3760,19 @@
  *                 properties:
  *                   settings:
  *                     type: object
+ *                     additionalProperties:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           key:
+ *                             type: string
+ *                           value:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           type:
+ *                             type: string
  *         401:
  *           description: Unauthorized
  *           content:
@@ -2704,6 +3789,7 @@
  *       tags: [Settings]
  *       summary: Update system settings
  *       description: Update system settings (admin only)
+ *       operationId: updateSystemSettings
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -2715,6 +3801,8 @@
  *               properties:
  *                 settings:
  *                   type: object
+ *                   additionalProperties:
+ *                     type: string
  *       responses:
  *         200:
  *           description: Settings updated
@@ -2727,7 +3815,6 @@
  *                     type: boolean
  *                     example: true
  *                   message:
- *                     type: string
  *         401:
  *           description: Unauthorized
  *           content:
@@ -2746,6 +3833,7 @@
  *       tags: [Settings]
  *       summary: Get backup settings
  *       description: Retrieve backup settings and history (admin only)
+ *       operationId: getBackupSettings
  *       security:
  *         - bearerAuth: []
  *       responses:
@@ -2763,8 +3851,10 @@
  *                         type: boolean
  *                       intervall:
  *                         type: string
+ *                         enum: [taeglich, woechentlich, monatlich]
  *                       zeit:
  *                         type: string
+ *                         pattern: "^([01]\\d|2[0-3]):([0-5]\\d)$"
  *                       aufbewahrung:
  *                         type: integer
  *                       letzte_ausfuehrung:
@@ -2776,6 +3866,18 @@
  *                     type: array
  *                     items:
  *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         dateiname:
+ *                           type: string
+ *                         groesse:
+ *                           type: string
+ *                         datum:
+ *                           type: string
+ *                           format: date-time
+ *                         status:
+ *                           type: string
  *         401:
  *           description: Unauthorized
  *           content:
@@ -2792,6 +3894,7 @@
  *       tags: [Settings]
  *       summary: Update backup settings
  *       description: Update backup settings (admin only)
+ *       operationId: updateBackupSettings
  *       security:
  *         - bearerAuth: []
  *       requestBody:
@@ -2811,6 +3914,7 @@
  *                   pattern: "^([01]\\d|2[0-3]):([0-5]\\d)$"
  *                 aufbewahrung:
  *                   type: integer
+ *                   minimum: 1
  *       responses:
  *         200:
  *           description: Backup settings updated
@@ -2823,7 +3927,6 @@
  *                     type: boolean
  *                     example: true
  *                   message:
- *                     type: string
  *         400:
  *           description: Validation error
  *           content:
@@ -2848,6 +3951,7 @@
  *       tags: [Settings]
  *       summary: Trigger manual backup
  *       description: Start a manual backup process (admin only)
+ *       operationId: triggerManualBackup
  *       security:
  *         - bearerAuth: []
  *       responses:
@@ -2862,7 +3966,6 @@
  *                     type: boolean
  *                     example: true
  *                   message:
- *                     type: string
  *                   status:
  *                     type: string
  *         401:
@@ -2884,6 +3987,7 @@
  *       tags: [Public]
  *       summary: Submit contact form
  *       description: Send a contact request from the public website
+ *       operationId: submitContact
  *       requestBody:
  *         required: true
  *         content:
@@ -2924,7 +4028,6 @@
  *                     type: boolean
  *                     example: true
  *                   message:
- *                     type: string
  *                   requestId:
  *                     type: integer
  *         400:
@@ -2945,6 +4048,28 @@
  *                     example: false
  *                   error:
  *                     type: string
+ *
+ *   # Health check endpoint
+ *   /health:
+ *     get:
+ *       tags: [System]
+ *       summary: Health check
+ *       description: Check if the API is running
+ *       operationId: healthCheck
+ *       responses:
+ *         200:
+ *           description: API is running
+ *           content:
+ *             application/json:
+ *               schema:
+ *                 type: object
+ *                 properties:
+ *                   status:
+ *                     type: string
+ *                     example: ok
+ *                   timestamp:
+ *                     type: string
+ *                     format: date-time
  *
  * # Define tags
  * tags:
@@ -2968,4 +4093,6 @@
  *     description: User and system settings
  *   - name: Public
  *     description: Public accessible endpoints
+ *   - name: System
+ *     description: System and health check endpoints
  */
