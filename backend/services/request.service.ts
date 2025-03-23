@@ -5,7 +5,11 @@
  */
 import { format } from 'date-fns';
 import { BaseService } from '../utils/base.service.js';
-import { RequestRepository, ContactRequest, requestRepository } from '../repositories/request.repository.js';
+import { 
+  RequestRepository, 
+  ContactRequest, 
+  requestRepository 
+} from '../repositories/request.repository.js';
 import { 
   ContactRequestCreateDTO, 
   ContactRequestResponseDTO, 
@@ -66,7 +70,7 @@ export class RequestService extends BaseService<
       });
       
       // Map to response DTOs
-      const requests = result.data.map((request: ContactRequest) => this.mapEntityToDTO(request));
+      const requests = result.data.map((request) => this.mapEntityToDTO(request as any));
       
       return {
         data: requests,
@@ -347,7 +351,7 @@ export class RequestService extends BaseService<
    * @param entity - Contact request entity
    * @returns Contact request response DTO
    */
-  protected mapEntityToDTO(entity: ContactRequest): ContactRequestResponseDTO {
+  protected mapEntityToDTO(entity: ContactRequest | any): ContactRequestResponseDTO {
     const statusInfo = getAnfrageStatusInfo(entity.status);
     
     return {
@@ -358,7 +362,8 @@ export class RequestService extends BaseService<
                    entity.service === 'moving' ? 'Umzüge & Transporte' : 
                    entity.service === 'winter' ? 'Winterdienst' : 'Sonstiges',
       formattedDate: format(entity.createdAt, 'dd.MM.yyyy'),
-      status: statusInfo.label,
+      status: entity.status,
+      statusLabel: statusInfo.label,
       statusClass: statusInfo.className
     };
   }

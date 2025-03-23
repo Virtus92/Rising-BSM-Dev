@@ -88,6 +88,8 @@ export interface ContactRequestResponseDTO extends BaseResponseDTO {
    * Status label
    */
   status: string;
+  
+  statusLabel: string;
 
   /**
    * Status CSS class

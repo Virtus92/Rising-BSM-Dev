@@ -36,8 +36,8 @@ import logger from '../utils/logger.js';
 export interface AppointmentRecord {
   id: number;
   title: string;
-  customerId: number | null;  // Ensure this is not optional (undefined)
-  projectId: number | null;   // Ensure this is not optional (undefined)
+  customerId: number | null | undefined;  // Allow undefined to match imported type
+  projectId: number | null | undefined;   // Allow undefined to match imported type
   appointmentDate: Date;
   duration: number | null;
   location: string | null;
@@ -97,8 +97,8 @@ export class AppointmentService extends BaseService<
       });
       
       // Map to response DTOs
-      const appointments = result.data.map((appointment: AppointmentRecord | Appointment) => 
-        this.mapEntityToDTO(appointment)
+      const appointments = result.data.map(appointment => 
+        this.mapEntityToDTO(appointment as any)
       );
       
       return {
@@ -258,7 +258,7 @@ export class AppointmentService extends BaseService<
       }
       
       // Return mapped response
-      return this.mapEntityToDTO(created);
+      return this.mapEntityToDTO(created as any);
     } catch (error) {
       this.handleError(error, 'Error creating appointment', { data });
     }
@@ -313,7 +313,7 @@ export class AppointmentService extends BaseService<
       }
       
       // Return mapped response
-      return this.mapEntityToDTO(updated);
+      return this.mapEntityToDTO(updated as AppointmentRecord);
     } catch (error) {
       this.handleError(error, `Error updating appointment with ID ${id}`, { id, data });
     }

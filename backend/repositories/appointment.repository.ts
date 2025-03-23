@@ -13,8 +13,8 @@ import entityLogger from '../utils/entity-logger.js';
 export interface Appointment {
   id: number;
   title: string;
-  customerId: number | null;  // Make sure it's not optional to match AppointmentRecord
-  projectId: number | null;   // Make sure it's not optional to match AppointmentRecord
+  customerId: number | null | undefined;
+  projectId: number | null | undefined;
   appointmentDate: Date;
   duration: number | null;
   location: string | null;
@@ -25,8 +25,8 @@ export interface Appointment {
   updatedAt: Date;
   customer?: any;
   project?: any;
-  Customer?: any; // For backward compatibility
-  Project?: any;  // For backward compatibility
+  Customer?: any;
+  Project?: any;
 }
 
 export class AppointmentRepository extends BaseRepository<AppointmentRecord, AppointmentFilterDTO> {

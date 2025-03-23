@@ -7,10 +7,13 @@ import { Request, Response } from 'express';
 import { BadRequestError } from '../utils/errors.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ResponseFactory } from '../utils/response.factory.js';
-import { RequestService, requestService } from '../services/request.service.js';
+import { RequestService } from '../services/request.service.js';
 import { NotificationService, notificationService } from '../services/notification.service.js';
 import { ContactRequestCreateDTO } from '../types/dtos/request.dto.js';
 import { prisma } from '../utils/prisma.utils.js';
+
+// Erstelle eine neue Instanz des RequestService
+const requestService = new RequestService();
 
 /**
  * Submit contact form
@@ -28,7 +31,7 @@ export const submitContact = asyncHandler(async (req: Request, res: Response): P
   // Create contact request with IP address
   const result = await requestService.create(contactData, {
     userContext: {
-      userId: null,
+      userId: -1,
       userName: 'System',
       userRole: 'system',
       ipAddress: req.ip

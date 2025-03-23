@@ -561,7 +561,9 @@ export class CustomerService extends BaseService<
       type: dto.kundentyp || 'privat',
       status: dto.status || 'aktiv',
       notes: dto.notizen || null,
-      newsletter: dto.newsletter === true || dto.newsletter === 'on'
+      newsletter: dto.newsletter === true || 
+                 (typeof dto.newsletter === 'string' && 
+                  ['on', 'true', '1'].includes((dto.newsletter as string).toLowerCase()))
     };
   }
 
@@ -582,7 +584,7 @@ export class CustomerService extends BaseService<
     if (dto.plz !== undefined) updateData.postalCode = dto.plz || null;
     if (dto.ort !== undefined) updateData.city = dto.ort || null;
     if (dto.notizen !== undefined) updateData.notes = dto.notizen || null;
-    if (dto.newsletter !== undefined) updateData.newsletter = dto.newsletter === true || dto.newsletter === 'on';
+    if (dto.newsletter !== undefined) updateData.newsletter = dto.newsletter === true || (typeof dto.newsletter === 'string' && ['on', 'true', '1'].includes((dto.newsletter as string).toLowerCase()));
     if (dto.status !== undefined) updateData.status = dto.status;
     if (dto.kundentyp !== undefined) updateData.type = dto.kundentyp;
     

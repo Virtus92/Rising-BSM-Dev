@@ -7,7 +7,10 @@
     "outDir": "./dist",
     "rootDir": "./",
     "removeComments": true,
-    "typeRoots": ["./node_modules/@types", "./types"],
+    "typeRoots": [
+      "./node_modules/@types",
+      "./types"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -19,7 +22,8 @@
     "emitDecoratorMetadata": true,
     "baseUrl": ".",
     "paths": {
-      "@prisma/client": ["./prisma/generated/client"]
+      "@prisma/client": ["./prisma/generated/client"],
+      "*": ["./types/*"]
     }
   },
   "include": ["**/*.ts"],

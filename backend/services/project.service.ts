@@ -27,7 +27,7 @@ import {
 } from '../types/service.types.js';
 import { getProjektStatusInfo, getTerminStatusInfo } from '../utils/helpers.js';
 import { validateRequired, validateDate } from '../utils/common-validators.js';
-import validator from '../utils/validators.js';
+import * as validator from '../utils/validation-types.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -395,6 +395,56 @@ export class ProjectService extends BaseService<
   }
 
   /**
+ * Überprüft, ob ein Kunde existiert
+ * @param id Kunden-ID
+ * @returns true wenn der Kunde existiert, sonst false
+ */
+private async checkCustomerExists(id: number): Promise<boolean> {
+  try {
+    // Verwende die Repository-Methode, wenn verfügbar
+    if ('customerExists' in this.repository) {
+      return (this.repository as any).customerExists(id);
+    }
+    
+    // Alternativ: Direkter Zugriff über die Repository-Schnittstelle
+    const result = await this.repository.findOne(
+      { where: { id } },
+      { select: { id: true } }
+    );
+    
+    return !!result;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Überprüft, ob ein Service existiert
+ * @param id Service-ID
+ * @returns true wenn der Service existiert, sonst false
+ */
+private async checkServiceExists(id: number): Promise<boolean> {
+  try {
+    // Verwende die Repository-Methode, wenn verfügbar
+    if ('serviceExists' in this.repository) {
+      return (this.repository as any).serviceExists(id);
+    }
+    
+    // Alternativ: Direkter Zugriff über findById auf dem Service-Modell
+    const service = await this.repository.transaction(async (tx) => {
+      return tx.service.findUnique({
+        where: { id },
+        select: { id: true }
+      });
+    });
+    
+    return !!service;
+  } catch (error) {
+    return false;
+  }
+}
+
+  /**
    * Validate create DTO
    * @param data - Create DTO
    * @throws ValidationError if validation fails
@@ -438,11 +488,8 @@ export class ProjectService extends BaseService<
     // Validate customer ID if provided
     if (data.kunde_id) {
       // Check if customer exists
-      const customer = await this.repository.prisma.customer.findUnique({
-        where: { id: Number(data.kunde_id) }
-      });
-      
-      if (!customer) {
+      const customerExists = await this.checkCustomerExists(Number(data.kunde_id));
+      if (!customerExists) {
         throw new ValidationError(`Customer with ID ${data.kunde_id} not found`);
       }
     }
@@ -450,11 +497,8 @@ export class ProjectService extends BaseService<
     // Validate service ID if provided
     if (data.dienstleistung_id) {
       // Check if service exists
-      const service = await this.repository.prisma.service.findUnique({
-        where: { id: Number(data.dienstleistung_id) }
-      });
-      
-      if (!service) {
+      const serviceExists = await this.checkServiceExists(Number(data.dienstleistung_id));
+      if (!serviceExists) {
         throw new ValidationError(`Service with ID ${data.dienstleistung_id} not found`);
       }
     }
@@ -537,24 +581,16 @@ export class ProjectService extends BaseService<
     
     // Validate customer ID if provided
     if (data.kunde_id !== undefined && data.kunde_id !== null) {
-      // Check if customer exists
-      const customer = await this.repository.prisma.customer.findUnique({
-        where: { id: Number(data.kunde_id) }
-      });
-      
-      if (!customer) {
+      const customerExists = await this.checkCustomerExists(Number(data.kunde_id));
+      if (!customerExists) {
         throw new ValidationError(`Customer with ID ${data.kunde_id} not found`);
       }
     }
     
     // Validate service ID if provided
     if (data.dienstleistung_id !== undefined && data.dienstleistung_id !== null) {
-      // Check if service exists
-      const service = await this.repository.prisma.service.findUnique({
-        where: { id: Number(data.dienstleistung_id) }
-      });
-      
-      if (!service) {
+      const serviceExists = await this.checkServiceExists(Number(data.dienstleistung_id));
+      if (!serviceExists) {
         throw new ValidationError(`Service with ID ${data.dienstleistung_id} not found`);
       }
     }

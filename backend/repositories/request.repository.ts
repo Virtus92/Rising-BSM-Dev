@@ -6,6 +6,20 @@ import { ContactRequestRecord } from '../types/models.js';
 import { prisma } from '../utils/prisma.utils.js';
 import entityLogger from '../utils/entity-logger.js';
 
+export interface ContactRequest {
+  id: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  service: string;
+  message: string;
+  status: string;
+  processorId: number | null;
+  ipAddress: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export class RequestRepository extends BaseRepository<ContactRequestRecord> {
   constructor() {
     super(prisma, prisma.contactRequest);
@@ -109,3 +123,5 @@ export class RequestRepository extends BaseRepository<ContactRequestRecord> {
     );
   }
 }
+
+export const requestRepository = new RequestRepository();
