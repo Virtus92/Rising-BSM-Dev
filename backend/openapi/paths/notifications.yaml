@@ -1,4 +1,3 @@
-# paths/notifications.yaml
 notifications:
   get:
     tags:
@@ -18,9 +17,21 @@ notifications:
                   type: boolean
                   example: true
                 data:
-                  type: array
-                  items:
-                    $ref: '../schemas/models.yaml#/Notification'
+                  type: object
+                  properties:
+                    notifications:
+                      type: array
+                      items:
+                        $ref: '../schemas/notification.yaml#/Notification'
+                message:
+                  type: string
+                  example: "Notifications retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
@@ -36,17 +47,7 @@ notifications-read:
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              notificationId:
-                type: integer
-                description: ID of specific notification to mark as read
-              markAll:
-                type: boolean
-                description: Set to true to mark all notifications as read
-            oneOf:
-              - required: [notificationId]
-              - required: [markAll]
+            $ref: '../schemas/notification.yaml#/MarkNotificationRead'
     responses:
       '200':
         description: Notifications marked as read
@@ -58,11 +59,21 @@ notifications-read:
                 success:
                   type: boolean
                   example: true
-                count:
-                  type: integer
-                  description: Number of notifications marked as read
+                data:
+                  type: object
+                  properties:
+                    count:
+                      type: integer
+                      description: Number of notifications marked as read
                 message:
                   type: string
+                  example: "Notifications marked as read"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':

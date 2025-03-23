@@ -11,29 +11,7 @@ contact:
       content:
         application/json:
           schema:
-            type: object
-            required:
-              - name
-              - email
-              - service
-              - message
-            properties:
-              name:
-                type: string
-                minLength: 2
-                maxLength: 100
-              email:
-                type: string
-                format: email
-              phone:
-                type: string
-              service:
-                type: string
-                enum: [facility, moving, winter, other]
-              message:
-                type: string
-                minLength: 10
-                maxLength: 1000
+            $ref: '../schemas/contact.yaml#/ContactRequestCreate'
     responses:
       '201':
         description: Contact request submitted
@@ -45,10 +23,20 @@ contact:
                 success:
                   type: boolean
                   example: true
+                data:
+                  type: object
+                  properties:
+                    requestId:
+                      type: integer
                 message:
                   type: string
-                requestId:
-                  type: integer
+                  example: "Ihre Anfrage wurde erfolgreich übermittelt. Wir melden uns in Kürze bei Ihnen."
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '429':

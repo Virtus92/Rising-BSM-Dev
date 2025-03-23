@@ -1,4 +1,3 @@
-# paths/users.yaml
 users:
   get:
     tags:
@@ -37,20 +36,6 @@ users:
           default: 20
           maximum: 100
         description: Items per page
-      - in: query
-        name: sortBy
-        schema:
-          type: string
-          enum: [name, email, role, status, created_at]
-          default: name
-        description: Field to sort by
-      - in: query
-        name: sortDirection
-        schema:
-          type: string
-          enum: [asc, desc]
-          default: asc
-        description: Sort direction
     responses:
       '200':
         description: List of users
@@ -65,12 +50,18 @@ users:
                 data:
                   type: array
                   items:
-                    $ref: '../schemas/models.yaml#/User'
-                pagination:
-                  $ref: '../schemas/common.yaml#/Pagination'
+                    $ref: '../schemas/user.yaml#/User'
+                message:
+                  type: string
+                  example: "Users retrieved successfully"
                 meta:
                   type: object
                   properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    pagination:
+                      $ref: '../schemas/common.yaml#/Pagination'
                     filters:
                       type: object
                       properties:
@@ -96,41 +87,7 @@ users:
       content:
         application/json:
           schema:
-            type: object
-            required:
-              - name
-              - email
-              - password
-            properties:
-              name:
-                type: string
-                description: Full name
-                minLength: 2
-                maxLength: 100
-              email:
-                type: string
-                format: email
-                description: Email address (must be unique)
-              password:
-                type: string
-                format: password
-                description: Password (min 8 characters)
-                minLength: 8
-              role:
-                type: string
-                enum: [admin, manager, mitarbeiter, benutzer]
-                default: mitarbeiter
-                description: User role
-              phone:
-                type: string
-                description: Phone number
-                maxLength: 30
-                nullable: true
-              status:
-                type: string
-                enum: [aktiv, inaktiv, gesperrt]
-                default: aktiv
-                description: User status
+            $ref: '../schemas/user.yaml#/UserCreate'
     responses:
       '201':
         description: User created
@@ -143,10 +100,16 @@ users:
                   type: boolean
                   example: true
                 data:
-                  $ref: '../schemas/models.yaml#/User'
+                  $ref: '../schemas/user.yaml#/User'
                 message:
                   type: string
                   example: "User created successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
@@ -186,40 +149,16 @@ users-id:
                   type: boolean
                   example: true
                 data:
+                  $ref: '../schemas/user.yaml#/User'
+                message:
+                  type: string
+                  example: "User retrieved successfully"
+                meta:
                   type: object
-                  allOf:
-                    - $ref: '../schemas/models.yaml#/User'
-                    - type: object
-                      properties:
-                        activity:
-                          type: array
-                          items:
-                            type: object
-                            properties:
-                              id:
-                                type: integer
-                              activity:
-                                type: string
-                              activityLabel:
-                                type: string
-                              timestamp:
-                                type: string
-                                format: date-time
-                              formattedDate:
-                                type: string
-                        settings:
-                          type: object
-                          properties:
-                            language:
-                              type: string
-                            darkMode:
-                              type: boolean
-                            emailNotifications:
-                              type: boolean
-                            pushNotifications:
-                              type: boolean
-                            notificationInterval:
-                              type: string
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
       '403':
@@ -245,35 +184,7 @@ users-id:
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              name:
-                type: string
-                description: Full name
-                minLength: 2
-                maxLength: 100
-              email:
-                type: string
-                format: email
-                description: Email address
-              password:
-                type: string
-                format: password
-                description: New password (min 8 characters)
-                minLength: 8
-              role:
-                type: string
-                enum: [admin, manager, mitarbeiter, benutzer]
-                description: User role
-              phone:
-                type: string
-                description: Phone number
-                maxLength: 30
-                nullable: true
-              status:
-                type: string
-                enum: [aktiv, inaktiv, gesperrt]
-                description: User status
+            $ref: '../schemas/user.yaml#/UserUpdate'
     responses:
       '200':
         description: User updated
@@ -286,10 +197,16 @@ users-id:
                   type: boolean
                   example: true
                 data:
-                  $ref: '../schemas/models.yaml#/User'
+                  $ref: '../schemas/user.yaml#/User'
                 message:
                   type: string
                   example: "User updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
@@ -329,11 +246,20 @@ users-id:
                 success:
                   type: boolean
                   example: true
-                id:
-                  type: integer
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
                 message:
                   type: string
-                  example: "User has been deactivated"
+                  example: "User deleted successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         description: Cannot delete own account
         content:
@@ -374,10 +300,6 @@ users-id-status:
                 type: string
                 enum: [aktiv, inaktiv, gesperrt]
                 description: New user status
-              note:
-                type: string
-                description: Optional note about the status change
-                maxLength: 1000
     responses:
       '200':
         description: Status updated successfully
@@ -390,17 +312,16 @@ users-id-status:
                   type: boolean
                   example: true
                 data:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                    status:
-                      type: string
-                    statusLabel:
-                      type: string
+                  $ref: '../schemas/user.yaml#/User'
                 message:
                   type: string
                   example: "User status updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
@@ -409,113 +330,3 @@ users-id-status:
         $ref: '../openapi.yaml#/components/responses/ForbiddenError'
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
-
-users-id-reset-password:
-  post:
-    tags:
-      - Users
-    summary: Reset user password
-    description: Reset password for a user (admin only)
-    operationId: resetUserPassword
-    parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-        description: User ID
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            required:
-              - password
-            properties:
-              password:
-                type: string
-                format: password
-                description: New password (min 8 characters)
-                minLength: 8
-              sendEmail:
-                type: boolean
-                default: true
-                description: Whether to send password reset email to user
-    responses:
-      '200':
-        description: Password reset successfully
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                message:
-                  type: string
-                  example: "User password has been reset"
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-      '403':
-        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
-
-users-batch-status:
-  patch:
-    tags:
-      - Users
-    summary: Batch update user status
-    description: Change the status of multiple users at once
-    operationId: batchUpdateUserStatus
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            required:
-              - ids
-              - status
-            properties:
-              ids:
-                type: array
-                items:
-                  type: integer
-                description: Array of user IDs to update
-                minItems: 1
-              status:
-                type: string
-                enum: [aktiv, inaktiv, gesperrt]
-                description: New user status
-              note:
-                type: string
-                description: Optional note about the status change
-                maxLength: 1000
-    responses:
-      '200':
-        description: Status updated successfully
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                count:
-                  type: integer
-                  description: Number of users updated
-                message:
-                  type: string
-                  example: "3 users updated successfully"
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-      '403':
-        $ref: '../openapi.yaml#/components/responses/ForbiddenError'

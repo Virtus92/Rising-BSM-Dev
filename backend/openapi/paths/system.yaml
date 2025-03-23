@@ -16,10 +16,16 @@ health:
               properties:
                 status:
                   type: string
-                  example: ok
+                  example: "ok"
+                message:
+                  type: string
+                  example: "API is operational"
                 timestamp:
                   type: string
                   format: date-time
+                environment:
+                  type: string
+                  example: "development"
 
 version:
   get:

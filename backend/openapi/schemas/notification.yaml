@@ -1,6 +1,7 @@
 Notification:
   type: object
   required:
+    - id
     - type
     - title
   properties:
@@ -12,7 +13,7 @@ Notification:
       description: ID of the user receiving the notification
     type:
       type: string
-      enum: [anfrage, termin, projekt, warnung, system]
+      enum: [anfrage, termin, projekt, warnung, system, info]
       description: Notification type
     title:
       type: string
@@ -22,23 +23,32 @@ Notification:
       type: string
       description: Notification message
       maxLength: 1000
+    icon:
+      type: string
+      description: Icon representing notification type
     referenceId:
       type: integer
-      description: ID of the referenced entity
       nullable: true
+      description: ID of the referenced entity
     referenceType:
       type: string
-      description: Type of the referenced entity
       enum: [kunde, projekt, termin, anfrage, system]
       nullable: true
+      description: Type of the referenced entity
     read:
       type: boolean
       default: false
       description: Whether the notification has been read
-    createdAt:
+    time:
+      type: string
+      description: Relative time (e.g., "2 hours ago")
+    timestamp:
       type: string
       format: date-time
       description: Timestamp of notification creation
+    link:
+      type: string
+      description: Link to related content
 
 NotificationCreate:
   type: object
@@ -51,7 +61,7 @@ NotificationCreate:
       description: ID of the user receiving the notification
     type:
       type: string
-      enum: [anfrage, termin, projekt, warnung, system]
+      enum: [anfrage, termin, projekt, warnung, system, info]
       description: Notification type
     title:
       type: string
@@ -63,54 +73,27 @@ NotificationCreate:
       maxLength: 1000
     referenceId:
       type: integer
+      nullable: true
       description: ID of the referenced entity
-      nullable: true
     referenceType:
       type: string
+      enum: [kunde, projekt, termin, anfrage, system]
+      nullable: true
       description: Type of the referenced entity
-      enum: [kunde, projekt, termin, anfrage, system]
-      nullable: true
 
-NotificationUpdate:
+MarkNotificationRead:
   type: object
   properties:
-    read:
-      type: boolean
-      description: Mark notification as read/unread
-
-NotificationFilter:
-  type: object
-  properties:
-    type:
-      type: string
-      enum: [anfrage, termin, projekt, warnung, system]
-      description: Filter by notification type
-    read:
-      type: boolean
-      description: Filter by read status
-    referenceType:
-      type: string
-      enum: [kunde, projekt, termin, anfrage, system]
-      description: Filter by reference type
-    page:
+    notificationId:
       type: integer
-      default: 1
-      description: Page number (1-based)
-    limit:
-      type: integer
-      default: 20
-      maximum: 100
-      description: Items per page
-    sortBy:
-      type: string
-      enum: [createdAt, type, title]
-      default: createdAt
-      description: Field to sort by
-    sortDirection:
-      type: string
-      enum: [asc, desc]
-      default: desc
-      description: Sort direction
+      description: Specific notification ID to mark as read
+    markAll:
+      type: boolean
+      default: false
+      description: Flag to mark all notifications as read
+  oneOf:
+    - required: [notificationId]
+    - required: [markAll]
 
 NotificationCount:
   type: object
@@ -133,4 +116,6 @@ NotificationCount:
         warnung:
           type: integer
         system:
+          type: integer
+        info:
           type: integer

@@ -1,8 +1,10 @@
 Project:
   type: object
   required:
+    - id
     - titel
     - start_datum
+    - status
   properties:
     id:
       type: integer
@@ -10,16 +12,20 @@ Project:
     titel:
       type: string
       description: Project title
-      minLength: 2
-      maxLength: 200
     kunde_id:
       type: integer
       nullable: true
       description: ID of the associated customer
+    kunde_name:
+      type: string
+      description: Name of the associated customer
     dienstleistung_id:
       type: integer
       nullable: true
       description: ID of the associated service
+    dienstleistung:
+      type: string
+      description: Name of the associated service
     start_datum:
       type: string
       format: date
@@ -34,28 +40,28 @@ Project:
       format: float
       nullable: true
       description: Project amount/budget
-      minimum: 0
     beschreibung:
       type: string
       nullable: true
       description: Project description
-      maxLength: 2000
     status:
       type: string
       enum: [neu, in_bearbeitung, abgeschlossen, storniert]
-      default: neu
       description: Project status
-    created_by:
-      type: integer
-      description: ID of user who created the project
-    created_at:
+    statusLabel:
+      type: string
+      description: Formatted status label
+    statusClass:
+      type: string
+      description: CSS class for status
+    createdAt:
       type: string
       format: date-time
-      description: Timestamp of project creation
-    updated_at:
+      description: Creation timestamp
+    updatedAt:
       type: string
       format: date-time
-      description: Timestamp of last update
+      description: Last update timestamp
 
 ProjectCreate:
   type: object
@@ -168,55 +174,27 @@ ProjectNote:
       minLength: 1
       maxLength: 1000
 
-ProjectFilter:
-  type: object
-  properties:
-    status:
-      type: string
-      enum: [neu, in_bearbeitung, abgeschlossen, storniert]
-      description: Filter by status
-    kunde_id:
-      type: integer
-      description: Filter by customer ID
-    dienstleistung_id:
-      type: integer
-      description: Filter by service ID
-    start_datum_von:
-      type: string
-      format: date
-      description: Start date filter (from)
-    start_datum_bis:
-      type: string
-      format: date
-      description: Start date filter (to)
-    search:
-      type: string
-      description: Search term for title and description
-    page:
-      type: integer
-      default: 1
-      description: Page number (1-based)
-    limit:
-      type: integer
-      default: 20
-      maximum: 100
-      description: Items per page
-    sortBy:
-      type: string
-      enum: [titel, start_datum, end_datum, betrag, status, created_at]
-      default: start_datum
-      description: Field to sort by
-    sortDirection:
-      type: string
-      enum: [asc, desc]
-      default: desc
-      description: Sort direction
-
 ProjectWithDetails:
   allOf:
     - $ref: '#/Project'
     - type: object
       properties:
+        notes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              text:
+                type: string
+              userName:
+                type: string
+              formattedDate:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
         customer:
           type: object
           properties:
@@ -252,22 +230,6 @@ ProjectWithDetails:
                 type: string
               statusLabel:
                 type: string
-        notes:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: integer
-              text:
-                type: string
-              userName:
-                type: string
-              formattedDate:
-                type: string
-              createdAt:
-                type: string
-                format: date-time
 
 ProjectStatistics:
   type: object

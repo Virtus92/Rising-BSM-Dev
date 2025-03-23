@@ -17,12 +17,15 @@ Pagination:
 MetaData:
   type: object
   properties:
-    pagination:
-      $ref: '#/Pagination'
     timestamp:
       type: string
       format: date-time
       description: Response timestamp
+    pagination:
+      $ref: '#/Pagination'
+    filters:
+      type: object
+      description: Applied filters
 
 SuccessResponse:
   type: object
@@ -30,6 +33,7 @@ SuccessResponse:
     success:
       type: boolean
       example: true
+      description: Indicates if the request was successful
     data:
       type: object
       description: Response data
@@ -39,12 +43,13 @@ SuccessResponse:
     meta:
       $ref: '#/MetaData'
       
-ListResponse:
+PaginatedResponse:
   type: object
   properties:
     success:
       type: boolean
       example: true
+      description: Indicates if the request was successful
     data:
       type: array
       items:
@@ -54,4 +59,10 @@ ListResponse:
       type: string
       description: Response message
     meta:
-      $ref: '#/MetaData'
+      allOf:
+        - $ref: '#/MetaData'
+        - type: object
+          properties:
+            pagination:
+              $ref: '#/Pagination'
+              required: true

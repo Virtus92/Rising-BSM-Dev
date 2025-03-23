@@ -13,49 +13,71 @@ profile:
             schema:
               type: object
               properties:
-                user:
+                success:
+                  type: boolean
+                  example: true
+                data:
                   type: object
                   properties:
-                    id:
-                      type: integer
-                    name:
-                      type: string
-                    email:
-                      type: string
-                    telefon:
-                      type: string
-                    rolle:
-                      type: string
-                    profilbild:
-                      type: string
-                    seit:
-                      type: string
-                settings:
+                    user:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        email:
+                          type: string
+                        telefon:
+                          type: string
+                        rolle:
+                          type: string
+                        profilbild:
+                          type: string
+                        seit:
+                          type: string
+                    settings:
+                      type: object
+                      properties:
+                        sprache:
+                          type: string
+                        dark_mode:
+                          type: boolean
+                        benachrichtigungen_email:
+                          type: boolean
+                        benachrichtigungen_push:
+                          type: boolean
+                        benachrichtigungen_intervall:
+                          type: string
+                    activity:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                          ip:
+                            type: string
+                          date:
+                            type: string
+                message:
+                  type: string
+                  example: "Profile retrieved successfully"
+                meta:
                   type: object
                   properties:
-                    sprache:
+                    timestamp:
                       type: string
-                    dark_mode:
-                      type: boolean
-                    benachrichtigungen_email:
-                      type: boolean
-                    benachrichtigungen_push:
-                      type: boolean
-                    benachrichtigungen_intervall:
-                      type: string
-                activity:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      type:
-                        type: string
-                      ip:
-                        type: string
-                      date:
-                        type: string
+                      format: date-time
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '400':
+        description: User not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
+
   put:
     tags:
       - Profile
@@ -75,7 +97,11 @@ profile:
                 type: string
                 minLength: 2
                 description: Full name
-              phone:
+              email:
+                type: string
+                format: email
+                description: Email address
+              telefon:
                 type: string
                 description: Phone number
     responses:
@@ -89,15 +115,36 @@ profile:
                 success:
                   type: boolean
                   example: true
+                data:
+                  type: object
+                  properties:
+                    user:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        email:
+                          type: string
+                        telefon:
+                          type: string
                 message:
                   type: string
+                  example: "Profile updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
 profile-password:
-  patch:
+  put:
     tags:
       - Profile
     summary: Update password
@@ -110,20 +157,20 @@ profile-password:
           schema:
             type: object
             required:
-              - currentPassword
-              - newPassword
-              - confirmPassword
+              - current_password
+              - new_password
+              - confirm_password
             properties:
-              currentPassword:
+              current_password:
                 type: string
                 format: password
                 description: Current password
-              newPassword:
+              new_password:
                 type: string
                 format: password
                 minLength: 8
                 description: New password
-              confirmPassword:
+              confirm_password:
                 type: string
                 format: password
                 description: Confirm new password
@@ -138,15 +185,24 @@ profile-password:
                 success:
                   type: boolean
                   example: true
+                data:
+                  type: object
                 message:
                   type: string
+                  example: "Password updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
 profile-picture:
-  patch:
+  post:
     tags:
       - Profile
     summary: Update profile picture
@@ -159,9 +215,9 @@ profile-picture:
           schema:
             type: object
             required:
-              - picture
+              - file
             properties:
-              picture:
+              file:
                 type: string
                 format: binary
                 description: Image file
@@ -176,17 +232,27 @@ profile-picture:
                 success:
                   type: boolean
                   example: true
-                profilePicture:
-                  type: string
+                data:
+                  type: object
+                  properties:
+                    imagePath:
+                      type: string
                 message:
                   type: string
+                  example: "Profile picture updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
 profile-notifications:
-  patch:
+  put:
     tags:
       - Profile
     summary: Update notification settings
@@ -199,11 +265,11 @@ profile-notifications:
           schema:
             type: object
             properties:
-              emailNotifications:
+              benachrichtigungen_email:
                 type: boolean
-              pushNotifications:
+              benachrichtigungen_push:
                 type: boolean
-              notificationInterval:
+              benachrichtigungen_intervall:
                 type: string
                 enum: [sofort, taeglich, woechentlich]
     responses:
@@ -217,8 +283,17 @@ profile-notifications:
                 success:
                   type: boolean
                   example: true
+                data:
+                  type: object
                 message:
                   type: string
+                  example: "Notification settings updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':

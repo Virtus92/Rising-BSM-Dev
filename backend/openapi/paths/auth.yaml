@@ -24,6 +24,7 @@ login:
                 format: password
               remember:
                 type: boolean
+                default: false
           example:
             email: admin@example.com
             password: AdminPass123!
@@ -39,23 +40,35 @@ login:
                 success:
                   type: boolean
                   example: true
-                accessToken:
-                  type: string
-                refreshToken:
-                  type: string
-                expiresIn:
-                  type: number
-                user:
+                data:
                   type: object
                   properties:
-                    id:
-                      type: integer
-                    name:
+                    accessToken:
                       type: string
-                    email:
+                    refreshToken:
                       type: string
-                    role:
+                    expiresIn:
+                      type: number
+                    user:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        email:
+                          type: string
+                        role:
+                          type: string
+                message:
+                  type: string
+                  example: "Login successful"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
                       type: string
+                      format: date-time
       '401':
         description: Invalid credentials
         content:
@@ -93,12 +106,24 @@ refresh-token:
                 success:
                   type: boolean
                   example: true
-                accessToken:
+                data:
+                  type: object
+                  properties:
+                    accessToken:
+                      type: string
+                    refreshToken:
+                      type: string
+                    expiresIn:
+                      type: number
+                message:
                   type: string
-                refreshToken:
-                  type: string
-                expiresIn:
-                  type: number
+                  example: "Token refreshed successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '401':
         description: Invalid refresh token
         content:
@@ -137,10 +162,23 @@ forgot-password:
                 success:
                   type: boolean
                   example: true
+                data:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                      example: "If an account with this email exists, password reset instructions have been sent"
                 message:
                   type: string
+                  example: "If an account with this email exists, password reset instructions have been sent"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
 
-reset-token:
+validate-reset-token:
   get:
     tags:
       - Authentication
@@ -166,10 +204,22 @@ reset-token:
                 success:
                   type: boolean
                   example: true
-                userId:
-                  type: integer
-                email:
+                data:
+                  type: object
+                  properties:
+                    userId:
+                      type: integer
+                    email:
+                      type: string
+                message:
                   type: string
+                  example: "Token is valid"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         description: Invalid token
         content:
@@ -220,8 +270,17 @@ reset-password:
                 success:
                   type: boolean
                   example: true
+                data:
+                  type: object
                 message:
                   type: string
+                  example: "Password has been reset successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         description: Validation error
         content:
@@ -256,5 +315,14 @@ logout:
                 success:
                   type: boolean
                   example: true
+                data:
+                  type: object
                 message:
                   type: string
+                  example: "Logged out successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time

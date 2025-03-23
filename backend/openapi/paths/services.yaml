@@ -30,20 +30,6 @@ services:
           default: 20
           maximum: 100
         description: Items per page
-      - in: query
-        name: sortBy
-        schema:
-          type: string
-          enum: [name, preis_basis, einheit, created_at]
-          default: name
-        description: Field to sort by
-      - in: query
-        name: sortDirection
-        schema:
-          type: string
-          enum: [asc, desc]
-          default: asc
-        description: Sort direction
     responses:
       '200':
         description: List of services
@@ -59,11 +45,17 @@ services:
                   type: array
                   items:
                     $ref: '../schemas/services.yaml#/Service'
-                pagination:
-                  $ref: '../schemas/common.yaml#/Pagination'
+                message:
+                  type: string
+                  example: "Services retrieved successfully"
                 meta:
                   type: object
                   properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    pagination:
+                      $ref: '../schemas/common.yaml#/Pagination'
                     filters:
                       type: object
                       properties:
@@ -105,6 +97,12 @@ services:
                 message:
                   type: string
                   example: "Service created successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
@@ -139,6 +137,15 @@ services-id:
                   example: true
                 data:
                   $ref: '../schemas/services.yaml#/Service'
+                message:
+                  type: string
+                  example: "Service retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
@@ -182,6 +189,12 @@ services-id:
                 message:
                   type: string
                   example: "Service updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
@@ -230,6 +243,12 @@ services-id-status:
                 message:
                   type: string
                   example: "Service status updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
@@ -253,13 +272,6 @@ services-id-statistics:
         schema:
           type: integer
         description: Service ID
-      - in: query
-        name: period
-        schema:
-          type: string
-          enum: [week, month, quarter, year]
-          default: month
-        description: Time period for statistics
     responses:
       '200':
         description: Service statistics
@@ -276,44 +288,16 @@ services-id-statistics:
                   properties:
                     statistics:
                       $ref: '../schemas/services.yaml#/ServiceStatistics'
+                message:
+                  type: string
+                  example: "Service statistics retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-services-batch-status:
-  patch:
-    tags:
-      - Services
-    summary: Batch update service status
-    description: Enable or disable multiple services at once
-    operationId: batchUpdateServiceStatus
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '../schemas/services.yaml#/ServiceBatchUpdate'
-    responses:
-      '200':
-        description: Services updated successfully
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                count:
-                  type: integer
-                  description: Number of services updated
-                message:
-                  type: string
-                  example: "4 services updated successfully"
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-      '403':
-        $ref: '../openapi.yaml#/components/responses/ForbiddenError'

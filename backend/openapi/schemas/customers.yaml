@@ -1,7 +1,10 @@
 Customer:
   type: object
   required:
+    - id
     - name
+    - status
+    - kundentyp
   properties:
     id:
       type: integer
@@ -9,61 +12,54 @@ Customer:
     name:
       type: string
       description: Customer name
-      minLength: 2
-      maxLength: 100
     firma:
       type: string
-      description: Company name
-      maxLength: 100
       nullable: true
+      description: Company name
     email:
       type: string
       format: email
-      nullable: true
       description: Customer email address
     telefon:
       type: string
-      description: Phone number
-      maxLength: 30
       nullable: true
+      description: Phone number
     adresse:
       type: string
-      description: Street address
-      maxLength: 200
       nullable: true
+      description: Street address
     plz:
       type: string
-      description: Postal code
-      maxLength: 10
       nullable: true
+      description: Postal code
     ort:
       type: string
-      description: City
-      maxLength: 100
       nullable: true
-    country:
-      type: string
-      default: "Österreich"
-      description: Country
+      description: City
     notizen:
       type: string
-      description: Notes about the customer
-      maxLength: 2000
       nullable: true
+      description: Notes about the customer
     newsletter:
       type: boolean
       description: Newsletter subscription status
-      default: false
     status:
       type: string
       enum: [aktiv, inaktiv, geloescht]
-      default: aktiv
       description: Customer status
+    statusLabel:
+      type: string
+      description: Formatted status label
+    statusClass:
+      type: string
+      description: CSS class for status
     kundentyp:
       type: string
       enum: [privat, geschaeft]
-      default: privat
       description: Customer type
+    kundentypLabel:
+      type: string
+      description: Formatted customer type label
     created_at:
       type: string
       format: date-time
@@ -113,10 +109,6 @@ CustomerCreate:
       description: City
       maxLength: 100
       nullable: true
-    country:
-      type: string
-      default: "Österreich"
-      description: Country
     notizen:
       type: string
       description: Notes about the customer
@@ -174,10 +166,6 @@ CustomerUpdate:
       description: City
       maxLength: 100
       nullable: true
-    country:
-      type: string
-      default: "Österreich"
-      description: Country
     notizen:
       type: string
       description: Notes about the customer
@@ -219,40 +207,6 @@ CustomerNote:
       description: Note text
       minLength: 1
       maxLength: 1000
-
-CustomerFilter:
-  type: object
-  properties:
-    status:
-      type: string
-      enum: [aktiv, inaktiv, geloescht]
-      description: Filter by status
-    type:
-      type: string
-      enum: [privat, geschaeft]
-      description: Filter by customer type
-    search:
-      type: string
-      description: Search term for name, email, or company
-    page:
-      type: integer
-      default: 1
-      description: Page number (1-based)
-    limit:
-      type: integer
-      default: 20
-      maximum: 100
-      description: Items per page
-    sortBy:
-      type: string
-      enum: [name, email, firma, ort, status, created_at]
-      default: name
-      description: Field to sort by
-    sortDirection:
-      type: string
-      enum: [asc, desc]
-      default: asc
-      description: Sort direction
 
 CustomerWithDetails:
   allOf:

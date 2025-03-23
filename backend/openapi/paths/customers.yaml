@@ -64,12 +64,18 @@ customers:
                 data:
                   type: array
                   items:
-                    $ref: '../schemas/models.yaml#/Customer'
-                pagination:
-                  $ref: '../schemas/common.yaml#/Pagination'
+                    $ref: '../schemas/customers.yaml#/Customer'
+                message:
+                  type: string
+                  example: "Customers retrieved successfully"
                 meta:
                   type: object
                   properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    pagination:
+                      $ref: '../schemas/common.yaml#/Pagination'
                     filters:
                       type: object
                       properties:
@@ -93,64 +99,7 @@ customers:
       content:
         application/json:
           schema:
-            type: object
-            required:
-              - name
-              - email
-            properties:
-              name:
-                type: string
-                description: Customer name
-                minLength: 2
-                maxLength: 100
-              firma:
-                type: string
-                description: Company name
-                maxLength: 100
-                nullable: true
-              email:
-                type: string
-                format: email
-                description: Customer email address
-              telefon:
-                type: string
-                description: Phone number
-                maxLength: 30
-                nullable: true
-              adresse:
-                type: string
-                description: Street address
-                maxLength: 200
-                nullable: true
-              plz:
-                type: string
-                description: Postal code
-                maxLength: 10
-                nullable: true
-              ort:
-                type: string
-                description: City
-                maxLength: 100
-                nullable: true
-              notizen:
-                type: string
-                description: Notes about the customer
-                maxLength: 2000
-                nullable: true
-              newsletter:
-                type: boolean
-                description: Newsletter subscription status
-                default: false
-              status:
-                type: string
-                enum: [aktiv, inaktiv, geloescht]
-                default: aktiv
-                description: Customer status
-              kundentyp:
-                type: string
-                enum: [privat, geschaeft]
-                default: privat
-                description: Customer type
+            $ref: '../schemas/customers.yaml#/CustomerCreate'
     responses:
       '201':
         description: Customer created
@@ -163,10 +112,16 @@ customers:
                   type: boolean
                   example: true
                 data:
-                  $ref: '../schemas/models.yaml#/Customer'
+                  $ref: '../schemas/customers.yaml#/Customer'
                 message:
                   type: string
                   example: "Customer created successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
@@ -177,6 +132,38 @@ customers:
           application/json:
             schema:
               $ref: '../schemas/error.yaml#/Error'
+
+customers-statistics:
+  get:
+    tags:
+      - Customers
+    summary: Get customer statistics
+    description: Retrieve statistics about customers like counts by type, status, growth
+    operationId: getCustomerStatistics
+    responses:
+      '200':
+        description: Customer statistics
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/customers.yaml#/CustomerStatistics'
+                message:
+                  type: string
+                  example: "Customer statistics retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
 customers-id:
   get:
@@ -204,45 +191,16 @@ customers-id:
                   type: boolean
                   example: true
                 data:
+                  $ref: '../schemas/customers.yaml#/CustomerWithDetails'
+                message:
+                  type: string
+                  example: "Customer retrieved successfully"
+                meta:
                   type: object
-                  allOf:
-                    - $ref: '../schemas/models.yaml#/Customer'
-                    - type: object
-                      properties:
-                        projects:
-                          type: array
-                          items:
-                            type: object
-                            properties:
-                              id:
-                                type: integer
-                              title:
-                                type: string
-                              datum:
-                                type: string
-                              status:
-                                type: string
-                              statusLabel:
-                                type: string
-                              statusClass:
-                                type: string
-                        appointments:
-                          type: array
-                          items:
-                            type: object
-                            properties:
-                              id:
-                                type: integer
-                              title:
-                                type: string
-                              datum:
-                                type: string
-                              status:
-                                type: string
-                              statusLabel:
-                                type: string
-                              statusClass:
-                                type: string
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
@@ -266,58 +224,7 @@ customers-id:
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              name:
-                type: string
-                description: Customer name
-                minLength: 2
-                maxLength: 100
-              firma:
-                type: string
-                description: Company name
-                maxLength: 100
-                nullable: true
-              email:
-                type: string
-                format: email
-                description: Customer email address
-              telefon:
-                type: string
-                description: Phone number
-                maxLength: 30
-                nullable: true
-              adresse:
-                type: string
-                description: Street address
-                maxLength: 200
-                nullable: true
-              plz:
-                type: string
-                description: Postal code
-                maxLength: 10
-                nullable: true
-              ort:
-                type: string
-                description: City
-                maxLength: 100
-                nullable: true
-              notizen:
-                type: string
-                description: Notes about the customer
-                maxLength: 2000
-                nullable: true
-              newsletter:
-                type: boolean
-                description: Newsletter subscription status
-              status:
-                type: string
-                enum: [aktiv, inaktiv, geloescht]
-                description: Customer status
-              kundentyp:
-                type: string
-                enum: [privat, geschaeft]
-                description: Customer type
+            $ref: '../schemas/customers.yaml#/CustomerUpdate'
     responses:
       '200':
         description: Customer updated
@@ -330,10 +237,16 @@ customers-id:
                   type: boolean
                   example: true
                 data:
-                  $ref: '../schemas/models.yaml#/Customer'
+                  $ref: '../schemas/customers.yaml#/Customer'
                 message:
                   type: string
                   example: "Customer updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
@@ -346,46 +259,6 @@ customers-id:
           application/json:
             schema:
               $ref: '../schemas/error.yaml#/Error'
-
-  delete:
-    tags:
-      - Customers
-    summary: Delete customer
-    description: Mark customer as deleted (soft delete)
-    operationId: deleteCustomer
-    parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-        description: Customer ID
-    responses:
-      '200':
-        description: Customer deleted
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                id:
-                  type: integer
-                message:
-                  type: string
-                  example: "Customer deleted successfully"
-      '400':
-        description: Cannot delete customer with related data
-        content:
-          application/json:
-            schema:
-              $ref: '../schemas/error.yaml#/Error'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
 customers-id-notes:
   post:
@@ -406,15 +279,7 @@ customers-id-notes:
       content:
         application/json:
           schema:
-            type: object
-            required:
-              - note
-            properties:
-              note:
-                type: string
-                description: Note text
-                minLength: 1
-                maxLength: 1000
+            $ref: '../schemas/customers.yaml#/CustomerNote'
     responses:
       '201':
         description: Note added successfully
@@ -440,6 +305,12 @@ customers-id-notes:
                 message:
                   type: string
                   example: "Note added successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
@@ -466,18 +337,7 @@ customers-id-status:
       content:
         application/json:
           schema:
-            type: object
-            required:
-              - status
-            properties:
-              status:
-                type: string
-                enum: [aktiv, inaktiv, geloescht]
-                description: New customer status
-              note:
-                type: string
-                description: Optional note about the status change
-                maxLength: 1000
+            $ref: '../schemas/customers.yaml#/CustomerStatusUpdate'
     responses:
       '200':
         description: Status updated successfully
@@ -501,182 +361,15 @@ customers-id-status:
                 message:
                   type: string
                   example: "Customer status updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-customers-batch-status:
-  patch:
-    tags:
-      - Customers
-    summary: Batch update customer status
-    description: Change the status of multiple customers at once
-    operationId: batchUpdateCustomerStatus
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            required:
-              - customerIds
-              - status
-            properties:
-              customerIds:
-                type: array
-                items:
-                  type: integer
-                description: Array of customer IDs to update
-                minItems: 1
-              status:
-                type: string
-                enum: [aktiv, inaktiv, geloescht]
-                description: New customer status
-              note:
-                type: string
-                description: Optional note about the status change
-                maxLength: 1000
-    responses:
-      '200':
-        description: Status updated successfully
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                count:
-                  type: integer
-                  description: Number of customers updated
-                message:
-                  type: string
-                  example: "5 customers updated successfully"
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-customers-statistics:
-  get:
-    tags:
-      - Customers
-    summary: Get customer statistics
-    description: Retrieve statistics about customers like counts by type, status, growth
-    operationId: getCustomerStatistics
-    responses:
-      '200':
-        description: Customer statistics
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                data:
-                  type: object
-                  properties:
-                    stats:
-                      type: object
-                      properties:
-                        total:
-                          type: integer
-                          description: Total number of customers
-                        active:
-                          type: integer
-                          description: Number of active customers
-                        private:
-                          type: integer
-                          description: Number of private customers
-                        business:
-                          type: integer
-                          description: Number of business customers
-                    growth:
-                      type: array
-                      description: Customer growth over time
-                      items:
-                        type: object
-                        properties:
-                          month:
-                            type: string
-                            description: Month label (e.g., "Jan 2023")
-                          count:
-                            type: integer
-                            description: New customers in this month
-                    distribution:
-                      type: object
-                      description: Customer distribution statistics
-                      properties:
-                        byType:
-                          type: object
-                          properties:
-                            private:
-                              type: integer
-                            business:
-                              type: integer
-                        byStatus:
-                          type: object
-                          properties:
-                            aktiv:
-                              type: integer
-                            inaktiv:
-                              type: integer
-                            geloescht:
-                              type: integer
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-customers-export:
-  get:
-    tags:
-      - Customers
-    summary: Export customers
-    description: Export customers to a file (CSV or Excel)
-    operationId: exportCustomers
-    parameters:
-      - in: query
-        name: format
-        schema:
-          type: string
-          enum: [csv, excel]
-          default: excel
-        description: Export file format
-      - in: query
-        name: status
-        schema:
-          type: string
-          enum: [aktiv, inaktiv, geloescht]
-        description: Filter by status
-      - in: query
-        name: type
-        schema:
-          type: string
-          enum: [privat, geschaeft]
-        description: Filter by customer type
-      - in: query
-        name: search
-        schema:
-          type: string
-        description: Search term for filtering
-    responses:
-      '200':
-        description: File export successful
-        content:
-          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-            schema:
-              type: string
-              format: binary
-          text/csv:
-            schema:
-              type: string
-              format: binary
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'

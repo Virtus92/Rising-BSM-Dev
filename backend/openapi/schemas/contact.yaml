@@ -1,10 +1,12 @@
 ContactRequest:
   type: object
   required:
+    - id
     - name
     - email
     - service
     - message
+    - status
   properties:
     id:
       type: integer
@@ -12,39 +14,45 @@ ContactRequest:
     name:
       type: string
       description: Contact name
-      minLength: 2
-      maxLength: 100
     email:
       type: string
       format: email
       description: Contact email
     phone:
       type: string
-      description: Contact phone number
-      maxLength: 30
       nullable: true
+      description: Contact phone number
     service:
       type: string
       enum: [facility, moving, winter, other]
       description: Requested service type
+    serviceLabel:
+      type: string
+      description: Formatted service label
     message:
       type: string
       description: Request message
-      minLength: 10
-      maxLength: 2000
     status:
       type: string
       enum: [neu, in_bearbeitung, beantwortet, geschlossen]
-      default: neu
       description: Request status
+    statusLabel:
+      type: string
+      description: Formatted status label
+    statusClass:
+      type: string
+      description: CSS class for status
+    formattedDate:
+      type: string
+      description: Formatted creation date
     processorId:
       type: integer
-      description: ID of the user processing the request
       nullable: true
+      description: ID of the user processing the request
     ipAddress:
       type: string
-      description: IP address of submitter
       nullable: true
+      description: IP address of submitter
     createdAt:
       type: string
       format: date-time
@@ -84,25 +92,9 @@ ContactRequestCreate:
       type: string
       description: Request message
       minLength: 10
-      maxLength: 2000
-    ipAddress:
-      type: string
-      description: IP address of submitter
-      nullable: true
+      maxLength: 1000
 
-ContactRequestUpdate:
-  type: object
-  properties:
-    status:
-      type: string
-      enum: [neu, in_bearbeitung, beantwortet, geschlossen]
-      description: Request status
-    processorId:
-      type: integer
-      description: ID of the user processing the request
-      nullable: true
-
-ContactRequestNote:
+RequestNoteCreate:
   type: object
   required:
     - note
@@ -113,60 +105,25 @@ ContactRequestNote:
       minLength: 1
       maxLength: 1000
 
-ContactRequestFilter:
+RequestStatusUpdate:
   type: object
+  required:
+    - status
   properties:
     status:
       type: string
       enum: [neu, in_bearbeitung, beantwortet, geschlossen]
-      description: Filter by status
-    service:
+      description: New request status
+    note:
       type: string
-      enum: [facility, moving, winter, other]
-      description: Filter by service type
-    search:
-      type: string
-      description: Search term for name, email or message
-    dateFrom:
-      type: string
-      format: date
-      description: Filter by creation date (from)
-    dateTo:
-      type: string
-      format: date
-      description: Filter by creation date (to)
-    page:
-      type: integer
-      default: 1
-      description: Page number (1-based)
-    limit:
-      type: integer
-      default: 20
-      maximum: 100
-      description: Items per page
-    sortBy:
-      type: string
-      enum: [createdAt, name, email, status, service]
-      default: createdAt
-      description: Field to sort by
-    sortDirection:
-      type: string
-      enum: [asc, desc]
-      default: desc
-      description: Sort direction
+      description: Optional note about the status change
+      maxLength: 1000
 
 ContactRequestWithDetails:
   allOf:
     - $ref: '#/ContactRequest'
     - type: object
       properties:
-        processor:
-          type: object
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
         notes:
           type: array
           items:
@@ -183,41 +140,14 @@ ContactRequestWithDetails:
               createdAt:
                 type: string
                 format: date-time
-
-ContactRequestStatistics:
-  type: object
-  properties:
-    total:
-      type: integer
-      description: Total number of requests
-    statusCounts:
-      type: object
-      properties:
-        neu:
-          type: integer
-        in_bearbeitung:
-          type: integer
-        beantwortet:
-          type: integer
-        geschlossen:
-          type: integer
-    byService:
-      type: object
-      properties:
-        facility:
-          type: integer
-        moving:
-          type: integer
-        winter:
-          type: integer
-        other:
-          type: integer
-    monthly:
-      type: array
-      items:
-        type: object
-        properties:
-          month:
-            type: string
-          count:
-            type: integer
+        processor:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+            role:
+              type: string

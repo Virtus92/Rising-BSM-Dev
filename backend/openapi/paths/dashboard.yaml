@@ -65,6 +65,27 @@ dashboard:
                               type: number
                             trend:
                               type: integer
+                    chartFilters:
+                      type: object
+                      properties:
+                        revenue:
+                          type: object
+                          properties:
+                            selected:
+                              type: string
+                            options:
+                              type: array
+                              items:
+                                type: string
+                        services:
+                          type: object
+                          properties:
+                            selected:
+                              type: string
+                            options:
+                              type: array
+                              items:
+                                type: string
                     charts:
                       type: object
                       properties:
@@ -90,6 +111,10 @@ dashboard:
                               type: array
                               items:
                                 type: number
+                    notifications:
+                      type: array
+                      items:
+                        $ref: '../schemas/notification.yaml#/Notification'
                     recentRequests:
                       type: array
                       items:
@@ -102,6 +127,8 @@ dashboard:
                           dateLabel:
                             type: string
                           status:
+                            type: string
+                          statusClass:
                             type: string
                     upcomingAppointments:
                       type: array
@@ -116,6 +143,29 @@ dashboard:
                             type: string
                           customer:
                             type: string
+                          time:
+                            type: string
+                    systemStatus:
+                      type: object
+                      properties:
+                        database:
+                          type: string
+                        lastUpdate:
+                          type: string
+                          format: date-time
+                        processing:
+                          type: string
+                        statistics:
+                          type: string
+                message:
+                  type: string
+                  example: "Dashboard data retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
@@ -134,34 +184,49 @@ dashboard-stats:
             schema:
               type: object
               properties:
-                newRequests:
+                success:
+                  type: boolean
+                  example: true
+                data:
                   type: object
                   properties:
-                    count:
-                      type: integer
-                    trend:
-                      type: integer
-                activeProjects:
+                    newRequests:
+                      type: object
+                      properties:
+                        count:
+                          type: integer
+                        trend:
+                          type: integer
+                    activeProjects:
+                      type: object
+                      properties:
+                        count:
+                          type: integer
+                        trend:
+                          type: integer
+                    totalCustomers:
+                      type: object
+                      properties:
+                        count:
+                          type: integer
+                        trend:
+                          type: integer
+                    monthlyRevenue:
+                      type: object
+                      properties:
+                        amount:
+                          type: number
+                        trend:
+                          type: integer
+                message:
+                  type: string
+                  example: "Dashboard statistics retrieved successfully"
+                meta:
                   type: object
                   properties:
-                    count:
-                      type: integer
-                    trend:
-                      type: integer
-                totalCustomers:
-                  type: object
-                  properties:
-                    count:
-                      type: integer
-                    trend:
-                      type: integer
-                monthlyRevenue:
-                  type: object
-                  properties:
-                    amount:
-                      type: number
-                    trend:
-                      type: integer
+                    timestamp:
+                      type: string
+                      format: date-time
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
@@ -170,7 +235,7 @@ dashboard-search:
     tags:
       - Dashboard
     summary: Global search
-    description: Search across customers, projects, appointments, and services
+    description: Search across all entities (customers, projects, appointments, services, etc.)
     operationId: globalSearch
     parameters:
       - in: query
@@ -180,12 +245,6 @@ dashboard-search:
           type: string
           minLength: 2
         description: Search query string
-      - in: query
-        name: limit
-        schema:
-          type: integer
-          default: 10
-        description: Maximum results per category
     responses:
       '200':
         description: Search results
@@ -197,64 +256,81 @@ dashboard-search:
                 success:
                   type: boolean
                   example: true
-                customers:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      name:
-                        type: string
-                      email:
-                        type: string
-                      type:
-                        type: string
-                      matchField:
-                        type: string
-                projects:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      title:
-                        type: string
-                      customer:
-                        type: string
-                      status:
-                        type: string
-                      matchField:
-                        type: string
-                appointments:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      title:
-                        type: string
-                      date:
-                        type: string
-                      status:
-                        type: string
-                      matchField:
-                        type: string
-                services:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      name:
-                        type: string
-                      price:
-                        type: number
-                      matchField:
-                        type: string
+                data:
+                  type: object
+                  properties:
+                    customers:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+                          email:
+                            type: string
+                          type:
+                            type: string
+                    projects:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          title:
+                            type: string
+                          customer:
+                            type: string
+                          status:
+                            type: string
+                    appointments:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          title:
+                            type: string
+                          date:
+                            type: string
+                          status:
+                            type: string
+                    requests:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+                          service:
+                            type: string
+                          status:
+                            type: string
+                    services:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+                          price:
+                            type: number
+                message:
+                  type: string
+                  example: "Search completed successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '400':
         description: Invalid search query
         content:

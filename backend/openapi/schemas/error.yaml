@@ -15,12 +15,12 @@ Error:
       items:
         type: string
       description: List of specific error messages
-    details:
+    meta:
       type: object
-      description: Additional error context
-    stack:
-      type: string
-      description: Stack trace (only in development)
+      properties:
+        timestamp:
+          type: string
+          format: date-time
 
 ValidationError:
   type: object
@@ -43,6 +43,12 @@ ValidationError:
         type: array
         items:
           type: string
+    meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
 
 AuthError:
   type: object
@@ -61,3 +67,9 @@ AuthError:
     message:
       type: string
       description: Detailed error message
+    meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time

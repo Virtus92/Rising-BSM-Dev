@@ -81,17 +81,25 @@ projects:
                   type: array
                   items:
                     $ref: '../schemas/projects.yaml#/Project'
-                pagination:
-                  $ref: '../schemas/common.yaml#/Pagination'
+                message:
+                  type: string
+                  example: "Projects retrieved successfully"
                 meta:
                   type: object
                   properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    pagination:
+                      $ref: '../schemas/common.yaml#/Pagination'
                     filters:
                       type: object
                       properties:
                         status:
                           type: string
                         kunde_id:
+                          type: integer
+                        dienstleistung_id:
                           type: integer
                         search:
                           type: string
@@ -126,238 +134,12 @@ projects:
                 message:
                   type: string
                   example: "Project created successfully"
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-projects-id:
-  get:
-    tags:
-      - Projects
-    summary: Get project by ID
-    description: Retrieve detailed project information with appointments and notes
-    operationId: getProjectById
-    parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-        description: Project ID
-    responses:
-      '200':
-        description: Project details
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                data:
-                  $ref: '../schemas/projects.yaml#/ProjectWithDetails'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-  put:
-    tags:
-      - Projects
-    summary: Update project
-    description: Update an existing project
-    operationId: updateProject
-    parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-        description: Project ID
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '../schemas/projects.yaml#/ProjectUpdate'
-    responses:
-      '200':
-        description: Project updated
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                data:
-                  $ref: '../schemas/projects.yaml#/Project'
-                message:
-                  type: string
-                  example: "Project updated successfully"
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-projects-id-status:
-  patch:
-    tags:
-      - Projects
-    summary: Update project status
-    description: Change the status of a project
-    operationId: updateProjectStatus
-    parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-        description: Project ID
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '../schemas/projects.yaml#/ProjectStatusUpdate'
-    responses:
-      '200':
-        description: Status updated successfully
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                data:
+                meta:
                   type: object
                   properties:
-                    id:
-                      type: integer
-                    status:
-                      type: string
-                    statusLabel:
-                      type: string
-                message:
-                  type: string
-                  example: "Project status updated successfully"
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-projects-id-notes:
-  post:
-    tags:
-      - Projects
-    summary: Add note to project
-    description: Add a new note to an existing project
-    operationId: addProjectNote
-    parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-        description: Project ID
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '../schemas/projects.yaml#/ProjectNote'
-    responses:
-      '201':
-        description: Note added successfully
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                data:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                    projectId:
-                      type: integer
-                    text:
-                      type: string
-                    userName:
-                      type: string
-                    createdAt:
+                    timestamp:
                       type: string
                       format: date-time
-                message:
-                  type: string
-                  example: "Note added successfully"
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-projects-batch-status:
-  patch:
-    tags:
-      - Projects
-    summary: Batch update project status
-    description: Change the status of multiple projects at once
-    operationId: batchUpdateProjectStatus
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            required:
-              - ids
-              - status
-            properties:
-              ids:
-                type: array
-                items:
-                  type: integer
-                description: Array of project IDs to update
-                minItems: 1
-              status:
-                type: string
-                enum: [neu, in_bearbeitung, abgeschlossen, storniert]
-                description: New project status
-              note:
-                type: string
-                description: Optional note about the status change
-                maxLength: 1000
-    responses:
-      '200':
-        description: Status updated successfully
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                count:
-                  type: integer
-                  description: Number of projects updated
-                message:
-                  type: string
-                  example: "3 projects updated successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
@@ -412,6 +194,218 @@ projects-statistics:
                   example: true
                 data:
                   $ref: '../schemas/projects.yaml#/ProjectStatistics'
+                message:
+                  type: string
+                  example: "Project statistics retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-id:
+  get:
+    tags:
+      - Projects
+    summary: Get project by ID
+    description: Retrieve detailed project information with appointments and notes
+    operationId: getProjectById
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Project ID
+    responses:
+      '200':
+        description: Project details
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/projects.yaml#/ProjectWithDetails'
+                message:
+                  type: string
+                  example: "Project retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  put:
+    tags:
+      - Projects
+    summary: Update project
+    description: Update an existing project
+    operationId: updateProject
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Project ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/projects.yaml#/ProjectUpdate'
+    responses:
+      '200':
+        description: Project updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/projects.yaml#/Project'
+                message:
+                  type: string
+                  example: "Project updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-id-status:
+  patch:
+    tags:
+      - Projects
+    summary: Update project status
+    description: Change the status of a project
+    operationId: updateProjectStatus
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Project ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/projects.yaml#/ProjectStatusUpdate'
+    responses:
+      '200':
+        description: Status updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    status:
+                      type: string
+                    statusLabel:
+                      type: string
+                message:
+                  type: string
+                  example: "Project status updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-id-notes:
+  post:
+    tags:
+      - Projects
+    summary: Add note to project
+    description: Add a new note to an existing project
+    operationId: addProjectNote
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Project ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/projects.yaml#/ProjectNote'
+    responses:
+      '201':
+        description: Note added successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    text:
+                      type: string
+                    userName:
+                      type: string
+                    formattedDate:
+                      type: string
+                message:
+                  type: string
+                  example: "Note added successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 

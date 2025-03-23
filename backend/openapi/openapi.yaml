@@ -62,27 +62,13 @@ components:
     # Import common schemas from separate files
     Error:
       $ref: './schemas/error.yaml#/Error'
+    ValidationError:
+      $ref: './schemas/error.yaml#/ValidationError'
     Pagination:
       $ref: './schemas/common.yaml#/Pagination'
     SuccessResponse:
       $ref: './schemas/common.yaml#/SuccessResponse'
     
-    # Entity schemas
-    Customer:
-      $ref: './schemas/customers.yaml#/Customer'
-    Project:
-      $ref: './schemas/projects.yaml#/Project'
-    Appointment:
-      $ref: './schemas/appointments.yaml#/Appointment'
-    Service:
-      $ref: './schemas/services.yaml#/Service'
-    User:
-      $ref: './schemas/models.yaml#/User'
-    ContactRequest:
-      $ref: './schemas/models.yaml#/ContactRequest'
-    Notification:
-      $ref: './schemas/models.yaml#/Notification'
-
   # Common responses
   responses:
     UnauthorizedError:
@@ -108,7 +94,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: '#/components/schemas/ValidationError'
     ServerError:
       description: Internal server error
       content:
@@ -130,7 +116,7 @@ paths:
   /auth/forgot-password:
     $ref: './paths/auth.yaml#/forgot-password'
   /auth/reset-token/{token}:
-    $ref: './paths/auth.yaml#/reset-token'
+    $ref: './paths/auth.yaml#/validate-reset-token'
   /auth/reset-password/{token}:
     $ref: './paths/auth.yaml#/reset-password'
   /auth/logout:
@@ -143,10 +129,6 @@ paths:
     $ref: './paths/user.yaml#/users-id'
   /users/{id}/status:
     $ref: './paths/user.yaml#/users-id-status'
-  /users/{id}/reset-password:
-    $ref: './paths/user.yaml#/users-id-reset-password'
-  /users/batch-status:
-    $ref: './paths/user.yaml#/users-batch-status'
 
   # Notifications
   /notifications:
@@ -165,38 +147,30 @@ paths:
     $ref: './paths/customers.yaml#/customers-id-notes'
   /customers/{id}/status:
     $ref: './paths/customers.yaml#/customers-id-status'
-  /customers/batch-status:
-    $ref: './paths/customers.yaml#/customers-batch-status'
-  /customers/export:
-    $ref: './paths/customers.yaml#/customers-export'
 
   # Projects
   /projects:
     $ref: './paths/projects.yaml#/projects'
   /projects/statistics:
     $ref: './paths/projects.yaml#/projects-statistics'
+  /projects/export:
+    $ref: './paths/projects.yaml#/projects-export'
   /projects/{id}:
     $ref: './paths/projects.yaml#/projects-id'
   /projects/{id}/status:
     $ref: './paths/projects.yaml#/projects-id-status'
   /projects/{id}/notes:
     $ref: './paths/projects.yaml#/projects-id-notes'
-  /projects/batch-status:
-    $ref: './paths/projects.yaml#/projects-batch-status'
-  /projects/export:
-    $ref: './paths/projects.yaml#/projects-export'
 
   # Appointments
   /appointments:
     $ref: './paths/appointments.yaml#/appointments'
   /appointments/{id}:
     $ref: './paths/appointments.yaml#/appointments-id'
-  /appointments/status:
-    $ref: './paths/appointments.yaml#/appointments-status'
+  /appointments/{id}/status:
+    $ref: './paths/appointments.yaml#/appointments-id-status'
   /appointments/{id}/notes:
     $ref: './paths/appointments.yaml#/appointments-id-notes'
-  /appointments/batch:
-    $ref: './paths/appointments.yaml#/appointments-batch'
 
   # Services
   /services:
@@ -207,8 +181,6 @@ paths:
     $ref: './paths/services.yaml#/services-id-status'
   /services/{id}/statistics:
     $ref: './paths/services.yaml#/services-id-statistics'
-  /services/batch-status:
-    $ref: './paths/services.yaml#/services-batch-status'
 
   # Requests
   /requests:
@@ -219,10 +191,6 @@ paths:
     $ref: './paths/requests.yaml#/requests-id-status'
   /requests/{id}/notes:
     $ref: './paths/requests.yaml#/requests-id-notes'
-  /requests/{id}/assign:
-    $ref: './paths/requests.yaml#/requests-id-assign'
-  /requests/batch-status:
-    $ref: './paths/requests.yaml#/requests-batch-status'
   /requests/export:
     $ref: './paths/requests.yaml#/requests-export'
 

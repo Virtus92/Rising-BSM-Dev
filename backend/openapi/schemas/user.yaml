@@ -1,9 +1,11 @@
 User:
   type: object
   required:
+    - id
     - name
     - email
-    - password
+    - role
+    - status
   properties:
     id:
       type: integer
@@ -11,45 +13,42 @@ User:
     name:
       type: string
       description: Full name of the user
-      minLength: 2
-      maxLength: 100
     email:
       type: string
       format: email
-      description: Email address (must be unique)
-    password:
-      type: string
-      format: password
-      description: Password (min 8 characters, stored encrypted)
-      minLength: 8
-    role:
-      type: string
-      enum: [admin, manager, mitarbeiter]
-      default: mitarbeiter
-      description: User role determining access permissions
+      description: Email address
     phone:
       type: string
-      description: Phone number
-      maxLength: 30
       nullable: true
+      description: Phone number
+    role:
+      type: string
+      enum: [admin, manager, mitarbeiter, benutzer]
+      description: User role determining access permissions
+    roleLabel:
+      type: string
+      description: Formatted role label
     status:
       type: string
       enum: [aktiv, inaktiv, gesperrt]
-      default: aktiv
       description: User account status
+    statusLabel:
+      type: string
+      description: Formatted status label
+    statusClass:
+      type: string
+      description: CSS class for status
+    initials:
+      type: string
+      description: User's initials
     profilePicture:
       type: string
-      description: Path to profile picture
       nullable: true
-      maxLength: 255
+      description: Path to profile picture
     createdAt:
       type: string
       format: date-time
       description: Timestamp of user creation
-    updatedAt:
-      type: string
-      format: date-time
-      description: Timestamp of last update
 
 UserCreate:
   type: object
@@ -72,26 +71,21 @@ UserCreate:
       format: password
       description: Password (min 8 characters)
       minLength: 8
-    role:
-      type: string
-      enum: [admin, manager, mitarbeiter]
-      default: mitarbeiter
-      description: User role determining access permissions
     phone:
       type: string
       description: Phone number
       maxLength: 30
       nullable: true
+    role:
+      type: string
+      enum: [admin, manager, mitarbeiter, benutzer]
+      default: mitarbeiter
+      description: User role determining access permissions
     status:
       type: string
       enum: [aktiv, inaktiv, gesperrt]
       default: aktiv
       description: User account status
-    profilePicture:
-      type: string
-      description: Path to profile picture
-      nullable: true
-      maxLength: 255
 
 UserUpdate:
   type: object
@@ -104,191 +98,62 @@ UserUpdate:
     email:
       type: string
       format: email
-      description: Email address (must be unique)
+      description: Email address
     password:
       type: string
       format: password
-      description: Password (min 8 characters)
+      description: New password (min 8 characters)
       minLength: 8
-    role:
-      type: string
-      enum: [admin, manager, mitarbeiter]
-      description: User role determining access permissions
     phone:
       type: string
       description: Phone number
       maxLength: 30
       nullable: true
+    role:
+      type: string
+      enum: [admin, manager, mitarbeiter, benutzer]
+      description: User role determining access permissions
     status:
       type: string
       enum: [aktiv, inaktiv, gesperrt]
       description: User account status
-    profilePicture:
-      type: string
-      description: Path to profile picture
-      nullable: true
-      maxLength: 255
 
-UserPasswordUpdate:
-  type: object
-  required:
-    - currentPassword
-    - newPassword
-  properties:
-    currentPassword:
-      type: string
-      format: password
-      description: Current password
-    newPassword:
-      type: string
-      format: password
-      description: New password (min 8 characters)
-      minLength: 8
-
-UserStatusUpdate:
-  type: object
-  required:
-    - status
-  properties:
-    status:
-      type: string
-      enum: [aktiv, inaktiv, gesperrt]
-      description: New user status
-    note:
-      type: string
-      description: Optional note about the status change
-      maxLength: 1000
-
-UserLogin:
-  type: object
-  required:
-    - email
-    - password
-  properties:
-    email:
-      type: string
-      format: email
-      description: User email
-    password:
-      type: string
-      format: password
-      description: User password
-    rememberMe:
-      type: boolean
-      default: false
-      description: Whether to extend the session duration
-
-UserFilter:
+UserActivity:
   type: object
   properties:
-    status:
-      type: string
-      enum: [aktiv, inaktiv, gesperrt]
-      description: Filter by status
-    role:
-      type: string
-      enum: [admin, manager, mitarbeiter]
-      description: Filter by role
-    search:
-      type: string
-      description: Search term for name or email
-    page:
+    id:
       type: integer
-      default: 1
-      description: Page number (1-based)
-    limit:
-      type: integer
-      default: 20
-      maximum: 100
-      description: Items per page
-    sortBy:
+    activity:
       type: string
-      enum: [name, email, role, status, createdAt]
-      default: name
-      description: Field to sort by
-    sortDirection:
+    activityLabel:
       type: string
-      enum: [asc, desc]
-      default: asc
-      description: Sort direction
+    ipAddress:
+      type: string
+    timestamp:
+      type: string
+      format: date-time
+    formattedDate:
+      type: string
 
-UserWithActivity:
+UserWithDetails:
   allOf:
     - $ref: '#/User'
     - type: object
       properties:
-        lastLogin:
-          type: string
-          format: date-time
-          description: Last login timestamp
-        activities:
+        activity:
           type: array
           items:
-            type: object
-            properties:
-              id:
-                type: integer
-              timestamp:
-                type: string
-                format: date-time
-              activity:
-                type: string
-              ipAddress:
-                type: string
+            $ref: '#/UserActivity'
         settings:
           type: object
           properties:
-            darkMode:
-              type: boolean
             language:
               type: string
+            darkMode:
+              type: boolean
             emailNotifications:
               type: boolean
             pushNotifications:
               type: boolean
             notificationInterval:
               type: string
-
-UserSettings:
-  type: object
-  properties:
-    language:
-      type: string
-      enum: [de, en]
-      default: de
-      description: User interface language preference
-    darkMode:
-      type: boolean
-      default: false
-      description: Dark mode enabled/disabled
-    emailNotifications:
-      type: boolean
-      default: true
-      description: Email notifications enabled/disabled
-    pushNotifications:
-      type: boolean
-      default: false
-      description: Push notifications enabled/disabled
-    notificationInterval:
-      type: string
-      enum: [sofort, taeglich, woechentlich]
-      default: sofort
-      description: Notification delivery interval
-
-AuthResponse:
-  type: object
-  required:
-    - user
-    - token
-  properties:
-    user:
-      $ref: '#/User'
-    token:
-      type: string
-      description: JWT access token
-    refreshToken:
-      type: string
-      description: Refresh token for getting a new access token
-    expiresIn:
-      type: integer
-      description: Token expiration time in seconds
