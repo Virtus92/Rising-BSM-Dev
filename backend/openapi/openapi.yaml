@@ -66,6 +66,22 @@ components:
       $ref: './schemas/common.yaml#/Pagination'
     SuccessResponse:
       $ref: './schemas/common.yaml#/SuccessResponse'
+    
+    # Entity schemas
+    Customer:
+      $ref: './schemas/customers.yaml#/Customer'
+    Project:
+      $ref: './schemas/projects.yaml#/Project'
+    Appointment:
+      $ref: './schemas/appointments.yaml#/Appointment'
+    Service:
+      $ref: './schemas/services.yaml#/Service'
+    User:
+      $ref: './schemas/models.yaml#/User'
+    ContactRequest:
+      $ref: './schemas/models.yaml#/ContactRequest'
+    Notification:
+      $ref: './schemas/models.yaml#/Notification'
 
   # Common responses
   responses:
@@ -122,11 +138,15 @@ paths:
 
   # Users
   /users:
-    $ref: './paths/users.yaml#/users'
+    $ref: './paths/user.yaml#/users'
   /users/{id}:
-    $ref: './paths/users.yaml#/users-id'
+    $ref: './paths/user.yaml#/users-id'
   /users/{id}/status:
-    $ref: './paths/users.yaml#/users-id-status'
+    $ref: './paths/user.yaml#/users-id-status'
+  /users/{id}/reset-password:
+    $ref: './paths/user.yaml#/users-id-reset-password'
+  /users/batch-status:
+    $ref: './paths/user.yaml#/users-batch-status'
 
   # Notifications
   /notifications:
@@ -143,8 +163,12 @@ paths:
     $ref: './paths/customers.yaml#/customers-id'
   /customers/{id}/notes:
     $ref: './paths/customers.yaml#/customers-id-notes'
-  /customers/status:
-    $ref: './paths/customers.yaml#/customers-status'
+  /customers/{id}/status:
+    $ref: './paths/customers.yaml#/customers-id-status'
+  /customers/batch-status:
+    $ref: './paths/customers.yaml#/customers-batch-status'
+  /customers/export:
+    $ref: './paths/customers.yaml#/customers-export'
 
   # Projects
   /projects:
@@ -157,6 +181,8 @@ paths:
     $ref: './paths/projects.yaml#/projects-id-status'
   /projects/{id}/notes:
     $ref: './paths/projects.yaml#/projects-id-notes'
+  /projects/batch-status:
+    $ref: './paths/projects.yaml#/projects-batch-status'
   /projects/export:
     $ref: './paths/projects.yaml#/projects-export'
 
@@ -169,6 +195,8 @@ paths:
     $ref: './paths/appointments.yaml#/appointments-id-status'
   /appointments/{id}/notes:
     $ref: './paths/appointments.yaml#/appointments-id-notes'
+  /appointments/batch:
+    $ref: './paths/appointments.yaml#/appointments-batch'
 
   # Services
   /services:
@@ -179,6 +207,8 @@ paths:
     $ref: './paths/services.yaml#/services-id-status'
   /services/{id}/statistics:
     $ref: './paths/services.yaml#/services-id-statistics'
+  /services/batch-status:
+    $ref: './paths/services.yaml#/services-batch-status'
 
   # Requests
   /requests:
@@ -189,6 +219,10 @@ paths:
     $ref: './paths/requests.yaml#/requests-id-status'
   /requests/{id}/notes:
     $ref: './paths/requests.yaml#/requests-id-notes'
+  /requests/{id}/assign:
+    $ref: './paths/requests.yaml#/requests-id-assign'
+  /requests/batch-status:
+    $ref: './paths/requests.yaml#/requests-batch-status'
   /requests/export:
     $ref: './paths/requests.yaml#/requests-export'
 

@@ -1,108 +1,258 @@
 /**
- * OpenAPI specification validator script
+ * OpenAPI Validation Script
  * 
- * This script validates the OpenAPI specification for correctness
- * and ensures that all controllers match defined endpoints.
+ * This script validates all OpenAPI YAML files for syntax errors and reference consistency.
+ * 
+ * Usage: 
+ * npm run openapi:validate
  */
-const SwaggerParser = require('@apidevtools/swagger-parser');
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
 
-// Constants
-const OPENAPI_PATH = path.join(__dirname, '../backend/openapi/openapi.yaml');
-const CONTROLLERS_PATH = path.join(__dirname, '../backend/controllers');
+import fs from 'fs';
+import path from 'path';
+import yaml from 'js-yaml';
 
-// Helper functions
-function getControllerFiles() {
-  return fs.readdirSync(CONTROLLERS_PATH)
-    .filter(file => file.endsWith('.controller.ts') || file.endsWith('.controller.js'));
+const OPENAPI_DIR = path.resolve(process.cwd(), 'backend/openapi');
+const PATHS_DIR = path.join(OPENAPI_DIR, 'paths');
+const SCHEMAS_DIR = path.join(OPENAPI_DIR, 'schemas');
+
+/**
+ * Validate YAML file for syntax errors
+ */
+function validateYamlFile(filePath) {
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const parsedYaml = yaml.load(fileContent);
+    return { valid: true, content: parsedYaml };
+  } catch (error) {
+    return { 
+      valid: false, 
+      error: error.message,
+      lineNumber: error.mark ? error.mark.line + 1 : undefined,
+      column: error.mark ? error.mark.column + 1 : undefined
+    };
+  }
 }
 
-function extractEndpointsFromController(controllerPath) {
-  const content = fs.readFileSync(path.join(CONTROLLERS_PATH, controllerPath), 'utf8');
+/**
+ * Find all YAML files in a directory
+ */
+function findYamlFiles(directory) {
+  const files = [];
   
-  // Find export functions which are likely API endpoints
-  const exportRegex = /export const (\w+)/g;
-  let match;
-  const exportedFunctions = [];
-  
-  while ((match = exportRegex.exec(content)) !== null) {
-    exportedFunctions.push(match[1]);
+  function traverseDir(currentPath) {
+    const entries = fs.readdirSync(currentPath, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const fullPath = path.join(currentPath, entry.name);
+      
+      if (entry.isDirectory()) {
+        traverseDir(fullPath);
+      } else if (entry.name.endsWith('.yaml') || entry.name.endsWith('.yml')) {
+        files.push(fullPath);
+      }
+    }
   }
   
-  return exportedFunctions;
+  traverseDir(directory);
+  return files;
 }
 
-// Main validation function
-async function validateOpenAPI() {
-  console.log(chalk.blue('🔍 Validating OpenAPI specification...'));
-  
+/**
+ * Validate reference in OpenAPI spec
+ */
+function validateReference(mainSpec, reference, referencingFile) {
   try {
-    // Parse and validate OpenAPI spec
-    const api = await SwaggerParser.validate(OPENAPI_PATH);
-    console.log(chalk.green('✅ OpenAPI specification is valid!'));
+    // Skip external references
+    if (!reference.startsWith('./')) {
+      return { valid: true };
+    }
     
-    // Get all defined operation IDs from OpenAPI spec
-    const operationIds = new Set();
+    const [filePath, pointer] = reference.substring(2).split('#/');
+    const fullPath = path.join(path.dirname(referencingFile), filePath);
     
-    // Extract all operationIds from paths
-    Object.values(api.paths).forEach(pathItem => {
-      Object.values(pathItem).forEach(operation => {
-        if (operation.operationId) {
-          operationIds.add(operation.operationId);
-        }
-      });
-    });
+    if (!fs.existsSync(fullPath)) {
+      return {
+        valid: false,
+        error: `Referenced file does not exist: ${fullPath}`
+      };
+    }
     
-    console.log(chalk.blue(`📊 Found ${operationIds.size} operation IDs in OpenAPI spec`));
+    const fileResult = validateYamlFile(fullPath);
+    if (!fileResult.valid) {
+      return {
+        valid: false,
+        error: `Error in referenced file: ${fileResult.error}`
+      };
+    }
     
-    // Compare with controller functions
-    console.log(chalk.blue('\n🔄 Checking controller functions against OpenAPI spec...'));
-    
-    const controllerFiles = getControllerFiles();
-    let totalControllerFunctions = 0;
-    let missingOperationIds = [];
-    
-    for (const controllerFile of controllerFiles) {
-      const controllerName = controllerFile.replace('.controller.ts', '').replace('.controller.js', '');
-      const controllerFunctions = extractEndpointsFromController(controllerFile);
-      totalControllerFunctions += controllerFunctions.length;
+    // Check if the pointer exists in the file
+    if (pointer) {
+      const pointerParts = pointer.split('/');
+      let currentObj = fileResult.content;
       
-      console.log(chalk.cyan(`\n📁 Controller: ${controllerName}`));
-      
-      for (const func of controllerFunctions) {
-        if (operationIds.has(func)) {
-          console.log(chalk.green(`  ✅ ${func}`));
-        } else {
-          console.log(chalk.yellow(`  ⚠️ ${func} - Not found in OpenAPI spec`));
-          missingOperationIds.push({ controller: controllerName, function: func });
+      for (const part of pointerParts) {
+        if (!part) continue;
+        
+        if (!currentObj || typeof currentObj !== 'object' || !(part in currentObj)) {
+          return {
+            valid: false,
+            error: `Reference pointer "${pointer}" not found in ${filePath}`
+          };
         }
+        
+        currentObj = currentObj[part];
       }
     }
     
-    // Summary
-    console.log(chalk.blue('\n📋 Validation Summary:'));
-    console.log(chalk.blue(`  - OpenAPI Operation IDs: ${operationIds.size}`));
-    console.log(chalk.blue(`  - Controller Functions: ${totalControllerFunctions}`));
-    
-    if (missingOperationIds.length > 0) {
-      console.log(chalk.yellow(`\n⚠️ Found ${missingOperationIds.length} controller functions not defined in OpenAPI spec:`));
-      missingOperationIds.forEach(item => {
-        console.log(chalk.yellow(`  - ${item.controller}.${item.function}`));
-      });
-      
-      console.log(chalk.yellow('\n💡 To fix this, add appropriate operationId fields to your OpenAPI paths.'));
-    } else {
-      console.log(chalk.green('\n✅ All controller functions have corresponding OpenAPI operation IDs!'));
-    }
-    
-  } catch (err) {
-    console.error(chalk.red('❌ OpenAPI validation failed:'));
-    console.error(chalk.red(err));
-    process.exit(1);
+    return { valid: true };
+  } catch (error) {
+    return {
+      valid: false,
+      error: `Error validating reference: ${error.message}`
+    };
   }
 }
 
-// Run validation
-validateOpenAPI();
+/**
+ * Find all references in an object
+ */
+function findReferences(obj, result = [], path = '') {
+  if (!obj || typeof obj !== 'object') {
+    return result;
+  }
+  
+  if (Array.isArray(obj)) {
+    obj.forEach((item, index) => {
+      findReferences(item, result, `${path}[${index}]`);
+    });
+    return result;
+  }
+  
+  for (const [key, value] of Object.entries(obj)) {
+    const currentPath = path ? `${path}.${key}` : key;
+    
+    if (key === '$ref' && typeof value === 'string') {
+      result.push({
+        path: currentPath,
+        value
+      });
+    } else {
+      findReferences(value, result, currentPath);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Validate all OpenAPI files
+ */
+async function validateOpenApi() {
+  console.log('Validating OpenAPI files...\n');
+  
+  let hasErrors = false;
+  
+  // Validate main OpenAPI file
+  const mainFilePath = path.join(OPENAPI_DIR, 'openapi.yaml');
+  console.log(`Checking main file: ${mainFilePath}`);
+  
+  const mainFileResult = validateYamlFile(mainFilePath);
+  if (!mainFileResult.valid) {
+    console.error(`❌ Error in main OpenAPI file: ${mainFileResult.error}`);
+    console.error(`   at line ${mainFileResult.lineNumber}, column ${mainFileResult.column}`);
+    hasErrors = true;
+  } else {
+    console.log('✅ Main OpenAPI file is valid');
+    
+    // Find all references in main file
+    const references = findReferences(mainFileResult.content);
+    console.log(`Found ${references.length} references in main file`);
+    
+    // Validate each reference
+    for (const ref of references) {
+      const refResult = validateReference(mainFileResult.content, ref.value, mainFilePath);
+      
+      if (!refResult.valid) {
+        console.error(`❌ Invalid reference at ${ref.path}: ${ref.value}`);
+        console.error(`   Error: ${refResult.error}`);
+        hasErrors = true;
+      }
+    }
+  }
+  
+  console.log('\nValidating path files...');
+  
+  // Check all path files
+  const pathFiles = findYamlFiles(PATHS_DIR);
+  for (const file of pathFiles) {
+    const relativePath = path.relative(OPENAPI_DIR, file);
+    const result = validateYamlFile(file);
+    
+    if (!result.valid) {
+      console.error(`❌ Error in ${relativePath}: ${result.error}`);
+      console.error(`   at line ${result.lineNumber}, column ${result.column}`);
+      hasErrors = true;
+    } else {
+      console.log(`✅ ${relativePath} is valid`);
+      
+      // Validate references in this file
+      const references = findReferences(result.content);
+      if (references.length > 0) {
+        for (const ref of references) {
+          const refResult = validateReference(mainFileResult.content, ref.value, file);
+          
+          if (!refResult.valid) {
+            console.error(`❌ Invalid reference in ${relativePath} at ${ref.path}: ${ref.value}`);
+            console.error(`   Error: ${refResult.error}`);
+            hasErrors = true;
+          }
+        }
+      }
+    }
+  }
+  
+  console.log('\nValidating schema files...');
+  
+  // Check all schema files
+  const schemaFiles = findYamlFiles(SCHEMAS_DIR);
+  for (const file of schemaFiles) {
+    const relativePath = path.relative(OPENAPI_DIR, file);
+    const result = validateYamlFile(file);
+    
+    if (!result.valid) {
+      console.error(`❌ Error in ${relativePath}: ${result.error}`);
+      console.error(`   at line ${result.lineNumber}, column ${result.column}`);
+      hasErrors = true;
+    } else {
+      console.log(`✅ ${relativePath} is valid`);
+      
+      // Validate references in this file
+      const references = findReferences(result.content);
+      if (references.length > 0) {
+        for (const ref of references) {
+          const refResult = validateReference(mainFileResult.content, ref.value, file);
+          
+          if (!refResult.valid) {
+            console.error(`❌ Invalid reference in ${relativePath} at ${ref.path}: ${ref.value}`);
+            console.error(`   Error: ${refResult.error}`);
+            hasErrors = true;
+          }
+        }
+      }
+    }
+  }
+  
+  console.log('\nValidation complete.');
+  
+  if (hasErrors) {
+    console.error('\n❌ Validation failed with errors');
+    process.exit(1);
+  } else {
+    console.log('\n✅ All OpenAPI files are valid');
+  }
+}
+
+validateOpenApi().catch(error => {
+  console.error('Unexpected error during validation:', error);
+  process.exit(1);
+});

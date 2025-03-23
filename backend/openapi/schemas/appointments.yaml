@@ -49,6 +49,10 @@ Appointment:
       enum: [geplant, bestaetigt, abgeschlossen, storniert]
       default: geplant
       description: Appointment status
+    created_by:
+      type: integer
+      nullable: true
+      description: ID of user who created the appointment
     created_at:
       type: string
       format: date-time

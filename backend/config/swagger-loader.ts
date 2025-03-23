@@ -8,6 +8,9 @@ import swaggerUi from 'swagger-ui-express';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Debug flag can be enabled with environment variable
+const DEBUG = process.env.DEBUG_SWAGGER === 'true';
+
 /**
  * Try to find the correct path to the OpenAPI files
  * Useful when running in Docker or different environments
@@ -34,8 +37,10 @@ function findOpenApiPath(rootDir: string = 'backend/openapi'): string {
     }
   }
 
-  // If we can't find the OpenAPI files, use the mock data
-  console.log(`⚠️ Could not find OpenAPI spec, using mock data`);
+  // If we can't find the OpenAPI files, log a more detailed warning
+  console.warn(`⚠️ Could not find OpenAPI spec in any of the following locations:`);
+  possiblePaths.forEach(p => console.warn(`  - ${p}`));
+  console.warn('Using mock data instead. This will limit your API documentation.');
   return '';
 }
 
@@ -105,15 +110,44 @@ export function loadOpenApiSpec(rootDir: string = 'backend/openapi'): any {
   try {
     // Read and parse main OpenAPI file
     const mainSpecPath = path.join(openapiPath, 'openapi.yaml');
-    const mainSpecYaml = fs.readFileSync(mainSpecPath, 'utf8');
-    const mainSpec = yaml.load(mainSpecYaml) as any;
+    let mainSpecYaml;
+    
+    try {
+      mainSpecYaml = fs.readFileSync(mainSpecPath, 'utf8');
+    } catch (error) {
+      console.error(`Error reading main OpenAPI file: ${mainSpecPath}`, error);
+      return createMockOpenApiSpec();
+    }
+    
+    let mainSpec;
+    try {
+      mainSpec = yaml.load(mainSpecYaml) as any;
+      if (DEBUG) console.log('Successfully parsed main OpenAPI YAML');
+    } catch (yamlError: any) {
+      console.error('⚠️ YAML parsing error in main OpenAPI file:');
+      console.error(`   ${(yamlError as Error).message}`);
+      console.error(`   at line ${yamlError.mark?.line + 1}, column ${yamlError.mark?.column + 1}`);
+      console.error('This will cause issues with your API documentation.');
+      return createMockOpenApiSpec();
+    }
     
     // Track loaded files to avoid circular references
     const loadedFiles = new Set<string>();
     loadedFiles.add(mainSpecPath);
     
     // Resolve references in spec
-    return resolveReferences(mainSpec, openapiPath, loadedFiles);
+    const resolvedSpec = resolveReferences(mainSpec, openapiPath, loadedFiles);
+    
+    // Validate the number of paths to ensure everything loaded correctly
+    const pathCount = Object.keys(resolvedSpec.paths || {}).length;
+    if (pathCount === 0) {
+      console.warn('⚠️ No paths found in the OpenAPI specification after resolving references.');
+      console.warn('   This might indicate problems with your reference paths or YAML syntax.');
+    } else {
+      if (DEBUG) console.log(`Found ${pathCount} API paths in the specification`);
+    }
+    
+    return resolvedSpec;
   } catch (error) {
     console.error('Error processing OpenAPI spec:', error);
     return createMockOpenApiSpec();
@@ -150,9 +184,25 @@ function resolveReferences(obj: any, rootDir: string, loadedFiles: Set<string>):
       try {
         // Load referenced file if not already loaded
         if (!loadedFiles.has(fullPath)) {
+          if (!fs.existsSync(fullPath)) {
+            console.error(`⚠️ Referenced file does not exist: ${fullPath}`);
+            result[key] = value; // Keep the unresolved reference
+            continue;
+          }
+          
           loadedFiles.add(fullPath);
           const refFileYaml = fs.readFileSync(fullPath, 'utf8');
-          const refObj = yaml.load(refFileYaml) as any;
+          
+          let refObj;
+          try {
+            refObj = yaml.load(refFileYaml) as any;
+          } catch (yamlError: any) {
+            console.error(`⚠️ YAML parsing error in referenced file: ${fullPath}`);
+            console.error(`   ${(yamlError as Error).message}`);
+            console.error(`   at line ${yamlError.mark?.line + 1}, column ${yamlError.mark?.column + 1}`);
+            result[key] = value; // Keep the unresolved reference
+            continue;
+          }
           
           // Get referenced object using pointer
           let referencedObj = refObj;
@@ -160,9 +210,22 @@ function resolveReferences(obj: any, rootDir: string, loadedFiles: Set<string>):
             const parts = refPointer.split('/');
             for (const part of parts) {
               if (part && referencedObj) {
+                if (!(part in referencedObj)) {
+                  console.error(`⚠️ Reference pointer "${refPointer}" not found in ${filePath}`);
+                  console.error(`   Missing part: ${part}`);
+                  result[key] = value; // Keep the unresolved reference
+                  continue;
+                }
                 referencedObj = referencedObj[part];
               }
             }
+          }
+          
+          // Check if we actually found the referenced object
+          if (referencedObj === undefined) {
+            console.error(`⚠️ Reference resolved to undefined: ${value}`);
+            result[key] = value; // Keep the unresolved reference
+            continue;
           }
           
           // Resolve any nested references
@@ -198,6 +261,9 @@ export function setupSwagger(app: any, options: any = {}): void {
   // Load OpenAPI spec (will return mock data if files not found)
   const openApiSpec = loadOpenApiSpec();
   
+  // Validate the loaded spec
+  validateOpenApiSpec(openApiSpec);
+  
   // Default Swagger UI options
   const defaultOptions = {
     explorer: true,
@@ -216,14 +282,14 @@ export function setupSwagger(app: any, options: any = {}): void {
     app.get('/api-docs', swaggerUi.setup(openApiSpec, uiOptions));
     
     // Serve Swagger specification as JSON
-    app.get('/swagger.json', (req: any, res: any) => {
+    app.get('/swagger.json', (_req: any, res: any) => {
       res.setHeader('Content-Type', 'application/json');
       res.send(openApiSpec);
     });
     
     // Development token endpoint (for testing in non-production environments)
     if (process.env.NODE_ENV !== 'production') {
-      app.get('/api-docs/dev-token', (req: any, res: any) => {
+      app.get('/api-docs/dev-token', (_req: any, res: any) => {
         try {
           const jwt = require('jsonwebtoken');
           const token = jwt.sign(
@@ -243,7 +309,7 @@ export function setupSwagger(app: any, options: any = {}): void {
       });
       
       // Create a helper HTML page for API testing
-      app.get('/api-docs/helper', (req: any, res: any) => {
+      app.get('/api-docs/helper', (_req: any, res: any) => {
         const jwt = require('jsonwebtoken');
         const token = jwt.sign(
           { userId: 1, role: 'admin', name: 'Developer' },
@@ -312,6 +378,62 @@ export function setupSwagger(app: any, options: any = {}): void {
     console.error('Error setting up Swagger UI:', error);
     console.log('👉 Swagger UI setup was skipped due to errors');
   }
+}
+
+/**
+ * Validate the OpenAPI specification
+ * @param spec OpenAPI specification object
+ * @returns true if valid, false if invalid
+ */
+function validateOpenApiSpec(spec: any): boolean {
+  if (!spec) {
+    console.error('❌ OpenAPI specification is null or undefined');
+    return false;
+  }
+  
+  if (!spec.paths || Object.keys(spec.paths).length === 0) {
+    console.warn('⚠️ OpenAPI specification has no paths defined');
+    return false;
+  }
+  
+  // Check if the specification has the required fields
+  if (!spec.openapi) {
+    console.warn('⚠️ OpenAPI specification is missing the "openapi" field');
+  }
+  
+  if (!spec.info) {
+    console.warn('⚠️ OpenAPI specification is missing the "info" field');
+  } else {
+    if (!spec.info.title) {
+      console.warn('⚠️ OpenAPI specification is missing the "info.title" field');
+    }
+    
+    if (!spec.info.version) {
+      console.warn('⚠️ OpenAPI specification is missing the "info.version" field');
+    }
+  }
+  
+  if (!spec.servers || spec.servers.length === 0) {
+    console.warn('⚠️ OpenAPI specification has no servers defined');
+  }
+  
+  // Count the number of defined paths and operations
+  let operationCount = 0;
+  for (const [_path, pathObj] of Object.entries(spec.paths || {})) {
+    for (const method of ['get', 'post', 'put', 'delete', 'patch', 'options', 'head']) {
+      if ((pathObj as any)[method]) {
+        operationCount++;
+      }
+    }
+  }
+  
+  if (DEBUG) {
+    console.log(`OpenAPI specification contains:`);
+    console.log(`- ${Object.keys(spec.paths || {}).length} paths`);
+    console.log(`- ${operationCount} operations`);
+  }
+  
+  return true;
 }
 
 export default setupSwagger;

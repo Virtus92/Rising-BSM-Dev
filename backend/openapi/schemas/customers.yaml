@@ -2,7 +2,6 @@ Customer:
   type: object
   required:
     - name
-    - email
   properties:
     id:
       type: integer
@@ -20,6 +19,7 @@ Customer:
     email:
       type: string
       format: email
+      nullable: true
       description: Customer email address
     telefon:
       type: string
@@ -41,6 +41,10 @@ Customer:
       description: City
       maxLength: 100
       nullable: true
+    country:
+      type: string
+      default: "Österreich"
+      description: Country
     notizen:
       type: string
       description: Notes about the customer
@@ -109,6 +113,10 @@ CustomerCreate:
       description: City
       maxLength: 100
       nullable: true
+    country:
+      type: string
+      default: "Österreich"
+      description: Country
     notizen:
       type: string
       description: Notes about the customer
@@ -166,6 +174,10 @@ CustomerUpdate:
       description: City
       maxLength: 100
       nullable: true
+    country:
+      type: string
+      default: "Österreich"
+      description: Country
     notizen:
       type: string
       description: Notes about the customer

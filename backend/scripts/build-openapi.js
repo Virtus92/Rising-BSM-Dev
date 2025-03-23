@@ -11,10 +11,13 @@ import yaml from 'js-yaml';
   console.log('Building bundled OpenAPI spec...');
   
   // Define paths
-  const __dirname = path.dirname(new URL(import.meta.url).pathname);
-  const rootDir = path.join(__dirname, '..', 'openapi');
-  const mainSpecPath = path.join(rootDir, 'openapi.yaml');
-  const outputPath = path.join(__dirname, '..', 'dist', 'swagger.json');
+  const OPENAPI_DIR = path.resolve(process.cwd(), 'openapi');
+  const PATHS_DIR = path.join(OPENAPI_DIR, 'paths');
+  const SCHEMAS_DIR = path.join(OPENAPI_DIR, 'schemas');
+
+  const rootDir = OPENAPI_DIR;
+  const mainSpecPath = path.join(OPENAPI_DIR, 'openapi.yaml');
+  const outputPath = path.join(process.cwd(), 'dist', 'swagger.json');
   
   // Track loaded files to avoid circular references
   const loadedFiles = new Set();

@@ -1,4 +1,3 @@
-# paths/services.yaml
 services:
   get:
     tags:
@@ -59,7 +58,7 @@ services:
                 data:
                   type: array
                   items:
-                    $ref: '../schemas/models.yaml#/Service'
+                    $ref: '../schemas/services.yaml#/Service'
                 pagination:
                   $ref: '../schemas/common.yaml#/Pagination'
                 meta:
@@ -86,42 +85,7 @@ services:
       content:
         application/json:
           schema:
-            type: object
-            required:
-              - name
-              - preis_basis
-              - einheit
-            properties:
-              name:
-                type: string
-                description: Service name
-                minLength: 2
-                maxLength: 100
-              beschreibung:
-                type: string
-                nullable: true
-                description: Service description
-                maxLength: 2000
-              preis_basis:
-                type: number
-                format: float
-                description: Base price
-                minimum: 0
-              einheit:
-                type: string
-                description: Unit (e.g., hour, piece, m²)
-                maxLength: 20
-              mwst_satz:
-                type: number
-                format: float
-                default: 20
-                description: VAT rate in percentage
-                minimum: 0
-                maximum: 100
-              aktiv:
-                type: boolean
-                default: true
-                description: Service status (active/inactive)
+            $ref: '../schemas/services.yaml#/ServiceCreate'
     responses:
       '201':
         description: Service created
@@ -134,7 +98,10 @@ services:
                   type: boolean
                   example: true
                 data:
-                  $ref: '../schemas/models.yaml#/Service'
+                  type: object
+                  properties:
+                    serviceId:
+                      type: integer
                 message:
                   type: string
                   example: "Service created successfully"
@@ -171,7 +138,7 @@ services-id:
                   type: boolean
                   example: true
                 data:
-                  $ref: '../schemas/models.yaml#/Service'
+                  $ref: '../schemas/services.yaml#/Service'
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
@@ -195,36 +162,7 @@ services-id:
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              name:
-                type: string
-                description: Service name
-                minLength: 2
-                maxLength: 100
-              beschreibung:
-                type: string
-                nullable: true
-                description: Service description
-                maxLength: 2000
-              preis_basis:
-                type: number
-                format: float
-                description: Base price
-                minimum: 0
-              einheit:
-                type: string
-                description: Unit (e.g., hour, piece, m²)
-                maxLength: 20
-              mwst_satz:
-                type: number
-                format: float
-                description: VAT rate in percentage
-                minimum: 0
-                maximum: 100
-              aktiv:
-                type: boolean
-                description: Service status (active/inactive)
+            $ref: '../schemas/services.yaml#/ServiceUpdate'
     responses:
       '200':
         description: Service updated
@@ -237,7 +175,10 @@ services-id:
                   type: boolean
                   example: true
                 data:
-                  $ref: '../schemas/models.yaml#/Service'
+                  type: object
+                  properties:
+                    serviceId:
+                      type: integer
                 message:
                   type: string
                   example: "Service updated successfully"
@@ -269,13 +210,7 @@ services-id-status:
       content:
         application/json:
           schema:
-            type: object
-            required:
-              - aktiv
-            properties:
-              aktiv:
-                type: boolean
-                description: Service status (true=active, false=inactive)
+            $ref: '../schemas/services.yaml#/ServiceStatusUpdate'
     responses:
       '200':
         description: Status updated successfully
@@ -290,10 +225,8 @@ services-id-status:
                 data:
                   type: object
                   properties:
-                    id:
+                    serviceId:
                       type: integer
-                    aktiv:
-                      type: boolean
                 message:
                   type: string
                   example: "Service status updated successfully"
@@ -341,58 +274,8 @@ services-id-statistics:
                 data:
                   type: object
                   properties:
-                    service:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                        name:
-                          type: string
-                        active:
-                          type: boolean
-                    usage:
-                      type: object
-                      properties:
-                        totalProjects:
-                          type: integer
-                        activeProjects:
-                          type: integer
-                        completedProjects:
-                          type: integer
-                    revenue:
-                      type: object
-                      properties:
-                        totalRevenue:
-                          type: number
-                        avgProjectValue:
-                          type: number
-                        periodComparison:
-                          type: number
-                          description: Percentage change compared to previous period
-                    monthlyRevenue:
-                      type: array
-                      description: Revenue grouped by month
-                      items:
-                        type: object
-                        properties:
-                          month:
-                            type: string
-                          revenue:
-                            type: number
-                    topCustomers:
-                      type: array
-                      description: Top customers for this service
-                      items:
-                        type: object
-                        properties:
-                          id:
-                            type: integer
-                          name:
-                            type: string
-                          revenue:
-                            type: number
-                          projectCount:
-                            type: integer
+                    statistics:
+                      $ref: '../schemas/services.yaml#/ServiceStatistics'
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
@@ -410,20 +293,7 @@ services-batch-status:
       content:
         application/json:
           schema:
-            type: object
-            required:
-              - ids
-              - aktiv
-            properties:
-              ids:
-                type: array
-                items:
-                  type: integer
-                description: Array of service IDs to update
-                minItems: 1
-              aktiv:
-                type: boolean
-                description: Service status (true=active, false=inactive)
+            $ref: '../schemas/services.yaml#/ServiceBatchUpdate'
     responses:
       '200':
         description: Services updated successfully

@@ -1,0 +1,136 @@
+Notification:
+  type: object
+  required:
+    - type
+    - title
+  properties:
+    id:
+      type: integer
+      description: Notification ID (auto-generated)
+    userId:
+      type: integer
+      description: ID of the user receiving the notification
+    type:
+      type: string
+      enum: [anfrage, termin, projekt, warnung, system]
+      description: Notification type
+    title:
+      type: string
+      description: Notification title
+      maxLength: 100
+    message:
+      type: string
+      description: Notification message
+      maxLength: 1000
+    referenceId:
+      type: integer
+      description: ID of the referenced entity
+      nullable: true
+    referenceType:
+      type: string
+      description: Type of the referenced entity
+      enum: [kunde, projekt, termin, anfrage, system]
+      nullable: true
+    read:
+      type: boolean
+      default: false
+      description: Whether the notification has been read
+    createdAt:
+      type: string
+      format: date-time
+      description: Timestamp of notification creation
+
+NotificationCreate:
+  type: object
+  required:
+    - type
+    - title
+  properties:
+    userId:
+      type: integer
+      description: ID of the user receiving the notification
+    type:
+      type: string
+      enum: [anfrage, termin, projekt, warnung, system]
+      description: Notification type
+    title:
+      type: string
+      description: Notification title
+      maxLength: 100
+    message:
+      type: string
+      description: Notification message
+      maxLength: 1000
+    referenceId:
+      type: integer
+      description: ID of the referenced entity
+      nullable: true
+    referenceType:
+      type: string
+      description: Type of the referenced entity
+      enum: [kunde, projekt, termin, anfrage, system]
+      nullable: true
+
+NotificationUpdate:
+  type: object
+  properties:
+    read:
+      type: boolean
+      description: Mark notification as read/unread
+
+NotificationFilter:
+  type: object
+  properties:
+    type:
+      type: string
+      enum: [anfrage, termin, projekt, warnung, system]
+      description: Filter by notification type
+    read:
+      type: boolean
+      description: Filter by read status
+    referenceType:
+      type: string
+      enum: [kunde, projekt, termin, anfrage, system]
+      description: Filter by reference type
+    page:
+      type: integer
+      default: 1
+      description: Page number (1-based)
+    limit:
+      type: integer
+      default: 20
+      maximum: 100
+      description: Items per page
+    sortBy:
+      type: string
+      enum: [createdAt, type, title]
+      default: createdAt
+      description: Field to sort by
+    sortDirection:
+      type: string
+      enum: [asc, desc]
+      default: desc
+      description: Sort direction
+
+NotificationCount:
+  type: object
+  properties:
+    total:
+      type: integer
+      description: Total number of notifications
+    unread:
+      type: integer
+      description: Number of unread notifications
+    byType:
+      type: object
+      properties:
+        anfrage:
+          type: integer
+        termin:
+          type: integer
+        projekt:
+          type: integer
+        warnung:
+          type: integer
+        system:
+          type: integer

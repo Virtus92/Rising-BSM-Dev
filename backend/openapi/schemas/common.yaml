@@ -38,3 +38,20 @@ SuccessResponse:
       description: Response message
     meta:
       $ref: '#/MetaData'
+      
+ListResponse:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: true
+    data:
+      type: array
+      items:
+        type: object
+      description: List of data items
+    message:
+      type: string
+      description: Response message
+    meta:
+      $ref: '#/MetaData'

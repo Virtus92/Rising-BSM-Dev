@@ -16,7 +16,7 @@ requests:
         name: service
         schema:
           type: string
-          enum: [facility, moving, winter]
+          enum: [facility, moving, winter, other]
         description: Filter by service type
       - in: query
         name: date
@@ -52,23 +52,26 @@ requests:
                 success:
                   type: boolean
                   example: true
-                requests:
+                data:
                   type: array
                   items:
                     $ref: '../schemas/models.yaml#/ContactRequest'
                 pagination:
                   $ref: '../schemas/common.yaml#/Pagination'
-                filters:
+                meta:
                   type: object
                   properties:
-                    status:
-                      type: string
-                    service:
-                      type: string
-                    date:
-                      type: string
-                    search:
-                      type: string
+                    filters:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                        service:
+                          type: string
+                        date:
+                          type: string
+                        search:
+                          type: string
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
@@ -97,23 +100,39 @@ requests-id:
                 success:
                   type: boolean
                   example: true
-                request:
-                  $ref: '../schemas/models.yaml#/ContactRequest'
-                notes:
-                  type: array
-                  items:
-                    $ref: '../schemas/models.yaml#/Note'
-                processor:
+                data:
                   type: object
-                  properties:
-                    id:
-                      type: integer
-                    name:
-                      type: string
-                    email:
-                      type: string
-                    role:
-                      type: string
+                  allOf:
+                    - $ref: '../schemas/models.yaml#/ContactRequest'
+                    - type: object
+                      properties:
+                        notes:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                              text:
+                                type: string
+                              userName:
+                                type: string
+                              formattedDate:
+                                type: string
+                              createdAt:
+                                type: string
+                                format: date-time
+                        processor:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            email:
+                              type: string
+                            role:
+                              type: string
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
@@ -146,6 +165,10 @@ requests-id-status:
                 type: string
                 enum: [neu, in_bearbeitung, beantwortet, geschlossen]
                 description: New request status
+              note:
+                type: string
+                description: Optional note about the status change
+                maxLength: 1000
     responses:
       '200':
         description: Status updated successfully
@@ -157,10 +180,16 @@ requests-id-status:
                 success:
                   type: boolean
                   example: true
-                requestId:
-                  type: integer
+                data:
+                  type: object
+                  properties:
+                    requestId:
+                      type: integer
+                    status:
+                      type: string
                 message:
                   type: string
+                  example: "Request status updated successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
@@ -194,6 +223,8 @@ requests-id-notes:
               note:
                 type: string
                 description: Note text
+                minLength: 1
+                maxLength: 1000
     responses:
       '201':
         description: Note added successfully
@@ -205,14 +236,129 @@ requests-id-notes:
                 success:
                   type: boolean
                   example: true
-                requestId:
-                  type: integer
+                data:
+                  type: object
+                  properties:
+                    requestId:
+                      type: integer
+                    noteId:
+                      type: integer
                 message:
                   type: string
+                  example: "Note added successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+requests-id-assign:
+  patch:
+    tags:
+      - Requests
+    summary: Assign request to processor
+    description: Assign a contact request to a user for processing
+    operationId: assignRequest
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Request ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - processorId
+            properties:
+              processorId:
+                type: integer
+                description: User ID to assign the request to
+    responses:
+      '200':
+        description: Request assigned successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    processorId:
+                      type: integer
+                    processorName:
+                      type: string
+                message:
+                  type: string
+                  example: "Request assigned successfully"
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+requests-batch-status:
+  patch:
+    tags:
+      - Requests
+    summary: Batch update request status
+    description: Change the status of multiple contact requests at once
+    operationId: batchUpdateRequestStatus
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - ids
+              - status
+            properties:
+              ids:
+                type: array
+                items:
+                  type: integer
+                description: Array of request IDs to update
+                minItems: 1
+              status:
+                type: string
+                enum: [neu, in_bearbeitung, beantwortet, geschlossen]
+                description: New request status
+              note:
+                type: string
+                description: Optional note about the status change
+                maxLength: 1000
+    responses:
+      '200':
+        description: Status updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                count:
+                  type: integer
+                  description: Number of requests updated
+                message:
+                  type: string
+                  example: "3 requests updated successfully"
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
@@ -241,7 +387,7 @@ requests-export:
         name: service
         schema:
           type: string
-          enum: [facility, moving, winter]
+          enum: [facility, moving, winter, other]
         description: Filter by service type
       - in: query
         name: startDate
@@ -271,3 +417,16 @@ requests-export:
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '501':
+        description: Export functionality is not implemented yet
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: false
+                error:
+                  type: string
+                  example: "Export functionality is not implemented yet"
