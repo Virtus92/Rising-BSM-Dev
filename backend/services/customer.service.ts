@@ -18,7 +18,7 @@ import {
   NotFoundError, 
   ValidationError, 
   ConflictError
-} from '../utils/error-handler.js';
+} from '../utils/errors.js';
 import { 
   CreateOptions, 
   UpdateOptions, 

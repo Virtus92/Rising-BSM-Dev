@@ -18,7 +18,7 @@ import {
   NotFoundError, 
   ValidationError, 
   ConflictError
-} from '../utils/error-handler.js';
+} from '../utils/errors.js';
 import { 
   CreateOptions, 
   UpdateOptions, 
@@ -26,7 +26,7 @@ import {
   FindAllOptions 
 } from '../types/service.types.js';
 import { getProjektStatusInfo, getTerminStatusInfo } from '../utils/helpers.js';
-import validator from '../utils/validator.js';
+import validator from '../utils/validators.js';
 import logger from '../utils/logger.js';
 
 /**

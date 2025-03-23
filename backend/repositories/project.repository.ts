@@ -8,7 +8,7 @@ import { BaseRepository } from './base.repository.js';
 import { QueryBuilder } from '../utils/query-builder.js';
 import { inject } from '../config/dependency-container.js';
 import { ProjectFilterDTO } from '../types/dtos/project.dto.js';
-import { DatabaseError } from '../utils/error-handler.js';
+import { DatabaseError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
 
 /**

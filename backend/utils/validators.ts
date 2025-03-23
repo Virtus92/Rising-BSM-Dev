@@ -1,5 +1,13 @@
+/**
+ * Validation Utilities
+ * Comprehensive validation utilities for data validation and sanitization.
+ */
 import validator from 'validator';
 import { ValidationError } from './errors.js';
+
+/**
+ * Validation related types
+ */
 
 /**
  * Base validation options interface
@@ -28,7 +36,28 @@ export interface ValidationSchema {
  * Generic validation rule interface
  */
 export interface ValidationRule extends BaseValidationOptions {
-  type: 'text' | 'email' | 'phone' | 'date' | 'numeric' | 'password' | 'time';
+  type: 'text' | 'email' | 'phone' | 'date' | 'numeric' | 'password' | 'time' | 'string' | 'number' | 'boolean' | 'array' | 'object' | 'enum' | 'custom';
+  required?: boolean;
+  default?: any;
+  min?: number;
+  max?: number;
+  pattern?: RegExp | string;
+  validate?: (value: any, data?: any) => boolean | string | Promise<boolean | string>;
+  message?: string;
+  messages?: {
+    required?: string;
+    min?: string;
+    max?: string;
+    pattern?: string;
+    type?: string;
+    enum?: string;
+    [key: string]: string | undefined;
+  };
+  enum?: any[];
+  schema?: ValidationSchema;
+  items?: ValidationRule;
+  options?: Record<string, any>;
+  transform?: Array<(value: any) => any>;
   [key: string]: any; // Allow additional properties based on type
 }
 
@@ -80,6 +109,25 @@ export interface PasswordValidationOptions extends BaseValidationOptions {
  */
 export interface TimeValidationOptions extends BaseValidationOptions {
   format?: '24h' | '12h';
+}
+
+/**
+ * Validation options for validateInput
+ */
+export interface ValidationOptions {
+  throwOnError?: boolean;
+  stopOnFirstError?: boolean;
+  customMessages?: Record<string, string>;
+}
+
+/**
+ * Field error information
+ */
+export interface FieldError {
+  path: string;
+  message: string;
+  type: string;
+  value?: any;
 }
 
 /**
@@ -479,6 +527,36 @@ export const validatePassword = (
 };
 
 /**
+ * Validate enum values
+ * @param value Value to validate
+ * @param options Validation options with allowed values
+ * @returns Validation result
+ */
+export const validateEnum = (
+  value: any,
+  options: BaseValidationOptions & { values: any[] }
+): ValidationResult<any> => {
+  const { required = false, values } = options;
+  const errors: string[] = [];
+
+  if ((value === null || value === undefined) && required) {
+    errors.push('Value is required');
+    return { isValid: false, errors, value: null };
+  }
+
+  if (value !== null && value !== undefined && !values.includes(value)) {
+    errors.push(`Value must be one of: ${values.join(', ')}`);
+    return { isValid: false, errors, value };
+  }
+
+  return {
+    isValid: true,
+    errors: [],
+    value
+  };
+};
+
+/**
  * Comprehensive input validation
  * @param data Input data to validate
  * @param schema Validation schema
@@ -488,46 +566,64 @@ export const validatePassword = (
 export const validateInput = <T extends Record<string, any>>(
   data: Record<string, any>,
   schema: ValidationSchema,
-  options: { throwOnError?: boolean } = {}
+  options: ValidationOptions = {}
 ): { isValid: boolean; errors: string[]; validatedData: T } => {
-  const { throwOnError = false } = options;
-  const validationResults: Record<string, ValidationResult> = {};
+  const { throwOnError = false, stopOnFirstError = false } = options;
   const errors: string[] = [];
   const validatedData: Record<string, any> = {};
 
-  Object.entries(schema).forEach(([field, rules]) => {
-    const value = data[field];
-    let result: ValidationResult;
-
-    switch (rules.type) {
-      case 'text':
-        result = validateText(value, rules);
-        break;
-      case 'email':
-        result = validateEmail(value, rules);
-        break;
-      case 'phone':
-        result = validatePhone(value, rules);
-        break;
-      case 'date':
-        result = validateDate(value, rules);
-        break;
-      case 'numeric':
-        result = validateNumeric(value, rules);
-        break;
-      case 'password':
-        result = validatePassword(value, rules);
-        break;
-      case 'time':
-        result = validateTimeFormat(value, rules);
-        break;
-      default:
-        result = { isValid: true, errors: [], value };
+  Object.entries(schema).forEach(([field, rule]) => {
+    if (errors.length > 0 && stopOnFirstError) {
+      return;
     }
 
-    validationResults[field] = result;
+    const value = data[field];
+    let result: ValidationResult<any>;
+
+    // Apply appropriate validation based on type
+    switch (rule.type) {
+      case 'text':
+      case 'string':
+        result = validateText(value, rule);
+        break;
+      case 'email':
+        result = validateEmail(value, rule);
+        break;
+      case 'phone':
+        result = validatePhone(value, rule);
+        break;
+      case 'date':
+        result = validateDate(value, rule);
+        break;
+      case 'numeric':
+      case 'number':
+        result = validateNumeric(value, rule);
+        break;
+      case 'password':
+        result = validatePassword(value, rule);
+        break;
+      case 'time':
+        result = validateTimeFormat(value, rule);
+        break;
+      case 'enum':
+        if (!rule.values && rule.enum) {
+          rule.values = rule.enum;
+        }
+        result = validateEnum(value, rule as BaseValidationOptions & { values: any[] });
+        break;
+      default:
+        // Default pass-through for types we don't explicitly handle
+        result = {
+          isValid: true,
+          errors: [],
+          value: value
+        };
+    }
+
+    // Save validated value
     validatedData[field] = result.value;
 
+    // Collect errors
     if (!result.isValid) {
       result.errors.forEach(err => errors.push(`${field}: ${err}`));
     }
@@ -535,6 +631,7 @@ export const validateInput = <T extends Record<string, any>>(
 
   const isValid = errors.length === 0;
 
+  // Throw error if validation failed and throwOnError is true
   if (!isValid && throwOnError) {
     throw new ValidationError('Validation failed', errors);
   }
@@ -545,6 +642,39 @@ export const validateInput = <T extends Record<string, any>>(
     validatedData: validatedData as T
   };
 };
+
+// Extension for allowing string literals in validation rule types
+export interface ExtendedValidationRule extends Omit<ValidationRule, 'type'> {
+  type: ValidationRule['type'] | string;
+}
+
+export interface ExtendedValidationSchema {
+  [key: string]: ExtendedValidationRule;
+}
+
+// Helper function to convert extended schema to standard schema
+export function convertValidationSchema(schema: ExtendedValidationSchema): ValidationSchema {
+  const converted: ValidationSchema = {};
+  
+  for (const [key, rule] of Object.entries(schema)) {
+    converted[key] = {
+      ...rule,
+      type: rule.type as ValidationRule['type']
+    };
+  }
+  
+  return converted;
+}
+
+/**
+ * Type guard to ensure validation schema types are correct
+ */
+export function isValidType(type: string): type is ValidationRule['type'] {
+  return [
+    'text', 'email', 'phone', 'date', 'numeric', 'password', 'time',
+    'string', 'number', 'boolean', 'array', 'object', 'enum', 'custom'
+  ].includes(type);
+}
 
 /**
  * Environment validation helper
