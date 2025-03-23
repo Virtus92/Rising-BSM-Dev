@@ -33,6 +33,32 @@ export function typeSafeMap<T, R>(items: any[], mapFn: (item: T) => R): R[] {
 /**
  * Sicheres Decimal-to-Number Casting für Arrays von Prisma-Objekten
  */
-export function castPrismaResults<T>(results: any[]): T[] {
-  return results as unknown as T[];
+export function castPrismaResults<T>(
+  results: any[], 
+  transform?: (item: any) => T, 
+  validator?: (item: any) => boolean
+): T[] {
+  if (!results) return [];
+  
+  return results
+    .filter(item => !validator || validator(item))
+    .map(item => transform ? transform(item) : processItem<T>(item));
+}
+
+function processItem<T>(item: any): T {
+  // Handle Decimal values and other Prisma-specific types
+  if (item instanceof Decimal) {
+    return toNumber(item) as unknown as T;
+  }
+  
+  // For objects, recursively process each property
+  if (item && typeof item === 'object' && !Array.isArray(item)) {
+    const processed: any = {};
+    for (const [key, value] of Object.entries(item)) {
+      processed[key] = processItem(value);
+    }
+    return processed as T;
+  }
+  
+  return item as unknown as T;
 }

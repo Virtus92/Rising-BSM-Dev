@@ -3,7 +3,7 @@
  * 
  * Repository for Customer entity operations providing data access and persistence.
  */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { BaseRepository } from '../utils/base.repository.js';
 import { QueryBuilder } from '../utils/query-builder.js';
 import { inject } from '../config/dependency-container.js';
@@ -249,14 +249,16 @@ export class CustomerRepository extends BaseRepository<Customer, CustomerFilterD
    */
   async getCustomerStats(): Promise<any> {
     try {
-      return this.prisma.$queryRaw`
-        SELECT
-          COUNT(*) AS total,
-          COUNT(CASE WHEN type = 'privat' THEN 1 END) AS privat,
-          COUNT(CASE WHEN type = 'geschaeft' THEN 1 END) AS geschaeft,
-          COUNT(CASE WHEN status = 'aktiv' THEN 1 END) AS aktiv
-        FROM "Customer"
-      `;
+      return this.prisma.$queryRaw(
+        Prisma.sql`
+          SELECT
+            COUNT(*) AS total,
+            COUNT(CASE WHEN type = 'privat' THEN 1 END) AS privat,
+            COUNT(CASE WHEN type = 'geschaeft' THEN 1 END) AS geschaeft,
+            COUNT(CASE WHEN status = 'aktiv' THEN 1 END) AS aktiv
+          FROM "Customer"
+        `
+      );
     } catch (error) {
       logger.error('Error in CustomerRepository.getCustomerStats', { error });
       throw new DatabaseError('Failed to fetch customer statistics', { cause: error });
@@ -266,19 +268,28 @@ export class CustomerRepository extends BaseRepository<Customer, CustomerFilterD
   /**
    * Get customer growth data by month
    * @param months - Number of months to include
-   * @returns Monthly customer growth data
+   * @returns Customer growth data
+   * @throws Error if months is not a positive integer
+   * @throws DatabaseError if query fails
    */
   async getCustomerGrowthData(months: number = 12): Promise<any> {
     try {
-      return this.prisma.$queryRaw`
-        SELECT
-          DATE_TRUNC('month', "createdAt") AS month,
-          COUNT(*) AS customer_count
-        FROM "Customer"
-        WHERE status != 'geloescht' AND "createdAt" >= NOW() - INTERVAL '${months} months'
-        GROUP BY DATE_TRUNC('month', "createdAt")
-        ORDER BY month
-      `;
+      // Validate months parameter
+      if (!Number.isInteger(months) || months <= 0) {
+        throw new Error('Months parameter must be a positive integer');
+      }
+      
+      return this.prisma.$queryRaw(
+        Prisma.sql`
+          SELECT
+            DATE_TRUNC('month', "createdAt") AS month,
+            COUNT(*) AS customer_count
+          FROM "Customer"
+          WHERE status != 'geloescht' AND "createdAt" >= NOW() - INTERVAL '${months} months'
+          GROUP BY DATE_TRUNC('month', "createdAt")
+          ORDER BY month
+        `
+      );
     } catch (error) {
       logger.error('Error in CustomerRepository.getCustomerGrowthData', { error, months });
       throw new DatabaseError('Failed to fetch customer growth data', { cause: error });

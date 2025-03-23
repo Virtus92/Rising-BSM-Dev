@@ -8,8 +8,8 @@ import { formatRelativeTime } from '../utils/formatters.js';
 import { BaseService } from '../utils/base.service.js';
 import { NotificationRepository, Notification, notificationRepository } from '../repositories/notification.repository.js';
 import { 
-  NotificationResponseDto,
-  MarkNotificationReadDto
+  NotificationResponseDTO,
+  MarkNotificationReadDTO
 } from '../types/dtos/notification.dto.js';
 import { 
   NotFoundError, 
@@ -100,13 +100,13 @@ export class NotificationService extends BaseService<Notification, NotificationR
   async getNotifications(
     userId: number,
     options: { limit?: number; unreadOnly?: boolean } = {}
-  ): Promise<{ notifications: NotificationResponseDto[]; unreadCount: number; totalCount: number }> {
+  ): Promise<{ notifications: NotificationResponseDTO[]; unreadCount: number; totalCount: number }> {
     try {
       // Generate cache key
       const cacheKey = `notifications_${userId}_${options.limit || 10}_${options.unreadOnly ? 'unread' : 'all'}`;
       
       // Try to get from cache
-      const cachedResult = cache.get<{ notifications: NotificationResponseDto[]; unreadCount: number; totalCount: number }>(cacheKey);
+      const cachedResult = cache.get<{ notifications: NotificationResponseDTO[]; unreadCount: number; totalCount: number }>(cacheKey);
       if (cachedResult) {
         return cachedResult;
       }
@@ -155,7 +155,7 @@ export class NotificationService extends BaseService<Notification, NotificationR
    */
   async markNotificationsRead(
     userId: number,
-    data: MarkNotificationReadDto
+    data: MarkNotificationReadDTO
   ): Promise<{ success: boolean; count: number }> {
     try {
       const { notificationId, markAll } = data;
@@ -185,25 +185,26 @@ export class NotificationService extends BaseService<Notification, NotificationR
   }
 
   /**
-   * Count unread notifications for a user
-   * @param userId - User ID
-   * @returns Count of unread notifications
-   */
-  async countUnreadNotifications(userId: number): Promise<number> {
-    try {
-      return this.repository.countUnreadNotifications(userId);
-    } catch (error) {
-      logger.error('Error counting unread notifications:', error);
-      return 0; // Return 0 as a safe default
-    }
+ * Count unread notifications for a user
+ * @param userId - User ID
+ * @returns Count of unread notifications
+ */
+async countUnreadNotifications(userId: number): Promise<number> {
+  try {
+    return this.repository.countUnreadNotifications(userId);
+  } catch (error) {
+    logger.error('Error counting unread notifications:', error);
+    throw new BadRequestError('Failed to count unread notifications');
   }
+}
+
 
   /**
    * Format notifications for response
    * @param notifications - Raw notification data
    * @returns Formatted notification DTOs
    */
-  private formatNotifications(notifications: any[]): NotificationResponseDto[] {
+  private formatNotifications(notifications: any[]): NotificationResponseDTO[] {
     return notifications.map((notification: any) => {
       // Determine type and icon
       let type: string;

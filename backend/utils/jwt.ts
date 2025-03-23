@@ -1,20 +1,15 @@
 import jwt from 'jsonwebtoken';
-import { UnauthorizedError } from './errors';
+import { UnauthorizedError } from './errors.js';
 
-// Load environment variables with fallbacks
-const JWT_SECRET = process.env.JWT_SECRET || 'your-default-super-secret-key-that-should-be-in-env';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-super-secret-key-that-should-be-in-env';
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+// Load environment variables
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN;
 
-// Check for missing environment variables in development
-if (process.env.NODE_ENV === 'development') {
-  if (process.env.JWT_SECRET === undefined) {
-    console.warn('⚠️ Warning: JWT_SECRET is not set in environment variables');
-  }
-  if (process.env.JWT_REFRESH_SECRET === undefined) {
-    console.warn('⚠️ Warning: JWT_REFRESH_SECRET is not set in environment variables');
-  }
+// Check for missing environment variables
+if (!JWT_SECRET || !JWT_EXPIRES_IN || !JWT_REFRESH_SECRET || !JWT_REFRESH_EXPIRES_IN) {
+  throw new Error('Required JWT environment variables are missing. Please set JWT_SECRET, JWT_EXPIRES_IN, JWT_REFRESH_SECRET, and JWT_REFRESH_EXPIRES_IN');
 }
 
 /**
