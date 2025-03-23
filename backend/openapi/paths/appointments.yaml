@@ -333,13 +333,9 @@ appointments-id-notes:
                 data:
                   type: object
                   properties:
-                    id:
-                      type: integer
-                    text:
-                      type: string
-                    userName:
-                      type: string
-                    formattedDate:
+                    success:
+                      type: boolean
+                    message:
                       type: string
                 message:
                   type: string

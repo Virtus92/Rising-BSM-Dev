@@ -1,0 +1,40 @@
+Resolver error at components.schemas.Error.$ref
+Could not resolve reference: undefined undefined
+Resolver error at components.schemas.ValidationError.$ref
+Could not resolve reference: undefined undefined
+Resolver error at components.schemas.Pagination.$ref
+Could not resolve reference: undefined undefined
+Resolver error at components.schemas.SuccessResponse.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./login.post.responses.401.content.application/json.schema.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./auth/refresh-token.post.responses.401.content.application/json.schema.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./auth/reset-token/{token}.get.responses.400.content.application/json.schema.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./auth/reset-password/{token}.post.responses.400.content.application/json.schema.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./users.get.responses.200.content.application/json.schema.properties.data.items.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./users.get.responses.200.content.application/json.schema.properties.meta.properties.pagination.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./users.get.responses.401.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./users.get.responses.403.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./notifications.get.responses.200.content.application/json.schema.properties.data.properties.notifications.items.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./notifications.get.responses.401.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./customers.get.responses.200.content.application/json.schema.properties.data.items.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./customers.get.responses.200.content.application/json.schema.properties.meta.properties.pagination.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./customers.get.responses.401.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./projects.get.responses.200.content.application/json.schema.properties.data.items.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./projects.get.responses.200.content.application/json.schema.properties.meta.properties.pagination.$ref
+Could not resolve reference: undefined undefined
+Resolver error at paths./projects.get.responses.401.$ref
+Could not resolve reference: undefined undefined

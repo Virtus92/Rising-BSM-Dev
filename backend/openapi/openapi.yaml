@@ -193,6 +193,10 @@ paths:
     $ref: './paths/requests.yaml#/requests-id-notes'
   /requests/export:
     $ref: './paths/requests.yaml#/requests-export'
+  
+  # Contact (Public API)
+  /contact:
+    $ref: './paths/public.yaml#/contact'
 
   # Profile
   /profile:
@@ -221,10 +225,6 @@ paths:
     $ref: './paths/settings.yaml#/settings-backup'
   /settings/backup/trigger:
     $ref: './paths/settings.yaml#/settings-backup-trigger'
-
-  # Public
-  /contact:
-    $ref: './paths/public.yaml#/contact'
 
   # System
   /health:

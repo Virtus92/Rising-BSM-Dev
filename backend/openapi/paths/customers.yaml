@@ -152,7 +152,28 @@ customers-statistics:
                   type: boolean
                   example: true
                 data:
-                  $ref: '../schemas/customers.yaml#/CustomerStatistics'
+                  type: object
+                  properties:
+                    stats:
+                      type: object
+                      properties:
+                        total:
+                          type: integer
+                        active:
+                          type: integer
+                        private:
+                          type: integer
+                        business:
+                          type: integer
+                    growthData:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          month:
+                            type: string
+                          count:
+                            type: integer
                 message:
                   type: string
                   example: "Customer statistics retrieved successfully"
@@ -294,13 +315,9 @@ customers-id-notes:
                 data:
                   type: object
                   properties:
-                    id:
-                      type: integer
-                    text:
-                      type: string
-                    userName:
-                      type: string
-                    formattedDate:
+                    success:
+                      type: boolean
+                    message:
                       type: string
                 message:
                   type: string
