@@ -6,6 +6,23 @@
 import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, BaseFilterDTO, StatusChangeDTO } from './base.dto.js';
 
 /**
+ * Enum for customer status values
+ */
+export enum CustomerStatus {
+  ACTIVE = 'aktiv',
+  INACTIVE = 'inaktiv',
+  DELETED = 'geloescht'
+}
+
+/**
+ * Enum for customer types
+ */
+export enum CustomerType {
+  PRIVATE = 'privat',
+  BUSINESS = 'geschaeft'
+}
+
+/**
  * DTO for creating a new customer
  */
 export interface CustomerCreateDTO extends BaseCreateDTO {
@@ -321,6 +338,46 @@ export interface CustomerAppointmentDTO {
 }
 
 /**
+ * DTO for customer statistics
+ */
+export interface CustomerStatsDTO {
+  /**
+   * Total customer count
+   */
+  total: number;
+
+  /**
+   * Active customer count
+   */
+  active: number;
+
+  /**
+   * Private customer count
+   */
+  private: number;
+
+  /**
+   * Business customer count
+   */
+  business: number;
+}
+
+/**
+ * DTO for customer growth data
+ */
+export interface CustomerGrowthDTO {
+  /**
+   * Month (e.g., "Jan 2023")
+   */
+  month: string;
+
+  /**
+   * New customer count
+   */
+  count: number;
+}
+
+/**
  * DTO for customer filtering
  */
 export interface CustomerFilterDTO extends BaseFilterDTO {
@@ -341,20 +398,13 @@ export interface CustomerFilterDTO extends BaseFilterDTO {
 }
 
 /**
- * Customer status enum
+ * DTO for customer note creation
  */
-export enum CustomerStatus {
-  ACTIVE = 'aktiv',
-  INACTIVE = 'inaktiv',
-  DELETED = 'geloescht'
-}
-
-/**
- * Customer type enum
- */
-export enum CustomerType {
-  PRIVATE = 'privat',
-  BUSINESS = 'geschaeft'
+export interface CustomerNoteCreateDTO {
+  /**
+   * Note text
+   */
+  note: string;
 }
 
 /**
@@ -496,3 +546,72 @@ export const customerStatusUpdateSchema = {
     }
   }
 };
+
+/**
+ * Validation schema for customer note creation
+ */
+export const customerNoteCreateSchema = {
+  note: {
+    type: 'string',
+    required: true,
+    min: 1,
+    max: 1000,
+    messages: {
+      required: 'Note text is required',
+      min: 'Note text cannot be empty',
+      max: 'Note text must not exceed 1000 characters'
+    }
+  }
+};
+
+/**
+ * Get customer status label
+ * @param status Customer status
+ * @returns Formatted status label
+ */
+export function getCustomerStatusLabel(status: string): string {
+  switch (status) {
+    case CustomerStatus.ACTIVE:
+      return 'Aktiv';
+    case CustomerStatus.INACTIVE:
+      return 'Inaktiv';
+    case CustomerStatus.DELETED:
+      return 'Gelöscht';
+    default:
+      return status;
+  }
+}
+
+/**
+ * Get customer status CSS class
+ * @param status Customer status
+ * @returns CSS class name
+ */
+export function getCustomerStatusClass(status: string): string {
+  switch (status) {
+    case CustomerStatus.ACTIVE:
+      return 'success';
+    case CustomerStatus.INACTIVE:
+      return 'secondary';
+    case CustomerStatus.DELETED:
+      return 'danger';
+    default:
+      return 'secondary';
+  }
+}
+
+/**
+ * Get customer type label
+ * @param type Customer type
+ * @returns Formatted type label
+ */
+export function getCustomerTypeLabel(type: string): string {
+  switch (type) {
+    case CustomerType.PRIVATE:
+      return 'Privatkunde';
+    case CustomerType.BUSINESS:
+      return 'Geschäftskunde';
+    default:
+      return type;
+  }
+}

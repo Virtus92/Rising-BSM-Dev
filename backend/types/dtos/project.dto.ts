@@ -3,7 +3,17 @@
  * 
  * Data Transfer Objects for Project entity operations.
  */
-import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, BaseFilterDTO, NoteResponseDTO, StatusChangeDTO } from './base.dto';
+import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, BaseFilterDTO, StatusChangeDTO } from './base.dto.js';
+
+/**
+ * Enum for project status values
+ */
+export enum ProjectStatus {
+  NEW = 'neu',
+  IN_PROGRESS = 'in_bearbeitung',
+  COMPLETED = 'abgeschlossen',
+  CANCELLED = 'storniert'
+}
 
 /**
  * DTO for creating a new project
@@ -25,17 +35,17 @@ export interface ProjectCreateDTO extends BaseCreateDTO {
   dienstleistung_id?: number | null;
 
   /**
-   * Project start date
+   * Project start date (YYYY-MM-DD format)
    */
   start_datum: string;
 
   /**
-   * Project end date (optional)
+   * Project end date (YYYY-MM-DD format, optional)
    */
   end_datum?: string | null;
 
   /**
-   * Project amount/budget (optional)
+   * Project budget/amount (optional)
    */
   betrag?: number | null;
 
@@ -70,17 +80,17 @@ export interface ProjectUpdateDTO extends BaseUpdateDTO {
   dienstleistung_id?: number | null;
 
   /**
-   * Project start date
+   * Project start date (YYYY-MM-DD format)
    */
   start_datum?: string;
 
   /**
-   * Project end date
+   * Project end date (YYYY-MM-DD format)
    */
   end_datum?: string | null;
 
   /**
-   * Project amount/budget
+   * Project budget/amount
    */
   betrag?: number | null;
 
@@ -160,7 +170,7 @@ export interface ProjectResponseDTO extends BaseResponseDTO {
   end_datum: string;
 
   /**
-   * Project amount/budget
+   * Project budget/amount
    */
   betrag: number | null;
 
@@ -202,7 +212,7 @@ export interface ProjectDetailResponseDTO extends ProjectResponseDTO {
   /**
    * Project notes
    */
-  notes: ProjectNoteResponseDTO[];
+  notes: ProjectNoteDTO[];
 
   /**
    * Related appointments
@@ -211,9 +221,9 @@ export interface ProjectDetailResponseDTO extends ProjectResponseDTO {
 }
 
 /**
- * DTO for project note response
+ * DTO for project note
  */
-export interface ProjectNoteResponseDTO extends NoteResponseDTO {
+export interface ProjectNoteDTO {
   /**
    * Note ID
    */
@@ -233,6 +243,16 @@ export interface ProjectNoteResponseDTO extends NoteResponseDTO {
    * Username who created the note
    */
   benutzer: string;
+}
+
+/**
+ * DTO for creating a new project note
+ */
+export interface ProjectNoteCreateDTO {
+  /**
+   * Note text
+   */
+  note: string;
 }
 
 /**
@@ -306,13 +326,37 @@ export interface ProjectFilterDTO extends BaseFilterDTO {
 }
 
 /**
- * Project status enum
+ * DTO for project statistics
  */
-export enum ProjectStatus {
-  NEW = 'neu',
-  IN_PROGRESS = 'in_bearbeitung',
-  COMPLETED = 'abgeschlossen',
-  CANCELLED = 'storniert'
+export interface ProjectStatisticsDTO {
+  /**
+   * Projects count by status
+   */
+  statusCounts: Record<string, number>;
+
+  /**
+   * Total project value
+   */
+  totalValue: number;
+
+  /**
+   * Projects by month
+   */
+  byMonth?: Array<{
+    month: string;
+    count: number;
+    value: number;
+  }>;
+
+  /**
+   * Top customers
+   */
+  topCustomers?: Array<{
+    id: number;
+    name: string;
+    projectCount: number;
+    totalValue: number;
+  }>;
 }
 
 /**
@@ -418,6 +462,23 @@ export const projectStatusUpdateSchema = {
     max: 1000,
     messages: {
       max: 'Note must not exceed 1000 characters'
+    }
+  }
+};
+
+/**
+ * Validation schema for project note creation
+ */
+export const projectNoteCreateSchema = {
+  note: {
+    type: 'string',
+    required: true,
+    min: 1,
+    max: 1000,
+    messages: {
+      required: 'Note text is required',
+      min: 'Note text cannot be empty',
+      max: 'Note text must not exceed 1000 characters'
     }
   }
 };

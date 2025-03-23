@@ -31,19 +31,19 @@ export interface BaseUpdateDTO extends BaseDTO {
  */
 export interface BaseResponseDTO extends BaseDTO {
   /**
-   * Unique identifier
+   * Resource ID
    */
   id: number;
   
   /**
    * Creation timestamp
    */
-  createdAt: string;
+  createdAt?: string;
   
   /**
    * Last update timestamp
    */
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 /**
@@ -77,76 +77,11 @@ export interface BaseFilterDTO extends BaseDTO {
 }
 
 /**
- * Base interface for list responses
- */
-export interface BaseListResponseDTO<T extends BaseResponseDTO> {
-  /**
-   * List of items
-   */
-  items: T[];
-  
-  /**
-   * Total number of items
-   */
-  total: number;
-  
-  /**
-   * Total number of pages
-   */
-  pages: number;
-  
-  /**
-   * Current page
-   */
-  currentPage: number;
-  
-  /**
-   * Items per page
-   */
-  itemsPerPage: number;
-}
-
-/**
- * Base interface for log/audit entries
- */
-export interface BaseAuditDTO extends BaseDTO {
-  /**
-   * Log ID
-   */
-  id: number;
-  
-  /**
-   * User ID who performed the action
-   */
-  userId: number;
-  
-  /**
-   * Username who performed the action
-   */
-  userName: string;
-  
-  /**
-   * Action performed
-   */
-  action: string;
-  
-  /**
-   * Action details
-   */
-  details?: string;
-  
-  /**
-   * Action timestamp
-   */
-  timestamp: string;
-}
-
-/**
- * Base interface for status change DTOs
+ * Base interface for status change operations
  */
 export interface StatusChangeDTO extends BaseDTO {
   /**
-   * ID of the entity to change status
+   * Entity ID
    */
   id: number;
   
@@ -162,9 +97,59 @@ export interface StatusChangeDTO extends BaseDTO {
 }
 
 /**
- * Base interface for note creation DTOs
+ * Base interface for pagination responses
  */
-export interface CreateNoteDTO extends BaseDTO {
+export interface PaginationDTO {
+  /**
+   * Current page number (1-based)
+   */
+  current: number;
+  
+  /**
+   * Total number of pages
+   */
+  total: number;
+  
+  /**
+   * Items per page
+   */
+  limit: number;
+  
+  /**
+   * Total number of records
+   */
+  totalRecords: number;
+}
+
+/**
+ * Base interface for paginated list responses
+ */
+export interface PaginatedResponseDTO<T extends BaseResponseDTO> {
+  /**
+   * List of items
+   */
+  data: T[];
+  
+  /**
+   * Pagination metadata
+   */
+  pagination: PaginationDTO;
+  
+  /**
+   * Additional metadata
+   */
+  meta?: Record<string, any>;
+}
+
+/**
+ * Base interface for note creation
+ */
+export interface NoteCreateDTO extends BaseDTO {
+  /**
+   * Entity ID
+   */
+  entityId: number;
+  
   /**
    * Note text
    */
@@ -172,26 +157,171 @@ export interface CreateNoteDTO extends BaseDTO {
 }
 
 /**
- * Base interface for note response DTOs
+ * Base interface for note response
  */
 export interface NoteResponseDTO extends BaseResponseDTO {
+  /**
+   * Entity ID
+   */
+  entityId: number;
+  
   /**
    * Note text
    */
   text: string;
   
   /**
-   * User ID who created the note
+   * User ID
    */
-  userId: number;
+  userId?: number;
   
   /**
-   * Username who created the note
+   * User name
    */
   userName: string;
   
   /**
-   * Formatted date string
+   * Creation date (formatted)
    */
   formattedDate: string;
+}
+
+/**
+ * Base interface for log/audit entries
+ */
+export interface LogEntryDTO extends BaseResponseDTO {
+  /**
+   * Entity ID
+   */
+  entityId: number;
+  
+  /**
+   * User ID
+   */
+  userId: number;
+  
+  /**
+   * User name
+   */
+  userName: string;
+  
+  /**
+   * Action performed
+   */
+  action: string;
+  
+  /**
+   * Details of the action
+   */
+  details?: string;
+  
+  /**
+   * IP address
+   */
+  ipAddress?: string;
+  
+  /**
+   * Timestamp
+   */
+  timestamp: string;
+}
+
+/**
+ * Base interface for export options
+ */
+export interface ExportOptionsDTO extends BaseDTO {
+  /**
+   * Export format
+   */
+  format: 'csv' | 'xlsx' | 'pdf' | 'json';
+  
+  /**
+   * Filter options for the export
+   */
+  filters?: Record<string, any>;
+  
+  /**
+   * Columns to include
+   */
+  columns?: string[];
+}
+
+/**
+ * Base interface for import options
+ */
+export interface ImportOptionsDTO extends BaseDTO {
+  /**
+   * Import file format
+   */
+  format: 'csv' | 'xlsx' | 'json';
+  
+  /**
+   * Whether to skip header row
+   */
+  skipHeader?: boolean;
+  
+  /**
+   * Column mappings
+   */
+  mappings?: Record<string, string>;
+}
+
+/**
+ * Base interface for success responses
+ */
+export interface SuccessResponseDTO<T = any> {
+  /**
+   * Success flag
+   */
+  success: true;
+  
+  /**
+   * Response data
+   */
+  data: T;
+  
+  /**
+   * Success message
+   */
+  message?: string;
+  
+  /**
+   * Additional metadata
+   */
+  meta?: Record<string, any>;
+}
+
+/**
+ * Base interface for error responses
+ */
+export interface ErrorResponseDTO {
+  /**
+   * Success flag
+   */
+  success: false;
+  
+  /**
+   * Error message
+   */
+  error: string;
+  
+  /**
+   * HTTP status code
+   */
+  statusCode: number;
+  
+  /**
+   * List of validation errors
+   */
+  errors?: string[];
+  
+  /**
+   * Error timestamp
+   */
+  timestamp: string;
+  
+  /**
+   * Additional error details
+   */
+  details?: any;
 }
