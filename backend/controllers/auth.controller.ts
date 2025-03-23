@@ -1,101 +1,38 @@
-import { Request, Response, NextFunction } from 'express';
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
-import prisma from '../utils/prisma.utils.js';
-import { validateInput, validatePassword } from '../utils/validators.js';
-import { UnauthorizedError, ValidationError, NotFoundError } from '../utils/errors.js';
-import { generateAuthTokens, verifyRefreshToken } from '../utils/jwt.js';
+import { Request, Response } from 'express';
+import { ValidationError, BadRequestError } from '../utils/errors.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import config from '../jest.config.js';
+import { ResponseFactory } from '../utils/response.factory.js';
 import { AuthenticatedRequest } from '../types/authenticated-request.js';
-import { LoginData } from '../types/data-models.js';
+import { UserService, userService } from '../services/user.service.js';
+import {
+  LoginDTO,
+  ForgotPasswordDTO,
+  ValidateResetTokenDTO,
+  ResetPasswordDTO,
+  RefreshTokenDTO,
+  LogoutDTO
+} from '../types/dtos/auth.dto.js';
 
 /**
  * Handle user login with JWT authentication
  */
 export const login = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   // Validate input
-  const { email, password, remember } = req.body as LoginData;
+  const loginData: LoginDTO = req.body;
 
-  if (!email || !password) {
+  if (!loginData.email || !loginData.password) {
     throw new ValidationError('Email and password are required');
   }
 
-  // Find user in database
-  const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() }
+  // Authenticate user through service
+  const result = await userService.authenticate(loginData, {
+    ipAddress: req.ip || '0.0.0.0'
   });
 
-  if (!user) {
-    throw new UnauthorizedError('Invalid email or password');
-  }
-
-  // Verify password
-  const passwordMatches = await bcrypt.compare(password, user.password);
-  
-  if (!passwordMatches) {
-    throw new UnauthorizedError('Invalid email or password');
-  }
-
-  // Check if account is active
-  if (user.status !== 'aktiv') {
-    throw new UnauthorizedError('Account is inactive or suspended');
-  }
-
-  // Generate access and refresh tokens
-  const tokens = generateAuthTokens({
-    userId: user.id,
-    role: user.role,
-    name: user.name,
-    email: user.email
-  });
-
-  // Log login activity
-  await prisma.userActivity.create({
-    data: {
-      userId: user.id,
-      activity: 'login',
-      ipAddress: req.ip || '0.0.0.0'
-    }
-  });
-
-  // Determine token expiration based on "remember me"
-  const rememberMe = remember === 'on' || remember === true;
-  const expiresIn = rememberMe 
-    ? 30 * 24 * 60 * 60 // 30 days in seconds
-    : tokens.expiresIn;
-
-  // Store refresh token in database if token rotation is enabled
-  if (config.JWT_REFRESH_TOKEN_ROTATION) {
-    await prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        token: tokens.refreshToken,
-        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        createdByIp: req.ip || '0.0.0.0'
-      }
-    });
-  }
-
-  // Prepare user data for response (don't include password)
-  const userData = {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    initials: user.name.split(' ').map((n: string) => n[0]).join('')
-  };
-
-  // Use ResponseFactory instead of direct response
+  // Send success response
   ResponseFactory.success(
     res,
-    { 
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiresIn,
-      user: userData,
-      remember: rememberMe
-    },
+    result,
     'Login successful',
     200
   );
@@ -105,98 +42,37 @@ export const login = asyncHandler(async (req: Request, res: Response): Promise<v
  * Handle forgot password request
  */
 export const forgotPassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { email } = req.body;
+  const forgotPasswordData: ForgotPasswordDTO = req.body;
 
-  // Input validation
-  if (!email || typeof email !== 'string') {
-    throw new ValidationError('Please provide a valid email address');
-  }
-
-  // Sanitize input
-  const sanitizedEmail = email.trim().toLowerCase();
-
-  // Check if user exists
-  const user = await prisma.user.findUnique({
-    where: { email: sanitizedEmail }
-  });
+  // Process password reset request through service
+  const result = await userService.requestPasswordReset(forgotPasswordData.email);
 
   // For security reasons, always return success even if user not found
-  if (!user) {
-    res.status(200).json({
-      success: true,
-      message: 'If an account with this email exists, password reset instructions have been sent'
-    });
-    return;
-  }
-
-  // Generate token
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto
-    .createHash('sha256')
-    .update(resetToken)
-    .digest('hex');
-
-  // Set token expiry to 1 hour
-  const expiry = new Date();
-  expiry.setHours(expiry.getHours() + 1);
-
-  // Save token to database
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      resetToken: hashedToken,
-      resetTokenExpiry: expiry,
-      updatedAt: new Date()
-    }
-  });
-
-  // Return token and user email for the email service to handle
-  res.status(200).json({
-    success: true,
-    userId: user.id,
-    email: user.email,
-    token: resetToken,
-    message: 'If an account with this email exists, password reset instructions have been sent'
-  });
+  ResponseFactory.success(
+    res,
+    result || { message: 'If an account with this email exists, password reset instructions have been sent' },
+    'If an account with this email exists, password reset instructions have been sent'
+  );
 });
 
 /**
  * Validate reset token
  */
 export const validateResetToken = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { token } = req.params;
+  const { token } = req.params as ValidateResetTokenDTO;
   
   if (!token) {
     throw new ValidationError('Invalid token');
   }
 
-  // Hash the token from the URL
-  const hashedToken = crypto
-    .createHash('sha256')
-    .update(token)
-    .digest('hex');
+  // Validate token through service
+  const result = await userService.validateResetToken(token);
 
-  // Find user with this token and valid expiry
-  const user = await prisma.user.findFirst({
-    where: {
-      resetToken: hashedToken,
-      resetTokenExpiry: { gt: new Date() }
-    },
-    select: {
-      id: true,
-      email: true
-    }
-  });
-
-  if (!user) {
+  if (!result) {
     throw new ValidationError('Invalid or expired token');
   }
 
-  res.status(200).json({
-    success: true,
-    userId: user.id,
-    email: user.email
-  });
+  ResponseFactory.success(res, result);
 });
 
 /**
@@ -204,137 +80,30 @@ export const validateResetToken = asyncHandler(async (req: Request, res: Respons
  */
 export const resetPassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { token } = req.params;
-  const { password, confirmPassword } = req.body;
+  const resetData: ResetPasswordDTO = req.body;
   
-  // Input validation
-  if (!password || !confirmPassword) {
-    throw new ValidationError('Please enter and confirm your new password');
-  }
-  
-  if (password !== confirmPassword) {
-    throw new ValidationError('Passwords do not match');
-  }
+  // Process password reset through service
+  const result = await userService.resetPassword(token, resetData.password, resetData.confirmPassword);
 
-  // Use the comprehensive password validation function
-  const passwordValidation = validatePassword(password);
-  if (!passwordValidation.isValid) {
-    throw new ValidationError(passwordValidation.errors[0]); // Use the first error message
-  }
-
-  // Hash the token from the URL
-  const hashedToken = crypto
-    .createHash('sha256')
-    .update(token)
-    .digest('hex');
-
-  // Find user with this token and valid expiry
-  const user = await prisma.user.findFirst({
-    where: {
-      resetToken: hashedToken,
-      resetTokenExpiry: { gt: new Date() }
-    }
-  });
-
-  if (!user) {
-    throw new ValidationError('Invalid or expired token');
-  }
-
-  // Hash new password
-  const saltRounds = 10;
-  const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-  // Update user's password and clear reset token
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      password: hashedPassword,
-      resetToken: null,
-      resetTokenExpiry: null,
-      updatedAt: new Date()
-    }
-  });
-
-  // Log password reset activity
-  await prisma.userActivity.create({
-    data: {
-      userId: user.id,
-      activity: 'password_reset',
-      ipAddress: req.ip || '0.0.0.0'
-    }
-  });
-
-  res.status(200).json({
-    success: true,
-    message: 'Password has been reset successfully'
-  });
+  ResponseFactory.success(res, result, 'Password has been reset successfully');
 });
 
 /**
  * Refresh access token using refresh token
  */
 export const refreshToken = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { refreshToken } = req.body;
+  const refreshData: RefreshTokenDTO = req.body;
   
-  if (!refreshToken) {
+  if (!refreshData.refreshToken) {
     throw new ValidationError('Refresh token is required');
   }
   
-  // Verify refresh token
-  const tokenPayload = await prisma.refreshToken.findFirst({
-    where: {
-      token: refreshToken,
-      expires: { gt: new Date() }
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          status: true
-        }
-      }
-    }
+  // Refresh token through service
+  const result = await userService.refreshToken(refreshData.refreshToken, {
+    ipAddress: req.ip || '0.0.0.0'
   });
-  
-  if (!tokenPayload || !tokenPayload.user || tokenPayload.user.status !== 'aktiv') {
-    throw new UnauthorizedError('Invalid or expired refresh token');
-  }
-  
-  // Generate new tokens
-  const tokens = generateAuthTokens({
-    userId: tokenPayload.user.id,
-    role: tokenPayload.user.role,
-    name: tokenPayload.user.name,
-    email: tokenPayload.user.email
-  });
-  
-  // Implement refresh token rotation for better security
-  if (config.JWT_REFRESH_TOKEN_ROTATION) {
-    // Invalidate the old refresh token
-    await prisma.refreshToken.delete({
-      where: { id: tokenPayload.id }
-    });
-    
-    // Store the new refresh token
-    await prisma.refreshToken.create({
-      data: {
-        userId: tokenPayload.user.id,
-        token: tokens.refreshToken,
-        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        createdByIp: req.ip || '0.0.0.0'
-      }
-    });
-  }
-  
-  // Return new tokens
-  res.status(200).json({
-    success: true,
-    accessToken: tokens.accessToken,
-    refreshToken: config.JWT_REFRESH_TOKEN_ROTATION ? tokens.refreshToken : refreshToken,
-    expiresIn: tokens.expiresIn
-  });
+
+  ResponseFactory.success(res, result);
 });
 
 /**
@@ -342,28 +111,17 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response): Pr
  * Invalidates the refresh token to effectively log out
  */
 export const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { refreshToken } = req.body;
+  const logoutData: LogoutDTO = req.body;
   
-  if (refreshToken) {
-    // Find and remove the refresh token
-    await prisma.refreshToken.deleteMany({
-      where: { token: refreshToken }
-    });
-  }
-  
-  // Log logout activity if user is in request
-  if (req.user?.id) {
-    await prisma.userActivity.create({
-      data: {
-        userId: req.user.id,
-        activity: 'logout',
-        ipAddress: req.ip || '0.0.0.0'
-      }
-    });
-  }
-  
-  res.status(200).json({ 
-    success: true,
-    message: 'Logged out successfully'
+  // Process logout through service
+  await userService.logout(logoutData.refreshToken, {
+    userContext: req.user ? {
+      userId: req.user.id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      ipAddress: req.ip
+    } : undefined
   });
+  
+  ResponseFactory.success(res, {}, 'Logged out successfully');
 });
