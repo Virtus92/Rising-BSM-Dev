@@ -1,97 +1,80 @@
 /**
  * Notification Service
- * Manages notification creation, sending, and tracking
+ * 
+ * Service for Notification entity operations providing business logic and validation.
  */
-import { prisma } from '../utils/prisma.utils';
-import { formatRelativeTime } from '../utils/formatters';
-import { cache } from './cache.service';
-import config from '../config';
+import { format } from 'date-fns';
+import { formatRelativeTime } from '../utils/formatters.js';
+import { BaseService } from '../utils/base.service.js';
+import { NotificationRepository, Notification, notificationRepository } from '../repositories/notification.repository.js';
+import { 
+  NotificationResponseDto,
+  MarkNotificationReadDto
+} from '../types/dtos/notification.dto.js';
+import { 
+  NotFoundError, 
+  ValidationError,
+  BadRequestError
+} from '../utils/errors.js';
+import { cache } from './cache.service.js';
+import logger from '../utils/logger.js';
 
 /**
- * Interface for notification creation options
+ * Service for Notification entity operations
  */
-export interface NotificationOptions {
-  userId: number | null;
-  type: string;
-  title: string;
-  message: string;
-  referenceId?: number | null;
-  referenceType?: string | null;
-}
+export class NotificationService extends BaseService<Notification, NotificationRepository> {
+  /**
+   * Creates a new NotificationService instance
+   * @param repository - NotificationRepository instance
+   */
+  constructor(repository: NotificationRepository = notificationRepository) {
+    super(repository);
+  }
 
-/**
- * Interface for notification item in response
- */
-export interface NotificationItem {
-  id: number;
-  type: {
-    key: string;
-    label: string;
-    icon: string;
-    color: string;
-  };
-  title: string;
-  message: string | null;
-  referenceId: number | null;
-  referenceType: string | null;
-  timestamp: string;
-  isRead: boolean;
-  link: string;
-}
-
-/**
- * Interface for notification retrieval options
- */
-export interface NotificationQueryOptions {
-  limit?: number;
-  offset?: number;
-  unreadOnly?: boolean;
-  type?: string | null;
-}
-
-/**
- * Interface for notification results
- */
-export interface NotificationResults {
-  notifications: NotificationItem[];
-  total: number;
-  unreadCount: number;
-}
-
-/**
- * Class that manages creation and retrieval of notifications
- */
-class NotificationService {
   /**
    * Create a new notification
-   * @param options Notification details
-   * @returns Created notification
+   * @param options - Notification options
+   * @returns Created notification ID and success status
    */
-  async create(options: NotificationOptions): Promise<{ id: number; success: boolean }> {
+  async create(options: {
+    userId: number | null;
+    type: string;
+    title: string;
+    message: string;
+    referenceId?: number | null;
+    referenceType?: string | null;
+  }): Promise<{ id: number; success: boolean }> {
     try {
-      const {
+      const { 
+        userId, 
+        type, 
+        title, 
+        message, 
+        referenceId = null, 
+        referenceType = null 
+      } = options;
+
+      // Validate inputs
+      if (!title) {
+        throw new ValidationError('Notification title is required');
+      }
+
+      if (!type) {
+        throw new ValidationError('Notification type is required');
+      }
+
+      // Insert notification
+      const notification = await this.repository.create({
         userId,
         type,
         title,
         message,
-        referenceId = null,
-        referenceType = null
-      } = options;
-
-      // Insert notification into database
-      const notification = await prisma.notification.create({
-        data: {
-          userId,
-          type,
-          title,
-          message,
-          referenceId,
-          referenceType,
-          read: false
-        }
+        referenceId,
+        referenceType,
+        read: false
       });
 
-      // Clear cache for this user
+      // Clear cache for this user if needed
       if (userId) {
         cache.delete(`notifications_${userId}`);
       }
@@ -101,270 +84,185 @@ class NotificationService {
         success: true
       };
     } catch (error) {
-      console.error('Notification creation error:', error);
-      return { id: 0, success: false };
+      logger.error('Notification creation error:', error);
+      
+      // Use a more generic error to avoid exposing internal details
+      throw new BadRequestError('Failed to create notification');
     }
   }
 
   /**
    * Get notifications for a user
-   * @param userId User ID
-   * @param options Filtering and pagination options
+   * @param userId - User ID
+   * @param options - Query options like limit and unreadOnly
    * @returns Notifications and metadata
    */
   async getNotifications(
-    userId: number, 
-    options: NotificationQueryOptions = {}
-  ): Promise<NotificationResults> {
+    userId: number,
+    options: { limit?: number; unreadOnly?: boolean } = {}
+  ): Promise<{ notifications: NotificationResponseDto[]; unreadCount: number; totalCount: number }> {
     try {
-      const {
-        limit = 10,
-        offset = 0,
-        unreadOnly = false,
-        type = null
-      } = options;
-
-      // Try to get from cache
-      const cacheKey = `notifications_${userId}_${limit}_${offset}_${unreadOnly}_${type || 'all'}`;
+      // Generate cache key
+      const cacheKey = `notifications_${userId}_${options.limit || 10}_${options.unreadOnly ? 'unread' : 'all'}`;
       
-      if (config.CACHE_ENABLED) {
-        const cachedResult = cache.get<NotificationResults>(cacheKey);
-        if (cachedResult) {
-          return cachedResult;
-        }
+      // Try to get from cache
+      const cachedResult = cache.get<{ notifications: NotificationResponseDto[]; unreadCount: number; totalCount: number }>(cacheKey);
+      if (cachedResult) {
+        return cachedResult;
       }
-
-      // Build Prisma where clause
-      const where = {
-        userId,
-        ...(unreadOnly ? { read: false } : {}),
-        ...(type ? { type } : {})
-      };
-
-      // Execute queries in parallel
-      const [notifications, totalCount] = await Promise.all([
+      
+      // Execute queries for notifications
+      const [notifications, unreadCount, totalCount] = await Promise.all([
         // Get notifications
-        prisma.notification.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          take: limit,
-          skip: offset
+        this.repository.getUserNotifications(userId, {
+          limit: options.limit || 10,
+          unreadOnly: options.unreadOnly || false
         }),
         
-        // Get count directly instead of using groupBy
-        prisma.notification.count({ where })
+        // Get unread count
+        this.repository.countUnreadNotifications(userId),
+        
+        // Get total count
+        this.repository.count({
+          userId: userId
+        })
       ]);
-
-      // Get unread count
-      const unreadCount = await prisma.notification.count({
-        where: {
-          userId,
-          read: false
-        }
-      });
-
-      interface NotificationData {
-        id: number;
-        title: string;
-        message: string | null;
-        type: string;
-        read: boolean;
-        createdAt: Date;
-        referenceId: number | null;
-        referenceType: string | null;
-      }
       
       // Format notifications
-      const formattedNotifications = notifications.map((notification: NotificationData) => ({
-        id: notification.id,
-        type: this.mapNotificationType(notification.type),
-        title: notification.title,
-        message: notification.message,
-        referenceId: notification.referenceId,
-        referenceType: notification.referenceType,
-        timestamp: formatRelativeTime(notification.createdAt),
-        isRead: notification.read,
-        link: this.generateNotificationLink(notification)
-      }));
+      const formattedNotifications = this.formatNotifications(notifications);
       
-
       const result = {
         notifications: formattedNotifications,
-        total: totalCount,
-        unreadCount
+        unreadCount,
+        totalCount
       };
-
+      
       // Cache the result
-      if (config.CACHE_ENABLED) {
-        cache.set(cacheKey, result, 30); // Cache for 30 seconds
-      }
-
+      cache.set(cacheKey, result, 30); // Cache for 30 seconds
+      
       return result;
     } catch (error) {
-      console.error('Notification retrieval error:', error);
-      throw error;
+      logger.error('Error retrieving notifications:', error);
+      throw new BadRequestError('Failed to retrieve notifications');
     }
   }
 
   /**
    * Mark notifications as read
-   * @param userId User ID
-   * @param notificationIds Notification ID(s)
-   * @returns Update result
+   * @param userId - User ID
+   * @param data - Notification read data (either notificationId or markAll)
+   * @returns Success status and count of updated notifications
    */
-  async markAsRead(
-    userId: number, 
-    notificationIds: number | number[]
-  ): Promise<{ success: boolean; updatedCount: number }> {
+  async markNotificationsRead(
+    userId: number,
+    data: MarkNotificationReadDto
+  ): Promise<{ success: boolean; count: number }> {
     try {
-      // Normalize to array
-      const ids = Array.isArray(notificationIds) ? notificationIds : [notificationIds];
-
-      // Update notifications
-      const result = await prisma.notification.updateMany({
-        where: {
-          userId,
-          id: { in: ids }
-        },
-        data: {
-          read: true
-        }
-      });
-
-      // Clear cache for this user
+      const { notificationId, markAll } = data;
+      let updatedCount = 0;
+      
+      if (markAll) {
+        // Mark all notifications as read
+        updatedCount = await this.repository.markAsRead(userId);
+      } else if (notificationId) {
+        // Mark specific notification as read
+        updatedCount = await this.repository.markAsRead(userId, notificationId);
+      } else {
+        throw new ValidationError('Either notification ID or mark all flag is required');
+      }
+      
+      // Clear cache
       cache.delete(`notifications_${userId}`);
-
+      
       return {
         success: true,
-        updatedCount: result.count
+        count: updatedCount
       };
     } catch (error) {
-      console.error('Notification mark as read error:', error);
-      return { success: false, updatedCount: 0 };
+      logger.error('Error marking notifications as read:', error);
+      throw new BadRequestError('Failed to mark notifications as read');
     }
   }
 
   /**
-   * Mark all notifications as read for a user
-   * @param userId User ID
-   * @returns Update result
+   * Count unread notifications for a user
+   * @param userId - User ID
+   * @returns Count of unread notifications
    */
-  async markAllAsRead(
-    userId: number
-  ): Promise<{ success: boolean; updatedCount: number }> {
+  async countUnreadNotifications(userId: number): Promise<number> {
     try {
-      const result = await prisma.notification.updateMany({
-        where: {
-          userId,
-          read: false
-        },
-        data: {
-          read: true
-        }
-      });
-
-      // Clear cache for this user
-      cache.delete(`notifications_${userId}`);
-
-      return {
-        success: true,
-        updatedCount: result.count
-      };
+      return this.repository.countUnreadNotifications(userId);
     } catch (error) {
-      console.error('Notification mark all as read error:', error);
-      return { success: false, updatedCount: 0 };
+      logger.error('Error counting unread notifications:', error);
+      return 0; // Return 0 as a safe default
     }
   }
 
   /**
-   * Map notification type to user-friendly representation
-   * @param type Notification type
-   * @returns Mapped notification type
+   * Format notifications for response
+   * @param notifications - Raw notification data
+   * @returns Formatted notification DTOs
    */
-  private mapNotificationType(type: string): {
-    key: string;
-    label: string;
-    icon: string;
-    color: string;
-  } {
-    const typeMap: Record<string, { key: string; label: string; icon: string; color: string }> = {
-      'anfrage': { 
-        key: 'request', 
-        label: 'Anfrage', 
-        icon: 'envelope', 
-        color: 'info' 
-      },
-      'termin': { 
-        key: 'appointment', 
-        label: 'Termin', 
-        icon: 'calendar', 
-        color: 'primary' 
-      },
-      'projekt': { 
-        key: 'project', 
-        label: 'Projekt', 
-        icon: 'briefcase', 
-        color: 'success' 
-      },
-      'system': { 
-        key: 'system', 
-        label: 'System', 
-        icon: 'bell', 
-        color: 'warning' 
-      },
-      'contact_confirmation': { 
-        key: 'contact_confirmation', 
-        label: 'Kontaktanfrage', 
-        icon: 'envelope-open', 
-        color: 'success' 
+  private formatNotifications(notifications: any[]): NotificationResponseDto[] {
+    return notifications.map((notification: any) => {
+      // Determine type and icon
+      let type: string;
+      let icon: string;
+      
+      switch (notification.type) {
+        case 'anfrage':
+          type = 'success';
+          icon = 'envelope';
+          break;
+        case 'termin':
+          type = 'primary';
+          icon = 'calendar-check';
+          break;
+        case 'warnung':
+          type = 'warning';
+          icon = 'exclamation-triangle';
+          break;
+        default:
+          type = 'info';
+          icon = 'bell';
       }
-    };
-
-    return typeMap[type] || { 
-      key: 'default', 
-      label: 'Benachrichtigung', 
-      icon: 'info-circle', 
-      color: 'secondary' 
-    };
-  }
-
-  /**
-   * Generate notification link based on type
-   * @param notification Notification object
-   * @returns Notification link
-   */
-  private generateNotificationLink(notification: {
-    type: string;
-    referenceId: number | null;
-  }): string {
-    switch (notification.type) {
-      case 'anfrage':
-        return `/dashboard/requests/${notification.referenceId}`;
-      case 'termin':
-        return `/dashboard/termine/${notification.referenceId}`;
-      case 'projekt':
-        return `/dashboard/projekte/${notification.referenceId}`;
-      case 'contact_confirmation':
-        return `/dashboard/requests/${notification.referenceId}`;
-      default:
-        return '/dashboard/notifications';
-    }
-  }
-}
-
-// Fix the _count property issue
-export async function getUnreadNotificationsCount(userId: number): Promise<number> {
-  try {
-    // Use count directly instead of groupBy for simplicity
-    return await prisma.notification.count({
-      where: {
-        userId,
-        read: false
+      
+      // Determine link based on type and reference
+      let link: string;
+      switch (notification.type) {
+        case 'anfrage':
+          link = `/dashboard/requests/${notification.referenceId}`;
+          break;
+        case 'termin':
+          link = `/dashboard/termine/${notification.referenceId}`;
+          break;
+        case 'projekt':
+          link = `/dashboard/projekte/${notification.referenceId}`;
+          break;
+        default:
+          link = '/dashboard/notifications';
       }
+      
+      return {
+        id: notification.id,
+        title: notification.title,
+        message: notification.message || '',
+        type,
+        icon,
+        read: notification.read,
+        time: formatRelativeTime(notification.createdAt),
+        timestamp: notification.createdAt,
+        link
+      };
     });
-  } catch (error) {
-    console.error('Error getting unread notification count:', error);
-    return 0;
+  }
+
+  /**
+   * Map entity to DTO - not used for this service
+   */
+  protected mapEntityToDTO(entity: Notification): any {
+    // No standard DTO mapping needed
+    return entity;
   }
 }
 
