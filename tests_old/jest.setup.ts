@@ -1,6 +1,6 @@
 // jest.setup.ts
 import 'jest';
-import { prismaMock } from './mocks/prisma.mock';
+import { prismaMock } from '../tests_old/mocks/prisma.mock';
 
 // Mock environment variables
 process.env.JWT_SECRET = 'test-jwt-secret';

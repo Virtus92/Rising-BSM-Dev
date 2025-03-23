@@ -1,0 +1,229 @@
+Service:
+  type: object
+  required:
+    - name
+    - preis_basis
+    - einheit
+  properties:
+    id:
+      type: integer
+      description: Service ID (auto-generated)
+    name:
+      type: string
+      description: Service name
+      minLength: 2
+      maxLength: 100
+    beschreibung:
+      type: string
+      nullable: true
+      description: Service description
+      maxLength: 2000
+    preis_basis:
+      type: number
+      format: float
+      description: Base price
+      minimum: 0
+    einheit:
+      type: string
+      description: Unit (e.g., hour, piece, m²)
+      maxLength: 20
+    mwst_satz:
+      type: number
+      format: float
+      default: 20
+      description: VAT rate in percentage
+      minimum: 0
+      maximum: 100
+    aktiv:
+      type: boolean
+      default: true
+      description: Service status (active/inactive)
+    created_at:
+      type: string
+      format: date-time
+      description: Timestamp of service creation
+    updated_at:
+      type: string
+      format: date-time
+      description: Timestamp of last update
+
+ServiceCreate:
+  type: object
+  required:
+    - name
+    - preis_basis
+    - einheit
+  properties:
+    name:
+      type: string
+      description: Service name
+      minLength: 2
+      maxLength: 100
+    beschreibung:
+      type: string
+      nullable: true
+      description: Service description
+      maxLength: 2000
+    preis_basis:
+      type: number
+      format: float
+      description: Base price
+      minimum: 0
+    einheit:
+      type: string
+      description: Unit (e.g., hour, piece, m²)
+      maxLength: 20
+    mwst_satz:
+      type: number
+      format: float
+      default: 20
+      description: VAT rate in percentage
+      minimum: 0
+      maximum: 100
+    aktiv:
+      type: boolean
+      default: true
+      description: Service status (active/inactive)
+
+ServiceUpdate:
+  type: object
+  properties:
+    name:
+      type: string
+      description: Service name
+      minLength: 2
+      maxLength: 100
+    beschreibung:
+      type: string
+      nullable: true
+      description: Service description
+      maxLength: 2000
+    preis_basis:
+      type: number
+      format: float
+      description: Base price
+      minimum: 0
+    einheit:
+      type: string
+      description: Unit (e.g., hour, piece, m²)
+      maxLength: 20
+    mwst_satz:
+      type: number
+      format: float
+      description: VAT rate in percentage
+      minimum: 0
+      maximum: 100
+    aktiv:
+      type: boolean
+      description: Service status (active/inactive)
+
+ServiceStatusUpdate:
+  type: object
+  required:
+    - aktiv
+  properties:
+    aktiv:
+      type: boolean
+      description: Service status (true=active, false=inactive)
+
+ServiceFilter:
+  type: object
+  properties:
+    status:
+      type: string
+      enum: [aktiv, inaktiv]
+      description: Filter by status (aktiv=true, inaktiv=false)
+    search:
+      type: string
+      description: Search term for service name and description
+    page:
+      type: integer
+      default: 1
+      description: Page number (1-based)
+    limit:
+      type: integer
+      default: 20
+      maximum: 100
+      description: Items per page
+    sortBy:
+      type: string
+      enum: [name, preis_basis, einheit, created_at]
+      default: name
+      description: Field to sort by
+    sortDirection:
+      type: string
+      enum: [asc, desc]
+      default: asc
+      description: Sort direction
+
+ServiceStatistics:
+  type: object
+  properties:
+    service:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        active:
+          type: boolean
+    usage:
+      type: object
+      properties:
+        totalProjects:
+          type: integer
+        activeProjects:
+          type: integer
+        completedProjects:
+          type: integer
+    revenue:
+      type: object
+      properties:
+        totalRevenue:
+          type: number
+        avgProjectValue:
+          type: number
+        periodComparison:
+          type: number
+          description: Percentage change compared to previous period
+    monthlyRevenue:
+      type: array
+      description: Revenue grouped by month
+      items:
+        type: object
+        properties:
+          month:
+            type: string
+          revenue:
+            type: number
+    topCustomers:
+      type: array
+      description: Top customers for this service
+      items:
+        type: object
+        properties:
+          id:
+            type: integer
+          name:
+            type: string
+          revenue:
+            type: number
+          projectCount:
+            type: integer
+
+ServiceBatchUpdate:
+  type: object
+  required:
+    - ids
+    - aktiv
+  properties:
+    ids:
+      type: array
+      items:
+        type: integer
+      description: Array of service IDs to update
+      minItems: 1
+    aktiv:
+      type: boolean
+      description: Service status (true=active, false=inactive)

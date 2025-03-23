@@ -1,7 +1,8 @@
 // build-openapi.js
-const fs = require('fs');
-const path = require('path');
-const yaml = require('js-yaml');
+import fs from 'fs';
+import path from 'path';
+import yaml from 'js-yaml';
+
 
 /**
  * Build a bundled OpenAPI spec from the modular files
@@ -10,6 +11,7 @@ const yaml = require('js-yaml');
   console.log('Building bundled OpenAPI spec...');
   
   // Define paths
+  const __dirname = path.dirname(new URL(import.meta.url).pathname);
   const rootDir = path.join(__dirname, '..', 'openapi');
   const mainSpecPath = path.join(rootDir, 'openapi.yaml');
   const outputPath = path.join(__dirname, '..', 'dist', 'swagger.json');

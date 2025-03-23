@@ -1,0 +1,277 @@
+Appointment:
+  type: object
+  required:
+    - titel
+    - termin_datum
+    - termin_zeit
+  properties:
+    id:
+      type: integer
+      description: Appointment ID (auto-generated)
+    titel:
+      type: string
+      description: Appointment title
+      minLength: 2
+      maxLength: 200
+    kunde_id:
+      type: integer
+      nullable: true
+      description: ID of the associated customer
+    projekt_id:
+      type: integer
+      nullable: true
+      description: ID of the associated project
+    termin_datum:
+      type: string
+      format: date
+      description: Appointment date (YYYY-MM-DD)
+    termin_zeit:
+      type: string
+      pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
+      description: Appointment time (HH:MM)
+    dauer:
+      type: integer
+      default: 60
+      description: Duration in minutes
+      minimum: 1
+    ort:
+      type: string
+      nullable: true
+      description: Appointment location
+      maxLength: 200
+    beschreibung:
+      type: string
+      nullable: true
+      description: Appointment description
+      maxLength: 2000
+    status:
+      type: string
+      enum: [geplant, bestaetigt, abgeschlossen, storniert]
+      default: geplant
+      description: Appointment status
+    created_at:
+      type: string
+      format: date-time
+      description: Timestamp of appointment creation
+    updated_at:
+      type: string
+      format: date-time
+      description: Timestamp of last update
+
+AppointmentCreate:
+  type: object
+  required:
+    - titel
+    - termin_datum
+    - termin_zeit
+  properties:
+    titel:
+      type: string
+      description: Appointment title
+      minLength: 2
+      maxLength: 200
+    kunde_id:
+      type: integer
+      nullable: true
+      description: Customer ID
+    projekt_id:
+      type: integer
+      nullable: true
+      description: Project ID
+    termin_datum:
+      type: string
+      format: date
+      description: Appointment date (YYYY-MM-DD)
+    termin_zeit:
+      type: string
+      pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
+      description: Appointment time (HH:MM)
+    dauer:
+      type: integer
+      default: 60
+      description: Duration in minutes
+      minimum: 1
+    ort:
+      type: string
+      nullable: true
+      description: Appointment location
+      maxLength: 200
+    beschreibung:
+      type: string
+      nullable: true
+      description: Appointment description
+      maxLength: 2000
+    status:
+      type: string
+      enum: [geplant, bestaetigt, abgeschlossen, storniert]
+      default: geplant
+      description: Appointment status
+
+AppointmentUpdate:
+  type: object
+  properties:
+    titel:
+      type: string
+      description: Appointment title
+      minLength: 2
+      maxLength: 200
+    kunde_id:
+      type: integer
+      nullable: true
+      description: Customer ID
+    projekt_id:
+      type: integer
+      nullable: true
+      description: Project ID
+    termin_datum:
+      type: string
+      format: date
+      description: Appointment date (YYYY-MM-DD)
+    termin_zeit:
+      type: string
+      pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
+      description: Appointment time (HH:MM)
+    dauer:
+      type: integer
+      description: Duration in minutes
+      minimum: 1
+    ort:
+      type: string
+      nullable: true
+      description: Appointment location
+      maxLength: 200
+    beschreibung:
+      type: string
+      nullable: true
+      description: Appointment description
+      maxLength: 2000
+    status:
+      type: string
+      enum: [geplant, bestaetigt, abgeschlossen, storniert]
+      description: Appointment status
+
+AppointmentStatusUpdate:
+  type: object
+  required:
+    - status
+  properties:
+    status:
+      type: string
+      enum: [geplant, bestaetigt, abgeschlossen, storniert]
+      description: New appointment status
+    note:
+      type: string
+      description: Optional note about the status change
+      maxLength: 1000
+
+AppointmentNote:
+  type: object
+  required:
+    - note
+  properties:
+    note:
+      type: string
+      description: Note text
+      minLength: 1
+      maxLength: 1000
+
+AppointmentFilter:
+  type: object
+  properties:
+    status:
+      type: string
+      enum: [geplant, bestaetigt, abgeschlossen, storniert]
+      description: Filter by status
+    date:
+      type: string
+      format: date
+      description: Filter by specific date (YYYY-MM-DD)
+    customerId:
+      type: integer
+      description: Filter by customer ID
+    projectId:
+      type: integer
+      description: Filter by project ID
+    search:
+      type: string
+      description: Search term for appointment title or location
+    page:
+      type: integer
+      default: 1
+      description: Page number (1-based)
+    limit:
+      type: integer
+      default: 20
+      maximum: 100
+      description: Items per page
+    sortBy:
+      type: string
+      enum: [termin_datum, titel, status, created_at]
+      default: termin_datum
+      description: Field to sort by
+    sortDirection:
+      type: string
+      enum: [asc, desc]
+      default: asc
+      description: Sort direction
+
+AppointmentWithDetails:
+  allOf:
+    - $ref: '#/Appointment'
+    - type: object
+      properties:
+        notes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              text:
+                type: string
+              userName:
+                type: string
+              formattedDate:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+        customer:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+        project:
+          type: object
+          properties:
+            id:
+              type: integer
+            title:
+              type: string
+            status:
+              type: string
+
+AppointmentBatchUpdate:
+  type: object
+  required:
+    - ids
+    - status
+  properties:
+    ids:
+      type: array
+      items:
+        type: integer
+      description: Array of appointment IDs
+      minItems: 1
+    status:
+      type: string
+      enum: [geplant, bestaetigt, abgeschlossen, storniert]
+      description: New status for all selected appointments
+    note:
+      type: string
+      description: Optional note about the status change
+      maxLength: 1000
