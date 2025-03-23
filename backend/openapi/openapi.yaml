@@ -24,6 +24,10 @@ servers:
 tags:
   - name: Authentication
     description: Authentication and user access operations
+  - name: Users
+    description: User management operations
+  - name: Notifications
+    description: User notification operations
   - name: Customers
     description: Customer management
   - name: Projects
@@ -115,6 +119,20 @@ paths:
     $ref: './paths/auth.yaml#/reset-password'
   /auth/logout:
     $ref: './paths/auth.yaml#/logout'
+
+  # Users
+  /users:
+    $ref: './paths/users.yaml#/users'
+  /users/{id}:
+    $ref: './paths/users.yaml#/users-id'
+  /users/{id}/status:
+    $ref: './paths/users.yaml#/users-id-status'
+
+  # Notifications
+  /notifications:
+    $ref: './paths/notifications.yaml#/notifications'
+  /notifications/read:
+    $ref: './paths/notifications.yaml#/notifications-read'
 
   # Customers
   /customers:

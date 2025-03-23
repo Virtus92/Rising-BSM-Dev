@@ -26,6 +26,6 @@
       "*": ["./types/*"]
     }
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "../tests_old/jest.setup.ts", "../tests_old/jest.config.ts"],
   "exclude": ["node_modules", "**/*.test.ts", "dist"]
 }

@@ -104,7 +104,7 @@ const options = {
   apis: [
     './routes/*.js',
     './controllers/*.js',
-    './docs/**/*.yaml',
+    './openapi/**/*.yaml',
   ],
 };
 

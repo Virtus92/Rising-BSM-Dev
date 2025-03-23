@@ -9,7 +9,7 @@ import cors from 'cors';
 import path from 'path';
 import { generateAuthTokens } from './utils/jwt.js';
 import config from './config/index.js';
-import { initSwaggerDocs } from './config/swagger.js';
+import setupSwagger from './config/swagger-loader.js';
 import prisma from './utils/prisma.utils.js';
 import { inject, cleanup } from './config/dependency-container.js';
 import { PrismaClient } from '@prisma/client';
@@ -80,12 +80,7 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // Initialize Swagger documentation
-try {
-  initSwaggerDocs(app);
-} catch (error) {
-  logger.error('Failed to initialize Swagger docs:', error);
-  logger.info('Continuing without Swagger documentation');
-}
+setupSwagger(app);
 
 // Development helpers
 if (config.IS_DEVELOPMENT) {

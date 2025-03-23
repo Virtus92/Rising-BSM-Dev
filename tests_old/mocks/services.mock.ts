@@ -1,5 +1,5 @@
-import { cache } from '../../services/cache.service';
-import notificationService from '../../services/notification.service';
+import { cache } from '../../services/cache.service.js';
+import notificationService from '../../services/notification.service.js';
 
 // Bereite Cache-Mock vor
 export const cacheMock = {
