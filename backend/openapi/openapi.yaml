@@ -123,7 +123,7 @@ security:
 # Paths are organized and imported from separate files
 paths:
   # Authentication
-  /auth/login:
+  /login:
     $ref: './paths/auth.yaml#/login'
   /auth/refresh-token:
     $ref: './paths/auth.yaml#/refresh-token'
@@ -191,8 +191,8 @@ paths:
     $ref: './paths/appointments.yaml#/appointments'
   /appointments/{id}:
     $ref: './paths/appointments.yaml#/appointments-id'
-  /appointments/{id}/status:
-    $ref: './paths/appointments.yaml#/appointments-id-status'
+  /appointments/status:
+    $ref: './paths/appointments.yaml#/appointments-status'
   /appointments/{id}/notes:
     $ref: './paths/appointments.yaml#/appointments-id-notes'
   /appointments/batch:

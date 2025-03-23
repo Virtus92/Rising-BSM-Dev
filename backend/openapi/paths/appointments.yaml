@@ -344,20 +344,8 @@ appointments-id:
             schema:
               $ref: '../schemas/error.yaml#/Error'
 
-appointments-id-status:
+appointments-status:
   patch:
-    tags:
-      - Appointments
-    summary: Update appointment status
-    description: Change the status of an existing appointment
-    operationId: updateAppointmentStatus
-    parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-        description: Appointment ID
     requestBody:
       required: true
       content:
@@ -365,45 +353,17 @@ appointments-id-status:
           schema:
             type: object
             required:
+              - id
               - status
             properties:
+              id:
+                type: integer
+                description: Appointment ID
               status:
                 type: string
                 enum: [geplant, bestaetigt, abgeschlossen, storniert]
-                description: New appointment status
               note:
                 type: string
-                description: Optional note about the status change
-                maxLength: 1000
-    responses:
-      '200':
-        description: Status updated successfully
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                data:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                    status:
-                      type: string
-                    statusLabel:
-                      type: string
-                message:
-                  type: string
-                  example: "Appointment status updated successfully"
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
 appointments-id-notes:
   post:
