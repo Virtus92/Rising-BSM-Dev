@@ -1,14 +1,15 @@
 import { Request, Response } from 'express';
-import { prisma } from '../utils/prisma.utils';
-import { formatDateSafely } from '../utils/formatters';
-import { getAnfrageStatusInfo } from '../utils/helpers';
-import { NotFoundError, ValidationError, BadRequestError } from '../utils/errors';
-import { validateInput } from '../utils/validators';
-import { asyncHandler } from '../utils/asyncHandler';
-import { AuthenticatedRequest } from '../types/authenticated-request';
-import config from '../config';
+import { prisma } from '../utils/prisma.utils.js';
+import { formatDateSafely } from '../utils/formatters.js';
+import { getAnfrageStatusInfo } from '../utils/helpers.js';
+import { NotFoundError, ValidationError, BadRequestError } from '../utils/errors.js';
+import { validateInput } from '../utils/validators.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { AuthenticatedRequest } from '../types/authenticated-request.js';
+import { ResponseFactory } from '../utils/response.factory.js';
+import config from '../config/index.js';
 
-// Type definitions
+// Typen-Definitionen
 interface RequestFilterOptions {
   status?: string;
   service?: string;
@@ -19,10 +20,10 @@ interface RequestFilterOptions {
 }
 
 /**
- * Get all requests with optional filtering
+ * Alle Anfragen mit optionaler Filterung abrufen
  */
 export const getAllRequests = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  // Extract filter parameters
+  // Filter-Parameter extrahieren
   const { 
     status, 
     service, 
@@ -32,12 +33,12 @@ export const getAllRequests = asyncHandler(async (req: Request, res: Response): 
     limit = config.DEFAULT_PAGE_SIZE 
   } = req.query as unknown as RequestFilterOptions;
 
-  // Validate and sanitize pagination parameters
+  // Validieren und bereinigen der Paginierungsparameter
   const pageNumber = Math.max(1, Number(page) || 1);
   const pageSize = Math.min(config.MAX_PAGE_SIZE, Math.max(1, Number(limit) || config.DEFAULT_PAGE_SIZE));
   const skip = (pageNumber - 1) * pageSize;
 
-  // Build filter conditions
+  // Filter-Bedingungen aufbauen
   const where: any = {};
   
   if (status) {
@@ -62,7 +63,7 @@ export const getAllRequests = asyncHandler(async (req: Request, res: Response): 
     ];
   }
 
-  // Execute queries in parallel
+  // Abfragen parallel ausführen
   const [requests, totalCount] = await Promise.all([
     prisma.contactRequest.findMany({
       where,
@@ -73,7 +74,7 @@ export const getAllRequests = asyncHandler(async (req: Request, res: Response): 
     prisma.contactRequest.count({ where })
   ]);
 
-  // Format request data with explicit typing
+  // Anfragedaten mit expliziter Typisierung formatieren
   interface RequestRecord {
     id: number;
     name: string;
@@ -98,50 +99,51 @@ export const getAllRequests = asyncHandler(async (req: Request, res: Response): 
     };
   });
 
-  // Calculate pagination data
+  // Paginierungsdaten berechnen
   const totalPages = Math.ceil(totalCount / pageSize);
 
-  // Return data object for rendering or JSON response
-  res.status(200).json({
-    success: true,
-    requests: formattedRequests,
-    pagination: {
+  // Mit ResponseFactory antworten
+  ResponseFactory.paginated(
+    res,
+    formattedRequests,
+    {
       current: pageNumber,
       limit: pageSize,
       total: totalPages,
       totalRecords: totalCount
     },
-    filters: {
-      status,
-      service,
-      date,
-      search
-    }
-  });
+    'Anfragen erfolgreich abgerufen'
+  );
 });
 
 /**
- * Get request by ID with related data
+ * Anfrage anhand ID mit zugehörigen Daten abrufen
  */
 export const getRequestById = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
-  const requestId = Number(id);
+  const id = req.params.id;
+  const requestId: number = Number(id);
   
   if (isNaN(requestId)) {
-    throw new BadRequestError('Invalid request ID');
+    throw new BadRequestError('Ungültige Anfrage-ID');
   }
 
-  // Get request details
+  // Anfrage-Details abrufen
   const request = await prisma.contactRequest.findUnique({
     where: { id: requestId }
   });
   
   if (!request) {
-    throw new NotFoundError(`Request with ID ${requestId} not found`);
+    throw new NotFoundError(`Anfrage mit ID ${requestId} nicht gefunden`);
   }
   
   const statusInfo = getAnfrageStatusInfo(request.status);
 
+  // Notizen für diese Anfrage abrufen
+  const notes = await prisma.requestNote.findMany({
+    where: { requestId },
+    orderBy: { createdAt: 'desc' }
+  });
+  
   interface NoteRecord {
     id: number;
     text: string;
@@ -149,15 +151,21 @@ export const getRequestById = asyncHandler(async (req: Request, res: Response): 
     userName: string;
   }
   
-  const notes = await prisma.requestNote.findMany({
-    where: { requestId },
-    orderBy: { createdAt: 'desc' }
-  });
-  
-  // Format request data for response
+  // Anfragedaten für die Antwort formatieren
   const result = {
     request: {
-      // ... existing properties ...
+      id: request.id,
+      name: request.name,
+      email: request.email,
+      phone: request.phone || 'Nicht angegeben',
+      serviceLabel: request.service === 'facility' ? 'Facility Management' : 
+                    request.service === 'moving' ? 'Umzüge & Transporte' : 
+                    request.service === 'winter' ? 'Winterdienst' : 'Sonstiges',
+      message: request.message,
+      formattedDate: formatDateSafely(request.createdAt, 'dd.MM.yyyy'),
+      status: request.status,
+      statusLabel: statusInfo.label,
+      statusClass: statusInfo.className
     },
     notes: notes.map((note: NoteRecord) => ({
       id: note.id,
@@ -166,41 +174,44 @@ export const getRequestById = asyncHandler(async (req: Request, res: Response): 
       benutzer: note.userName
     }))
   };
+  
+  // Mit ResponseFactory antworten
+  ResponseFactory.success(res, result, 'Anfrage erfolgreich abgerufen');
 });
 
 /**
- * Update request status
+ * Anfrage-Status aktualisieren
  */
 export const updateRequestStatus = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id, status, note } = req.body;
   const requestId = Number(id);
   
   if (isNaN(requestId)) {
-    throw new BadRequestError('Invalid request ID');
+    throw new BadRequestError('Ungültige Anfrage-ID');
   }
   
-  // Validation
+  // Validierung
   if (!status) {
-    throw new ValidationError('Status is required', ['Status is required']);
+    throw new ValidationError('Status ist erforderlich', ['Status ist erforderlich']);
   }
   
-  // Check valid status values
+  // Gültige Status-Werte prüfen
   if (!['neu', 'in_bearbeitung', 'beantwortet', 'geschlossen'].includes(status)) {
-    throw new ValidationError('Invalid status value', 
-      ['Status must be one of: neu, in_bearbeitung, beantwortet, geschlossen']);
+    throw new ValidationError('Ungültiger Status-Wert', 
+      ['Status muss einer der folgenden sein: neu, in_bearbeitung, beantwortet, geschlossen']);
   }
   
-  // Check if request exists
+  // Prüfen, ob Anfrage existiert
   const request = await prisma.contactRequest.findUnique({
     where: { id: requestId }
   });
   
   if (!request) {
-    throw new NotFoundError(`Request with ID ${requestId} not found`);
+    throw new NotFoundError(`Anfrage mit ID ${requestId} nicht gefunden`);
   }
   
   await prisma.$transaction(async (tx: any) => {
-    // Update status in database
+    // Status in der Datenbank aktualisieren
     await tx.contactRequest.update({
       where: { id: requestId },
       data: {
@@ -209,35 +220,45 @@ export const updateRequestStatus = asyncHandler(async (req: AuthenticatedRequest
       }
     });
     
-    // Add note if provided and user exists
+    // Notiz hinzufügen, falls vorhanden und Benutzer existiert
     if (note && note.trim() !== '' && req.user?.id) {
       await tx.requestNote.create({
         data: {
           requestId,
-          userId: req.user.id, // Required field
-          userName: req.user.name || 'Unknown',
+          userId: req.user.id,
+          userName: req.user.name || 'Unbekannt',
           text: note
         }
       });
     }
     
-    // Log the status change
+    // Statusänderung protokollieren
     if (req.user?.id) {
       await tx.requestLog.create({
         data: {
           requestId,
           userId: req.user.id,
-          userName: req.user.name || 'Unknown',
+          userName: req.user.name || 'Unbekannt',
           action: 'status_changed',
-          details: `Status changed to: ${status}`
+          details: `Status geändert auf: ${status}`
         }
       });
     }
   });
+
+  // Mit ResponseFactory antworten
+  ResponseFactory.success(
+    res, 
+    { 
+      requestId,
+      status
+    }, 
+    'Anfrage-Status erfolgreich aktualisiert'
+  );
 });
 
 /**
- * Add a note to request
+ * Eine Notiz zur Anfrage hinzufügen
  */
 export const addRequestNote = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id } = req.params;
@@ -245,62 +266,69 @@ export const addRequestNote = asyncHandler(async (req: AuthenticatedRequest, res
   const { note } = req.body;
   
   if (isNaN(requestId)) {
-    throw new BadRequestError('Invalid request ID');
+    throw new BadRequestError('Ungültige Anfrage-ID');
   }
   
   if (!note || note.trim() === '') {
-    throw new ValidationError('Note cannot be empty', ['Note cannot be empty']);
+    throw new ValidationError('Notiz darf nicht leer sein', ['Notiz darf nicht leer sein']);
   }
   
-  // Check if request exists
+  // Prüfen, ob Anfrage existiert
   const request = await prisma.contactRequest.findUnique({
     where: { id: requestId }
   });
 
   if (!request) {
-    throw new NotFoundError(`Request with ID ${requestId} not found`);
+    throw new NotFoundError(`Anfrage mit ID ${requestId} nicht gefunden`);
   }
   
-  // Insert note into database - only if userId exists
+  // Notiz in die Datenbank einfügen - nur wenn userId existiert
+  let createdNote;
+  
   if (req.user?.id) {
-    await prisma.requestNote.create({
+    createdNote = await prisma.requestNote.create({
       data: {
         requestId,
-        userId: req.user.id, // Required field
-        userName: req.user?.name || 'Unknown',
+        userId: req.user.id,
+        userName: req.user?.name || 'Unbekannt',
         text: note
       }
     });
     
-    // Log the note addition
+    // Hinzufügen der Notiz protokollieren
     await prisma.requestLog.create({
       data: {
         requestId,
         userId: req.user.id,
-        userName: req.user.name || 'Unknown',
+        userName: req.user.name || 'Unbekannt',
         action: 'note_added',
-        details: 'Note added to request'
+        details: 'Notiz zur Anfrage hinzugefügt'
       }
     });
   } else {
-    // Handle case where no user ID is available
-    console.warn('Note added without user context');
+    // Fall behandeln, wenn keine Benutzer-ID verfügbar ist
+    console.warn('Notiz ohne Benutzerkontext hinzugefügt');
   }
 
-  res.status(201).json({
-    success: true,
-    requestId,
-    message: 'Note added successfully'
-  });
+  // Mit ResponseFactory antworten
+  ResponseFactory.created(
+    res, 
+    {
+      requestId,
+      noteId: createdNote?.id
+    }, 
+    'Notiz erfolgreich hinzugefügt'
+  );
 });
 
 /**
- * Export requests data
+ * Anfragedaten exportieren
  */
 export const exportRequests = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  // Since the export service requires updates for Prisma compatibility,
-  // we'll return a not implemented response for now
-  res.status(501).json({ 
-    message: 'Export functionality is being migrated to TypeScript and Prisma' 
-  });
+  // Mit ResponseFactory antworten
+  ResponseFactory.status(
+    res,
+    'Exportfunktionalität wird auf TypeScript und Prisma migriert',
+    501 // Not Implemented
+  );
 });

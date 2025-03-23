@@ -14,7 +14,19 @@ export interface ValidationRule {
 }
 
 export interface ValidationSchema {
-  [key: string]: ValidationRule;
+  [key: string]: {
+    type: string;
+    required?: boolean;
+    min?: number;
+    max?: number;
+    minLength?: number;
+    maxLength?: number;
+    integer?: boolean;
+    messages?: {
+      [key: string]: string;
+    };
+    [key: string]: any;
+  };
 }
 
 export interface ValidationOptions {

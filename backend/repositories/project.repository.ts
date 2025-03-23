@@ -4,7 +4,7 @@
  * Repository for Project entity operations providing data access and persistence.
  */
 import { PrismaClient } from '@prisma/client';
-import { BaseRepository } from './base.repository.js';
+import { BaseRepository } from '../utils/base.repository.js';
 import { QueryBuilder } from '../utils/query-builder.js';
 import { inject } from '../config/dependency-container.js';
 import { ProjectFilterDTO } from '../types/dtos/project.dto.js';

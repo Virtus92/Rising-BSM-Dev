@@ -131,6 +131,40 @@ export class ResponseFactory {
   ): Response {
     return this.success(res, data, message, 202, meta);
   }
+  
+  /**
+   * Send a file download response
+   * @param res - Express response object
+   * @param data - File data
+   * @param filename - File name
+   * @param contentType - Content type
+   * @returns Express response
+   */
+  static file(
+    res: Response,
+    data: Buffer | string,
+    filename: string,
+    contentType: string
+  ): Response {
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(data);
+  }
+  
+  /**
+   * Send response with status only
+   * @param res - Express response object
+   * @param message - Status message
+   * @param statusCode - HTTP status code (default: 200)
+   * @returns Express response
+   */
+  static status(
+    res: Response,
+    message: string,
+    statusCode: number = 200
+  ): Response {
+    return this.success(res, { status: statusCode < 400 ? 'success' : 'error' }, message, statusCode);
+  }
 }
 
 export default ResponseFactory;
