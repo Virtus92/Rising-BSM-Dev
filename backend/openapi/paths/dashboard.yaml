@@ -1,3 +1,124 @@
+dashboard:
+  get:
+    tags:
+      - Dashboard
+    summary: Get dashboard data
+    description: Retrieve comprehensive dashboard data including statistics, charts, and recent activities
+    operationId: getDashboardData
+    parameters:
+      - in: query
+        name: revenueFilter
+        schema:
+          type: string
+          enum: [Letzten 30 Tage, Letzten 3 Monate, Letzten 6 Monate, Dieses Jahr]
+          default: Letzten 6 Monate
+        description: Filter for revenue chart
+      - in: query
+        name: servicesFilter
+        schema:
+          type: string
+          enum: [Diese Woche, Diesen Monat, Dieses Quartal, Dieses Jahr]
+          default: Diesen Monat
+        description: Filter for services chart
+    responses:
+      '200':
+        description: Dashboard data
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    stats:
+                      type: object
+                      properties:
+                        newRequests:
+                          type: object
+                          properties:
+                            count:
+                              type: integer
+                            trend:
+                              type: integer
+                        activeProjects:
+                          type: object
+                          properties:
+                            count:
+                              type: integer
+                            trend:
+                              type: integer
+                        totalCustomers:
+                          type: object
+                          properties:
+                            count:
+                              type: integer
+                            trend:
+                              type: integer
+                        monthlyRevenue:
+                          type: object
+                          properties:
+                            amount:
+                              type: number
+                            trend:
+                              type: integer
+                    charts:
+                      type: object
+                      properties:
+                        revenue:
+                          type: object
+                          properties:
+                            labels:
+                              type: array
+                              items:
+                                type: string
+                            data:
+                              type: array
+                              items:
+                                type: number
+                        services:
+                          type: object
+                          properties:
+                            labels:
+                              type: array
+                              items:
+                                type: string
+                            data:
+                              type: array
+                              items:
+                                type: number
+                    recentRequests:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+                          dateLabel:
+                            type: string
+                          status:
+                            type: string
+                    upcomingAppointments:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          title:
+                            type: string
+                          dateLabel:
+                            type: string
+                          customer:
+                            type: string
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
 dashboard-stats:
   get:
     tags:
@@ -44,28 +165,6 @@ dashboard-stats:
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
-dashboard-notifications:
-  get:
-    tags:
-      - Dashboard
-    summary: Get user notifications
-    description: Retrieve notifications for current user
-    operationId: getNotifications
-    responses:
-      '200':
-        description: User notifications
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                notifications:
-                  type: array
-                  items:
-                    $ref: '../schemas/models.yaml#/Notification'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
 dashboard-search:
   get:
     tags:
@@ -75,10 +174,11 @@ dashboard-search:
     operationId: globalSearch
     parameters:
       - in: query
-        name: query
+        name: q
         required: true
         schema:
           type: string
+          minLength: 2
         description: Search query string
       - in: query
         name: limit
@@ -155,47 +255,11 @@ dashboard-search:
                         type: number
                       matchField:
                         type: string
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-dashboard-notifications-mark-read:
-  post:
-    tags:
-      - Dashboard
-    summary: Mark notifications as read
-    description: Mark one or more notifications as read
-    operationId: markNotificationsRead
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              notificationIds:
-                type: array
-                items:
-                  type: integer
-                description: Array of notification IDs to mark as read
-              all:
-                type: boolean
-                description: Set to true to mark all notifications as read
-    responses:
-      '200':
-        description: Notifications marked as read
+      '400':
+        description: Invalid search query
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                count:
-                  type: integer
-                message:
-                  type: string
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
+              $ref: '../schemas/error.yaml#/Error'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'

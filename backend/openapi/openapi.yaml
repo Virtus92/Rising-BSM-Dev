@@ -137,6 +137,8 @@ paths:
   # Customers
   /customers:
     $ref: './paths/customers.yaml#/customers'
+  /customers/statistics:
+    $ref: './paths/customers.yaml#/customers-statistics'
   /customers/{id}:
     $ref: './paths/customers.yaml#/customers-id'
   /customers/{id}/notes:
@@ -147,6 +149,8 @@ paths:
   # Projects
   /projects:
     $ref: './paths/projects.yaml#/projects'
+  /projects/statistics:
+    $ref: './paths/projects.yaml#/projects-statistics'
   /projects/{id}:
     $ref: './paths/projects.yaml#/projects-id'
   /projects/{id}/status:
@@ -199,20 +203,16 @@ paths:
     $ref: './paths/profile.yaml#/profile-notifications'
 
   # Dashboard
+  /dashboard:
+    $ref: './paths/dashboard.yaml#/dashboard'
   /dashboard/stats:
     $ref: './paths/dashboard.yaml#/dashboard-stats'
-  /dashboard/data:
-    $ref: './paths/dashboard.yaml#/dashboard-data'
   /dashboard/search:
     $ref: './paths/dashboard.yaml#/dashboard-search'
-  /dashboard/notifications:
-    $ref: './paths/dashboard.yaml#/dashboard-notifications'
-  /dashboard/notifications/mark-read:
-    $ref: './paths/dashboard.yaml#/dashboard-notifications-mark-read'
 
   # Settings
-  /settings:
-    $ref: './paths/settings.yaml#/settings'
+  /settings/user:
+    $ref: './paths/settings.yaml#/settings-user'
   /settings/system:
     $ref: './paths/settings.yaml#/settings-system'
   /settings/backup:
@@ -227,3 +227,5 @@ paths:
   # System
   /health:
     $ref: './paths/system.yaml#/health'
+  /version:
+    $ref: './paths/system.yaml#/version'

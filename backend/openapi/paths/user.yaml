@@ -1,38 +1,29 @@
-appointments:
+# paths/users.yaml
+users:
   get:
     tags:
-      - Appointments
-    summary: Get all appointments
-    description: Retrieve list of appointments with optional filtering and pagination
-    operationId: getAllAppointments
+      - Users
+    summary: Get all users
+    description: Retrieve list of users with optional filtering (admin only)
+    operationId: getAllUsers
     parameters:
       - in: query
         name: status
         schema:
           type: string
-          enum: [geplant, bestaetigt, abgeschlossen, storniert]
+          enum: [aktiv, inaktiv, gesperrt]
         description: Filter by status
       - in: query
-        name: date
+        name: role
         schema:
           type: string
-          format: date
-        description: Filter by specific date (YYYY-MM-DD)
-      - in: query
-        name: customerId
-        schema:
-          type: integer
-        description: Filter by customer ID
-      - in: query
-        name: projectId
-        schema:
-          type: integer
-        description: Filter by project ID
+          enum: [admin, manager, mitarbeiter, benutzer]
+        description: Filter by role
       - in: query
         name: search
         schema:
           type: string
-        description: Search term for appointment title or location
+        description: Search term for name or email
       - in: query
         name: page
         schema:
@@ -50,8 +41,8 @@ appointments:
         name: sortBy
         schema:
           type: string
-          enum: [termin_datum, titel, status, created_at]
-          default: termin_datum
+          enum: [name, email, role, status, created_at]
+          default: name
         description: Field to sort by
       - in: query
         name: sortDirection
@@ -62,7 +53,7 @@ appointments:
         description: Sort direction
     responses:
       '200':
-        description: List of appointments
+        description: List of users
         content:
           application/json:
             schema:
@@ -74,7 +65,7 @@ appointments:
                 data:
                   type: array
                   items:
-                    $ref: '../schemas/models.yaml#/Appointment'
+                    $ref: '../schemas/models.yaml#/User'
                 pagination:
                   $ref: '../schemas/common.yaml#/Pagination'
                 meta:
@@ -85,19 +76,21 @@ appointments:
                       properties:
                         status:
                           type: string
-                        date:
+                        role:
                           type: string
                         search:
                           type: string
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
 
   post:
     tags:
-      - Appointments
-    summary: Create new appointment
-    description: Schedule a new appointment
-    operationId: createAppointment
+      - Users
+    summary: Create new user
+    description: Add a new user account (admin only)
+    operationId: createUser
     requestBody:
       required: true
       content:
@@ -105,54 +98,42 @@ appointments:
           schema:
             type: object
             required:
-              - titel
-              - termin_datum
-              - termin_zeit
+              - name
+              - email
+              - password
             properties:
-              titel:
+              name:
                 type: string
-                description: Appointment title
+                description: Full name
                 minLength: 2
-                maxLength: 200
-              kunde_id:
-                type: integer
-                nullable: true
-                description: Customer ID
-              projekt_id:
-                type: integer
-                nullable: true
-                description: Project ID
-              termin_datum:
+                maxLength: 100
+              email:
                 type: string
-                format: date
-                description: Appointment date (YYYY-MM-DD)
-              termin_zeit:
+                format: email
+                description: Email address (must be unique)
+              password:
                 type: string
-                pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
-                description: Appointment time (HH:MM)
-              dauer:
-                type: integer
-                default: 60
-                description: Duration in minutes
-                minimum: 1
-              ort:
+                format: password
+                description: Password (min 8 characters)
+                minLength: 8
+              role:
                 type: string
+                enum: [admin, manager, mitarbeiter, benutzer]
+                default: mitarbeiter
+                description: User role
+              phone:
+                type: string
+                description: Phone number
+                maxLength: 30
                 nullable: true
-                description: Appointment location
-                maxLength: 200
-              beschreibung:
-                type: string
-                nullable: true
-                description: Appointment description
-                maxLength: 2000
               status:
                 type: string
-                enum: [geplant, bestaetigt, abgeschlossen, storniert]
-                default: geplant
-                description: Appointment status
+                enum: [aktiv, inaktiv, gesperrt]
+                default: aktiv
+                description: User status
     responses:
       '201':
-        description: Appointment created
+        description: User created
         content:
           application/json:
             schema:
@@ -162,32 +143,40 @@ appointments:
                   type: boolean
                   example: true
                 data:
-                  $ref: '../schemas/models.yaml#/Appointment'
+                  $ref: '../schemas/models.yaml#/User'
                 message:
                   type: string
-                  example: "Appointment created successfully"
+                  example: "User created successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '409':
+        description: Email already exists
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
 
-appointments-id:
+users-id:
   get:
     tags:
-      - Appointments
-    summary: Get appointment by ID
-    description: Retrieve detailed appointment information including notes
-    operationId: getAppointmentById
+      - Users
+    summary: Get user by ID
+    description: Retrieve detailed user information (admin only)
+    operationId: getUserById
     parameters:
       - in: path
         name: id
         required: true
         schema:
           type: integer
-        description: Appointment ID
+        description: User ID
     responses:
       '200':
-        description: Appointment details
+        description: User details
         content:
           application/json:
             schema:
@@ -197,44 +186,60 @@ appointments-id:
                   type: boolean
                   example: true
                 data:
+                  type: object
                   allOf:
-                    - $ref: '../schemas/models.yaml#/Appointment'
+                    - $ref: '../schemas/models.yaml#/User'
                     - type: object
                       properties:
-                        notes:
+                        activity:
                           type: array
                           items:
                             type: object
                             properties:
                               id:
                                 type: integer
-                              text:
+                              activity:
                                 type: string
-                              userName:
+                              activityLabel:
                                 type: string
-                              formattedDate:
-                                type: string
-                              createdAt:
+                              timestamp:
                                 type: string
                                 format: date-time
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+                              formattedDate:
+                                type: string
+                        settings:
+                          type: object
+                          properties:
+                            language:
+                              type: string
+                            darkMode:
+                              type: boolean
+                            emailNotifications:
+                              type: boolean
+                            pushNotifications:
+                              type: boolean
+                            notificationInterval:
+                              type: string
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
 
   put:
     tags:
-      - Appointments
-    summary: Update appointment
-    description: Update an existing appointment
-    operationId: updateAppointment
+      - Users
+    summary: Update user
+    description: Update an existing user (admin only)
+    operationId: updateUser
     parameters:
       - in: path
         name: id
         required: true
         schema:
           type: integer
-        description: Appointment ID
+        description: User ID
     requestBody:
       required: true
       content:
@@ -242,48 +247,36 @@ appointments-id:
           schema:
             type: object
             properties:
-              titel:
+              name:
                 type: string
-                description: Appointment title
+                description: Full name
                 minLength: 2
-                maxLength: 200
-              kunde_id:
-                type: integer
-                nullable: true
-                description: Customer ID
-              projekt_id:
-                type: integer
-                nullable: true
-                description: Project ID
-              termin_datum:
+                maxLength: 100
+              email:
                 type: string
-                format: date
-                description: Appointment date (YYYY-MM-DD)
-              termin_zeit:
+                format: email
+                description: Email address
+              password:
                 type: string
-                pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
-                description: Appointment time (HH:MM)
-              dauer:
-                type: integer
-                description: Duration in minutes
-                minimum: 1
-              ort:
+                format: password
+                description: New password (min 8 characters)
+                minLength: 8
+              role:
                 type: string
+                enum: [admin, manager, mitarbeiter, benutzer]
+                description: User role
+              phone:
+                type: string
+                description: Phone number
+                maxLength: 30
                 nullable: true
-                description: Appointment location
-                maxLength: 200
-              beschreibung:
-                type: string
-                nullable: true
-                description: Appointment description
-                maxLength: 2000
               status:
                 type: string
-                enum: [geplant, bestaetigt, abgeschlossen, storniert]
-                description: Appointment status
+                enum: [aktiv, inaktiv, gesperrt]
+                description: User status
     responses:
       '200':
-        description: Appointment updated
+        description: User updated
         content:
           application/json:
             schema:
@@ -293,33 +286,41 @@ appointments-id:
                   type: boolean
                   example: true
                 data:
-                  $ref: '../schemas/models.yaml#/Appointment'
+                  $ref: '../schemas/models.yaml#/User'
                 message:
                   type: string
-                  example: "Appointment updated successfully"
+                  example: "User updated successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '409':
+        description: Email already exists
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
 
   delete:
     tags:
-      - Appointments
-    summary: Delete appointment
-    description: Delete an existing appointment
-    operationId: deleteAppointment
+      - Users
+    summary: Delete user
+    description: Delete or deactivate a user (admin only)
+    operationId: deleteUser
     parameters:
       - in: path
         name: id
         required: true
         schema:
           type: integer
-        description: Appointment ID
+        description: User ID
     responses:
       '200':
-        description: Appointment deleted
+        description: User deleted or deactivated
         content:
           application/json:
             schema:
@@ -332,32 +333,34 @@ appointments-id:
                   type: integer
                 message:
                   type: string
-                  example: "Appointment deleted successfully"
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-      '409':
-        description: Appointment cannot be deleted
+                  example: "User has been deactivated"
+      '400':
+        description: Cannot delete own account
         content:
           application/json:
             schema:
               $ref: '../schemas/error.yaml#/Error'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
 
-appointments-id-status:
+users-id-status:
   patch:
     tags:
-      - Appointments
-    summary: Update appointment status
-    description: Change the status of an existing appointment
-    operationId: updateAppointmentStatus
+      - Users
+    summary: Update user status
+    description: Change the status of a user (activate/deactivate/lock)
+    operationId: updateUserStatus
     parameters:
       - in: path
         name: id
         required: true
         schema:
           type: integer
-        description: Appointment ID
+        description: User ID
     requestBody:
       required: true
       content:
@@ -369,8 +372,8 @@ appointments-id-status:
             properties:
               status:
                 type: string
-                enum: [geplant, bestaetigt, abgeschlossen, storniert]
-                description: New appointment status
+                enum: [aktiv, inaktiv, gesperrt]
+                description: New user status
               note:
                 type: string
                 description: Optional note about the status change
@@ -397,28 +400,30 @@ appointments-id-status:
                       type: string
                 message:
                   type: string
-                  example: "Appointment status updated successfully"
+                  example: "User status updated successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
 
-appointments-id-notes:
+users-id-reset-password:
   post:
     tags:
-      - Appointments
-    summary: Add note to appointment
-    description: Add a new note to an existing appointment
-    operationId: addAppointmentNote
+      - Users
+    summary: Reset user password
+    description: Reset password for a user (admin only)
+    operationId: resetUserPassword
     parameters:
       - in: path
         name: id
         required: true
         schema:
           type: integer
-        description: Appointment ID
+        description: User ID
     requestBody:
       required: true
       content:
@@ -426,16 +431,20 @@ appointments-id-notes:
           schema:
             type: object
             required:
-              - note
+              - password
             properties:
-              note:
+              password:
                 type: string
-                description: Note text
-                minLength: 1
-                maxLength: 1000
+                format: password
+                description: New password (min 8 characters)
+                minLength: 8
+              sendEmail:
+                type: boolean
+                default: true
+                description: Whether to send password reset email to user
     responses:
-      '201':
-        description: Note added successfully
+      '200':
+        description: Password reset successfully
         content:
           application/json:
             schema:
@@ -444,34 +453,25 @@ appointments-id-notes:
                 success:
                   type: boolean
                   example: true
-                data:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                    text:
-                      type: string
-                    userName:
-                      type: string
-                    formattedDate:
-                      type: string
                 message:
                   type: string
-                  example: "Note added successfully"
+                  example: "User password has been reset"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
 
-appointments-batch:
+users-batch-status:
   patch:
     tags:
-      - Appointments
-    summary: Batch update appointment status
-    description: Update status for multiple appointments at once
-    operationId: batchUpdateAppointmentStatus
+      - Users
+    summary: Batch update user status
+    description: Change the status of multiple users at once
+    operationId: batchUpdateUserStatus
     requestBody:
       required: true
       content:
@@ -486,19 +486,19 @@ appointments-batch:
                 type: array
                 items:
                   type: integer
-                description: Array of appointment IDs
+                description: Array of user IDs to update
                 minItems: 1
               status:
                 type: string
-                enum: [geplant, bestaetigt, abgeschlossen, storniert]
-                description: New status for all selected appointments
+                enum: [aktiv, inaktiv, gesperrt]
+                description: New user status
               note:
                 type: string
                 description: Optional note about the status change
                 maxLength: 1000
     responses:
       '200':
-        description: Appointments updated successfully
+        description: Status updated successfully
         content:
           application/json:
             schema:
@@ -509,11 +509,13 @@ appointments-batch:
                   example: true
                 count:
                   type: integer
-                  description: Number of appointments updated
+                  description: Number of users updated
                 message:
                   type: string
-                  example: "3 appointments updated successfully"
+                  example: "3 users updated successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'

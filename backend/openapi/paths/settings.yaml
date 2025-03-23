@@ -1,4 +1,5 @@
-settings:
+# paths/settings.yaml
+settings-user:
   get:
     tags:
       - Settings
@@ -13,6 +14,9 @@ settings:
             schema:
               type: object
               properties:
+                success:
+                  type: boolean
+                  example: true
                 settings:
                   $ref: '../schemas/models.yaml#/UserSettings'
       '401':

@@ -1,9 +1,10 @@
+# paths/projects.yaml
 projects:
   get:
     tags:
       - Projects
     summary: Get all projects
-    description: Retrieve list of projects with optional filtering
+    description: Retrieve list of projects with optional filtering and pagination
     operationId: getAllProjects
     parameters:
       - in: query
@@ -13,22 +14,59 @@ projects:
           enum: [neu, in_bearbeitung, abgeschlossen, storniert]
         description: Filter by status
       - in: query
+        name: kunde_id
+        schema:
+          type: integer
+        description: Filter by customer ID
+      - in: query
+        name: dienstleistung_id
+        schema:
+          type: integer
+        description: Filter by service ID
+      - in: query
+        name: start_datum_von
+        schema:
+          type: string
+          format: date
+        description: Start date filter (from)
+      - in: query
+        name: start_datum_bis
+        schema:
+          type: string
+          format: date
+        description: Start date filter (to)
+      - in: query
         name: search
         schema:
           type: string
-        description: Search term for title or description
+        description: Search term for title and description
       - in: query
         name: page
         schema:
           type: integer
           default: 1
-        description: Page number
+        description: Page number (1-based)
       - in: query
         name: limit
         schema:
           type: integer
           default: 20
+          maximum: 100
         description: Items per page
+      - in: query
+        name: sortBy
+        schema:
+          type: string
+          enum: [titel, start_datum, end_datum, betrag, status, created_at]
+          default: start_datum
+        description: Field to sort by
+      - in: query
+        name: sortDirection
+        schema:
+          type: string
+          enum: [asc, desc]
+          default: desc
+        description: Sort direction
     responses:
       '200':
         description: List of projects
@@ -40,19 +78,24 @@ projects:
                 success:
                   type: boolean
                   example: true
-                projects:
+                data:
                   type: array
                   items:
                     $ref: '../schemas/models.yaml#/Project'
                 pagination:
                   $ref: '../schemas/common.yaml#/Pagination'
-                filters:
+                meta:
                   type: object
                   properties:
-                    status:
-                      type: string
-                    search:
-                      type: string
+                    filters:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                        kunde_id:
+                          type: integer
+                        search:
+                          type: string
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
@@ -69,37 +112,46 @@ projects:
           schema:
             type: object
             required:
-              - title
-              - startDate
+              - titel
+              - start_datum
             properties:
-              title:
+              titel:
                 type: string
-                minLength: 2
                 description: Project title
-              customerId:
+                minLength: 2
+                maxLength: 200
+              kunde_id:
                 type: integer
-                description: ID of the associated customer
-              serviceId:
+                nullable: true
+                description: Customer ID
+              dienstleistung_id:
                 type: integer
-                description: ID of the associated service
-              startDate:
+                nullable: true
+                description: Service ID
+              start_datum:
                 type: string
                 format: date
                 description: Project start date (YYYY-MM-DD)
-              endDate:
+              end_datum:
                 type: string
                 format: date
+                nullable: true
                 description: Project end date (YYYY-MM-DD)
-              amount:
+              betrag:
                 type: number
                 format: float
-                description: Project amount
-              description:
+                nullable: true
+                description: Project amount/budget
+                minimum: 0
+              beschreibung:
                 type: string
+                nullable: true
                 description: Project description
+                maxLength: 2000
               status:
                 type: string
                 enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+                default: neu
                 description: Project status
     responses:
       '201':
@@ -112,10 +164,11 @@ projects:
                 success:
                   type: boolean
                   example: true
-                projectId:
-                  type: integer
+                data:
+                  $ref: '../schemas/models.yaml#/Project'
                 message:
                   type: string
+                  example: "Project created successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
@@ -126,7 +179,7 @@ projects-id:
     tags:
       - Projects
     summary: Get project by ID
-    description: Retrieve detailed project information
+    description: Retrieve detailed project information with appointments and notes
     operationId: getProjectById
     parameters:
       - in: path
@@ -146,24 +199,63 @@ projects-id:
                 success:
                   type: boolean
                   example: true
-                project:
-                  $ref: '../schemas/models.yaml#/Project'
-                notes:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      text:
-                        type: string
-                      userId:
-                        type: integer
-                      userName:
-                        type: string
-                      createdAt:
-                        type: string
-                        format: date-time
+                data:
+                  type: object
+                  allOf:
+                    - $ref: '../schemas/models.yaml#/Project'
+                    - type: object
+                      properties:
+                        customer:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            email:
+                              type: string
+                        service:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            priceBase:
+                              type: number
+                            unit:
+                              type: string
+                        appointments:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                              title:
+                                type: string
+                              date:
+                                type: string
+                              status:
+                                type: string
+                              statusLabel:
+                                type: string
+                        notes:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                              text:
+                                type: string
+                              userName:
+                                type: string
+                              formattedDate:
+                                type: string
+                              createdAt:
+                                type: string
+                                format: date-time
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
@@ -188,35 +280,40 @@ projects-id:
         application/json:
           schema:
             type: object
-            required:
-              - title
-              - startDate
             properties:
-              title:
+              titel:
                 type: string
-                minLength: 2
                 description: Project title
-              customerId:
+                minLength: 2
+                maxLength: 200
+              kunde_id:
                 type: integer
-                description: ID of the associated customer
-              serviceId:
+                nullable: true
+                description: Customer ID
+              dienstleistung_id:
                 type: integer
-                description: ID of the associated service
-              startDate:
+                nullable: true
+                description: Service ID
+              start_datum:
                 type: string
                 format: date
                 description: Project start date (YYYY-MM-DD)
-              endDate:
+              end_datum:
                 type: string
                 format: date
+                nullable: true
                 description: Project end date (YYYY-MM-DD)
-              amount:
+              betrag:
                 type: number
                 format: float
-                description: Project amount
-              description:
+                nullable: true
+                description: Project amount/budget
+                minimum: 0
+              beschreibung:
                 type: string
+                nullable: true
                 description: Project description
+                maxLength: 2000
               status:
                 type: string
                 enum: [neu, in_bearbeitung, abgeschlossen, storniert]
@@ -232,10 +329,11 @@ projects-id:
                 success:
                   type: boolean
                   example: true
-                projectId:
-                  type: integer
+                data:
+                  $ref: '../schemas/models.yaml#/Project'
                 message:
                   type: string
+                  example: "Project updated successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
@@ -267,14 +365,78 @@ projects-id:
                 success:
                   type: boolean
                   example: true
+                id:
+                  type: integer
                 message:
                   type: string
+                  example: "Project deleted successfully"
       '400':
         description: Cannot delete project with related data
         content:
           application/json:
             schema:
               $ref: '../schemas/error.yaml#/Error'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-id-status:
+  patch:
+    tags:
+      - Projects
+    summary: Update project status
+    description: Change the status of a project
+    operationId: updateProjectStatus
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Project ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - status
+            properties:
+              status:
+                type: string
+                enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+                description: New project status
+              note:
+                type: string
+                description: Optional note about the status change
+                maxLength: 1000
+    responses:
+      '200':
+        description: Status updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    status:
+                      type: string
+                    statusLabel:
+                      type: string
+                message:
+                  type: string
+                  example: "Project status updated successfully"
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
@@ -306,6 +468,8 @@ projects-id-notes:
               note:
                 type: string
                 description: Note text
+                minLength: 1
+                maxLength: 1000
     responses:
       '201':
         description: Note added successfully
@@ -317,29 +481,37 @@ projects-id-notes:
                 success:
                   type: boolean
                   example: true
-                projectId:
-                  type: integer
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    projectId:
+                      type: integer
+                    text:
+                      type: string
+                    userName:
+                      type: string
+                    createdAt:
+                      type: string
+                      format: date-time
                 message:
                   type: string
+                  example: "Note added successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
-projects-id-status:
+projects-batch-status:
   patch:
     tags:
       - Projects
-    summary: Update project status
-    description: Change the status of a project
-    operationId: updateProjectStatus
-    parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-        description: Project ID
+    summary: Batch update project status
+    description: Change the status of multiple projects at once
+    operationId: batchUpdateProjectStatus
     requestBody:
       required: true
       content:
@@ -347,12 +519,23 @@ projects-id-status:
           schema:
             type: object
             required:
+              - ids
               - status
             properties:
+              ids:
+                type: array
+                items:
+                  type: integer
+                description: Array of project IDs to update
+                minItems: 1
               status:
                 type: string
                 enum: [neu, in_bearbeitung, abgeschlossen, storniert]
                 description: New project status
+              note:
+                type: string
+                description: Optional note about the status change
+                maxLength: 1000
     responses:
       '200':
         description: Status updated successfully
@@ -364,14 +547,107 @@ projects-id-status:
                 success:
                   type: boolean
                   example: true
-                projectId:
+                count:
                   type: integer
+                  description: Number of projects updated
                 message:
                   type: string
+                  example: "3 projects updated successfully"
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '404':
-        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-statistics:
+  get:
+    tags:
+      - Projects
+    summary: Get project statistics
+    description: Retrieve statistics about projects like status counts, values, trends
+    operationId: getProjectStatistics
+    parameters:
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+        description: Filter by status
+      - in: query
+        name: kunde_id
+        schema:
+          type: integer
+        description: Filter by customer ID
+      - in: query
+        name: dienstleistung_id
+        schema:
+          type: integer
+        description: Filter by service ID
+      - in: query
+        name: start_datum_von
+        schema:
+          type: string
+          format: date
+        description: Start date filter (from)
+      - in: query
+        name: start_datum_bis
+        schema:
+          type: string
+          format: date
+        description: Start date filter (to)
+    responses:
+      '200':
+        description: Project statistics
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    statusCounts:
+                      type: object
+                      properties:
+                        neu:
+                          type: integer
+                        in_bearbeitung:
+                          type: integer
+                        abgeschlossen:
+                          type: integer
+                        storniert:
+                          type: integer
+                    totalValue:
+                      type: number
+                      description: Total project value
+                    byMonth:
+                      type: array
+                      description: Projects grouped by month
+                      items:
+                        type: object
+                        properties:
+                          month:
+                            type: string
+                          count:
+                            type: integer
+                          value:
+                            type: number
+                    topCustomers:
+                      type: array
+                      description: Top customers by project count or value
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+                          projectCount:
+                            type: integer
+                          totalValue:
+                            type: number
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 

@@ -20,3 +20,29 @@ health:
                 timestamp:
                   type: string
                   format: date-time
+          
+version:
+get:
+  tags:
+    - System
+  summary: Get API version
+  description: Retrieve the API version information
+  operationId: getApiVersion
+  security: [] # No authentication required for version
+  responses:
+    '200':
+      description: API version information
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              version:
+                type: string
+                example: "1.0.0"
+              name:
+                type: string
+                example: "rising-bsm-api"
+              timestamp:
+                type: string
+                format: date-time
