@@ -127,7 +127,8 @@ export const getDashboardData = asyncHandler(async (req: Request, res: Response,
     };
   }, 300); // Cache for 5 minutes
   
-  res.status(200).json(dashboardData);
+  // Use ResponseFactory instead of direct response
+  ResponseFactory.success(res, dashboardData, 'Dashboard data retrieved successfully');
 });
 
 /**

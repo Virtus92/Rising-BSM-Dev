@@ -1,14 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import prisma from '../utils/prisma.utils';
-import { validateInput, validatePassword } from '../utils/validators';
-import { UnauthorizedError, ValidationError, NotFoundError } from '../utils/errors';
-import { generateAuthTokens, verifyRefreshToken } from '../utils/jwt';
-import { asyncHandler } from '../utils/asyncHandler';
-import config from '../config';
-import { AuthenticatedRequest } from '../types/authenticated-request';
-import { LoginData } from '../types/data-models';
+import prisma from '../utils/prisma.utils.js';
+import { validateInput, validatePassword } from '../utils/validators.js';
+import { UnauthorizedError, ValidationError, NotFoundError } from '../utils/errors.js';
+import { generateAuthTokens, verifyRefreshToken } from '../utils/jwt.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import config from '../jest.config.js';
+import { AuthenticatedRequest } from '../types/authenticated-request.js';
+import { LoginData } from '../types/data-models.js';
 
 /**
  * Handle user login with JWT authentication
@@ -86,15 +86,19 @@ export const login = asyncHandler(async (req: Request, res: Response): Promise<v
     initials: user.name.split(' ').map((n: string) => n[0]).join('')
   };
 
-  // Return tokens and user data
-  res.status(200).json({ 
-    success: true,
-    accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-    expiresIn,
-    user: userData,
-    remember: rememberMe
-  });
+  // Use ResponseFactory instead of direct response
+  ResponseFactory.success(
+    res,
+    { 
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn,
+      user: userData,
+      remember: rememberMe
+    },
+    'Login successful',
+    200
+  );
 });
 
 /**

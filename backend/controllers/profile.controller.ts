@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { prisma } from '../utils/prisma.utils';
-import { formatDateSafely } from '../utils/formatters';
-import { ValidationError, BadRequestError, NotFoundError } from '../utils/errors';
-import { asyncHandler } from '../utils/asyncHandler';
-import { AuthenticatedRequest } from '../types/authenticated-request';
+import { prisma } from '../utils/prisma.utils.js';
+import { formatDateSafely } from '../utils/formatters.js';
+import { ValidationError, BadRequestError, NotFoundError } from '../utils/errors.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { AuthenticatedRequest } from '../types/authenticated-request.js';
+import { ResponseFactory } from '../utils/response.factory.js';
 
 /**
  * Get current user profile data
@@ -50,14 +51,6 @@ export const getUserProfile = asyncHandler(async (req: AuthenticatedRequest, res
   };
   
   // Get user activity with type
-  interface ActivityItem {
-    activity: string;
-    ipAddress: string | null;
-    timestamp: Date | null;
-    userId: number;
-    id: number;
-  }
-  
   const activity = await prisma.userActivity.findMany({
     where: { userId },
     orderBy: { timestamp: 'desc' },
@@ -65,7 +58,7 @@ export const getUserProfile = asyncHandler(async (req: AuthenticatedRequest, res
   });
   
   // Format data for response with explicit typing
-  res.status(200).json({
+  const profileData = {
     user: {
       id: user.id,
       name: user.name,
@@ -82,12 +75,15 @@ export const getUserProfile = asyncHandler(async (req: AuthenticatedRequest, res
       benachrichtigungen_push: userSettings.pushNotifications || false,
       benachrichtigungen_intervall: userSettings.notificationInterval || 'sofort'
     },
-    activity: activity.map((item: { activity: string; ipAddress: string | null; timestamp: Date | null; userId: number; id: number; }) => ({
+    activity: activity.map((item: any) => ({
       type: item.activity,
       ip: item.ipAddress || '',
       date: formatDateSafely(item.timestamp!, 'dd.MM.yyyy, HH:mm')
     }))
-  });
+  };
+  
+  // Use ResponseFactory instead of direct response
+  ResponseFactory.success(res, profileData);
 });
 
 /**
@@ -140,19 +136,20 @@ export const updateProfile = asyncHandler(async (req: AuthenticatedRequest, res:
     }
   });
   
-  
-  // Return updated user data for session
-  res.status(200).json({
-    success: true,
-    user: {
-      id: userId,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      role: updatedUser.role,
-      initials: updatedUser.name.split(' ').map((n: string) => n[0]).join('')
+  // Use ResponseFactory instead of direct response
+  ResponseFactory.success(
+    res, 
+    {
+      user: {
+        id: userId,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        initials: updatedUser.name.split(' ').map((n: string) => n[0]).join('')
+      }
     },
-    message: 'Profile updated successfully'
-  });
+    'Profile updated successfully'
+  );
 });
 
 /**
@@ -221,10 +218,8 @@ export const updatePassword = asyncHandler(async (req: AuthenticatedRequest, res
     }
   });
   
-  res.status(200).json({
-    success: true,
-    message: 'Password updated successfully'
-  });
+  // Use ResponseFactory instead of direct response
+  ResponseFactory.success(res, {}, 'Password updated successfully');
 });
 
 /**
@@ -254,11 +249,12 @@ export const updateProfilePicture = asyncHandler(async (req: AuthenticatedReques
     }
   });
   
-  res.status(200).json({
-    success: true,
-    imagePath: imagePath,
-    message: 'Profile picture updated successfully'
-  });
+  // Use ResponseFactory instead of direct response
+  ResponseFactory.success(
+    res, 
+    { imagePath: imagePath },
+    'Profile picture updated successfully'
+  );
 });
 
 /**
@@ -304,8 +300,102 @@ export const updateNotificationSettings = asyncHandler(async (req: Authenticated
     });
   }
   
-  res.status(200).json({
-    success: true,
-    message: 'Notification settings updated successfully'
+  // Use ResponseFactory instead of direct response
+  ResponseFactory.success(res, {}, 'Notification settings updated successfully');
+});
+
+// Now let's update the appointment.controller.ts file:
+
+/**
+ * Get all appointments with optional filtering
+ */
+export const getAllAppointments = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  // Extract filter parameters
+  const { 
+    status, 
+    date, 
+    search, 
+    page = 1, 
+    limit = config.DEFAULT_PAGE_SIZE 
+  } = req.query as unknown as AppointmentFilterOptions;
+
+  // Validate and sanitize pagination parameters
+  const pageNumber: number = Math.max(1, Number(page) || 1);
+  const pageSize: number = Math.min(config.MAX_PAGE_SIZE, Math.max(1, Number(limit) || config.DEFAULT_PAGE_SIZE));
+  const skip: number = (pageNumber - 1) * pageSize;
+
+  // Build filter conditions
+  const where: any = {};
+  
+  if (status) {
+    where.status = status;
+  }
+  
+  if (date) {
+    where.appointmentDate = {
+      gte: new Date(`${date}T00:00:00`),
+      lt: new Date(`${date}T23:59:59`)
+    };
+  }
+  
+  if (search) {
+    where.OR = [
+      { title: { contains: search, mode: 'insensitive' } },
+      { Customer: { name: { contains: search, mode: 'insensitive' } } }
+    ];
+  }
+
+  // Execute queries in parallel
+  const [appointments, totalCount] = await Promise.all([
+    prisma.appointment.findMany({
+      where,
+      include: {
+        Customer: true,
+        Project: true
+      },
+      orderBy: { appointmentDate: 'asc' },
+      take: pageSize,
+      skip
+    }),
+    prisma.appointment.count({ where })
+  ]);
+
+  // Format appointment data
+  const formattedAppointments = appointments.map((appointment: any): Record<string, any> => {
+    const statusInfo = getTerminStatusInfo(appointment.status);
+    return {
+      id: appointment.id,
+      titel: appointment.title,
+      kunde_id: appointment.customerId,
+      kunde_name: appointment.Customer?.name || 'Kein Kunde zugewiesen',
+      projekt_id: appointment.projectId,
+      projekt_titel: appointment.Project?.title || 'Kein Projekt zugewiesen',
+      termin_datum: appointment.appointmentDate,
+      dateFormatted: formatDateSafely(appointment.appointmentDate, 'dd.MM.yyyy'),
+      timeFormatted: formatDateSafely(appointment.appointmentDate, 'HH:mm'),
+      dauer: appointment.duration !== null ? appointment.duration : 60,
+      ort: appointment.location || 'Nicht angegeben',
+      status: appointment.status,
+      statusLabel: statusInfo.label,
+      statusClass: statusInfo.className
+    };
   });
+
+  // Calculate pagination data
+  const totalPages: number = Math.ceil(totalCount / pageSize);
+
+  // Use ResponseFactory instead of direct response
+  ResponseFactory.paginated(
+    res,
+    formattedAppointments,
+    {
+      current: pageNumber,
+      limit: pageSize,
+      total: totalPages,
+      totalRecords: totalCount
+    },
+    'Appointments retrieved successfully',
+    200,
+    { filters: { status, date, search } }
+  );
 });
