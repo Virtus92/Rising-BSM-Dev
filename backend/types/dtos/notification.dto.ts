@@ -122,6 +122,11 @@ export interface MarkNotificationReadDTO {
  */
 export interface NotificationFilterDTO extends BaseFilterDTO {
   /**
+   * Filter by user ID
+   */
+  userId?: number | string;
+  
+  /**
    * Filter by type
    */
   type?: string;
@@ -129,7 +134,7 @@ export interface NotificationFilterDTO extends BaseFilterDTO {
   /**
    * Filter by read status
    */
-  read?: boolean;
+  read?: boolean | string;
 }
 
 /**

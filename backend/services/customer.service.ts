@@ -26,6 +26,7 @@ import {
   FindAllOptions 
 } from '../types/service.types.js';
 import { getProjektStatusInfo, getTerminStatusInfo } from '../utils/helpers.js';
+import { validateEmail, validateRequired, validatePhone } from '../utils/common-validators.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -417,18 +418,12 @@ export class CustomerService extends BaseService<
    */
   protected async validateCreate(data: CustomerCreateDTO): Promise<void> {
     // Validate required fields
-    if (!data.name) {
-      throw new ValidationError('Customer name is required');
-    }
+    validateRequired(data.name, 'Customer name');
+    validateEmail(data.email);
     
-    if (!data.email) {
-      throw new ValidationError('Email is required');
-    }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(data.email)) {
-      throw new ValidationError('Invalid email format');
+    // Validate phone if provided
+    if (data.telefon) {
+      validatePhone(data.telefon);
     }
     
     // Check if email is already in use
@@ -451,27 +446,24 @@ export class CustomerService extends BaseService<
    */
   protected async validateUpdate(id: number, data: CustomerUpdateDTO): Promise<void> {
     // Validate name if provided
-    if (data.name !== undefined && !data.name) {
-      throw new ValidationError('Customer name cannot be empty');
+    if (data.name !== undefined) {
+      validateRequired(data.name, 'Customer name');
     }
     
     // Validate email if provided
     if (data.email !== undefined) {
-      if (!data.email) {
-        throw new ValidationError('Email cannot be empty');
-      }
-      
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(data.email)) {
-        throw new ValidationError('Invalid email format');
-      }
+      validateEmail(data.email);
       
       // Check if email is already in use by another customer
       const existingCustomer = await this.repository.findByEmail(data.email);
       if (existingCustomer && existingCustomer.id !== id) {
         throw new ConflictError('Email is already in use by another customer');
       }
+    }
+    
+    // Validate phone if provided
+    if (data.telefon !== undefined) {
+      validatePhone(data.telefon);
     }
     
     // Validate status if provided

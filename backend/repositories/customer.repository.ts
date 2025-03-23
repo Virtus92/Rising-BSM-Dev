@@ -4,12 +4,14 @@
  * Repository for Customer entity operations providing data access and persistence.
  */
 import { PrismaClient, Prisma } from '@prisma/client';
+import { format } from 'date-fns';
 import { BaseRepository } from '../utils/base.repository.js';
 import { QueryBuilder } from '../utils/query-builder.js';
 import { inject } from '../config/dependency-container.js';
 import { CustomerFilterDTO } from '../types/dtos/customer.dto.js';
 import { DatabaseError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
+import entityLogger from '../utils/entity-logger.js';
 
 /**
  * Customer entity type
@@ -180,34 +182,33 @@ export class CustomerRepository extends BaseRepository<Customer, CustomerFilterD
     userId: number,
     userName: string,
     text: string
-  ): Promise<Customer> {
-    try {
-      // Get current notes
-      const customer = await this.findById(customerId);
-      
-      if (!customer) {
-        throw new Error(`Customer with ID ${customerId} not found`);
-      }
-      
-      // Format timestamp
-      const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      
-      // Append new note to existing notes
-      const currentNotes = customer.notes || '';
-      const newNotes = `${timestamp} - ${userName}: ${text}\n\n${currentNotes}`;
-      
-      // Update customer with new notes
-      return this.prisma.customer.update({
-        where: { id: customerId },
-        data: {
-          notes: newNotes,
-          updatedAt: new Date()
-        }
-      });
-    } catch (error) {
-      logger.error('Error in CustomerRepository.createNote', { error, customerId, userId });
-      throw new DatabaseError('Failed to add customer note', { cause: error });
+  ): Promise<any> {
+    // For customers, notes are stored in the customer entity itself
+    const timestamp = format(new Date(), 'yyyy-MM-dd HH:mm');
+    const customer = await this.findById(customerId);
+    
+    if (!customer) {
+      throw new Error(`Customer with ID ${customerId} not found`);
     }
+    
+    const currentNotes = customer.notes || '';
+    const newNotes = `${timestamp} - ${userName}: ${text}\n\n${currentNotes}`;
+    
+    // Update customer notes
+    await this.update(customerId, {
+      notes: newNotes
+    });
+    
+    // Also log the activity
+    await this.createLog(
+      customerId,
+      userId,
+      userName,
+      'note_added',
+      'Note added to customer'
+    );
+    
+    return { success: true };
   }
 
   /**
@@ -222,25 +223,18 @@ export class CustomerRepository extends BaseRepository<Customer, CustomerFilterD
   async createLog(
     customerId: number,
     userId: number,
-    userName: string,
+    userName: string = 'System',
     action: string,
-    details?: string
-  ): Promise<CustomerLog> {
-    try {
-      return this.prisma.customerLog.create({
-        data: {
-          customerId,
-          userId,
-          userName,
-          action,
-          details: details || null
-        }
-      });
-    } catch (error) {
-      // Log but don't throw - logging shouldn't break main operations
-      logger.error('Error in CustomerRepository.createLog', { error, customerId, action });
-      return null as any; // Fallback for error case
-    }
+    details: string = ''
+  ): Promise<any> {
+    return entityLogger.createLog(
+      'customer',
+      customerId,
+      userId,
+      userName,
+      action,
+      details
+    );
   }
 
   /**

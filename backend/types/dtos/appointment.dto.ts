@@ -275,19 +275,19 @@ export interface AppointmentFilterDTO extends BaseFilterDTO {
   date?: string;
 
   /**
+   * Search term for title, location, and customer name
+   */
+  search?: string;
+
+  /**
    * Filter by customer ID
    */
-  kunde_id?: number;
+  customerId?: number | string;
 
   /**
    * Filter by project ID
    */
-  projekt_id?: number;
-
-  /**
-   * Search term for title, location, and customer name
-   */
-  search?: string;
+  projectId?: number | string;
 }
 
 /**

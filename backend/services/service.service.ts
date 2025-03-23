@@ -4,6 +4,7 @@
  * Service for Service entity operations providing business logic and validation.
  */
 import { format } from 'date-fns';
+import { Prisma } from '@prisma/client';
 import { BaseService } from '../utils/base.service.js';
 import { ServiceRepository, Service, serviceRepository } from '../repositories/service.repository.js';
 import { 
@@ -23,6 +24,7 @@ import {
   FindOneOptions, 
   FindAllOptions 
 } from '../types/service.types.js';
+import { validateRequired } from '../utils/common-validators.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -65,7 +67,7 @@ export class ServiceService extends BaseService<
       });
       
       // Map to response DTOs
-      const services = result.data.map((service: Service) => this.mapEntityToDTO(service));
+      const services = result.data.map((service: ServiceRecord) => this.mapEntityToDTO(service as any));
       
       return {
         data: services,
@@ -99,7 +101,7 @@ export class ServiceService extends BaseService<
       }
       
       // Map to response DTO
-      return this.mapEntityToDTO(service);
+      return this.mapEntityToDTO(service as any);
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
@@ -312,17 +314,13 @@ export class ServiceService extends BaseService<
    */
   protected async validateCreate(data: ServiceCreateDTO): Promise<void> {
     // Validate required fields
-    if (!data.name) {
-      throw new ValidationError('Service name is required');
-    }
+    validateRequired(data.name, 'Service name');
     
     if (data.preis_basis === undefined || data.preis_basis === null) {
       throw new ValidationError('Price is required');
     }
     
-    if (!data.einheit) {
-      throw new ValidationError('Unit is required');
-    }
+    validateRequired(data.einheit, 'Unit');
     
     // Validate price is positive
     if (typeof data.preis_basis === 'number' && data.preis_basis < 0) {
@@ -347,8 +345,8 @@ export class ServiceService extends BaseService<
    */
   protected async validateUpdate(id: number, data: ServiceUpdateDTO): Promise<void> {
     // Validate name if provided
-    if (data.name !== undefined && !data.name) {
-      throw new ValidationError('Service name cannot be empty');
+    if (data.name !== undefined) {
+      validateRequired(data.name, 'Service name');
     }
     
     // Validate price if provided
@@ -357,8 +355,8 @@ export class ServiceService extends BaseService<
     }
     
     // Validate unit if provided
-    if (data.einheit !== undefined && !data.einheit) {
-      throw new ValidationError('Unit cannot be empty');
+    if (data.einheit !== undefined) {
+      validateRequired(data.einheit, 'Unit');
     }
     
     // Check if name is already in use by another service
@@ -378,14 +376,18 @@ export class ServiceService extends BaseService<
    * @param entity - Service entity
    * @returns Service response DTO
    */
-  protected mapEntityToDTO(entity: Service): ServiceResponseDTO {
+  protected mapEntityToDTO(entity: ServiceRecord | Service): ServiceResponseDTO {
     return {
       id: entity.id,
       name: entity.name,
       beschreibung: entity.description || '',
-      preis_basis: typeof entity.priceBase === 'object' ? parseFloat(entity.priceBase.toString()) : entity.priceBase,
+      preis_basis: typeof entity.priceBase === 'object' && 'toString' in entity.priceBase 
+        ? parseFloat(entity.priceBase.toString()) 
+        : (entity.priceBase as number),
       einheit: entity.unit || '',
-      mwst_satz: typeof entity.vatRate === 'object' ? parseFloat(entity.vatRate.toString()) : entity.vatRate,
+      mwst_satz: typeof entity.vatRate === 'object' && 'toString' in entity.vatRate 
+        ? parseFloat(entity.vatRate.toString()) 
+        : (entity.vatRate as number),
       aktiv: entity.active,
       created_at: format(entity.createdAt, 'yyyy-MM-dd'),
       updated_at: format(entity.updatedAt, 'yyyy-MM-dd')
@@ -404,7 +406,12 @@ export class ServiceService extends BaseService<
       priceBase: dto.preis_basis,
       unit: dto.einheit,
       vatRate: dto.mwst_satz !== undefined ? dto.mwst_satz : 20,
-      active: dto.aktiv === true || dto.aktiv === 'on'
+      active: dto.aktiv === true || 
+              (typeof dto.aktiv === 'string' && (
+                dto.aktiv === 'on' || 
+                dto.aktiv === '1' || 
+                dto.aktiv === 'true'
+              ))
     };
   }
 
@@ -422,10 +429,32 @@ export class ServiceService extends BaseService<
     if (dto.preis_basis !== undefined) updateData.priceBase = dto.preis_basis;
     if (dto.einheit !== undefined) updateData.unit = dto.einheit;
     if (dto.mwst_satz !== undefined) updateData.vatRate = dto.mwst_satz;
-    if (dto.aktiv !== undefined) updateData.active = dto.aktiv === true || dto.aktiv === 'on';
+    if (dto.aktiv !== undefined) {
+      updateData.active = dto.aktiv === true || 
+                          (typeof dto.aktiv === 'string' && (
+                            dto.aktiv === 'on' || 
+                            dto.aktiv === '1' || 
+                            dto.aktiv === 'true'
+                          ));
+    }
     
     return updateData;
   }
+}
+
+/**
+ * Service record type from database
+ */
+export interface ServiceRecord {
+  id: number;
+  name: string;
+  description?: string | null;
+  priceBase: number | Prisma.Decimal;
+  unit?: string | null;
+  vatRate: number | Prisma.Decimal;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Export singleton instance

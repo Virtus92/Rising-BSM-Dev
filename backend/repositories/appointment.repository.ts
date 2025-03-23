@@ -1,16 +1,40 @@
 import { PrismaClient } from '@prisma/client';
-import { BaseRepository } from '../utils/base.repository';
-import { QueryBuilder } from '../utils/query-builder';
-import { FilterOptions } from '../types/controller-types';
-import { AppointmentRecord } from '../types/models';
-import { prisma } from '../utils/prisma.utils';
+import { BaseRepository } from '../utils/base.repository.js';
+import { QueryBuilder } from '../utils/query-builder.js';
+import { FilterOptions } from '../types/controller.types.js';
+import { AppointmentFilterDTO } from '../types/dtos/appointment.dto.js';
+import { AppointmentRecord } from '../types/models.js';
+import { prisma } from '../utils/prisma.utils.js';
+import entityLogger from '../utils/entity-logger.js';
 
-export class AppointmentRepository extends BaseRepository<AppointmentRecord> {
+/**
+ * Appointment entity type
+ */
+export interface Appointment {
+  id: number;
+  title: string;
+  customerId: number | null;  // Make sure it's not optional to match AppointmentRecord
+  projectId: number | null;   // Make sure it's not optional to match AppointmentRecord
+  appointmentDate: Date;
+  duration: number | null;
+  location: string | null;
+  description: string | null;
+  status: string;
+  createdBy: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  customer?: any;
+  project?: any;
+  Customer?: any; // For backward compatibility
+  Project?: any;  // For backward compatibility
+}
+
+export class AppointmentRepository extends BaseRepository<AppointmentRecord, AppointmentFilterDTO> {
   constructor() {
     super(prisma, prisma.appointment);
   }
   
-  protected buildFilterConditions(filters: FilterOptions): any {
+  protected buildFilterConditions(filters: AppointmentFilterDTO): any {
     const { status, date, search, customerId, projectId } = filters;
     
     const builder = new QueryBuilder();
@@ -41,6 +65,30 @@ export class AppointmentRepository extends BaseRepository<AppointmentRecord> {
     }
     
     return builder.build();
+  }
+  
+  /**
+   * Find customer by ID for validation
+   * @param id Customer ID
+   * @returns True if customer exists
+   */
+  async customerExists(id: number): Promise<boolean> {
+    const count = await this.prisma.customer.count({
+      where: { id }
+    });
+    return count > 0;
+  }
+  
+  /**
+   * Find project by ID for validation
+   * @param id Project ID
+   * @returns True if project exists
+   */
+  async projectExists(id: number): Promise<boolean> {
+    const count = await this.prisma.project.count({
+      where: { id }
+    });
+    return count > 0;
   }
   
   async getAppointmentWithRelations(id: number): Promise<any> {
@@ -74,25 +122,26 @@ export class AppointmentRepository extends BaseRepository<AppointmentRecord> {
   }
   
   async createNote(appointmentId: number, userId: number, userName: string, text: string): Promise<any> {
-    return this.prisma.appointmentNote.create({
-      data: {
-        appointmentId,
-        userId,
-        userName,
-        text
-      }
-    });
+    return entityLogger.createNote(
+      'appointment',
+      appointmentId,
+      userId,
+      userName,
+      text
+    );
   }
   
-  async createLog(appointmentId: number, userId: number, userName: string, action: string, details?: string): Promise<any> {
-    return this.prisma.appointmentLog.create({
-      data: {
-        appointmentId,
-        userId,
-        userName,
-        action,
-        details: details || null
-      }
-    });
+  async createLog(appointmentId: number, userId: number, userName: string = 'System', action: string, details: string = ''): Promise<any> {
+    return entityLogger.createLog(
+      'appointment',
+      appointmentId,
+      userId,
+      userName,
+      action,
+      details
+    );
   }
 }
+
+export const appointmentRepository = new AppointmentRepository();
+export default appointmentRepository;

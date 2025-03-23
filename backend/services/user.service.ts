@@ -6,6 +6,8 @@
 import { format } from 'date-fns';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs';
 import { BaseService } from '../utils/base.service.js';
 import { UserRepository, User, userRepository } from '../repositories/user.repository.js';
 import { 
@@ -14,6 +16,7 @@ import {
   UserProfileResponseDTO,
   NotificationSettingsUpdateDTO
 } from '../types/dtos/profile.dto.js';
+import { UserFilterDTO } from '../types/dtos/user.dto.js';
 import { 
   NotFoundError, 
   ValidationError, 
@@ -25,12 +28,20 @@ import {
   UpdateOptions, 
   FindOneOptions
 } from '../types/service.types.js';
+import { validateEmail, validateRequired } from '../utils/common-validators.js';
 import logger from '../utils/logger.js';
 
 /**
  * Service for User entity operations
  */
-export class UserService extends BaseService<User, UserRepository> {
+export class UserService extends BaseService<
+  User,
+  UserRepository,
+  UserFilterDTO,
+  any,  // No standard create DTO
+  ProfileUpdateDTO,
+  UserProfileResponseDTO
+> {
   /**
    * Creates a new UserService instance
    * @param repository - UserRepository instance
@@ -89,6 +100,7 @@ export class UserService extends BaseService<User, UserRepository> {
       
       // Format profile data
       return {
+        id: user.id,
         user: {
           id: user.id,
           name: user.name,
@@ -179,7 +191,7 @@ async updateProfilePicture(
     
     // Log activity
     if (options.userContext?.userId) {
-      await this.repository.logActivity(
+      await this.repository.logSimpleActivity(
         userId,
         'profile_picture_updated',
         options.userContext.ipAddress || null
@@ -218,7 +230,7 @@ async updateProfilePicture(
       
       // Log the activity
       if (options.userContext?.userId || options.userId) {
-        await this.repository.logActivity(
+        await this.repository.logSimpleActivity(
           id,
           'profile_updated',
           options.userContext?.ipAddress || null
@@ -254,16 +266,12 @@ async updateProfilePicture(
       // Validate password data
       const { current_password, new_password, confirm_password } = data;
       
-      if (!current_password || !new_password || !confirm_password) {
-        throw new ValidationError('All password fields are required');
-      }
+      validateRequired(current_password, 'Current password');
+      validateRequired(new_password, 'New password', 8);
+      validateRequired(confirm_password, 'Confirm password');
       
       if (new_password !== confirm_password) {
         throw new ValidationError('New passwords do not match');
-      }
-      
-      if (new_password.length < 8) {
-        throw new ValidationError('Password must be at least 8 characters long');
       }
       
       // Get user with password
@@ -300,7 +308,7 @@ async updateProfilePicture(
       
       // Log the activity
       if (options.userContext?.userId || options.userId) {
-        await this.repository.logActivity(
+        await this.repository.logSimpleActivity(
           id,
           'password_changed',
           options.userContext?.ipAddress || null
@@ -336,10 +344,20 @@ async updateProfilePicture(
         throw new NotFoundError(`User with ID ${id} not found`);
       }
       
+      // Helper function to convert to boolean
+      const toBool = (value: any): boolean => {
+        return value === true || 
+              (typeof value === 'string' && (
+                value === 'on' || 
+                value === 'true' || 
+                value === '1'
+              ));
+      };
+      
       // Prepare settings data
       const settingsData = {
-        emailNotifications: data.benachrichtigungen_email === true || data.benachrichtigungen_email === 'on',
-        pushNotifications: data.benachrichtigungen_push === true || data.benachrichtigungen_push === 'on',
+        emailNotifications: toBool(data.benachrichtigungen_email),
+        pushNotifications: toBool(data.benachrichtigungen_push),
         notificationInterval: data.benachrichtigungen_intervall || 'sofort'
       };
       
@@ -348,7 +366,7 @@ async updateProfilePicture(
       
       // Log activity
       if (options.userContext?.userId || options.userId) {
-        await this.repository.logActivity(
+        await this.repository.logSimpleActivity(
           id,
           'notification_settings_updated',
           options.userContext?.ipAddress || null
@@ -487,7 +505,7 @@ async updateProfilePicture(
       });
       
       // Log activity
-      await this.repository.logActivity(
+      await this.repository.logSimpleActivity(
         user.id,
         'password_reset',
         null
@@ -510,15 +528,8 @@ async updateProfilePicture(
    */
   protected async validateProfileUpdate(id: number, data: ProfileUpdateDTO): Promise<void> {
     // Validate required fields
-    if (!data.name || !data.email) {
-      throw new ValidationError('Name and email are required fields');
-    }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(data.email)) {
-      throw new ValidationError('Invalid email format');
-    }
+    validateRequired(data.name, 'Name');
+    validateEmail(data.email);
     
     // Get current user data for comparison
     const user = await this.repository.findById(id);

@@ -56,7 +56,9 @@ export abstract class BaseService<
       const result = await repoMethod(filters, options);
       
       // Map to response DTOs
-      const mappedData = this.mapToDTO(result.data);
+      const mappedData = Array.isArray(result.data)
+        ? result.data.map((item: any) => this.mapEntityToDTO(item))
+        : [];
       
       return {
         data: mappedData,
@@ -98,7 +100,7 @@ export abstract class BaseService<
       }
       
       // Map to response DTO
-      return this.mapToDTO(entity);
+      return this.mapEntityToDTO(entity) as TResponseDTO;
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
@@ -134,7 +136,7 @@ export abstract class BaseService<
       await this.afterCreate(created, data, options);
       
       // Map to response DTO
-      return this.mapToDTO(created);
+      return this.mapEntityToDTO(created);
     } catch (error) {
       this.handleError(error, 'Error creating entity', { data, options });
     }
@@ -169,7 +171,7 @@ export abstract class BaseService<
       await this.afterUpdate(updated, data, options);
       
       // Map to response DTO
-      return this.mapToDTO(updated);
+      return this.mapEntityToDTO(updated);
     } catch (error) {
       this.handleError(error, `Error updating entity with ID ${id}`, { id, data, options });
     }
@@ -198,7 +200,7 @@ export abstract class BaseService<
       await this.afterDelete(deleted, options);
       
       // Map to response DTO
-      return this.mapToDTO(deleted);
+      return this.mapEntityToDTO(deleted);
     } catch (error) {
       this.handleError(error, `Error deleting entity with ID ${id}`, { id, options });
     }
@@ -294,8 +296,9 @@ export abstract class BaseService<
    * @returns Entity name
    */
   protected getEntityName(): string {
-    // By default, try to extract entity name from repository class name
-    const repoName = this.repository.constructor.name;
+    // By default, try to extract entity name from repository constructor name
+    const repoConstructor = (this.repository as any).constructor;
+    const repoName = repoConstructor ? repoConstructor.name : 'Unknown';
     return repoName.replace('Repository', '');
   }
 

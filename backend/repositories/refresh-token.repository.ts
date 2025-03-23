@@ -1,8 +1,8 @@
 import { PrismaClient } from '@prisma/client';
-import { BaseRepository } from '../utils/base.repository';
-import { QueryBuilder } from '../utils/query-builder';
-import { FilterOptions } from '../types/controller-types';
-import { prisma } from '../utils/prisma.utils';
+import { BaseRepository } from '../utils/base.repository.js';
+import { QueryBuilder } from '../utils/query-builder.js';
+import { FilterOptions } from '../types/controller.types.js';
+import { prisma } from '../utils/prisma.utils.js';
 
 export class RefreshTokenRepository extends BaseRepository<any> {
   constructor() {

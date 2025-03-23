@@ -1,9 +1,10 @@
 import { PrismaClient } from '@prisma/client';
-import { BaseRepository } from '../utils/base.repository';
-import { QueryBuilder } from '../utils/query-builder';
-import { FilterOptions } from '../types/controller-types';
-import { ContactRequestRecord } from '../types/models';
-import { prisma } from '../utils/prisma.utils';
+import { BaseRepository } from '../utils/base.repository.js';
+import { QueryBuilder } from '../utils/query-builder.js';
+import { FilterOptions } from '../types/controller.types.js';
+import { ContactRequestRecord } from '../types/models.js';
+import { prisma } from '../utils/prisma.utils.js';
+import entityLogger from '../utils/entity-logger.js';
 
 export class RequestRepository extends BaseRepository<ContactRequestRecord> {
   constructor() {
@@ -59,26 +60,52 @@ export class RequestRepository extends BaseRepository<ContactRequestRecord> {
     });
   }
   
-  async createNote(requestId: number, userId: number, userName: string, text: string): Promise<any> {
-    return this.prisma.requestNote.create({
-      data: {
-        requestId,
-        userId,
-        userName,
-        text
-      }
-    });
+  /**
+   * Create a note for a contact request
+   * @param requestId - Contact request ID
+   * @param userId - User ID
+   * @param userName - User name
+   * @param text - Note text
+   * @returns The created note
+   */
+  async createNote(
+    requestId: number,
+    userId: number,
+    userName: string,
+    text: string
+  ): Promise<any> {
+    return entityLogger.createNote(
+      'request',
+      requestId,
+      userId,
+      userName,
+      text
+    );
   }
-  
-  async createLog(requestId: number, userId: number, userName: string, action: string, details?: string): Promise<any> {
-    return this.prisma.requestLog.create({
-      data: {
-        requestId,
-        userId,
-        userName,
-        action,
-        details: details || null
-      }
-    });
+
+  /**
+   * Log an activity on a contact request
+   * @param requestId - Contact request ID
+   * @param userId - User ID
+   * @param userName - User name
+   * @param action - Action type
+   * @param details - Action details
+   * @returns The created log entry
+   */
+  async createLog(
+    requestId: number,
+    userId: number,
+    userName: string = 'System',
+    action: string,
+    details: string = ''
+  ): Promise<any> {
+    return entityLogger.createLog(
+      'request',
+      requestId,
+      userId,
+      userName,
+      action,
+      details
+    );
   }
 }

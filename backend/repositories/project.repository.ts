@@ -10,6 +10,7 @@ import { inject } from '../config/dependency-container.js';
 import { ProjectFilterDTO } from '../types/dtos/project.dto.js';
 import { DatabaseError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
+import entityLogger from '../utils/entity-logger.js';
 
 /**
  * Project entity type
@@ -214,19 +215,13 @@ export class ProjectRepository extends BaseRepository<Project, ProjectFilterDTO>
     userName: string,
     text: string
   ): Promise<ProjectNote> {
-    try {
-      return await this.prisma.projectNote.create({
-        data: {
-          projectId,
-          userId,
-          userName,
-          text
-        }
-      }) as ProjectNote;
-    } catch (error) {
-      logger.error('Error in ProjectRepository.addNote', { error, projectId, userId });
-      throw new DatabaseError('Failed to add project note', { cause: error });
-    }
+    return entityLogger.createNote(
+      'project',
+      projectId,
+      userId,
+      userName,
+      text
+    );
   }
 
   /**
@@ -241,25 +236,18 @@ export class ProjectRepository extends BaseRepository<Project, ProjectFilterDTO>
   async logActivity(
     projectId: number,
     userId: number,
-    userName: string,
+    userName: string = 'System',
     action: string,
-    details?: string
-  ): Promise<ProjectLog> {
-    try {
-      return await this.prisma.projectLog.create({
-        data: {
-          projectId,
-          userId,
-          userName,
-          action,
-          details: details || null
-        }
-      });
-    } catch (error) {
-      // Log but don't throw - logging shouldn't break main operations
-      logger.error('Error in ProjectRepository.logActivity', { error, projectId, action });
-      return null as any; // Fallback for error case
-    }
+    details: string = ''
+  ): Promise<any> {
+    return entityLogger.createLog(
+      'project',
+      projectId,
+      userId,
+      userName,
+      action,
+      details
+    );
   }
 
   /**

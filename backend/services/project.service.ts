@@ -26,6 +26,7 @@ import {
   FindAllOptions 
 } from '../types/service.types.js';
 import { getProjektStatusInfo, getTerminStatusInfo } from '../utils/helpers.js';
+import { validateRequired, validateDate } from '../utils/common-validators.js';
 import validator from '../utils/validators.js';
 import logger from '../utils/logger.js';
 
@@ -400,36 +401,26 @@ export class ProjectService extends BaseService<
    */
   protected async validateCreate(data: ProjectCreateDTO): Promise<void> {
     // Validate required fields
-    if (!data.titel) {
-      throw new ValidationError('Project title is required');
-    }
-    
-    if (!data.start_datum) {
-      throw new ValidationError('Start date is required');
-    }
+    validateRequired(data.titel, 'Project title');
     
     // Validate date format
     try {
-      new Date(data.start_datum);
-    } catch (error) {
-      throw new ValidationError('Invalid start date format');
-    }
-    
-    // Validate end date if provided
-    if (data.end_datum) {
-      try {
-        const endDate = new Date(data.end_datum);
+      validateDate(data.start_datum, 'Start date');
+      
+      // Validate end date if provided
+      if (data.end_datum) {
+        const endDate = validateDate(data.end_datum, 'End date');
         const startDate = new Date(data.start_datum);
         
         if (endDate < startDate) {
           throw new ValidationError('End date must be after start date');
         }
-      } catch (error) {
-        if (error instanceof ValidationError) {
-          throw error;
-        }
-        throw new ValidationError('Invalid end date format');
       }
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      throw new ValidationError('Invalid date format');
     }
     
     // Validate amount if provided
@@ -477,8 +468,8 @@ export class ProjectService extends BaseService<
    */
   protected async validateUpdate(id: number, data: ProjectUpdateDTO): Promise<void> {
     // Validate title if provided
-    if (data.titel !== undefined && (!data.titel || data.titel.trim().length < 2)) {
-      throw new ValidationError('Project title must be at least 2 characters long');
+    if (data.titel !== undefined) {
+      validateRequired(data.titel, 'Project title', 2);
     }
     
     // Validate dates
@@ -488,7 +479,7 @@ export class ProjectService extends BaseService<
     // Check start date format
     if (data.start_datum) {
       try {
-        startDate = new Date(data.start_datum);
+        startDate = validateDate(data.start_datum, 'Start date');
       } catch (error) {
         throw new ValidationError('Invalid start date format');
       }
@@ -497,7 +488,7 @@ export class ProjectService extends BaseService<
     // Check end date format
     if (data.end_datum) {
       try {
-        endDate = new Date(data.end_datum);
+        endDate = validateDate(data.end_datum, 'End date');
       } catch (error) {
         throw new ValidationError('Invalid end date format');
       }

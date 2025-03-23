@@ -1,16 +1,37 @@
 import { PrismaClient } from '@prisma/client';
-import { BaseRepository } from '../utils/base.repository';
-import { QueryBuilder } from '../utils/query-builder';
-import { FilterOptions } from '../types/controller-types';
-import { ServiceRecord } from '../types/models';
-import { prisma } from '../utils/prisma.utils';
+import { BaseRepository } from '../utils/base.repository.js';
+import { QueryBuilder } from '../utils/query-builder.js';
+import { ServiceFilterDTO } from '../types/dtos/service.dto.js';
+import { ServiceRecord } from '../types/models.js';
+import { prisma } from '../utils/prisma.utils.js';
+import entityLogger from '../utils/entity-logger.js';
 
-export class ServiceRepository extends BaseRepository<ServiceRecord> {
+/**
+ * Service entity type
+ */
+export interface Service {
+  id: number;
+  name: string;
+  description: string | null;
+  priceBase: number;
+  unit: string | null;
+  vatRate: number;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Service Repository
+ * 
+ * Repository for Service entity operations
+ */
+export class ServiceRepository extends BaseRepository<ServiceRecord, ServiceFilterDTO> {
   constructor() {
     super(prisma, prisma.service);
   }
   
-  protected buildFilterConditions(filters: FilterOptions): any {
+  protected buildFilterConditions(filters: ServiceFilterDTO): any {
     const { status, search } = filters;
     
     const builder = new QueryBuilder();
@@ -65,7 +86,7 @@ export class ServiceRepository extends BaseRepository<ServiceRecord> {
       by: ['serviceId'],
       where: {
         serviceId,
-        Invoice: {
+        invoice: { // Changed from Invoice to invoice
           invoiceDate: dateFilter
         }
       },
@@ -103,7 +124,7 @@ export class ServiceRepository extends BaseRepository<ServiceRecord> {
       select: {
         id: true,
         customerId: true,
-        Customer: {
+        customer: { // Changed from Customer to customer
           select: {
             id: true,
             name: true
@@ -118,15 +139,32 @@ export class ServiceRepository extends BaseRepository<ServiceRecord> {
     };
   }
   
-  async createLog(serviceId: number, userId: number, userName: string, action: string, details?: string): Promise<any> {
-    return this.prisma.serviceLog.create({
-      data: {
-        serviceId,
-        userId,
-        userName,
-        action,
-        details: details || null
-      }
-    });
+  /**
+   * Log an activity on a service
+   * @param serviceId - Service ID
+   * @param userId - User ID
+   * @param userName - User name
+   * @param action - Action type
+   * @param details - Action details
+   * @returns The created log entry
+   */
+  async createLog(
+    serviceId: number,
+    userId: number,
+    userName: string = 'System',
+    action: string,
+    details: string = ''
+  ): Promise<any> {
+    return entityLogger.createLog(
+      'service',
+      serviceId,
+      userId,
+      userName,
+      action,
+      details
+    );
   }
 }
+
+export const serviceRepository = new ServiceRepository();
+export default serviceRepository;

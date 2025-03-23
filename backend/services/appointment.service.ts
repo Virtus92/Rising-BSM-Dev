@@ -4,6 +4,7 @@
  * Service for Appointment entity operations providing business logic and validation.
  */
 import { format } from 'date-fns';
+import { PrismaClient } from '@prisma/client';
 import { BaseService } from '../utils/base.service.js';
 import { AppointmentRepository, Appointment, appointmentRepository } from '../repositories/appointment.repository.js';
 import { 
@@ -26,7 +27,31 @@ import {
   FindAllOptions 
 } from '../types/service.types.js';
 import { getTerminStatusInfo } from '../utils/helpers.js';
+import { validateRequired, validateDate } from '../utils/common-validators.js';
 import logger from '../utils/logger.js';
+
+/**
+ * Type for AppointmentRecord from database
+ */
+export interface AppointmentRecord {
+  id: number;
+  title: string;
+  customerId: number | null;  // Ensure this is not optional (undefined)
+  projectId: number | null;   // Ensure this is not optional (undefined)
+  appointmentDate: Date;
+  duration: number | null;
+  location: string | null;
+  description: string | null;
+  status: string;
+  createdBy: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  customer?: any;
+  project?: any;
+  // For backwards compatibility
+  Customer?: any;
+  Project?: any;
+}
 
 /**
  * Service for Appointment entity operations
@@ -66,13 +91,15 @@ export class AppointmentService extends BaseService<
           ? { [options.orderBy]: options.orderDirection || 'asc' }
           : { appointmentDate: 'asc' as const },
         include: {
-          Customer: true,
-          Project: true
+          customer: true,
+          project: true
         }
       });
       
       // Map to response DTOs
-      const appointments = result.data.map((appointment: Appointment) => this.mapEntityToDTO(appointment));
+      const appointments = result.data.map((appointment: AppointmentRecord | Appointment) => 
+        this.mapEntityToDTO(appointment)
+      );
       
       return {
         data: appointments,
@@ -94,42 +121,44 @@ export class AppointmentService extends BaseService<
         return [];
       }
       
-      // Search appointments by title, location, and customer name
-      const appointments = await this.repository.model.findMany({
-        where: {
-          OR: [
-            { title: { contains: searchTerm, mode: 'insensitive' } },
-            { location: { contains: searchTerm, mode: 'insensitive' } },
-            { Customer: { name: { contains: searchTerm, mode: 'insensitive' } } }
-          ]
-        },
-        include: {
-          Customer: {
-            select: {
-              id: true,
-              name: true
+      // Instead of direct access to protected prisma, use the repository
+      const appointments = await this.repository.transaction(async (tx) => {
+        return tx.appointment.findMany({
+          where: {
+            OR: [
+              { title: { contains: searchTerm, mode: 'insensitive' } },
+              { location: { contains: searchTerm, mode: 'insensitive' } },
+              { customer: { name: { contains: searchTerm, mode: 'insensitive' } } }
+            ]
+          },
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            project: {
+              select: {
+                id: true,
+                title: true
+              }
             }
           },
-          Project: {
-            select: {
-              id: true,
-              title: true
-            }
-          }
-        },
-        take: 10
+          take: 10
+        });
       });
       
       // Format results for search
-      return appointments.map(appointment => ({
+      return appointments.map((appointment: any) => ({
         id: appointment.id,
         title: appointment.title,
         type: 'Termin',
         date: format(appointment.appointmentDate, 'dd.MM.yyyy HH:mm'),
         status: appointment.status,
         url: `/dashboard/termine/${appointment.id}`,
-        customer: appointment.Customer?.name || 'Kein Kunde',
-        project: appointment.Project?.title || 'Kein Projekt'
+        customer: appointment.customer?.name || 'Kein Kunde',
+        project: appointment.project?.title || 'Kein Projekt'
       }));
     } catch (error) {
       this.handleError(error, 'Error searching appointments', { searchTerm });
@@ -458,17 +487,9 @@ export class AppointmentService extends BaseService<
    */
   protected async validateCreate(data: AppointmentCreateDTO): Promise<void> {
     // Validate required fields
-    if (!data.titel) {
-      throw new ValidationError('Title is required');
-    }
-    
-    if (!data.termin_datum) {
-      throw new ValidationError('Date is required');
-    }
-    
-    if (!data.termin_zeit) {
-      throw new ValidationError('Time is required');
-    }
+    validateRequired(data.titel, 'Title');
+    validateRequired(data.termin_datum, 'Date');
+    validateRequired(data.termin_zeit, 'Time');
     
     // Validate date and time format
     try {
@@ -488,11 +509,9 @@ export class AppointmentService extends BaseService<
     // Validate customer ID if provided
     if (data.kunde_id) {
       // Check if customer exists
-      const customer = await this.repository.prisma.customer.findUnique({
-        where: { id: Number(data.kunde_id) }
-      });
+      const customerExists = await this.repository.customerExists(Number(data.kunde_id));
       
-      if (!customer) {
+      if (!customerExists) {
         throw new ValidationError(`Customer with ID ${data.kunde_id} not found`);
       }
     }
@@ -500,11 +519,9 @@ export class AppointmentService extends BaseService<
     // Validate project ID if provided
     if (data.projekt_id) {
       // Check if project exists
-      const project = await this.repository.prisma.project.findUnique({
-        where: { id: Number(data.projekt_id) }
-      });
+      const projectExists = await this.repository.projectExists(Number(data.projekt_id));
       
-      if (!project) {
+      if (!projectExists) {
         throw new ValidationError(`Project with ID ${data.projekt_id} not found`);
       }
     }
@@ -518,8 +535,8 @@ export class AppointmentService extends BaseService<
    */
   protected async validateUpdate(id: number, data: AppointmentUpdateDTO): Promise<void> {
     // Validate title if provided
-    if (data.titel !== undefined && !data.titel) {
-      throw new ValidationError('Title cannot be empty');
+    if (data.titel !== undefined) {
+      validateRequired(data.titel, 'Title');
     }
     
     // Validate date and time if provided
@@ -546,11 +563,9 @@ export class AppointmentService extends BaseService<
     // Validate customer ID if provided
     if (data.kunde_id !== undefined && data.kunde_id !== null) {
       // Check if customer exists
-      const customer = await this.repository.prisma.customer.findUnique({
-        where: { id: Number(data.kunde_id) }
-      });
+      const customerExists = await this.repository.customerExists(Number(data.kunde_id));
       
-      if (!customer) {
+      if (!customerExists) {
         throw new ValidationError(`Customer with ID ${data.kunde_id} not found`);
       }
     }
@@ -558,11 +573,9 @@ export class AppointmentService extends BaseService<
     // Validate project ID if provided
     if (data.projekt_id !== undefined && data.projekt_id !== null) {
       // Check if project exists
-      const project = await this.repository.prisma.project.findUnique({
-        where: { id: Number(data.projekt_id) }
-      });
+      const projectExists = await this.repository.projectExists(Number(data.projekt_id));
       
-      if (!project) {
+      if (!projectExists) {
         throw new ValidationError(`Project with ID ${data.projekt_id} not found`);
       }
     }
@@ -581,16 +594,27 @@ export class AppointmentService extends BaseService<
    * @param entity - Appointment entity
    * @returns Appointment response DTO
    */
-  protected mapEntityToDTO(entity: Appointment): AppointmentResponseDTO {
+  protected mapEntityToDTO(entity: AppointmentRecord | Appointment): AppointmentResponseDTO {
     const statusInfo = getTerminStatusInfo(entity.status);
+    
+    // Get customer and project information safely
+    const customerName = 
+      entity.customer?.name || 
+      entity.Customer?.name || 
+      'Kein Kunde zugewiesen';
+    
+    const projectTitle = 
+      entity.project?.title || 
+      entity.Project?.title || 
+      'Kein Projekt zugewiesen';
     
     return {
       id: entity.id,
       titel: entity.title,
-      kunde_id: entity.customerId,
-      kunde_name: entity.Customer?.name || 'Kein Kunde zugewiesen',
-      projekt_id: entity.projectId,
-      projekt_titel: entity.Project?.title || 'Kein Projekt zugewiesen',
+      kunde_id: entity.customerId || null,  // Handle undefined case
+      kunde_name: customerName,
+      projekt_id: entity.projectId || null,  // Handle undefined case
+      projekt_titel: projectTitle,
       termin_datum: entity.appointmentDate,
       dateFormatted: format(entity.appointmentDate, 'dd.MM.yyyy'),
       timeFormatted: format(entity.appointmentDate, 'HH:mm'),
@@ -619,14 +643,24 @@ export class AppointmentService extends BaseService<
       benutzer: note.userName
     })) || [];
     
+    // Safely access properties
+    const customerId = appointment.customerId || null;
+    const projectId = appointment.projectId || null;
+    const customerName = appointment.customer?.name || 
+                        appointment.Customer?.name || 
+                        'Kein Kunde zugewiesen';
+    const projectTitle = appointment.project?.title || 
+                        appointment.Project?.title || 
+                        'Kein Projekt zugewiesen';
+    
     // Return combined data
     return {
       id: appointment.id,
       titel: appointment.title,
-      kunde_id: appointment.customerId,
-      kunde_name: appointment.Customer?.name || 'Kein Kunde zugewiesen',
-      projekt_id: appointment.projectId,
-      projekt_titel: appointment.Project?.title || 'Kein Projekt zugewiesen',
+      kunde_id: customerId,
+      kunde_name: customerName,
+      projekt_id: projectId,
+      projekt_titel: projectTitle,
       termin_datum: appointment.appointmentDate,
       dateFormatted: format(appointment.appointmentDate, 'dd.MM.yyyy'),
       timeFormatted: format(appointment.appointmentDate, 'HH:mm'),

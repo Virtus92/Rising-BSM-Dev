@@ -504,3 +504,62 @@ export const passwordResetSchema = {
     }
   }
 };
+
+/**
+ * User and profile related DTOs
+ */
+
+/**
+ * User profile update DTO
+ */
+export interface ProfileUpdateDTO {
+  name: string;
+  email: string;
+  telefon?: string;
+}
+
+/**
+ * Password update DTO
+ */
+export interface PasswordUpdateDTO {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+/**
+ * User profile response DTO
+ */
+export interface UserProfileResponseDTO {
+  id: number;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    telefon: string;
+    rolle: string;
+    profilbild: string | null;
+    seit: string;
+  };
+  settings: {
+    sprache: string;
+    dark_mode: boolean;
+    benachrichtigungen_email: boolean;
+    benachrichtigungen_push: boolean;
+    benachrichtigungen_intervall: string;
+  };
+  activity: Array<{
+    type: string;
+    ip: string;
+    date: string;
+  }>;
+}
+
+/**
+ * Notification settings update DTO
+ */
+export interface NotificationSettingsUpdateDTO {
+  benachrichtigungen_email: boolean | string;
+  benachrichtigungen_push: boolean | string;
+  benachrichtigungen_intervall: string;
+}

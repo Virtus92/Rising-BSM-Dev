@@ -23,6 +23,7 @@ import {
   FindAllOptions 
 } from '../types/service.types.js';
 import { getAnfrageStatusInfo } from '../utils/helpers.js';
+import { validateEmail, validateRequired } from '../utils/common-validators.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -335,32 +336,10 @@ export class RequestService extends BaseService<
    */
   protected async validateCreate(data: ContactRequestCreateDTO): Promise<void> {
     // Validate required fields
-    if (!data.name) {
-      throw new ValidationError('Name is required');
-    }
-    
-    if (!data.email) {
-      throw new ValidationError('Email is required');
-    }
-    
-    if (!data.service) {
-      throw new ValidationError('Service is required');
-    }
-    
-    if (!data.message) {
-      throw new ValidationError('Message is required');
-    }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(data.email)) {
-      throw new ValidationError('Invalid email format');
-    }
-    
-    // Validate message length
-    if (data.message.length < 10) {
-      throw new ValidationError('Message must be at least 10 characters long');
-    }
+    validateRequired(data.name, 'Name');
+    validateEmail(data.email);
+    validateRequired(data.service, 'Service');
+    validateRequired(data.message, 'Message', 10);
   }
 
   /**

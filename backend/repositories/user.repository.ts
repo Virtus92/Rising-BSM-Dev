@@ -1,16 +1,35 @@
 import { PrismaClient } from '@prisma/client';
-import { BaseRepository } from '../utils/base.repository';
-import { QueryBuilder } from '../utils/query-builder';
-import { FilterOptions } from '../types/controller-types';
-import { UserRecord } from '../types/models';
-import { prisma } from '../utils/prisma.utils';
+import { BaseRepository } from '../utils/base.repository.js';
+import { QueryBuilder } from '../utils/query-builder.js';
+import { UserFilterDTO } from '../types/dtos/user.dto.js';
+import { UserRecord } from '../types/models.js';
+import { prisma } from '../utils/prisma.utils.js';
+import entityLogger from '../utils/entity-logger.js';
 
-export class UserRepository extends BaseRepository<UserRecord> {
+/**
+ * User entity type
+ */
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  phone?: string | null;
+  status: string;
+  profilePicture?: string | null;
+  resetToken?: string | null;
+  resetTokenExpiry?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export class UserRepository extends BaseRepository<UserRecord, UserFilterDTO> {
   constructor() {
     super(prisma, prisma.user);
   }
   
-  protected buildFilterConditions(filters: FilterOptions): any {
+  protected buildFilterConditions(filters: UserFilterDTO): any {
     const { status, search, role } = filters;
     
     const builder = new QueryBuilder();
@@ -107,14 +126,47 @@ export class UserRepository extends BaseRepository<UserRecord> {
     });
   }
   
-  async logActivity(userId: number, activity: string, ipAddress?: string): Promise<void> {
-    await this.prisma.userActivity.create({
+  /**
+   * Log activity for a user
+   * @param userId - User ID
+   * @param actorId - Actor user ID
+   * @param actorName - Actor user name
+   * @param action - Action type
+   * @param details - Additional details
+   * @returns Created log
+   */
+  async logActivity(
+    userId: number,
+    actorId: number,
+    actorName: string,
+    action: string,
+    details?: string
+  ): Promise<any> {
+    return entityLogger.createLog('user', userId, actorId, actorName, action, details);
+  }
+
+  /**
+   * Log user activity (simplified version)
+   * @param userId - User ID
+   * @param activity - Activity type
+   * @param ipAddress - IP address
+   * @returns Created activity log
+   */
+  async logSimpleActivity(
+    userId: number,
+    activity: string,
+    ipAddress: string | null = null
+  ): Promise<any> {
+    return this.prisma.userActivity.create({
       data: {
         userId,
         activity,
-        ipAddress: ipAddress || null,
+        ipAddress,
         timestamp: new Date()
       }
     });
   }
 }
+
+export const userRepository = new UserRepository();
+export default userRepository;
