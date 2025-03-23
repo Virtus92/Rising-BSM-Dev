@@ -84,6 +84,59 @@ export class AppointmentService extends BaseService<
   }
 
   /**
+   * Search appointments
+   * @param searchTerm - Search term
+   * @returns List of appointment search results
+   */
+  async search(searchTerm: string): Promise<any[]> {
+    try {
+      if (!searchTerm || searchTerm.trim().length < 2) {
+        return [];
+      }
+      
+      // Search appointments by title, location, and customer name
+      const appointments = await this.repository.model.findMany({
+        where: {
+          OR: [
+            { title: { contains: searchTerm, mode: 'insensitive' } },
+            { location: { contains: searchTerm, mode: 'insensitive' } },
+            { Customer: { name: { contains: searchTerm, mode: 'insensitive' } } }
+          ]
+        },
+        include: {
+          Customer: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          Project: {
+            select: {
+              id: true,
+              title: true
+            }
+          }
+        },
+        take: 10
+      });
+      
+      // Format results for search
+      return appointments.map(appointment => ({
+        id: appointment.id,
+        title: appointment.title,
+        type: 'Termin',
+        date: format(appointment.appointmentDate, 'dd.MM.yyyy HH:mm'),
+        status: appointment.status,
+        url: `/dashboard/termine/${appointment.id}`,
+        customer: appointment.Customer?.name || 'Kein Kunde',
+        project: appointment.Project?.title || 'Kein Projekt'
+      }));
+    } catch (error) {
+      this.handleError(error, 'Error searching appointments', { searchTerm });
+    }
+  }
+
+  /**
    * Find appointment by ID with full details
    * @param id - Appointment ID
    * @param options - Find options

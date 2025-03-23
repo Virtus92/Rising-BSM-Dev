@@ -1,81 +1,113 @@
-import { Request, Response, NextFunction } from 'express';
-import { asyncHandler } from '../utils/asyncHandler';
-import { ResponseFactory } from '../utils/response.factory';
-import { RequestService, requestService } from '../services/request.service';
-import { NotificationService, notificationService } from '../services/notification.service';
-import { ContactRequestCreateDTO } from '../types/dtos/request.dto';
+/**
+ * Contact Controller
+ * 
+ * Handles contact form submissions and related operations
+ */
+import { Request, Response } from 'express';
+import { BadRequestError } from '../utils/errors.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { ResponseFactory } from '../utils/response.factory.js';
+import { RequestService, requestService } from '../services/request.service.js';
+import { NotificationService, notificationService } from '../services/notification.service.js';
+import { ContactRequestCreateDTO } from '../types/dtos/request.dto.js';
+import { prisma } from '../utils/prisma.utils.js';
 
 /**
  * Submit contact form
+ * Handles the initial contact request submission from public-facing forms
  */
 export const submitContact = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  // Extract create DTO from request body
+  // Extract contact data from request body
   const contactData: ContactRequestCreateDTO = req.body;
   
-  // Create contact request through service
+  // Basic validation
+  if (!contactData.name || !contactData.email || !contactData.message || !contactData.service) {
+    throw new BadRequestError('All required fields must be filled out');
+  }
+  
+  // Create contact request with IP address
   const result = await requestService.create(contactData, {
-    ipAddress: req.ip
+    userContext: {
+      userId: null,
+      userName: 'System',
+      userRole: 'system',
+      ipAddress: req.ip
+    }
   });
 
-  // Create notifications for admins
-  await createNotificationsForAdmins(result.id, contactData.name, contactData.service);
+  // Create notifications for admin users
+  await createNotificationsForNewRequest(result.id, contactData.name, contactData.service);
 
-  // Respond based on request type
-  if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
+  // Send appropriate response based on request type
+  if (req.xhr || req.headers.accept?.includes('application/json')) {
+    // For AJAX requests, return JSON
     ResponseFactory.created(
       res,
       { requestId: result.id },
-      'Ihre Anfrage wurde erfolgreich übermittelt. Wir melden uns bald bei Ihnen.'
+      'Ihre Anfrage wurde erfolgreich übermittelt. Wir melden uns in Kürze bei Ihnen.'
     );
   } else {
-    // For non-AJAX requests, redirect to home page
-    res.redirect('/');
+    // For regular form submissions, redirect
+    res.redirect('/?success=true');
   }
 });
 
 /**
  * Get contact request by ID
+ * Allows authenticated users to view a specific contact request
  */
 export const getContactRequest = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
+  
+  if (isNaN(id)) {
+    throw new BadRequestError('Invalid request ID');
+  }
 
-  // Get contact request through service
-  const result = await requestService.findById(id, {
+  // Get contact request with details
+  const result = await requestService.findByIdWithDetails(id, {
     throwIfNotFound: true
   });
 
-  ResponseFactory.success(res, result);
+  ResponseFactory.success(res, result, 'Contact request retrieved successfully');
 });
 
 /**
- * Create notifications for admin users
+ * Create notifications for administrators about new contact requests
  */
-async function createNotificationsForAdmins(requestId: number, name: string, service: string): Promise<void> {
-  // Find admin users
-  const adminUsers = await requestService.getAdminUsers();
+async function createNotificationsForNewRequest(
+  requestId: number, 
+  name: string, 
+  service: string
+): Promise<void> {
+  try {
+    // Find admin users
+    const adminUsers = await prisma.user.findMany({
+      where: {
+        role: 'admin',
+        status: 'aktiv'
+      },
+      select: {
+        id: true
+      }
+    });
 
-  // Create notifications for each admin
-  const notifications = adminUsers.map(admin => ({
-    userId: admin.id,
-    type: 'anfrage',
-    title: 'Neue Kontaktanfrage',
-    message: `Neue Anfrage von ${name} über ${service}`,
-    referenceId: requestId,
-    referenceType: 'kontaktanfragen'
-  }));
+    // Create notifications for all admin users
+    const promises = adminUsers.map(admin => 
+      notificationService.create({
+        userId: admin.id,
+        type: 'anfrage',
+        title: 'Neue Kontaktanfrage',
+        message: `Neue Anfrage von ${name} zum Thema ${service}`,
+        referenceId: requestId,
+        referenceType: 'anfrage'
+      })
+    );
 
-  // Add confirmation notification
-  notifications.push({
-    userId: null,
-    type: 'contact_confirmation',
-    title: 'Kontaktanfrage erhalten',
-    message: 'Wir haben Ihre Anfrage erhalten und werden uns in Kürze bei Ihnen melden',
-    referenceId: requestId,
-    referenceType: 'kontaktanfragen'
-  });
-
-  // Create all notifications
-  await Promise.all(notifications.map(notification => 
-    notificationService.create(notification)
-  ));
+    // Wait for all notifications to be created
+    await Promise.all(promises);
+  } catch (error) {
+    console.error('Error creating notifications:', error);
+    // We don't want to fail the contact submission if notifications fail
+    // Just log the error and continue
+  }
 }

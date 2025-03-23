@@ -120,6 +120,79 @@ export class UserService extends BaseService<User, UserRepository> {
   }
 
   /**
+ * Update user profile picture
+ * @param userId - User ID
+ * @param file - Uploaded file
+ * @param options - Update options
+ * @returns Path to the updated profile picture
+ */
+async updateProfilePicture(
+  userId: number,
+  file: Express.Multer.File,
+  options: UpdateOptions = {}
+): Promise<{ imagePath: string }> {
+  try {
+    // Validate file
+    if (!file) {
+      throw new ValidationError('No file uploaded');
+    }
+    
+    // Check allowed MIME types
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new ValidationError('Invalid file type. Only JPG, PNG, and GIF images are allowed');
+    }
+    
+    // Check file size (max 2MB)
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    if (file.size > maxSize) {
+      throw new ValidationError('File too large. Maximum file size is 2MB');
+    }
+    
+    // Get user to verify existence
+    const user = await this.repository.findById(userId);
+    
+    if (!user) {
+      throw new NotFoundError(`User with ID ${userId} not found`);
+    }
+    
+    // Generate unique filename
+    const fileExt = file.originalname.split('.').pop();
+    const fileName = `${userId}_${Date.now()}.${fileExt}`;
+    const uploadDir = path.join(process.cwd(), 'uploads', 'profiles');
+    const filePath = path.join(uploadDir, fileName);
+    
+    // Ensure upload directory exists
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    
+    // Write file to disk
+    fs.writeFileSync(filePath, file.buffer);
+    
+    // Update user profile picture in database
+    const imagePath = `/uploads/profiles/${fileName}`;
+    await this.repository.update(userId, {
+      profilePicture: imagePath,
+      updatedAt: new Date()
+    });
+    
+    // Log activity
+    if (options.userContext?.userId) {
+      await this.repository.logActivity(
+        userId,
+        'profile_picture_updated',
+        options.userContext.ipAddress || null
+      );
+    }
+    
+    return { imagePath };
+  } catch (error) {
+    this.handleError(error, `Error updating profile picture for user with ID ${userId}`);
+  }
+}
+
+  /**
    * Update user profile
    * @param id - User ID
    * @param data - Profile update DTO
@@ -472,6 +545,8 @@ export class UserService extends BaseService<User, UserRepository> {
     return entity;
   }
 }
+
+
 
 // Export singleton instance
 export const userService = new UserService();
