@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import path from 'path';
 import { generateAuthTokens } from './utils/jwt.js';
 import config from './config/index.js';
 import { initSwaggerDocs } from './config/swagger.js';
@@ -21,6 +22,7 @@ const port = config.PORT;
 // Import middleware
 import * as errorMiddleware from './middleware/error.middleware.js';
 import { authenticate } from './middleware/auth.middleware.js';
+import requestLogger from './middleware/request-logger.middleware.js';
 
 // Import routes
 import apiRoutes from './routes/api.routes.js';
@@ -44,13 +46,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Request logging middleware in development
-if (config.IS_DEVELOPMENT) {
-  app.use((req: Request, _res: Response, next: NextFunction) => {
-    logger.debug(`${req.method} ${req.url}`);
-    next();
-  });
-}
+// Static files directory for uploads
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// Request logging middleware
+app.use(requestLogger);
 
 // Rate limiters
 const apiLimiter = rateLimit({
@@ -79,22 +79,15 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// Add request logging middleware in development
-if (config.IS_DEVELOPMENT) {
-  app.use((req: Request, _res: Response, next: NextFunction) => {
-    console.log(`${req.method} ${req.url}`);
-    next();
-  });
-}
-
-// Initialize Swagger documentation (after routes are defined)
+// Initialize Swagger documentation
 try {
   initSwaggerDocs(app);
 } catch (error) {
-  console.error('Failed to initialize Swagger docs:', error);
-  console.log('Continuing without Swagger documentation');
+  logger.error('Failed to initialize Swagger docs:', error);
+  logger.info('Continuing without Swagger documentation');
 }
 
+// Development helpers
 if (config.IS_DEVELOPMENT) {
   app.get('/dev-token', (req, res) => {
     const devToken = generateAuthTokens({
@@ -184,10 +177,7 @@ if (config.IS_DEVELOPMENT) {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1', apiLimiter, apiRoutes);
 
-// Apply JWT authentication to protected routes
-app.use('/api/v1/protected', authenticate, apiRoutes);
-
-// Contact form route with rate limiting
+// Contact form route with rate limiting (public endpoint)
 app.post('/api/v1/contact', contactLimiter, submitContact);
 
 // Error handling middleware
@@ -200,6 +190,7 @@ const server = app.listen(port, () => {
   
   if (config.IS_DEVELOPMENT) {
     logger.info(`API Documentation: http://localhost:${port}/api-docs`);
+    logger.info(`Developer Portal: http://localhost:${port}/dev-portal`);
   }
 });
 

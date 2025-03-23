@@ -5,23 +5,17 @@
  */
 import { format } from 'date-fns';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
-import path from 'path';
-import fs from 'fs';
 import { BaseService } from '../utils/base.service.js';
 import { UserRepository, User, userRepository } from '../repositories/user.repository.js';
 import { 
   ProfileUpdateDTO,
-  PasswordUpdateDTO,
-  UserProfileResponseDTO,
-  NotificationSettingsUpdateDTO
+  UserProfileResponseDTO
 } from '../types/dtos/profile.dto.js';
 import { UserFilterDTO } from '../types/dtos/user.dto.js';
 import { 
   NotFoundError, 
   ValidationError, 
-  ConflictError,
-  UnauthorizedError
+  ConflictError
 } from '../utils/errors.js';
 import { 
   CreateOptions, 
@@ -29,7 +23,57 @@ import {
   FindOneOptions
 } from '../types/service.types.js';
 import { validateEmail, validateRequired } from '../utils/common-validators.js';
-import logger from '../utils/logger.js';
+
+interface FindAllOptions {
+  page?: number;
+  limit?: number;
+  orderBy?: string;
+  orderDirection?: 'asc' | 'desc';
+}
+
+interface DeleteOptions extends UpdateOptions {
+  softDelete?: boolean;
+}
+
+interface UserResponseDTO {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  roleLabel: string;
+  status: string;
+  statusLabel: string;
+  statusClass: string;
+  initials: string;
+  profilePicture: string | null;
+  createdAt: string;
+}
+
+interface UserCreateDTO {
+  name: string;
+  email: string;
+  password: string;
+  role?: string;
+  phone?: string | null;
+  status?: string;
+}
+
+interface UserUpdateDTO {
+  name?: string;
+  email?: string;
+  phone?: string | null;
+  role?: string;
+  status?: string;
+  password?: string;
+}
+
+class BadRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BadRequestError';
+  }
+}
 
 /**
  * Service for User entity operations
@@ -40,524 +84,553 @@ export class UserService extends BaseService<
   UserFilterDTO,
   any,  // No standard create DTO
   ProfileUpdateDTO,
-  UserProfileResponseDTO
-> {
-  /**
-   * Creates a new UserService instance
-   * @param repository - UserRepository instance
-   */
-  constructor(repository: UserRepository = userRepository) {
-    super(repository);
+  UserProfileResponseDTO>{
+  constructor() {
+    super(userRepository);
   }
-
+  
   /**
-   * Get user profile by ID
-   * @param id - User ID
-   * @param options - Find options
-   * @returns User profile or null if not found
+   * Map entity to DTO
+   * Required implementation of abstract method from BaseService
    */
-  async getProfile(
-    id: number,
-    options: FindOneOptions = {}
-  ): Promise<UserProfileResponseDTO | null> {
-    try {
-      // Get user from repository
-      const user = await this.repository.findById(id, {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          role: true,
-          profilePicture: true,
-          createdAt: true,
-          updatedAt: true
-        }
-      });
-      
-      // Return null if user not found
-      if (!user) {
-        if (options.throwIfNotFound) {
-          throw new NotFoundError(`User with ID ${id} not found`);
-        }
-        return null;
-      }
-      
-      // Get user settings
-      const settings = await this.repository.getUserSettings(id);
-      
-      // Default settings if none exist
-      const userSettings = settings || {
-        language: 'de',
-        darkMode: false,
-        emailNotifications: true,
-        pushNotifications: false,
-        notificationInterval: 'sofort'
-      };
-      
-      // Get user activity with type
-      const activity = await this.repository.getUserActivity(id);
-      
-      // Format profile data
+  mapEntityToDTO(entity: User): UserProfileResponseDTO {
+    return {
+      id: entity.id,
+      user: {
+        id: entity.id,
+        name: entity.name,
+        email: entity.email,
+        telefon: entity.phone || '',
+        rolle: entity.role || 'benutzer',
+        profilbild: entity.profilePicture || null,
+        seit: format(entity.createdAt, 'yyyy-MM-dd')
+      },
+      settings: {
+        sprache: 'de',
+        dark_mode: false,
+        benachrichtigungen_email: true,
+        benachrichtigungen_push: false,
+        benachrichtigungen_intervall: 'sofort'
+      },
+      activity: []
+    };
+  }
+  /**
+ * These methods need to be added to your existing UserService class
+ * to support the new user management functionality
+ */
+
+/**
+ * Find all users with filtering and pagination
+ * @param filters - Filter criteria
+ * @param options - Find options
+ * @returns Paginated list of users
+ */
+async findAllUsers(
+  filters: UserFilterDTO,
+  options: FindAllOptions = {}
+): Promise<{ data: UserResponseDTO[]; pagination: any }> {
+  try {
+    // Get users from repository
+    const result = await this.repository.findAll(filters, {
+      page: options.page,
+      limit: options.limit,
+      orderBy: options.orderBy 
+        ? { [options.orderBy]: options.orderDirection || 'asc' }
+        : { name: 'asc' as const }
+    });
+    
+    // Map to response DTOs
+    const users = result.data.map((user) => {
       return {
         id: user.id,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          telefon: user.phone || '',
-          rolle: user.role,
-          profilbild: user.profilePicture || null,
-          seit: format(user.createdAt, 'dd.MM.yyyy')
-        },
-        settings: {
-          sprache: userSettings.language || 'de',
-          dark_mode: userSettings.darkMode || false,
-          benachrichtigungen_email: userSettings.emailNotifications || true,
-          benachrichtigungen_push: userSettings.pushNotifications || false,
-          benachrichtigungen_intervall: userSettings.notificationInterval || 'sofort'
-        },
-        activity: activity.map((item: any) => ({
-          type: item.activity,
-          ip: item.ipAddress || '',
-          date: format(item.timestamp, 'dd.MM.yyyy, HH:mm')
-        }))
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '',
+        role: user.role,
+        roleLabel: this.getRoleLabel(user.role),
+        status: user.status,
+        statusLabel: this.getStatusLabel(user.status),
+        statusClass: this.getStatusClass(user.status),
+        initials: this.getInitials(user.name),
+        profilePicture: user.profilePicture || null,
+        createdAt: format(user.createdAt, 'yyyy-MM-dd')
       };
-    } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-      this.handleError(error, `Error fetching profile for user with ID ${id}`);
-    }
+    });
+    
+    return {
+      data: users,
+      pagination: result.pagination
+    };
+  } catch (error) {
+    this.handleError(error, 'Error fetching users', { filters, options });
   }
+}
 
-  /**
- * Update user profile picture
- * @param userId - User ID
- * @param file - Uploaded file
- * @param options - Update options
- * @returns Path to the updated profile picture
+/**
+ * Find user by ID
+ * @param id - User ID
+ * @param options - Find options
+ * @returns User or null if not found
  */
-async updateProfilePicture(
-  userId: number,
-  file: Express.Multer.File,
-  options: UpdateOptions = {}
-): Promise<{ imagePath: string }> {
+async findUserById(
+  id: number,
+  options: FindOneOptions = {}
+): Promise<UserResponseDTO | null> {
   try {
-    // Validate file
-    if (!file) {
-      throw new ValidationError('No file uploaded');
-    }
+    // Get user from repository
+    const user = await this.repository.findById(id);
     
-    // Check allowed MIME types
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new ValidationError('Invalid file type. Only JPG, PNG, and GIF images are allowed');
-    }
-    
-    // Check file size (max 2MB)
-    const maxSize = 2 * 1024 * 1024; // 2MB
-    if (file.size > maxSize) {
-      throw new ValidationError('File too large. Maximum file size is 2MB');
-    }
-    
-    // Get user to verify existence
-    const user = await this.repository.findById(userId);
-    
+    // Return null if user not found
     if (!user) {
-      throw new NotFoundError(`User with ID ${userId} not found`);
+      if (options.throwIfNotFound) {
+        throw new NotFoundError(`User with ID ${id} not found`);
+      }
+      return null;
     }
     
-    // Generate unique filename
-    const fileExt = file.originalname.split('.').pop();
-    const fileName = `${userId}_${Date.now()}.${fileExt}`;
-    const uploadDir = path.join(process.cwd(), 'uploads', 'profiles');
-    const filePath = path.join(uploadDir, fileName);
+    // Return mapped response
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      role: user.role,
+      roleLabel: this.getRoleLabel(user.role),
+      status: user.status,
+      statusLabel: this.getStatusLabel(user.status),
+      statusClass: this.getStatusClass(user.status),
+      initials: this.getInitials(user.name),
+      profilePicture: user.profilePicture || null,
+      createdAt: format(user.createdAt, 'yyyy-MM-dd')
+    };
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    this.handleError(error, `Error fetching user with ID ${id}`);
+  }
+}
+
+/**
+ * Create a new user
+ * @param data - User create DTO
+ * @param options - Create options
+ * @returns Created user
+ */
+async createUser(
+  data: UserCreateDTO,
+  options: CreateOptions = {}
+): Promise<UserResponseDTO> {
+  try {
+    // Validate create data
+    this.validateCreateUser(data);
     
-    // Ensure upload directory exists
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    // Check if email is already in use
+    const existingUser = await this.repository.findByEmail(data.email);
+    if (existingUser) {
+      throw new ConflictError('Email is already in use');
     }
     
-    // Write file to disk
-    fs.writeFileSync(filePath, file.buffer);
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(data.password, saltRounds);
     
-    // Update user profile picture in database
-    const imagePath = `/uploads/profiles/${fileName}`;
-    await this.repository.update(userId, {
-      profilePicture: imagePath,
+    // Create user
+    const user = await this.repository.create({
+      name: data.name,
+      email: data.email,
+      password: hashedPassword,
+      role: data.role || 'mitarbeiter',
+      phone: data.phone || null,
+      status: data.status || 'aktiv',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    
+    // Create default user settings
+    await this.repository.updateUserSettings(user.id, {
+      language: 'de',
+      darkMode: false,
+      emailNotifications: true,
+      pushNotifications: false,
+      notificationInterval: 'sofort'
+    });
+    
+    // Log activity
+    if (options.userContext?.userId) {
+      await this.repository.logActivity(
+        user.id,
+        options.userContext.userId,
+        options.userContext.userName || 'System',
+        'user_created',
+        `User created by ${options.userContext.userName || 'System'}`
+      );
+    }
+    
+    // Return mapped response
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      role: user.role,
+      roleLabel: this.getRoleLabel(user.role),
+      status: user.status,
+      statusLabel: this.getStatusLabel(user.status),
+      statusClass: this.getStatusClass(user.status),
+      initials: this.getInitials(user.name),
+      profilePicture: null,
+      createdAt: format(user.createdAt, 'yyyy-MM-dd')
+    };
+  } catch (error) {
+    this.handleError(error, 'Error creating user', { data });
+  }
+}
+
+/**
+ * Update an existing user
+ * @param id - User ID
+ * @param data - User update DTO
+ * @param options - Update options
+ * @returns Updated user
+ */
+async updateUser(
+  id: number,
+  data: UserUpdateDTO,
+  options: UpdateOptions = {}
+): Promise<UserResponseDTO> {
+  try {
+    // Validate user exists
+    const existingUser = await this.repository.findById(id);
+    if (!existingUser) {
+      if (options.throwIfNotFound) {
+        throw new NotFoundError(`User with ID ${id} not found`);
+      }
+      throw new BadRequestError('User not found');
+    }
+    
+    // Check if email is already in use by another user
+    if (data.email && data.email !== existingUser.email) {
+      const emailUser = await this.repository.findByEmail(data.email);
+      if (emailUser && emailUser.id !== id) {
+        throw new ConflictError('Email is already in use by another user');
+      }
+    }
+    
+    // Prepare update data
+    const updateData: any = {
+      updatedAt: new Date()
+    };
+    
+    if (data.name) updateData.name = data.name;
+    if (data.email) updateData.email = data.email;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.role) updateData.role = data.role;
+    if (data.status) updateData.status = data.status;
+    
+    // Handle password update if provided
+    if (data.password) {
+      const saltRounds = 10;
+      updateData.password = await bcrypt.hash(data.password, saltRounds);
+    }
+    
+    // Update user
+    const user = await this.repository.update(id, updateData);
+    
+    // Log activity
+    if (options.userContext?.userId) {
+      await this.repository.logActivity(
+        id,
+        options.userContext.userId,
+        options.userContext.userName || 'System',
+        'user_updated',
+        `User updated by ${options.userContext.userName || 'System'}`
+      );
+    }
+    
+    // Return mapped response
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      role: user.role,
+      roleLabel: this.getRoleLabel(user.role),
+      status: user.status,
+      statusLabel: this.getStatusLabel(user.status),
+      statusClass: this.getStatusClass(user.status),
+      initials: this.getInitials(user.name),
+      profilePicture: user.profilePicture || null,
+      createdAt: format(user.createdAt, 'yyyy-MM-dd')
+    };
+  } catch (error) {
+    this.handleError(error, `Error updating user with ID ${id}`, { id, data });
+  }
+}
+
+/**
+ * Delete a user
+ * @param id - User ID
+ * @param options - Delete options
+ * @returns Success message
+ */
+async deleteUser(
+  id: number,
+  options: DeleteOptions = {}
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // Validate user exists
+    const existingUser = await this.repository.findById(id);
+    if (!existingUser) {
+      if (options.throwIfNotFound) {
+        throw new NotFoundError(`User with ID ${id} not found`);
+      }
+      throw new BadRequestError('User not found');
+    }
+    
+    // Prevent deleting your own account
+    if (options.userContext?.userId === id) {
+      throw new BadRequestError('You cannot delete your own account');
+    }
+    
+    // For safety, we might want to implement soft delete instead of hard delete
+    if (options.softDelete !== false) {
+      // Soft delete - mark as inactive
+      await this.repository.update(id, {
+        status: 'inaktiv',
+        updatedAt: new Date()
+      });
+      
+      // Log activity
+      if (options.userContext?.userId) {
+        await this.repository.logActivity(
+          id,
+          options.userContext.userId,
+          options.userContext.userName || 'System',
+          'user_deactivated',
+          `User deactivated by ${options.userContext.userName || 'System'}`
+        );
+      }
+      
+      return {
+        success: true,
+        message: 'User has been deactivated'
+      };
+    } else {
+      // Hard delete - actually remove from database
+      // This should be used with caution as it can break referential integrity
+      await this.repository.delete(id);
+      
+      // Log activity
+      if (options.userContext?.userId) {
+        await this.repository.logActivity(
+          id,
+          options.userContext.userId,
+          options.userContext.userName || 'System',
+          'user_deleted',
+          `User deleted by ${options.userContext.userName || 'System'}`
+        );
+      }
+      
+      return {
+        success: true,
+        message: 'User has been permanently deleted'
+      };
+    }
+  } catch (error) {
+    this.handleError(error, `Error deleting user with ID ${id}`, { id });
+  }
+}
+
+/**
+ * Update user status
+ * @param id - User ID
+ * @param status - New status
+ * @param options - Update options
+ * @returns Updated user
+ */
+async updateUserStatus(
+  id: number,
+  status: string,
+  options: UpdateOptions = {}
+): Promise<UserResponseDTO> {
+  try {
+    // Validate user exists
+    const existingUser = await this.repository.findById(id);
+    if (!existingUser) {
+      if (options.throwIfNotFound) {
+        throw new NotFoundError(`User with ID ${id} not found`);
+      }
+      throw new BadRequestError('User not found');
+    }
+    
+    // Prevent changing your own status
+    if (options.userContext?.userId === id) {
+      throw new BadRequestError('You cannot change your own status');
+    }
+    
+    // Validate status
+    const validStatuses = ['aktiv', 'inaktiv', 'gesperrt'];
+    if (!validStatuses.includes(status)) {
+      throw new BadRequestError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    }
+    
+    // Update user
+    const user = await this.repository.update(id, {
+      status,
       updatedAt: new Date()
     });
     
     // Log activity
     if (options.userContext?.userId) {
-      await this.repository.logSimpleActivity(
-        userId,
-        'profile_picture_updated',
-        options.userContext.ipAddress || null
+      await this.repository.logActivity(
+        id,
+        options.userContext.userId,
+        options.userContext.userName || 'System',
+        'status_changed',
+        `Status changed to ${status} by ${options.userContext.userName || 'System'}`
       );
     }
     
-    return { imagePath };
+    // Return mapped response
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      role: user.role,
+      roleLabel: this.getRoleLabel(user.role),
+      status: user.status,
+      statusLabel: this.getStatusLabel(user.status),
+      statusClass: this.getStatusClass(user.status),
+      initials: this.getInitials(user.name),
+      profilePicture: user.profilePicture || null,
+      createdAt: format(user.createdAt, 'yyyy-MM-dd')
+    };
   } catch (error) {
-    this.handleError(error, `Error updating profile picture for user with ID ${userId}`);
+    this.handleError(error, `Error updating status for user with ID ${id}`, { id, status });
   }
 }
 
-  /**
-   * Update user profile
-   * @param id - User ID
-   * @param data - Profile update DTO
-   * @param options - Update options
-   * @returns Updated user profile
-   */
-  async updateProfile(
-    id: number,
-    data: ProfileUpdateDTO,
-    options: UpdateOptions = {}
-  ): Promise<{ id: number; name: string; email: string; role: string; initials: string }> {
-    try {
-      // Validate update data
-      await this.validateProfileUpdate(id, data);
-      
-      // Update user in database
-      const updatedUser = await this.repository.update(id, {
-        name: data.name,
-        email: data.email,
-        phone: data.telefon || null,
-        updatedAt: new Date()
-      });
-      
-      // Log the activity
-      if (options.userContext?.userId || options.userId) {
-        await this.repository.logSimpleActivity(
-          id,
-          'profile_updated',
-          options.userContext?.ipAddress || null
-        );
-      }
-      
-      // Return simplified user data
-      return {
-        id: updatedUser.id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: updatedUser.role,
-        initials: updatedUser.name.split(' ').map((n: string) => n[0]).join('')
-      };
-    } catch (error) {
-      this.handleError(error, `Error updating profile for user with ID ${id}`, { id, data });
+/**
+ * Validate create user data
+ * @param data - User create data
+ * @throws ValidationError if validation fails
+ */
+private validateCreateUser(data: UserCreateDTO): void {
+  // Validate required fields
+  if (!data.name) {
+    throw new ValidationError('Name is required');
+  }
+  
+  if (!data.email) {
+    throw new ValidationError('Email is required');
+  }
+  
+  if (!data.password) {
+    throw new ValidationError('Password is required');
+  }
+  
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(data.email)) {
+    throw new ValidationError('Invalid email format');
+  }
+  
+  // Validate password strength
+  if (data.password.length < 8) {
+    throw new ValidationError('Password must be at least 8 characters long');
+  }
+  
+  // Validate role if provided
+  if (data.role) {
+    const validRoles = ['admin', 'manager', 'mitarbeiter', 'benutzer'];
+    if (!validRoles.includes(data.role)) {
+      throw new ValidationError(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
     }
   }
-
-  /**
-   * Update user password
-   * @param id - User ID
-   * @param data - Password update DTO
-   * @param options - Update options
-   * @returns Success message
-   */
-  async updatePassword(
-    id: number,
-    data: PasswordUpdateDTO,
-    options: UpdateOptions = {}
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      // Validate password data
-      const { current_password, new_password, confirm_password } = data;
-      
-      validateRequired(current_password, 'Current password');
-      validateRequired(new_password, 'New password', 8);
-      validateRequired(confirm_password, 'Confirm password');
-      
-      if (new_password !== confirm_password) {
-        throw new ValidationError('New passwords do not match');
-      }
-      
-      // Get user with password
-      const user = await this.repository.findById(id, {
-        select: {
-          id: true,
-          password: true
-        }
-      });
-      
-      if (!user) {
-        throw new NotFoundError(`User with ID ${id} not found`);
-      }
-      
-      // Verify current password
-      const passwordMatches = await bcrypt.compare(
-        current_password, 
-        user.password
-      );
-      
-      if (!passwordMatches) {
-        throw new UnauthorizedError('Current password is incorrect');
-      }
-      
-      // Hash new password
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(new_password, saltRounds);
-      
-      // Update password in database
-      await this.repository.update(id, {
-        password: hashedPassword,
-        updatedAt: new Date()
-      });
-      
-      // Log the activity
-      if (options.userContext?.userId || options.userId) {
-        await this.repository.logSimpleActivity(
-          id,
-          'password_changed',
-          options.userContext?.ipAddress || null
-        );
-      }
-      
-      return {
-        success: true,
-        message: 'Password updated successfully'
-      };
-    } catch (error) {
-      this.handleError(error, `Error updating password for user with ID ${id}`, { id });
+  
+  // Validate status if provided
+  if (data.status) {
+    const validStatuses = ['aktiv', 'inaktiv', 'gesperrt'];
+    if (!validStatuses.includes(data.status)) {
+      throw new ValidationError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     }
-  }
-
-  /**
-   * Update notification settings
-   * @param id - User ID
-   * @param data - Notification settings update DTO
-   * @param options - Update options
-   * @returns Success message
-   */
-  async updateNotificationSettings(
-    id: number,
-    data: NotificationSettingsUpdateDTO,
-    options: UpdateOptions = {}
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      // Get user
-      const user = await this.repository.findById(id);
-      
-      if (!user) {
-        throw new NotFoundError(`User with ID ${id} not found`);
-      }
-      
-      // Helper function to convert to boolean
-      const toBool = (value: any): boolean => {
-        return value === true || 
-              (typeof value === 'string' && (
-                value === 'on' || 
-                value === 'true' || 
-                value === '1'
-              ));
-      };
-      
-      // Prepare settings data
-      const settingsData = {
-        emailNotifications: toBool(data.benachrichtigungen_email),
-        pushNotifications: toBool(data.benachrichtigungen_push),
-        notificationInterval: data.benachrichtigungen_intervall || 'sofort'
-      };
-      
-      // Update settings
-      await this.repository.updateUserSettings(id, settingsData);
-      
-      // Log activity
-      if (options.userContext?.userId || options.userId) {
-        await this.repository.logSimpleActivity(
-          id,
-          'notification_settings_updated',
-          options.userContext?.ipAddress || null
-        );
-      }
-      
-      return {
-        success: true,
-        message: 'Notification settings updated successfully'
-      };
-    } catch (error) {
-      this.handleError(error, `Error updating notification settings for user with ID ${id}`, { id, data });
-    }
-  }
-
-  /**
-   * Request password reset
-   * @param email - User email
-   * @returns Reset token info or null if user not found
-   */
-  async requestPasswordReset(email: string): Promise<{ token: string; userId: number; email: string } | null> {
-    try {
-      // Find user by email
-      const user = await this.repository.findByEmail(email);
-      
-      if (!user) {
-        return null;
-      }
-      
-      // Generate token
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const hashedToken = crypto
-        .createHash('sha256')
-        .update(resetToken)
-        .digest('hex');
-      
-      // Set token expiry to 1 hour
-      const expiry = new Date();
-      expiry.setHours(expiry.getHours() + 1);
-      
-      // Save token to database
-      await this.repository.createPasswordResetToken(
-        user.id,
-        hashedToken,
-        expiry
-      );
-      
-      return {
-        userId: user.id,
-        email: user.email,
-        token: resetToken
-      };
-    } catch (error) {
-      this.handleError(error, `Error requesting password reset for email ${email}`);
-    }
-  }
-
-  /**
-   * Validate reset token
-   * @param token - Reset token
-   * @returns User ID and email if token is valid
-   */
-  async validateResetToken(token: string): Promise<{ userId: number; email: string } | null> {
-    try {
-      // Hash the token
-      const hashedToken = crypto
-        .createHash('sha256')
-        .update(token)
-        .digest('hex');
-      
-      // Find user with this token and valid expiry
-      const user = await this.repository.findByResetToken(hashedToken);
-      
-      if (!user) {
-        return null;
-      }
-      
-      return {
-        userId: user.id,
-        email: user.email
-      };
-    } catch (error) {
-      this.handleError(error, 'Error validating reset token');
-    }
-  }
-
-  /**
-   * Reset password using token
-   * @param token - Reset token
-   * @param password - New password
-   * @param confirmPassword - Confirm new password
-   * @returns Success message
-   */
-  async resetPassword(
-    token: string,
-    password: string,
-    confirmPassword: string
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      // Validate passwords
-      if (!password || !confirmPassword) {
-        throw new ValidationError('Please enter and confirm your new password');
-      }
-      
-      if (password !== confirmPassword) {
-        throw new ValidationError('Passwords do not match');
-      }
-      
-      if (password.length < 8) {
-        throw new ValidationError('Password must be at least 8 characters long');
-      }
-      
-      // Hash the token
-      const hashedToken = crypto
-        .createHash('sha256')
-        .update(token)
-        .digest('hex');
-      
-      // Find user with this token and valid expiry
-      const user = await this.repository.findByResetToken(hashedToken);
-      
-      if (!user) {
-        throw new ValidationError('Invalid or expired token');
-      }
-      
-      // Hash new password
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
-      
-      // Update user's password and clear reset token
-      await this.repository.update(user.id, {
-        password: hashedPassword,
-        resetToken: null,
-        resetTokenExpiry: null,
-        updatedAt: new Date()
-      });
-      
-      // Log activity
-      await this.repository.logSimpleActivity(
-        user.id,
-        'password_reset',
-        null
-      );
-      
-      return {
-        success: true,
-        message: 'Password has been reset successfully'
-      };
-    } catch (error) {
-      this.handleError(error, 'Error resetting password');
-    }
-  }
-
-  /**
-   * Validate profile update data
-   * @param id - User ID
-   * @param data - Profile update data
-   * @throws ValidationError if validation fails
-   */
-  protected async validateProfileUpdate(id: number, data: ProfileUpdateDTO): Promise<void> {
-    // Validate required fields
-    validateRequired(data.name, 'Name');
-    validateEmail(data.email);
-    
-    // Get current user data for comparison
-    const user = await this.repository.findById(id);
-    
-    if (!user) {
-      throw new NotFoundError(`User with ID ${id} not found`);
-    }
-    
-    // Check if email is unique (if changed)
-    if (data.email !== user.email) {
-      const emailExists = await this.repository.findByEmail(data.email);
-      
-      if (emailExists && emailExists.id !== id) {
-        throw new ConflictError('Email address is already in use');
-      }
-    }
-  }
-
-  /**
-   * Map entity to DTO - not used for this service
-   */
-  protected mapEntityToDTO(entity: User): any {
-    // No standard DTO mapping needed
-    return entity;
   }
 }
 
+/**
+ * Get user role label
+ * @param role - Role code
+ * @returns Formatted role label
+ */
+private getRoleLabel(role: string): string {
+  switch (role) {
+    case 'admin':
+      return 'Administrator';
+    case 'manager':
+      return 'Manager';
+    case 'mitarbeiter':
+      return 'Mitarbeiter';
+    case 'benutzer':
+      return 'Benutzer';
+    default:
+      return role;
+  }
+}
 
+/**
+ * Get user status label
+ * @param status - Status code
+ * @returns Formatted status label
+ */
+private getStatusLabel(status: string): string {
+  switch (status) {
+    case 'aktiv':
+      return 'Aktiv';
+    case 'inaktiv':
+      return 'Inaktiv';
+    case 'gesperrt':
+      return 'Gesperrt';
+    default:
+      return status;
+  }
+}
+
+/**
+ * Get status CSS class
+ * @param status - Status code
+ * @returns CSS class name
+ */
+private getStatusClass(status: string): string {
+  switch (status) {
+    case 'aktiv':
+      return 'success';
+    case 'inaktiv':
+      return 'secondary';
+    case 'gesperrt':
+      return 'danger';
+    default:
+      return 'secondary';
+  }
+}
+
+/**
+ * Get user initials from name
+ * @param name - User name
+ * @returns Initials (max 2 characters)
+ */
+private getInitials(name: string): string {
+  if (!name) return '';
+  
+  const parts = name.split(' ').filter(part => part.length > 0);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+}
 
 // Export singleton instance
 export const userService = new UserService();

@@ -418,3 +418,8 @@ export class RequestService extends BaseService<
     };
   }
 }
+
+/**
+ * Create and export default service instance for convenience
+ */
+export const requestService = new RequestService();

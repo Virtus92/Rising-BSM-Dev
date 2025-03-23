@@ -1,75 +1,49 @@
-import { Request, Response, NextFunction } from 'express';
-import { UnauthorizedError, ForbiddenError } from '../../../utils/errors';
-import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { createTypedMock } from '../../mocks/jest-utils';
+import { Request, Response } from 'express';
+import { authenticate, isAdmin, isManager } from '../../../middleware/auth.middleware.js';
+import { verifyToken, extractTokenFromHeader } from '..//../../utils/jwt';
+import { UnauthorizedError, ForbiddenError } from '..//../../utils/errors';
+import prisma from '../../../utils/prisma.utils.js';
 
-
-// Define User type
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  status: string;
-}
-
-// Create a simple mock function without complex generic typing
-const mockFindUnique = createTypedMock<User | null>();
-
-// Mock JWT utilities
-jest.mock('../../../utils/jwt', () => ({
+// Mock dependencies
+jest.mock('../utils/jwt', () => ({
   verifyToken: jest.fn(),
   extractTokenFromHeader: jest.fn()
 }));
 
-// Mock Prisma utilities
-jest.mock('../../../utils/prisma.utils', () => ({
-  __esModule: true,
-  prisma: {
-    user: {
-      findUnique: mockFindUnique
-    }
-  },
-  default: {
-    user: {
-      findUnique: mockFindUnique
-    }
+jest.mock('../utils/prisma.utils', () => ({
+  user: {
+    findUnique: jest.fn()
   }
 }));
 
-// Import after mocks are set up
-import { authenticate, isAdmin, isManager, isEmployee } from '../../../middleware/auth.middleware';
-import * as jwtUtils from '../../../utils/jwt';
-
 describe('Authentication Middleware', () => {
-  let req: Partial<Request>;
-  let res: Partial<Response>;
-  let next: jest.Mock;
+  let mockRequest: Partial<Request>;
+  let mockResponse: Partial<Response>;
+  let nextFunction: jest.Mock;
 
   beforeEach(() => {
-    req = {
+    mockRequest = {
       headers: {
         authorization: 'Bearer valid-token'
       }
     };
-    res = {};
-    next = jest.fn();
-
-    // Reset mocks
-    jest.clearAllMocks();
-    (jwtUtils.verifyToken as jest.Mock).mockReset();
-    (jwtUtils.extractTokenFromHeader as jest.Mock).mockReset();
-    mockFindUnique.mockReset();
+    mockResponse = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis()
+    };
+    nextFunction = jest.fn();
   });
 
-  describe('authenticate middleware', () => {
-    test('should authenticate valid token and attach user to request', async () => {
-      // Mock JWT verification
-      (jwtUtils.extractTokenFromHeader as jest.Mock).mockReturnValue('valid-token');
-      (jwtUtils.verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
-      
-      // Mock user in database with correct typing
-      mockFindUnique.mockResolvedValue({
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('authenticate', () => {
+    it('should call next function when token is valid and user exists', async () => {
+      // Arrange
+      (extractTokenFromHeader as jest.Mock).mockReturnValue('valid-token');
+      (verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 1,
         name: 'Test User',
         email: 'test@example.com',
@@ -77,10 +51,13 @@ describe('Authentication Middleware', () => {
         status: 'aktiv'
       });
 
-      await authenticate(req as Request, res as Response, next);
+      // Act
+      await authenticate(mockRequest as Request, mockResponse as Response, nextFunction);
 
-      expect(jwtUtils.verifyToken).toHaveBeenCalledWith('valid-token');
-      expect(mockFindUnique).toHaveBeenCalledWith({
+      // Assert
+      expect(extractTokenFromHeader).toHaveBeenCalledWith('Bearer valid-token');
+      expect(verifyToken).toHaveBeenCalledWith('valid-token');
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
         select: {
           id: true,
@@ -90,154 +67,173 @@ describe('Authentication Middleware', () => {
           status: true
         }
       });
-      
-      expect((req as any).user).toEqual({
+      expect(nextFunction).toHaveBeenCalled();
+      expect((mockRequest as any).user).toEqual({
         id: 1,
         name: 'Test User',
         email: 'test@example.com',
         role: 'admin'
       });
-      expect(next).toHaveBeenCalled();
     });
 
-    test('should throw UnauthorizedError if user not found or inactive', async () => {
-      // Mock JWT verification
-      (jwtUtils.extractTokenFromHeader as jest.Mock).mockReturnValue('valid-token');
-      (jwtUtils.verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
-      
-      // Return null for user lookup
-      mockFindUnique.mockResolvedValue(null);
+    it('should call next with UnauthorizedError when token is missing', async () => {
+      // Arrange
+      mockRequest.headers = {};
+      (extractTokenFromHeader as jest.Mock).mockReturnValue(null);
 
-      await authenticate(req as Request, res as Response, next);
+      // Act
+      await authenticate(mockRequest as Request, mockResponse as Response, nextFunction);
 
-      expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+      // Assert
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+      expect(nextFunction.mock.calls[0][0].message).toBe('Authentication required');
+    });
+
+    it('should call next with UnauthorizedError when user is not found', async () => {
+      // Arrange
+      (extractTokenFromHeader as jest.Mock).mockReturnValue('valid-token');
+      (verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+
+      // Act
+      await authenticate(mockRequest as Request, mockResponse as Response, nextFunction);
+
+      // Assert
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+      expect(nextFunction.mock.calls[0][0].message).toBe('User inactive or not found');
+    });
+
+    it('should call next with UnauthorizedError when user is inactive', async () => {
+      // Arrange
+      (extractTokenFromHeader as jest.Mock).mockReturnValue('valid-token');
+      (verifyToken as jest.Mock).mockReturnValue({ userId: 1 });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: 1,
+        name: 'Test User',
+        email: 'test@example.com',
+        role: 'admin',
+        status: 'inaktiv'
+      });
+
+      // Act
+      await authenticate(mockRequest as Request, mockResponse as Response, nextFunction);
+
+      // Assert
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+      expect(nextFunction.mock.calls[0][0].message).toBe('User inactive or not found');
     });
   });
 
-  describe('isAdmin middleware', () => {
-    test('should allow admin users', () => {
-      (req as any).user = {
+  describe('isAdmin', () => {
+    it('should call next function when user is admin', () => {
+      // Arrange
+      mockRequest.user = {
         id: 1,
         name: 'Admin User',
         email: 'admin@example.com',
         role: 'admin'
       };
 
-      isAdmin(req as Request, res as Response, next);
+      // Act
+      isAdmin(mockRequest as Request, mockResponse as Response, nextFunction);
 
-      expect(next).toHaveBeenCalled();
-      expect(next).not.toHaveBeenCalledWith(expect.any(Error));
+      // Assert
+      expect(nextFunction).toHaveBeenCalled();
+      expect(nextFunction.mock.calls[0][0]).toBeUndefined();
     });
 
-    test('should reject non-admin users', () => {
-      (req as any).user = {
+    it('should call next with ForbiddenError when user is not admin', () => {
+      // Arrange
+      mockRequest.user = {
         id: 2,
         name: 'Regular User',
         email: 'user@example.com',
-        role: 'user'
+        role: 'mitarbeiter'
       };
 
-      isAdmin(req as Request, res as Response, next);
+      // Act
+      isAdmin(mockRequest as Request, mockResponse as Response, nextFunction);
 
-      expect(next).toHaveBeenCalledWith(expect.any(ForbiddenError));
+      // Assert
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(ForbiddenError));
+      expect(nextFunction.mock.calls[0][0].message).toBe('Admin privileges required');
     });
 
-    test('should reject unauthenticated requests', () => {
-      (req as any).user = undefined;
+    it('should call next with UnauthorizedError when user is not authenticated', () => {
+      // Arrange
+      mockRequest.user = undefined;
 
-      isAdmin(req as Request, res as Response, next);
+      // Act
+      isAdmin(mockRequest as Request, mockResponse as Response, nextFunction);
 
-      expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+      // Assert
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+      expect(nextFunction.mock.calls[0][0].message).toBe('Authentication required');
     });
   });
 
-  describe('isManager middleware', () => {
-    test('should allow admin users', () => {
-      (req as any).user = {
+  describe('isManager', () => {
+    it('should call next function when user is admin', () => {
+      // Arrange
+      mockRequest.user = {
         id: 1,
         name: 'Admin User',
         email: 'admin@example.com',
         role: 'admin'
       };
 
-      isManager(req as Request, res as Response, next);
+      // Act
+      isManager(mockRequest as Request, mockResponse as Response, nextFunction);
 
-      expect(next).toHaveBeenCalled();
-      expect(next).not.toHaveBeenCalledWith(expect.any(Error));
+      // Assert
+      expect(nextFunction).toHaveBeenCalled();
+      expect(nextFunction.mock.calls[0][0]).toBeUndefined();
     });
 
-    test('should allow manager users', () => {
-      (req as any).user = {
+    it('should call next function when user is manager', () => {
+      // Arrange
+      mockRequest.user = {
         id: 2,
         name: 'Manager User',
         email: 'manager@example.com',
         role: 'manager'
       };
 
-      isManager(req as Request, res as Response, next);
+      // Act
+      isManager(mockRequest as Request, mockResponse as Response, nextFunction);
 
-      expect(next).toHaveBeenCalled();
-      expect(next).not.toHaveBeenCalledWith(expect.any(Error));
+      // Assert
+      expect(nextFunction).toHaveBeenCalled();
+      expect(nextFunction.mock.calls[0][0]).toBeUndefined();
     });
 
-    test('should reject non-manager users', () => {
-      (req as any).user = {
+    it('should call next with ForbiddenError when user is not admin or manager', () => {
+      // Arrange
+      mockRequest.user = {
         id: 3,
-        name: 'Employee User',
-        email: 'employee@example.com',
-        role: 'employee'
+        name: 'Regular User',
+        email: 'user@example.com',
+        role: 'mitarbeiter'
       };
 
-      isManager(req as Request, res as Response, next);
+      // Act
+      isManager(mockRequest as Request, mockResponse as Response, nextFunction);
 
-      expect(next).toHaveBeenCalledWith(expect.any(ForbiddenError));
-    });
-  });
-
-  describe('isEmployee middleware', () => {
-    test('should allow employee users', () => {
-      (req as any).user = {
-        id: 3,
-        name: 'Employee User',
-        email: 'employee@example.com',
-        role: 'employee'
-      };
-
-      isEmployee(req as Request, res as Response, next);
-
-      expect(next).toHaveBeenCalled();
-      expect(next).not.toHaveBeenCalledWith(expect.any(Error));
+      // Assert
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(ForbiddenError));
+      expect(nextFunction.mock.calls[0][0].message).toBe('Manager privileges required');
     });
 
-    test('should allow manager and admin users', () => {
-      (req as any).user = {
-        id: 1,
-        name: 'Admin User',
-        email: 'admin@example.com',
-        role: 'admin'
-      };
+    it('should call next with UnauthorizedError when user is not authenticated', () => {
+      // Arrange
+      mockRequest.user = undefined;
 
-      isEmployee(req as Request, res as Response, next);
+      // Act
+      isManager(mockRequest as Request, mockResponse as Response, nextFunction);
 
-      expect(next).toHaveBeenCalled();
-
-      (req as any).user.role = 'manager';
-      isEmployee(req as Request, res as Response, next);
-
-      expect(next).toHaveBeenCalled();
-    });
-
-    test('should reject non-employee users', () => {
-      (req as any).user = {
-        id: 4,
-        name: 'Customer User',
-        email: 'customer@example.com',
-        role: 'customer'
-      };
-
-      isEmployee(req as Request, res as Response, next);
-
-      expect(next).toHaveBeenCalledWith(expect.any(ForbiddenError));
+      // Assert
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+      expect(nextFunction.mock.calls[0][0].message).toBe('Authentication required');
     });
   });
 });

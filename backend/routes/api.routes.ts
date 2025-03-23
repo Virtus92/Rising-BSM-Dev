@@ -9,13 +9,14 @@ import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
 // Import route modules
 import projectRoutes from './project.routes.js';
 import customerRoutes from './customer.routes.js';
-// Import other route modules as they are implemented
-// import appointmentRoutes from './appointment.routes.js';
-// import serviceRoutes from './service.routes.js';
-// import requestRoutes from './request.routes.js';
-// import profileRoutes from './profile.routes.js';
-// import dashboardRoutes from './dashboard.routes.js';
-// import settingsRoutes from './settings.routes.js';
+import appointmentRoutes from './appointment.routes.js';
+import serviceRoutes from './service.routes.js';
+import requestRoutes from './request.routes.js';
+import profileRoutes from './profile.routes.js';
+import dashboardRoutes from './dashboard.routes.js';
+import settingsRoutes from './settings.routes.js';
+import notificationRoutes from './notification.routes.js';
+import userRoutes from './user.routes.js';
 
 // Create router
 const router = Router();
@@ -23,14 +24,14 @@ const router = Router();
 // Mount routes
 router.use('/projects', projectRoutes);
 router.use('/customers', customerRoutes);
-
-// Mount other routes as they are implemented
-// router.use('/appointments', appointmentRoutes);
-// router.use('/services', serviceRoutes);
-// router.use('/requests', requestRoutes);
-// router.use('/profile', profileRoutes);
-// router.use('/dashboard', dashboardRoutes);
-// router.use('/settings', settingsRoutes);
+router.use('/appointments', appointmentRoutes);
+router.use('/services', serviceRoutes);
+router.use('/requests', requestRoutes);
+router.use('/profile', profileRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/settings', settingsRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/users', userRoutes);
 
 /**
  * @route GET /api/v1/health
