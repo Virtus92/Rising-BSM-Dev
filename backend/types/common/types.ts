@@ -99,30 +99,6 @@ export interface BaseDTO {
     sortDirection?: 'asc' | 'desc';
   }
   
-  /**
-   * DTO for request filtering
-   */
-  export interface RequestFilterDTO extends BaseFilterDTO {
-    /**
-     * Filter by status
-     */
-    status?: string;
-
-    /**
-     * Filter by service type
-     */
-    service?: string;
-
-    /**
-     * Filter by date range (from)
-     */
-    dateFrom?: string;
-
-    /**
-     * Filter by date range (to)
-     */
-    dateTo?: string;
-  }
 
   /**
    * Common status values used across the application

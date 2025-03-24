@@ -16,8 +16,5 @@ export * from './dtos/customer.dto.js';
 export * from './dtos/project.dto.js';
 export * from './dtos/appointment.dto.js';
 export * from './dtos/service.dto.js';
-export * from './dtos/contact-request.dto.js';
+export * from './dtos/request.dto.js';
 export * from './dtos/auth.dto.js';
-
-// Make previous imports available for legacy code
-export { AuthUser, AuthenticatedRequest } from './common/types.js';

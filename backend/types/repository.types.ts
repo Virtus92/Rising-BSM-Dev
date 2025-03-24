@@ -4,6 +4,7 @@
  * Type definitions for repositories and their operations.
  */
 import { SortDirection } from './common/types.js';
+import { TransactionClient } from '@prisma/client';
 
 /**
  * Common options for repository operations
@@ -130,15 +131,10 @@ export interface TransactionOptions {
   isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable';
 }
 
-/**
- * Transaction client for use in transaction callbacks
- */
-export interface TransactionClient {
-  [key: string]: any;
-}
-
-/**
- * Filter criteria for queries
+/** 
+ * Filter criteria for database queries.
+ * Key-value pairs that map to entity fields.
+ * Example: `{ userId: 5, status: 'active' }`
  */
 export interface FilterCriteria {
   [key: string]: any;

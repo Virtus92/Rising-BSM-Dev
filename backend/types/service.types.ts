@@ -15,11 +15,7 @@ export interface ServiceOptions extends BaseOptions {
 /**
  * Options for retrieving multiple records
  */
-export interface FindAllOptions extends ServiceOptions, PaginationOptions, SortOptions {
-  // Fields moved to core types but preserved here for backward compatibility
-  orderBy?: string;
-  orderDirection?: 'asc' | 'desc';
-}
+export interface FindAllOptions extends ServiceOptions, PaginationOptions, SortOptions {}
 
 /**
  * Options for retrieving a single record
