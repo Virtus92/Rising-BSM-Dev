@@ -24,7 +24,7 @@ import requestLogger from './middleware/request-logger.middleware.js';
 
 // Import routes
 import apiRoutes from './routes/api.routes.js';
-// import authRoutes from './routes/auth.routes.js'; 
+import authRoutes from './routes/auth.routes.js'; 
 // import { submitContact } from './controllers/contact.controller.js';
 
 // Apply middleware
@@ -66,7 +66,7 @@ const contactLimiter = rateLimit({
 });
 
 // Apply rate limiting to API routes
-app.use('/api', apiLimiter);
+app.use('/api/v1', apiLimiter);
 
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response) => {

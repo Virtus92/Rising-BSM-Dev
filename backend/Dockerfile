@@ -5,8 +5,10 @@ WORKDIR /app
 # Install OpenSSL which is needed by Prisma
 RUN apk add --no-cache openssl
 
-# Copy package files and install dependencies
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
 RUN npm install
 RUN npm install -g tsx
 
@@ -19,7 +21,6 @@ ENV DATABASE_URL=postgresql://postgres:postgres@db:5432/rising_bsm?schema=public
 
 # Copy the rest of the application
 COPY . .
-
 
 RUN chmod +x wait-for-db.sh
 

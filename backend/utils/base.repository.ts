@@ -5,7 +5,7 @@
  * Serves as a foundation for specialized entity repositories.
  */
 import { PrismaClient } from '@prisma/client';
-import logger from './logger.js';
+import {logger } from './common.utils.js';
 import { 
   FindOptions, 
   FindManyOptions, 

@@ -7,7 +7,7 @@
 import jwt from 'jsonwebtoken';
 import { UnauthorizedError } from './error.utils.js';
 import { logger } from './common.utils.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs'; // Changed from bcrypt to bcryptjs
 import config from '../config/index.js';
 
 // JWT configuration
@@ -63,7 +63,7 @@ export const generateToken = (payload: TokenPayload): string => {
   return jwt.sign(
     payload,
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
+    { expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] }
   );
 };
 
@@ -104,7 +104,7 @@ export const generateRefreshToken = (userId: number, tokenId?: string): string =
   return jwt.sign(
     payload,
     JWT_REFRESH_SECRET,
-    { expiresIn: JWT_REFRESH_EXPIRES_IN as  }
+    { expiresIn: JWT_REFRESH_EXPIRES_IN as jwt.SignOptions['expiresIn'] }
   );
 };
 

@@ -13,7 +13,7 @@ import {
   DeleteOptions 
 } from '../types/service.types.js';
 import { PaginationResult } from '../types/core.types.js';
-import logger from './logger.js';
+import { logger } from './common.utils.js';
 
 /**
  * Abstract base service providing common business logic operations
@@ -90,12 +90,11 @@ export abstract class BaseService<
       if (!entity && !options.throwIfNotFound) {
         return null;
       }
-      
+      let details: { entityId: number, entityType: string } = { entityId: id, entityType: this.getEntityName() };
       // Throw error if entity not found and throwIfNotFound is true
       if (!entity && options.throwIfNotFound) {
         throw new NotFoundError(
-          `Entity with ID ${id} not found`,
-          { entityId: id, entityType: this.getEntityName() }
+          `Entity with ID ${id} not found. Details: ${JSON.stringify(details)}`
         );
       }
       
