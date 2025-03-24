@@ -1,0 +1,298 @@
+Customer:
+  type: object
+  required:
+    - id
+    - name
+    - status
+    - kundentyp
+  properties:
+    id:
+      type: integer
+      description: Customer ID (auto-generated)
+    name:
+      type: string
+      description: Customer name
+    firma:
+      type: string
+      nullable: true
+      description: Company name
+    email:
+      type: string
+      format: email
+      description: Customer email address
+    telefon:
+      type: string
+      nullable: true
+      description: Phone number
+    adresse:
+      type: string
+      nullable: true
+      description: Street address
+    plz:
+      type: string
+      nullable: true
+      description: Postal code
+    ort:
+      type: string
+      nullable: true
+      description: City
+    notizen:
+      type: string
+      nullable: true
+      description: Notes about the customer
+    newsletter:
+      type: boolean
+      description: Newsletter subscription status
+    status:
+      type: string
+      enum: [aktiv, inaktiv, geloescht]
+      description: Customer status
+    statusLabel:
+      type: string
+      description: Formatted status label
+    statusClass:
+      type: string
+      description: CSS class for status
+    kundentyp:
+      type: string
+      enum: [privat, geschaeft]
+      description: Customer type
+    kundentypLabel:
+      type: string
+      description: Formatted customer type label
+    created_at:
+      type: string
+      format: date-time
+      description: Timestamp of customer creation
+    updated_at:
+      type: string
+      format: date-time
+      description: Timestamp of last update
+
+CustomerCreate:
+  type: object
+  required:
+    - name
+    - email
+  properties:
+    name:
+      type: string
+      description: Customer name
+      minLength: 2
+      maxLength: 100
+    firma:
+      type: string
+      description: Company name
+      maxLength: 100
+      nullable: true
+    email:
+      type: string
+      format: email
+      description: Customer email address
+    telefon:
+      type: string
+      description: Phone number
+      maxLength: 30
+      nullable: true
+    adresse:
+      type: string
+      description: Street address
+      maxLength: 200
+      nullable: true
+    plz:
+      type: string
+      description: Postal code
+      maxLength: 10
+      nullable: true
+    ort:
+      type: string
+      description: City
+      maxLength: 100
+      nullable: true
+    notizen:
+      type: string
+      description: Notes about the customer
+      maxLength: 2000
+      nullable: true
+    newsletter:
+      type: boolean
+      description: Newsletter subscription status
+      default: false
+    status:
+      type: string
+      enum: [aktiv, inaktiv, geloescht]
+      default: aktiv
+      description: Customer status
+    kundentyp:
+      type: string
+      enum: [privat, geschaeft]
+      default: privat
+      description: Customer type
+
+CustomerUpdate:
+  type: object
+  properties:
+    name:
+      type: string
+      description: Customer name
+      minLength: 2
+      maxLength: 100
+    firma:
+      type: string
+      description: Company name
+      maxLength: 100
+      nullable: true
+    email:
+      type: string
+      format: email
+      description: Customer email address
+    telefon:
+      type: string
+      description: Phone number
+      maxLength: 30
+      nullable: true
+    adresse:
+      type: string
+      description: Street address
+      maxLength: 200
+      nullable: true
+    plz:
+      type: string
+      description: Postal code
+      maxLength: 10
+      nullable: true
+    ort:
+      type: string
+      description: City
+      maxLength: 100
+      nullable: true
+    notizen:
+      type: string
+      description: Notes about the customer
+      maxLength: 2000
+      nullable: true
+    newsletter:
+      type: boolean
+      description: Newsletter subscription status
+    status:
+      type: string
+      enum: [aktiv, inaktiv, geloescht]
+      description: Customer status
+    kundentyp:
+      type: string
+      enum: [privat, geschaeft]
+      description: Customer type
+
+CustomerStatusUpdate:
+  type: object
+  required:
+    - status
+  properties:
+    status:
+      type: string
+      enum: [aktiv, inaktiv, geloescht]
+      description: New customer status
+    note:
+      type: string
+      description: Optional note about the status change
+      maxLength: 1000
+
+CustomerNote:
+  type: object
+  required:
+    - note
+  properties:
+    note:
+      type: string
+      description: Note text
+      minLength: 1
+      maxLength: 1000
+
+CustomerWithDetails:
+  allOf:
+    - $ref: '#/Customer'
+    - type: object
+      properties:
+        projects:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              datum:
+                type: string
+              status:
+                type: string
+              statusLabel:
+                type: string
+              statusClass:
+                type: string
+        appointments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              datum:
+                type: string
+              status:
+                type: string
+              statusLabel:
+                type: string
+              statusClass:
+                type: string
+        notes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              text:
+                type: string
+              userName:
+                type: string
+              formattedDate:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+
+CustomerStatistics:
+  type: object
+  properties:
+    total:
+      type: integer
+      description: Total number of customers
+    active:
+      type: integer
+      description: Number of active customers
+    inactive:
+      type: integer
+      description: Number of inactive customers
+    deleted:
+      type: integer
+      description: Number of deleted customers
+    byType:
+      type: object
+      properties:
+        privat:
+          type: integer
+        geschaeft:
+          type: integer
+    growth:
+      type: array
+      description: Customer growth over time
+      items:
+        type: object
+        properties:
+          month:
+            type: string
+          count:
+            type: integer

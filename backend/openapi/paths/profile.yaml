@@ -1,0 +1,300 @@
+profile:
+  get:
+    tags:
+      - Profile
+    summary: Get user profile
+    description: Retrieve current user profile information
+    operationId: getUserProfile
+    responses:
+      '200':
+        description: User profile
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    user:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        email:
+                          type: string
+                        telefon:
+                          type: string
+                        rolle:
+                          type: string
+                        profilbild:
+                          type: string
+                        seit:
+                          type: string
+                    settings:
+                      type: object
+                      properties:
+                        sprache:
+                          type: string
+                        dark_mode:
+                          type: boolean
+                        benachrichtigungen_email:
+                          type: boolean
+                        benachrichtigungen_push:
+                          type: boolean
+                        benachrichtigungen_intervall:
+                          type: string
+                    activity:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                          ip:
+                            type: string
+                          date:
+                            type: string
+                message:
+                  type: string
+                  example: "Profile retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '400':
+        description: User not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
+
+  put:
+    tags:
+      - Profile
+    summary: Update user profile
+    description: Update current user's profile information
+    operationId: updateProfile
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+            properties:
+              name:
+                type: string
+                minLength: 2
+                description: Full name
+              email:
+                type: string
+                format: email
+                description: Email address
+              telefon:
+                type: string
+                description: Phone number
+    responses:
+      '200':
+        description: Profile updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    user:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        email:
+                          type: string
+                        telefon:
+                          type: string
+                message:
+                  type: string
+                  example: "Profile updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+profile-password:
+  put:
+    tags:
+      - Profile
+    summary: Update password
+    description: Change current user's password
+    operationId: updatePassword
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - current_password
+              - new_password
+              - confirm_password
+            properties:
+              current_password:
+                type: string
+                format: password
+                description: Current password
+              new_password:
+                type: string
+                format: password
+                minLength: 8
+                description: New password
+              confirm_password:
+                type: string
+                format: password
+                description: Confirm new password
+    responses:
+      '200':
+        description: Password updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                message:
+                  type: string
+                  example: "Password updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+profile-picture:
+  post:
+    tags:
+      - Profile
+    summary: Update profile picture
+    description: Upload a new profile picture
+    operationId: updateProfilePicture
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required:
+              - file
+            properties:
+              file:
+                type: string
+                format: binary
+                description: Image file
+    responses:
+      '200':
+        description: Profile picture updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    imagePath:
+                      type: string
+                message:
+                  type: string
+                  example: "Profile picture updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+profile-notifications:
+  put:
+    tags:
+      - Profile
+    summary: Update notification settings
+    description: Change notification preferences
+    operationId: updateNotificationSettings
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              benachrichtigungen_email:
+                type: boolean
+              benachrichtigungen_push:
+                type: boolean
+              benachrichtigungen_intervall:
+                type: string
+                enum: [sofort, taeglich, woechentlich]
+    responses:
+      '200':
+        description: Notification settings updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                message:
+                  type: string
+                  example: "Notification settings updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'

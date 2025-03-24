@@ -1,0 +1,473 @@
+projects:
+  get:
+    tags:
+      - Projects
+    summary: Get all projects
+    description: Retrieve list of projects with optional filtering and pagination
+    operationId: getAllProjects
+    parameters:
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+        description: Filter by status
+      - in: query
+        name: kunde_id
+        schema:
+          type: integer
+        description: Filter by customer ID
+      - in: query
+        name: dienstleistung_id
+        schema:
+          type: integer
+        description: Filter by service ID
+      - in: query
+        name: start_datum_von
+        schema:
+          type: string
+          format: date
+        description: Start date filter (from)
+      - in: query
+        name: start_datum_bis
+        schema:
+          type: string
+          format: date
+        description: Start date filter (to)
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search term for title and description
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+        description: Page number (1-based)
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+        description: Items per page
+      - in: query
+        name: sortBy
+        schema:
+          type: string
+          enum: [titel, start_datum, end_datum, betrag, status, created_at]
+          default: start_datum
+        description: Field to sort by
+      - in: query
+        name: sortDirection
+        schema:
+          type: string
+          enum: [asc, desc]
+          default: desc
+        description: Sort direction
+    responses:
+      '200':
+        description: List of projects
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    $ref: '../schemas/projects.yaml#/Project'
+                message:
+                  type: string
+                  example: "Projects retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    pagination:
+                      $ref: '../schemas/common.yaml#/Pagination'
+                    filters:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                        kunde_id:
+                          type: integer
+                        dienstleistung_id:
+                          type: integer
+                        search:
+                          type: string
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  post:
+    tags:
+      - Projects
+    summary: Create new project
+    description: Add a new project
+    operationId: createProject
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/projects.yaml#/ProjectCreate'
+    responses:
+      '201':
+        description: Project created
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/projects.yaml#/Project'
+                message:
+                  type: string
+                  example: "Project created successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-statistics:
+  get:
+    tags:
+      - Projects
+    summary: Get project statistics
+    description: Retrieve statistics about projects like status counts, values, trends
+    operationId: getProjectStatistics
+    parameters:
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+        description: Filter by status
+      - in: query
+        name: kunde_id
+        schema:
+          type: integer
+        description: Filter by customer ID
+      - in: query
+        name: dienstleistung_id
+        schema:
+          type: integer
+        description: Filter by service ID
+      - in: query
+        name: start_datum_von
+        schema:
+          type: string
+          format: date
+        description: Start date filter (from)
+      - in: query
+        name: start_datum_bis
+        schema:
+          type: string
+          format: date
+        description: Start date filter (to)
+    responses:
+      '200':
+        description: Project statistics
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/projects.yaml#/ProjectStatistics'
+                message:
+                  type: string
+                  example: "Project statistics retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-id:
+  get:
+    tags:
+      - Projects
+    summary: Get project by ID
+    description: Retrieve detailed project information with appointments and notes
+    operationId: getProjectById
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Project ID
+    responses:
+      '200':
+        description: Project details
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/projects.yaml#/ProjectWithDetails'
+                message:
+                  type: string
+                  example: "Project retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  put:
+    tags:
+      - Projects
+    summary: Update project
+    description: Update an existing project
+    operationId: updateProject
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Project ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/projects.yaml#/ProjectUpdate'
+    responses:
+      '200':
+        description: Project updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/projects.yaml#/Project'
+                message:
+                  type: string
+                  example: "Project updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-id-status:
+  patch:
+    tags:
+      - Projects
+    summary: Update project status
+    description: Change the status of a project
+    operationId: updateProjectStatus
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Project ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/projects.yaml#/ProjectStatusUpdate'
+    responses:
+      '200':
+        description: Status updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    status:
+                      type: string
+                    statusLabel:
+                      type: string
+                message:
+                  type: string
+                  example: "Project status updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-id-notes:
+  post:
+    tags:
+      - Projects
+    summary: Add note to project
+    description: Add a new note to an existing project
+    operationId: addProjectNote
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Project ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/projects.yaml#/ProjectNote'
+    responses:
+      '201':
+        description: Note added successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    text:
+                      type: string
+                    userName:
+                      type: string
+                    formattedDate:
+                      type: string
+                message:
+                  type: string
+                  example: "Note added successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+projects-export:
+  get:
+    tags:
+      - Projects
+    summary: Export projects
+    description: Export projects to a file (CSV or Excel)
+    operationId: exportProjects
+    parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum: [csv, excel]
+          default: excel
+        description: Export file format
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+        description: Filter by status
+      - in: query
+        name: startDate
+        schema:
+          type: string
+          format: date
+        description: Start date for filtering (YYYY-MM-DD)
+      - in: query
+        name: endDate
+        schema:
+          type: string
+          format: date
+        description: End date for filtering (YYYY-MM-DD)
+    responses:
+      '200':
+        description: File export successful
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema:
+              type: string
+              format: binary
+          text/csv:
+            schema:
+              type: string
+              format: binary
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '501':
+        description: Export functionality is not implemented yet
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: false
+                error:
+                  type: string
+                  example: "Export functionality is not implemented yet"

@@ -24,8 +24,8 @@ import requestLogger from './middleware/request-logger.middleware.js';
 
 // Import routes
 import apiRoutes from './routes/api.routes.js';
-import authRoutes from './routes/auth.routes.js'; 
-import { submitContact } from './controllers/contact.controller.js';
+// import authRoutes from './routes/auth.routes.js'; 
+// import { submitContact } from './controllers/contact.controller.js';
 
 // Apply middleware
 // CORS
@@ -167,11 +167,11 @@ if (config.IS_DEVELOPMENT) {
 }
 
 // Main API routes
-app.use('/api/v1/auth', authRoutes);
+// app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1', apiLimiter, apiRoutes);
 
 // Contact form route with rate limiting (public endpoint)
-app.post('/api/v1/contact', contactLimiter, submitContact);
+// app.post('/api/v1/contact', contactLimiter, submitContact);
 
 // Error handling middleware
 app.use(errorMiddleware.notFoundHandler);

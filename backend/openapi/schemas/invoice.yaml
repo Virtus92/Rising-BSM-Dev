@@ -1,0 +1,409 @@
+Invoice:
+  type: object
+  required:
+    - rechnungsnummer
+    - rechnungsdatum
+    - faelligkeitsdatum
+  properties:
+    id:
+      type: integer
+      description: Invoice ID (auto-generated)
+    rechnungsnummer:
+      type: string
+      description: Invoice number
+      maxLength: 50
+    projekt_id:
+      type: integer
+      nullable: true
+      description: ID of the associated project
+    kunde_id:
+      type: integer
+      nullable: true
+      description: ID of the associated customer
+    betrag:
+      type: number
+      format: float
+      description: Net amount
+      minimum: 0
+    mwst_betrag:
+      type: number
+      format: float
+      description: VAT amount
+      minimum: 0
+    gesamtbetrag:
+      type: number
+      format: float
+      description: Total amount (including VAT)
+      minimum: 0
+    rechnungsdatum:
+      type: string
+      format: date
+      description: Invoice date (YYYY-MM-DD)
+    faelligkeitsdatum:
+      type: string
+      format: date
+      description: Due date (YYYY-MM-DD)
+    bezahlt_am:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when invoice was paid
+    status:
+      type: string
+      enum: [offen, teilweise_bezahlt, bezahlt, storniert, ueberfaellig]
+      default: offen
+      description: Invoice status
+    created_at:
+      type: string
+      format: date-time
+      description: Timestamp of invoice creation
+    updated_at:
+      type: string
+      format: date-time
+      description: Timestamp of last update
+
+InvoiceCreate:
+  type: object
+  required:
+    - rechnungsdatum
+    - faelligkeitsdatum
+    - positionen
+  properties:
+    rechnungsnummer:
+      type: string
+      description: Invoice number (optional, auto-generated if not provided)
+      maxLength: 50
+    projekt_id:
+      type: integer
+      nullable: true
+      description: Project ID
+    kunde_id:
+      type: integer
+      nullable: true
+      description: Customer ID
+    rechnungsdatum:
+      type: string
+      format: date
+      description: Invoice date (YYYY-MM-DD)
+    faelligkeitsdatum:
+      type: string
+      format: date
+      description: Due date (YYYY-MM-DD)
+    status:
+      type: string
+      enum: [offen, teilweise_bezahlt, bezahlt, storniert, ueberfaellig]
+      default: offen
+      description: Invoice status
+    positionen:
+      type: array
+      items:
+        $ref: '#/InvoicePositionCreate'
+      minItems: 1
+      description: Invoice positions/items
+
+InvoiceUpdate:
+  type: object
+  properties:
+    rechnungsnummer:
+      type: string
+      description: Invoice number
+      maxLength: 50
+    projekt_id:
+      type: integer
+      nullable: true
+      description: Project ID
+    kunde_id:
+      type: integer
+      nullable: true
+      description: Customer ID
+    rechnungsdatum:
+      type: string
+      format: date
+      description: Invoice date (YYYY-MM-DD)
+    faelligkeitsdatum:
+      type: string
+      format: date
+      description: Due date (YYYY-MM-DD)
+    bezahlt_am:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when invoice was paid
+    status:
+      type: string
+      enum: [offen, teilweise_bezahlt, bezahlt, storniert, ueberfaellig]
+      description: Invoice status
+
+InvoiceStatusUpdate:
+  type: object
+  required:
+    - status
+  properties:
+    status:
+      type: string
+      enum: [offen, teilweise_bezahlt, bezahlt, storniert, ueberfaellig]
+      description: New invoice status
+    note:
+      type: string
+      description: Optional note about the status change
+      maxLength: 1000
+
+InvoicePosition:
+  type: object
+  required:
+    - rechnung_id
+    - dienstleistung_id
+    - anzahl
+    - einzelpreis
+  properties:
+    id:
+      type: integer
+      description: Position ID (auto-generated)
+    rechnung_id:
+      type: integer
+      description: Invoice ID
+    dienstleistung_id:
+      type: integer
+      description: Service ID
+    anzahl:
+      type: integer
+      description: Quantity
+      minimum: 1
+    einzelpreis:
+      type: number
+      format: float
+      description: Unit price
+      minimum: 0
+    created_at:
+      type: string
+      format: date-time
+      description: Timestamp of creation
+    updated_at:
+      type: string
+      format: date-time
+      description: Timestamp of last update
+
+InvoicePositionCreate:
+  type: object
+  required:
+    - dienstleistung_id
+    - anzahl
+    - einzelpreis
+  properties:
+    dienstleistung_id:
+      type: integer
+      description: Service ID
+    anzahl:
+      type: integer
+      description: Quantity
+      minimum: 1
+    einzelpreis:
+      type: number
+      format: float
+      description: Unit price
+      minimum: 0
+
+InvoiceFilter:
+  type: object
+  properties:
+    status:
+      type: string
+      enum: [offen, teilweise_bezahlt, bezahlt, storniert, ueberfaellig]
+      description: Filter by status
+    kunde_id:
+      type: integer
+      description: Filter by customer ID
+    projekt_id:
+      type: integer
+      description: Filter by project ID
+    datum_von:
+      type: string
+      format: date
+      description: Invoice date filter (from)
+    datum_bis:
+      type: string
+      format: date
+      description: Invoice date filter (to)
+    search:
+      type: string
+      description: Search term for invoice number
+    page:
+      type: integer
+      default: 1
+      description: Page number (1-based)
+    limit:
+      type: integer
+      default: 20
+      maximum: 100
+      description: Items per page
+    sortBy:
+      type: string
+      enum: [rechnungsnummer, rechnungsdatum, faelligkeitsdatum, gesamtbetrag, status, created_at]
+      default: rechnungsdatum
+      description: Field to sort by
+    sortDirection:
+      type: string
+      enum: [asc, desc]
+      default: desc
+      description: Sort direction
+
+InvoiceWithDetails:
+  allOf:
+    - $ref: '#/Invoice'
+    - type: object
+      properties:
+        customer:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            company:
+              type: string
+            email:
+              type: string
+            address:
+              type: string
+            postalCode:
+              type: string
+            city:
+              type: string
+        project:
+          type: object
+          properties:
+            id:
+              type: integer
+            title:
+              type: string
+            status:
+              type: string
+        positions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              serviceName:
+                type: string
+              quantity:
+                type: integer
+              unitPrice:
+                type: number
+              total:
+                type: number
+
+InvoiceStatistics:
+  type: object
+  properties:
+    total:
+      type: integer
+      description: Total number of invoices
+    statusCounts:
+      type: object
+      properties:
+        offen:
+          type: integer
+        teilweise_bezahlt:
+          type: integer
+        bezahlt:
+          type: integer
+        storniert:
+          type: integer
+        ueberfaellig:
+          type: integer
+    totalAmount:
+      type: number
+      description: Total amount of all invoices
+    paidAmount:
+      type: number
+      description: Total amount of paid invoices
+    outstandingAmount:
+      type: number
+      description: Total amount of outstanding invoices
+    monthly:
+      type: array
+      items:
+        type: object
+        properties:
+          month:
+            type: string
+          count:
+            type: integer
+          amount:
+            type: number
+    topCustomers:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: integer
+          name:
+            type: string
+          invoiceCount:
+            type: integer
+          totalAmount:
+            type: number
+
+InvoiceBatchUpdate:
+  type: object
+  required:
+    - ids
+    - status
+  properties:
+    ids:
+      type: array
+      items:
+        type: integer
+      description: Array of invoice IDs
+      minItems: 1
+    status:
+      type: string
+      enum: [offen, teilweise_bezahlt, bezahlt, storniert, ueberfaellig]
+      description: New status for all selected invoices
+    note:
+      type: string
+      description: Optional note about the status change
+      maxLength: 1000
+
+InvoiceNote:
+  type: object
+  required:
+    - note
+  properties:
+    note:
+      type: string
+      description: Note text
+      minLength: 1
+      maxLength: 1000
+
+InvoicePayment:
+  type: object
+  required:
+    - betrag
+    - zahlungsdatum
+  properties:
+    betrag:
+      type: number
+      format: float
+      description: Payment amount
+      minimum: 0.01
+    zahlungsdatum:
+      type: string
+      format: date
+      description: Payment date (YYYY-MM-DD)
+    zahlungsart:
+      type: string
+      enum: [ueberweisung, bar, kreditkarte, lastschrift, paypal, sonstige]
+      default: ueberweisung
+      description: Payment method
+    referenz:
+      type: string
+      description: Payment reference (e.g., transaction ID)
+      maxLength: 100
+    notiz:
+      type: string
+      description: Additional payment notes
+      maxLength: 1000

@@ -1,0 +1,75 @@
+Error:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: false
+    error:
+      type: string
+      description: Main error message
+    statusCode:
+      type: integer
+      description: HTTP status code
+    errors:
+      type: array
+      items:
+        type: string
+      description: List of specific error messages
+    meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+
+ValidationError:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: false
+    error:
+      type: string
+      description: Main error message
+      example: "Validation Error"
+    statusCode:
+      type: integer
+      description: HTTP status code
+      example: 400
+    validationErrors:
+      type: object
+      description: Field-specific validation errors
+      additionalProperties:
+        type: array
+        items:
+          type: string
+    meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+
+AuthError:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: false
+    error:
+      type: string
+      description: Authentication error message
+      example: "Unauthorized"
+    statusCode:
+      type: integer
+      description: HTTP status code
+      example: 401
+    message:
+      type: string
+      description: Detailed error message
+    meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time

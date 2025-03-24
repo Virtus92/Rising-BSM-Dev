@@ -1,0 +1,153 @@
+ContactRequest:
+  type: object
+  required:
+    - id
+    - name
+    - email
+    - service
+    - message
+    - status
+  properties:
+    id:
+      type: integer
+      description: Request ID (auto-generated)
+    name:
+      type: string
+      description: Contact name
+    email:
+      type: string
+      format: email
+      description: Contact email
+    phone:
+      type: string
+      nullable: true
+      description: Contact phone number
+    service:
+      type: string
+      enum: [facility, moving, winter, other]
+      description: Requested service type
+    serviceLabel:
+      type: string
+      description: Formatted service label
+    message:
+      type: string
+      description: Request message
+    status:
+      type: string
+      enum: [neu, in_bearbeitung, beantwortet, geschlossen]
+      description: Request status
+    statusLabel:
+      type: string
+      description: Formatted status label
+    statusClass:
+      type: string
+      description: CSS class for status
+    formattedDate:
+      type: string
+      description: Formatted creation date
+    processorId:
+      type: integer
+      nullable: true
+      description: ID of the user processing the request
+    ipAddress:
+      type: string
+      nullable: true
+      description: IP address of submitter
+    createdAt:
+      type: string
+      format: date-time
+      description: Timestamp of request creation
+    updatedAt:
+      type: string
+      format: date-time
+      description: Timestamp of last update
+
+ContactRequestCreate:
+  type: object
+  required:
+    - name
+    - email
+    - service
+    - message
+  properties:
+    name:
+      type: string
+      description: Contact name
+      minLength: 2
+      maxLength: 100
+    email:
+      type: string
+      format: email
+      description: Contact email
+    phone:
+      type: string
+      description: Contact phone number
+      maxLength: 30
+      nullable: true
+    service:
+      type: string
+      enum: [facility, moving, winter, other]
+      description: Requested service type
+    message:
+      type: string
+      description: Request message
+      minLength: 10
+      maxLength: 1000
+
+RequestNoteCreate:
+  type: object
+  required:
+    - note
+  properties:
+    note:
+      type: string
+      description: Note text
+      minLength: 1
+      maxLength: 1000
+
+RequestStatusUpdate:
+  type: object
+  required:
+    - status
+  properties:
+    status:
+      type: string
+      enum: [neu, in_bearbeitung, beantwortet, geschlossen]
+      description: New request status
+    note:
+      type: string
+      description: Optional note about the status change
+      maxLength: 1000
+
+ContactRequestWithDetails:
+  allOf:
+    - $ref: '#/ContactRequest'
+    - type: object
+      properties:
+        notes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              text:
+                type: string
+              userName:
+                type: string
+              formattedDate:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+        processor:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+            role:
+              type: string

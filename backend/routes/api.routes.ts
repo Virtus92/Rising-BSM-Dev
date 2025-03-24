@@ -5,37 +5,37 @@
  */
 import { Router } from 'express';
 import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
-import { login } from '../controllers/auth.controller.js';
+// import { login } from '../controllers/auth.controller.js';
 
 // Import route modules
-import projectRoutes from './project.routes.js';
-import customerRoutes from './customer.routes.js';
-import appointmentRoutes from './appointment.routes.js';
-import serviceRoutes from './service.routes.js';
-import requestRoutes from './request.routes.js';
-import profileRoutes from './profile.routes.js';
-import dashboardRoutes from './dashboard.routes.js';
-import settingsRoutes from './settings.routes.js';
-import notificationRoutes from './notification.routes.js';
-import userRoutes from './user.routes.js';
+// import projectRoutes from './project.routes.js';
+// import customerRoutes from './customer.routes.js';
+// import appointmentRoutes from './appointment.routes.js';
+// import serviceRoutes from './service.routes.js';
+// import requestRoutes from './request.routes.js';
+// import profileRoutes from './profile.routes.js';
+// import dashboardRoutes from './dashboard.routes.js';
+// import settingsRoutes from './settings.routes.js';
+ import notificationRoutes from './notification.routes.js';
+// import userRoutes from './user.routes.js';
 
 // Create router
 const router = Router();
 
 // Direct auth routes
-router.post('/login', login);
+// router.post('/login', login);
 
 // Mount routes
-router.use('/projects', projectRoutes);
-router.use('/customers', customerRoutes);
-router.use('/appointments', appointmentRoutes);
-router.use('/services', serviceRoutes);
-router.use('/requests', requestRoutes);
-router.use('/profile', profileRoutes);
-router.use('/dashboard', dashboardRoutes);
-router.use('/settings', settingsRoutes);
-router.use('/notifications', notificationRoutes);
-router.use('/users', userRoutes);
+// router.use('/projects', projectRoutes);
+// router.use('/customers', customerRoutes);
+// router.use('/appointments', appointmentRoutes);
+// router.use('/services', serviceRoutes);
+// router.use('/requests', requestRoutes);
+// router.use('/profile', profileRoutes);
+// router.use('/dashboard', dashboardRoutes);
+// router.use('/settings', settingsRoutes);
+ router.use('/notifications', notificationRoutes);
+// router.use('/users', userRoutes);
 
 /**
  * @route GET /api/v1/health

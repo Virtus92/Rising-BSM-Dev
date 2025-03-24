@@ -1,0 +1,303 @@
+services:
+  get:
+    tags:
+      - Services
+    summary: Get all services
+    description: Retrieve list of services with optional filtering and pagination
+    operationId: getAllServices
+    parameters:
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum: [aktiv, inaktiv]
+        description: Filter by status (aktiv=true, inaktiv=false)
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search term for service name and description
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+        description: Page number (1-based)
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+        description: Items per page
+    responses:
+      '200':
+        description: List of services
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    $ref: '../schemas/services.yaml#/Service'
+                message:
+                  type: string
+                  example: "Services retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    pagination:
+                      $ref: '../schemas/common.yaml#/Pagination'
+                    filters:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                        search:
+                          type: string
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  post:
+    tags:
+      - Services
+    summary: Create new service
+    description: Add a new service
+    operationId: createService
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/services.yaml#/ServiceCreate'
+    responses:
+      '201':
+        description: Service created
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    serviceId:
+                      type: integer
+                message:
+                  type: string
+                  example: "Service created successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+services-id:
+  get:
+    tags:
+      - Services
+    summary: Get service by ID
+    description: Retrieve detailed service information
+    operationId: getServiceById
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Service ID
+    responses:
+      '200':
+        description: Service details
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/services.yaml#/Service'
+                message:
+                  type: string
+                  example: "Service retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  put:
+    tags:
+      - Services
+    summary: Update service
+    description: Update an existing service
+    operationId: updateService
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Service ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/services.yaml#/ServiceUpdate'
+    responses:
+      '200':
+        description: Service updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    serviceId:
+                      type: integer
+                message:
+                  type: string
+                  example: "Service updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+services-id-status:
+  patch:
+    tags:
+      - Services
+    summary: Toggle service status
+    description: Enable or disable a service
+    operationId: toggleServiceStatus
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Service ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/services.yaml#/ServiceStatusUpdate'
+    responses:
+      '200':
+        description: Status updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    serviceId:
+                      type: integer
+                message:
+                  type: string
+                  example: "Service status updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+services-id-statistics:
+  get:
+    tags:
+      - Services
+    summary: Get service statistics
+    description: Retrieve usage and revenue statistics for a service
+    operationId: getServiceStatistics
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Service ID
+    responses:
+      '200':
+        description: Service statistics
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    statistics:
+                      $ref: '../schemas/services.yaml#/ServiceStatistics'
+                message:
+                  type: string
+                  example: "Service statistics retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'

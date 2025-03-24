@@ -1,0 +1,80 @@
+notifications:
+  get:
+    tags:
+      - Notifications
+    summary: Get user notifications
+    description: Retrieve notifications for the current user
+    operationId: getNotifications
+    responses:
+      '200':
+        description: List of notifications
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    notifications:
+                      type: array
+                      items:
+                        $ref: '../schemas/notification.yaml#/Notification'
+                message:
+                  type: string
+                  example: "Notifications retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+notifications-read:
+  put:
+    tags:
+      - Notifications
+    summary: Mark notifications as read
+    description: Mark one or more notifications as read
+    operationId: markNotificationsRead
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/notification.yaml#/MarkNotificationRead'
+    responses:
+      '200':
+        description: Notifications marked as read
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    count:
+                      type: integer
+                      description: Number of notifications marked as read
+                message:
+                  type: string
+                  example: "Notifications marked as read"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'

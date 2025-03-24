@@ -1,0 +1,332 @@
+users:
+  get:
+    tags:
+      - Users
+    summary: Get all users
+    description: Retrieve list of users with optional filtering (admin only)
+    operationId: getAllUsers
+    parameters:
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum: [aktiv, inaktiv, gesperrt]
+        description: Filter by status
+      - in: query
+        name: role
+        schema:
+          type: string
+          enum: [admin, manager, mitarbeiter, benutzer]
+        description: Filter by role
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search term for name or email
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+        description: Page number (1-based)
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+        description: Items per page
+    responses:
+      '200':
+        description: List of users
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    $ref: '../schemas/user.yaml#/User'
+                message:
+                  type: string
+                  example: "Users retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    pagination:
+                      $ref: '../schemas/common.yaml#/Pagination'
+                    filters:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                        role:
+                          type: string
+                        search:
+                          type: string
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+  post:
+    tags:
+      - Users
+    summary: Create new user
+    description: Add a new user account (admin only)
+    operationId: createUser
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/user.yaml#/UserCreate'
+    responses:
+      '201':
+        description: User created
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/user.yaml#/User'
+                message:
+                  type: string
+                  example: "User created successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '409':
+        description: Email already exists
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
+
+users-id:
+  get:
+    tags:
+      - Users
+    summary: Get user by ID
+    description: Retrieve detailed user information (admin only)
+    operationId: getUserById
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: User ID
+    responses:
+      '200':
+        description: User details
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/user.yaml#/User'
+                message:
+                  type: string
+                  example: "User retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+
+  put:
+    tags:
+      - Users
+    summary: Update user
+    description: Update an existing user (admin only)
+    operationId: updateUser
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: User ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/user.yaml#/UserUpdate'
+    responses:
+      '200':
+        description: User updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/user.yaml#/User'
+                message:
+                  type: string
+                  example: "User updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '409':
+        description: Email already exists
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
+
+  delete:
+    tags:
+      - Users
+    summary: Delete user
+    description: Delete or deactivate a user (admin only)
+    operationId: deleteUser
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: User ID
+    responses:
+      '200':
+        description: User deleted or deactivated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                message:
+                  type: string
+                  example: "User deleted successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        description: Cannot delete own account
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+
+users-id-status:
+  patch:
+    tags:
+      - Users
+    summary: Update user status
+    description: Change the status of a user (activate/deactivate/lock)
+    operationId: updateUserStatus
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: User ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - status
+            properties:
+              status:
+                type: string
+                enum: [aktiv, inaktiv, gesperrt]
+                description: New user status
+    responses:
+      '200':
+        description: Status updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/user.yaml#/User'
+                message:
+                  type: string
+                  example: "User status updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'

@@ -1,0 +1,274 @@
+settings-user:
+  get:
+    tags:
+      - Settings
+    summary: Get user settings
+    description: Retrieve current user's settings
+    operationId: getUserSettings
+    responses:
+      '200':
+        description: User settings
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    settings:
+                      $ref: '../schemas/settings.yaml#/UserSettings'
+                message:
+                  type: string
+                  example: "User settings retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  put:
+    tags:
+      - Settings
+    summary: Update user settings
+    description: Update current user's settings
+    operationId: updateUserSettings
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/settings.yaml#/UserSettingsUpdate'
+    responses:
+      '200':
+        description: Settings updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                message:
+                  type: string
+                  example: "Settings updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+settings-system:
+  get:
+    tags:
+      - Settings
+    summary: Get system settings
+    description: Retrieve system settings (admin only)
+    operationId: getSystemSettings
+    responses:
+      '200':
+        description: System settings
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    settings:
+                      $ref: '../schemas/settings.yaml#/SystemSettings'
+                message:
+                  type: string
+                  example: "System settings retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+  put:
+    tags:
+      - Settings
+    summary: Update system settings
+    description: Update system settings (admin only)
+    operationId: updateSystemSettings
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              settings:
+                $ref: '../schemas/settings.yaml#/SystemSettingsUpdate'
+    responses:
+      '200':
+        description: Settings updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                message:
+                  type: string
+                  example: "System settings updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+settings-backup:
+  get:
+    tags:
+      - Settings
+    summary: Get backup settings
+    description: Retrieve backup settings and history (admin only)
+    operationId: getBackupSettings
+    responses:
+      '200':
+        description: Backup settings and history
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/settings.yaml#/BackupSettings'
+                message:
+                  type: string
+                  example: "Backup settings retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+  put:
+    tags:
+      - Settings
+    summary: Update backup settings
+    description: Update backup settings (admin only)
+    operationId: updateBackupSettings
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/settings.yaml#/BackupSettingsUpdate'
+    responses:
+      '200':
+        description: Settings updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                message:
+                  type: string
+                  example: "Backup settings updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+settings-backup-trigger:
+  post:
+    tags:
+      - Settings
+    summary: Trigger manual backup
+    description: Start a manual backup process (admin only)
+    operationId: triggerManualBackup
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/settings.yaml#/ManualBackup'
+    responses:
+      '200':
+        description: Backup triggered successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      example: "pending"
+                message:
+                  type: string
+                  example: "Backup process initiated"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'

@@ -1,0 +1,354 @@
+appointments:
+  get:
+    tags:
+      - Appointments
+    summary: Get all appointments
+    description: Retrieve list of appointments with optional filtering and pagination
+    operationId: getAllAppointments
+    parameters:
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum: [geplant, bestaetigt, abgeschlossen, storniert]
+        description: Filter by status
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+        description: Filter by specific date (YYYY-MM-DD)
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search term for appointment title or location
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+        description: Page number (1-based)
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+        description: Items per page
+    responses:
+      '200':
+        description: List of appointments
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    $ref: '../schemas/appointments.yaml#/Appointment'
+                message:
+                  type: string
+                  example: "Appointments retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    pagination:
+                      $ref: '../schemas/common.yaml#/Pagination'
+                    filters:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                        date:
+                          type: string
+                        search:
+                          type: string
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  post:
+    tags:
+      - Appointments
+    summary: Create new appointment
+    description: Schedule a new appointment
+    operationId: createAppointment
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/appointments.yaml#/AppointmentCreate'
+    responses:
+      '201':
+        description: Appointment created
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/appointments.yaml#/Appointment'
+                message:
+                  type: string
+                  example: "Appointment created successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+appointments-id:
+  get:
+    tags:
+      - Appointments
+    summary: Get appointment by ID
+    description: Retrieve detailed appointment information including notes
+    operationId: getAppointmentById
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Appointment ID
+    responses:
+      '200':
+        description: Appointment details
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/appointments.yaml#/AppointmentWithDetails'
+                message:
+                  type: string
+                  example: "Appointment retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  put:
+    tags:
+      - Appointments
+    summary: Update appointment
+    description: Update an existing appointment
+    operationId: updateAppointment
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Appointment ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/appointments.yaml#/AppointmentUpdate'
+    responses:
+      '200':
+        description: Appointment updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/appointments.yaml#/Appointment'
+                message:
+                  type: string
+                  example: "Appointment updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+  delete:
+    tags:
+      - Appointments
+    summary: Delete appointment
+    description: Delete an existing appointment
+    operationId: deleteAppointment
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Appointment ID
+    responses:
+      '200':
+        description: Appointment deleted
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                message:
+                  type: string
+                  example: "Appointment deleted successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+appointments-id-status:
+  patch:
+    tags:
+      - Appointments
+    summary: Update appointment status
+    description: Change the status of an appointment
+    operationId: updateAppointmentStatus
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Appointment ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/appointments.yaml#/AppointmentStatusUpdate'
+    responses:
+      '200':
+        description: Status updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    status:
+                      type: string
+                message:
+                  type: string
+                  example: "Appointment status updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+appointments-id-notes:
+  post:
+    tags:
+      - Appointments
+    summary: Add note to appointment
+    description: Add a new note to an existing appointment
+    operationId: addAppointmentNote
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Appointment ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/appointments.yaml#/AppointmentNote'
+    responses:
+      '201':
+        description: Note added successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    success:
+                      type: boolean
+                    message:
+                      type: string
+                message:
+                  type: string
+                  example: "Note added successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'

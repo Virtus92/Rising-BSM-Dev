@@ -1,0 +1,68 @@
+Pagination:
+  type: object
+  properties:
+    current:
+      type: integer
+      description: Current page number
+    limit:
+      type: integer
+      description: Items per page
+    total:
+      type: integer
+      description: Total number of pages
+    totalRecords:
+      type: integer
+      description: Total number of records
+
+MetaData:
+  type: object
+  properties:
+    timestamp:
+      type: string
+      format: date-time
+      description: Response timestamp
+    pagination:
+      $ref: '#/Pagination'
+    filters:
+      type: object
+      description: Applied filters
+
+SuccessResponse:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: true
+      description: Indicates if the request was successful
+    data:
+      type: object
+      description: Response data
+    message:
+      type: string
+      description: Response message
+    meta:
+      $ref: '#/MetaData'
+      
+PaginatedResponse:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: true
+      description: Indicates if the request was successful
+    data:
+      type: array
+      items:
+        type: object
+      description: List of data items
+    message:
+      type: string
+      description: Response message
+    meta:
+      allOf:
+        - $ref: '#/MetaData'
+        - type: object
+          properties:
+            pagination:
+              $ref: '#/Pagination'
+              required: true
