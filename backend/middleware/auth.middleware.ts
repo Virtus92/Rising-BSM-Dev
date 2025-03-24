@@ -7,7 +7,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/security.utils.js';
 import { UnauthorizedError, ForbiddenError } from '../utils/error.utils.js';
-import { AuthenticatedRequest, AuthUser } from '../types/common/types.js';
+import { AuthenticatedRequest } from '../types/controller.types.js';
 import { prisma } from '../utils/prisma.utils.js';
 import { logger } from '../utils/common.utils.js';
 

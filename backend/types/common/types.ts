@@ -8,6 +8,8 @@ import { File } from 'buffer';
 import { Request } from 'express';
 import { ParsedQs } from 'qs';
 import { ParamsDictionary } from 'express-serve-static-core';
+import { AuthenticatedRequest } from '../controller.types.js';
+
 /**
  * Base interface for all DTOs
  */
@@ -262,36 +264,6 @@ export interface BaseDTO {
   }
   
   /**
-   * Error response envelope
-   */
-  export interface ErrorResponse {
-    /**
-     * Success indicator
-     */
-    success: false;
-    
-    /**
-     * Error message
-     */
-    error: string;
-    
-    /**
-     * HTTP status code
-     */
-    statusCode: number;
-    
-    /**
-     * Validation errors
-     */
-    errors?: string[];
-    
-    /**
-     * Response timestamp
-     */
-    timestamp: string;
-  }
-  
-  /**
    * User context for operations
    */
   export interface UserContext {
@@ -353,41 +325,6 @@ export interface BaseDTO {
   }
   
   /**
-   * Comprehensive authenticated request interface
-   * Extends Express Request with additional properties
-   */
-  /**
- * Comprehensive authenticated request interface
- * Extends Express Request with additional properties
- */
-export interface AuthenticatedRequest extends Request {  
-  /**
-   * Authenticated user information
-   */
-  user?: AuthUser;
-
-  /**
-   * Optional validated request data
-   */
-  validatedData?: any;
-  validatedQuery?: any;
-  validatedParams?: any;
-
-  /**
-   * File upload support
-   */
-  file?: Express.Multer.File;
-
-  /**
-   * Optional credentials and other properties
-   */
-  credentials?: any;
-  destination?: string;
-  integrity?: string;
-  cache?: any;
-}
-  
-  /**
    * Type guard to check if a request is an authenticated request
    */
   export function isAuthenticatedRequest(req: Request | AuthenticatedRequest): req is AuthenticatedRequest {
@@ -413,29 +350,4 @@ export interface AuthenticatedRequest extends Request {
       userRole: req.user.role,
       ipAddress: req.ip
     };
-  }
-  
-  /**
-   * User context for operations
-   */
-  export interface UserContext {
-    /**
-     * User ID
-     */
-    userId: number;
-    
-    /**
-     * User name
-     */
-    userName: string;
-    
-    /**
-     * User role
-     */
-    userRole: string;
-    
-    /**
-     * IP address
-     */
-    ipAddress?: string;
   }

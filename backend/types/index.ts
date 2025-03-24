@@ -11,10 +11,14 @@ export * from './common/types.js';
 export * from './models/index.js';
 
 // DTOs for entity operations
-export * from './dtos/user.dto.js';
-export * from './dtos/customer.dto.js';
-export * from './dtos/project.dto.js';
 export * from './dtos/appointment.dto.js';
-export * from './dtos/service.dto.js';
-export * from './dtos/request.dto.js';
 export * from './dtos/auth.dto.js';
+export * from './dtos/customer.dto.js';
+export * from './dtos/dashboard.dto.js';
+export * from './dtos/notification.dto.js';
+export * from './dtos/profile.dto.js';
+export * from './dtos/project.dto.js';
+export * from './dtos/request.dto.js';
+export * from './dtos/service.dto.js';
+export * from './dtos/settings.dto.js';
+export * from './dtos/user.dto.js';

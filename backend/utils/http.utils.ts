@@ -5,7 +5,7 @@
  * async handlers, and API response formatting.
  */
 import { Request, Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../types/common/types.js';
+import { AuthenticatedRequest } from '../types/controller.types.js';
 import { logger } from './common.utils.js';
 import config from '../config/index.js';
 

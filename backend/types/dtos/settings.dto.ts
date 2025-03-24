@@ -41,65 +41,6 @@ export enum BackupStorageType {
   FTP = 'ftp'
 }
 
-/**
- * DTO for user settings update
- */
-export interface UserSettingsUpdateDTO {
-  /**
-   * Language preference
-   */
-  language?: string;
-
-  /**
-   * Dark mode preference
-   */
-  darkMode?: boolean;
-
-  /**
-   * Email notifications preference
-   */
-  emailNotifications?: boolean;
-
-  /**
-   * Push notifications preference
-   */
-  pushNotifications?: boolean;
-
-  /**
-   * Notification interval preference
-   */
-  notificationInterval?: string;
-}
-
-/**
- * DTO for user settings response
- */
-export interface UserSettingsResponseDTO {
-  /**
-   * Language preference
-   */
-  language: string;
-
-  /**
-   * Dark mode preference
-   */
-  darkMode: boolean;
-
-  /**
-   * Email notifications preference
-   */
-  emailNotifications: boolean;
-
-  /**
-   * Push notifications preference
-   */
-  pushNotifications: boolean;
-
-  /**
-   * Notification interval preference
-   */
-  notificationInterval: string;
-}
 
 /**
  * DTO for system settings update

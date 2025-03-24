@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { NotificationService } from '../services/notification.service.js';
-import { AuthenticatedRequest } from '../types/common/types.js';
+import { AuthenticatedRequest } from '../types/controller.types.js';
 import { 
   MarkNotificationReadDTO, 
   NotificationFilterDTO 
