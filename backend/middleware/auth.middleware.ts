@@ -5,26 +5,12 @@
  * Verifies JWT tokens, attaches user to request, and implements role-based access control.
  */
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken } from '../utils/security.utils.js';
-import { UnauthorizedError, ForbiddenError } from '../utils/error.utils.js';
+import { verifyToken, extractTokenFromHeader } from '../utils/security.utils.js';
+import { UnauthorizedError, ForbiddenError, NotFoundError } from '../utils/error.utils.js';
 import { AuthenticatedRequest } from '../types/controller.types.js';
 import { prisma } from '../utils/prisma.utils.js';
 import { logger } from '../utils/common.utils.js';
-
-/**
- * Extracts JWT token from Authorization header
- * @param req HTTP request
- * @returns JWT token or null
- */
-function extractTokenFromHeader(req: Request): string | null {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-  
-  return authHeader.substring(7); // Remove 'Bearer ' prefix
-}
+import config from '../config/index.js';
 
 /**
  * Authentication middleware 
@@ -37,7 +23,7 @@ export const authenticate = async (
 ): Promise<void> => {
   try {
     // Extract token from header
-    const token = extractTokenFromHeader(req);
+    const token = extractTokenFromHeader(req.headers.authorization);
     
     if (!token) {
       throw new UnauthorizedError('Authentication required');
@@ -48,7 +34,7 @@ export const authenticate = async (
       const payload = verifyToken(token);
       
       // Verify user in database if configured to do so
-      if (process.env.VERIFY_JWT_USER_IN_DB === 'true') {
+      if (config.VERIFY_JWT_USER_IN_DB) {
         const user = await prisma.user.findUnique({
           where: { id: payload.userId },
           select: {
@@ -66,7 +52,7 @@ export const authenticate = async (
         }
         
         if (user.status !== 'active') {
-          throw new UnauthorizedError('User account is inactive');
+          throw new UnauthorizedError('User account is inactive or suspended');
         }
         
         // Attach user to request
@@ -89,6 +75,9 @@ export const authenticate = async (
       next();
     } catch (error) {
       logger.debug('Token verification failed', { error });
+      if (error instanceof UnauthorizedError) {
+        throw error;
+      }
       throw new UnauthorizedError('Invalid or expired token');
     }
   } catch (error) {
@@ -122,7 +111,7 @@ export const authorize = (roles: string | string[] = []) => {
       
       // Check if user has one of the allowed roles
       if (!allowedRoles.includes(authReq.user.role)) {
-        throw new ForbiddenError('Insufficient permissions');
+        throw new ForbiddenError(`Insufficient permissions. Required roles: ${allowedRoles.join(', ')}`);
       }
       
       next();
@@ -181,22 +170,64 @@ export const isResourceOwner = (
       }
       
       // Get owner ID from resource
-      const ownerId = await idProvider(resourceId);
-      
-      if (ownerId === null) {
-        throw new UnauthorizedError('Resource not found');
+      try {
+        const ownerId = await idProvider(resourceId);
+        
+        if (ownerId === null) {
+          throw new NotFoundError('Resource not found');
+        }
+        
+        // Check if user is owner
+        if (ownerId !== authReq.user.id) {
+          throw new ForbiddenError('You do not have permission to access this resource');
+        }
+        
+        next();
+      } catch (error) {
+        if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+          throw error;
+        }
+        logger.error('Error in isResourceOwner middleware', { 
+          error, 
+          resourceId, 
+          userId: authReq.user.id 
+        });
+        throw new ForbiddenError('Unable to verify resource ownership');
       }
-      
-      // Check if user is owner
-      if (ownerId !== authReq.user.id) {
-        throw new ForbiddenError('You do not have permission to access this resource');
-      }
-      
-      next();
     } catch (error) {
       next(error);
     }
   };
+};
+
+/**
+ * Self or admin middleware
+ * Allows access if the user is accessing their own account or is an admin
+ */
+export const isSelfOrAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const userId = parseInt(req.params.id);
+    
+    // Check if request has authenticated user
+    if (!authReq.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+    
+    // Admin users bypass self check
+    if (authReq.user.role === 'admin') {
+      return next();
+    }
+    
+    // Check if user is accessing their own account
+    if (isNaN(userId) || userId !== authReq.user.id) {
+      throw new ForbiddenError('You do not have permission to access this resource');
+    }
+    
+    next();
+  } catch (error) {
+    next(error);
+  }
 };
 
 export default {
@@ -204,5 +235,6 @@ export default {
   authorize,
   isAdmin,
   isManager,
-  isResourceOwner
+  isResourceOwner,
+  isSelfOrAdmin
 };

@@ -10,7 +10,7 @@ import {
   markNotificationsRead,
   getNotificationStats,
   deleteNotification
-} from '../controller/notification.controller.js';
+} from '../controllers/notification.controller.js';
 import { validateBody, validateParams, validateQuery } from '../middleware/validation.middleware.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { 

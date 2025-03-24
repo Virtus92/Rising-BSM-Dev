@@ -4,10 +4,10 @@
  * Main API router that combines all entity-specific routes.
  */
 import { Router } from 'express';
-import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
-// import { login } from '../controllers/auth.controller.js';
+import { authenticate } from '../middleware/auth.middleware.js';
+import authRoutes from './auth.routes.js';
 
-// Import route modules
+// Import other route modules
 // import projectRoutes from './project.routes.js';
 // import customerRoutes from './customer.routes.js';
 // import appointmentRoutes from './appointment.routes.js';
@@ -16,31 +16,37 @@ import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
 // import profileRoutes from './profile.routes.js';
 // import dashboardRoutes from './dashboard.routes.js';
 // import settingsRoutes from './settings.routes.js';
- import notificationRoutes from './notification.routes.js';
+import notificationRoutes from './notification.routes.js';
 // import userRoutes from './user.routes.js';
 
 // Create router
 const router = Router();
 
-// Direct auth routes
-// router.post('/login', login);
+// Mount authentication routes
+router.use('/auth', authRoutes);
 
-// Mount routes
-// router.use('/projects', projectRoutes);
-// router.use('/customers', customerRoutes);
-// router.use('/appointments', appointmentRoutes);
-// router.use('/services', serviceRoutes);
-// router.use('/requests', requestRoutes);
-// router.use('/profile', profileRoutes);
-// router.use('/dashboard', dashboardRoutes);
-// router.use('/settings', settingsRoutes);
- router.use('/notifications', notificationRoutes);
-// router.use('/users', userRoutes);
+// Mount other routes
+// router.use('/projects', authenticate, projectRoutes);
+// router.use('/customers', authenticate, customerRoutes);
+// router.use('/appointments', authenticate, appointmentRoutes);
+// router.use('/services', authenticate, serviceRoutes);
+// router.use('/requests', authenticate, requestRoutes);
+// router.use('/profile', authenticate, profileRoutes);
+// router.use('/dashboard', authenticate, dashboardRoutes);
+// router.use('/settings', authenticate, settingsRoutes);
+router.use('/notifications', authenticate, notificationRoutes);
+// router.use('/users', authenticate, userRoutes);
 
 /**
- * @route GET /api/v1/health
- * @description Health check endpoint
- * @access Public
+ * @swagger
+ * /api/v1/health:
+ *   get:
+ *     summary: Health check endpoint
+ *     description: Check if the API is running
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: API is operational
  */
 router.get('/health', (req, res) => {
   res.status(200).json({
@@ -52,9 +58,15 @@ router.get('/health', (req, res) => {
 });
 
 /**
- * @route GET /api/v1/version
- * @description Get API version
- * @access Public
+ * @swagger
+ * /api/v1/version:
+ *   get:
+ *     summary: Get API version
+ *     description: Get current API version information
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: Version information
  */
 router.get('/version', (req, res) => {
   res.status(200).json({

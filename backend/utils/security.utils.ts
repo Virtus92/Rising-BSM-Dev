@@ -8,16 +8,19 @@ import jwt from 'jsonwebtoken';
 import { UnauthorizedError } from './error.utils.js';
 import { logger } from './common.utils.js';
 import bcrypt from 'bcrypt';
+import config from '../config/index.js';
 
-// Load environment variables with defaults
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-jwt-refresh-secret';
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+// JWT configuration
+const JWT_SECRET = config.JWT_SECRET;
+const JWT_EXPIRES_IN = config.JWT_EXPIRES_IN;
+const JWT_REFRESH_SECRET = config.JWT_REFRESH_SECRET;
+const JWT_REFRESH_EXPIRES_IN = config.JWT_REFRESH_EXPIRES_IN;
+const JWT_REFRESH_TOKEN_ROTATION = config.JWT_REFRESH_TOKEN_ROTATION;
 
 // Warn if using default secrets in production
-if (process.env.NODE_ENV === 'production') {
-  if (process.env.JWT_SECRET === undefined || process.env.JWT_REFRESH_SECRET === undefined) {
+if (config.IS_PRODUCTION) {
+  if (JWT_SECRET === 'your-default-super-secret-key-change-in-production' || 
+      JWT_REFRESH_SECRET === 'your-refresh-default-key-change-in-production') {
     logger.error('SECURITY WARNING: Using default JWT secrets in production environment!');
   }
 }
@@ -42,6 +45,16 @@ export interface TokenResult {
 }
 
 /**
+ * Decoded refresh token payload
+ */
+export interface RefreshTokenPayload {
+  userId: number;
+  tokenId?: string;
+  exp?: number;
+  iat?: number;
+}
+
+/**
  * Generate JWT access token
  * @param payload User information to encode in token
  * @returns JWT token string
@@ -50,7 +63,7 @@ export const generateToken = (payload: TokenPayload): string => {
   return jwt.sign(
     payload,
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN  as jwt.SignOptions['expiresIn'] }
+    { expiresIn: JWT_EXPIRES_IN }
   );
 };
 
@@ -75,28 +88,35 @@ export const verifyToken = (token: string): TokenPayload => {
 };
 
 /**
- * Generate refresh token
+ * Generate refresh token with optional token ID
  * @param userId User ID to encode in token
+ * @param tokenId Optional unique token ID for rotation
  * @returns Refresh token string
  */
-export const generateRefreshToken = (userId: number): string => {
+export const generateRefreshToken = (userId: number, tokenId?: string): string => {
+  const payload: any = { userId };
+  
+  // Add token ID if provided (used for token rotation)
+  if (tokenId) {
+    payload.tokenId = tokenId;
+  }
+  
   return jwt.sign(
-    { userId },
+    payload,
     JWT_REFRESH_SECRET,
-    { expiresIn: JWT_REFRESH_EXPIRES_IN  as jwt.SignOptions['expiresIn'] }
+    { expiresIn: JWT_REFRESH_EXPIRES_IN as  }
   );
 };
 
 /**
  * Verify refresh token
  * @param token Refresh token to verify
- * @returns User ID from token
+ * @returns Decoded refresh token payload
  * @throws UnauthorizedError if token is invalid or expired
  */
-export const verifyRefreshToken = (token: string): number => {
+export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
   try {
-    const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as { userId: number };
-    return decoded.userId;
+    return jwt.verify(token, JWT_REFRESH_SECRET) as RefreshTokenPayload;
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
       throw new UnauthorizedError('Invalid refresh token');
@@ -111,11 +131,12 @@ export const verifyRefreshToken = (token: string): number => {
 /**
  * Generate both access and refresh tokens
  * @param payload User information for tokens
+ * @param tokenId Optional unique ID for refresh token
  * @returns Object containing both tokens and expiration
  */
-export const generateAuthTokens = (payload: TokenPayload): TokenResult => {
+export const generateAuthTokens = (payload: TokenPayload, tokenId?: string): TokenResult => {
   const accessToken = generateToken(payload);
-  const refreshToken = generateRefreshToken(payload.userId);
+  const refreshToken = generateRefreshToken(payload.userId, tokenId);
   
   // Parse expiration time from JWT_EXPIRES_IN
   let expiresIn = 3600; // Default to 1 hour in seconds
@@ -195,4 +216,12 @@ export const generateSecureToken = (length: number = 32): string => {
 export const calculateHash = (value: string): string => {
   const crypto = require('crypto');
   return crypto.createHash('sha256').update(value).digest('hex');
+};
+
+/**
+ * Check if token rotation is enabled
+ * @returns Whether token rotation is enabled
+ */
+export const isTokenRotationEnabled = (): boolean => {
+  return JWT_REFRESH_TOKEN_ROTATION;
 };
