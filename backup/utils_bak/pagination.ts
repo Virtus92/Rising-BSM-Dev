@@ -1,4 +1,4 @@
-import config from '../config';
+import config from '../config/index.js';
 
 export interface PaginationParams {
   page?: number | string;

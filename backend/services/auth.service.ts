@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { BaseService } from '../utils/base.service.js';
 import { userRepository } from '../repositories/user.repository.js';
-import { NotFoundError, ValidationError, ConflictError } from '../utils/errors.js';
+import { NotFoundError, ValidationError, ConflictError } from '../../backup/utils_bak/errors.js';
 import { 
   LoginDTO, 
   ForgotPasswordDTO, 

@@ -3,7 +3,7 @@
  * Standardized response formats for the API
  */
 import { Response } from 'express';
-import { ErrorResponse } from './errors';
+import { ErrorResponse } from './errors.js';
 
 /**
  * Pagination metadata structure

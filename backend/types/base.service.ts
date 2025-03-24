@@ -1,3 +1,6 @@
+// Re-export all service types from service.types for backward compatibility
+export * from './service.types.js';
+
 export interface ServiceOptions {
   includeDeleted?: boolean;
 }

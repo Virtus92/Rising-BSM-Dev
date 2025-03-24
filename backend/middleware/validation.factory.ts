@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { ValidationSchema } from '../types/validation';
-import { validateInput } from '../utils/validators';
-import { ValidationError } from '../utils/errors';
+import { ValidationSchema } from '../types/validation.types.js';
+import { validateInput } from '../utils/validation.utils.js';
+import { ValidationError } from '../utils/error.utils.js';
 
 /**
  * Factory function to create validation middleware

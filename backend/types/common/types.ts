@@ -380,47 +380,36 @@ export interface BaseDTO {
    * Comprehensive authenticated request interface
    * Extends Express Request with additional properties
    */
-  export interface AuthenticatedRequest extends Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>> {  
-    /**
-     * Authenticated user information
-     */
-    user?: AuthUser;
-  
-    /**
-     * Optional validated request data
-     */
-    validatedData?: any;
-    validatedQuery?: any;
-    validatedParams?: any;
-  
-    /**
-     * File upload support
-     */
-    file?: File;
-  
-    /**
-     * IP address of the request
-     */
-    ip: string;
-  
-    /**
-     * Additional request properties to match Express Request
-     */
-    get(name: string): string[] | undefined;
-    header(name: string): string | undefined;
-    accepts(type: string): string | false;
-    acceptsCharsets(charset: string): string | false;
-    acceptsLanguages(language: string): string | false;
-    is(type: string): string | false;
-    
-    /**
-     * Optional credentials and other properties
-     */
-    credentials?: any;
-    destination?: string;
-    integrity?: string;
-    cache?: any;
-  }
+  /**
+ * Comprehensive authenticated request interface
+ * Extends Express Request with additional properties
+ */
+export interface AuthenticatedRequest extends Request {  
+  /**
+   * Authenticated user information
+   */
+  user?: AuthUser;
+
+  /**
+   * Optional validated request data
+   */
+  validatedData?: any;
+  validatedQuery?: any;
+  validatedParams?: any;
+
+  /**
+   * File upload support
+   */
+  file?: Express.Multer.File;
+
+  /**
+   * Optional credentials and other properties
+   */
+  credentials?: any;
+  destination?: string;
+  integrity?: string;
+  cache?: any;
+}
   
   /**
    * Type guard to check if a request is an authenticated request

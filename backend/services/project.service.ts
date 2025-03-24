@@ -18,16 +18,16 @@ import {
   NotFoundError, 
   ValidationError, 
   ConflictError
-} from '../utils/errors.js';
+} from '../../backup/utils_bak/errors.js';
 import { 
   CreateOptions, 
   UpdateOptions, 
   FindOneOptions, 
   FindAllOptions 
 } from '../types/service.types.js';
-import { getProjektStatusInfo, getTerminStatusInfo } from '../utils/helpers.js';
-import { validateRequired, validateDate } from '../utils/common-validators.js';
-import * as validator from '../utils/validation-types.js';
+import { getProjektStatusInfo, getTerminStatusInfo } from '../../backup/utils_bak/helpers.js';
+import { validateRequired, validateDate } from '../../backup/utils_bak/common-validators.js';
+import * as validator from '../../backup/utils_bak/validation-types.js';
 import logger from '../utils/logger.js';
 
 /**

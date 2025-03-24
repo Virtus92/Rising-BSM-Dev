@@ -1,4 +1,4 @@
-import { prisma } from '../utils/prisma.utils';
+import { prisma } from '../../backup/utils_bak/prisma.utils';
 
 // Re-export the singleton instance
 export { prisma };

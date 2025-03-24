@@ -3,7 +3,7 @@
  * 
  * Data Transfer Objects for Contact Request entity operations.
  */
-import { BaseCreateDTO, BaseResponseDTO, FilterParams } from '../common/types.js';
+import { BaseCreateDTO, BaseResponseDTO, FilterParams, StatusChangeDTO, ServiceType } from '../common/types.js';
 
 /**
  * Enum for request status values
@@ -100,6 +100,11 @@ export interface ContactRequestResponseDTO extends BaseResponseDTO {
    * CSS class for status display
    */
   statusClass: string;
+
+  /**
+   * Processor ID
+   */
+  processorId?: number;
 }
 
 /**
@@ -145,7 +150,7 @@ export interface RequestFilterDTO extends FilterParams {
 /**
  * DTO for request status update
  */
-export interface RequestStatusUpdateDTO {
+export interface RequestStatusUpdateDTO extends StatusChangeDTO {
   /**
    * Request ID
    */
@@ -162,6 +167,11 @@ export interface RequestStatusUpdateDTO {
    * @maxLength 1000
    */
   note?: string;
+
+  /**
+   * Processor ID
+   */
+  processorId?: number;
 }
 
 /**
@@ -187,6 +197,11 @@ export interface RequestNoteDTO {
    * Username who created the note
    */
   benutzer: string;
+
+  /**
+   * Creation date (ISO string)
+   */
+  createdAt?: string;
 }
 
 /**
@@ -295,7 +310,15 @@ export const contactRequestCreateValidation = {
 /**
  * Validation schema for request status update
  */
-export const requestStatusUpdateSchema = {
+export const requestStatusUpdateValidation = {
+  id: {
+    type: 'number',
+    required: true,
+    messages: {
+      required: 'Request ID is required',
+      type: 'Request ID must be a number'
+    }
+  },
   status: {
     type: 'enum',
     required: true,
@@ -312,13 +335,24 @@ export const requestStatusUpdateSchema = {
     messages: {
       max: 'Note must not exceed 1000 characters'
     }
+  },
+  processorId: {
+    type: 'number',
+    required: false
   }
 };
 
 /**
  * Validation schema for request note creation
  */
-export const requestNoteCreateSchema = {
+export const requestNoteCreateValidation = {
+  requestId: {
+    type: 'number',
+    required: true,
+    messages: {
+      required: 'Request ID is required'
+    }
+  },
   text: {
     type: 'string',
     required: true,

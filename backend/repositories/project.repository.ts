@@ -5,12 +5,12 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { BaseRepository } from '../utils/base.repository.js';
-import { QueryBuilder } from '../utils/query-builder.js';
+import { QueryBuilder } from '../../backup/utils_bak/query-builder.js';
 import { inject } from '../config/dependency-container.js';
 import { ProjectFilterDTO } from '../types/dtos/project.dto.js';
-import { DatabaseError } from '../utils/errors.js';
+import { DatabaseError } from '../../backup/utils_bak/errors.js';
 import logger from '../utils/logger.js';
-import entityLogger from '../utils/entity-logger.js';
+import entityLogger from '../../backup/utils_bak/entity-logger.js';
 
 /**
  * Project entity type

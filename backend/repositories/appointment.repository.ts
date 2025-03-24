@@ -1,11 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import { BaseRepository } from '../utils/base.repository.js';
-import { QueryBuilder } from '../utils/query-builder.js';
+import { QueryBuilder } from '../../backup/utils_bak/query-builder.js';
 import { FilterOptions } from '../types/controller.types.js';
 import { AppointmentFilterDTO } from '../types/dtos/appointment.dto.js';
 import { AppointmentRecord } from '../types/models.js';
 import { prisma } from '../utils/prisma.utils.js';
-import entityLogger from '../utils/entity-logger.js';
+import entityLogger from '../../backup/utils_bak/entity-logger.js';
 
 /**
  * Appointment entity type

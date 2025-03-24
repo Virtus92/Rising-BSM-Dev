@@ -1,10 +1,11 @@
 /**
- * Error Handling Utilities
- * Provides standardized error handling across the application with custom error classes
- * and error response formatting utilities.
+ * Error Utilities
+ * 
+ * Standardized error handling with custom error classes and
+ * error response formatting utilities.
  */
 import { Request, Response, NextFunction } from 'express';
-import logger from './logger.js';
+import { logger } from './common.utils.js';
 
 /**
  * Base application error with additional metadata
@@ -238,26 +239,7 @@ const filterSensitiveData = (data: any): any => {
 };
 
 /**
- * Type for async handler function
- */
-type AsyncFunction = (req: Request, res: Response, next: NextFunction) => Promise<any>;
-
-/**
- * Higher-order function to wrap async route handlers
- * Automatically catches errors and passes them to the next middleware
- * @param fn - Async function to wrap
- * @returns Wrapped function that handles errors
- */
-export const asyncHandler = (fn: AsyncFunction) => {
-  return function(req: Request, res: Response, next: NextFunction) {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
-};
-
-/**
  * Global error handler middleware
- * Handles all unhandled errors from routes and controllers
- * Formats and sends standardized error responses
  * @param err - Error to handle
  * @param req - Request object
  * @param res - Response object
@@ -302,7 +284,6 @@ export const errorHandler = (
 
 /**
  * 404 Not Found handler
- * Handles routes that don't match any defined routes
  * @param req - Request object
  * @param res - Response object
  * @param next - Next function
@@ -312,20 +293,42 @@ export const notFoundHandler = (req: Request, res: Response, next: NextFunction)
   next(error);
 };
 
-// Export all error handling utilities
-export default {
-  AppError,
-  ValidationError,
-  NotFoundError,
-  UnauthorizedError,
-  ForbiddenError,
-  DatabaseError,
-  ServiceUnavailableError,
-  ConflictError,
-  BadRequestError,
-  TooManyRequestsError,
-  createErrorResponse,
-  asyncHandler,
-  errorHandler,
-  notFoundHandler
+/**
+ * Rate limit error handler
+ * @param req - Request object
+ * @param res - Response object
+ */
+export const rateLimitHandler = (req: Request, res: Response): void => {
+  const error = new TooManyRequestsError('Too many requests, please try again later');
+  const errorResponse = createErrorResponse(error);
+  res.status(429).json(errorResponse);
+};
+
+/**
+ * Setup all error handling middleware on an Express app
+ * @param app - Express application
+ */
+export const setupErrorHandling = (app: any): void => {
+  // Add 404 handler after all routes
+  app.use(notFoundHandler);
+  
+  // Add global error handler
+  app.use(errorHandler);
+  
+  // Handle uncaught errors
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception', { error });
+    
+    // Exit with error after logging
+    setTimeout(() => {
+      process.exit(1);
+    }, 1000);
+  });
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection', { reason, promise });
+    // Don't exit for unhandled rejections, just log them
+  });
+  
+  logger.info('Error handling middleware configured');
 };

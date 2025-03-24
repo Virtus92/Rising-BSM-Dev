@@ -1,10 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { BaseRepository } from '../utils/base.repository.js';
-import { QueryBuilder } from '../utils/query-builder.js';
+import { QueryBuilder } from '../../backup/utils_bak/query-builder.js';
 import { UserFilterDTO } from '../types/dtos/user.dto.js';
 import { UserRecord } from '../types/models.js';
 import { prisma } from '../utils/prisma.utils.js';
-import entityLogger from '../utils/entity-logger.js';
+import entityLogger from '../../backup/utils_bak/entity-logger.js';
 
 /**
  * User entity type

@@ -19,15 +19,15 @@ import {
 import { 
   NotFoundError, 
   ValidationError
-} from '../utils/errors.js';
+} from '../../backup/utils_bak/errors.js';
 import { 
   CreateOptions, 
   UpdateOptions, 
   FindOneOptions, 
   FindAllOptions 
 } from '../types/service.types.js';
-import { getAnfrageStatusInfo } from '../utils/helpers.js';
-import { validateEmail, validateRequired } from '../utils/common-validators.js';
+import { getAnfrageStatusInfo } from '../../backup/utils_bak/helpers.js';
+import { validateEmail, validateRequired } from '../../backup/utils_bak/common-validators.js';
 import logger from '../utils/logger.js';
 
 /**

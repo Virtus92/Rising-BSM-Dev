@@ -2,7 +2,7 @@
  * Logger Utility
  * Provides consistent logging across the application
  */
-import config from '../config';
+import config from '../config/index.js';
 
 // Log levels
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';

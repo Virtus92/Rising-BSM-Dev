@@ -5,8 +5,8 @@
  */
 import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../types/controller.types.js';
-import { asyncHandler } from '../utils/errors.js';
-import { ResponseFactory } from '../utils/response.factory.js';
+import { asyncHandler } from '../../backup/utils_bak/errors.js';
+import { ResponseFactory } from '../../backup/utils_bak/response.factory.js';
 import { CustomerService, customerService } from '../services/customer.service.js';
 import { 
   CustomerCreateDTO, 
@@ -14,7 +14,7 @@ import {
   CustomerFilterParams,
   CustomerStatusUpdateDTO
 } from '../types/dtos/customer.dto.js';
-import { BadRequestError } from '../utils/errors.js';
+import { BadRequestError } from '../../backup/utils_bak/errors.js';
 
 /**
  * Controller for Customer entity operations

@@ -16,15 +16,15 @@ import {
 import { 
   NotFoundError, 
   ValidationError
-} from '../utils/errors.js';
+} from '../../backup/utils_bak/errors.js';
 import { 
   CreateOptions, 
   UpdateOptions, 
   FindOneOptions, 
   FindAllOptions 
 } from '../types/service.types.js';
-import { getTerminStatusInfo } from '../utils/helpers.js';
-import { validateRequired } from '../utils/common-validators.js';
+import { getTerminStatusInfo } from '../../backup/utils_bak/helpers.js';
+import { validateRequired } from '../../backup/utils_bak/common-validators.js';
 
 /**
  * Type for AppointmentRecord from database

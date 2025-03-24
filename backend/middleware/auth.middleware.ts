@@ -1,6 +1,6 @@
 import { Request, NextFunction, Response } from 'express';
-import { verifyToken, extractTokenFromHeader } from '../utils/jwt.js';
-import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
+import { verifyToken, extractTokenFromHeader } from '../../backup/utils_bak/jwt.js';
+import { UnauthorizedError, ForbiddenError } from '../../backup/utils_bak/errors.js';
 import { AuthenticatedRequest } from '../types/common/types.js';
 import prisma from '../utils/prisma.utils.js';
 
@@ -21,36 +21,32 @@ export const authenticate = async (
       throw new UnauthorizedError('Authentication required');
     }
     
-    try {
-      const payload = verifyToken(token);
-      
-      // Always verify user in database
-      const user = await prisma.user.findUnique({
-        where: { id: payload.userId },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          status: true
-        }
-      });
-
-      if (!user || user.status !== 'aktiv') {
-        throw new UnauthorizedError('User inactive or not found');
+    const payload = verifyToken(token);
+    
+    // Always verify user in database
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        status: true
       }
-      
-      (req as unknown as AuthenticatedRequest).user = {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      };
-      
-      next();
-    } catch (error) {
-      next(error);
+    });
+
+    if (!user || user.status !== 'aktiv') {
+      throw new UnauthorizedError('User inactive or not found');
     }
+    
+    (req as unknown as AuthenticatedRequest).user = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role
+    };
+    
+    next();
   } catch (error) {
     next(error);
   }

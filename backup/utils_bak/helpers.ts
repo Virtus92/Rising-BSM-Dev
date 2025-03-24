@@ -2,8 +2,8 @@
  * Helper utilities
  * Common utility functions used across the application
  */
-import { cache } from '../services/cache.service';
-import { prisma } from './prisma.utils';
+import { cache } from '../services/cache.service.js';
+import { prisma } from '../utils/prisma.utils.js';
 
 /**
  * Status information with label and class name

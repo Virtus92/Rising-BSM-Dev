@@ -4,7 +4,7 @@
  * Type definitions for controllers, request handling, and HTTP-related operations.
  */
 import { Request, Response, NextFunction } from 'express';
-import { SortDirection } from './common/types.js';
+import { PaginationOptions, PaginationResult, SortOptions } from './core.types.js';
 
 /**
  * Extension of Express Request with authenticated user
@@ -43,49 +43,9 @@ export type ControllerHandler = (
 ) => Promise<void> | void;
 
 /**
- * Base pagination parameters
- */
-export interface PaginationOptions {
-  /**
-   * Current page (1-based)
-   */
-  page?: number | string;
-  
-  /**
-   * Items per page
-   */
-  limit?: number | string;
-}
-
-/**
- * Pagination result metadata
- */
-export interface PaginationResult {
-  /**
-   * Current page (1-based)
-   */
-  current: number;
-  
-  /**
-   * Items per page
-   */
-  limit: number;
-  
-  /**
-   * Total number of pages
-   */
-  total: number;
-  
-  /**
-   * Total number of records
-   */
-  totalRecords: number;
-}
-
-/**
  * Base filter options
  */
-export interface FilterOptions extends PaginationOptions {
+export interface FilterOptions extends PaginationOptions, SortOptions {
   /**
    * Status filter
    */
@@ -115,16 +75,6 @@ export interface FilterOptions extends PaginationOptions {
    * End date for filtering
    */
   endDate?: string | Date;
-  
-  /**
-   * Sort field
-   */
-  sortBy?: string;
-  
-  /**
-   * Sort direction
-   */
-  sortDirection?: SortDirection;
   
   /**
    * Additional include relations
@@ -287,45 +237,5 @@ export interface FileUploadOptions {
   uniqueFilenames?: boolean;
 }
 
-/**
- * Process pagination options and return formatted pagination result
- * @param params Pagination parameters from request
- * @param defaultLimit Default items per page
- * @param maxLimit Maximum items per page
- */
-export function processPagination(
-  params: PaginationOptions,
-  defaultLimit: number = 20,
-  maxLimit: number = 100
-): PaginationResult {
-  const page = Math.max(1, Number(params.page) || 1);
-  const limit = Math.min(
-    maxLimit, 
-    Math.max(1, Number(params.limit) || defaultLimit)
-  );
-  
-  return {
-    current: page,
-    limit,
-    total: 0, // Will be filled later
-    totalRecords: 0 // Will be filled later
-  };
-}
-
-/**
- * Complete pagination result with total counts
- * @param pagination Pagination base result
- * @param totalRecords Total number of records
- */
-export function completePagination(
-  pagination: PaginationResult, 
-  totalRecords: number
-): PaginationResult {
-  const totalPages = Math.ceil(totalRecords / pagination.limit);
-  
-  return {
-    ...pagination,
-    total: totalPages,
-    totalRecords
-  };
-}
+// Re-export pagination helper functions from core.types
+export { processPagination, completePagination } from './core.types.js';

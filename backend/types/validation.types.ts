@@ -34,9 +34,24 @@ export interface ValidationRule {
   max?: number;
   
   /**
+   * Minimum string length (alias for min for backward compatibility)
+   */
+  minLength?: number;
+  
+  /**
+   * Maximum string length (alias for max for backward compatibility)
+   */
+  maxLength?: number;
+  
+  /**
    * Regular expression pattern to match
    */
   pattern?: RegExp | string;
+  
+  /**
+   * Whether the number must be an integer
+   */
+  integer?: boolean;
   
   /**
    * Custom validation function
@@ -55,9 +70,12 @@ export interface ValidationRule {
     required?: string;
     min?: string;
     max?: string;
+    minLength?: string;
+    maxLength?: string;
     pattern?: string;
     type?: string;
     enum?: string;
+    integer?: string;
     [key: string]: string | undefined;
   };
   
@@ -65,6 +83,11 @@ export interface ValidationRule {
    * Allowed values for enum type
    */
   enum?: any[];
+  
+  /**
+   * Options for enum (alias for enum for backward compatibility)
+   */
+  options?: any[] | Record<string, any>;
   
   /**
    * Nested schema for object type
@@ -79,7 +102,7 @@ export interface ValidationRule {
   /**
    * Additional type-specific options
    */
-  options?: Record<string, any>;
+  [key: string]: any;
   
   /**
    * Array of transformation functions to apply before validation
@@ -104,6 +127,11 @@ export interface ValidationOptions {
   abortEarly?: boolean;
   
   /**
+   * Alias for abortEarly (backward compatibility)
+   */
+  stopOnFirstError?: boolean;
+  
+  /**
    * Whether to strip fields not in the schema
    */
   stripUnknown?: boolean;
@@ -112,6 +140,16 @@ export interface ValidationOptions {
    * Whether to convert types where possible
    */
   convert?: boolean;
+  
+  /**
+   * Whether to throw an error instead of returning validation result
+   */
+  throwOnError?: boolean;
+  
+  /**
+   * Custom validation messages
+   */
+  customMessages?: Record<string, string>;
   
   /**
    * Context data for custom validators
@@ -137,6 +175,11 @@ export interface ValidationResult<T = any> {
    * Validated and transformed data
    */
   data: T;
+  
+  /**
+   * Validated data (alias for data for backward compatibility)
+   */
+  validatedData?: T;
   
   /**
    * Field names with validation errors

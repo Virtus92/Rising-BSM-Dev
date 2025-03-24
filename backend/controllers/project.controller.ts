@@ -5,8 +5,8 @@
  */
 import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../types/controller.types.js';
-import { asyncHandler } from '../utils/errors.js';
-import { ResponseFactory } from '../utils/response.factory.js';
+import { asyncHandler } from '../../backup/utils_bak/errors.js';
+import { ResponseFactory } from '../../backup/utils_bak/response.factory.js';
 import { ProjectService, projectService } from '../services/project.service.js';
 import { 
   ProjectCreateDTO, 
@@ -14,7 +14,7 @@ import {
   ProjectFilterParams,
   ProjectStatusUpdateDTO
 } from '../types/dtos/project.dto.js';
-import { BadRequestError } from '../utils/errors.js';
+import { BadRequestError } from '../../backup/utils_bak/errors.js';
 
 /**
  * Controller for Project entity operations

@@ -4,7 +4,7 @@
  * Generic base service providing standardized business logic operations for all domain entities.
  * Implements consistent error handling, validation, and transaction management.
  */
-import { NotFoundError, AppError } from './errors.js';
+import { NotFoundError, AppError } from '../../backup/utils_bak/errors.js';
 import { 
   FindAllOptions, 
   FindOneOptions, 

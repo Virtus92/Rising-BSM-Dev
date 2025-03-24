@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { FilterOptions } from '../types/controller.types.js';
-import { DatabaseError } from './errors.js';
+import { DatabaseError } from '../../backup/utils_bak/errors.js';
 import logger from './logger.js';
 
 /**

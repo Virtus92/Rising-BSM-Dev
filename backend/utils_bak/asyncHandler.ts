@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../types/common/types.js';
+import { AuthenticatedRequest } from '../../backend/types/common/types.js';
 
 type RequestType = Request | AuthenticatedRequest;
 

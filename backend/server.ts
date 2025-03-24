@@ -7,7 +7,7 @@ import { rateLimit } from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import path from 'path';
-import { generateAuthTokens } from './utils/jwt.js';
+import { generateAuthTokens } from '../backup/utils_bak/jwt.js';
 import config from './config/index.js';
 import setupSwagger from './config/swagger-loader.js';
 import prisma from './utils/prisma.utils.js';

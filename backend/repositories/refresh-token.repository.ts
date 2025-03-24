@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { BaseRepository } from '../utils/base.repository.js';
-import { QueryBuilder } from '../utils/query-builder.js';
+import { QueryBuilder } from '../../backup/utils_bak/query-builder.js';
 import { FilterOptions } from '../types/controller.types.js';
 import { prisma } from '../utils/prisma.utils.js';
 
