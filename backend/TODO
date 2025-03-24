@@ -1,5 +1,0 @@
-Implement the remaining entities following the Project template
-Add integration tests for each layer
-Add a logging service for better traceability
-Implement API documentation using Swagger/OpenAPI
-Add a migration system for database changes
