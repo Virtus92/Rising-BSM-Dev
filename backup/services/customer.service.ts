@@ -4,7 +4,7 @@
  * Service for Customer entity operations providing business logic and validation.
  */
 import { format } from 'date-fns';
-import { BaseService } from '../utils/base.service.js';
+import { BaseService } from '../../backend/utils/base.service.js';
 import { CustomerRepository, Customer, customerRepository } from '../repositories/customer.repository.js';
 import { 
   CustomerCreateDTO, 
@@ -13,21 +13,21 @@ import {
   CustomerDetailResponseDTO,
   CustomerFilterDTO,
   CustomerStatus
-} from '../types/dtos/customer.dto.js';
+} from '../../backend/types/dtos/customer.dto.js';
 import { 
   NotFoundError, 
   ValidationError, 
   ConflictError
-} from '../../backup/utils_bak/errors.js';
+} from '../utils_bak/errors.js';
 import { 
   CreateOptions, 
   UpdateOptions, 
   FindOneOptions, 
   FindAllOptions 
-} from '../types/service.types.js';
-import { getProjektStatusInfo, getTerminStatusInfo } from '../../backup/utils_bak/helpers.js';
-import { validateEmail, validateRequired, validatePhone } from '../../backup/utils_bak/common-validators.js';
-import logger from '../utils/logger.js';
+} from '../../backend/types/service.types.js';
+import { getProjektStatusInfo, getTerminStatusInfo } from '../utils_bak/helpers.js';
+import { validateEmail, validateRequired, validatePhone } from '../utils_bak/common-validators.js';
+import logger from '../../backend/utils/logger.js';
 
 /**
  * Service for Customer entity operations

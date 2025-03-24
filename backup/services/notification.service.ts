@@ -4,20 +4,20 @@
  * Service for Notification entity operations providing business logic and validation.
  */
 import { format } from 'date-fns';
-import { formatRelativeTime } from '../../backup/utils_bak/formatters.js';
-import { BaseService } from '../utils/base.service.js';
+import { formatRelativeTime } from '../utils_bak/formatters.js';
+import { BaseService } from '../../backend/utils/base.service.js';
 import { NotificationRepository, Notification, notificationRepository } from '../repositories/notification.repository.js';
 import { 
   NotificationResponseDTO,
   MarkNotificationReadDTO
-} from '../types/dtos/notification.dto.js';
+} from '../../backend/types/dtos/notification.dto.js';
 import { 
   NotFoundError, 
   ValidationError,
   BadRequestError
-} from '../../backup/utils_bak/errors.js';
+} from '../utils_bak/errors.js';
 import { cache } from './cache.service.js';
-import logger from '../utils/logger.js';
+import logger from '../../backend/utils/logger.js';
 
 /**
  * Service for Notification entity operations

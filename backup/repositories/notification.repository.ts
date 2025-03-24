@@ -1,9 +1,9 @@
 import { PrismaClient } from '@prisma/client';
-import { BaseRepository } from '../utils/base.repository.js';
-import { QueryBuilder } from '../../backup/utils_bak/query-builder.js';
-import { NotificationFilterDTO } from '../types/dtos/notification.dto.js';
+import { BaseRepository } from '../../backend/utils/base.repository.js';
+import { QueryBuilder } from '../utils_bak/query-builder.js';
+import { NotificationFilterDTO } from '../../backend/types/dtos/notification.dto.js';
 import { NotificationRecord } from '../types/models.js';
-import { prisma } from '../utils/prisma.utils.js';
+import { prisma } from '../../backend/utils/prisma.utils.js';
 
 /**
  * Notification entity type

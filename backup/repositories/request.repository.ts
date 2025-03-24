@@ -1,10 +1,10 @@
 import { PrismaClient } from '@prisma/client';
-import { BaseRepository } from '../utils/base.repository.js';
-import { QueryBuilder } from '../../backup/utils_bak/query-builder.js';
-import { FilterOptions } from '../types/controller.types.js';
+import { BaseRepository } from '../../backend/utils/base.repository.js';
+import { QueryBuilder } from '../utils_bak/query-builder.js';
+import { FilterOptions } from '../../backend/types/controller.types.js';
 import { ContactRequestRecord } from '../types/models.js';
-import { prisma } from '../utils/prisma.utils.js';
-import entityLogger from '../../backup/utils_bak/entity-logger.js';
+import { prisma } from '../../backend/utils/prisma.utils.js';
+import entityLogger from '../utils_bak/entity-logger.js';
 
 export interface ContactRequest {
   id: number;

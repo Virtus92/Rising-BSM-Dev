@@ -10,9 +10,11 @@ import {
   ValidationError, 
   NotFoundError, 
   UnauthorizedError, 
-  ForbiddenError, 
+  ForbiddenError,
+  DatabaseError,
+  BusinessLogicError,
   createErrorResponse 
-} from '../../backup/utils_bak/errors.js';
+} from '../utils/error.utils.js';
 import logger from '../utils/logger.js';
 import config from '../config/index.js';
 
@@ -33,24 +35,28 @@ export const errorHandler = (
   
   // Log error with appropriate severity
   const timestamp = new Date().toISOString();
+  const requestPath = `${req.method} ${req.path}`;
+  const userId = (req as any).user?.id;
+  const requestInfo = { path: requestPath, userId, ip: req.ip };
+  
   if (statusCode >= 500) {
-    logger.error(`[${timestamp}] Error ${statusCode}: ${message}`, {
-      error: err,
-      path: req.path,
-      method: req.method,
-      ip: req.ip,
-      userId: (req as any).user?.id
+    logger.error(`Error ${statusCode}: ${message}`, {
+      ...requestInfo,
+      error: err instanceof Error ? {
+        name: err.name,
+        message: err.message,
+        stack: config.SHOW_STACK_TRACES ? err.stack : undefined
+      } : err
     });
   } else if (statusCode >= 400) {
-    logger.warn(`[${timestamp}] Error ${statusCode}: ${message}`, {
-      path: req.path,
-      method: req.method,
-      userId: (req as any).user?.id
-    });
+    logger.warn(`Error ${statusCode}: ${message}`, requestInfo);
   }
   
   // Generate standardized error response
   const errorResponse = createErrorResponse(err);
+  
+  // Add request path to error response
+  errorResponse.path = requestPath;
   
   // Send response
   res.status(statusCode).json(errorResponse);
@@ -72,6 +78,7 @@ export const notFoundHandler = (req: Request, _res: Response, next: NextFunction
 export const rateLimitHandler = (req: Request, res: Response): void => {
   const error = new AppError('Too many requests, please try again later', 429);
   const errorResponse = createErrorResponse(error);
+  errorResponse.path = `${req.method} ${req.path}`;
   res.status(429).json(errorResponse);
 };
 
@@ -79,7 +86,7 @@ export const rateLimitHandler = (req: Request, res: Response): void => {
  * Error logging middleware
  * Logs request information before errors occur
  */
-export const errorLoggerMiddleware = (req: Request, _res: Response, next: NextFunction): void => {
+export const requestContextMiddleware = (req: Request, _res: Response, next: NextFunction): void => {
   // Add request info to context for better error logging
   (req as any).requestContext = {
     startTime: Date.now(),
@@ -94,11 +101,11 @@ export const errorLoggerMiddleware = (req: Request, _res: Response, next: NextFu
 
 /**
  * Setup all error handling middleware on an Express app
- * @param app - Express application
+ * @param app Express application
  */
 export const setupErrorHandling = (app: any): void => {
   // Add request context for better error logging
-  app.use(errorLoggerMiddleware);
+  app.use(requestContextMiddleware);
   
   // Add 404 handler after all routes
   app.use(notFoundHandler);
@@ -108,7 +115,13 @@ export const setupErrorHandling = (app: any): void => {
   
   // Handle uncaught errors
   process.on('uncaughtException', (error) => {
-    logger.error('Uncaught Exception', { error });
+    logger.error('Uncaught Exception', { 
+      error: {
+        name: error.name,
+        message: error.message,
+        stack: config.SHOW_STACK_TRACES ? error.stack : undefined
+      }
+    });
     
     // Exit with error after logging
     setTimeout(() => {
@@ -117,7 +130,14 @@ export const setupErrorHandling = (app: any): void => {
   });
   
   process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection', { reason, promise });
+    logger.error('Unhandled Rejection', { 
+      reason: reason instanceof Error ? {
+        name: reason.name,
+        message: reason.message,
+        stack: config.SHOW_STACK_TRACES ? reason.stack : undefined
+      } : reason,
+      promise
+    });
     // Don't exit for unhandled rejections, just log them
   });
   
@@ -128,6 +148,6 @@ export default {
   errorHandler,
   notFoundHandler,
   rateLimitHandler,
-  errorLoggerMiddleware,
+  requestContextMiddleware,
   setupErrorHandling
 };

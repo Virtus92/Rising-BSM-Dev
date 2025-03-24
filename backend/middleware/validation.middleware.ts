@@ -1,32 +1,36 @@
 /**
  * Validation Middleware
  * 
- * Provides middleware functions for validating request data against schemas.
- * Ensures consistent validation across all API endpoints.
+ * Middleware for validating request data against schemas.
+ * Supports validation of request body, query parameters, and URL parameters.
  */
 import { Request, Response, NextFunction } from 'express';
-import { ValidationSchema } from '../types/validation.js';
+import { ValidationSchema, ValidationOptions } from '../types/validation.types.js';
 import { validateInput } from '../utils/validation.utils.js';
 import { ValidationError } from '../utils/error.utils.js';
 import logger from '../utils/logger.js';
 
 /**
  * Validates request body against a schema
- * @param schema - Validation schema
- * @returns Middleware function
+ * @param schema Validation schema
+ * @param options Validation options
+ * @returns Validation middleware
  */
-export const validateBody = (schema: ValidationSchema) => {
+export const validateBody = (
+  schema: ValidationSchema, 
+  options: ValidationOptions = {}
+) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
       const { validatedData, isValid, errors } = validateInput(
         req.body, 
         schema,
-        { throwOnError: false }
+        { throwOnError: false, ...options }
       );
       
       if (!isValid) {
-        logger.debug('Validation failed', { errors, body: req.body });
-        throw new ValidationError('Validation failed', errors);
+        logger.debug('Body validation failed', { errors, body: req.body });
+        throw new ValidationError('Body validation failed', errors);
       }
       
       // Attach validated data to request for use in controller
@@ -41,24 +45,29 @@ export const validateBody = (schema: ValidationSchema) => {
 
 /**
  * Validates request query parameters against a schema
- * @param schema - Validation schema
- * @returns Middleware function
+ * @param schema Validation schema
+ * @param options Validation options
+ * @returns Validation middleware
  */
-export const validateQuery = (schema: ValidationSchema) => {
+export const validateQuery = (
+  schema: ValidationSchema, 
+  options: ValidationOptions = {}
+) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
-      const validationResult = validateInput(req.query, schema, { throwOnError: false });
+      const { validatedData, isValid, errors } = validateInput(
+        req.query, 
+        schema, 
+        { throwOnError: false, ...options }
+      );
 
-      if (!validationResult.isValid) {
-        logger.debug('Query validation failed', { errors: validationResult.errors, query: req.query });
-        throw new ValidationError(
-          'Query validation failed', 
-          validationResult.errors
-        );
+      if (!isValid) {
+        logger.debug('Query validation failed', { errors, query: req.query });
+        throw new ValidationError('Query validation failed', errors);
       }
 
       // Attach validated query to request for use in controller
-      (req as any).validatedQuery = validationResult.validatedData;
+      (req as any).validatedQuery = validatedData;
       next();
     } catch (error) {
       next(error);
@@ -67,25 +76,30 @@ export const validateQuery = (schema: ValidationSchema) => {
 };
 
 /**
- * Validates request parameters against a schema
- * @param schema - Validation schema
- * @returns Middleware function
+ * Validates request URL parameters against a schema
+ * @param schema Validation schema
+ * @param options Validation options
+ * @returns Validation middleware
  */
-export const validateParams = (schema: ValidationSchema) => {
+export const validateParams = (
+  schema: ValidationSchema, 
+  options: ValidationOptions = {}
+) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
-      const validationResult = validateInput(req.params, schema, { throwOnError: false });
+      const { validatedData, isValid, errors } = validateInput(
+        req.params, 
+        schema, 
+        { throwOnError: false, ...options }
+      );
 
-      if (!validationResult.isValid) {
-        logger.debug('Params validation failed', { errors: validationResult.errors, params: req.params });
-        throw new ValidationError(
-          'Params validation failed', 
-          validationResult.errors
-        );
+      if (!isValid) {
+        logger.debug('Params validation failed', { errors, params: req.params });
+        throw new ValidationError('Params validation failed', errors);
       }
 
       // Attach validated parameters to request for use in controller
-      (req as any).validatedParams = validationResult.validatedData;
+      (req as any).validatedParams = validatedData;
       next();
     } catch (error) {
       next(error);
@@ -94,16 +108,18 @@ export const validateParams = (schema: ValidationSchema) => {
 };
 
 /**
- * Creates a combined validation middleware for multiple request parts
- * @param bodySchema - Schema for request body
- * @param querySchema - Schema for query parameters
- * @param paramsSchema - Schema for route parameters
- * @returns Middleware function
+ * Validates request against multiple schemas
+ * @param bodySchema Schema for request body
+ * @param querySchema Schema for query parameters
+ * @param paramsSchema Schema for URL parameters
+ * @param options Validation options
+ * @returns Combined validation middleware
  */
 export const validateRequest = (
   bodySchema?: ValidationSchema,
   querySchema?: ValidationSchema,
-  paramsSchema?: ValidationSchema
+  paramsSchema?: ValidationSchema,
+  options: ValidationOptions = {}
 ) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
@@ -111,7 +127,7 @@ export const validateRequest = (
 
       // Validate body if schema provided
       if (bodySchema) {
-        const bodyResult = validateInput(req.body, bodySchema, { throwOnError: false });
+        const bodyResult = validateInput(req.body, bodySchema, { throwOnError: false, ...options });
         if (!bodyResult.isValid) {
           validationErrors.push(...bodyResult.errors.map(err => `Body: ${err}`));
         } else {
@@ -121,7 +137,7 @@ export const validateRequest = (
 
       // Validate query if schema provided
       if (querySchema) {
-        const queryResult = validateInput(req.query, querySchema, { throwOnError: false });
+        const queryResult = validateInput(req.query, querySchema, { throwOnError: false, ...options });
         if (!queryResult.isValid) {
           validationErrors.push(...queryResult.errors.map(err => `Query: ${err}`));
         } else {
@@ -131,7 +147,7 @@ export const validateRequest = (
 
       // Validate params if schema provided
       if (paramsSchema) {
-        const paramsResult = validateInput(req.params, paramsSchema, { throwOnError: false });
+        const paramsResult = validateInput(req.params, paramsSchema, { throwOnError: false, ...options });
         if (!paramsResult.isValid) {
           validationErrors.push(...paramsResult.errors.map(err => `Params: ${err}`));
         } else {
@@ -142,10 +158,7 @@ export const validateRequest = (
       // If any validation errors occurred, throw ValidationError
       if (validationErrors.length > 0) {
         logger.debug('Request validation failed', { errors: validationErrors });
-        throw new ValidationError(
-          'Request validation failed',
-          validationErrors
-        );
+        throw new ValidationError('Request validation failed', validationErrors);
       }
 
       next();
@@ -162,57 +175,109 @@ export const commonSchemas = {
   // ID parameter schema
   idParam: {
     id: {
-      type: 'numeric',
+      type: 'number',
       required: true,
       min: 1,
-      integer: true
+      integer: true,
+      messages: {
+        required: 'ID is required',
+        type: 'ID must be a number',
+        min: 'ID must be positive',
+        integer: 'ID must be an integer'
+      }
     }
   },
   
   // Pagination query schema
   pagination: {
     page: {
-      type: 'numeric',
+      type: 'number',
       required: false,
       min: 1,
-      integer: true
+      integer: true,
+      messages: {
+        type: 'Page must be a number',
+        min: 'Page must be at least 1',
+        integer: 'Page must be an integer'
+      }
     },
     limit: {
-      type: 'numeric',
+      type: 'number',
       required: false,
       min: 1,
       max: 100,
-      integer: true
+      integer: true,
+      messages: {
+        type: 'Limit must be a number',
+        min: 'Limit must be at least 1',
+        max: 'Limit must not exceed 100',
+        integer: 'Limit must be an integer'
+      }
     }
   },
   
   // Search query schema
   search: {
     search: {
-      type: 'text',
+      type: 'string',
       required: false,
       minLength: 1,
-      maxLength: 100
+      maxLength: 100,
+      messages: {
+        type: 'Search must be a string',
+        minLength: 'Search must be at least 1 character',
+        maxLength: 'Search must not exceed 100 characters'
+      }
     }
   },
   
   // Date range query schema
   dateRange: {
-    start_date: {
+    startDate: {
       type: 'date',
-      required: false
+      required: false,
+      messages: {
+        type: 'Start date must be a valid date'
+      }
     },
-    end_date: {
+    endDate: {
       type: 'date',
-      required: false
+      required: false,
+      messages: {
+        type: 'End date must be a valid date'
+      }
     }
   },
   
   // Status query schema
   status: {
     status: {
-      type: 'text',
-      required: false
+      type: 'string',
+      required: false,
+      messages: {
+        type: 'Status must be a string'
+      }
+    }
+  },
+  
+  // Sort options schema
+  sort: {
+    sortBy: {
+      type: 'string',
+      required: false,
+      messages: {
+        type: 'Sort field must be a string'
+      }
+    },
+    sortDirection: {
+      type: 'enum',
+      required: false,
+      enum: ['asc', 'desc'],
+      default: 'desc',
+      messages: {
+        type: 'Sort direction must be a string',
+        enum: 'Sort direction must be either "asc" or "desc"'
+      }
     }
   }
 };

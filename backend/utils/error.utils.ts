@@ -1,334 +1,269 @@
 /**
  * Error Utilities
  * 
- * Standardized error handling with custom error classes and
- * error response formatting utilities.
+ * Custom error classes and helpers for consistent error handling throughout the application.
+ * Provides standardized error responses and error codes.
  */
 import { Request, Response, NextFunction } from 'express';
-import { logger } from './common.utils.js';
+import config from '../config/index.js';
 
 /**
- * Base application error with additional metadata
+ * Base Application Error
+ * Parent class for all custom error types
  */
 export class AppError extends Error {
   statusCode: number;
-  isOperational: boolean;
+  errorCode: string;
   details?: any;
-  timestamp: Date;
   
-  constructor(message: string, statusCode: number = 500, details?: any) {
+  /**
+   * Creates a new AppError
+   * @param message Error message
+   * @param statusCode HTTP status code
+   * @param errorCode Application error code
+   * @param details Additional error details
+   */
+  constructor(
+    message: string, 
+    statusCode: number = 500, 
+    errorCode: string = 'internal_error',
+    details?: any
+  ) {
     super(message);
     this.name = this.constructor.name;
     this.statusCode = statusCode;
-    this.isOperational = true;
+    this.errorCode = errorCode;
     this.details = details;
-    this.timestamp = new Date();
     
-    // Fix prototype chain for proper 'instanceof' behavior
-    Object.setPrototypeOf(this, AppError.prototype);
-    
-    // Capture stack trace
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, this.constructor);
-    }
+    // Maintains proper stack trace for where our error was thrown
+    Error.captureStackTrace(this, this.constructor);
   }
 }
 
 /**
- * Validation error for form/data validation failures
+ * Validation Error
+ * Used for request validation failures
  */
 export class ValidationError extends AppError {
   errors: string[];
   
-  constructor(message: string, errors: string[] = [], details?: any) {
-    super(message, 400, details);
-    this.name = this.constructor.name;
+  /**
+   * Creates a new ValidationError
+   * @param message Error message
+   * @param errors Validation error messages
+   */
+  constructor(message: string = 'Validation failed', errors: string[] = []) {
+    super(message, 400, 'validation_error');
     this.errors = errors;
-    
-    // Fix prototype chain
-    Object.setPrototypeOf(this, ValidationError.prototype);
   }
 }
 
 /**
- * Not found error for resource lookups
+ * Not Found Error
+ * Used when a requested resource does not exist
  */
 export class NotFoundError extends AppError {
-  resource: string;
-  
-  constructor(message: string, details?: any) {
-    super(message, 404, details);
-    this.name = this.constructor.name;
-    this.resource = details?.entityType || 'Resource';
-    
-    // Fix prototype chain
-    Object.setPrototypeOf(this, NotFoundError.prototype);
+  /**
+   * Creates a new NotFoundError
+   * @param message Error message
+   */
+  constructor(message: string = 'Resource not found') {
+    super(message, 404, 'not_found');
   }
 }
 
 /**
- * Unauthorized error for authentication failures
+ * Unauthorized Error
+ * Used for authentication failures
  */
 export class UnauthorizedError extends AppError {
-  constructor(message: string = 'Unauthorized access', details?: any) {
-    super(message, 401, details);
-    this.name = this.constructor.name;
-    
-    // Fix prototype chain
-    Object.setPrototypeOf(this, UnauthorizedError.prototype);
+  /**
+   * Creates a new UnauthorizedError
+   * @param message Error message
+   */
+  constructor(message: string = 'Authentication required') {
+    super(message, 401, 'unauthorized');
   }
 }
 
 /**
- * Forbidden error for authorization failures
+ * Forbidden Error
+ * Used for authorization failures
  */
 export class ForbiddenError extends AppError {
-  constructor(message: string = 'Forbidden access', details?: any) {
-    super(message, 403, details);
-    this.name = this.constructor.name;
-    
-    // Fix prototype chain
-    Object.setPrototypeOf(this, ForbiddenError.prototype);
+  /**
+   * Creates a new ForbiddenError
+   * @param message Error message
+   */
+  constructor(message: string = 'Insufficient permissions') {
+    super(message, 403, 'forbidden');
   }
 }
 
 /**
- * Database error for database operation failures
- */
-export class DatabaseError extends AppError {
-  constructor(message: string = 'Database operation failed', details?: any) {
-    super(message, 500, details);
-    this.name = this.constructor.name;
-    
-    // Fix prototype chain
-    Object.setPrototypeOf(this, DatabaseError.prototype);
-  }
-}
-
-/**
- * Service unavailable error for temporary service outages
- */
-export class ServiceUnavailableError extends AppError {
-  constructor(message: string = 'Service temporarily unavailable', details?: any) {
-    super(message, 503, details);
-    this.name = this.constructor.name;
-    
-    // Fix prototype chain
-    Object.setPrototypeOf(this, ServiceUnavailableError.prototype);
-  }
-}
-
-/**
- * Conflict error for resource conflicts
+ * Conflict Error
+ * Used for resource conflicts (e.g., duplicate entries)
  */
 export class ConflictError extends AppError {
-  constructor(message: string = 'Resource conflict', details?: any) {
-    super(message, 409, details);
-    this.name = this.constructor.name;
-    
-    // Fix prototype chain
-    Object.setPrototypeOf(this, ConflictError.prototype);
+  /**
+   * Creates a new ConflictError
+   * @param message Error message
+   */
+  constructor(message: string = 'Resource conflict') {
+    super(message, 409, 'conflict');
   }
 }
 
 /**
- * Bad request error for malformed requests
+ * Database Error
+ * Used for database operation failures
  */
-export class BadRequestError extends AppError {
-  constructor(message: string = 'Bad request', details?: any) {
-    super(message, 400, details);
-    this.name = this.constructor.name;
-    
-    // Fix prototype chain
-    Object.setPrototypeOf(this, BadRequestError.prototype);
+export class DatabaseError extends AppError {
+  /**
+   * Creates a new DatabaseError
+   * @param message Error message
+   * @param details Error details
+   */
+  constructor(message: string = 'Database operation failed', details?: any) {
+    super(message, 500, 'database_error', details);
   }
 }
 
 /**
- * Too many requests error for rate limiting
+ * Business Logic Error
+ * Used for application-specific logic errors
  */
-export class TooManyRequestsError extends AppError {
-  constructor(message: string = 'Too many requests', details?: any) {
-    super(message, 429, details);
-    this.name = this.constructor.name;
-    
-    // Fix prototype chain
-    Object.setPrototypeOf(this, TooManyRequestsError.prototype);
+export class BusinessLogicError extends AppError {
+  /**
+   * Creates a new BusinessLogicError
+   * @param message Error message
+   * @param statusCode HTTP status code (defaults to 400)
+   * @param errorCode Application error code
+   */
+  constructor(
+    message: string, 
+    statusCode: number = 400, 
+    errorCode: string = 'business_logic_error'
+  ) {
+    super(message, statusCode, errorCode);
   }
 }
 
 /**
- * Response interface for standardized error responses
+ * Service Unavailable Error
+ * Used when a service is temporarily unavailable
  */
-export interface ErrorResponse {
-  success: false;
-  error: string;
-  statusCode: number;
-  errors?: string[];
-  timestamp: string;
-  details?: any;
-  stack?: string;
+export class ServiceUnavailableError extends AppError {
+  /**
+   * Creates a new ServiceUnavailableError
+   * @param message Error message
+   */
+  constructor(message: string = 'Service temporarily unavailable') {
+    super(message, 503, 'service_unavailable');
+  }
 }
 
 /**
- * Create a standardized error response object
- * @param error - Error instance
- * @param includeStack - Whether to include stack trace
- * @returns Standardized error response object
+ * Create standardized error response object
+ * @param error Error instance
+ * @returns Error response object
  */
-export const createErrorResponse = (error: Error, includeStack: boolean = false): ErrorResponse => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const statusCode = error instanceof AppError ? error.statusCode : 500;
-  const message = error.message || 'An unexpected error occurred';
-  
-  const response: ErrorResponse = {
-    success: false,
-    error: message,
-    statusCode,
-    timestamp: new Date().toISOString()
-  };
-  
-  if (error instanceof ValidationError) {
-    response.errors = error.errors;
-  }
-  
-  if (error instanceof AppError && error.details) {
-    // Filter sensitive information in production
-    response.details = isProduction 
-      ? filterSensitiveData(error.details)
-      : error.details;
-  }
-  
-  // Include stack trace in development or when explicitly requested
-  if ((!isProduction || includeStack) && error.stack) {
-    response.stack = error.stack;
-  }
-  
-  return response;
-};
-
-/**
- * Filter sensitive data from error details
- * @param data - Data to filter
- * @returns Filtered data
- */
-const filterSensitiveData = (data: any): any => {
-  if (!data || typeof data !== 'object') {
-    return data;
-  }
-  
-  // Filter sensitive fields
-  const sensitiveFields = ['password', 'token', 'secret', 'Authorization', 'auth'];
-  
-  if (Array.isArray(data)) {
-    return data.map(item => filterSensitiveData(item));
-  }
-  
-  const filtered: any = {};
-  for (const [key, value] of Object.entries(data)) {
-    if (sensitiveFields.some(field => key.toLowerCase().includes(field.toLowerCase()))) {
-      filtered[key] = '[REDACTED]';
-    } else if (typeof value === 'object' && value !== null) {
-      filtered[key] = filterSensitiveData(value);
-    } else {
-      filtered[key] = value;
-    }
-  }
-  
-  return filtered;
-};
-
-/**
- * Global error handler middleware
- * @param err - Error to handle
- * @param req - Request object
- * @param res - Response object
- * @param next - Next function
- */
-export const errorHandler = (
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  // Default to 500 if not an AppError
-  const statusCode = err instanceof AppError ? err.statusCode : 500;
-  const message = err.message || 'An unexpected error occurred';
-  
-  // Log the error with appropriate level based on status code
+export function createErrorResponse(error: any): any {
   const timestamp = new Date().toISOString();
-  if (statusCode >= 500) {
-    logger.error(`[${timestamp}] ${statusCode} ${message}`, {
-      error: err, 
-      path: req.path, 
-      method: req.method, 
-      ip: req.ip, 
-      userId: (req as any).user?.id 
-    });
-  } else if (statusCode >= 400) {
-    logger.warn(`[${timestamp}] ${statusCode} ${message}`, {
-      path: req.path, 
-      method: req.method
-    });
+  
+  // If this is an AppError, use its properties
+  if (error instanceof AppError) {
+    const response: any = {
+      success: false,
+      error: error.message,
+      errorCode: error.errorCode,
+      statusCode: error.statusCode,
+      timestamp
+    };
+    
+    // Add validation errors if available
+    if (error instanceof ValidationError && error.errors?.length > 0) {
+      response.errors = error.errors;
+    }
+    
+    // Add stack trace in development mode
+    if (config.SHOW_STACK_TRACES) {
+      response.stack = error.stack;
+    }
+    
+    return response;
   }
   
-  // Generate standardized error response
-  const errorResponse = createErrorResponse(
-    err, 
-    process.env.NODE_ENV !== 'production'
-  );
-  
-  // Send response
-  res.status(statusCode).json(errorResponse);
+  // Default error response
+  return {
+    success: false,
+    error: error.message || 'An unexpected error occurred',
+    errorCode: 'internal_error',
+    statusCode: 500,
+    timestamp,
+    stack: config.SHOW_STACK_TRACES ? error.stack : undefined
+  };
+}
+
+/**
+ * Async handler to avoid try/catch in routes
+ * @param fn Route handler function
+ * @returns Wrapped route handler
+ */
+export const asyncHandler = (fn: Function) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
 };
 
 /**
- * 404 Not Found handler
- * @param req - Request object
- * @param res - Response object
- * @param next - Next function
+ * Extract useful properties from an error for logging
+ * @param error Error object
+ * @returns Simplified error object
  */
-export const notFoundHandler = (req: Request, res: Response, next: NextFunction): void => {
-  const error = new NotFoundError(`Resource not found: ${req.method} ${req.originalUrl}`);
-  next(error);
-};
+export function sanitizeError(error: any): any {
+  if (!error) return { message: 'Unknown error' };
+  
+  // If it's an AppError, get its properties
+  if (error instanceof AppError) {
+    return {
+      name: error.name,
+      message: error.message,
+      statusCode: error.statusCode,
+      errorCode: error.errorCode,
+      stack: error.stack
+    };
+  }
+  
+  // If it's an Error, get standard properties
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    };
+  }
+  
+  // If it's a string, treat as message
+  if (typeof error === 'string') {
+    return { message: error };
+  }
+  
+  // For other objects, just return as is
+  return error;
+}
 
-/**
- * Rate limit error handler
- * @param req - Request object
- * @param res - Response object
- */
-export const rateLimitHandler = (req: Request, res: Response): void => {
-  const error = new TooManyRequestsError('Too many requests, please try again later');
-  const errorResponse = createErrorResponse(error);
-  res.status(429).json(errorResponse);
-};
-
-/**
- * Setup all error handling middleware on an Express app
- * @param app - Express application
- */
-export const setupErrorHandling = (app: any): void => {
-  // Add 404 handler after all routes
-  app.use(notFoundHandler);
-  
-  // Add global error handler
-  app.use(errorHandler);
-  
-  // Handle uncaught errors
-  process.on('uncaughtException', (error) => {
-    logger.error('Uncaught Exception', { error });
-    
-    // Exit with error after logging
-    setTimeout(() => {
-      process.exit(1);
-    }, 1000);
-  });
-  
-  process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection', { reason, promise });
-    // Don't exit for unhandled rejections, just log them
-  });
-  
-  logger.info('Error handling middleware configured');
+export default {
+  AppError,
+  ValidationError,
+  NotFoundError,
+  UnauthorizedError,
+  ForbiddenError,
+  ConflictError,
+  DatabaseError,
+  BusinessLogicError,
+  ServiceUnavailableError,
+  createErrorResponse,
+  asyncHandler,
+  sanitizeError
 };

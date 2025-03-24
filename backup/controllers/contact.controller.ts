@@ -4,14 +4,14 @@
  * Handles contact form submissions and related operations
  */
 import { Request, Response } from 'express';
-import { BadRequestError } from '../../backup/utils_bak/errors.js';
-import { asyncHandler } from '../../backup/utils_bak/asyncHandler.js';
-import { ResponseFactory } from '../../backup/utils_bak/response.factory.js';
-import { AuthenticatedRequest } from '../types/common/types.js';
+import { BadRequestError } from '../utils_bak/errors.js';
+import { asyncHandler } from '../utils_bak/asyncHandler.js';
+import { ResponseFactory } from '../utils_bak/response.factory.js';
+import { AuthenticatedRequest } from '../../backend/types/common/types.js';
 import { RequestService } from '../services/request.service.js';
 import { NotificationService, notificationService } from '../services/notification.service.js';
-import { ContactRequestCreateDTO } from '../types/dtos/request.dto.js';
-import { prisma } from '../utils/prisma.utils.js';
+import { ContactRequestCreateDTO } from '../../backend/types/dtos/request.dto.js';
+import { prisma } from '../../backend/utils/prisma.utils.js';
 
 // Erstelle eine neue Instanz des RequestService
 const requestService = new RequestService();

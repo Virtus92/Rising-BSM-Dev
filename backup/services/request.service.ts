@@ -4,7 +4,7 @@
  * Service for ContactRequest entity operations providing business logic and validation.
  */
 import { format } from 'date-fns';
-import { BaseService } from '../utils/base.service.js';
+import { BaseService } from '../../backend/utils/base.service.js';
 import { 
   RequestRepository, 
   ContactRequest, 
@@ -15,20 +15,20 @@ import {
   ContactRequestResponseDTO, 
   ContactRequestDetailDTO,
   RequestFilterDTO
-} from '../types/dtos/request.dto.js';
+} from '../../backend/types/dtos/request.dto.js';
 import { 
   NotFoundError, 
   ValidationError
-} from '../../backup/utils_bak/errors.js';
+} from '../utils_bak/errors.js';
 import { 
   CreateOptions, 
   UpdateOptions, 
   FindOneOptions, 
   FindAllOptions 
-} from '../types/service.types.js';
-import { getAnfrageStatusInfo } from '../../backup/utils_bak/helpers.js';
-import { validateEmail, validateRequired } from '../../backup/utils_bak/common-validators.js';
-import logger from '../utils/logger.js';
+} from '../../backend/types/service.types.js';
+import { getAnfrageStatusInfo } from '../utils_bak/helpers.js';
+import { validateEmail, validateRequired } from '../utils_bak/common-validators.js';
+import logger from '../../backend/utils/logger.js';
 
 /**
  * Service for ContactRequest entity operations

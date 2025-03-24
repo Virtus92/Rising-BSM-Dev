@@ -5,13 +5,13 @@
  */
 import { PrismaClient, Prisma } from '@prisma/client';
 import { format } from 'date-fns';
-import { BaseRepository } from '../utils/base.repository.js';
-import { QueryBuilder } from '../../backup/utils_bak/query-builder.js';
-import { inject } from '../config/dependency-container.js';
-import { CustomerFilterDTO } from '../types/dtos/customer.dto.js';
-import { DatabaseError } from '../../backup/utils_bak/errors.js';
-import logger from '../utils/logger.js';
-import entityLogger from '../../backup/utils_bak/entity-logger.js';
+import { BaseRepository } from '../../backend/utils/base.repository.js';
+import { QueryBuilder } from '../utils_bak/query-builder.js';
+import { inject } from '../../backend/config/dependency-container.js';
+import { CustomerFilterDTO } from '../../backend/types/dtos/customer.dto.js';
+import { DatabaseError } from '../utils_bak/errors.js';
+import logger from '../../backend/utils/logger.js';
+import entityLogger from '../utils_bak/entity-logger.js';
 
 /**
  * Customer entity type

@@ -1,18 +1,32 @@
+/**
+ * Base Repository
+ * 
+ * Generic base repository providing common CRUD operations with Prisma.
+ * Serves as a foundation for specialized entity repositories.
+ */
 import { PrismaClient } from '@prisma/client';
-import { FilterOptions } from '../types/controller.types.js';
-import { DatabaseError } from '../utils/error.utils.js';
 import logger from './logger.js';
+import { 
+  FindOptions, 
+  FindManyOptions, 
+  CreateOptions, 
+  UpdateOptions, 
+  DeleteOptions, 
+  FilterCriteria,
+} from '../types/repository.types.js';
+import { PaginationResult } from '../types/core.types.js';
+import { DatabaseError, NotFoundError } from './error.utils.js';
 
 /**
- * Base repository class providing common data access methods
- * @template T - Entity type
- * @template F - Filter type (defaults to FilterOptions)
+ * Base repository providing common database operations
+ * @template T Entity type
+ * @template TFilter Filter criteria type
  */
-export abstract class BaseRepository<T, F = FilterOptions> {
+export class BaseRepository<T, TFilter extends FilterCriteria = FilterCriteria> {
   /**
    * Creates a new BaseRepository instance
-   * @param prisma - PrismaClient instance
-   * @param model - Prisma model for the entity
+   * @param prisma PrismaClient instance
+   * @param model Prisma model to use
    */
   constructor(
     protected readonly prisma: PrismaClient,
@@ -20,178 +34,322 @@ export abstract class BaseRepository<T, F = FilterOptions> {
   ) {}
 
   /**
-   * Build filter conditions for queries
-   * @param filters - Filter criteria
+   * Build where conditions from filter criteria
+   * @param filters Filter criteria
    * @returns Prisma-compatible where conditions
    */
-  protected abstract buildFilterConditions(filters: F): any;
+  protected buildFilterConditions(filters: TFilter): any {
+    // Default implementation returns an empty object
+    // Override in subclasses to implement specific filtering logic
+    return {};
+  }
 
   /**
-   * Find all entities matching filters
-   * @param filters - Filter criteria
-   * @param options - Query options
-   * @returns Paginated list of entities
+   * Find all entities matching filter criteria
+   * @param filters Filter criteria
+   * @param options Query options
+   * @returns Paginated results
    */
   async findAll(
-    filters: F,
-    options: {
-      page?: number;
-      limit?: number;
-      orderBy?: any;
-      include?: any;
-    } = {}
-  ): Promise<{ data: T[]; pagination: any }> {
+    filters: TFilter = {} as TFilter,
+    options: FindManyOptions = {}
+  ): Promise<{ data: T[]; pagination: PaginationResult }> {
     try {
-      const { page = 1, limit = 10, orderBy, include } = options;
-      const skip = (page - 1) * limit;
-      
-      // Build where conditions from filters
       const where = this.buildFilterConditions(filters);
       
-      // Execute count query
+      // Process pagination
+      const page = Math.max(1, options.page || 1);
+      const limit = Math.max(1, options.limit || 20);
+      const skip = (page - 1) * limit;
+      
+      // Build order by
+      const orderBy: any = {};
+      if (options.orderBy) {
+        if (Array.isArray(options.orderBy)) {
+          return this.findAllWithMultiSort(filters, { ...options, page, limit, skip });
+        } else {
+          for (const [key, direction] of Object.entries(options.orderBy)) {
+            orderBy[key] = direction;
+          }
+        }
+      } else {
+        // Default sorting by ID if not specified
+        orderBy.id = 'desc';
+      }
+      
+      // Execute count query to get total results
       const total = await this.model.count({ where });
       
-      // Execute find query
+      // Execute main query with pagination
       const data = await this.model.findMany({
         where,
         skip,
         take: limit,
         orderBy,
-        include
+        include: options.include,
+        select: options.select
       });
       
       // Calculate pagination metadata
-      const lastPage = Math.ceil(total / limit);
-      
-      return {
-        data,
-        pagination: {
-          total,
-          lastPage,
-          currentPage: page,
-          perPage: limit,
-          prev: page > 1 ? page - 1 : null,
-          next: page < lastPage ? page + 1 : null
-        }
+      const totalPages = Math.ceil(total / limit);
+      const pagination: PaginationResult = {
+        current: page,
+        limit,
+        total: totalPages,
+        totalRecords: total
       };
+      
+      return { data, pagination };
     } catch (error) {
-      logger.error('Error in BaseRepository.findAll', { entity: this.model.name, error, filters });
-      throw new DatabaseError('Failed to fetch records', { cause: error });
+      logger.error('Error in BaseRepository.findAll', { error, entity: this.model.name, filters });
+      throw new DatabaseError('Failed to fetch entities', { cause: error });
+    }
+  }
+
+  /**
+   * Find all entities with complex multi-column sorting
+   * Private helper for findAll to handle multiple sort columns
+   */
+  private async findAllWithMultiSort(
+    filters: TFilter,
+    options: FindManyOptions & { page: number; limit: number; skip: number }
+  ): Promise<{ data: T[]; pagination: PaginationResult }> {
+    try {
+      const where = this.buildFilterConditions(filters);
+      const { page, limit, skip, orderBy } = options;
+      
+      // Multi-column sorting requires a different approach
+      let orderByArray = [];
+      if (Array.isArray(orderBy)) {
+        for (const sortItem of orderBy) {
+          for (const [key, direction] of Object.entries(sortItem)) {
+            orderByArray.push({ [key]: direction });
+          }
+        }
+      }
+      
+      // Execute count query to get total results
+      const total = await this.model.count({ where });
+      
+      // Execute main query with pagination
+      const data = await this.model.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: orderByArray,
+        include: options.include,
+        select: options.select
+      });
+      
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(total / limit);
+      const pagination: PaginationResult = {
+        current: page,
+        limit,
+        total: totalPages,
+        totalRecords: total
+      };
+      
+      return { data, pagination };
+    } catch (error) {
+      logger.error('Error in BaseRepository.findAllWithMultiSort', { error, entity: this.model.name, filters });
+      throw new DatabaseError('Failed to fetch entities with complex sorting', { cause: error });
     }
   }
 
   /**
    * Find entity by ID
-   * @param id - Entity ID
-   * @param options - Query options
+   * @param id Entity ID
+   * @param options Query options
    * @returns Entity or null if not found
    */
-  async findById(id: number, options: any = {}): Promise<T | null> {
+  async findById(id: number, options: FindOptions = {}): Promise<T | null> {
     try {
-      return this.model.findUnique({
+      const entity = await this.model.findUnique({
         where: { id },
-        ...options
+        include: options.include,
+        select: options.select
       });
+      
+      return entity;
     } catch (error) {
-      logger.error('Error in BaseRepository.findById', { entity: this.model.name, error, id });
-      throw new DatabaseError(`Failed to fetch record with ID ${id}`, { cause: error });
+      logger.error('Error in BaseRepository.findById', { error, entity: this.model.name, id });
+      throw new DatabaseError(`Failed to fetch entity with ID ${id}`, { cause: error });
     }
   }
 
   /**
-   * Find first entity matching conditions
-   * @param where - Query conditions
-   * @param options - Query options
+   * Find entity by ID or throw error if not found
+   * @param id Entity ID
+   * @param options Query options
+   * @returns Entity
+   * @throws NotFoundError if entity not found
+   */
+  async findByIdOrThrow(id: number, options: FindOptions = {}): Promise<T> {
+    const entity = await this.findById(id, options);
+    
+    if (!entity) {
+      throw new NotFoundError(`Entity with ID ${id} not found`);
+    }
+    
+    return entity;
+  }
+
+  /**
+   * Find a single entity by custom criteria
+   * @param where Where conditions
+   * @param options Query options
    * @returns Entity or null if not found
    */
-  async findOne(where: any, options: any = {}): Promise<T | null> {
+  async findOne(where: any, options: FindOptions = {}): Promise<T | null> {
     try {
-      return this.model.findFirst({
+      const entity = await this.model.findFirst({
         where,
-        ...options
+        include: options.include,
+        select: options.select,
+        orderBy: options.orderBy
       });
+      
+      return entity;
     } catch (error) {
-      logger.error('Error in BaseRepository.findOne', { entity: this.model.name, error, where });
-      throw new DatabaseError('Failed to fetch record', { cause: error });
+      logger.error('Error in BaseRepository.findOne', { error, entity: this.model.name, where });
+      throw new DatabaseError('Failed to fetch entity', { cause: error });
     }
   }
 
   /**
    * Create a new entity
-   * @param data - Entity data
+   * @param data Entity data
+   * @param options Create options
    * @returns Created entity
    */
-  async create(data: Partial<T>): Promise<T> {
+  async create(data: Partial<T>, options: CreateOptions = {}): Promise<T> {
     try {
-      return this.model.create({
-        data
+      const entity = await this.model.create({
+        data,
+        include: options.include,
+        select: options.select
       });
+      
+      return entity;
     } catch (error) {
-      logger.error('Error in BaseRepository.create', { entity: this.model.name, error });
-      throw new DatabaseError('Failed to create record', { cause: error });
+      logger.error('Error in BaseRepository.create', { error, entity: this.model.name, data });
+      throw new DatabaseError('Failed to create entity', { cause: error });
     }
   }
 
   /**
    * Update an existing entity
-   * @param id - Entity ID
-   * @param data - Entity data
+   * @param id Entity ID
+   * @param data Updated entity data
+   * @param options Update options
    * @returns Updated entity
+   * @throws NotFoundError if entity not found and checkExists is true
    */
-  async update(id: number, data: Partial<T>): Promise<T> {
+  async update(id: number, data: Partial<T>, options: UpdateOptions = {}): Promise<T> {
     try {
-      return this.model.update({
+      // Check if entity exists if required
+      if (options.checkExists) {
+        const exists = await this.model.findUnique({ where: { id } });
+        if (!exists) {
+          throw new NotFoundError(`Entity with ID ${id} not found`);
+        }
+      }
+      
+      // Update entity
+      const entity = await this.model.update({
         where: { id },
-        data
+        data,
+        include: options.include,
+        select: options.select
       });
+      
+      return entity;
     } catch (error) {
-      logger.error('Error in BaseRepository.update', { entity: this.model.name, error, id });
-      throw new DatabaseError(`Failed to update record with ID ${id}`, { cause: error });
+      // If error is already a NotFoundError, rethrow it
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      
+      logger.error('Error in BaseRepository.update', { error, entity: this.model.name, id, data });
+      throw new DatabaseError(`Failed to update entity with ID ${id}`, { cause: error });
     }
   }
 
   /**
    * Delete an entity
-   * @param id - Entity ID
+   * @param id Entity ID
+   * @param options Delete options
    * @returns Deleted entity
+   * @throws NotFoundError if entity not found and checkExists is true
    */
-  async delete(id: number): Promise<T> {
+  async delete(id: number, options: DeleteOptions = {}): Promise<T> {
     try {
-      return this.model.delete({
+      // Check if entity exists if required
+      if (options.checkExists) {
+        const exists = await this.model.findUnique({ where: { id } });
+        if (!exists) {
+          throw new NotFoundError(`Entity with ID ${id} not found`);
+        }
+      }
+      
+      // Delete entity
+      const entity = await this.model.delete({
         where: { id }
       });
+      
+      return entity;
     } catch (error) {
-      logger.error('Error in BaseRepository.delete', { entity: this.model.name, error, id });
-      throw new DatabaseError(`Failed to delete record with ID ${id}`, { cause: error });
+      // If error is already a NotFoundError, rethrow it
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      
+      logger.error('Error in BaseRepository.delete', { error, entity: this.model.name, id });
+      throw new DatabaseError(`Failed to delete entity with ID ${id}`, { cause: error });
     }
   }
 
   /**
-   * Count entities matching conditions
-   * @param where - Query conditions
-   * @returns Count of matching entities
+   * Count entities with filter
+   * @param filters Filter criteria
+   * @param options Count options
+   * @returns Entity count
    */
-  async count(where: any = {}): Promise<number> {
+  async count(filters: TFilter = {} as TFilter, options: any = {}): Promise<number> {
     try {
-      return this.model.count({ where });
+      const where = this.buildFilterConditions(filters);
+      
+      return this.model.count({
+        where,
+        distinct: options.distinct
+      });
     } catch (error) {
-      logger.error('Error in BaseRepository.count', { entity: this.model.name, error, where });
-      throw new DatabaseError('Failed to count records', { cause: error });
+      logger.error('Error in BaseRepository.count', { error, entity: this.model.name, filters });
+      throw new DatabaseError('Failed to count entities', { cause: error });
     }
   }
 
   /**
-   * Execute operations in a transaction
-   * @param callback - Transaction callback
-   * @returns Result of the transaction
+   * Execute operations within a transaction
+   * @param callback Transaction callback
+   * @param options Transaction options
+   * @returns Result of the callback
    */
   async transaction<R>(
-    callback: (tx: any) => Promise<R>
+    callback: (tx: any) => Promise<R>,
+    options: any = {}
   ): Promise<R> {
     try {
-      return this.prisma.$transaction(callback);
+      // Execute transaction with prisma.$transaction
+      return await this.prisma.$transaction(async (tx) => {
+        return callback(tx);
+      }, {
+        timeout: options.timeout,
+        isolationLevel: options.isolationLevel
+      });
     } catch (error) {
-      logger.error('Error in BaseRepository.transaction', { entity: this.model.name, error });
+      logger.error('Error in BaseRepository.transaction', { error, entity: this.model.name });
       throw new DatabaseError('Transaction failed', { cause: error });
     }
   }

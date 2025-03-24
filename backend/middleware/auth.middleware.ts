@@ -1,12 +1,34 @@
-import { Request, NextFunction, Response } from 'express';
-import { verifyToken, extractTokenFromHeader } from '../utils/security.utils.js';
+/**
+ * Authentication Middleware
+ * 
+ * Middleware for handling authentication and authorization.
+ * Verifies JWT tokens, attaches user to request, and implements role-based access control.
+ */
+import { Request, Response, NextFunction } from 'express';
+import { verifyToken } from '../utils/security.utils.js';
 import { UnauthorizedError, ForbiddenError } from '../utils/error.utils.js';
-import { AuthenticatedRequest } from '../types/common/types.js';
-import prisma from '../utils/prisma.utils.js';
+import { AuthenticatedRequest, AuthUser } from '../types/common/types.js';
+import { prisma } from '../utils/prisma.utils.js';
+import logger from '../utils/logger.js';
 
 /**
- * Authentication middleware that validates JWT tokens
- * Always verifies user in database and attaches user object to request if authenticated
+ * Extracts JWT token from Authorization header
+ * @param req HTTP request
+ * @returns JWT token or null
+ */
+function extractTokenFromHeader(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  
+  return authHeader.substring(7); // Remove 'Bearer ' prefix
+}
+
+/**
+ * Authentication middleware 
+ * Validates JWT token and attaches user to request
  */
 export const authenticate = async (
   req: Request,
@@ -14,126 +36,159 @@ export const authenticate = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = extractTokenFromHeader(authHeader);
+    // Extract token from header
+    const token = extractTokenFromHeader(req);
     
     if (!token) {
       throw new UnauthorizedError('Authentication required');
     }
     
-    const payload = verifyToken(token);
-    
-    // Always verify user in database
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        status: true
-      }
-    });
+    // Verify token
+    try {
+      const payload = verifyToken(token);
+      
+      // Verify user in database if configured to do so
+      if (process.env.VERIFY_JWT_USER_IN_DB === 'true') {
+        const user = await prisma.user.findUnique({
+          where: { id: payload.userId },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            status: true
+          }
+        });
 
-    if (!user || user.status !== 'aktiv') {
-      throw new UnauthorizedError('User inactive or not found');
+        // Check if user exists and is active
+        if (!user) {
+          throw new UnauthorizedError('User not found');
+        }
+        
+        if (user.status !== 'active') {
+          throw new UnauthorizedError('User account is inactive');
+        }
+        
+        // Attach user to request
+        (req as AuthenticatedRequest).user = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        };
+      } else {
+        // Attach user from token payload
+        (req as AuthenticatedRequest).user = {
+          id: payload.userId,
+          name: payload.name || '',
+          email: payload.email || '',
+          role: payload.role || 'user'
+        };
+      }
+      
+      next();
+    } catch (error) {
+      logger.debug('Token verification failed', { error });
+      throw new UnauthorizedError('Invalid or expired token');
     }
-    
-    (req as unknown as AuthenticatedRequest).user = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role
-    };
-    
-    next();
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * Admin role authorization middleware
- * Requires the authenticate middleware to be called first
+ * Role-based authorization middleware factory
+ * Creates middleware that checks if user has required roles
+ * @param roles Allowed roles
+ * @returns Authorization middleware
  */
-export const isAdmin = (
-  req: Request, 
-  next: NextFunction
-): void => {
-  const user = (req as unknown as AuthenticatedRequest).user;
+export const authorize = (roles: string | string[] = []) => {
+  // Convert single role to array
+  const allowedRoles = Array.isArray(roles) ? roles : [roles];
   
-  if (!user) {
-    return next(new UnauthorizedError('Authentication required'));
-  }
-  
-  if (user.role !== 'admin') {
-    return next(new ForbiddenError('Admin privileges required'));
-  }
-  
-  next();
-};
-
-/**
- * Manager role authorization middleware
- * Requires the authenticate middleware to be called first
- */
-export const isManager = (
-  req: Request, 
-  next: NextFunction
-): void => {
-  const user = (req as unknown as AuthenticatedRequest).user;
-  
-  if (!user) {
-    return next(new UnauthorizedError('Authentication required'));
-  }
-  
-  if (user.role !== 'admin' && user.role !== 'manager') {
-    return next(new ForbiddenError('Manager privileges required'));
-  }
-  
-  next();
-};
-
-/**
- * Resource owner middleware
- * Checks if the authenticated user is the owner of the resource
- * Allows admins to access resources regardless of ownership
- * @param paramName - Name of the parameter containing the resource ID
- * @param userIdProvider - Function to get the user ID from the resource
- */
-export const isResourceOwner = (
-  paramName: string,
-  userIdProvider: (resourceId: number) => Promise<number | null>
-) => {
-  return async (
-    req: Request, 
-    next: NextFunction
-  ): Promise<void> => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     try {
-      const user = (req as unknown as AuthenticatedRequest).user;
+      const authReq = req as AuthenticatedRequest;
       
-      if (!user) {
+      // Check if request has authenticated user
+      if (!authReq.user) {
         throw new UnauthorizedError('Authentication required');
       }
       
-      // Admins can access all resources
-      if (user.role === 'admin') {
+      // If no roles specified, any authenticated user is allowed
+      if (allowedRoles.length === 0) {
         return next();
       }
       
+      // Check if user has one of the allowed roles
+      if (!allowedRoles.includes(authReq.user.role)) {
+        throw new ForbiddenError('Insufficient permissions');
+      }
+      
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+};
+
+/**
+ * Admin authorization middleware
+ * Shorthand for authorize(['admin'])
+ */
+export const isAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  return authorize('admin')(req, res, next);
+};
+
+/**
+ * Manager authorization middleware
+ * Shorthand for authorize(['admin', 'manager'])
+ */
+export const isManager = (req: Request, res: Response, next: NextFunction): void => {
+  return authorize(['admin', 'manager'])(req, res, next);
+};
+
+/**
+ * Resource owner middleware factory
+ * Creates middleware that checks if the authenticated user is the owner of the resource
+ * @param paramName Name of URL parameter containing resource ID
+ * @param idProvider Function to get owner ID from resource
+ * @returns Resource ownership middleware
+ */
+export const isResourceOwner = (
+  paramName: string,
+  idProvider: (resourceId: number) => Promise<number | null>
+) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      
+      // Check if request has authenticated user
+      if (!authReq.user) {
+        throw new UnauthorizedError('Authentication required');
+      }
+      
+      // Admin users bypass ownership check
+      if (authReq.user.role === 'admin') {
+        return next();
+      }
+      
+      // Get resource ID from URL parameter
       const resourceId = parseInt(req.params[paramName]);
       
       if (isNaN(resourceId)) {
         throw new UnauthorizedError('Invalid resource ID');
       }
       
-      const resourceUserId = await userIdProvider(resourceId);
+      // Get owner ID from resource
+      const ownerId = await idProvider(resourceId);
       
-      if (resourceUserId === null) {
+      if (ownerId === null) {
         throw new UnauthorizedError('Resource not found');
       }
       
-      if (resourceUserId !== user.id) {
+      // Check if user is owner
+      if (ownerId !== authReq.user.id) {
         throw new ForbiddenError('You do not have permission to access this resource');
       }
       
@@ -142,4 +197,12 @@ export const isResourceOwner = (
       next(error);
     }
   };
+};
+
+export default {
+  authenticate,
+  authorize,
+  isAdmin,
+  isManager,
+  isResourceOwner
 };
