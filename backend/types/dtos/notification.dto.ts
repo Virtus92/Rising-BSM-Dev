@@ -2,9 +2,19 @@
  * Notification DTOs
  * 
  * Data Transfer Objects for Notification entity operations.
+ * @module types/dtos/notification
  */
 import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, BaseFilterDTO } from './base.dto.js';
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     NotificationType:
+ *       type: string
+ *       enum: [anfrage, termin, projekt, warnung, info, system]
+ *       description: Type of notification
+ */
 /**
  * Enum for notification types
  */
@@ -17,6 +27,42 @@ export enum NotificationType {
   SYSTEM = 'system'
 }
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     NotificationCreateDTO:
+ *       type: object
+ *       required:
+ *         - type
+ *         - title
+ *         - message
+ *       properties:
+ *         userId:
+ *           type: integer
+ *           description: User ID to notify (null for system notifications)
+ *           nullable: true
+ *         type:
+ *           $ref: '#/components/schemas/NotificationType'
+ *         title:
+ *           type: string
+ *           minLength: 2
+ *           maxLength: 100
+ *           description: Notification title
+ *         message:
+ *           type: string
+ *           minLength: 2
+ *           maxLength: 500
+ *           description: Notification message
+ *         referenceId:
+ *           type: integer
+ *           description: Related entity ID (optional)
+ *           nullable: true
+ *         referenceType:
+ *           type: string
+ *           description: Related entity type (optional)
+ *           nullable: true
+ */
 /**
  * DTO for creating a new notification
  */
@@ -52,6 +98,42 @@ export interface NotificationCreateDTO extends BaseCreateDTO {
   referenceType?: string | null;
 }
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     NotificationResponseDTO:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: Notification ID
+ *         title:
+ *           type: string
+ *           description: Notification title
+ *         message:
+ *           type: string
+ *           description: Notification message
+ *         type:
+ *           type: string
+ *           description: CSS type class (success, primary, warning, info)
+ *         icon:
+ *           type: string
+ *           description: Notification icon
+ *         read:
+ *           type: boolean
+ *           description: Read status
+ *         time:
+ *           type: string
+ *           description: Relative time (e.g., "2 hours ago")
+ *         timestamp:
+ *           type: string
+ *           format: date-time
+ *           description: Notification timestamp
+ *         link:
+ *           type: string
+ *           description: Link to related content
+ */
 /**
  * DTO for notification response
  */
@@ -103,6 +185,21 @@ export interface NotificationResponseDTO extends BaseResponseDTO {
 }
 
 /**
+ * @swagger
+ * components:
+ *   schemas:
+ *     MarkNotificationReadDTO:
+ *       type: object
+ *       properties:
+ *         notificationId:
+ *           type: integer
+ *           description: Specific notification ID to mark as read (optional)
+ *         markAll:
+ *           type: boolean
+ *           default: false
+ *           description: Flag to mark all notifications as read
+ */
+/**
  * DTO for marking notifications as read
  */
 export interface MarkNotificationReadDTO {
@@ -117,6 +214,39 @@ export interface MarkNotificationReadDTO {
   markAll?: boolean;
 }
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     NotificationFilterDTO:
+ *       type: object
+ *       properties:
+ *         userId:
+ *           type: integer
+ *           description: Filter by user ID
+ *         type:
+ *           type: string
+ *           description: Filter by type
+ *         read:
+ *           type: boolean
+ *           description: Filter by read status
+ *         search:
+ *           type: string
+ *           description: Search term
+ *         page:
+ *           type: integer
+ *           description: Page number
+ *         limit:
+ *           type: integer
+ *           description: Items per page
+ *         sortBy:
+ *           type: string
+ *           description: Field to sort by
+ *         sortDirection:
+ *           type: string
+ *           enum: [asc, desc]
+ *           description: Sort direction
+ */
 /**
  * DTO for notification filtering
  */
@@ -138,6 +268,25 @@ export interface NotificationFilterDTO extends BaseFilterDTO {
 }
 
 /**
+ * @swagger
+ * components:
+ *   schemas:
+ *     NotificationStatsDTO:
+ *       type: object
+ *       properties:
+ *         totalCount:
+ *           type: integer
+ *           description: Total notifications count
+ *         unreadCount:
+ *           type: integer
+ *           description: Unread notifications count
+ *         byType:
+ *           type: object
+ *           additionalProperties:
+ *             type: integer
+ *           description: Notifications by type
+ */
+/**
  * DTO for notification statistics
  */
 export interface NotificationStatsDTO {
@@ -155,6 +304,27 @@ export interface NotificationStatsDTO {
    * Notifications by type
    */
   byType: Record<string, number>;
+}
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     NotificationUpdateDTO:
+ *       type: object
+ *       properties:
+ *         read:
+ *           type: boolean
+ *           description: Read status
+ */
+/**
+ * DTO for updating an existing notification
+ */
+export interface NotificationUpdateDTO extends BaseUpdateDTO {
+  /**
+   * Read status
+   */
+  read?: boolean;
 }
 
 /**
@@ -211,6 +381,70 @@ export const notificationCreateSchema = {
     required: false,
     messages: {
       type: 'Reference type must be a string'
+    }
+  }
+};
+
+/**
+ * Validation schema for notification query
+ */
+export const notificationQuerySchema = {
+  type: {
+    type: 'string',
+    required: false,
+    messages: {
+      type: 'Type must be a string'
+    }
+  },
+  read: {
+    type: 'string',
+    required: false,
+    messages: {
+      type: 'Read status must be a boolean or string'
+    }
+  },
+  page: {
+    type: 'number',
+    required: false,
+    min: 1,
+    messages: {
+      type: 'Page must be a number',
+      min: 'Page must be at least 1'
+    }
+  },
+  limit: {
+    type: 'number',
+    required: false,
+    min: 1,
+    max: 100,
+    messages: {
+      type: 'Limit must be a number',
+      min: 'Limit must be at least 1',
+      max: 'Limit must not exceed 100'
+    }
+  },
+  search: {
+    type: 'string',
+    required: false,
+    messages: {
+      type: 'Search term must be a string'
+    }
+  },
+  sortBy: {
+    type: 'string',
+    required: false,
+    messages: {
+      type: 'Sort field must be a string'
+    }
+  },
+  sortDirection: {
+    type: 'enum',
+    required: false,
+    enum: ['asc', 'desc'],
+    default: 'desc',
+    messages: {
+      type: 'Sort direction must be a string',
+      enum: 'Sort direction must be either "asc" or "desc"'
     }
   }
 };
