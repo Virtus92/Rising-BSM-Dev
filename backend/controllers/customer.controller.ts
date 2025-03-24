@@ -11,7 +11,7 @@ import { CustomerService, customerService } from '../services/customer.service.j
 import { 
   CustomerCreateDTO, 
   CustomerUpdateDTO, 
-  CustomerFilterDTO,
+  CustomerFilterParams,
   CustomerStatusUpdateDTO
 } from '../types/dtos/customer.dto.js';
 import { BadRequestError } from '../utils/errors.js';
@@ -32,7 +32,7 @@ export class CustomerController {
    */
   getAllCustomers = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Extract query parameters as filter options
-    const filters: CustomerFilterDTO = {
+    const filters: CustomerFilterParams = {
       status: req.query.status as string,
       type: req.query.type as string,
       search: req.query.search as string,
@@ -216,7 +216,7 @@ export class CustomerController {
    */
   exportCustomers = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Extract query parameters as filter options
-    const filters: CustomerFilterDTO = {
+    const filters: CustomerFilterParams = {
       status: req.query.status as string,
       type: req.query.type as string,
       search: req.query.search as string,

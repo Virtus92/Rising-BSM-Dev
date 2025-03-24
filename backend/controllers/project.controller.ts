@@ -11,7 +11,7 @@ import { ProjectService, projectService } from '../services/project.service.js';
 import { 
   ProjectCreateDTO, 
   ProjectUpdateDTO, 
-  ProjectFilterDTO,
+  ProjectFilterParams,
   ProjectStatusUpdateDTO
 } from '../types/dtos/project.dto.js';
 import { BadRequestError } from '../utils/errors.js';
@@ -32,12 +32,12 @@ export class ProjectController {
    */
   getAllProjects = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Extract query parameters as filter options
-    const filters: ProjectFilterDTO = {
+    const filters: ProjectFilterParams = {
       status: req.query.status as string,
-      kunde_id: req.query.kunde_id ? Number(req.query.kunde_id) : undefined,
-      dienstleistung_id: req.query.dienstleistung_id ? Number(req.query.dienstleistung_id) : undefined,
-      start_datum_von: req.query.start_datum_von as string,
-      start_datum_bis: req.query.start_datum_bis as string,
+      customerId: req.query.kunde_id ? Number(req.query.kunde_id) : undefined,
+      serviceId: req.query.dienstleistung_id ? Number(req.query.dienstleistung_id) : undefined,
+      startDateFrom: req.query.start_datum_von as string,
+      startDateTo: req.query.start_datum_bis as string,
       search: req.query.search as string,
       page: req.query.page ? Number(req.query.page) : undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
@@ -207,12 +207,12 @@ export class ProjectController {
    */
   getProjectStatistics = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Extract filter parameters
-    const filters: Partial<ProjectFilterDTO> = {
+    const filters: Partial<ProjectFilterParams> = {
       status: req.query.status as string,
-      kunde_id: req.query.kunde_id ? Number(req.query.kunde_id) : undefined,
-      dienstleistung_id: req.query.dienstleistung_id ? Number(req.query.dienstleistung_id) : undefined,
-      start_datum_von: req.query.start_datum_von as string,
-      start_datum_bis: req.query.start_datum_bis as string
+      customerId: req.query.kunde_id ? Number(req.query.kunde_id) : undefined,
+      serviceId: req.query.dienstleistung_id ? Number(req.query.dienstleistung_id) : undefined,
+      startDateFrom: req.query.start_datum_von as string,
+      startDateTo: req.query.start_datum_bis as string
     };
     
     // Get statistics from service

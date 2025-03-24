@@ -6,13 +6,13 @@
 import { Request, Response } from 'express';
 import { BadRequestError } from '../utils/errors.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { AuthenticatedRequest } from '../types/authenticated-request.js';
+import { AuthenticatedRequest } from '../types/common/types.js';
 import { ResponseFactory } from '../utils/response.factory.js';
 import { UserService, userService } from '../services/user.service.js';
 import { 
   UserCreateDTO, 
   UserUpdateDTO, 
-  UserFilterDTO
+  UserFilterParams
 } from '../types/dtos/user.dto.js';
 
 /**
@@ -20,7 +20,7 @@ import {
  */
 export const getAllUsers = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   // Extract filter parameters
-  const filters: UserFilterDTO = {
+  const filters: UserFilterParams = {
     status: req.query.status as string,
     role: req.query.role as string,
     search: req.query.search as string,

@@ -4,6 +4,8 @@
  * Shared type definitions used across the application.
  */
 
+import { File } from 'buffer';
+
 /**
  * Base interface for all DTOs
  */
@@ -365,8 +367,14 @@ export interface BaseDTO {
    * Authenticated request extension
    */
   export interface AuthenticatedRequest extends Request {
-    /**
-     * Authenticated user
-     */
-    user?: AuthUser;
+    user?: {
+      id: number;
+      name: string;
+      email: string;
+      role: string;
+    };
+    params: any;
+    body: any;
+    ip: string;
+    file?: File;
   }

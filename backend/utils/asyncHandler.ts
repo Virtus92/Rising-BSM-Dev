@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from '../types/common/types.js';
 
 /**
  * Wraps an async function to properly handle errors and pass them to Express's error handler
@@ -7,7 +8,7 @@ import { Request, Response, NextFunction } from 'express';
  * @returns Wrapped function that catches and forwards errors
  */
 export const asyncHandler = <T extends Request = Request, R = void>(
-  fn: (req: T, res: Response, next: NextFunction) => Promise<R>
+  fn: (req: Request | AuthenticatedRequest, res: Response, next?: NextFunction) => Promise<void>
 ) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     Promise.resolve(fn(req as T, res, next))

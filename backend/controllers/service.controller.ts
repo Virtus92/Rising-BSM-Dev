@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
 import { BadRequestError } from '../utils/errors.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { AuthenticatedRequest } from '../types/authenticated-request.js';
+import { AuthenticatedRequest } from '../types/common/types.js';
 import { ResponseFactory } from '../utils/response.factory.js';
 import { ServiceService, serviceService } from '../services/service.service.js';
 import { 
-  ServiceFilterDTO,
+  ServiceFilterParams,
   ServiceCreateDTO,
   ServiceUpdateDTO,
   ServiceStatusUpdateDTO
@@ -16,7 +16,7 @@ import {
  */
 export const getAllServices = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   // Extract filter parameters
-  const filters: ServiceFilterDTO = {
+  const filters: ServiceFilterParams = {
     status: req.query.status as string,
     search: req.query.search as string,
     page: req.query.page ? Number(req.query.page) : undefined,

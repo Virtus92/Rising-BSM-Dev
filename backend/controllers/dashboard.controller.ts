@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { AuthenticatedRequest } from '../types/authenticated-request.js';
+import { AuthenticatedRequest } from '../types/common/types.js';
 import { ResponseFactory } from '../utils/response.factory.js';
 import { NotificationService, notificationService } from '../services/notification.service.js';
 import { CustomerService, customerService } from '../services/customer.service.js';

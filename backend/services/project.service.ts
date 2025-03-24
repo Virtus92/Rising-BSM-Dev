@@ -11,7 +11,7 @@ import {
   ProjectUpdateDTO, 
   ProjectResponseDTO, 
   ProjectDetailResponseDTO,
-  ProjectFilterDTO,
+  ProjectFilterParams,
   ProjectStatus
 } from '../types/dtos/project.dto.js';
 import { 
@@ -36,7 +36,7 @@ import logger from '../utils/logger.js';
 export class ProjectService extends BaseService<
   Project,
   ProjectRepository,
-  ProjectFilterDTO,
+  ProjectFilterParams,
   ProjectCreateDTO,
   ProjectUpdateDTO,
   ProjectResponseDTO
@@ -56,7 +56,7 @@ export class ProjectService extends BaseService<
    * @returns Paginated list of projects
    */
   async findAll(
-    filters: ProjectFilterDTO,
+    filters: ProjectFilterParams,
     options: FindAllOptions = {}
   ): Promise<{ data: ProjectResponseDTO[]; pagination: any }> {
     try {
@@ -386,7 +386,7 @@ export class ProjectService extends BaseService<
    * @param filters - Filter criteria
    * @returns Project statistics
    */
-  async getStatistics(filters: Partial<ProjectFilterDTO> = {}): Promise<any> {
+  async getStatistics(filters: Partial<ProjectFilterParams> = {}): Promise<any> {
     try {
       return await this.repository.getProjectStats(filters);
     } catch (error) {
@@ -451,16 +451,16 @@ private async checkServiceExists(id: number): Promise<boolean> {
    */
   protected async validateCreate(data: ProjectCreateDTO): Promise<void> {
     // Validate required fields
-    validateRequired(data.titel, 'Project title');
+    validateRequired(data.title, 'Project title');
     
     // Validate date format
     try {
-      validateDate(data.start_datum, 'Start date');
+      validateDate(data.startDate, 'Start date');
       
       // Validate end date if provided
-      if (data.end_datum) {
-        const endDate = validateDate(data.end_datum, 'End date');
-        const startDate = new Date(data.start_datum);
+      if (data.endDate) {
+        const endDate = validateDate(data.endDate, 'End date');
+        const startDate = new Date(data.startDate);
         
         if (endDate < startDate) {
           throw new ValidationError('End date must be after start date');
@@ -474,8 +474,8 @@ private async checkServiceExists(id: number): Promise<boolean> {
     }
     
     // Validate amount if provided
-    if (data.betrag !== undefined && data.betrag !== null) {
-      if (isNaN(Number(data.betrag)) || Number(data.betrag) < 0) {
+    if (data.amount !== undefined && data.amount !== null) {
+      if (isNaN(Number(data.amount)) || Number(data.amount) < 0) {
         throw new ValidationError('Amount must be a positive number');
       }
     }
@@ -486,20 +486,20 @@ private async checkServiceExists(id: number): Promise<boolean> {
     }
     
     // Validate customer ID if provided
-    if (data.kunde_id) {
+    if (data.customerId) {
       // Check if customer exists
-      const customerExists = await this.checkCustomerExists(Number(data.kunde_id));
+      const customerExists = await this.checkCustomerExists(Number(data.customerId));
       if (!customerExists) {
-        throw new ValidationError(`Customer with ID ${data.kunde_id} not found`);
+        throw new ValidationError(`Customer with ID ${data.customerId} not found`);
       }
     }
     
     // Validate service ID if provided
-    if (data.dienstleistung_id) {
+    if (data.serviceId) {
       // Check if service exists
-      const serviceExists = await this.checkServiceExists(Number(data.dienstleistung_id));
+      const serviceExists = await this.checkServiceExists(Number(data.serviceId));
       if (!serviceExists) {
-        throw new ValidationError(`Service with ID ${data.dienstleistung_id} not found`);
+        throw new ValidationError(`Service with ID ${data.serviceId} not found`);
       }
     }
   }
@@ -512,8 +512,8 @@ private async checkServiceExists(id: number): Promise<boolean> {
    */
   protected async validateUpdate(id: number, data: ProjectUpdateDTO): Promise<void> {
     // Validate title if provided
-    if (data.titel !== undefined) {
-      validateRequired(data.titel, 'Project title', 2);
+    if (data.title !== undefined) {
+      validateRequired(data.title, 'Project title', 2);
     }
     
     // Validate dates
@@ -521,18 +521,18 @@ private async checkServiceExists(id: number): Promise<boolean> {
     let endDate: Date | null = null;
     
     // Check start date format
-    if (data.start_datum) {
+    if (data.startDate) {
       try {
-        startDate = validateDate(data.start_datum, 'Start date');
+        startDate = validateDate(data.startDate, 'Start date');
       } catch (error) {
         throw new ValidationError('Invalid start date format');
       }
     }
     
     // Check end date format
-    if (data.end_datum) {
+    if (data.endDate) {
       try {
-        endDate = validateDate(data.end_datum, 'End date');
+        endDate = validateDate(data.endDate, 'End date');
       } catch (error) {
         throw new ValidationError('Invalid end date format');
       }
@@ -551,7 +551,7 @@ private async checkServiceExists(id: number): Promise<boolean> {
     }
     
     // Use existing dates for comparison if not in update data
-    if (!startDate && data.end_datum) {
+    if (!startDate && data.endDate) {
       startDate = existing.startDate;
       
       if (startDate && endDate && endDate < startDate) {
@@ -559,7 +559,7 @@ private async checkServiceExists(id: number): Promise<boolean> {
       }
     }
     
-    if (!endDate && data.start_datum && existing.endDate) {
+    if (!endDate && data.startDate && existing.endDate) {
       endDate = existing.endDate;
       
       if (startDate && endDate && endDate < startDate) {
@@ -568,8 +568,8 @@ private async checkServiceExists(id: number): Promise<boolean> {
     }
     
     // Validate amount if provided
-    if (data.betrag !== undefined) {
-      if (data.betrag !== null && (isNaN(Number(data.betrag)) || Number(data.betrag) < 0)) {
+    if (data.amount !== undefined) {
+      if (data.amount !== null && (isNaN(Number(data.amount)) || Number(data.amount) < 0)) {
         throw new ValidationError('Amount must be a positive number');
       }
     }
@@ -580,18 +580,18 @@ private async checkServiceExists(id: number): Promise<boolean> {
     }
     
     // Validate customer ID if provided
-    if (data.kunde_id !== undefined && data.kunde_id !== null) {
-      const customerExists = await this.checkCustomerExists(Number(data.kunde_id));
+    if (data.customerId !== undefined && data.customerId !== null) {
+      const customerExists = await this.checkCustomerExists(Number(data.customerId));
       if (!customerExists) {
-        throw new ValidationError(`Customer with ID ${data.kunde_id} not found`);
+        throw new ValidationError(`Customer with ID ${data.customerId} not found`);
       }
     }
     
     // Validate service ID if provided
-    if (data.dienstleistung_id !== undefined && data.dienstleistung_id !== null) {
-      const serviceExists = await this.checkServiceExists(Number(data.dienstleistung_id));
+    if (data.serviceId !== undefined && data.serviceId !== null) {
+      const serviceExists = await this.checkServiceExists(Number(data.serviceId));
       if (!serviceExists) {
-        throw new ValidationError(`Service with ID ${data.dienstleistung_id} not found`);
+        throw new ValidationError(`Service with ID ${data.serviceId} not found`);
       }
     }
   }
@@ -607,18 +607,16 @@ private async checkServiceExists(id: number): Promise<boolean> {
     
     return {
       id: entity.id,
-      titel: entity.title,
-      kunde_id: entity.customerId,
-      kunde_name: entity.Customer?.name || 'Kein Kunde zugewiesen',
-      dienstleistung_id: entity.serviceId,
-      dienstleistung: entity.Service?.name || 'Keine Dienstleistung',
-      start_datum: entity.startDate ? format(entity.startDate, 'yyyy-MM-dd') : '',
-      end_datum: entity.endDate ? format(entity.endDate, 'yyyy-MM-dd') : '',
-      betrag: entity.amount ? Number(entity.amount) : null,
-      beschreibung: entity.description || '',
+      title: entity.title,
+      customerId: entity.customerId,
+      customerName: entity.Customer?.name || 'Kein Kunde zugewiesen',
+      serviceId: entity.serviceId,
+      serviceName: entity.Service?.name || 'Keine Dienstleistung',
+      startDate: entity.startDate ? format(entity.startDate, 'yyyy-MM-dd') : '',
+      endDate: entity.endDate ? format(entity.endDate, 'yyyy-MM-dd') : '',
+      amount: entity.amount ? Number(entity.amount) : null,
+      description: entity.description || '',
       status: entity.status,
-      statusLabel: statusInfo.label,
-      statusClass: statusInfo.className,
       createdAt: format(entity.createdAt, 'yyyy-MM-dd HH:mm:ss'),
       updatedAt: format(entity.updatedAt, 'yyyy-MM-dd HH:mm:ss')
     };
@@ -640,8 +638,8 @@ private async checkServiceExists(id: number): Promise<boolean> {
       const statusInfo = getTerminStatusInfo(appointment.status);
       return {
         id: appointment.id,
-        titel: appointment.title,
-        datum: format(appointment.appointmentDate, 'yyyy-MM-dd HH:mm'),
+        title: appointment.title,
+        appointmentDate: format(appointment.appointmentDate, 'yyyy-MM-dd HH:mm'),
         status: appointment.status,
         statusLabel: statusInfo.label,
         statusClass: statusInfo.className
@@ -652,8 +650,8 @@ private async checkServiceExists(id: number): Promise<boolean> {
     const formattedNotes = notes.map((note: any) => ({
       id: note.id,
       text: note.text,
-      formattedDate: format(note.createdAt, 'yyyy-MM-dd HH:mm'),
-      benutzer: note.userName
+      createdAt: format(note.createdAt, 'yyyy-MM-dd HH:mm'),
+      userName: note.userName
     }));
     
     // Return combined data
@@ -671,13 +669,13 @@ private async checkServiceExists(id: number): Promise<boolean> {
    */
   protected mapCreateDtoToEntity(dto: ProjectCreateDTO): Partial<Project> {
     return {
-      title: dto.titel,
-      customerId: dto.kunde_id !== undefined ? Number(dto.kunde_id) : null,
-      serviceId: dto.dienstleistung_id !== undefined ? Number(dto.dienstleistung_id) : null,
-      startDate: dto.start_datum ? new Date(dto.start_datum) : null,
-      endDate: dto.end_datum ? new Date(dto.end_datum) : null,
-      amount: dto.betrag !== undefined ? Number(dto.betrag) : null,
-      description: dto.beschreibung || null,
+      title: dto.title,
+      customerId: dto.customerId !== undefined ? Number(dto.customerId) : null,
+      serviceId: dto.serviceId !== undefined ? Number(dto.serviceId) : null,
+      startDate: dto.startDate ? new Date(dto.startDate) : null,
+      endDate: dto.endDate ? new Date(dto.endDate) : null,
+      amount: dto.amount !== undefined ? Number(dto.amount) : null,
+      description: dto.description || null,
       status: dto.status || ProjectStatus.NEW
     };
   }
@@ -691,13 +689,13 @@ private async checkServiceExists(id: number): Promise<boolean> {
     const updateData: Partial<Project> = {};
     
     // Only include fields that are present in the DTO
-    if (dto.titel !== undefined) updateData.title = dto.titel;
-    if (dto.kunde_id !== undefined) updateData.customerId = dto.kunde_id !== null ? Number(dto.kunde_id) : null;
-    if (dto.dienstleistung_id !== undefined) updateData.serviceId = dto.dienstleistung_id !== null ? Number(dto.dienstleistung_id) : null;
-    if (dto.start_datum !== undefined) updateData.startDate = new Date(dto.start_datum);
-    if (dto.end_datum !== undefined) updateData.endDate = dto.end_datum ? new Date(dto.end_datum) : null;
-    if (dto.betrag !== undefined) updateData.amount = dto.betrag !== null ? Number(dto.betrag) : null;
-    if (dto.beschreibung !== undefined) updateData.description = dto.beschreibung;
+    if (dto.title !== undefined) updateData.title = dto.title;
+    if (dto.customerId !== undefined) updateData.customerId = dto.customerId !== null ? Number(dto.customerId) : null;
+    if (dto.serviceId !== undefined) updateData.serviceId = dto.serviceId !== null ? Number(dto.serviceId) : null;
+    if (dto.startDate !== undefined) updateData.startDate = new Date(dto.startDate);
+    if (dto.endDate !== undefined) updateData.endDate = dto.endDate ? new Date(dto.endDate) : null;
+    if (dto.amount !== undefined) updateData.amount = dto.amount !== null ? Number(dto.amount) : null;
+    if (dto.description !== undefined) updateData.description = dto.description;
     if (dto.status !== undefined) updateData.status = dto.status;
     
     return updateData;
