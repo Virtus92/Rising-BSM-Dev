@@ -5,7 +5,9 @@
  */
 
 import { File } from 'buffer';
-
+import { Request } from 'express';
+import { ParsedQs } from 'qs';
+import { ParamsDictionary } from 'express-serve-static-core';
 /**
  * Base interface for all DTOs
  */
@@ -363,18 +365,112 @@ export interface BaseDTO {
     role: string;
   }
   
+  
   /**
-   * Authenticated request extension
+   * Comprehensive authentication user information
    */
-  export interface AuthenticatedRequest extends Request {
-    user?: {
-      id: number;
-      name: string;
-      email: string;
-      role: string;
-    };
-    params: any;
-    body: any;
-    ip: string;
+  export interface AuthUser {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+  }
+  
+  /**
+   * Comprehensive authenticated request interface
+   * Extends Express Request with additional properties
+   */
+  export interface AuthenticatedRequest extends Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>> {  
+    /**
+     * Authenticated user information
+     */
+    user?: AuthUser;
+  
+    /**
+     * Optional validated request data
+     */
+    validatedData?: any;
+    validatedQuery?: any;
+    validatedParams?: any;
+  
+    /**
+     * File upload support
+     */
     file?: File;
+  
+    /**
+     * IP address of the request
+     */
+    ip: string;
+  
+    /**
+     * Additional request properties to match Express Request
+     */
+    get(name: string): string[] | undefined;
+    header(name: string): string | undefined;
+    accepts(type: string): string | false;
+    acceptsCharsets(charset: string): string | false;
+    acceptsLanguages(language: string): string | false;
+    is(type: string): string | false;
+    
+    /**
+     * Optional credentials and other properties
+     */
+    credentials?: any;
+    destination?: string;
+    integrity?: string;
+    cache?: any;
+  }
+  
+  /**
+   * Type guard to check if a request is an authenticated request
+   */
+  export function isAuthenticatedRequest(req: Request | AuthenticatedRequest): req is AuthenticatedRequest {
+    return 'user' in req && req.user !== undefined;
+  }
+  
+  /**
+   * Safely get user ID from request
+   */
+  export function getUserId(req: Request | AuthenticatedRequest): number | undefined {
+    return isAuthenticatedRequest(req) ? req.user?.id : undefined;
+  }
+  
+  /**
+   * Safely get user context from request
+   */
+  export function getUserContext(req: Request | AuthenticatedRequest): UserContext | undefined {
+    if (!isAuthenticatedRequest(req) || !req.user) return undefined;
+  
+    return {
+      userId: req.user.id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      ipAddress: req.ip
+    };
+  }
+  
+  /**
+   * User context for operations
+   */
+  export interface UserContext {
+    /**
+     * User ID
+     */
+    userId: number;
+    
+    /**
+     * User name
+     */
+    userName: string;
+    
+    /**
+     * User role
+     */
+    userRole: string;
+    
+    /**
+     * IP address
+     */
+    ipAddress?: string;
   }

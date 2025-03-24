@@ -7,6 +7,7 @@ import { Request, Response } from 'express';
 import { BadRequestError } from '../utils/errors.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ResponseFactory } from '../utils/response.factory.js';
+import { AuthenticatedRequest } from '../types/common/types.js';
 import { RequestService } from '../services/request.service.js';
 import { NotificationService, notificationService } from '../services/notification.service.js';
 import { ContactRequestCreateDTO } from '../types/dtos/request.dto.js';
@@ -56,10 +57,9 @@ export const submitContact = asyncHandler(async (req: Request, res: Response): P
 });
 
 /**
- * Get contact request by ID
  * Allows authenticated users to view a specific contact request
  */
-export const getContactRequest = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+export const getContactRequest = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const id = Number(req.params.id);
   
   if (isNaN(id)) {
