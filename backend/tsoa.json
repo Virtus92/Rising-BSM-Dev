@@ -1,0 +1,13 @@
+{
+    "entryFile": "server.ts",
+    "noImplicitAdditionalProperties": "throw-on-extras",
+    "controllerPathGlobs": ["./controllers/*.ts"],
+    "spec": {
+      "outputDirectory": "dist",
+      "specVersion": 3
+    },
+    "routes": {
+      "routesDir": "dist",
+      "middlewareTemplate": "templates/routes.template.hbs"
+    }
+  }
