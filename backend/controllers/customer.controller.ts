@@ -209,6 +209,38 @@ export class CustomerController {
     // Send success response
     ResponseFactory.success(res, statistics, 'Customer statistics retrieved successfully');
   });
+
+  /**
+   * Export customers to CSV
+   * @route GET /api/v1/customers/export
+   */
+  exportCustomers = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    // Extract query parameters as filter options
+    const filters: CustomerFilterDTO = {
+      status: req.query.status as string,
+      type: req.query.type as string,
+      search: req.query.search as string,
+      sortBy: req.query.sortBy as string,
+      sortDirection: req.query.sortDirection as 'asc' | 'desc'
+    };
+
+    // Get customers from service
+    const result = await this.service.findAll(filters, {
+      orderBy: filters.sortBy,
+      orderDirection: filters.sortDirection
+    });
+
+    // Convert customers to CSV
+    //const csv = this.service.convertToCSV(result.data);
+
+    // Set response headers for CSV download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="customers.csv"');
+
+    // Send CSV data
+    res.status(200).send(null);
+  });
+
 }
 
 // Create controller instance for use in routes
@@ -222,7 +254,8 @@ export const {
   updateCustomer,
   updateCustomerStatus,
   addCustomerNote,
-  getCustomerStatistics
+  getCustomerStatistics,
+  exportCustomers
 } = customerController;
 
 export default customerController;

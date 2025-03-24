@@ -4,7 +4,7 @@
  * Type definitions for controllers, request handling, and HTTP-related operations.
  */
 import { Request, Response, NextFunction } from 'express';
-import { SortDirection } from './common.types.js';
+import { SortDirection } from './common/types.js';
 
 /**
  * Extension of Express Request with authenticated user

@@ -11,15 +11,17 @@ import {
   updateAppointment,
   deleteAppointment,
   updateAppointmentStatus,
-  addAppointmentNote
+  addAppointmentNote,
+  exportAppointments
 } from '../controllers/appointment.controller.js';
 import { validateBody, validateParams, validateQuery } from '../middleware/validation.middleware.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { 
-  appointmentCreateSchema, 
-  appointmentUpdateSchema, 
-  appointmentStatusUpdateSchema, 
-  appointmentNoteCreateSchema 
+  appointmentCreateValidation, 
+  appointmentUpdateValidation,
+  appointmentStatusUpdateValidation,
+  appointmentNoteCreateValidation,
+  AppointmentStatus
 } from '../types/dtos/appointment.dto.js';
 
 // Create router
@@ -34,6 +36,21 @@ router.use(authenticate);
  * @access Private
  */
 router.get('/', getAllAppointments);
+
+/**
+ * @route GET /api/v1/appointments/statistics
+ * @description Get appointment statistics
+ * @access Private
+ 
+router.get('/statistics', getAppointmentStatistics);
+*/
+
+/**
+ * @route GET /api/v1/appointments/export
+ * @description Export appointments data
+ * @access Private
+ */
+router.get('/export', exportAppointments);
 
 /**
  * @route GET /api/v1/appointments/:id
@@ -56,7 +73,7 @@ router.get('/:id', validateParams({
  * @description Create a new appointment
  * @access Private
  */
-router.post('/', validateBody(appointmentCreateSchema), createAppointment);
+router.post('/', validateBody(appointmentCreateValidation), createAppointment);
 
 /**
  * @route PUT /api/v1/appointments/:id
@@ -72,7 +89,7 @@ router.put('/:id', validateParams({
       type: 'Appointment ID must be a number'
     }
   }
-}), validateBody(appointmentUpdateSchema), updateAppointment);
+}), validateBody(appointmentUpdateValidation), updateAppointment);
 
 /**
  * @route DELETE /api/v1/appointments/:id
@@ -104,7 +121,10 @@ router.patch('/:id/status', validateParams({
       type: 'Appointment ID must be a number'
     }
   }
-}), validateBody(appointmentStatusUpdateSchema), updateAppointmentStatus);
+}), validateBody({
+  status: appointmentStatusUpdateValidation.status,
+  note: appointmentStatusUpdateValidation.note
+}), updateAppointmentStatus);
 
 /**
  * @route POST /api/v1/appointments/:id/notes
@@ -120,6 +140,18 @@ router.post('/:id/notes', validateParams({
       type: 'Appointment ID must be a number'
     }
   }
-}), validateBody(appointmentNoteCreateSchema), addAppointmentNote);
+}), validateBody({
+  text: {
+    type: 'string',
+    required: true,
+    min: 1,
+    max: 1000,
+    messages: {
+      required: 'Note text is required',
+      min: 'Note text cannot be empty',
+      max: 'Note text must not exceed 1000 characters'
+    }
+  }
+}), addAppointmentNote);
 
 export default router;

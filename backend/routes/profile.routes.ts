@@ -15,9 +15,9 @@ import {
 import { validateBody } from '../middleware/validation.middleware.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { 
-  profileUpdateSchema, 
-  passwordUpdateSchema, 
-  notificationSettingsUpdateSchema 
+  profileUpdateValidation, 
+  passwordUpdateValidation, 
+  notificationSettingsUpdateValidation 
 } from '../types/dtos/profile.dto.js';
 
 // Configure multer for profile picture uploads
@@ -55,14 +55,14 @@ router.get('/', getUserProfile);
  * @description Update user profile
  * @access Private
  */
-router.put('/', validateBody(profileUpdateSchema), updateProfile);
+router.put('/', validateBody(profileUpdateValidation), updateProfile);
 
 /**
  * @route PUT /api/v1/profile/password
  * @description Update user password
  * @access Private
  */
-router.put('/password', validateBody(passwordUpdateSchema), updatePassword);
+router.put('/password', validateBody(passwordUpdateValidation), updatePassword);
 
 /**
  * @route POST /api/v1/profile/picture
@@ -76,6 +76,6 @@ router.post('/picture', upload.single('file'), updateProfilePicture);
  * @description Update notification settings
  * @access Private
  */
-router.put('/notifications', validateBody(notificationSettingsUpdateSchema), updateNotificationSettings);
+router.put('/notifications', validateBody(notificationSettingsUpdateValidation), updateNotificationSettings);
 
 export default router;

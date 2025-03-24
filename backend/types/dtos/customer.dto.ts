@@ -440,6 +440,46 @@ export const customerUpdateValidation = {
 };
 
 /**
+ * Validation schema for customer status update
+ */
+export const customerStatusUpdateValidation = {
+  status: {
+    type: 'enum',
+    required: true,
+    enum: Object.values(CustomerStatus),
+    messages: {
+      required: 'Status is required',
+      enum: `Status must be one of: ${Object.values(CustomerStatus).join(', ')}`
+    }
+  },
+  note: {
+    type: 'string',
+    required: false,
+    max: 1000,
+    messages: {
+      max: 'Note must not exceed 1000 characters'
+    }
+  }
+};
+
+/**
+ * Validation schema for customer note creation
+ */
+export const customerNoteCreateValidation = {
+  text: {
+    type: 'string',
+    required: true,
+    min: 1,
+    max: 1000,
+    messages: {
+      required: 'Note text is required',
+      min: 'Note text cannot be empty',
+      max: 'Note text must not exceed 1000 characters'
+    }
+  }
+};
+
+/**
  * Get human-readable status label
  */
 export function getCustomerStatusLabel(status: string): string {

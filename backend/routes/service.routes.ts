@@ -15,9 +15,9 @@ import {
 import { validateBody, validateParams, validateQuery } from '../middleware/validation.middleware.js';
 import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
 import { 
-  serviceCreateSchema, 
-  serviceUpdateSchema, 
-  serviceStatusUpdateSchema 
+  serviceCreateValidation, 
+  serviceUpdateValidation, 
+  serviceStatusUpdateValidation 
 } from '../types/dtos/service.dto.js';
 
 // Create router
@@ -54,7 +54,7 @@ router.get('/:id', validateParams({
  * @description Create a new service
  * @access Admin only
  */
-router.post('/', isAdmin, validateBody(serviceCreateSchema), createService);
+router.post('/', isAdmin, validateBody(serviceCreateValidation), createService);
 
 /**
  * @route PUT /api/v1/services/:id
@@ -70,7 +70,7 @@ router.put('/:id', isAdmin, validateParams({
       type: 'Service ID must be a number'
     }
   }
-}), validateBody(serviceUpdateSchema), updateService);
+}), validateBody(serviceUpdateValidation), updateService);
 
 /**
  * @route PATCH /api/v1/services/:id/status
@@ -86,7 +86,7 @@ router.patch('/:id/status', isAdmin, validateParams({
       type: 'Service ID must be a number'
     }
   }
-}), validateBody(serviceStatusUpdateSchema), toggleServiceStatus);
+}), validateBody(serviceStatusUpdateValidation), toggleServiceStatus);
 
 /**
  * @route GET /api/v1/services/:id/statistics

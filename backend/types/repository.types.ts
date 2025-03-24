@@ -3,7 +3,7 @@
  * 
  * Type definitions for repositories and their operations.
  */
-import { SortDirection } from './common.types.js';
+import { SortDirection } from './common/types.js';
 
 /**
  * Common options for repository operations

@@ -17,9 +17,10 @@ import {
 import { validateBody, validateParams, validateQuery } from '../middleware/validation.middleware.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { 
-  projectCreateSchema, 
-  projectUpdateSchema, 
-  projectStatusUpdateSchema 
+  projectCreateValidation, 
+  projectUpdateValidation, 
+  ProjectStatusUpdateDTO,
+  projectNoteCreateValidation
 } from '../types/dtos/project.dto.js';
 
 // Create router
@@ -70,7 +71,7 @@ router.get('/:id', validateParams({
  * @description Create a new project
  * @access Private
  */
-router.post('/', validateBody(projectCreateSchema), createProject);
+router.post('/', validateBody(projectCreateValidation), createProject);
 
 /**
  * @route PUT /api/v1/projects/:id
@@ -86,7 +87,7 @@ router.put('/:id', validateParams({
       type: 'Project ID must be a number'
     }
   }
-}), validateBody(projectUpdateSchema), updateProject);
+}), validateBody(projectUpdateValidation), updateProject);
 
 /**
  * @route PATCH /api/v1/projects/:id/status
@@ -102,7 +103,7 @@ router.patch('/:id/status', validateParams({
       type: 'Project ID must be a number'
     }
   }
-}), validateBody(projectStatusUpdateSchema), updateProjectStatus);
+}), validateBody(projectUpdateValidation), updateProjectStatus);
 
 /**
  * @route POST /api/v1/projects/:id/notes
@@ -118,18 +119,6 @@ router.post('/:id/notes', validateParams({
       type: 'Project ID must be a number'
     }
   }
-}), validateBody({
-  note: {
-    type: 'string',
-    required: true,
-    min: 1,
-    max: 1000,
-    messages: {
-      required: 'Note text is required',
-      min: 'Note text cannot be empty',
-      max: 'Note text must not exceed 1000 characters'
-    }
-  }
-}), addProjectNote);
+}), validateBody(projectNoteCreateValidation), addProjectNote);
 
 export default router;

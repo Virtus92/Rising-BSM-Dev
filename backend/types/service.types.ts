@@ -3,7 +3,7 @@
  * 
  * Type definitions for services and their operations.
  */
-import { UserContext } from './common.types.js';
+import { UserContext } from './common/types.js';
 
 /**
  * Common options for service operations

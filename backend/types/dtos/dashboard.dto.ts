@@ -3,19 +3,21 @@
  * 
  * Data Transfer Objects for Dashboard operations and data visualization.
  */
-import { BaseFilterDTO } from './base.dto.js';
+import { BaseFilterDTO, Status } from '../common/types.js';
+import { getRequestStatusLabel, getRequestStatusClass } from './contact-request.dto.js';
+import { getAppointmentStatusLabel, getAppointmentStatusClass } from './appointment.dto.js';
 
 /**
  * DTO for dashboard filter options
  */
 export interface DashboardFilterDTO extends BaseFilterDTO {
   /**
-   * Revenue chart filter (e.g., "Letzten 30 Tage", "Letzten 3 Monate", etc.)
+   * Revenue chart filter
    */
   revenueFilter?: string;
 
   /**
-   * Services chart filter (e.g., "Diese Woche", "Diesen Monat", etc.)
+   * Services chart filter
    */
   servicesFilter?: string;
 
@@ -152,7 +154,17 @@ export interface SystemStatusDTO {
   /**
    * Database status
    */
-  database: string;
+  database: {
+    /**
+     * Connection status
+     */
+    status: string;
+
+    /**
+     * Detailed message
+     */
+    message: string;
+  };
 
   /**
    * Last update timestamp
@@ -162,12 +174,32 @@ export interface SystemStatusDTO {
   /**
    * Processing status
    */
-  processing: string;
+  processing: {
+    /**
+     * Overall processing status
+     */
+    status: string;
+
+    /**
+     * Detailed message
+     */
+    message: string;
+  };
 
   /**
    * Statistics status
    */
-  statistics: string;
+  statistics: {
+    /**
+     * Statistics calculation status
+     */
+    status: string;
+
+    /**
+     * Detailed message
+     */
+    message: string;
+  };
 }
 
 /**
@@ -227,7 +259,12 @@ export interface UpcomingAppointmentDTO {
   /**
    * Customer name
    */
-  customer: string;
+  customerName: string;
+
+  /**
+   * Project title (optional)
+   */
+  projectTitle?: string;
 
   /**
    * Date label
@@ -235,9 +272,14 @@ export interface UpcomingAppointmentDTO {
   dateLabel: string;
 
   /**
-   * Date CSS class
+   * Status label
    */
-  dateClass: string;
+  status: string;
+
+  /**
+   * Status CSS class
+   */
+  statusClass: string;
 
   /**
    * Formatted time
@@ -246,7 +288,7 @@ export interface UpcomingAppointmentDTO {
 }
 
 /**
- * DTO for complete dashboard data
+ * DTO for complex dashboard data
  */
 export interface DashboardDataDTO {
   /**
@@ -302,7 +344,7 @@ export interface GlobalSearchDTO {
   /**
    * Search query term
    */
-  q: string;
+  query: string;
 }
 
 /**
@@ -321,7 +363,7 @@ export interface SearchItemDTO {
   name?: string;
 
   /**
-   * Item type (e.g., "Kunde", "Projekt", etc.)
+   * Item type (e.g., "Customer", "Project", etc.)
    */
   type: string;
 
@@ -379,18 +421,28 @@ export interface SearchResultsDTO {
 /**
  * Validation schema for dashboard filters
  */
-export const dashboardFilterSchema = {
+export const dashboardFilterValidation = {
   revenueFilter: {
     type: 'enum',
     required: false,
-    enum: ['Letzten 30 Tage', 'Letzten 3 Monate', 'Letzten 6 Monate', 'Dieses Jahr'],
-    default: 'Letzten 6 Monate'
+    enum: [
+      'Last 30 Days', 
+      'Last 3 Months', 
+      'Last 6 Months', 
+      'This Year'
+    ],
+    default: 'Last 6 Months'
   },
   servicesFilter: {
     type: 'enum',
     required: false,
-    enum: ['Diese Woche', 'Diesen Monat', 'Dieses Quartal', 'Dieses Jahr'],
-    default: 'Diesen Monat'
+    enum: [
+      'This Week', 
+      'This Month', 
+      'This Quarter', 
+      'This Year'
+    ],
+    default: 'This Month'
   },
   startDate: {
     type: 'date',
@@ -405,15 +457,71 @@ export const dashboardFilterSchema = {
 /**
  * Validation schema for global search
  */
-export const globalSearchSchema = {
-  q: {
+export const globalSearchValidation = {
+  query: {
     type: 'string',
     required: true,
     min: 2,
     max: 100,
     messages: {
       required: 'Search query is required',
-      min: 'Search query must be at least 2 characters'
+      min: 'Search query must be at least 2 characters',
+      max: 'Search query must not exceed 100 characters'
     }
   }
 };
+
+/**
+ * Convert dashboard statistics to display format
+ */
+export function formatDashboardStats(stats: DashboardStatsDTO): DashboardStatsDTO {
+  return {
+    newRequests: {
+      count: stats.newRequests.count,
+      trend: parseFloat(stats.newRequests.trend.toFixed(2))
+    },
+    activeProjects: {
+      count: stats.activeProjects.count,
+      trend: parseFloat(stats.activeProjects.trend.toFixed(2))
+    },
+    totalCustomers: {
+      count: stats.totalCustomers.count,
+      trend: parseFloat(stats.totalCustomers.trend.toFixed(2))
+    },
+    monthlyRevenue: {
+      amount: parseFloat(stats.monthlyRevenue.amount.toFixed(2)),
+      trend: parseFloat(stats.monthlyRevenue.trend.toFixed(2))
+    }
+  };
+}
+
+/**
+ * Create a recent request DTO
+ */
+export function createRecentRequestDTO(request: any): RecentRequestDTO {
+  return {
+    id: request.id,
+    name: request.name,
+    email: request.email,
+    serviceLabel: request.serviceLabel,
+    formattedDate: request.formattedDate,
+    status: getRequestStatusLabel(request.status),
+    statusClass: getRequestStatusClass(request.status)
+  };
+}
+
+/**
+ * Create an upcoming appointment DTO
+ */
+export function createUpcomingAppointmentDTO(appointment: any): UpcomingAppointmentDTO {
+  return {
+    id: appointment.id,
+    title: appointment.title,
+    customerName: appointment.customerName,
+    projectTitle: appointment.projectTitle,
+    dateLabel: appointment.dateLabel,
+    status: getAppointmentStatusLabel(appointment.status),
+    statusClass: getAppointmentStatusClass(appointment.status),
+    time: appointment.time
+  };
+}

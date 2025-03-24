@@ -15,8 +15,10 @@ import {
 import { validateBody, validateParams, validateQuery } from '../middleware/validation.middleware.js';
 import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
 import {
-  userCreateSchema,
-  userUpdateSchema
+  userCreateValidation,
+  userUpdateValidation,
+  UserStatusUpdateDTO,
+  UserStatus
 } from '../types/dtos/user.dto.js';
 
 // Create router
@@ -54,7 +56,7 @@ router.get('/:id', validateParams({
  * @description Create a new user
  * @access Admin only
  */
-router.post('/', validateBody(userCreateSchema), createUser);
+router.post('/', validateBody(userCreateValidation), createUser);
 
 /**
  * @route PUT /api/v1/users/:id
@@ -70,7 +72,7 @@ router.put('/:id', validateParams({
       type: 'User ID must be a number'
     }
   }
-}), validateBody(userUpdateSchema), updateUser);
+}), validateBody(userUpdateValidation), updateUser);
 
 /**
  * @route DELETE /api/v1/users/:id
@@ -104,12 +106,12 @@ router.patch('/:id/status', validateParams({
   }
 }), validateBody({
   status: {
-    type: 'string',
+    type: 'enum',
     required: true,
-    enum: ['aktiv', 'inaktiv', 'gesperrt'],
+    enum: Object.values(UserStatus),
     messages: {
       required: 'Status is required',
-      enum: 'Status must be one of: aktiv, inaktiv, gesperrt'
+      enum: `Status must be one of: ${Object.values(UserStatus).join(', ')}`
     }
   }
 }), updateUserStatus);

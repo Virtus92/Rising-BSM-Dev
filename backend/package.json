@@ -6,10 +6,10 @@
     "main": "dist/server.js",
     "scripts": {
         "prisma:generate": "prisma generate",
-        "tsoa": "tsoa spec-and-routes",
-        "build": "npm run tsoa && tsc -p tsconfig.json",
-        "dev": "npm run tsoa && tsx watch server.ts",
+        "generate-openapi": "ts-node generate-openapi.ts",
+        "build": "npm run generate-openapi && tsc -p tsconfig.json",
         "start": "node dist/server.js",
+        "dev": "tsx watch server.ts",
         "build:dev": "sh wait-for-db.sh && tsx watch server.ts",
         "build:watch": "tsc -w",
         "migrate": "prisma migrate dev",
@@ -49,6 +49,7 @@
         "pdfkit": "^0.13.0",
         "pg": "^8.10.0",
         "swagger-jsdoc": "^6.2.8",
+        "swagger-ui-express": "^5.0.0",
         "tsoa": "^6.6.0",
         "validator": "^13.9.0"
     },

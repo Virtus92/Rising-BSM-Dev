@@ -1,23 +1,46 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { BadRequestError } from '../utils/errors.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { AuthenticatedRequest } from '../types/authenticated-request.js';
+import { AuthenticatedRequest } from '../types/common/types.js';
 import { ResponseFactory } from '../utils/response.factory.js';
 import { AppointmentService, appointmentService } from '../services/appointment.service.js';
 import { 
-  AppointmentFilterDTO,
+  AppointmentFilterParams,
   AppointmentCreateDTO,
   AppointmentUpdateDTO,
   AppointmentStatusUpdateDTO,
-  AppointmentNoteCreateDTO
+  AppointmentNoteCreateDTO,
+  AppointmentStatus
 } from '../types/dtos/appointment.dto.js';
+
+/**
+ * Type guard to check if request is authenticated
+ */
+function isAuthenticated(req: Request): req is AuthenticatedRequest & Request {
+  return 'user' in req && req.user !== undefined;
+}
+
+/**
+ * Get user context from request
+ */
+function getUserContext(req: Request) {
+  if (isAuthenticated(req) && req.user) {
+    return {
+      userId: req.user.id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      ipAddress: req.ip || 'unknown'
+    };
+  }
+  return undefined;
+}
 
 /**
  * Get all appointments with optional filtering
  */
 export const getAllAppointments = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   // Extract filter parameters
-  const filters: AppointmentFilterDTO = {
+  const filters: AppointmentFilterParams = {
     status: req.query.status as string,
     date: req.query.date as string,
     search: req.query.search as string,
@@ -64,18 +87,25 @@ export const getAppointmentById = asyncHandler(async (req: Request, res: Respons
 /**
  * Create a new appointment
  */
-export const createAppointment = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const createAppointment = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const body = req.body as any;
+  
   // Extract create DTO from request body
-  const appointmentData: AppointmentCreateDTO = req.body;
+  const appointmentData: AppointmentCreateDTO = {
+    title: body?.title || '',
+    customerId: body?.customerId,
+    projectId: body?.projectId,
+    appointmentDate: body?.appointmentDate || '',
+    appointmentTime: body?.appointmentTime || '',
+    duration: body?.duration,
+    location: body?.location,
+    description: body?.description,
+    status: body?.status
+  };
   
   // Create appointment with user context
   const result = await appointmentService.create(appointmentData, {
-    userContext: req.user ? {
-      userId: req.user.id,
-      userName: req.user.name,
-      userRole: req.user.role,
-      ipAddress: req.ip
-    } : undefined
+    userContext: getUserContext(req)
   });
   
   // Send created response
@@ -85,24 +115,30 @@ export const createAppointment = asyncHandler(async (req: AuthenticatedRequest, 
 /**
  * Update an existing appointment
  */
-export const updateAppointment = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const updateAppointment = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
+  const body = req.body as any;
   
   if (isNaN(id)) {
     throw new BadRequestError('Invalid appointment ID');
   }
   
   // Extract update DTO from request body
-  const appointmentData: AppointmentUpdateDTO = req.body;
+  const appointmentData: AppointmentUpdateDTO = {
+    title: body?.title,
+    customerId: body?.customerId,
+    projectId: body?.projectId,
+    appointmentDate: body?.appointmentDate,
+    appointmentTime: body?.appointmentTime,
+    duration: body?.duration,
+    location: body?.location,
+    description: body?.description,
+    status: body?.status
+  };
   
   // Update appointment with user context
   const result = await appointmentService.update(id, appointmentData, {
-    userContext: req.user ? {
-      userId: req.user.id,
-      userName: req.user.name,
-      userRole: req.user.role,
-      ipAddress: req.ip
-    } : undefined,
+    userContext: getUserContext(req),
     throwIfNotFound: true
   });
   
@@ -113,7 +149,7 @@ export const updateAppointment = asyncHandler(async (req: AuthenticatedRequest, 
 /**
  * Delete an existing appointment
  */
-export const deleteAppointment = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const deleteAppointment = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
   
   if (isNaN(id)) {
@@ -122,12 +158,7 @@ export const deleteAppointment = asyncHandler(async (req: AuthenticatedRequest, 
 
   // Delete appointment with user context
   const result = await appointmentService.delete(id, {
-    userContext: req.user ? {
-      userId: req.user.id,
-      userName: req.user.name,
-      userRole: req.user.role,
-      ipAddress: req.ip
-    } : undefined,
+    userContext: getUserContext(req),
     throwIfNotFound: true
   });
   
@@ -138,21 +169,22 @@ export const deleteAppointment = asyncHandler(async (req: AuthenticatedRequest, 
 /**
  * Update appointment status
  */
-export const updateAppointmentStatus = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { id, status, note }: AppointmentStatusUpdateDTO = req.body;
+export const updateAppointmentStatus = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const id = Number(req.params.id);
+  const body = req.body as any;
   
-  if (isNaN(Number(id))) {
+  if (isNaN(id)) {
     throw new BadRequestError('Invalid appointment ID');
   }
   
+  const statusData: Omit<AppointmentStatusUpdateDTO, 'id'> = {
+    status: body?.status || '',
+    note: body?.note
+  };
+  
   // Update status with user context
-  const result = await appointmentService.updateStatus(Number(id), status, note || null, {
-    userContext: req.user ? {
-      userId: req.user.id,
-      userName: req.user.name,
-      userRole: req.user.role,
-      ipAddress: req.ip
-    } : undefined
+  const result = await appointmentService.updateStatus(id, statusData.status, statusData.note || null, {
+    userContext: getUserContext(req)
   });
   
   // Send success response
@@ -162,24 +194,49 @@ export const updateAppointmentStatus = asyncHandler(async (req: AuthenticatedReq
 /**
  * Add a note to appointment
  */
-export const addAppointmentNote = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const addAppointmentNote = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const id = Number(req.params.id);
-  const noteData: AppointmentNoteCreateDTO = { note: req.body.note };
+  const body = req.body as any;
   
   if (isNaN(id)) {
     throw new BadRequestError('Invalid appointment ID');
   }
   
+  const noteData: AppointmentNoteCreateDTO = {
+    appointmentId: id,
+    text: body?.text || ''
+  };
+  
   // Add note with user context
-  const result = await appointmentService.addNote(id, noteData.note, {
-    userContext: req.user ? {
-      userId: req.user.id,
-      userName: req.user.name,
-      userRole: req.user.role,
-      ipAddress: req.ip
-    } : undefined
+  const result = await appointmentService.addNote(id, noteData.text, {
+    userContext: getUserContext(req)
   });
   
   // Send success response
   ResponseFactory.success(res, result, 'Note added successfully', 201);
+});
+
+/**
+ * Export appointments to CSV
+ */
+export const exportAppointments = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  // Extract filter parameters
+  const filters: AppointmentFilterParams = {
+    status: req.query.status as string,
+    date: req.query.date as string,
+    search: req.query.search as string,
+  };
+
+  // Get appointments from service
+  const result = await appointmentService.findAll(filters);
+
+  // Convert appointments to CSV
+  const csv = appointmentService.convertToCSV(result.data);
+
+  // Set response headers for CSV download
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="appointments.csv"');
+
+  // Send CSV data
+  res.status(200).send(csv);
 });

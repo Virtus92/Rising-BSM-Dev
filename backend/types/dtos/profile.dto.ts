@@ -3,7 +3,8 @@
  * 
  * Data Transfer Objects for User Profile operations.
  */
-import { BaseDTO, BaseResponseDTO } from './base.dto.js';
+import { BaseDTO, BaseResponseDTO } from '../common/types.js';
+import { NotificationInterval, LanguageOption } from './settings.dto.js';
 import { File } from 'buffer';
 
 /**
@@ -23,7 +24,7 @@ export interface ProfileUpdateDTO extends BaseDTO {
   /**
    * User phone (optional)
    */
-  telefon?: string;
+  phone?: string;
 }
 
 /**
@@ -33,17 +34,17 @@ export interface PasswordUpdateDTO extends BaseDTO {
   /**
    * Current password
    */
-  current_password: string;
+  currentPassword: string;
 
   /**
    * New password
    */
-  new_password: string;
+  newPassword: string;
 
   /**
    * Confirm new password
    */
-  confirm_password: string;
+  confirmPassword: string;
 }
 
 /**
@@ -53,17 +54,17 @@ export interface NotificationSettingsUpdateDTO extends BaseDTO {
   /**
    * Email notifications preference
    */
-  benachrichtigungen_email?: boolean;
+  emailNotifications?: boolean;
 
   /**
    * Push notifications preference
    */
-  benachrichtigungen_push?: boolean;
+  pushNotifications?: boolean;
 
   /**
    * Notification interval preference
    */
-  benachrichtigungen_intervall?: string;
+  notificationInterval?: string;
 }
 
 /**
@@ -75,7 +76,6 @@ export interface ProfilePictureUpdateDTO extends BaseDTO {
    */
   file: File;
 }
-
 /**
  * DTO for user profile response
  */
@@ -102,22 +102,22 @@ export interface UserProfileResponseDTO extends BaseResponseDTO {
     /**
      * User phone
      */
-    telefon: string;
+    phone?: string;
 
     /**
      * User role
      */
-    rolle: string;
+    role: string;
 
     /**
      * User profile picture
      */
-    profilbild: string | null;
+    profilePicture?: string | null;
 
     /**
      * Registration date (formatted)
      */
-    seit: string;
+    registeredAt: string;
   };
 
   /**
@@ -127,27 +127,27 @@ export interface UserProfileResponseDTO extends BaseResponseDTO {
     /**
      * Language preference
      */
-    sprache: string;
+    language: string;
 
     /**
      * Dark mode preference
      */
-    dark_mode: boolean;
+    darkMode: boolean;
 
     /**
      * Email notifications preference
      */
-    benachrichtigungen_email: boolean;
+    emailNotifications: boolean;
 
     /**
      * Push notifications preference
      */
-    benachrichtigungen_push: boolean;
+    pushNotifications: boolean;
 
     /**
      * Notification interval preference
      */
-    benachrichtigungen_intervall: string;
+    notificationInterval: string;
   };
 
   /**
@@ -168,36 +168,18 @@ export interface UserActivityDTO {
   /**
    * IP address
    */
-  ip: string;
+  ipAddress?: string;
 
   /**
    * Activity date (formatted)
    */
-  date: string;
-}
-
-/**
- * Available notification interval options
- */
-export enum NotificationInterval {
-  IMMEDIATE = 'sofort',
-  HOURLY = 'stuendlich',
-  DAILY = 'taeglich',
-  WEEKLY = 'woechentlich'
-}
-
-/**
- * Available language options
- */
-export enum LanguageOption {
-  GERMAN = 'de',
-  ENGLISH = 'en'
+  timestamp: string;
 }
 
 /**
  * Validation schema for profile update
  */
-export const profileUpdateSchema = {
+export const profileUpdateValidation = {
   name: {
     type: 'string',
     required: true,
@@ -217,7 +199,7 @@ export const profileUpdateSchema = {
       email: 'Invalid email format'
     }
   },
-  telefon: {
+  phone: {
     type: 'phone',
     required: false,
     messages: {
@@ -229,15 +211,15 @@ export const profileUpdateSchema = {
 /**
  * Validation schema for password update
  */
-export const passwordUpdateSchema = {
-  current_password: {
+export const passwordUpdateValidation = {
+  currentPassword: {
     type: 'string',
     required: true,
     messages: {
       required: 'Current password is required'
     }
   },
-  new_password: {
+  newPassword: {
     type: 'password',
     required: true,
     min: 8,
@@ -246,14 +228,14 @@ export const passwordUpdateSchema = {
       min: 'New password must be at least 8 characters long'
     }
   },
-  confirm_password: {
+  confirmPassword: {
     type: 'string',
     required: true,
     messages: {
       required: 'Confirm password is required'
     },
     validate: (value: string, data: any) => {
-      return value === data.new_password ? true : 'Passwords do not match';
+      return value === data.newPassword ? true : 'Passwords do not match';
     }
   }
 };
@@ -261,18 +243,18 @@ export const passwordUpdateSchema = {
 /**
  * Validation schema for notification settings update
  */
-export const notificationSettingsUpdateSchema = {
-  benachrichtigungen_email: {
+export const notificationSettingsUpdateValidation = {
+  emailNotifications: {
     type: 'boolean',
     required: false,
     default: true
   },
-  benachrichtigungen_push: {
+  pushNotifications: {
     type: 'boolean',
     required: false,
     default: false
   },
-  benachrichtigungen_intervall: {
+  notificationInterval: {
     type: 'enum',
     required: false,
     enum: Object.values(NotificationInterval),
@@ -291,19 +273,19 @@ export const notificationSettingsUpdateSchema = {
 export function getActivityLabel(type: string): string {
   switch (type) {
     case 'login':
-      return 'Anmeldung';
+      return 'Login';
     case 'logout':
-      return 'Abmeldung';
+      return 'Logout';
     case 'password_changed':
-      return 'Passwort geändert';
+      return 'Password Changed';
     case 'profile_updated':
-      return 'Profil aktualisiert';
+      return 'Profile Updated';
     case 'settings_updated':
-      return 'Einstellungen aktualisiert';
+      return 'Settings Updated';
     case 'notification_settings_updated':
-      return 'Benachrichtigungseinstellungen aktualisiert';
+      return 'Notification Settings Updated';
     case 'password_reset':
-      return 'Passwort zurückgesetzt';
+      return 'Password Reset';
     default:
       return type.replace('_', ' ');
   }

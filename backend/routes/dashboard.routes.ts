@@ -12,8 +12,8 @@ import {
 import { validateQuery } from '../middleware/validation.middleware.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { 
-  dashboardFilterSchema,
-  globalSearchSchema
+  dashboardFilterValidation,
+  globalSearchValidation
 } from '../types/dtos/dashboard.dto.js';
 
 // Create router
@@ -27,7 +27,7 @@ router.use(authenticate);
  * @description Get dashboard data including statistics, charts, and activities
  * @access Private
  */
-router.get('/', validateQuery(dashboardFilterSchema), getDashboardData);
+router.get('/', validateQuery(dashboardFilterValidation), getDashboardData);
 
 /**
  * @route GET /api/v1/dashboard/stats
@@ -41,6 +41,6 @@ router.get('/stats', getDashboardStats);
  * @description Global search across all entities
  * @access Private
  */
-router.get('/search', validateQuery(globalSearchSchema), globalSearch);
+router.get('/search', validateQuery(globalSearchValidation), globalSearch);
 
 export default router;

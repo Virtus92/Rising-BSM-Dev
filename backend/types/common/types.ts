@@ -64,7 +64,62 @@ export interface BaseDTO {
      */
     note?: string;
   }
+
+  /**
+   * Base filter interface
+   */
+  export interface BaseFilterDTO {
+    /**
+     * Current page (1-based)
+     */
+    page?: number;
+    
+    /**
+     * Items per page
+     */
+    limit?: number;
+    
+    /**
+     * Search term
+     */
+    search?: string;
+    
+    /**
+     * Sort field
+     */
+    sortBy?: string;
+    
+    /**
+     * Sort direction
+     */
+    sortDirection?: 'asc' | 'desc';
+  }
   
+  /**
+   * DTO for request filtering
+   */
+  export interface RequestFilterDTO extends BaseFilterDTO {
+    /**
+     * Filter by status
+     */
+    status?: string;
+
+    /**
+     * Filter by service type
+     */
+    service?: string;
+
+    /**
+     * Filter by date range (from)
+     */
+    dateFrom?: string;
+
+    /**
+     * Filter by date range (to)
+     */
+    dateTo?: string;
+  }
+
   /**
    * Common status values used across the application
    */
@@ -127,6 +182,11 @@ export interface BaseDTO {
   }
   
   /**
+   * Sort direction type
+   */
+  export type SortDirection = 'asc' | 'desc';
+  
+  /**
    * Sort parameters
    */
   export interface SortParams {
@@ -138,7 +198,7 @@ export interface BaseDTO {
     /**
      * Sort direction
      */
-    sortDirection?: 'asc' | 'desc';
+    sortDirection?: SortDirection;
   }
   
   /**

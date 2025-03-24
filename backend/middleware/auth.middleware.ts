@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, NextFunction, Response } from 'express';
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt.js';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
-import { AuthenticatedRequest } from '../types/authenticated-request.js';
+import { AuthenticatedRequest } from '../types/common/types.js';
 import prisma from '../utils/prisma.utils.js';
 
 /**
@@ -9,8 +9,8 @@ import prisma from '../utils/prisma.utils.js';
  * Always verifies user in database and attaches user object to request if authenticated
  */
 export const authenticate = async (
-  req: Request, 
-  res: Response, 
+  req: Request,
+  res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
@@ -40,7 +40,7 @@ export const authenticate = async (
         throw new UnauthorizedError('User inactive or not found');
       }
       
-      (req as AuthenticatedRequest).user = {
+      (req as unknown as AuthenticatedRequest).user = {
         id: user.id,
         name: user.name,
         email: user.email,
@@ -49,7 +49,7 @@ export const authenticate = async (
       
       next();
     } catch (error) {
-      throw error;
+      next(error);
     }
   } catch (error) {
     next(error);
@@ -62,10 +62,9 @@ export const authenticate = async (
  */
 export const isAdmin = (
   req: Request, 
-  res: Response, 
   next: NextFunction
 ): void => {
-  const user = (req as AuthenticatedRequest).user;
+  const user = (req as unknown as AuthenticatedRequest).user;
   
   if (!user) {
     return next(new UnauthorizedError('Authentication required'));
@@ -84,10 +83,9 @@ export const isAdmin = (
  */
 export const isManager = (
   req: Request, 
-  res: Response, 
   next: NextFunction
 ): void => {
-  const user = (req as AuthenticatedRequest).user;
+  const user = (req as unknown as AuthenticatedRequest).user;
   
   if (!user) {
     return next(new UnauthorizedError('Authentication required'));
@@ -113,11 +111,10 @@ export const isResourceOwner = (
 ) => {
   return async (
     req: Request, 
-    res: Response, 
     next: NextFunction
   ): Promise<void> => {
     try {
-      const user = (req as AuthenticatedRequest).user;
+      const user = (req as unknown as AuthenticatedRequest).user;
       
       if (!user) {
         throw new UnauthorizedError('Authentication required');

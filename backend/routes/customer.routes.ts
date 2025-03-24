@@ -11,14 +11,17 @@ import {
   updateCustomer,
   updateCustomerStatus,
   addCustomerNote,
-  getCustomerStatistics
+  getCustomerStatistics,
+  exportCustomers
 } from '../controllers/customer.controller.js';
 import { validateBody, validateParams, validateQuery } from '../middleware/validation.middleware.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { 
-  customerCreateSchema, 
-  customerUpdateSchema, 
-  customerStatusUpdateSchema 
+  customerCreateValidation, 
+  customerUpdateValidation,
+  customerStatusUpdateValidation,
+  customerNoteCreateValidation,
+  CustomerStatus
 } from '../types/dtos/customer.dto.js';
 
 // Create router
@@ -42,6 +45,13 @@ router.get('/', getAllCustomers);
 router.get('/statistics', getCustomerStatistics);
 
 /**
+ * @route GET /api/v1/customers/export
+ * @description Export customers data
+ * @access Private
+ */
+router.get('/export', exportCustomers);
+
+/**
  * @route GET /api/v1/customers/:id
  * @description Get customer by ID with related data
  * @access Private
@@ -62,7 +72,7 @@ router.get('/:id', validateParams({
  * @description Create a new customer
  * @access Private
  */
-router.post('/', validateBody(customerCreateSchema), createCustomer);
+router.post('/', validateBody(customerCreateValidation), createCustomer);
 
 /**
  * @route PUT /api/v1/customers/:id
@@ -78,7 +88,7 @@ router.put('/:id', validateParams({
       type: 'Customer ID must be a number'
     }
   }
-}), validateBody(customerUpdateSchema), updateCustomer);
+}), validateBody(customerUpdateValidation), updateCustomer);
 
 /**
  * @route PATCH /api/v1/customers/:id/status
@@ -94,7 +104,7 @@ router.patch('/:id/status', validateParams({
       type: 'Customer ID must be a number'
     }
   }
-}), validateBody(customerStatusUpdateSchema), updateCustomerStatus);
+}), validateBody(customerStatusUpdateValidation), updateCustomerStatus);
 
 /**
  * @route POST /api/v1/customers/:id/notes
@@ -110,18 +120,6 @@ router.post('/:id/notes', validateParams({
       type: 'Customer ID must be a number'
     }
   }
-}), validateBody({
-  note: {
-    type: 'string',
-    required: true,
-    min: 1,
-    max: 1000,
-    messages: {
-      required: 'Note text is required',
-      min: 'Note text cannot be empty',
-      max: 'Note text must not exceed 1000 characters'
-    }
-  }
-}), addCustomerNote);
+}), validateBody(customerNoteCreateValidation), addCustomerNote);
 
 export default router;

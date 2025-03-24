@@ -16,9 +16,9 @@ import {
 import { validateBody } from '../middleware/validation.middleware.js';
 import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
 import { 
-  userSettingsUpdateSchema,
-  systemSettingsUpdateSchema,
-  backupSettingsUpdateSchema
+  userSettingsUpdateValidation,
+  systemSettingsUpdateValidation,
+  backupSettingsUpdateValidation
 } from '../types/dtos/settings.dto.js';
 
 // Create router
@@ -39,7 +39,7 @@ router.get('/user', getUserSettings);
  * @description Update user settings
  * @access Private
  */
-router.put('/user', validateBody(userSettingsUpdateSchema), updateUserSettings);
+router.put('/user', validateBody(userSettingsUpdateValidation), updateUserSettings);
 
 /**
  * @route GET /api/v1/settings/system
@@ -53,7 +53,7 @@ router.get('/system', isAdmin, getSystemSettings);
  * @description Update system settings
  * @access Admin only
  */
-router.put('/system', isAdmin, validateBody(systemSettingsUpdateSchema), updateSystemSettings);
+router.put('/system', isAdmin, validateBody(systemSettingsUpdateValidation), updateSystemSettings);
 
 /**
  * @route GET /api/v1/settings/backup
@@ -67,7 +67,7 @@ router.get('/backup', isAdmin, getBackupSettings);
  * @description Update backup settings
  * @access Admin only
  */
-router.put('/backup', isAdmin, validateBody(backupSettingsUpdateSchema), updateBackupSettings);
+router.put('/backup', isAdmin, validateBody(backupSettingsUpdateValidation), updateBackupSettings);
 
 /**
  * @route POST /api/v1/settings/backup/trigger

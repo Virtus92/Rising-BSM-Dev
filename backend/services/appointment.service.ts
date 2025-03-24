@@ -10,8 +10,8 @@ import {
   AppointmentCreateDTO, 
   AppointmentUpdateDTO, 
   AppointmentResponseDTO, 
-  AppointmentDetailDTO,
-  AppointmentFilterDTO
+  AppointmentDetailResponseDTO,
+  AppointmentFilterParams
 } from '../types/dtos/appointment.dto.js';
 import { 
   NotFoundError, 
@@ -55,7 +55,7 @@ export interface AppointmentRecord {
 export class AppointmentService extends BaseService<
   Appointment,
   AppointmentRepository,
-  AppointmentFilterDTO,
+  AppointmentFilterParams,
   AppointmentCreateDTO,
   AppointmentUpdateDTO,
   AppointmentResponseDTO
@@ -80,19 +80,16 @@ export class AppointmentService extends BaseService<
     
     return {
       id: entity.id,
-      titel: entity.title,
-      kunde_id: entity.customerId || null,
-      kunde_name: customerName,
-      projekt_id: entity.projectId || null,
-      projekt_titel: projectTitle,
-      termin_datum: format(entity.appointmentDate, 'yyyy-MM-dd') as any,
-      termin_zeit: format(entity.appointmentDate, 'HH:mm'),
-      dauer: entity.duration !== null ? entity.duration : 60,
-      ort: entity.location || '',
-      beschreibung: entity.description || '',
+      title: entity.title,
+      customerId: entity.customerId || null,
+      customerName: customerName,
+      projectId: entity.projectId || null,
+      projectTitle: projectTitle,
+      appointmentDate: format(entity.appointmentDate, 'yyyy-MM-dd') as any,
+      duration: entity.duration !== null ? entity.duration : 60,
+      location: entity.location || '',
+      description: entity.description || '',
       status: entity.status,
-      statusLabel: statusInfo.label,
-      statusClass: statusInfo.className,
       createdAt: format(entity.createdAt, 'yyyy-MM-dd HH:mm:ss'),
       updatedAt: format(entity.updatedAt, 'yyyy-MM-dd HH:mm:ss')
     };
@@ -112,7 +109,7 @@ export class AppointmentService extends BaseService<
    * @returns Paginated list of appointments
    */
   async findAll(
-    filters: AppointmentFilterDTO,
+    filters: AppointmentFilterParams,
     options: FindAllOptions = {}
   ): Promise<{ data: AppointmentResponseDTO[]; pagination: any }> {
     try {
@@ -207,7 +204,7 @@ export class AppointmentService extends BaseService<
   async findByIdWithDetails(
     id: number,
     options: FindOneOptions = {}
-  ): Promise<AppointmentDetailDTO | null> {
+  ): Promise<AppointmentDetailResponseDTO | null> {
     try {
       // Get appointment with details from repository
       const result = await this.repository.getAppointmentWithRelations(id);
@@ -345,11 +342,11 @@ export class AppointmentService extends BaseService<
   /**
    * Update an appointment's status
    * @param id - Appointment ID
-      // Return mapped response
-      return this.mapEntityToDTO(updated as any);
-    } catch (error) {
-      this.handleError(error, `Error updating appointment with ID ${id}`, { id, data });
-    }
+   * @param status - New status
+   * @param note - Optional note about the status change
+   * @param options - Update options
+   * @returns Updated appointment
+   */
   async updateStatus(
     id: number,
     status: string,
@@ -388,16 +385,6 @@ export class AppointmentService extends BaseService<
               text: note
             }
           });
-        } else if (note && options.userContext) {
-          await tx.appointmentNote.create({
-            data: {
-              appointmentId: id,
-              userId: options.userContext.userId,
-              userName: options.userContext.userName || 'System',
-              text: note
-            }
-          });
-        }
         }
         
         // Log status change
@@ -412,36 +399,58 @@ export class AppointmentService extends BaseService<
             }
           });
         }
-
-  /**
-   * Add a note to an appointment
-   * @param id - Appointment ID
-   * @param text - Note text
-   * @param options - Create options
-   * @returns Success message
-        }
+        
+        return updated;
+      });
       
-      // Check if appointment exists
-      const appointment = await this.repository.findById(id);
-      
-      if (!appointment) {
-        throw new NotFoundError(`Appointment with ID ${id} not found`);
-      }
-      
-      // Add note
-      if (options.userContext?.userId) {
-        await this.repository.createNote(
-          id,
-          options.userContext.userId,
-          options.userContext.userName || 'System',
-          text
       // Return mapped response
       return this.mapEntityToDTO(updated as any);
     } catch (error) {
       this.handleError(error, `Error updating status for appointment with ID ${id}`, { id, status });
     }
-          options.userContext.userId,
-          options.userContext.userName || 'System',
+  }
+
+  /**
+   * Convert appointments to CSV format
+   * @param appointments - List of appointments to convert
+   * @returns CSV formatted string
+   */
+  convertToCSV(appointments: AppointmentResponseDTO[]): string {
+    // Define CSV headers
+    const headers = [
+      'ID',
+      'Title',
+      'Customer',
+      'Project',
+      'Date',
+      'Duration (Min)',
+      'Location',
+      'Status',
+      'Created At'
+    ];
+    
+    // Convert each appointment to CSV row
+    const rows = appointments.map(appointment => [
+      appointment.id,
+      appointment.title,
+      appointment.customerName,
+      appointment.projectTitle,
+      appointment.appointmentDate,
+      appointment.duration,
+      appointment.location || '',
+      appointment.status,
+      appointment.createdAt
+    ]);
+    
+    // Combine headers and rows
+    const csvData = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ];
+    
+    return csvData.join('\n');
+  }
+
   /**
    * Add a note to an appointment
    * @param id - Appointment ID
@@ -514,18 +523,18 @@ export class AppointmentService extends BaseService<
    */
   protected async validateUpdate(_id: number, data: AppointmentUpdateDTO): Promise<void> {
     // Validate title if provided
-    if (data.titel !== undefined) {
-      validateRequired(data.titel, 'Title');
+    if (data.title !== undefined) {
+      validateRequired(data.title, 'Title');
     }
     
     // Validate date and time if provided
-    if ((data.termin_datum && !data.termin_zeit) || (!data.termin_datum && data.termin_zeit)) {
+    if ((data.appointmentDate && !data.appointmentTime) || (!data.appointmentDate && data.appointmentTime)) {
       throw new ValidationError('Both date and time must be provided together');
     }
     
-    if (data.termin_datum && data.termin_zeit) {
+    if (data.appointmentDate && data.appointmentTime) {
       try {
-        const dateTime = new Date(`${data.termin_datum}T${data.termin_zeit}`);
+        const dateTime = new Date(`${data.appointmentDate}T${data.appointmentTime}`);
         if (isNaN(dateTime.getTime())) {
           throw new Error('Invalid date/time format');
         }
@@ -535,33 +544,33 @@ export class AppointmentService extends BaseService<
     }
     
     // Validate duration if provided
-    if (data.dauer !== undefined && (isNaN(Number(data.dauer)) || Number(data.dauer) <= 0)) {
+    if (data.duration !== undefined && (isNaN(Number(data.duration)) || Number(data.duration) <= 0)) {
       throw new ValidationError('Duration must be a positive number');
     }
     
     // Validate customer ID if provided
-    if (data.kunde_id !== undefined && data.kunde_id !== null) {
+    if (data.customerId !== undefined && data.customerId !== null) {
       // Check if customer exists
-      const customerExists = await this.repository.customerExists(Number(data.kunde_id));
+      const customerExists = await this.repository.customerExists(Number(data.customerId));
       
       if (!customerExists) {
-        throw new ValidationError(`Customer with ID ${data.kunde_id} not found`);
+        throw new ValidationError(`Customer with ID ${data.customerId} not found`);
       }
     }
     
     // Validate project ID if provided
-    if (data.projekt_id !== undefined && data.projekt_id !== null) {
+    if (data.projectId !== undefined && data.projectId !== null) {
       // Check if project exists
-      const projectExists = await this.repository.projectExists(Number(data.projekt_id));
+      const projectExists = await this.repository.projectExists(Number(data.projectId));
       
       if (!projectExists) {
-        throw new ValidationError(`Project with ID ${data.projekt_id} not found`);
+        throw new ValidationError(`Project with ID ${data.projectId} not found`);
       }
     }
     
     // Validate status if provided
     if (data.status) {
-      const validStatuses = ['geplant', 'bestaetigt', 'abgeschlossen', 'storniert'];
+      const validStatuses = ['planned', 'confirmed', 'completed', 'cancelled'];
       if (!validStatuses.includes(data.status)) {
         throw new ValidationError(`Invalid status value. Must be one of: ${validStatuses.join(', ')}`);
       }
@@ -573,7 +582,7 @@ export class AppointmentService extends BaseService<
    * @param result - Appointment with notes and optional related data
    * @returns Appointment detail response DTO
    */
-  protected mapToDetailDTO(result: any): AppointmentDetailDTO {
+  protected mapToDetailDTO(result: any): AppointmentDetailResponseDTO {
     const appointment = result;
     const statusInfo = getTerminStatusInfo(appointment.status);
     
@@ -581,8 +590,8 @@ export class AppointmentService extends BaseService<
     const formattedNotes = appointment.notes?.map((note: any) => ({
       id: note.id,
       text: note.text,
-      formattedDate: format(note.createdAt, 'dd.MM.yyyy, HH:mm'),
-      benutzer: note.userName
+      createdAt: format(note.createdAt, 'dd.MM.yyyy, HH:mm'),
+      userName: note.userName
     })) || [];
     
     // Safely access properties
@@ -598,21 +607,19 @@ export class AppointmentService extends BaseService<
     // Return combined data
     return {
       id: appointment.id,
-      titel: appointment.title,
-      kunde_id: customerId,
-      kunde_name: customerName,
-      projekt_id: projectId,
-      projekt_titel: projectTitle,
-      termin_datum: appointment.appointmentDate,
-      dateFormatted: format(appointment.appointmentDate, 'dd.MM.yyyy'),
-      timeFormatted: format(appointment.appointmentDate, 'HH:mm'),
-      dauer: appointment.duration !== null ? appointment.duration : 60,
-      ort: appointment.location || 'Nicht angegeben',
-      beschreibung: appointment.description || 'Keine Beschreibung vorhanden',
+      title: appointment.title,
+      customerId: customerId,
+      customerName: customerName,
+      projectId: projectId,
+      projectTitle: projectTitle,
+      appointmentDate: format(appointment.appointmentDate, 'yyyy-MM-dd'),
+      duration: appointment.duration !== null ? appointment.duration : 60,
+      location: appointment.location || 'Not specified',
+      description: appointment.description || 'No description available',
       status: appointment.status,
-      statusLabel: statusInfo.label,
-      statusClass: statusInfo.className,
-      notes: formattedNotes
+      notes: formattedNotes,
+      createdAt: format(appointment.createdAt, 'yyyy-MM-dd HH:mm:ss'),
+      updatedAt: format(appointment.updatedAt, 'yyyy-MM-dd HH:mm:ss')
     };
   }
 
@@ -623,17 +630,17 @@ export class AppointmentService extends BaseService<
    */
   protected mapCreateDtoToEntity(dto: AppointmentCreateDTO): Partial<Appointment> {
     // Combine date and time
-    const appointmentDate = new Date(`${dto.termin_datum}T${dto.termin_zeit}`);
+    const appointmentDate = new Date(`${dto.appointmentDate}T${dto.appointmentTime}`);
     
     return {
-      title: dto.titel,
-      customerId: dto.kunde_id ? Number(dto.kunde_id) : null,
-      projectId: dto.projekt_id ? Number(dto.projekt_id) : null,
+      title: dto.title,
+      customerId: dto.customerId ? Number(dto.customerId) : null,
+      projectId: dto.projectId ? Number(dto.projectId) : null,
       appointmentDate,
-      duration: dto.dauer ? Number(dto.dauer) : 60,
-      location: dto.ort || null,
-      description: dto.beschreibung || null,
-      status: dto.status || 'geplant'
+      duration: dto.duration ? Number(dto.duration) : 60,
+      location: dto.location || null,
+      description: dto.description || null,
+      status: dto.status || 'planned'
     };
   }
 
@@ -646,18 +653,18 @@ export class AppointmentService extends BaseService<
     const updateData: Partial<Appointment> = {};
     
     // Only include fields that are present in the DTO
-    if (dto.titel !== undefined) updateData.title = dto.titel;
-    if (dto.kunde_id !== undefined) updateData.customerId = dto.kunde_id !== null ? Number(dto.kunde_id) : null;
-    if (dto.projekt_id !== undefined) updateData.projectId = dto.projekt_id !== null ? Number(dto.projekt_id) : null;
+    if (dto.title !== undefined) updateData.title = dto.title;
+    if (dto.customerId !== undefined) updateData.customerId = dto.customerId !== null ? Number(dto.customerId) : null;
+    if (dto.projectId !== undefined) updateData.projectId = dto.projectId !== null ? Number(dto.projectId) : null;
     
     // Combine date and time if both are provided
-    if (dto.termin_datum && dto.termin_zeit) {
-      updateData.appointmentDate = new Date(`${dto.termin_datum}T${dto.termin_zeit}`);
+    if (dto.appointmentDate && dto.appointmentTime) {
+      updateData.appointmentDate = new Date(`${dto.appointmentDate}T${dto.appointmentTime}`);
     }
     
-    if (dto.dauer !== undefined) updateData.duration = Number(dto.dauer);
-    if (dto.ort !== undefined) updateData.location = dto.ort;
-    if (dto.beschreibung !== undefined) updateData.description = dto.beschreibung;
+    if (dto.duration !== undefined) updateData.duration = Number(dto.duration);
+    if (dto.location !== undefined) updateData.location = dto.location;
+    if (dto.description !== undefined) updateData.description = dto.description;
     if (dto.status !== undefined) updateData.status = dto.status;
     
     return updateData;

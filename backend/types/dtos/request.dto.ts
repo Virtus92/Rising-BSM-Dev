@@ -1,9 +1,9 @@
 /**
- * Request DTOs
+ * Contact Request DTOs
  * 
  * Data Transfer Objects for Contact Request entity operations.
  */
-import { BaseCreateDTO, BaseResponseDTO, BaseFilterDTO, StatusChangeDTO } from './base.dto.js';
+import { BaseCreateDTO, BaseResponseDTO, FilterParams } from '../common/types.js';
 
 /**
  * Enum for request status values
@@ -31,26 +31,33 @@ export enum RequestService {
 export interface ContactRequestCreateDTO extends BaseCreateDTO {
   /**
    * Requester name
+   * @minLength 2
+   * @maxLength 100
    */
   name: string;
 
   /**
    * Email address
+   * @format email
    */
   email: string;
 
   /**
    * Phone number (optional)
+   * @maxLength 30
    */
   phone?: string;
 
   /**
    * Service type
+   * @isEnum RequestService
    */
-  service: string;
+  service: RequestService;
 
   /**
    * Request message
+   * @minLength 10
+   * @maxLength 1000
    */
   message: string;
 }
@@ -59,11 +66,6 @@ export interface ContactRequestCreateDTO extends BaseCreateDTO {
  * DTO for contact request response
  */
 export interface ContactRequestResponseDTO extends BaseResponseDTO {
-  /**
-   * Request ID
-   */
-  id: number;
-
   /**
    * Requester name
    */
@@ -75,24 +77,27 @@ export interface ContactRequestResponseDTO extends BaseResponseDTO {
   email: string;
 
   /**
-   * Service label
+   * Service type label
    */
   serviceLabel: string;
 
   /**
-   * Formatted date
+   * Formatted creation date
    */
   formattedDate: string;
 
   /**
-   * Status label
+   * Request status
    */
-  status: string;
-  
+  status: RequestStatus;
+
+  /**
+   * Status label for display
+   */
   statusLabel: string;
 
   /**
-   * Status CSS class
+   * CSS class for status display
    */
   statusClass: string;
 }
@@ -107,7 +112,7 @@ export interface ContactRequestDetailDTO extends ContactRequestResponseDTO {
   phone: string;
 
   /**
-   * Request message
+   * Full request message
    */
   message: string;
 
@@ -120,32 +125,27 @@ export interface ContactRequestDetailDTO extends ContactRequestResponseDTO {
 /**
  * DTO for request filtering
  */
-export interface RequestFilterDTO extends BaseFilterDTO {
-  /**
-   * Filter by status
-   */
-  status?: string;
-
+export interface RequestFilterDTO extends FilterParams {
   /**
    * Filter by service type
    */
-  service?: string;
+  service?: RequestService;
 
   /**
-   * Filter by date
+   * Filter by date range (from)
    */
-  date?: string;
+  dateFrom?: string;
 
   /**
-   * Search term for name and email
+   * Filter by date range (to)
    */
-  search?: string;
+  dateTo?: string;
 }
 
 /**
  * DTO for request status update
  */
-export interface RequestStatusUpdateDTO extends StatusChangeDTO {
+export interface RequestStatusUpdateDTO {
   /**
    * Request ID
    */
@@ -153,11 +153,13 @@ export interface RequestStatusUpdateDTO extends StatusChangeDTO {
 
   /**
    * New status
+   * @isEnum RequestStatus
    */
-  status: string;
+  status: RequestStatus;
 
   /**
    * Optional note about the status change
+   * @maxLength 1000
    */
   note?: string;
 }
@@ -177,7 +179,7 @@ export interface RequestNoteDTO {
   text: string;
 
   /**
-   * Formatted date
+   * Formatted creation date
    */
   formattedDate: string;
 
@@ -192,9 +194,14 @@ export interface RequestNoteDTO {
  */
 export interface RequestNoteCreateDTO {
   /**
+   * Request ID
+   */
+  requestId: number;
+  
+  /**
    * Note text
    */
-  note: string;
+  text: string;
 }
 
 /**
@@ -229,13 +236,13 @@ export interface RequestStatsDTO {
   /**
    * Requests by service type
    */
-  byService: Record<string, number>;
+  byService: Record<RequestService, number>;
 }
 
 /**
  * Validation schema for contact request creation
  */
-export const contactRequestCreateSchema = {
+export const contactRequestCreateValidation = {
   name: {
     type: 'string',
     required: true,
@@ -256,10 +263,11 @@ export const contactRequestCreateSchema = {
     }
   },
   phone: {
-    type: 'phone',
+    type: 'string',
     required: false,
+    max: 30,
     messages: {
-      phone: 'Invalid phone number format'
+      max: 'Phone number must not exceed 30 characters'
     }
   },
   service: {
@@ -288,14 +296,6 @@ export const contactRequestCreateSchema = {
  * Validation schema for request status update
  */
 export const requestStatusUpdateSchema = {
-  id: {
-    type: 'number',
-    required: true,
-    messages: {
-      required: 'Request ID is required',
-      type: 'Request ID must be a number'
-    }
-  },
   status: {
     type: 'enum',
     required: true,
@@ -319,7 +319,7 @@ export const requestStatusUpdateSchema = {
  * Validation schema for request note creation
  */
 export const requestNoteCreateSchema = {
-  note: {
+  text: {
     type: 'string',
     required: true,
     min: 1,
@@ -334,10 +334,8 @@ export const requestNoteCreateSchema = {
 
 /**
  * Get service label for service type
- * @param service Service type
- * @returns Human-readable service label
  */
-export function getServiceLabel(service: string): string {
+export function getServiceLabel(service: RequestService): string {
   switch (service) {
     case RequestService.FACILITY:
       return 'Facility Management';
@@ -347,6 +345,42 @@ export function getServiceLabel(service: string): string {
       return 'Winterdienst';
     case RequestService.OTHER:
     default:
-      return 'Sonstiges';
+      return 'Sonstige Dienstleistungen';
+  }
+}
+
+/**
+ * Get human-readable status label
+ */
+export function getRequestStatusLabel(status: RequestStatus): string {
+  switch (status) {
+    case RequestStatus.NEW:
+      return 'Neu';
+    case RequestStatus.IN_PROGRESS:
+      return 'In Bearbeitung';
+    case RequestStatus.ANSWERED:
+      return 'Beantwortet';
+    case RequestStatus.CLOSED:
+      return 'Geschlossen';
+    default:
+      return status;
+  }
+}
+
+/**
+ * Get CSS class for status
+ */
+export function getRequestStatusClass(status: RequestStatus): string {
+  switch (status) {
+    case RequestStatus.NEW:
+      return 'info';
+    case RequestStatus.IN_PROGRESS:
+      return 'primary';
+    case RequestStatus.ANSWERED:
+      return 'warning';
+    case RequestStatus.CLOSED:
+      return 'success';
+    default:
+      return 'secondary';
   }
 }

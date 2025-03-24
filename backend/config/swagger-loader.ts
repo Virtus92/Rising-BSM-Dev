@@ -3,7 +3,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
 import swaggerUi from 'swagger-ui-express';
-import swaggerJSDoc from 'swagger-jsdoc';
 
 // Get the directory name equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -450,7 +449,7 @@ function validateOpenApiSpec(spec: any): boolean {
 /**
  * Setup Swagger UI middleware
  */
-export function setupSwagger(app: any, swaggerOptions: any = {}): void {
+export function setupSwagger(app: any, options: any = {}): void {
   console.log('Setting up Swagger UI documentation...');
   // Check if Swagger is enabled (default to enabled)
   const isSwaggerEnabled = process.env.SWAGGER_ENABLED !== 'false';
@@ -478,24 +477,11 @@ export function setupSwagger(app: any, swaggerOptions: any = {}): void {
   };
   
   // Merge options
-  const uiOptions = { ...defaultOptions, ...swaggerOptions };
-
-  const options = {
-    definition: {
-      openapi: '3.0.0',
-      info: {
-        title: 'Rising BSM API',
-        version: '1.0.0',
-      },
-    },
-    apis: ['./routes/*.js', './controllers/*.js'],
-  };
-  
-  const swaggerSpec = swaggerJSDoc(options);
+  const uiOptions = { ...defaultOptions, ...options };
   
   try {
     // Serve Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+    app.use('/api-docs', swaggerUi.serve);
     app.get('/api-docs', swaggerUi.setup(openApiSpec, uiOptions));
     console.log('✨ Swagger UI documentation enabled');
   }

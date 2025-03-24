@@ -3,16 +3,16 @@
  * 
  * Data Transfer Objects for application settings operations.
  */
-import { BaseFilterDTO } from './base.dto.js';
+import { BaseFilterDTO } from '../common/types.js';
 
 /**
  * Enum for notification interval options
  */
 export enum NotificationInterval {
-  IMMEDIATE = 'sofort',
-  HOURLY = 'stuendlich',
-  DAILY = 'taeglich',
-  WEEKLY = 'woechentlich'
+  IMMEDIATE = 'immediate',
+  HOURLY = 'hourly',
+  DAILY = 'daily',
+  WEEKLY = 'weekly'
 }
 
 /**
@@ -27,16 +27,16 @@ export enum LanguageOption {
  * Enum for backup interval options
  */
 export enum BackupInterval {
-  DAILY = 'taeglich',
-  WEEKLY = 'woechentlich',
-  MONTHLY = 'monatlich'
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  MONTHLY = 'monthly'
 }
 
 /**
  * Enum for backup storage type options
  */
 export enum BackupStorageType {
-  LOCAL = 'lokal',
+  LOCAL = 'local',
   S3 = 's3',
   FTP = 'ftp'
 }
@@ -48,27 +48,27 @@ export interface UserSettingsUpdateDTO {
   /**
    * Language preference
    */
-  sprache?: string;
+  language?: string;
 
   /**
    * Dark mode preference
    */
-  dark_mode?: boolean;
+  darkMode?: boolean;
 
   /**
    * Email notifications preference
    */
-  benachrichtigungen_email?: boolean;
+  emailNotifications?: boolean;
 
   /**
    * Push notifications preference
    */
-  benachrichtigungen_push?: boolean;
+  pushNotifications?: boolean;
 
   /**
    * Notification interval preference
    */
-  benachrichtigungen_intervall?: string;
+  notificationInterval?: string;
 }
 
 /**
@@ -78,27 +78,27 @@ export interface UserSettingsResponseDTO {
   /**
    * Language preference
    */
-  sprache: string;
+  language: string;
 
   /**
    * Dark mode preference
    */
-  dark_mode: boolean;
+  darkMode: boolean;
 
   /**
    * Email notifications preference
    */
-  benachrichtigungen_email: boolean;
+  emailNotifications: boolean;
 
   /**
    * Push notifications preference
    */
-  benachrichtigungen_push: boolean;
+  pushNotifications: boolean;
 
   /**
    * Notification interval preference
    */
-  benachrichtigungen_intervall: string;
+  notificationInterval: string;
 }
 
 /**
@@ -404,8 +404,8 @@ export interface ManualBackupDTO {
 /**
  * Validation schema for user settings update
  */
-export const userSettingsUpdateSchema = {
-  sprache: {
+export const userSettingsUpdateValidation = {
+  language: {
     type: 'enum',
     required: false,
     enum: Object.values(LanguageOption),
@@ -414,22 +414,22 @@ export const userSettingsUpdateSchema = {
       enum: `Language must be one of: ${Object.values(LanguageOption).join(', ')}`
     }
   },
-  dark_mode: {
+  darkMode: {
     type: 'boolean',
     required: false,
     default: false
   },
-  benachrichtigungen_email: {
+  emailNotifications: {
     type: 'boolean',
     required: false,
     default: true
   },
-  benachrichtigungen_push: {
+  pushNotifications: {
     type: 'boolean',
     required: false,
     default: false
   },
-  benachrichtigungen_intervall: {
+  notificationInterval: {
     type: 'enum',
     required: false,
     enum: Object.values(NotificationInterval),
@@ -443,7 +443,7 @@ export const userSettingsUpdateSchema = {
 /**
  * Validation schema for system settings update
  */
-export const systemSettingsUpdateSchema = {
+export const systemSettingsUpdateValidation = {
   siteTitle: {
     type: 'string',
     required: false,
@@ -512,7 +512,7 @@ export const systemSettingsUpdateSchema = {
     }
   },
   defaultVatRate: {
-    type: 'numeric',
+    type: 'number',
     required: false,
     min: 0,
     max: 100,
@@ -544,7 +544,7 @@ export const systemSettingsUpdateSchema = {
 /**
  * Validation schema for backup settings update
  */
-export const backupSettingsUpdateSchema = {
+export const backupSettingsUpdateValidation = {
   autoBackup: {
     type: 'boolean',
     required: false,
@@ -568,7 +568,7 @@ export const backupSettingsUpdateSchema = {
     }
   },
   keepCount: {
-    type: 'numeric',
+    type: 'number',
     required: false,
     min: 1,
     max: 100,

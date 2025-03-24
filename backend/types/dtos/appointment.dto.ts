@@ -394,6 +394,29 @@ export const appointmentNoteCreateValidation = {
 };
 
 /**
+ * Validation schema for appointment status update
+ */
+export const appointmentStatusUpdateValidation = {
+  status: {
+    type: 'enum',
+    required: true,
+    enum: Object.values(AppointmentStatus),
+    messages: {
+      required: 'Status is required',
+      enum: `Status must be one of: ${Object.values(AppointmentStatus).join(', ')}`
+    }
+  },
+  note: {
+    type: 'string',
+    required: false,
+    max: 1000,
+    messages: {
+      max: 'Note must not exceed 1000 characters'
+    }
+  }
+};
+
+/**
  * Get human-readable appointment status label
  */
 export function getAppointmentStatusLabel(status: string): string {
@@ -454,4 +477,15 @@ export function formatAppointmentTime(date: string | Date): string {
     hour: '2-digit',
     minute: '2-digit'
   });
+}
+
+/**
+ * Detailed appointment response DTO with notes
+ */
+export interface AppointmentDetailDTO extends AppointmentDetailResponseDTO {
+  // Additional properties used for detail view
+  dateFormatted: string;
+  timeFormatted: string;
+  statusClass: string;
+  statusLabel: string;
 }
