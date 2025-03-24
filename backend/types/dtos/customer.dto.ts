@@ -3,23 +3,15 @@
  * 
  * Data Transfer Objects for Customer entity operations.
  */
-import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, BaseFilterDTO, StatusChangeDTO } from './base.dto.js';
+import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, FilterParams, StatusChangeDTO, CustomerType, Status } from '../common/types.js';
 
 /**
- * Enum for customer status values
+ * Customer status values
  */
 export enum CustomerStatus {
-  ACTIVE = 'aktiv',
-  INACTIVE = 'inaktiv',
-  DELETED = 'geloescht'
-}
-
-/**
- * Enum for customer types
- */
-export enum CustomerType {
-  PRIVATE = 'privat',
-  BUSINESS = 'geschaeft'
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  DELETED = 'deleted'
 }
 
 /**
@@ -34,7 +26,7 @@ export interface CustomerCreateDTO extends BaseCreateDTO {
   /**
    * Company name (optional)
    */
-  firma?: string;
+  company?: string;
 
   /**
    * Email address
@@ -44,42 +36,47 @@ export interface CustomerCreateDTO extends BaseCreateDTO {
   /**
    * Phone number (optional)
    */
-  telefon?: string;
+  phone?: string;
 
   /**
    * Address (optional)
    */
-  adresse?: string;
+  address?: string;
 
   /**
    * Postal code (optional)
    */
-  plz?: string;
+  postalCode?: string;
 
   /**
    * City (optional)
    */
-  ort?: string;
+  city?: string;
+
+  /**
+   * Country (optional, defaults to 'Austria')
+   */
+  country?: string;
 
   /**
    * Notes (optional)
    */
-  notizen?: string;
+  notes?: string;
 
   /**
-   * Newsletter subscription (optional)
+   * Newsletter subscription (optional, defaults to false)
    */
   newsletter?: boolean;
 
   /**
-   * Customer status (optional, defaults to 'aktiv')
+   * Customer status (optional, defaults to 'active')
    */
   status?: string;
 
   /**
-   * Customer type (optional, defaults to 'privat')
+   * Customer type (optional, defaults to 'private')
    */
-  kundentyp?: string;
+  type?: string;
 }
 
 /**
@@ -94,7 +91,7 @@ export interface CustomerUpdateDTO extends BaseUpdateDTO {
   /**
    * Company name
    */
-  firma?: string;
+  company?: string;
 
   /**
    * Email address
@@ -104,27 +101,32 @@ export interface CustomerUpdateDTO extends BaseUpdateDTO {
   /**
    * Phone number
    */
-  telefon?: string;
+  phone?: string;
 
   /**
    * Address
    */
-  adresse?: string;
+  address?: string;
 
   /**
    * Postal code
    */
-  plz?: string;
+  postalCode?: string;
 
   /**
    * City
    */
-  ort?: string;
+  city?: string;
+
+  /**
+   * Country
+   */
+  country?: string;
 
   /**
    * Notes
    */
-  notizen?: string;
+  notes?: string;
 
   /**
    * Newsletter subscription
@@ -139,7 +141,7 @@ export interface CustomerUpdateDTO extends BaseUpdateDTO {
   /**
    * Customer type
    */
-  kundentyp?: string;
+  type?: string;
 }
 
 /**
@@ -167,11 +169,6 @@ export interface CustomerStatusUpdateDTO extends StatusChangeDTO {
  */
 export interface CustomerResponseDTO extends BaseResponseDTO {
   /**
-   * Customer ID
-   */
-  id: number;
-
-  /**
    * Customer name
    */
   name: string;
@@ -179,32 +176,37 @@ export interface CustomerResponseDTO extends BaseResponseDTO {
   /**
    * Company name
    */
-  firma: string;
+  company?: string;
 
   /**
    * Email address
    */
-  email: string;
+  email?: string;
 
   /**
    * Phone number
    */
-  telefon: string;
+  phone?: string;
 
   /**
    * Address
    */
-  adresse: string;
+  address?: string;
 
   /**
    * Postal code
    */
-  plz: string;
+  postalCode?: string;
 
   /**
    * City
    */
-  ort: string;
+  city?: string;
+
+  /**
+   * Country
+   */
+  country: string;
 
   /**
    * Customer status
@@ -212,24 +214,9 @@ export interface CustomerResponseDTO extends BaseResponseDTO {
   status: string;
 
   /**
-   * Status label (formatted)
-   */
-  statusLabel: string;
-
-  /**
-   * Status CSS class
-   */
-  statusClass: string;
-
-  /**
    * Customer type
    */
-  kundentyp: string;
-
-  /**
-   * Customer type label (formatted)
-   */
-  kundentypLabel: string;
+  type: string;
 
   /**
    * Newsletter subscription
@@ -239,17 +226,7 @@ export interface CustomerResponseDTO extends BaseResponseDTO {
   /**
    * Notes
    */
-  notizen: string;
-
-  /**
-   * Creation date (formatted)
-   */
-  created_at: string;
-
-  /**
-   * Last update date (formatted)
-   */
-  updated_at: string;
+  notes?: string;
 }
 
 /**
@@ -259,12 +236,12 @@ export interface CustomerDetailResponseDTO extends CustomerResponseDTO {
   /**
    * Related projects
    */
-  projects: CustomerProjectDTO[];
+  projects?: CustomerProjectDTO[];
 
   /**
    * Related appointments
    */
-  appointments: CustomerAppointmentDTO[];
+  appointments?: CustomerAppointmentDTO[];
 }
 
 /**
@@ -279,27 +256,17 @@ export interface CustomerProjectDTO {
   /**
    * Project title
    */
-  titel: string;
+  title: string;
 
   /**
-   * Formatted date
+   * Formatted start date
    */
-  datum: string;
+  startDate: string;
 
   /**
    * Project status
    */
   status: string;
-
-  /**
-   * Status label (formatted)
-   */
-  statusLabel: string;
-
-  /**
-   * Status CSS class
-   */
-  statusClass: string;
 }
 
 /**
@@ -314,87 +281,27 @@ export interface CustomerAppointmentDTO {
   /**
    * Appointment title
    */
-  titel: string;
+  title: string;
 
   /**
    * Formatted date and time
    */
-  datum: string;
+  appointmentDate: string;
 
   /**
    * Appointment status
    */
   status: string;
-
-  /**
-   * Status label (formatted)
-   */
-  statusLabel: string;
-
-  /**
-   * Status CSS class
-   */
-  statusClass: string;
-}
-
-/**
- * DTO for customer statistics
- */
-export interface CustomerStatsDTO {
-  /**
-   * Total customer count
-   */
-  total: number;
-
-  /**
-   * Active customer count
-   */
-  active: number;
-
-  /**
-   * Private customer count
-   */
-  private: number;
-
-  /**
-   * Business customer count
-   */
-  business: number;
-}
-
-/**
- * DTO for customer growth data
- */
-export interface CustomerGrowthDTO {
-  /**
-   * Month (e.g., "Jan 2023")
-   */
-  month: string;
-
-  /**
-   * New customer count
-   */
-  count: number;
 }
 
 /**
  * DTO for customer filtering
  */
-export interface CustomerFilterDTO extends BaseFilterDTO {
+export interface CustomerFilterParams extends FilterParams {
   /**
-   * Filter by status
-   */
-  status?: string;
-
-  /**
-   * Filter by customer type
+   * Filter by type (private/business)
    */
   type?: string;
-
-  /**
-   * Search term for name, email, and company
-   */
-  search?: string;
 }
 
 /**
@@ -402,15 +309,20 @@ export interface CustomerFilterDTO extends BaseFilterDTO {
  */
 export interface CustomerNoteCreateDTO {
   /**
+   * Customer ID
+   */
+  customerId: number;
+  
+  /**
    * Note text
    */
-  note: string;
+  text: string;
 }
 
 /**
  * Validation schema for customer creation
  */
-export const customerCreateSchema = {
+export const customerCreateValidation = {
   name: {
     type: 'string',
     required: true,
@@ -430,7 +342,7 @@ export const customerCreateSchema = {
       email: 'Invalid email format'
     }
   },
-  firma: {
+  company: {
     type: 'string',
     required: false,
     max: 100,
@@ -438,7 +350,7 @@ export const customerCreateSchema = {
       max: 'Company name must not exceed 100 characters'
     }
   },
-  telefon: {
+  phone: {
     type: 'string',
     required: false,
     max: 30,
@@ -446,15 +358,15 @@ export const customerCreateSchema = {
       max: 'Phone number must not exceed 30 characters'
     }
   },
-  adresse: {
+  address: {
     type: 'string',
     required: false,
-    max: 200,
+    max: 255,
     messages: {
-      max: 'Address must not exceed 200 characters'
+      max: 'Address must not exceed 255 characters'
     }
   },
-  plz: {
+  postalCode: {
     type: 'string',
     required: false,
     max: 10,
@@ -462,7 +374,7 @@ export const customerCreateSchema = {
       max: 'Postal code must not exceed 10 characters'
     }
   },
-  ort: {
+  city: {
     type: 'string',
     required: false,
     max: 100,
@@ -470,7 +382,16 @@ export const customerCreateSchema = {
       max: 'City must not exceed 100 characters'
     }
   },
-  notizen: {
+  country: {
+    type: 'string',
+    required: false,
+    max: 100,
+    default: 'Austria',
+    messages: {
+      max: 'Country must not exceed 100 characters'
+    }
+  },
+  notes: {
     type: 'string',
     required: false,
     max: 2000,
@@ -480,7 +401,8 @@ export const customerCreateSchema = {
   },
   newsletter: {
     type: 'boolean',
-    required: false
+    required: false,
+    default: false
   },
   status: {
     type: 'enum',
@@ -491,7 +413,7 @@ export const customerCreateSchema = {
       enum: `Status must be one of: ${Object.values(CustomerStatus).join(', ')}`
     }
   },
-  kundentyp: {
+  type: {
     type: 'enum',
     required: false,
     enum: Object.values(CustomerType),
@@ -505,87 +427,36 @@ export const customerCreateSchema = {
 /**
  * Validation schema for customer update
  */
-export const customerUpdateSchema = {
-  ...customerCreateSchema,
+export const customerUpdateValidation = {
+  ...customerCreateValidation,
   name: {
-    ...customerCreateSchema.name,
+    ...customerCreateValidation.name,
     required: false
   },
   email: {
-    ...customerCreateSchema.email,
+    ...customerCreateValidation.email,
     required: false
   }
 };
 
 /**
- * Validation schema for customer status update
- */
-export const customerStatusUpdateSchema = {
-  id: {
-    type: 'number',
-    required: true,
-    messages: {
-      required: 'Customer ID is required'
-    }
-  },
-  status: {
-    type: 'enum',
-    required: true,
-    enum: Object.values(CustomerStatus),
-    messages: {
-      required: 'Status is required',
-      enum: `Status must be one of: ${Object.values(CustomerStatus).join(', ')}`
-    }
-  },
-  note: {
-    type: 'string',
-    required: false,
-    max: 1000,
-    messages: {
-      max: 'Note must not exceed 1000 characters'
-    }
-  }
-};
-
-/**
- * Validation schema for customer note creation
- */
-export const customerNoteCreateSchema = {
-  note: {
-    type: 'string',
-    required: true,
-    min: 1,
-    max: 1000,
-    messages: {
-      required: 'Note text is required',
-      min: 'Note text cannot be empty',
-      max: 'Note text must not exceed 1000 characters'
-    }
-  }
-};
-
-/**
- * Get customer status label
- * @param status Customer status
- * @returns Formatted status label
+ * Get human-readable status label
  */
 export function getCustomerStatusLabel(status: string): string {
   switch (status) {
     case CustomerStatus.ACTIVE:
-      return 'Aktiv';
+      return 'Active';
     case CustomerStatus.INACTIVE:
-      return 'Inaktiv';
+      return 'Inactive';
     case CustomerStatus.DELETED:
-      return 'Gelöscht';
+      return 'Deleted';
     default:
       return status;
   }
 }
 
 /**
- * Get customer status CSS class
- * @param status Customer status
- * @returns CSS class name
+ * Get CSS class for status
  */
 export function getCustomerStatusClass(status: string): string {
   switch (status) {
@@ -601,16 +472,14 @@ export function getCustomerStatusClass(status: string): string {
 }
 
 /**
- * Get customer type label
- * @param type Customer type
- * @returns Formatted type label
+ * Get human-readable type label
  */
 export function getCustomerTypeLabel(type: string): string {
   switch (type) {
     case CustomerType.PRIVATE:
-      return 'Privatkunde';
+      return 'Private';
     case CustomerType.BUSINESS:
-      return 'Geschäftskunde';
+      return 'Business';
     default:
       return type;
   }

@@ -3,16 +3,16 @@
  * 
  * Data Transfer Objects for Project entity operations.
  */
-import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, BaseFilterDTO, StatusChangeDTO } from './base.dto.js';
+import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, FilterParams, StatusChangeDTO } from '../common/types.js';
 
 /**
- * Enum for project status values
+ * Project status values
  */
 export enum ProjectStatus {
-  NEW = 'neu',
-  IN_PROGRESS = 'in_bearbeitung',
-  COMPLETED = 'abgeschlossen',
-  CANCELLED = 'storniert'
+  NEW = 'new',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled'
 }
 
 /**
@@ -22,40 +22,40 @@ export interface ProjectCreateDTO extends BaseCreateDTO {
   /**
    * Project title
    */
-  titel: string;
+  title: string;
 
   /**
    * Customer ID (optional)
    */
-  kunde_id?: number | null;
+  customerId?: number | null;
 
   /**
    * Service ID (optional)
    */
-  dienstleistung_id?: number | null;
+  serviceId?: number | null;
 
   /**
    * Project start date (YYYY-MM-DD format)
    */
-  start_datum: string;
+  startDate: string;
 
   /**
    * Project end date (YYYY-MM-DD format, optional)
    */
-  end_datum?: string | null;
+  endDate?: string | null;
 
   /**
    * Project budget/amount (optional)
    */
-  betrag?: number | null;
+  amount?: number | null;
 
   /**
    * Project description (optional)
    */
-  beschreibung?: string | null;
+  description?: string | null;
 
   /**
-   * Project status (optional, defaults to 'neu')
+   * Project status (optional, defaults to 'new')
    */
   status?: string;
 }
@@ -67,37 +67,37 @@ export interface ProjectUpdateDTO extends BaseUpdateDTO {
   /**
    * Project title
    */
-  titel?: string;
+  title?: string;
 
   /**
    * Customer ID
    */
-  kunde_id?: number | null;
+  customerId?: number | null;
 
   /**
    * Service ID
    */
-  dienstleistung_id?: number | null;
+  serviceId?: number | null;
 
   /**
    * Project start date (YYYY-MM-DD format)
    */
-  start_datum?: string;
+  startDate?: string;
 
   /**
    * Project end date (YYYY-MM-DD format)
    */
-  end_datum?: string | null;
+  endDate?: string | null;
 
   /**
    * Project budget/amount
    */
-  betrag?: number | null;
+  amount?: number | null;
 
   /**
    * Project description
    */
-  beschreibung?: string | null;
+  description?: string | null;
 
   /**
    * Project status
@@ -130,54 +130,49 @@ export interface ProjectStatusUpdateDTO extends StatusChangeDTO {
  */
 export interface ProjectResponseDTO extends BaseResponseDTO {
   /**
-   * Project ID
-   */
-  id: number;
-
-  /**
    * Project title
    */
-  titel: string;
+  title: string;
 
   /**
    * Customer ID
    */
-  kunde_id: number | null;
+  customerId: number | null;
 
   /**
    * Customer name
    */
-  kunde_name: string;
+  customerName?: string;
 
   /**
    * Service ID
    */
-  dienstleistung_id: number | null;
+  serviceId: number | null;
 
   /**
    * Service name
    */
-  dienstleistung: string;
+  serviceName?: string;
 
   /**
-   * Project start date (formatted)
+   * Project start date (ISO string)
    */
-  start_datum: string;
+  startDate: string;
 
   /**
-   * Project end date (formatted)
+   * Project end date (ISO string)
    */
-  end_datum: string;
+  endDate?: string;
 
   /**
    * Project budget/amount
    */
-  betrag: number | null;
+  amount: number | null;
 
   /**
    * Project description
    */
-  beschreibung: string;
+  description?: string;
 
   /**
    * Project status
@@ -185,24 +180,9 @@ export interface ProjectResponseDTO extends BaseResponseDTO {
   status: string;
 
   /**
-   * Status label (formatted)
+   * ID of user who created the project
    */
-  statusLabel: string;
-
-  /**
-   * Status CSS class
-   */
-  statusClass: string;
-
-  /**
-   * Creation date (formatted)
-   */
-  createdAt: string;
-
-  /**
-   * Last update date (formatted)
-   */
-  updatedAt: string;
+  createdBy?: number;
 }
 
 /**
@@ -212,12 +192,12 @@ export interface ProjectDetailResponseDTO extends ProjectResponseDTO {
   /**
    * Project notes
    */
-  notes: ProjectNoteDTO[];
+  notes?: ProjectNoteDTO[];
 
   /**
    * Related appointments
    */
-  appointments: ProjectAppointmentDTO[];
+  appointments?: ProjectAppointmentDTO[];
 }
 
 /**
@@ -235,14 +215,14 @@ export interface ProjectNoteDTO {
   text: string;
 
   /**
-   * Formatted date
+   * Creation date (ISO string)
    */
-  formattedDate: string;
+  createdAt: string;
 
   /**
    * Username who created the note
    */
-  benutzer: string;
+  userName: string;
 }
 
 /**
@@ -250,9 +230,14 @@ export interface ProjectNoteDTO {
  */
 export interface ProjectNoteCreateDTO {
   /**
+   * Project ID
+   */
+  projectId: number;
+  
+  /**
    * Note text
    */
-  note: string;
+  text: string;
 }
 
 /**
@@ -267,103 +252,49 @@ export interface ProjectAppointmentDTO {
   /**
    * Appointment title
    */
-  titel: string;
+  title: string;
 
   /**
-   * Formatted date and time
+   * Appointment date (ISO string)
    */
-  datum: string;
+  appointmentDate: string;
 
   /**
    * Appointment status
    */
   status: string;
-
-  /**
-   * Status label (formatted)
-   */
-  statusLabel: string;
-
-  /**
-   * Status CSS class
-   */
-  statusClass: string;
 }
 
 /**
  * DTO for project filtering
  */
-export interface ProjectFilterDTO extends BaseFilterDTO {
-  /**
-   * Filter by status
-   */
-  status?: string;
-
+export interface ProjectFilterParams extends FilterParams {
   /**
    * Filter by customer ID
    */
-  kunde_id?: number;
+  customerId?: number;
 
   /**
    * Filter by service ID
    */
-  dienstleistung_id?: number;
+  serviceId?: number;
 
   /**
    * Filter by start date range (from)
    */
-  start_datum_von?: string;
+  startDateFrom?: string;
 
   /**
    * Filter by start date range (to)
    */
-  start_datum_bis?: string;
-
-  /**
-   * Search term for title and description
-   */
-  search?: string;
-}
-
-/**
- * DTO for project statistics
- */
-export interface ProjectStatisticsDTO {
-  /**
-   * Projects count by status
-   */
-  statusCounts: Record<string, number>;
-
-  /**
-   * Total project value
-   */
-  totalValue: number;
-
-  /**
-   * Projects by month
-   */
-  byMonth?: Array<{
-    month: string;
-    count: number;
-    value: number;
-  }>;
-
-  /**
-   * Top customers
-   */
-  topCustomers?: Array<{
-    id: number;
-    name: string;
-    projectCount: number;
-    totalValue: number;
-  }>;
+  startDateTo?: string;
 }
 
 /**
  * Validation schema for project creation
  */
-export const projectCreateSchema = {
-  titel: {
+export const projectCreateValidation = {
+  title: {
     type: 'string',
     required: true,
     min: 2,
@@ -374,15 +305,15 @@ export const projectCreateSchema = {
       max: 'Project title must not exceed 200 characters'
     }
   },
-  kunde_id: {
+  customerId: {
     type: 'number',
     required: false
   },
-  dienstleistung_id: {
+  serviceId: {
     type: 'number',
     required: false
   },
-  start_datum: {
+  startDate: {
     type: 'date',
     required: true,
     messages: {
@@ -390,11 +321,11 @@ export const projectCreateSchema = {
       type: 'Start date must be a valid date'
     }
   },
-  end_datum: {
+  endDate: {
     type: 'date',
     required: false
   },
-  betrag: {
+  amount: {
     type: 'number',
     required: false,
     min: 0,
@@ -402,7 +333,7 @@ export const projectCreateSchema = {
       min: 'Amount must be a positive number'
     }
   },
-  beschreibung: {
+  description: {
     type: 'string',
     required: false,
     max: 2000,
@@ -424,53 +355,30 @@ export const projectCreateSchema = {
 /**
  * Validation schema for project update
  */
-export const projectUpdateSchema = {
-  ...projectCreateSchema,
-  titel: {
-    ...projectCreateSchema.titel,
+export const projectUpdateValidation = {
+  ...projectCreateValidation,
+  title: {
+    ...projectCreateValidation.title,
     required: false
   },
-  start_datum: {
-    ...projectCreateSchema.start_datum,
+  startDate: {
+    ...projectCreateValidation.startDate,
     required: false
-  }
-};
-
-/**
- * Validation schema for project status update
- */
-export const projectStatusUpdateSchema = {
-  id: {
-    type: 'number',
-    required: true,
-    messages: {
-      required: 'Project ID is required'
-    }
-  },
-  status: {
-    type: 'enum',
-    required: true,
-    enum: Object.values(ProjectStatus),
-    messages: {
-      required: 'Status is required',
-      enum: `Status must be one of: ${Object.values(ProjectStatus).join(', ')}`
-    }
-  },
-  note: {
-    type: 'string',
-    required: false,
-    max: 1000,
-    messages: {
-      max: 'Note must not exceed 1000 characters'
-    }
   }
 };
 
 /**
  * Validation schema for project note creation
  */
-export const projectNoteCreateSchema = {
-  note: {
+export const projectNoteCreateValidation = {
+  projectId: {
+    type: 'number',
+    required: true,
+    messages: {
+      required: 'Project ID is required'
+    }
+  },
+  text: {
     type: 'string',
     required: true,
     min: 1,
@@ -482,3 +390,39 @@ export const projectNoteCreateSchema = {
     }
   }
 };
+
+/**
+ * Get human-readable project status label
+ */
+export function getProjectStatusLabel(status: string): string {
+  switch (status) {
+    case ProjectStatus.NEW:
+      return 'New';
+    case ProjectStatus.IN_PROGRESS:
+      return 'In Progress';
+    case ProjectStatus.COMPLETED:
+      return 'Completed';
+    case ProjectStatus.CANCELLED:
+      return 'Cancelled';
+    default:
+      return status;
+  }
+}
+
+/**
+ * Get CSS class for project status
+ */
+export function getProjectStatusClass(status: string): string {
+  switch (status) {
+    case ProjectStatus.NEW:
+      return 'info';
+    case ProjectStatus.IN_PROGRESS:
+      return 'primary';
+    case ProjectStatus.COMPLETED:
+      return 'success';
+    case ProjectStatus.CANCELLED:
+      return 'danger';
+    default:
+      return 'secondary';
+  }
+}

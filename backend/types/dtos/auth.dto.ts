@@ -3,7 +3,7 @@
  * 
  * Data Transfer Objects for Authentication operations.
  */
-import { BaseDTO, BaseResponseDTO } from './base.dto.js';
+import { BaseDTO, BaseResponseDTO } from '../common/types.js';
 import { UserResponseDTO } from './user.dto.js';
 
 /**
@@ -23,7 +23,7 @@ export interface LoginDTO extends BaseDTO {
   /**
    * Remember me option
    */
-  remember?: boolean | string;
+  remember?: boolean;
 }
 
 /**
@@ -74,11 +74,6 @@ export interface AuthResponseDTO extends BaseResponseDTO {
    * User data
    */
   user: UserResponseDTO;
-
-  /**
-   * Remember me flag
-   */
-  remember?: boolean;
 }
 
 /**
@@ -142,24 +137,14 @@ export interface ValidateResetTokenDTO extends BaseDTO {
 }
 
 /**
- * DTO for reset token validation response
- */
-export interface ValidateResetTokenResponseDTO extends BaseResponseDTO {
-  /**
-   * User ID
-   */
-  userId: number;
-
-  /**
-   * User email
-   */
-  email: string;
-}
-
-/**
  * DTO for password reset request
  */
 export interface ResetPasswordDTO extends BaseDTO {
+  /**
+   * Reset token
+   */
+  token: string;
+  
   /**
    * New password
    */
@@ -174,7 +159,7 @@ export interface ResetPasswordDTO extends BaseDTO {
 /**
  * Validation schema for login request
  */
-export const loginSchema = {
+export const loginValidation = {
   email: {
     type: 'email',
     required: true,
@@ -192,14 +177,15 @@ export const loginSchema = {
   },
   remember: {
     type: 'boolean',
-    required: false
+    required: false,
+    default: false
   }
 };
 
 /**
  * Validation schema for token refresh
  */
-export const refreshTokenSchema = {
+export const refreshTokenValidation = {
   refreshToken: {
     type: 'string',
     required: true,
@@ -212,7 +198,7 @@ export const refreshTokenSchema = {
 /**
  * Validation schema for forgot password
  */
-export const forgotPasswordSchema = {
+export const forgotPasswordValidation = {
   email: {
     type: 'email',
     required: true,
@@ -226,7 +212,14 @@ export const forgotPasswordSchema = {
 /**
  * Validation schema for reset password
  */
-export const resetPasswordSchema = {
+export const resetPasswordValidation = {
+  token: {
+    type: 'string',
+    required: true,
+    messages: {
+      required: 'Token is required'
+    }
+  },
   password: {
     type: 'password',
     required: true,
@@ -250,8 +243,6 @@ export const resetPasswordSchema = {
 
 /**
  * Get error message for authentication errors
- * @param errorCode Error code
- * @returns Human-readable error message
  */
 export function getAuthErrorMessage(errorCode: string): string {
   switch (errorCode) {

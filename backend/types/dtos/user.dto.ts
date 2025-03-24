@@ -3,25 +3,15 @@
  * 
  * Data Transfer Objects for User entity operations.
  */
-import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, BaseFilterDTO } from './base.dto.js';
+import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, FilterParams, StatusChangeDTO, UserRole } from '../common/types.js';
 
 /**
- * Enum for user status values
+ * User status values
  */
 export enum UserStatus {
-  ACTIVE = 'aktiv',
-  INACTIVE = 'inaktiv',
-  SUSPENDED = 'gesperrt'
-}
-
-/**
- * Enum for user role values
- */
-export enum UserRole {
-  ADMIN = 'admin',
-  MANAGER = 'manager',
-  EMPLOYEE = 'mitarbeiter',
-  USER = 'benutzer'
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  SUSPENDED = 'suspended'
 }
 
 /**
@@ -49,12 +39,12 @@ export interface UserCreateDTO extends BaseCreateDTO {
   phone?: string;
 
   /**
-   * User's role (optional, defaults to 'benutzer')
+   * User's role (optional, defaults to 'employee')
    */
   role?: string;
 
   /**
-   * User's status (optional, defaults to 'aktiv')
+   * User's status (optional, defaults to 'active')
    */
   status?: string;
 }
@@ -90,34 +80,29 @@ export interface UserUpdateDTO extends BaseUpdateDTO {
 }
 
 /**
- * DTO for user login
+ * DTO for user status update
  */
-export interface UserLoginDTO {
+export interface UserStatusUpdateDTO extends StatusChangeDTO {
   /**
-   * User's email address
+   * User ID
    */
-  email: string;
+  id: number;
 
   /**
-   * User's password
+   * New status
    */
-  password: string;
+  status: string;
 
   /**
-   * Remember me option
+   * Optional note about the status change
    */
-  remember?: boolean;
+  note?: string;
 }
 
 /**
  * DTO for user response
  */
 export interface UserResponseDTO extends BaseResponseDTO {
-  /**
-   * User ID
-   */
-  id: number;
-
   /**
    * User's full name
    */
@@ -139,39 +124,14 @@ export interface UserResponseDTO extends BaseResponseDTO {
   role: string;
 
   /**
-   * User's role label
-   */
-  roleLabel: string;
-
-  /**
    * User's status
    */
   status: string;
 
   /**
-   * User's status label
-   */
-  statusLabel: string;
-
-  /**
-   * User's status CSS class
-   */
-  statusClass: string;
-
-  /**
-   * User's initials
-   */
-  initials: string;
-
-  /**
    * User's profile picture URL
    */
   profilePicture?: string;
-
-  /**
-   * User's registration date
-   */
-  createdAt: string;
 }
 
 /**
@@ -179,60 +139,20 @@ export interface UserResponseDTO extends BaseResponseDTO {
  */
 export interface UserDetailResponseDTO extends UserResponseDTO {
   /**
-   * User's activity log
-   */
-  activity: UserActivityDTO[];
-
-  /**
    * User's settings
    */
-  settings: UserSettingsDTO;
-}
-
-/**
- * DTO for user activity log
- */
-export interface UserActivityDTO {
-  /**
-   * Activity ID
-   */
-  id: number;
+  settings?: UserSettingsResponseDTO;
 
   /**
-   * Activity type
+   * User's recent activity
    */
-  activity: string;
-
-  /**
-   * Activity label
-   */
-  activityLabel: string;
-
-  /**
-   * IP address
-   */
-  ipAddress?: string;
-
-  /**
-   * Timestamp
-   */
-  timestamp: string;
-
-  /**
-   * Formatted timestamp
-   */
-  formattedDate: string;
+  activity?: UserActivityResponseDTO[];
 }
 
 /**
  * DTO for user settings
  */
-export interface UserSettingsDTO {
-  /**
-   * Language preference
-   */
-  language: string;
-
+export interface UserSettingsResponseDTO {
   /**
    * Dark mode preference
    */
@@ -249,74 +169,99 @@ export interface UserSettingsDTO {
   pushNotifications: boolean;
 
   /**
+   * Language preference
+   */
+  language: string;
+
+  /**
    * Notification interval preference
    */
   notificationInterval: string;
 }
 
 /**
+ * DTO for updating user settings
+ */
+export interface UserSettingsUpdateDTO extends BaseUpdateDTO {
+  /**
+   * Dark mode preference
+   */
+  darkMode?: boolean;
+
+  /**
+   * Email notifications preference
+   */
+  emailNotifications?: boolean;
+
+  /**
+   * Push notifications preference
+   */
+  pushNotifications?: boolean;
+
+  /**
+   * Language preference
+   */
+  language?: string;
+
+  /**
+   * Notification interval preference
+   */
+  notificationInterval?: string;
+}
+
+/**
+ * DTO for user activity
+ */
+export interface UserActivityResponseDTO {
+  /**
+   * Activity ID
+   */
+  id: number;
+
+  /**
+   * Activity type
+   */
+  activity: string;
+
+  /**
+   * IP address
+   */
+  ipAddress?: string;
+
+  /**
+   * Timestamp
+   */
+  timestamp: string;
+}
+
+/**
  * DTO for user filtering
  */
-export interface UserFilterDTO extends BaseFilterDTO {
-  /**
-   * Filter by status
-   */
-  status?: string;
-
+export interface UserFilterParams extends FilterParams {
   /**
    * Filter by role
    */
   role?: string;
 
   /**
-   * Search term for name and email
+   * Filter by status
    */
-  search?: string;
+  status?: string;
 }
 
 /**
- * DTO for password change
+ * DTO for changing password
  */
-export interface PasswordChangeDTO {
+export interface PasswordChangeDTO extends BaseUpdateDTO {
   /**
    * Current password
    */
-  current_password: string;
+  currentPassword: string;
 
   /**
    * New password
    */
-  new_password: string;
-
-  /**
-   * Confirm new password
-   */
-  confirm_password: string;
-}
-
-/**
- * DTO for password reset request
- */
-export interface PasswordResetRequestDTO {
-  /**
-   * User's email address
-   */
-  email: string;
-}
-
-/**
- * DTO for password reset
- */
-export interface PasswordResetDTO {
-  /**
-   * Reset token
-   */
-  token: string;
-
-  /**
-   * New password
-   */
-  password: string;
+  newPassword: string;
 
   /**
    * Confirm new password
@@ -327,7 +272,7 @@ export interface PasswordResetDTO {
 /**
  * Validation schema for user creation
  */
-export const userCreateSchema = {
+export const userCreateValidation = {
   name: {
     type: 'string',
     required: true,
@@ -357,17 +302,18 @@ export const userCreateSchema = {
     }
   },
   phone: {
-    type: 'phone',
+    type: 'string',
     required: false,
+    max: 30,
     messages: {
-      phone: 'Invalid phone number format'
+      max: 'Phone number must not exceed 30 characters'
     }
   },
   role: {
     type: 'enum',
     required: false,
     enum: Object.values(UserRole),
-    default: UserRole.USER,
+    default: UserRole.EMPLOYEE,
     messages: {
       enum: `Role must be one of: ${Object.values(UserRole).join(', ')}`
     }
@@ -386,43 +332,18 @@ export const userCreateSchema = {
 /**
  * Validation schema for user update
  */
-export const userUpdateSchema = {
-  ...userCreateSchema,
+export const userUpdateValidation = {
+  ...userCreateValidation,
   name: {
-    ...userCreateSchema.name,
+    ...userCreateValidation.name,
     required: false
   },
   email: {
-    ...userCreateSchema.email,
+    ...userCreateValidation.email,
     required: false
   },
   password: {
-    ...userCreateSchema.password,
-    required: false
-  }
-};
-
-/**
- * Validation schema for user login
- */
-export const userLoginSchema = {
-  email: {
-    type: 'email',
-    required: true,
-    messages: {
-      required: 'Email is required',
-      email: 'Invalid email format'
-    }
-  },
-  password: {
-    type: 'string',
-    required: true,
-    messages: {
-      required: 'Password is required'
-    }
-  },
-  remember: {
-    type: 'boolean',
+    ...userCreateValidation.password,
     required: false
   }
 };
@@ -430,67 +351,21 @@ export const userLoginSchema = {
 /**
  * Validation schema for password change
  */
-export const passwordChangeSchema = {
-  current_password: {
+export const passwordChangeValidation = {
+  currentPassword: {
     type: 'string',
     required: true,
     messages: {
       required: 'Current password is required'
     }
   },
-  new_password: {
+  newPassword: {
     type: 'password',
     required: true,
     min: 8,
     messages: {
       required: 'New password is required',
       min: 'New password must be at least 8 characters long'
-    }
-  },
-  confirm_password: {
-    type: 'string',
-    required: true,
-    messages: {
-      required: 'Confirm password is required'
-    },
-    validate: (value: string, data: any) => {
-      return value === data.new_password ? true : 'Passwords do not match';
-    }
-  }
-};
-
-/**
- * Validation schema for password reset request
- */
-export const passwordResetRequestSchema = {
-  email: {
-    type: 'email',
-    required: true,
-    messages: {
-      required: 'Email is required',
-      email: 'Invalid email format'
-    }
-  }
-};
-
-/**
- * Validation schema for password reset
- */
-export const passwordResetSchema = {
-  token: {
-    type: 'string',
-    required: true,
-    messages: {
-      required: 'Token is required'
-    }
-  },
-  password: {
-    type: 'password',
-    required: true,
-    min: 8,
-    messages: {
-      required: 'Password is required',
-      min: 'Password must be at least 8 characters long'
     }
   },
   confirmPassword: {
@@ -500,66 +375,57 @@ export const passwordResetSchema = {
       required: 'Confirm password is required'
     },
     validate: (value: string, data: any) => {
-      return value === data.password ? true : 'Passwords do not match';
+      return value === data.newPassword ? true : 'Passwords do not match';
     }
   }
 };
 
 /**
- * User and profile related DTOs
+ * Get human-readable status label
  */
-
-/**
- * User profile update DTO
- */
-export interface ProfileUpdateDTO {
-  name: string;
-  email: string;
-  telefon?: string;
+export function getUserStatusLabel(status: string): string {
+  switch (status) {
+    case UserStatus.ACTIVE:
+      return 'Active';
+    case UserStatus.INACTIVE:
+      return 'Inactive';
+    case UserStatus.SUSPENDED:
+      return 'Suspended';
+    default:
+      return status;
+  }
 }
 
 /**
- * Password update DTO
+ * Get CSS class for status
  */
-export interface PasswordUpdateDTO {
-  current_password: string;
-  new_password: string;
-  confirm_password: string;
+export function getUserStatusClass(status: string): string {
+  switch (status) {
+    case UserStatus.ACTIVE:
+      return 'success';
+    case UserStatus.INACTIVE:
+      return 'secondary';
+    case UserStatus.SUSPENDED:
+      return 'danger';
+    default:
+      return 'secondary';
+  }
 }
 
 /**
- * User profile response DTO
+ * Get human-readable role label
  */
-export interface UserProfileResponseDTO {
-  id: number;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-    telefon: string;
-    rolle: string;
-    profilbild: string | null;
-    seit: string;
-  };
-  settings: {
-    sprache: string;
-    dark_mode: boolean;
-    benachrichtigungen_email: boolean;
-    benachrichtigungen_push: boolean;
-    benachrichtigungen_intervall: string;
-  };
-  activity: Array<{
-    type: string;
-    ip: string;
-    date: string;
-  }>;
-}
-
-/**
- * Notification settings update DTO
- */
-export interface NotificationSettingsUpdateDTO {
-  benachrichtigungen_email: boolean | string;
-  benachrichtigungen_push: boolean | string;
-  benachrichtigungen_intervall: string;
+export function getUserRoleLabel(role: string): string {
+  switch (role) {
+    case UserRole.ADMIN:
+      return 'Administrator';
+    case UserRole.MANAGER:
+      return 'Manager';
+    case UserRole.EMPLOYEE:
+      return 'Employee';
+    case UserRole.USER:
+      return 'User';
+    default:
+      return role;
+  }
 }

@@ -3,16 +3,16 @@
  * 
  * Data Transfer Objects for Appointment entity operations.
  */
-import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, BaseFilterDTO, StatusChangeDTO } from './base.dto.js';
+import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, FilterParams, StatusChangeDTO } from '../common/types.js';
 
 /**
- * Enum for appointment status values
+ * Appointment status values
  */
 export enum AppointmentStatus {
-  PLANNED = 'geplant',
-  CONFIRMED = 'bestaetigt',
-  COMPLETED = 'abgeschlossen',
-  CANCELLED = 'storniert'
+  PLANNED = 'planned',
+  CONFIRMED = 'confirmed',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled'
 }
 
 /**
@@ -22,45 +22,45 @@ export interface AppointmentCreateDTO extends BaseCreateDTO {
   /**
    * Appointment title
    */
-  titel: string;
+  title: string;
 
   /**
    * Customer ID (optional)
    */
-  kunde_id?: number | null;
+  customerId?: number | null;
 
   /**
    * Project ID (optional)
    */
-  projekt_id?: number | null;
+  projectId?: number | null;
 
   /**
    * Appointment date (YYYY-MM-DD format)
    */
-  termin_datum: string;
+  appointmentDate: string;
 
   /**
    * Appointment time (HH:MM format)
    */
-  termin_zeit: string;
+  appointmentTime: string;
 
   /**
    * Duration in minutes (optional, defaults to 60)
    */
-  dauer?: number;
+  duration?: number;
 
   /**
    * Location (optional)
    */
-  ort?: string | null;
+  location?: string | null;
 
   /**
    * Description (optional)
    */
-  beschreibung?: string | null;
+  description?: string | null;
 
   /**
-   * Status (optional, defaults to 'geplant')
+   * Status (optional, defaults to 'planned')
    */
   status?: string;
 }
@@ -72,42 +72,42 @@ export interface AppointmentUpdateDTO extends BaseUpdateDTO {
   /**
    * Appointment title
    */
-  titel?: string;
+  title?: string;
 
   /**
    * Customer ID
    */
-  kunde_id?: number | null;
+  customerId?: number | null;
 
   /**
    * Project ID
    */
-  projekt_id?: number | null;
+  projectId?: number | null;
 
   /**
    * Appointment date (YYYY-MM-DD format)
    */
-  termin_datum?: string;
+  appointmentDate?: string;
 
   /**
    * Appointment time (HH:MM format)
    */
-  termin_zeit?: string;
+  appointmentTime?: string;
 
   /**
    * Duration in minutes
    */
-  dauer?: number;
+  duration?: number;
 
   /**
    * Location
    */
-  ort?: string | null;
+  location?: string | null;
 
   /**
    * Description
    */
-  beschreibung?: string | null;
+  description?: string | null;
 
   /**
    * Status
@@ -140,59 +140,49 @@ export interface AppointmentStatusUpdateDTO extends StatusChangeDTO {
  */
 export interface AppointmentResponseDTO extends BaseResponseDTO {
   /**
-   * Appointment ID
-   */
-  id: number;
-
-  /**
    * Appointment title
    */
-  titel: string;
+  title: string;
 
   /**
    * Customer ID
    */
-  kunde_id: number | null;
+  customerId: number | null;
 
   /**
    * Customer name
    */
-  kunde_name: string;
+  customerName?: string;
 
   /**
    * Project ID
    */
-  projekt_id: number | null;
+  projectId: number | null;
 
   /**
    * Project title
    */
-  projekt_titel: string;
+  projectTitle?: string;
 
   /**
-   * Appointment date (Date object)
+   * Appointment date (ISO string)
    */
-  termin_datum: Date;
-
-  /**
-   * Formatted date string (dd.MM.yyyy)
-   */
-  dateFormatted: string;
-
-  /**
-   * Formatted time string (HH:mm)
-   */
-  timeFormatted: string;
+  appointmentDate: string;
 
   /**
    * Duration in minutes
    */
-  dauer: number;
+  duration: number | null;
 
   /**
    * Location
    */
-  ort: string;
+  location?: string;
+
+  /**
+   * Description
+   */
+  description?: string;
 
   /**
    * Status
@@ -200,29 +190,19 @@ export interface AppointmentResponseDTO extends BaseResponseDTO {
   status: string;
 
   /**
-   * Status label (formatted)
+   * ID of user who created the appointment
    */
-  statusLabel: string;
-
-  /**
-   * Status CSS class
-   */
-  statusClass: string;
+  createdBy?: number;
 }
 
 /**
  * DTO for detailed appointment response with related data
  */
-export interface AppointmentDetailDTO extends AppointmentResponseDTO {
-  /**
-   * Description
-   */
-  beschreibung: string;
-
+export interface AppointmentDetailResponseDTO extends AppointmentResponseDTO {
   /**
    * Appointment notes
    */
-  notes: AppointmentNoteDTO[];
+  notes?: AppointmentNoteDTO[];
 }
 
 /**
@@ -240,14 +220,14 @@ export interface AppointmentNoteDTO {
   text: string;
 
   /**
-   * Formatted date
+   * Creation date (ISO string)
    */
-  formattedDate: string;
+  createdAt: string;
 
   /**
    * Username who created the note
    */
-  benutzer: string;
+  userName: string;
 }
 
 /**
@@ -255,46 +235,51 @@ export interface AppointmentNoteDTO {
  */
 export interface AppointmentNoteCreateDTO {
   /**
+   * Appointment ID
+   */
+  appointmentId: number;
+  
+  /**
    * Note text
    */
-  note: string;
+  text: string;
 }
 
 /**
  * DTO for appointment filtering
  */
-export interface AppointmentFilterDTO extends BaseFilterDTO {
-  /**
-   * Filter by status
-   */
-  status?: string;
-
+export interface AppointmentFilterParams extends FilterParams {
   /**
    * Filter by date
    */
   date?: string;
 
   /**
-   * Search term for title, location, and customer name
+   * Filter by date range (from)
    */
-  search?: string;
+  dateFrom?: string;
+
+  /**
+   * Filter by date range (to)
+   */
+  dateTo?: string;
 
   /**
    * Filter by customer ID
    */
-  customerId?: number | string;
+  customerId?: number;
 
   /**
    * Filter by project ID
    */
-  projectId?: number | string;
+  projectId?: number;
 }
 
 /**
  * Validation schema for appointment creation
  */
-export const appointmentCreateSchema = {
-  titel: {
+export const appointmentCreateValidation = {
+  title: {
     type: 'string',
     required: true,
     min: 2,
@@ -305,15 +290,15 @@ export const appointmentCreateSchema = {
       max: 'Appointment title must not exceed 200 characters'
     }
   },
-  kunde_id: {
+  customerId: {
     type: 'number',
     required: false
   },
-  projekt_id: {
+  projectId: {
     type: 'number',
     required: false
   },
-  termin_datum: {
+  appointmentDate: {
     type: 'date',
     required: true,
     messages: {
@@ -321,7 +306,7 @@ export const appointmentCreateSchema = {
       type: 'Appointment date must be a valid date'
     }
   },
-  termin_zeit: {
+  appointmentTime: {
     type: 'time',
     required: true,
     messages: {
@@ -329,15 +314,16 @@ export const appointmentCreateSchema = {
       type: 'Appointment time must be in HH:MM format'
     }
   },
-  dauer: {
+  duration: {
     type: 'number',
     required: false,
     min: 1,
+    default: 60,
     messages: {
       min: 'Duration must be a positive number'
     }
   },
-  ort: {
+  location: {
     type: 'string',
     required: false,
     max: 200,
@@ -345,7 +331,7 @@ export const appointmentCreateSchema = {
       max: 'Location must not exceed 200 characters'
     }
   },
-  beschreibung: {
+  description: {
     type: 'string',
     required: false,
     max: 2000,
@@ -367,57 +353,34 @@ export const appointmentCreateSchema = {
 /**
  * Validation schema for appointment update
  */
-export const appointmentUpdateSchema = {
-  ...appointmentCreateSchema,
-  titel: {
-    ...appointmentCreateSchema.titel,
+export const appointmentUpdateValidation = {
+  ...appointmentCreateValidation,
+  title: {
+    ...appointmentCreateValidation.title,
     required: false
   },
-  termin_datum: {
-    ...appointmentCreateSchema.termin_datum,
+  appointmentDate: {
+    ...appointmentCreateValidation.appointmentDate,
     required: false
   },
-  termin_zeit: {
-    ...appointmentCreateSchema.termin_zeit,
+  appointmentTime: {
+    ...appointmentCreateValidation.appointmentTime,
     required: false
-  }
-};
-
-/**
- * Validation schema for appointment status update
- */
-export const appointmentStatusUpdateSchema = {
-  id: {
-    type: 'number',
-    required: true,
-    messages: {
-      required: 'Appointment ID is required'
-    }
-  },
-  status: {
-    type: 'enum',
-    required: true,
-    enum: Object.values(AppointmentStatus),
-    messages: {
-      required: 'Status is required',
-      enum: `Status must be one of: ${Object.values(AppointmentStatus).join(', ')}`
-    }
-  },
-  note: {
-    type: 'string',
-    required: false,
-    max: 1000,
-    messages: {
-      max: 'Note must not exceed 1000 characters'
-    }
   }
 };
 
 /**
  * Validation schema for appointment note creation
  */
-export const appointmentNoteCreateSchema = {
-  note: {
+export const appointmentNoteCreateValidation = {
+  appointmentId: {
+    type: 'number',
+    required: true,
+    messages: {
+      required: 'Appointment ID is required'
+    }
+  },
+  text: {
     type: 'string',
     required: true,
     min: 1,
@@ -429,3 +392,66 @@ export const appointmentNoteCreateSchema = {
     }
   }
 };
+
+/**
+ * Get human-readable appointment status label
+ */
+export function getAppointmentStatusLabel(status: string): string {
+  switch (status) {
+    case AppointmentStatus.PLANNED:
+      return 'Planned';
+    case AppointmentStatus.CONFIRMED:
+      return 'Confirmed';
+    case AppointmentStatus.COMPLETED:
+      return 'Completed';
+    case AppointmentStatus.CANCELLED:
+      return 'Cancelled';
+    default:
+      return status;
+  }
+}
+
+/**
+ * Get CSS class for appointment status
+ */
+export function getAppointmentStatusClass(status: string): string {
+  switch (status) {
+    case AppointmentStatus.PLANNED:
+      return 'info';
+    case AppointmentStatus.CONFIRMED:
+      return 'primary';
+    case AppointmentStatus.COMPLETED:
+      return 'success';
+    case AppointmentStatus.CANCELLED:
+      return 'danger';
+    default:
+      return 'secondary';
+  }
+}
+
+/**
+ * Format date for display
+ */
+export function formatAppointmentDate(date: string | Date): string {
+  if (!date) return '';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return dateObj.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+}
+
+/**
+ * Format time for display
+ */
+export function formatAppointmentTime(date: string | Date): string {
+  if (!date) return '';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return dateObj.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}

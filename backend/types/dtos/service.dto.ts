@@ -3,7 +3,7 @@
  * 
  * Data Transfer Objects for Service entity operations.
  */
-import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, BaseFilterDTO } from './base.dto.js';
+import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, FilterParams } from '../common/types.js';
 
 /**
  * DTO for creating a new service
@@ -17,27 +17,27 @@ export interface ServiceCreateDTO extends BaseCreateDTO {
   /**
    * Service description (optional)
    */
-  beschreibung?: string | null;
+  description?: string | null;
 
   /**
    * Base price
    */
-  preis_basis: number;
+  basePrice: number;
 
   /**
    * Unit (e.g., "hour", "item", "m²")
    */
-  einheit: string;
+  unit?: string;
 
   /**
-   * VAT rate (optional, defaults to system default)
+   * VAT rate (optional, defaults to 20.00)
    */
-  mwst_satz?: number;
+  vatRate?: number;
 
   /**
    * Active status (optional, defaults to true)
    */
-  aktiv?: boolean;
+  active?: boolean;
 }
 
 /**
@@ -52,77 +52,27 @@ export interface ServiceUpdateDTO extends BaseUpdateDTO {
   /**
    * Service description
    */
-  beschreibung?: string | null;
+  description?: string | null;
 
   /**
    * Base price
    */
-  preis_basis?: number;
+  basePrice?: number;
 
   /**
    * Unit
    */
-  einheit?: string;
+  unit?: string;
 
   /**
    * VAT rate
    */
-  mwst_satz?: number;
+  vatRate?: number;
 
   /**
    * Active status
    */
-  aktiv?: boolean;
-}
-
-/**
- * DTO for service response
- */
-export interface ServiceResponseDTO extends BaseResponseDTO {
-  /**
-   * Service ID
-   */
-  id: number;
-
-  /**
-   * Service name
-   */
-  name: string;
-
-  /**
-   * Service description
-   */
-  beschreibung: string;
-
-  /**
-   * Base price
-   */
-  preis_basis: number;
-
-  /**
-   * Unit
-   */
-  einheit: string;
-
-  /**
-   * VAT rate
-   */
-  mwst_satz: number;
-
-  /**
-   * Active status
-   */
-  aktiv: boolean;
-
-  /**
-   * Creation date
-   */
-  created_at: string;
-
-  /**
-   * Last update date
-   */
-  updated_at: string;
+  active?: boolean;
 }
 
 /**
@@ -137,102 +87,78 @@ export interface ServiceStatusUpdateDTO {
   /**
    * Active status
    */
-  aktiv: boolean;
+  active: boolean;
+}
+
+/**
+ * DTO for service response
+ */
+export interface ServiceResponseDTO extends BaseResponseDTO {
+  /**
+   * Service name
+   */
+  name: string;
+
+  /**
+   * Service description
+   */
+  description?: string;
+
+  /**
+   * Base price
+   */
+  basePrice: number;
+
+  /**
+   * Unit
+   */
+  unit?: string;
+
+  /**
+   * VAT rate
+   */
+  vatRate: number;
+
+  /**
+   * Active status
+   */
+  active: boolean;
+}
+
+/**
+ * DTO for detailed service response with usage statistics
+ */
+export interface ServiceDetailResponseDTO extends ServiceResponseDTO {
+  /**
+   * Usage statistics
+   */
+  usage?: {
+    /**
+     * Total projects using this service
+     */
+    projectCount: number;
+    
+    /**
+     * Total revenue generated
+     */
+    totalRevenue: number;
+  };
 }
 
 /**
  * DTO for service filtering
  */
-export interface ServiceFilterDTO extends BaseFilterDTO {
+export interface ServiceFilterParams extends FilterParams {
   /**
-   * Filter by status ('aktiv' or 'inaktiv')
+   * Filter by active status
    */
-  status?: string;
-
-  /**
-   * Search term for name and description
-   */
-  search?: string;
-}
-
-/**
- * DTO for service statistics
- */
-export interface ServiceStatisticsDTO {
-  /**
-   * Service information
-   */
-  service: {
-    id: number;
-    name: string;
-    active: boolean;
-  };
-
-  /**
-   * Usage statistics
-   */
-  usage: {
-    /**
-     * Total revenue generated
-     */
-    totalRevenue: number;
-
-    /**
-     * Number of invoices containing this service
-     */
-    invoiceCount: number;
-
-    /**
-     * Monthly revenue data
-     */
-    monthlyRevenue: MonthlyRevenueDTO[];
-
-    /**
-     * Top customers for this service
-     */
-    topCustomers: ServiceCustomerDTO[];
-  };
-}
-
-/**
- * DTO for monthly revenue data
- */
-export interface MonthlyRevenueDTO {
-  /**
-   * Month (YYYY-MM format)
-   */
-  monat: string;
-
-  /**
-   * Revenue
-   */
-  umsatz: number;
-}
-
-/**
- * DTO for service customer data
- */
-export interface ServiceCustomerDTO {
-  /**
-   * Customer ID
-   */
-  id: number;
-
-  /**
-   * Customer name
-   */
-  name: string;
-
-  /**
-   * Total revenue from this customer
-   */
-  revenue: number;
+  active?: boolean;
 }
 
 /**
  * Validation schema for service creation
  */
-export const serviceCreateSchema = {
+export const serviceCreateValidation = {
   name: {
     type: 'string',
     required: true,
@@ -244,7 +170,7 @@ export const serviceCreateSchema = {
       max: 'Service name must not exceed 100 characters'
     }
   },
-  beschreibung: {
+  description: {
     type: 'string',
     required: false,
     max: 2000,
@@ -252,8 +178,8 @@ export const serviceCreateSchema = {
       max: 'Description must not exceed 2000 characters'
     }
   },
-  preis_basis: {
-    type: 'numeric',
+  basePrice: {
+    type: 'number',
     required: true,
     min: 0,
     messages: {
@@ -262,27 +188,27 @@ export const serviceCreateSchema = {
       type: 'Base price must be a number'
     }
   },
-  einheit: {
+  unit: {
     type: 'string',
-    required: true,
+    required: false,
     max: 20,
     messages: {
-      required: 'Unit is required',
       max: 'Unit must not exceed 20 characters'
     }
   },
-  mwst_satz: {
-    type: 'numeric',
+  vatRate: {
+    type: 'number',
     required: false,
     min: 0,
     max: 100,
+    default: 20.00,
     messages: {
       min: 'VAT rate must be a non-negative number',
       max: 'VAT rate must not exceed 100',
       type: 'VAT rate must be a number'
     }
   },
-  aktiv: {
+  active: {
     type: 'boolean',
     required: false,
     default: true
@@ -292,18 +218,14 @@ export const serviceCreateSchema = {
 /**
  * Validation schema for service update
  */
-export const serviceUpdateSchema = {
-  ...serviceCreateSchema,
+export const serviceUpdateValidation = {
+  ...serviceCreateValidation,
   name: {
-    ...serviceCreateSchema.name,
+    ...serviceCreateValidation.name,
     required: false
   },
-  preis_basis: {
-    ...serviceCreateSchema.preis_basis,
-    required: false
-  },
-  einheit: {
-    ...serviceCreateSchema.einheit,
+  basePrice: {
+    ...serviceCreateValidation.basePrice,
     required: false
   }
 };
@@ -311,7 +233,7 @@ export const serviceUpdateSchema = {
 /**
  * Validation schema for service status update
  */
-export const serviceStatusUpdateSchema = {
+export const serviceStatusUpdateValidation = {
   id: {
     type: 'number',
     required: true,
@@ -320,7 +242,7 @@ export const serviceStatusUpdateSchema = {
       type: 'Service ID must be a number'
     }
   },
-  aktiv: {
+  active: {
     type: 'boolean',
     required: true,
     messages: {
@@ -328,3 +250,31 @@ export const serviceStatusUpdateSchema = {
     }
   }
 };
+
+/**
+ * Get formatted price with currency
+ */
+export function formatServicePrice(price: number, currency: string = '€'): string {
+  return `${currency} ${price.toFixed(2)}`;
+}
+
+/**
+ * Get formatted VAT rate with percentage
+ */
+export function formatVatRate(vatRate: number): string {
+  return `${vatRate}%`;
+}
+
+/**
+ * Get active status label
+ */
+export function getActiveStatusLabel(active: boolean): string {
+  return active ? 'Active' : 'Inactive';
+}
+
+/**
+ * Get CSS class for active status
+ */
+export function getActiveStatusClass(active: boolean): string {
+  return active ? 'success' : 'secondary';
+}
