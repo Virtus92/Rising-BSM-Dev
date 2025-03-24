@@ -7,10 +7,9 @@ import { rateLimit } from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import path from 'path';
-import { generateAuthTokens } from '../backup/utils_bak/jwt.js';
+import { generateAuthTokens } from './utils/security.utils.js';
 import config from './config/index.js';
 import setupSwagger from './config/swagger-loader.js';
-import prisma from './utils/prisma.utils.js';
 import { inject, cleanup } from './config/dependency-container.js';
 import { PrismaClient } from '@prisma/client';
 import logger from './utils/logger.js';
@@ -21,7 +20,6 @@ const port = config.PORT;
 
 // Import middleware
 import * as errorMiddleware from './middleware/error.middleware.js';
-import { authenticate } from './middleware/auth.middleware.js';
 import requestLogger from './middleware/request-logger.middleware.js';
 
 // Import routes

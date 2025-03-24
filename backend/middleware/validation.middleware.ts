@@ -6,8 +6,8 @@
  */
 import { Request, Response, NextFunction } from 'express';
 import { ValidationSchema } from '../types/validation.js';
-import { validateInput } from '../../backup/utils_bak/validators.js';
-import { ValidationError } from '../../backup/utils_bak/errors.js';
+import { validateInput } from '../utils/validation.utils.js';
+import { ValidationError } from '../utils/error.utils.js';
 import logger from '../utils/logger.js';
 
 /**

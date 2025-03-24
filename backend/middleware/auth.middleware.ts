@@ -1,6 +1,6 @@
 import { Request, NextFunction, Response } from 'express';
-import { verifyToken, extractTokenFromHeader } from '../../backup/utils_bak/jwt.js';
-import { UnauthorizedError, ForbiddenError } from '../../backup/utils_bak/errors.js';
+import { verifyToken, extractTokenFromHeader } from '../utils/security.utils.js';
+import { UnauthorizedError, ForbiddenError } from '../utils/error.utils.js';
 import { AuthenticatedRequest } from '../types/common/types.js';
 import prisma from '../utils/prisma.utils.js';
 

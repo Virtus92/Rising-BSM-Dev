@@ -97,7 +97,6 @@ class Logger {
   private replacer(key: string, value: any): any {
     if (value instanceof Error) {
       return {
-        message: value.message,
         stack: value.stack,
         ...value
       };
