@@ -514,46 +514,6 @@ async updateUserStatus(
 }
 
 /**
- * Authenticate user
- * @param {Object} loginData - User login data containing email and password
- * @param {Object} options - Additional options for authentication
- * @returns {Promise<Object>} - Authenticated user data
- */
-async authenticate(loginData: any, options: any): Promise<any> {
-  try {
-    // Validate input
-    if (!loginData.email || !loginData.password) {
-      throw new ValidationError('Email and password are required');
-    }
-    
-    // Get user from repository
-    const user = await this.repository.findByEmail(loginData.email);
-    
-    // Check if user exists
-    if (!user) {
-      throw new NotFoundError('Invalid credentials');
-    }
-    
-    // Check if password is correct
-    const passwordIsValid = await bcrypt.compare(loginData.password, user.password);
-    if (!passwordIsValid) {
-      throw new NotFoundError('Invalid credentials');
-    }
-    
-    // Return user
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      profilePicture: user.profilePicture,
-    };
-  } catch (error) {
-    this.handleError(error, 'Error authenticating user', { loginData, options });
-  }
-}
-
-/**
  * Check if user is admin
  * @param {number} userId - User ID
  * @returns {Promise<boolean>} - True if user is admin, false otherwise

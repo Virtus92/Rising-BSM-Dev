@@ -5,6 +5,7 @@
  */
 import { Router } from 'express';
 import { authenticate, isAdmin } from '../middleware/auth.middleware.js';
+import { login } from '../controllers/auth.controller.js';
 
 // Import route modules
 import projectRoutes from './project.routes.js';
@@ -20,6 +21,9 @@ import userRoutes from './user.routes.js';
 
 // Create router
 const router = Router();
+
+// Direct auth routes
+router.post('/login', login);
 
 // Mount routes
 router.use('/projects', projectRoutes);

@@ -3,7 +3,7 @@ import { ValidationError, BadRequestError } from '../utils/errors.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ResponseFactory } from '../utils/response.factory.js';
 import { AuthenticatedRequest } from '../types/authenticated-request.js';
-import { UserService, userService } from '../services/user.service.js';
+import { AuthService, authService } from '../services/auth.service.js';
 import {
   LoginDTO,
   ForgotPasswordDTO,
@@ -25,7 +25,7 @@ export const login = asyncHandler(async (req: Request, res: Response): Promise<v
   }
 
   // Authenticate user through service
-  const result = await userService.authenticate(loginData, {
+  const result = await authService.authenticate(loginData, {
     ipAddress: req.ip || '0.0.0.0'
   });
 
@@ -45,7 +45,7 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response): 
   const forgotPasswordData: ForgotPasswordDTO = req.body;
 
   // Process password reset request through service
-  const result = await userService.requestPasswordReset(forgotPasswordData.email);
+  const result = await authService.requestPasswordReset(forgotPasswordData.email);
 
   // For security reasons, always return success even if user not found
   ResponseFactory.success(
@@ -59,14 +59,14 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response): 
  * Validate reset token
  */
 export const validateResetToken = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { token } = req.params as ValidateResetTokenDTO;
+  const token = req.params.token;
   
   if (!token) {
     throw new ValidationError('Invalid token');
   }
 
   // Validate token through service
-  const result = await userService.validateResetToken(token);
+  const result = await authService.validateResetToken(token);
 
   if (!result) {
     throw new ValidationError('Invalid or expired token');
@@ -83,7 +83,7 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response): P
   const resetData: ResetPasswordDTO = req.body;
   
   // Process password reset through service
-  const result = await userService.resetPassword(token, resetData.password, resetData.confirmPassword);
+  const result = await authService.resetPassword(token, resetData.password, resetData.confirmPassword);
 
   ResponseFactory.success(res, result, 'Password has been reset successfully');
 });
@@ -99,7 +99,7 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response): Pr
   }
   
   // Refresh token through service
-  const result = await userService.refreshToken(refreshData.refreshToken, {
+  const result = await authService.refreshToken(refreshData.refreshToken, {
     ipAddress: req.ip || '0.0.0.0'
   });
 
@@ -114,7 +114,7 @@ export const logout = asyncHandler(async (req: AuthenticatedRequest, res: Respon
   const logoutData: LogoutDTO = req.body;
   
   // Process logout through service
-  await userService.logout(logoutData.refreshToken, {
+  await authService.logout(logoutData.refreshToken || '', {
     userContext: req.user ? {
       userId: req.user.id,
       userName: req.user.name,
