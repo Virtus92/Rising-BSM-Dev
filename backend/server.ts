@@ -12,7 +12,7 @@ import config from './config/index.js';
 import setupSwagger from './config/swagger-loader.js';
 import { inject, cleanup } from './config/dependency-container.js';
 import { PrismaClient } from '@prisma/client';
-import logger from './utils/logger.js';
+import { logger } from './utils/common.utils.js';
 
 // Create Express app
 const app: Express = express();

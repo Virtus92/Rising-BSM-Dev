@@ -8,7 +8,7 @@ import { Request, Response, NextFunction } from 'express';
 import { ValidationSchema, ValidationOptions } from '../types/validation.types.js';
 import { validateInput } from '../utils/validation.utils.js';
 import { ValidationError } from '../utils/error.utils.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/common.utils.js';
 
 /**
  * Validates request body against a schema

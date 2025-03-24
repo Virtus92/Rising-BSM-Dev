@@ -5,7 +5,7 @@
  * Provides valuable information for debugging and monitoring API usage.
  */
 import { Request, Response, NextFunction } from 'express';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/common.utils.js';
 import config from '../config/index.js';
 
 /**

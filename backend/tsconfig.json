@@ -23,7 +23,9 @@
     "baseUrl": ".",
     "paths": {
       "@prisma/client": ["./prisma/generated/client"],
-      "*": ["./types/*"]
+      "common/*": ["./types/common/*"],
+      "dtos/*": ["./types/dtos/*"],
+      "models/*": ["./types/models/*"]
     }
   },
   "include": ["**/*.ts"],

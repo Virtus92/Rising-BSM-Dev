@@ -15,7 +15,7 @@ import {
   BusinessLogicError,
   createErrorResponse 
 } from '../utils/error.utils.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/common.utils.js';
 import config from '../config/index.js';
 
 /**

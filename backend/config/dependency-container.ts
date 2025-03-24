@@ -5,7 +5,7 @@
  * Provides a central location for registering and resolving dependencies with proper lifecycle management.
  */
 import { PrismaClient } from '@prisma/client';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/common.utils.js';
 
 /**
  * A simplified dependency injection container
