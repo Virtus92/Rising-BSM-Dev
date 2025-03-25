@@ -93,17 +93,27 @@ export class EntityLogger {
     tx: any = null
   ): Promise<any> {
     const noteModel = this.getNoteModelForEntity(entityType, tx);
-    
-    const noteData = {
-      userId,
-      userName,
-      text,
-      createdAt: new Date()
-    };
+
+    // Special case for customer notes
+    if (entityType === 'customer') {
+      return noteModel.create({
+        data: {
+          customerId: entityId,
+          userId,
+          userName,
+          action: 'note',
+          details: text,
+          createdAt: new Date()
+        }
+      });
+    }
     
     const entityIdField = `${entityType}Id`;
     const data = {
-      ...noteData,
+      userId,
+      userName,
+      text,
+      createdAt: new Date(),
       [entityIdField]: entityId
     };
     
@@ -120,6 +130,7 @@ export class EntityLogger {
       case 'project': return db.projectNote;
       case 'appointment': return db.appointmentNote;
       case 'request': return db.requestNote;
+      case 'customer': return db.customerLog;
       default: throw new Error(`Notes not supported for entity type: ${entityType}`);
     }
   }

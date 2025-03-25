@@ -311,6 +311,41 @@ export class BaseRepository<T, TFilter extends FilterCriteria = FilterCriteria> 
   }
 
   /**
+ * Soft delete an entity by updating its status
+ * @param id Entity ID
+ * @param options Delete options
+ * @returns Updated entity
+ * @throws NotFoundError if entity not found and checkExists is true
+ */
+async softDelete(id: number, options: DeleteOptions = {}): Promise<T> {
+  try {
+    // Check if entity exists if required
+    if (options.checkExists) {
+      const exists = await this.model.findUnique({ where: { id } });
+      if (!exists) {
+        throw new NotFoundError(`Entity with ID ${id} not found`);
+      }
+    }
+    
+    // Update entity status to 'deleted' instead of actually deleting it
+    const entity = await this.model.update({
+      where: { id },
+      data: { status: 'deleted' }
+    });
+    
+    return entity;
+  } catch (error) {
+    // If error is already a NotFoundError, rethrow it
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    
+    logger.error('Error in BaseRepository.softDelete', { error, entity: this.model.name, id });
+    throw new DatabaseError(`Failed to soft delete entity with ID ${id}`, { cause: error });
+  }
+}
+
+  /**
    * Count entities with filter
    * @param filters Filter criteria
    * @param options Count options

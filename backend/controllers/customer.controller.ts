@@ -170,21 +170,13 @@ export const addCustomerNote = asyncHandler(async (req: Request, res: Response) 
  * Get customer statistics
  */
 export const getCustomerStatistics = asyncHandler(async (req: Request, res: Response) => {
-  // This would be implemented with additional service methods
-  // Example statistics: count by type, status, etc.
+  // Get statistics from service
+  const statistics = await customerService.getCustomerStatistics();
   
+  // Return statistics
   ResponseFactory.success(
     res,
-    {
-      total: 0,
-      byType: {},
-      byStatus: {},
-      trend: {
-        thisMonth: 0,
-        lastMonth: 0,
-        percentage: 0
-      }
-    },
+    statistics,
     'Customer statistics retrieved successfully'
   );
 });
@@ -195,18 +187,19 @@ export const getCustomerStatistics = asyncHandler(async (req: Request, res: Resp
 export const deleteCustomer = asyncHandler(async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const authReq = req as AuthenticatedRequest;
+  const hardDelete = req.query.mode === 'hard';
   
   // Delete customer with user context
   const result = await customerService.delete(id, {
     userId: authReq.user?.id,
-    softDelete: true
+    softDelete: !hardDelete // Use soft delete if not hard delete
   });
   
   // Return success response
   ResponseFactory.success(
     res,
-    { success: true, id },
-    'Customer deleted successfully'
+    { success: true, id, mode: hardDelete ? 'hard' : 'soft' },
+    `Customer ${hardDelete ? 'permanently ' : ''}deleted successfully`
   );
 });
 

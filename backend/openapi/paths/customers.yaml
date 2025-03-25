@@ -482,6 +482,13 @@ customers-id:
         schema:
           type: integer
         description: Customer ID
+      - in: query
+        name: mode
+        schema:
+          type: string
+          enum: [soft, hard]
+          default: soft
+        description: "Delete mode: soft (archive) or hard (permanent deletion for GDPR compliance)"
     responses:
       '200':
         description: Customer deleted
