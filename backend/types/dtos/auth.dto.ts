@@ -161,7 +161,7 @@ export interface ResetPasswordDTO extends BaseDTO {
  */
 export const loginValidation = {
   email: {
-    type: 'email',
+    type: 'email' as const,
     required: true,
     messages: {
       required: 'Email is required',
@@ -169,14 +169,14 @@ export const loginValidation = {
     }
   },
   password: {
-    type: 'string',
+    type: 'string' as const,
     required: true,
     messages: {
       required: 'Password is required'
     }
   },
   remember: {
-    type: 'boolean',
+    type: 'boolean' as const,
     required: false,
     default: false
   }
@@ -187,7 +187,7 @@ export const loginValidation = {
  */
 export const refreshTokenValidation = {
   refreshToken: {
-    type: 'string',
+    type: 'string' as const,
     required: true,
     messages: {
       required: 'Refresh token is required'
@@ -200,7 +200,7 @@ export const refreshTokenValidation = {
  */
 export const forgotPasswordValidation = {
   email: {
-    type: 'email',
+    type: 'email' as const,
     required: true,
     messages: {
       required: 'Email is required',
@@ -213,15 +213,8 @@ export const forgotPasswordValidation = {
  * Validation schema for reset password
  */
 export const resetPasswordValidation = {
-  token: {
-    type: 'string',
-    required: true,
-    messages: {
-      required: 'Token is required'
-    }
-  },
   password: {
-    type: 'password',
+    type: 'string' as const,
     required: true,
     min: 8,
     messages: {
@@ -230,13 +223,26 @@ export const resetPasswordValidation = {
     }
   },
   confirmPassword: {
-    type: 'string',
+    type: 'string' as const,
     required: true,
     messages: {
       required: 'Confirm password is required'
     },
     validate: (value: string, data: any) => {
       return value === data.password ? true : 'Passwords do not match';
+    }
+  }
+};
+
+/**
+ * Validation schema for logout
+ */
+export const logoutValidation = {
+  refreshToken: {
+    type: 'string' as const,
+    required: false,
+    messages: {
+      type: 'Refresh token must be a string'
     }
   }
 };
@@ -262,6 +268,16 @@ export function getAuthErrorMessage(errorCode: string): string {
       return 'Password reset token is invalid';
     case 'reset_token_expired':
       return 'Password reset token has expired';
+    case 'password_reset_error':
+      return 'Error resetting password';
+    case 'password_reset_invalid':
+      return 'Invalid password reset request';
+    case 'password_reset_expired':
+      return 'Password reset request has expired';
+    case 'password_reset_mismatch':
+      return 'Passwords do not match';
+    case 'invalid_request':
+      return 'Invalid request';
     default:
       return 'Authentication error';
   }

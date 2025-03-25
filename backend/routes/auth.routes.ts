@@ -10,16 +10,19 @@ import {
   forgotPassword, 
   validateResetToken, 
   resetPassword, 
-  logout 
+  logout,
+  getResetToken 
 } from '../controllers/auth.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
-import { validateBody, validateParams } from '../middleware/validation.middleware.js';
+import { validateBody, validateParams, validateQuery } from '../middleware/validation.middleware.js';
 import { 
   loginValidation, 
   refreshTokenValidation,
   forgotPasswordValidation,
-  resetPasswordValidation
+  resetPasswordValidation,
+  logoutValidation
 } from '../types/dtos/auth.dto.js';
+import config from '../config/index.js';
 
 const router = Router();
 
@@ -29,7 +32,6 @@ const router = Router();
  *   name: Authentication
  *   description: User authentication operations
  */
-
 
 /**
  * @swagger
@@ -128,11 +130,12 @@ router.post('/reset-password/:token', validateBody(resetPasswordValidation), res
  * /api/v1/auth/logout:
  *   post:
  *     summary: Logout user
- *     description: Revoke refresh token and log user out
+ *     description: Log user out and optionally invalidate refresh token
  *     tags: [Authentication]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
@@ -140,12 +143,47 @@ router.post('/reset-password/:token', validateBody(resetPasswordValidation), res
  *             properties:
  *               refreshToken:
  *                 type: string
+ *                 description: Optional refresh token to invalidate
  *     responses:
  *       200:
  *         description: Logout successful
  *       401:
  *         description: Not authenticated
  */
-router.post('/logout', authenticate, logout);
+router.post('/logout', authenticate, validateBody(logoutValidation), logout);
+
+// Development mode only routes
+if (config.IS_DEVELOPMENT) {
+  /**
+   * @swagger
+   * /api/v1/auth/dev/reset-token:
+   *   get:
+   *     summary: Get reset token for testing
+   *     description: Retrieve a reset token for testing (development only)
+   *     tags: [Authentication, Development]
+   *     parameters:
+   *       - in: query
+   *         name: email
+   *         required: true
+   *         schema:
+   *           type: string
+   *           format: email
+   *     responses:
+   *       200:
+   *         description: Reset token retrieved
+   *       404:
+   *         description: No active token found
+   */
+  router.get('/dev/reset-token', validateQuery({
+    email: {
+      type: 'email' as const,
+      required: true,
+      messages: {
+        required: 'Email is required',
+        email: 'Invalid email format'
+      }
+    }
+  }), getResetToken);
+}
 
 export default router;

@@ -74,7 +74,17 @@ login:
         content:
           application/json:
             schema:
-              $ref: '../schemas/error.yaml#/Error'
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: false
+                error:
+                  type: string
+                  example: "Invalid email or password"
+                statusCode:
+                  type: integer
+                  example: 401
 
 refresh-token:
   post:
@@ -129,7 +139,17 @@ refresh-token:
         content:
           application/json:
             schema:
-              $ref: '../schemas/error.yaml#/Error'
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: false
+                error:
+                  type: string
+                  example: "Invalid refresh token"
+                statusCode:
+                  type: integer
+                  example: 401
 
 forgot-password:
   post:
@@ -168,6 +188,9 @@ forgot-password:
                     message:
                       type: string
                       example: "If an account with this email exists, password reset instructions have been sent"
+                    resetToken:
+                      type: string
+                      description: "Reset token (only returned in development environment)"
                 message:
                   type: string
                   example: "If an account with this email exists, password reset instructions have been sent"
@@ -207,6 +230,9 @@ validate-reset-token:
                 data:
                   type: object
                   properties:
+                    valid:
+                      type: boolean
+                      example: true
                     userId:
                       type: integer
                     email:
@@ -225,7 +251,28 @@ validate-reset-token:
         content:
           application/json:
             schema:
-              $ref: '../schemas/error.yaml#/Error'
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: false
+                error:
+                  type: string
+                  description: Main error message
+                statusCode:
+                  type: integer
+                  description: HTTP status code
+                errors:
+                  type: array
+                  items:
+                    type: string
+                  description: List of specific error messages
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
 
 reset-password:
   post:
@@ -286,7 +333,28 @@ reset-password:
         content:
           application/json:
             schema:
-              $ref: '../schemas/error.yaml#/Error'
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: false
+                error:
+                  type: string
+                  description: Main error message
+                statusCode:
+                  type: integer
+                  description: HTTP status code
+                errors:
+                  type: array
+                  items:
+                    type: string
+                  description: List of specific error messages
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
 
 logout:
   post:
@@ -301,9 +369,12 @@ logout:
         application/json:
           schema:
             type: object
+            required:
+              - refreshToken
             properties:
               refreshToken:
                 type: string
+                description: "Refresh token to invalidate"
     responses:
       '200':
         description: Logout successful
@@ -320,6 +391,108 @@ logout:
                 message:
                   type: string
                   example: "Logged out successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "Unauthorized"
+                  statusCode:
+                    type: integer
+                    example: 401
+                  message:
+                    type: string
+                    description: "Access token is missing or invalid"
+                  meta:
+                    type: object
+                    properties:
+                      timestamp:
+                        type: string
+                        format: date-time
+
+# Neue Test-API nur für Entwicklungsumgebung
+get-reset-token:
+  get:
+    tags:
+      - Authentication
+      - Development
+    summary: Get reset token for testing (Development only)
+    description: Retrieve a reset token for a specific email for testing purposes
+    operationId: getResetToken
+    security: [] # No authentication required
+    parameters:
+      - in: query
+        name: email
+        required: true
+        schema:
+          type: string
+          format: email
+        description: Email to get reset token for
+    responses:
+      '200':
+        description: Reset token information
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    email:
+                      type: string
+                      format: email
+                    resetToken:
+                      type: string
+                    resetTokenExpiry:
+                      type: string
+                      format: date-time
+                message:
+                  type: string
+                  example: "Reset token retrieved for testing"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '404':
+        description: No active reset token found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: false
+                error:
+                  type: string
+                  description: Main error message
+                statusCode:
+                  type: integer
+                  description: HTTP status code
+                errors:
+                  type: array
+                  items:
+                    type: string
+                  description: List of specific error messages
                 meta:
                   type: object
                   properties:

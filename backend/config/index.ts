@@ -70,7 +70,7 @@ export const CORS_ORIGINS = env<string>('CORS_ORIGINS', 'http://localhost:3000')
 
 // Authentication settings
 export const JWT_SECRET = env<string>('JWT_SECRET', 'your-default-super-secret-key-change-in-production');
-export const JWT_EXPIRES_IN = env<string>('JWT_EXPIRES_IN', '1h');
+export const JWT_EXPIRES_IN = env<string>('JWT_EXPIRES_IN', '15m');
 export const JWT_REFRESH_SECRET = env<string>('JWT_REFRESH_SECRET', 'your-refresh-default-key-change-in-production');
 export const JWT_REFRESH_EXPIRES_IN = env<string>('JWT_REFRESH_EXPIRES_IN', '7d');
 export const JWT_REFRESH_TOKEN_ROTATION = env<boolean>('JWT_REFRESH_TOKEN_ROTATION', true);

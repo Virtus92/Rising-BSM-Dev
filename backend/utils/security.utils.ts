@@ -7,8 +7,9 @@
 import jwt from 'jsonwebtoken';
 import { UnauthorizedError } from './error.utils.js';
 import { logger } from './common.utils.js';
-import bcrypt from 'bcryptjs'; // Changed from bcrypt to bcryptjs
+import bcrypt from 'bcryptjs'; 
 import config from '../config/index.js';
+import crypto from 'crypto';
 
 // JWT configuration
 const JWT_SECRET = config.JWT_SECRET;
@@ -204,7 +205,6 @@ export const comparePassword = async (password: string, hash: string): Promise<b
  * @returns Random secure token
  */
 export const generateSecureToken = (length: number = 32): string => {
-  const crypto = require('crypto');
   return crypto.randomBytes(length).toString('hex');
 };
 
@@ -214,7 +214,6 @@ export const generateSecureToken = (length: number = 32): string => {
  * @returns Hash of the value
  */
 export const calculateHash = (value: string): string => {
-  const crypto = require('crypto');
   return crypto.createHash('sha256').update(value).digest('hex');
 };
 

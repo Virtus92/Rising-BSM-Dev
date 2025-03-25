@@ -23,10 +23,11 @@ import {
 } from '../utils/security.utils.js';
 import { prisma } from '../utils/prisma.utils.js';
 import { asyncHandler } from '../utils/error.utils.js';
-import { UnauthorizedError, NotFoundError, ValidationError } from '../utils/error.utils.js';
+import { UnauthorizedError, NotFoundError, ValidationError, ForbiddenError } from '../utils/error.utils.js';
 import { logger } from '../utils/common.utils.js';
 import { ResponseFactory } from '../utils/http.utils.js';
 import crypto from 'crypto';
+import config from '../config/index.js';
 
 /**
  * Handle user login
@@ -294,10 +295,70 @@ export const forgotPassword = asyncHandler(async (
   });
   
   // Send response
+  const responseData: any = { success: true };
+  
+  // Only include the reset token in development environment
+  if (config.IS_DEVELOPMENT) {
+    responseData.resetToken = resetToken;
+    responseData.resetLink = `${req.protocol}://${req.get('host')}/api/v1/auth/reset-password/${resetToken}`;
+  }
+  
+  // Send response
   ResponseFactory.success(
     res,
-    { success: true },
+    responseData,
     'Password reset instructions sent, if the email exists in our system'
+  );
+});
+
+/**
+ * Get reset token for testing (Development only)
+ * @route GET /api/v1/auth/dev/reset-token
+ */
+export const getResetToken = asyncHandler(async (
+  req: Request, 
+  res: Response
+): Promise<void> => {
+  // Only allow in development mode
+  if (!config.IS_DEVELOPMENT) {
+    throw new ForbiddenError('This endpoint is only available in development mode');
+  }
+  
+  const { email } = req.query;
+  
+  if (!email || typeof email !== 'string') {
+    throw new ValidationError('Email is required', ['Email is required']);
+  }
+  
+  // Find user with active reset token
+  const user = await prisma.user.findFirst({
+    where: {
+      email: email,
+      resetToken: { not: null },
+      resetTokenExpiry: { gt: new Date() }
+    },
+    select: {
+      id: true,
+      email: true,
+      resetToken: true,
+      resetTokenExpiry: true
+    }
+  });
+  
+  if (!user || !user.resetToken) {
+    throw new NotFoundError('No active reset token found for this email');
+  }
+  
+  // Return reset token info
+  ResponseFactory.success(
+    res,
+    {
+      email: user.email,
+      resetToken: user.resetToken,
+      resetTokenExpiry: user.resetTokenExpiry,
+      resetLink: `${req.protocol}://${req.get('host')}/api/v1/auth/reset-password/${user.resetToken}`
+    },
+    'Reset token retrieved for testing'
   );
 });
 
@@ -409,13 +470,13 @@ export const logout = asyncHandler(async (
   req: AuthenticatedRequest, 
   res: Response
 ): Promise<void> => {
-  // Get refresh token
-  const { refreshToken } = req.validatedData || req.body;
-  
   // Check if user is authenticated
   if (!req.user) {
     throw new UnauthorizedError('Authentication required');
   }
+  
+  // Get refresh token if provided
+  const { refreshToken } = req.body;
   
   // Log activity
   await prisma.userActivity.create({
@@ -426,28 +487,31 @@ export const logout = asyncHandler(async (
     }
   });
   
-  // If refresh token provided, revoke it
-  if (refreshToken) {
-    const refreshTokenDoc = await prisma.refreshToken.findFirst({
-      where: {
-        token: refreshToken,
-        userId: req.user.id,
-        revoked: false
-      }
-    });
-    
-    if (refreshTokenDoc) {
-      await prisma.refreshToken.update({
-        where: { id: refreshTokenDoc.id },
-        data: { revoked: true, revokedAt: new Date(), revokedByIp: req.ip }
-      });
+  // Revoke all tokens
+  const result = await prisma.refreshToken.updateMany({
+    where: {
+      userId: req.user.id,
+      revoked: false
+    },
+    data: { 
+      revoked: true, 
+      revokedAt: new Date(), 
+      revokedByIp: req.ip 
     }
-  }
+  });
+  
+  logger.info(`User logged out, revoked ${result.count} refresh tokens`, { 
+    userId: req.user.id
+  });
   
   // Send response
   ResponseFactory.success(
     res,
-    { success: true },
-    'Logout successful'
+    { 
+      success: true,
+      tokenCount: result.count,
+      message: "Alle Sessions wurden beendet. Bitte entfernen Sie alle gespeicherten Tokens im Client."
+    },
+    'Logout erfolgreich durchgeführt'
   );
 });
