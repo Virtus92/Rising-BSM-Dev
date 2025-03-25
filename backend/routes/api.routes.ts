@@ -20,7 +20,7 @@ import customerRoutes from './customer.routes.js';
 // import dashboardRoutes from './dashboard.routes.js';
 // import settingsRoutes from './settings.routes.js';
 import notificationRoutes from './notification.routes.js';
-// import userRoutes from './user.routes.js';
+import userRoutes from './user.routes.js';
 
 // Create router
 const router = Router();
@@ -85,7 +85,7 @@ router.use('/customers', authenticate, customerRoutes);
 // router.use('/dashboard', authenticate, dashboardRoutes);
 // router.use('/settings', authenticate, settingsRoutes);
 router.use('/notifications', authenticate, notificationRoutes);
-// router.use('/users', authenticate, userRoutes);
+router.use('/users', authenticate, userRoutes);
 
 /**
  * @swagger

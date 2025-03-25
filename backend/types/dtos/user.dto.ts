@@ -14,6 +14,8 @@ export enum UserStatus {
   SUSPENDED = 'suspended'
 }
 
+
+
 /**
  * DTO for creating a new user
  */
@@ -247,6 +249,16 @@ export interface UserFilterParams extends FilterParams {
    * Filter by status
    */
   status?: string;
+  
+  /**
+   * Filter by creation date (from)
+   */
+  startDate?: string | Date;
+  
+  /**
+   * Filter by creation date (to)
+   */
+  endDate?: string | Date;
 }
 
 /**
@@ -274,7 +286,7 @@ export interface PasswordChangeDTO extends BaseUpdateDTO {
  */
 export const userCreateValidation = {
   name: {
-    type: 'string',
+    type: 'string' as const,
     required: true,
     min: 2,
     max: 100,
@@ -285,7 +297,7 @@ export const userCreateValidation = {
     }
   },
   email: {
-    type: 'email',
+    type: 'email' as const,
     required: true,
     messages: {
       required: 'Email is required',
@@ -293,7 +305,7 @@ export const userCreateValidation = {
     }
   },
   password: {
-    type: 'password',
+    type: 'string' as const,
     required: true,
     min: 8,
     messages: {
@@ -302,7 +314,7 @@ export const userCreateValidation = {
     }
   },
   phone: {
-    type: 'string',
+    type: 'string' as const,
     required: false,
     max: 30,
     messages: {
@@ -310,7 +322,7 @@ export const userCreateValidation = {
     }
   },
   role: {
-    type: 'enum',
+    type: 'enum' as const,
     required: false,
     enum: Object.values(UserRole),
     default: UserRole.EMPLOYEE,
@@ -319,7 +331,7 @@ export const userCreateValidation = {
     }
   },
   status: {
-    type: 'enum',
+    type: 'enum' as const,
     required: false,
     enum: Object.values(UserStatus),
     default: UserStatus.ACTIVE,
@@ -333,18 +345,54 @@ export const userCreateValidation = {
  * Validation schema for user update
  */
 export const userUpdateValidation = {
-  ...userCreateValidation,
   name: {
-    ...userCreateValidation.name,
-    required: false
+    type: 'string' as const,
+    required: false,
+    min: 2,
+    max: 100,
+    messages: {
+      min: 'Name must be at least 2 characters long',
+      max: 'Name must not exceed 100 characters'
+    }
   },
   email: {
-    ...userCreateValidation.email,
-    required: false
+    type: 'email' as const,
+    required: false,
+    messages: {
+      email: 'Invalid email format'
+    }
   },
   password: {
-    ...userCreateValidation.password,
-    required: false
+    type: 'string' as const,
+    required: false,
+    min: 8,
+    messages: {
+      min: 'Password must be at least 8 characters long'
+    }
+  },
+  phone: {
+    type: 'string' as const,
+    required: false,
+    max: 30,
+    messages: {
+      max: 'Phone number must not exceed 30 characters'
+    }
+  },
+  role: {
+    type: 'enum' as const,
+    required: false,
+    enum: Object.values(UserRole),
+    messages: {
+      enum: `Role must be one of: ${Object.values(UserRole).join(', ')}`
+    }
+  },
+  status: {
+    type: 'enum' as const,
+    required: false,
+    enum: Object.values(UserStatus),
+    messages: {
+      enum: `Status must be one of: ${Object.values(UserStatus).join(', ')}`
+    }
   }
 };
 
@@ -381,19 +429,18 @@ export const passwordChangeValidation = {
 };
 
 /**
- * Get human-readable status label
+ * Get human-readable label for user status
+ * @param status User status
+ * @returns Readable label
  */
 export function getUserStatusLabel(status: string): string {
-  switch (status) {
-    case UserStatus.ACTIVE:
-      return 'Active';
-    case UserStatus.INACTIVE:
-      return 'Inactive';
-    case UserStatus.SUSPENDED:
-      return 'Suspended';
-    default:
-      return status;
-  }
+  const labels: Record<string, string> = {
+    active: 'Active',
+    inactive: 'Inactive',
+    suspended: 'Suspended'
+  };
+  
+  return labels[status] || status;
 }
 
 /**

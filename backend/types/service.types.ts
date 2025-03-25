@@ -39,6 +39,7 @@ export interface UpdateOptions {
   userId?: number;
   userName?: string;
   throwIfNotFound?: boolean;
+  ipAddress?: string;
   }
 
 /**
@@ -47,4 +48,5 @@ export interface UpdateOptions {
 export interface DeleteOptions extends ServiceOptions {
   throwIfNotFound?: boolean;
   softDelete?: boolean;
+  ipAddress?: string;
 }
