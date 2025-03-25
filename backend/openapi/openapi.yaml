@@ -147,6 +147,18 @@ paths:
     $ref: './paths/customers.yaml#/customers-id-notes'
   /customers/{id}/status:
     $ref: './paths/customers.yaml#/customers-id-status'
+  /customers/search:
+    $ref: './paths/customers.yaml#/customers-search'
+  /customers/bulk-update:
+    $ref: './paths/customers.yaml#/customers-bulk-update'
+  /customers/export:
+    $ref: './paths/customers.yaml#/customers-export'
+  /customers/{id}/insights:
+    $ref: './paths/customers.yaml#/customers-id-insights'
+  /customers/{id}/similar:
+    $ref: './paths/customers.yaml#/customers-id-similar'
+  /customers/{id}/history:
+    $ref: './paths/customers.yaml#/customers-id-history'
 
   # Projects
   /projects:

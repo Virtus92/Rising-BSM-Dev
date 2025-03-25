@@ -10,13 +10,13 @@ customers:
         name: status
         schema:
           type: string
-          enum: [aktiv, inaktiv, geloescht]
+          enum: [active, inactive, deleted]
         description: Filter by status
       - in: query
         name: type
         schema:
           type: string
-          enum: [privat, geschaeft]
+          enum: [private, business]
         description: Filter by customer type
       - in: query
         name: search
@@ -40,7 +40,7 @@ customers:
         name: sortBy
         schema:
           type: string
-          enum: [name, email, firma, ort, status, created_at]
+          enum: [name, email, company, city, status, createdAt]
           default: name
         description: Field to sort by
       - in: query
@@ -152,28 +152,7 @@ customers-statistics:
                   type: boolean
                   example: true
                 data:
-                  type: object
-                  properties:
-                    stats:
-                      type: object
-                      properties:
-                        total:
-                          type: integer
-                        active:
-                          type: integer
-                        private:
-                          type: integer
-                        business:
-                          type: integer
-                    growthData:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          month:
-                            type: string
-                          count:
-                            type: integer
+                  $ref: '../schemas/customers.yaml#/CustomerStatistics'
                 message:
                   type: string
                   example: "Customer statistics retrieved successfully"
@@ -183,6 +162,188 @@ customers-statistics:
                     timestamp:
                       type: string
                       format: date-time
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+customers-search:
+  get:
+    tags:
+      - Customers
+    summary: Search customers
+    description: Search for customers with specific term and filters
+    operationId: searchCustomers
+    parameters:
+      - in: query
+        name: term
+        required: true
+        schema:
+          type: string
+          minLength: 2
+        description: Search term
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+        description: Page number (1-based)
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+        description: Items per page
+    responses:
+      '200':
+        description: Search results
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    $ref: '../schemas/customers.yaml#/Customer'
+                message:
+                  type: string
+                  example: "Customers retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    pagination:
+                      $ref: '../schemas/common.yaml#/Pagination'
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+customers-bulk-update:
+  post:
+    tags:
+      - Customers
+    summary: Bulk update customers
+    description: Update multiple customers at once
+    operationId: bulkUpdateCustomers
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - customerIds
+              - data
+            properties:
+              customerIds:
+                type: array
+                items:
+                  type: integer
+                description: Array of customer IDs to update
+                minItems: 1
+              data:
+                $ref: '../schemas/customers.yaml#/CustomerUpdate'
+    responses:
+      '200':
+        description: Customers updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    count:
+                      type: integer
+                      description: Number of customers updated
+                    ids:
+                      type: array
+                      items:
+                        type: integer
+                message:
+                  type: string
+                  example: "3 customers updated successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '403':
+        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+
+customers-export:
+  get:
+    tags:
+      - Customers
+    summary: Export customers
+    description: Export customers to CSV or Excel file
+    operationId: exportCustomers
+    parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum: [csv, excel]
+          default: csv
+        description: Export format
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum: [active, inactive, deleted]
+        description: Filter by status
+      - in: query
+        name: type
+        schema:
+          type: string
+          enum: [private, business]
+        description: Filter by customer type
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search term
+      - in: query
+        name: startDate
+        schema:
+          type: string
+          format: date
+        description: Start date for filtering (YYYY-MM-DD)
+      - in: query
+        name: endDate
+        schema:
+          type: string
+          format: date
+        description: End date for filtering (YYYY-MM-DD)
+    responses:
+      '200':
+        description: File export successful
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema:
+              type: string
+              format: binary
+          text/csv:
+            schema:
+              type: string
+              format: binary
+      '400':
+        $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
@@ -280,6 +441,51 @@ customers-id:
           application/json:
             schema:
               $ref: '../schemas/error.yaml#/Error'
+
+  delete:
+    tags:
+      - Customers
+    summary: Delete customer
+    description: Delete (soft-delete) a customer
+    operationId: deleteCustomer
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Customer ID
+    responses:
+      '200':
+        description: Customer deleted
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    success:
+                      type: boolean
+                    id:
+                      type: integer
+                message:
+                  type: string
+                  example: "Customer deleted successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
 customers-id-notes:
   post:
@@ -386,6 +592,197 @@ customers-id-status:
                       format: date-time
       '400':
         $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+customers-id-insights:
+  get:
+    tags:
+      - Customers
+    summary: Get customer insights
+    description: Retrieve detailed insights for a customer including activity, metrics, and business intelligence
+    operationId: getCustomerInsights
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Customer ID
+    responses:
+      '200':
+        description: Customer insights
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    customer:
+                      $ref: '../schemas/customers.yaml#/Customer'
+                    projectStats:
+                      type: object
+                      properties:
+                        total:
+                          type: integer
+                        byStatus:
+                          type: object
+                          additionalProperties:
+                            type: integer
+                    appointmentStats:
+                      type: object
+                      properties:
+                        total:
+                          type: integer
+                        upcoming:
+                          type: integer
+                    financials:
+                      type: object
+                      properties:
+                        totalRevenue:
+                          type: string
+                        averageProjectValue:
+                          type: string
+                    activity:
+                      type: object
+                      properties:
+                        recent:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              action:
+                                type: string
+                              date:
+                                type: string
+                              by:
+                                type: string
+                              details:
+                                type: string
+                        lastUpdate:
+                          type: string
+                message:
+                  type: string
+                  example: "Customer insights retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+customers-id-similar:
+  get:
+    tags:
+      - Customers
+    summary: Get similar customers
+    description: Find customers with similar attributes
+    operationId: getSimilarCustomers
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Reference customer ID
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          default: 5
+          maximum: 20
+        description: Maximum number of similar customers to return
+    responses:
+      '200':
+        description: Similar customers
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    $ref: '../schemas/customers.yaml#/Customer'
+                message:
+                  type: string
+                  example: "Similar customers retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+      '404':
+        $ref: '../openapi.yaml#/components/responses/NotFoundError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+customers-id-history:
+  get:
+    tags:
+      - Customers
+    summary: Get customer history
+    description: Retrieve the activity history for a customer
+    operationId: getCustomerHistory
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        description: Customer ID
+    responses:
+      '200':
+        description: Customer history
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      action:
+                        type: string
+                      timestamp:
+                        type: string
+                      relativeTime:
+                        type: string
+                      user:
+                        type: string
+                      details:
+                        type: string
+                message:
+                  type: string
+                  example: "Customer history retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '404':
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
