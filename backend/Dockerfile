@@ -21,13 +21,13 @@ ENV DATABASE_URL=postgresql://postgres:postgres@db:5432/rising_bsm?schema=public
 
 # Copy OpenAPI files first
 COPY openapi ./openapi/
-COPY scripts/build-openapi.js ./scripts/build-openapi.js
+COPY scripts ./scripts/
 
 # Create output directory
 RUN mkdir -p dist
 
 # Bundle OpenAPI files
-RUN node scripts/build-openapi.js
+RUN node ./scripts/bundle-openapi.js
 
 # Copy the rest of the application
 COPY . .

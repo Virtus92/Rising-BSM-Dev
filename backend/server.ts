@@ -7,12 +7,18 @@ import { rateLimit } from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { generateAuthTokens } from './utils/security.utils.js';
 import config from './config/index.js';
 import setupSwagger from './config/swagger-loader.js';
 import { inject, cleanup } from './config/dependency-container.js';
 import { PrismaClient } from '@prisma/client';
 import { logger } from './utils/common.utils.js';
+
+// Create ESM compatible __dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Create Express app
 const app: Express = express();
@@ -78,6 +84,21 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // Initialize Swagger documentation
+try {
+  const bundlerPath = path.join(__dirname, 'scripts/bundle-openapi.js');
+  if (fs.existsSync(bundlerPath)) {
+    logger.info('Bundling OpenAPI spec...');
+    const { execSync } = await import('child_process');
+    execSync(`node ${bundlerPath}`, { stdio: 'inherit' });
+    logger.info('OpenAPI spec bundled successfully');
+  } else {
+    logger.warn('OpenAPI bundler script not found. Swagger UI may have incomplete documentation.');
+  }
+} catch (error) {
+  logger.error('Error bundling OpenAPI spec:', error);
+  // Continue anyway, setupSwagger will use a fallback if needed
+}
+
 setupSwagger(app);
 
 // Development helpers
