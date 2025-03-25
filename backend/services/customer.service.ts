@@ -21,6 +21,7 @@ import { BusinessLogicError } from '../utils/error.utils.js';
 import { cache } from '../utils/common.utils.js';
 import { formatCurrency, formatRelativeTime } from '../utils/format.utils.js';
 import { DeleteOptions, UpdateOptions } from '../types/service.types.js';
+import { logger } from '../utils/common.utils.js';
 
 export class CustomerService extends BaseService<
   Customer,
@@ -200,6 +201,82 @@ export class CustomerService extends BaseService<
       );
     }
   }
+
+  /**
+   * Hard delete a customer and all related records
+   * @param id Customer ID
+   * @param options Delete options
+   * @returns Result of deletion operation
+   */
+  async hardDelete(id: number, options: any = {}): Promise<CustomerResponseDTO> {
+    try {
+      // Get prisma client from DI container
+      const prisma = inject<PrismaClient>('PrismaClient');
+      
+      // Find customer first to return proper data if successful
+      const customer = await this.repository.findByIdOrThrow(id);
+      const customerDto = this.mapEntityToDTO(customer);
+      
+      // Execute deletion within a transaction
+      await prisma.$transaction(async (tx) => {
+        logger.info(`Executing hard delete for customer ${id}`, { 
+          id, 
+          options
+        });
+        
+        // 1. Delete CustomerLog entries
+        const logResult = await tx.customerLog.deleteMany({
+          where: { customerId: id }
+        });
+        logger.debug(`Deleted ${logResult.count} customer log entries`);
+        
+        // 2. Update related projects to remove customer reference
+        const projectResult = await tx.project.updateMany({
+          where: { customerId: id },
+          data: { customerId: null }
+        });
+        logger.debug(`Updated ${projectResult.count} projects`);
+        
+        // 3. Update related appointments to remove customer reference
+        const appointmentResult = await tx.appointment.updateMany({
+          where: { customerId: id },
+          data: { customerId: null }
+        });
+        logger.debug(`Updated ${appointmentResult.count} appointments`);
+        
+        // 4. Update related invoices to remove customer reference
+        const invoiceResult = await tx.invoice.updateMany({
+          where: { customerId: id },
+          data: { customerId: null }
+        });
+        logger.debug(`Updated ${invoiceResult.count} invoices`);
+        
+        // 5. Delete the customer record
+        await tx.customer.delete({
+          where: { id }
+        });
+        logger.debug(`Deleted customer record with ID ${id}`);
+        
+        // 6. Log the operation
+        if (options.userId) {
+          await tx.userActivity.create({
+            data: {
+              userId: options.userId,
+              activity: 'customer_hard_delete',
+              ipAddress: options.ipAddress || 'unknown'
+            }
+          });
+          logger.debug(`Created activity log for user ${options.userId}`);
+        }
+      });
+      
+      // Return customer data for the response
+      return customerDto;
+    } catch (error) {
+      this.handleError(error, `Error performing hard delete for customer ${id}`, { id, options });
+    }
+  }
+
   // Override der afterDelete-Methode aus BaseService
   protected async afterDelete(deleted: Customer, options: DeleteOptions): Promise<void> {
     // Aufruf der Basis-Implementierung (falls vorhanden)

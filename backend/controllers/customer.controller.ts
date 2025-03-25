@@ -189,11 +189,21 @@ export const deleteCustomer = asyncHandler(async (req: Request, res: Response) =
   const authReq = req as AuthenticatedRequest;
   const hardDelete = req.query.mode === 'hard';
   
-  // Delete customer with user context
-  const result = await customerService.delete(id, {
-    userId: authReq.user?.id,
-    softDelete: !hardDelete // Use soft delete if not hard delete
-  });
+  let result;
+  
+  if (hardDelete) {
+    // Use hard delete when specified
+    result = await customerService.hardDelete(id, {
+      userId: authReq.user?.id,
+      ipAddress: req.ip
+    });
+  } else {
+    // Default to soft delete
+    result = await customerService.delete(id, {
+      userId: authReq.user?.id,
+      softDelete: true
+    });
+  }
   
   // Return success response
   ResponseFactory.success(
