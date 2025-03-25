@@ -21,7 +21,6 @@ import { logger } from '../utils/common.utils.js';
 // Create user service instance
 const userService = new UserService();
 
-/**
  * @swagger
  * /api/v1/users:
  *   get:
@@ -139,7 +138,6 @@ export const getAllUsers = asyncHandler(async (
   }
 });
 
-/**
  * @swagger
  * /api/v1/users/{id}:
  *   get:
@@ -198,7 +196,6 @@ export const getUserById = asyncHandler(async (
   }
 });
 
-/**
  * @swagger
  * /api/v1/users:
  *   post:
@@ -260,7 +257,6 @@ export const createUser = asyncHandler(async (
   }
 });
 
-/**
  * @swagger
  * /api/v1/users/{id}:
  *   put:
@@ -331,7 +327,6 @@ export const updateUser = asyncHandler(async (
   }
 });
 
-/**
  * @swagger
  * /api/v1/users/{id}:
  *   delete:
@@ -426,7 +421,6 @@ export const deleteUser = asyncHandler(async (
   }
 });
 
-/**
  * @swagger
  * /api/v1/users/{id}/status:
  *   patch:
@@ -512,7 +506,6 @@ export const updateUserStatus = asyncHandler(async (
   }
 });
 
-/**
  * @swagger
  * /api/v1/users/search:
  *   get:
@@ -614,7 +607,6 @@ export const searchUsers = asyncHandler(async (
   }
 });
 
-/**
  * @swagger
  * /api/v1/users/statistics:
  *   get:
@@ -656,7 +648,6 @@ export const getUserStatistics = asyncHandler(async (
   }
 });
 
-/**
  * @swagger
  * /api/v1/users/export:
  *   get:
@@ -741,7 +732,6 @@ export const exportUsers = asyncHandler(async (
   }
 });
 
-/**
  * @swagger
  * /api/v1/users/bulk-update:
  *   post:
