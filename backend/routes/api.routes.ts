@@ -6,6 +6,9 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware.js';
 import authRoutes from './auth.routes.js';
+import { validateBody, validateParams } from '../middleware/validation.middleware.js';
+import { loginValidation } from '../types/dtos/auth.dto.js';
+import { login } from '../controllers/auth.controller.js';
 
 // Import other route modules
 // import projectRoutes from './project.routes.js';
@@ -22,8 +25,55 @@ import notificationRoutes from './notification.routes.js';
 // Create router
 const router = Router();
 
+/**
+ * @swagger
+ * /api/v1/login:
+ *   post:
+ *     summary: User login
+ *     description: Authenticate user and return tokens
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginDTO'
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponseDTO'
+ *       401:
+ *         description: Invalid credentials
+ */
+router.post('/login', validateBody({
+  email: {
+    type: 'email',
+    required: true,
+    messages: {
+      required: 'Email is required',
+      email: 'Invalid email format'
+    }
+  },
+  password: {
+    type: 'string',
+    required: true,
+    messages: {
+      required: 'Password is required'
+    }
+  },
+  remember: {
+    type: 'boolean',
+    required: false,
+    default: false
+  }
+}), login);
+
 // Mount authentication routes
 router.use('/auth', authRoutes);
+
 
 // Mount other routes
 // router.use('/projects', authenticate, projectRoutes);

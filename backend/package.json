@@ -12,6 +12,7 @@
         "dev": "tsx watch server.ts",
         "build:dev": "sh wait-for-db.sh && tsx watch server.ts",
         "build:watch": "tsc -w",
+        "db:seed": "tsx prisma/seed.ts",
         "migrate": "prisma migrate dev",
         "test": "jest",
         "test:watch": "jest --watch",

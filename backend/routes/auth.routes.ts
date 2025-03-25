@@ -30,30 +30,6 @@ const router = Router();
  *   description: User authentication operations
  */
 
-/**
- * @swagger
- * /api/v1/auth/login:
- *   post:
- *     summary: User login
- *     description: Authenticate user and return tokens
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/LoginDTO'
- *     responses:
- *       200:
- *         description: Login successful
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AuthResponseDTO'
- *       401:
- *         description: Invalid credentials
- */
-router.post('/login', validateBody(loginValidation), login);
 
 /**
  * @swagger
