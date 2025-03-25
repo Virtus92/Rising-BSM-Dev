@@ -295,13 +295,38 @@ export interface CustomerAppointmentDTO {
 }
 
 /**
- * DTO for customer filtering
+ * DTO für Kunden-Filterparameter
  */
 export interface CustomerFilterParams extends FilterParams {
   /**
-   * Filter by type (private/business)
+   * Nach Kundentyp filtern (privat/geschäft)
    */
   type?: string;
+  
+  /**
+   * Nach Stadt filtern
+   */
+  city?: string;
+  
+  /**
+   * Nach Postleitzahl filtern
+   */
+  postalCode?: string;
+  
+  /**
+   * Nach Newsletter-Abonnement filtern
+   */
+  newsletter?: boolean;
+  
+  /**
+   * Nach Erstellungsdatum (von) filtern
+   */
+  startDate?: string | Date;
+  
+  /**
+   * Nach Erstellungsdatum (bis) filtern
+   */
+  endDate?: string | Date;
 }
 
 /**
@@ -324,7 +349,7 @@ export interface CustomerNoteCreateDTO {
  */
 export const customerCreateValidation = {
   name: {
-    type: 'string',
+    type: 'string' as const,
     required: true,
     min: 2,
     max: 100,
@@ -335,7 +360,7 @@ export const customerCreateValidation = {
     }
   },
   email: {
-    type: 'email',
+    type: 'email' as const,
     required: true,
     messages: {
       required: 'Email is required',
@@ -343,7 +368,7 @@ export const customerCreateValidation = {
     }
   },
   company: {
-    type: 'string',
+    type: 'string' as const,
     required: false,
     max: 100,
     messages: {
@@ -351,7 +376,7 @@ export const customerCreateValidation = {
     }
   },
   phone: {
-    type: 'string',
+    type: 'string' as const,
     required: false,
     max: 30,
     messages: {
@@ -359,7 +384,7 @@ export const customerCreateValidation = {
     }
   },
   address: {
-    type: 'string',
+    type: 'string' as const,
     required: false,
     max: 255,
     messages: {
@@ -367,7 +392,7 @@ export const customerCreateValidation = {
     }
   },
   postalCode: {
-    type: 'string',
+    type: 'string' as const,
     required: false,
     max: 10,
     messages: {
@@ -375,7 +400,7 @@ export const customerCreateValidation = {
     }
   },
   city: {
-    type: 'string',
+    type: 'string' as const,
     required: false,
     max: 100,
     messages: {
@@ -383,7 +408,7 @@ export const customerCreateValidation = {
     }
   },
   country: {
-    type: 'string',
+    type: 'string' as const,
     required: false,
     max: 100,
     default: 'Austria',
@@ -392,7 +417,7 @@ export const customerCreateValidation = {
     }
   },
   notes: {
-    type: 'string',
+    type: 'string' as const,
     required: false,
     max: 2000,
     messages: {
@@ -400,12 +425,12 @@ export const customerCreateValidation = {
     }
   },
   newsletter: {
-    type: 'boolean',
+    type: 'boolean' as const,
     required: false,
     default: false
   },
   status: {
-    type: 'enum',
+    type: 'enum' as const,
     required: false,
     enum: Object.values(CustomerStatus),
     default: CustomerStatus.ACTIVE,
@@ -414,7 +439,7 @@ export const customerCreateValidation = {
     }
   },
   type: {
-    type: 'enum',
+    type: 'enum' as const,
     required: false,
     enum: Object.values(CustomerType),
     default: CustomerType.PRIVATE,
@@ -444,7 +469,7 @@ export const customerUpdateValidation = {
  */
 export const customerStatusUpdateValidation = {
   status: {
-    type: 'enum',
+    type: 'enum' as const,
     required: true,
     enum: Object.values(CustomerStatus),
     messages: {
@@ -453,7 +478,7 @@ export const customerStatusUpdateValidation = {
     }
   },
   note: {
-    type: 'string',
+    type: 'string' as const,
     required: false,
     max: 1000,
     messages: {
@@ -467,7 +492,7 @@ export const customerStatusUpdateValidation = {
  */
 export const customerNoteCreateValidation = {
   text: {
-    type: 'string',
+    type: 'string' as const,
     required: true,
     min: 1,
     max: 1000,

@@ -34,9 +34,12 @@ export interface CreateOptions extends ServiceOptions {
 /**
  * Options for updating records
  */
-export interface UpdateOptions extends ServiceOptions {
+export interface UpdateOptions {
+  includeDeleted?: boolean;
+  userId?: number;
+  userName?: string;
   throwIfNotFound?: boolean;
-}
+  }
 
 /**
  * Options for deleting records

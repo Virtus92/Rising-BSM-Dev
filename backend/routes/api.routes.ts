@@ -12,7 +12,7 @@ import { login } from '../controllers/auth.controller.js';
 
 // Import other route modules
 // import projectRoutes from './project.routes.js';
-// import customerRoutes from './customer.routes.js';
+import customerRoutes from './customer.routes.js';
 // import appointmentRoutes from './appointment.routes.js';
 // import serviceRoutes from './service.routes.js';
 // import requestRoutes from './request.routes.js';
@@ -77,7 +77,7 @@ router.use('/auth', authRoutes);
 
 // Mount other routes
 // router.use('/projects', authenticate, projectRoutes);
-// router.use('/customers', authenticate, customerRoutes);
+router.use('/customers', authenticate, customerRoutes);
 // router.use('/appointments', authenticate, appointmentRoutes);
 // router.use('/services', authenticate, serviceRoutes);
 // router.use('/requests', authenticate, requestRoutes);

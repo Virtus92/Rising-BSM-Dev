@@ -175,7 +175,7 @@ export const commonSchemas = {
   // ID parameter schema
   idParam: {
     id: {
-      type: 'number',
+      type: 'number' as const,
       required: true,
       min: 1,
       integer: true,
@@ -191,7 +191,7 @@ export const commonSchemas = {
   // Pagination query schema
   pagination: {
     page: {
-      type: 'number',
+      type: 'number' as const,
       required: false,
       min: 1,
       integer: true,
@@ -202,7 +202,7 @@ export const commonSchemas = {
       }
     },
     limit: {
-      type: 'number',
+      type: 'number' as const,
       required: false,
       min: 1,
       max: 100,
@@ -219,7 +219,7 @@ export const commonSchemas = {
   // Search query schema
   search: {
     search: {
-      type: 'string',
+      type: 'string' as const,
       required: false,
       minLength: 1,
       maxLength: 100,
@@ -234,14 +234,14 @@ export const commonSchemas = {
   // Date range query schema
   dateRange: {
     startDate: {
-      type: 'date',
+      type: 'date' as const,
       required: false,
       messages: {
         type: 'Start date must be a valid date'
       }
     },
     endDate: {
-      type: 'date',
+      type: 'date' as const,
       required: false,
       messages: {
         type: 'End date must be a valid date'
@@ -252,7 +252,7 @@ export const commonSchemas = {
   // Status query schema
   status: {
     status: {
-      type: 'string',
+      type: 'string' as const,
       required: false,
       messages: {
         type: 'Status must be a string'
@@ -263,14 +263,14 @@ export const commonSchemas = {
   // Sort options schema
   sort: {
     sortBy: {
-      type: 'string',
+      type: 'string' as const,
       required: false,
       messages: {
         type: 'Sort field must be a string'
       }
     },
     sortDirection: {
-      type: 'enum',
+      type: 'enum' as const,
       required: false,
       enum: ['asc', 'desc'],
       default: 'desc',
