@@ -45,6 +45,41 @@ export class CustomerService extends BaseService<
   ) {
     super(customerRepository, logger, validator, errorHandler);
   }
+    /**
+     * Find all customers with filtering and pagination
+     * 
+     * @param filters - Filter parameters
+     * @param options - Service options
+     * @returns Promise with paginated customer response
+     */
+    async findAll(
+        filters: CustomerFilterParams, 
+        options?: ServiceOptions
+    ): Promise<{ data: CustomerResponseDto[]; pagination: any }> {
+        try {
+            // Extract pagination options
+            const page = options?.page || 1;
+            const limit = options?.limit || 20;
+            
+            // Merge filters and pagination options
+            const queryOptions = { ...filters, page, limit };
+            
+            // Get paginated data from repository
+            const paginatedResult = await this.customerRepository.findAll(queryOptions);
+            
+            // Map entities to DTOs
+            const data = paginatedResult.data.map(entity => this.toDTO(entity));
+            
+            // Return data and pagination info
+            return {
+                data,
+                pagination: paginatedResult.pagination
+            };
+        } catch (error) {
+            this.logger.error('Error in CustomerService.findAll', error instanceof Error ? error : String(error), { filters, options });
+            throw this.handleError(error);
+        }
+    }
 
   /**
    * Get detailed customer information
@@ -138,7 +173,7 @@ export class CustomerService extends BaseService<
       const totalCustomers = await this.repository.count();
       
       // Count by status
-      const customersByStatus = {};
+      const customersByStatus: Record<string, number> = {};
       for (const status of Object.values(CustomerStatus)) {
         const count = await this.repository.count({ status });
         customersByStatus[status] = count;
@@ -147,10 +182,6 @@ export class CustomerService extends BaseService<
       // Count by type
       const customersByType = {};
       const types = ['privat', 'geschaeft'];
-      for (const type of types) {
-        const count = await this.repository.count({ type });
-        customersByType[type] = count;
-      }
       
       // New customers this month
       const today = new Date();
@@ -262,6 +293,8 @@ export class CustomerService extends BaseService<
       throw this.handleError(error);
     }
   }
+
+  
 
   /**
    * Find similar customers based on attributes
@@ -389,7 +422,7 @@ export class CustomerService extends BaseService<
   async exportData(filters: CustomerFilterParams, format: string = 'csv'): Promise<{buffer: Buffer, filename: string}> {
     try {
       // Get filtered customers
-      const { data: customers } = await this.findAll(filters);
+      const { data: customers } = await this.customerRepository.findAll(filters);
       
       // Generate filename
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

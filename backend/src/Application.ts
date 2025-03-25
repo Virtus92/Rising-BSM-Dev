@@ -14,6 +14,7 @@ import { registerAll } from './factories.js';
 import { ILoggingService } from './interfaces/ILoggingService.js';
 import { IErrorHandler } from './interfaces/IErrorHandler.js';
 import { LoggingService } from './core/LoggingService.js';
+import { LogFormat } from './interfaces/ILoggingService.js';
 import { ErrorHandler } from './core/ErrorHandler.js';
 import { ValidationService } from './core/ValidationService.js';
 import { ErrorMiddleware } from './middleware/ErrorMiddleware.js';
@@ -68,8 +69,7 @@ function registerCoreServices() {
   container.register<ILoggingService>('LoggingService', () => {
     return new LoggingService({
       level: (process.env.LOG_LEVEL as any) || 'info',
-      format: process.env.NODE_ENV === 'production' ? 'json' : 'pretty'
-    });
+      format: process.env.NODE_ENV === 'production' ? LogFormat.JSON : LogFormat.PRETTY, });
   }, { singleton: true });
   
   // Get logger for subsequent registrations
@@ -215,7 +215,7 @@ function setupErrorHandling(app: Express, logger: ILoggingService, errorHandler:
   
   // Handle unhandled rejections
   process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection', typeof reason === 'object' ? reason : String(reason), { promise });
+    logger.error('Unhandled Rejection', reason instanceof Error ? reason : String(reason), { promise });
     // Don't exit for unhandled rejections, just log them
   });
   

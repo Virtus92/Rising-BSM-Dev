@@ -1,7 +1,7 @@
 /**
  * Factory functions for registering services with the DI container
  */
-import { createFactory } from './core/DiContainer.js';
+import { createFactory, DiContainer } from './core/DiContainer.js';
 
 // Repositories
 import { CustomerRepository } from './repositories/CustomerRepository.js';
@@ -9,7 +9,7 @@ import { NotificationRepository } from './repositories/NotificationRepository.js
 
 // Services
 import { CustomerService } from './services/CustomerService.js';
-import { NotificationService } from '../services/notification.service.js';
+import { NotificationService } from './services/NotificationService.js';
 
 // Controllers
 import { CustomerController } from './controllers/CustomerController.js';
@@ -53,7 +53,7 @@ export const createNotificationControllerFactory = () => createFactory(
  * 
  * @param container - DI container
  */
-export function registerRepositories(container) {
+export function registerRepositories(container: DiContainer): void {
   container.register('CustomerRepository', createCustomerRepositoryFactory(), { singleton: true });
   container.register('NotificationRepository', createNotificationRepositoryFactory(), { singleton: true });
 }
@@ -63,7 +63,7 @@ export function registerRepositories(container) {
  * 
  * @param container - DI container
  */
-export function registerServices(container) {
+export function registerServices(container: DiContainer): void {
   container.register('CustomerService', createCustomerServiceFactory(), { singleton: true });
   container.register('NotificationService', createNotificationServiceFactory(), { singleton: true });
 }
@@ -73,7 +73,7 @@ export function registerServices(container) {
  * 
  * @param container - DI container
  */
-export function registerControllers(container) {
+export function registerControllers(container: DiContainer): void {
   container.register('CustomerController', createCustomerControllerFactory(), { singleton: true });
   container.register('NotificationController', createNotificationControllerFactory(), { singleton: true });
 }
@@ -83,7 +83,7 @@ export function registerControllers(container) {
  * 
  * @param container - DI container
  */
-export function registerAll(container) {
+export function registerAll(container: DiContainer) {
   registerRepositories(container);
   registerServices(container);
   registerControllers(container);

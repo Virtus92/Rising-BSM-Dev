@@ -6,11 +6,24 @@ import { QueryOptions } from '../interfaces/IBaseRepository.js';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { PrismaClient } from '@prisma/client';
+import Item from 'mock-fs/lib/item.js';
 
 /**
  * Implementation of INotificationRepository for database operations.
  */
 export class NotificationRepository extends BaseRepository<Notification, number> implements INotificationRepository {
+  protected beginTransaction(): Promise<void> {
+      throw new Error('Method not implemented.');
+  }
+  protected commitTransaction(): Promise<void> {
+      throw new Error('Method not implemented.');
+  }
+  protected rollbackTransaction(): Promise<void> {
+      throw new Error('Method not implemented.');
+  }
+  protected executeQuery(operation: string, ...args: any[]): Promise<any> {
+      throw new Error('Method not implemented.');
+  }
   /**
    * Creates a new NotificationRepository instance
    * 
@@ -99,7 +112,7 @@ export class NotificationRepository extends BaseRepository<Notification, number>
         _count: { type: true }
       });
 
-      return result.map(item => ({
+      return result.map((item: { type: string; _count: { type: number } }) => ({
         type: item.type,
         count: item._count.type
       }));

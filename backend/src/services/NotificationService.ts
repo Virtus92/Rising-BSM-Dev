@@ -174,6 +174,59 @@ export class NotificationService extends BaseService<
     }
   }
 
+  
+  /**
+   * Find all notifications with filters and pagination
+   * 
+   * @param query - Query parameters
+   * @param options - Service options
+   * @returns Promise with paginated result of notification DTOs
+   */
+  async findAll(
+    query: NotificationFilterDto,
+    options?: ServiceOptions
+  ): Promise<any> {
+    try {
+      // Build filter criteria
+      const criteria: any = {};
+      if (query.userId) {
+        criteria.userId = query.userId;
+      }
+      if (query.type) {
+        criteria.type = query.type;
+      }
+      if (query.read !== undefined) {
+        criteria.read = typeof query.read === 'string' ? query.read === 'true' : Boolean(query.read);
+      }
+      if (query.search) {
+        criteria.title = { $like: `%${query.search}%` };
+      }
+
+      // Build pagination options
+      const page = Number(query.page) || 1;
+      const limit = Number(query.limit) || 20;
+      const offset = (page - 1) * limit;
+
+      // Find all notifications with pagination and filters
+      const result = await this.repository.findAll({
+        criteria,
+        offset,
+        limit
+      });
+
+      // Map entities to DTOs
+      const items = result.data.map(entity => this.toDTO(entity));
+
+      return {
+        ...result,
+        data: items
+      };
+    } catch (error) {
+      this.logger.error('Error finding all notifications', error instanceof Error ? error : String(error), { query });
+      throw this.handleError(error);
+    }
+  }
+
   /**
    * Create notifications for multiple users
    * 

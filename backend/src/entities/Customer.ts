@@ -98,6 +98,8 @@ export class Customer {
      * Related appointments
      */
     appointments?: any[];
+    
+    logs?: any[];
   
     /**
      * Creates a new Customer instance

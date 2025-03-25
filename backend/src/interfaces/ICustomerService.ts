@@ -51,6 +51,15 @@ export interface ICustomerService extends IBaseService<Customer, CustomerCreateD
   getCustomerInsights(id: number): Promise<any>;
   
   /**
+   * Find all customers with filtering and pagination
+   * 
+   * @param filters - Filter parameters
+   * @param options - Service options
+   * @returns Promise with paginated customer data
+   */
+  findAll(filters: CustomerFilterParams, options?: ServiceOptions): Promise<{data: CustomerResponseDto[], pagination: any}>;
+
+  /**
    * Find similar customers based on attributes
    * 
    * @param id - Customer ID

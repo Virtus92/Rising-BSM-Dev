@@ -286,3 +286,5 @@ export class LoggingService implements ILoggingService {
     };
   }
 }
+
+export default LoggingService;

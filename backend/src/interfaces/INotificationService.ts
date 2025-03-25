@@ -38,6 +38,18 @@ export interface INotificationService extends IBaseService<
    * @returns Promise with notification statistics
    */
   getNotificationStats(userId: number): Promise<NotificationStatsDto>;
+
+  /**
+   * Find all notifications with filters and pagination
+   * 
+   * @param query - Query parameters
+   * @param options - Service options
+   * @returns Promise with paginated result of notification DTOs
+   */
+  findAll(
+    query: NotificationFilterDto,
+    options?: ServiceOptions
+  ): Promise<any>;
   
   /**
    * Create a notification
