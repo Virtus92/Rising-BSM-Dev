@@ -1,209 +1,231 @@
-/**
- * Application
- * 
- * Main application class responsible for initializing and running the Express server.
- * Orchestrates the setup of middleware, routes, and error handling.
- */
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { rateLimit } from 'express-rate-limit';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
+import container from './core/DiContainer.js';
+import { registerAll } from './factories.js';
 import { ILoggingService } from './interfaces/ILoggingService.js';
 import { IErrorHandler } from './interfaces/IErrorHandler.js';
-import { DiContainer } from './core/DiContainer.js';
-import { AuthMiddleware } from './middleware/AuthMiddleware.js';
+import { LoggingService } from './core/LoggingService.js';
+import { ErrorHandler } from './core/ErrorHandler.js';
+import { ValidationService } from './core/ValidationService.js';
 import { ErrorMiddleware } from './middleware/ErrorMiddleware.js';
 import { RequestLoggerMiddleware } from './middleware/RequestLoggerMiddleware.js';
+import { AuthMiddleware } from './middleware/AuthMiddleware.js';
 
-import { UserController } from './controllers/UserController.js';
-import { NotificationController } from './controllers/NotificationController.js';
-import { CustomerController } from './controllers/CustomerController.js';
-import { RoutesConfig } from './config/RoutesConfig.js';
-import { SwaggerConfig } from './config/SwaggerConfig.js';
+// Create ESM compatible __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-export class Application {
-  private readonly app: Express;
-  private readonly port: number;
-  private readonly logger: ILoggingService;
-  private readonly errorHandler: IErrorHandler;
+/**
+ * Initialize the application
+ */
+async function initializeApp() {
+  // Create Express app
+  const app = express();
+  const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
   
-  /**
-   * Creates a new Application instance
-   * 
-   * @param container - Dependency injection container
-   * @param port - Port to listen on
-   */
-  constructor(
-    private readonly container: DiContainer,
-    port: number = 5000
-  ) {
-    this.app = express();
-    this.port = port;
-    this.logger = container.resolve<ILoggingService>('LoggingService');
-    this.errorHandler = container.resolve<IErrorHandler>('ErrorHandler');
+  // Register core services
+  registerCoreServices();
+  
+  // Register application components
+  registerAll(container);
+  
+  // Get services from container
+  const logger = container.resolve<ILoggingService>('LoggingService');
+  const errorHandler = container.resolve<IErrorHandler>('ErrorHandler');
+  
+  // Setup middleware
+  setupMiddleware(app, logger);
+  
+  // Setup routes
+  setupRoutes(app, logger);
+  
+  // Setup error handling
+  setupErrorHandling(app, logger, errorHandler);
+  
+  // Start server
+  app.listen(port, () => {
+    logger.info(`Server running at http://localhost:${port}`);
+    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+  
+  return app;
+}
+
+/**
+ * Register core services with the DI container
+ */
+function registerCoreServices() {
+  // Register logging service
+  container.register<ILoggingService>('LoggingService', () => {
+    return new LoggingService({
+      level: (process.env.LOG_LEVEL as any) || 'info',
+      format: process.env.NODE_ENV === 'production' ? 'json' : 'pretty'
+    });
+  }, { singleton: true });
+  
+  // Get logger for subsequent registrations
+  const logger = container.resolve<ILoggingService>('LoggingService');
+  
+  // Register error handler
+  container.register<IErrorHandler>('ErrorHandler', () => {
+    return new ErrorHandler(
+      logger,
+      process.env.NODE_ENV !== 'production'
+    );
+  }, { singleton: true });
+  
+  // Register validation service
+  container.register('ValidationService', () => {
+    return new ValidationService(logger);
+  }, { singleton: true });
+  
+  // Register database client
+  container.register('PrismaClient', () => {
+    const { PrismaClient } = require('@prisma/client');
+    return new PrismaClient({
+      log: process.env.NODE_ENV === 'development' 
+        ? ['query', 'error', 'warn'] 
+        : ['error'],
+    });
+  }, { singleton: true });
+  
+  // Register middleware
+  container.register('ErrorMiddleware', () => {
+    const errorHandler = container.resolve<IErrorHandler>('ErrorHandler');
+    return new ErrorMiddleware(logger, errorHandler, process.env.NODE_ENV !== 'production');
+  }, { singleton: true });
+  
+  container.register('RequestLoggerMiddleware', () => {
+    return new RequestLoggerMiddleware(logger);
+  }, { singleton: true });
+  
+  container.register('AuthMiddleware', () => {
+    const errorHandler = container.resolve<IErrorHandler>('ErrorHandler');
+    return new AuthMiddleware(
+      errorHandler,
+      logger,
+      process.env.JWT_SECRET || 'default-secret-key'
+    );
+  }, { singleton: true });
+  
+  logger.info('Core services registered');
+}
+
+/**
+ * Setup middleware
+ * 
+ * @param app - Express application
+ * @param logger - Logging service
+ */
+function setupMiddleware(app: Express, logger: ILoggingService) {
+  logger.info('Setting up middleware...');
+  
+  // Security middleware
+  app.use(helmet());
+  
+  // CORS middleware
+  const corsOptions = {
+    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+  };
+  app.use(cors(corsOptions));
+  
+  // Body parsing middleware
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
+  
+  // Static files
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  
+  // Request logging middleware
+  const requestLogger = container.resolve<RequestLoggerMiddleware>('RequestLoggerMiddleware');
+  app.use(requestLogger.logRequest);
+  
+  // API rate limiting middleware
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: 'Too many requests, please try again later.' }
+  });
+  app.use('/api/v1', apiLimiter);
+  
+  logger.info('Middleware setup complete');
+}
+
+/**
+ * Setup routes
+ * 
+ * @param app - Express application
+ * @param logger - Logging service
+ */
+function setupRoutes(app: Express, logger: ILoggingService) {
+  logger.info('Setting up routes...');
+  
+  // Health check endpoint
+  app.get('/health', (_req, res) => {
+    res.status(200).json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
+    });
+  });
+  
+  // TODO: Configure routes with controllers
+  
+  logger.info('Routes setup complete');
+}
+
+/**
+ * Setup error handling
+ * 
+ * @param app - Express application
+ * @param logger - Logging service
+ * @param errorHandler - Error handler
+ */
+function setupErrorHandling(app: Express, logger: ILoggingService, errorHandler: IErrorHandler) {
+  logger.info('Setting up error handling...');
+  
+  // Setup error middleware
+  const errorMiddleware = container.resolve<ErrorMiddleware>('ErrorMiddleware');
+  errorMiddleware.register(app);
+  
+  // Handle uncaught exceptions
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception', error, { stack: error.stack });
     
-    this.logger.info('Application instance created');
-  }
-  
-  /**
-   * Initialize the application
-   */
-  public async initialize(): Promise<void> {
-    this.logger.info('Initializing application...');
-    
-    try {
-      // Setup middleware
-      this.setupMiddleware();
-      
-      // Setup routes
-      this.setupRoutes();
-      
-      // Setup error handling
-      this.setupErrorHandling();
-      
-      this.logger.info('Application initialized successfully');
-    } catch (error) {
-      this.logger.error('Failed to initialize application', error instanceof Error ? error : String(error));
-      throw error;
-    }
-  }
-  
-  /**
-   * Start the application
-   */
-  public async start(): Promise<void> {
-    try {
-      await this.initialize();
-      
-      // Start server
-      this.app.listen(this.port, () => {
-        this.logger.info(`Server running at http://localhost:${this.port}`);
-        this.logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-        
-        if (process.env.NODE_ENV !== 'production') {
-          this.logger.info(`API Documentation: http://localhost:${this.port}/api-docs`);
-        }
-      });
-    } catch (error) {
-      this.logger.error('Failed to start application', error instanceof Error ? error : String(error));
+    // Exit with error after logging
+    setTimeout(() => {
       process.exit(1);
-    }
-  }
+    }, 1000);
+  });
   
-  /**
-   * Setup middleware
-   */
-  private setupMiddleware(): void {
-    this.logger.debug('Setting up middleware...');
-    
-    // Security middleware
-    this.app.use(helmet());
-    
-    // CORS middleware
-    const corsOptions = {
-      origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-      credentials: true
-    };
-    this.app.use(cors(corsOptions));
-    
-    // Body parsing middleware
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
-    this.app.use(cookieParser());
-    
-    // Static files
-    this.app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-    
-    // Request logging middleware
-    const requestLogger = this.container.resolve<RequestLoggerMiddleware>('RequestLoggerMiddleware');
-    this.app.use(requestLogger.logRequest);
-    
-    // API rate limiting middleware
-    const apiLimiter = rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100, // Limit each IP to 100 requests per window
-      standardHeaders: true,
-      legacyHeaders: false,
-      message: { success: false, error: 'Too many requests, please try again later.' }
-    });
-    this.app.use('/api/v1', apiLimiter);
-    
-    this.logger.debug('Middleware setup complete');
-  }
+  // Handle unhandled rejections
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection', typeof reason === 'object' ? reason : String(reason), { promise });
+    // Don't exit for unhandled rejections, just log them
+  });
   
-  /**
-   * Setup routes
-   */
-  private setupRoutes(): void {
-    this.logger.debug('Setting up routes...');
-    
-    // Health check endpoint
-    this.app.get('/health', (_req, res) => {
-      res.status(200).json({ 
-        status: 'ok', 
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
-      });
-    });
-    
-    // API version endpoint
-    this.app.get('/api/v1/version', (_req, res) => {
-      res.status(200).json({
-        version: process.env.npm_package_version || '1.0.0',
-        name: process.env.npm_package_name || 'rising-bsm-api',
-        timestamp: new Date().toISOString()
-      });
-    });
-    
-    // Setup Swagger documentation
-    const swaggerConfig = this.container.resolve<SwaggerConfig>('SwaggerConfig');
-    swaggerConfig.setup(this.app);
-    
-    // Setup API routes
-    const routesConfig = this.container.resolve<RoutesConfig>('RoutesConfig');
-    routesConfig.registerRoutes(this.app);
-    
-    this.logger.debug('Routes setup complete');
-  }
-  
-  /**
-   * Setup error handling
-   */
-  private setupErrorHandling(): void {
-    this.logger.debug('Setting up error handling...');
-    
-    // Setup error middleware
-    const errorMiddleware = this.container.resolve<ErrorMiddleware>('ErrorMiddleware');
-    errorMiddleware.register(this.app);
-    
-    // Handle uncaught exceptions
-    process.on('uncaughtException', (error) => {
-      this.logger.error('Uncaught Exception', { error });
-      
-      // Exit with error after logging
-      setTimeout(() => {
-        process.exit(1);
-      }, 1000);
-    });
-    
-    // Handle unhandled rejections
-    process.on('unhandledRejection', (reason, promise) => {
-      this.logger.error('Unhandled Rejection', { reason, promise });
-      // Don't exit for unhandled rejections, just log them
-    });
-    
-    this.logger.debug('Error handling setup complete');
-  }
-  
-  /**
-   * Get Express application instance
-   */
-  public getApp(): Express {
-    return this.app;
-  }
+  logger.info('Error handling setup complete');
+}
+
+// Export for testing
+export default initializeApp;
+
+// Run if executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  initializeApp();
 }
