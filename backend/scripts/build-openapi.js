@@ -1,110 +1,98 @@
-// build-openapi.js
+// scripts/build-openapi.js
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
+import { fileURLToPath } from 'url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/**
- * Build a bundled OpenAPI spec from the modular files
- */
-(async function buildOpenApiSpec() {
-  console.log('Building bundled OpenAPI spec...');
-  
-  // Define paths
-  const OPENAPI_DIR = path.resolve(process.cwd(), 'openapi');
-  const PATHS_DIR = path.join(OPENAPI_DIR, 'paths');
-  const SCHEMAS_DIR = path.join(OPENAPI_DIR, 'schemas');
+// Find OpenAPI directory
+const OPENAPI_DIR = path.resolve(process.cwd(), 'backend/openapi');
+const OUTPUT_FILE = path.resolve(process.cwd(), 'dist/swagger.json');
 
-  const rootDir = OPENAPI_DIR;
-  const mainSpecPath = path.join(OPENAPI_DIR, 'openapi.yaml');
-  const outputPath = path.join(process.cwd(), 'dist', 'swagger.json');
-  
-  // Track loaded files to avoid circular references
-  const loadedFiles = new Set();
-  loadedFiles.add(mainSpecPath);
-  
-  try {
-    // Read and parse main OpenAPI file
-    const mainSpecYaml = fs.readFileSync(mainSpecPath, 'utf8');
-    const mainSpec = yaml.load(mainSpecYaml);
-    
-    // Resolve references
-    const bundledSpec = resolveReferences(mainSpec, rootDir, loadedFiles);
-    
-    // Ensure output directory exists
-    const outputDir = path.dirname(outputPath);
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-    
-    // Write bundled spec to JSON file
-    fs.writeFileSync(outputPath, JSON.stringify(bundledSpec, null, 2));
-    
-    console.log(`✅ OpenAPI spec bundled successfully to ${outputPath}`);
-  } catch (error) {
-    console.error('❌ Error building OpenAPI spec:', error);
-    process.exit(1);
-  }
-})();
+console.log(`Bundling OpenAPI files from ${OPENAPI_DIR} to ${OUTPUT_FILE}`);
 
-/**
- * Recursively resolve references in OpenAPI spec
- */
-function resolveReferences(obj, rootDir, loadedFiles) {
-  if (!obj || typeof obj !== 'object') {
-    return obj;
-  }
+// Load main file
+const mainSpecPath = path.join(OPENAPI_DIR, 'openapi.yaml');
+const mainSpecContent = fs.readFileSync(mainSpecPath, 'utf8');
+const mainSpec = yaml.load(mainSpecContent);
+
+// Track loaded files to avoid circular references
+const loadedFiles = new Set([mainSpecPath]);
+
+// Resolve references recursively
+function resolveReferences(obj, basePath) {
+  if (!obj || typeof obj !== 'object') return obj;
   
-  // If it's an array, resolve references in each item
   if (Array.isArray(obj)) {
-    return obj.map(item => resolveReferences(item, rootDir, loadedFiles));
+    return obj.map(item => resolveReferences(item, basePath));
   }
   
-  // Create a new object to avoid modifying the original
   const result = {};
   
-  // Process each property
   for (const [key, value] of Object.entries(obj)) {
-    // Check for $ref property
-    if (key === '$ref' && typeof value === 'string' && value.startsWith('./')) {
-      // Parse reference path
-      const refPath = value.substring(2); // Remove './'
-      const [filePath, refPointer] = refPath.split('#/');
-      
-      // Resolve file path
-      const fullPath = path.join(rootDir, filePath);
-      
-      try {
-        // Load referenced file if not already loaded
+    if (key === '$ref' && typeof value === 'string') {
+      // Resolve file reference
+      if (value.startsWith('#/')) {
+        // Local reference - keep as is
+        result[key] = value;
+      } else {
+        // File reference
+        let refPath = value;
+        let refPointer = '';
+        
+        if (value.includes('#/')) {
+          [refPath, refPointer] = value.split('#/');
+          refPointer = '#/' + refPointer;
+        }
+        
+        // Handle relative paths
+        const fullPath = path.resolve(path.dirname(basePath), refPath);
+        
         if (!loadedFiles.has(fullPath)) {
           loadedFiles.add(fullPath);
-          const refFileYaml = fs.readFileSync(fullPath, 'utf8');
-          const refObj = yaml.load(refFileYaml);
+          console.log(`Resolving reference to ${fullPath}`);
           
-          // Get referenced object using pointer
-          let referencedObj = refObj;
+          const refContent = fs.readFileSync(fullPath, 'utf8');
+          let refObj = yaml.load(refContent);
+          
+          // Get referenced object
           if (refPointer) {
-            const parts = refPointer.split('/');
+            const parts = refPointer.substring(2).split('/');
+            let current = refObj;
+            
             for (const part of parts) {
-              if (part && referencedObj) {
-                referencedObj = referencedObj[part];
+              if (part in current) {
+                current = current[part];
+              } else {
+                console.error(`Reference not found: ${refPointer} in ${fullPath}`);
+                break;
               }
             }
+            
+            return resolveReferences(current, fullPath);
+          } else {
+            return resolveReferences(refObj, fullPath);
           }
-          
-          // Resolve any nested references
-          return resolveReferences(referencedObj, rootDir, loadedFiles);
         }
-      } catch (error) {
-        console.error(`Error resolving reference to ${fullPath}:`, error);
-        // Return the unresolved reference if there's an error
-        result[key] = value;
       }
     } else {
-      // Recursively resolve references in nested objects
-      result[key] = resolveReferences(value, rootDir, loadedFiles);
+      result[key] = resolveReferences(value, basePath);
     }
   }
   
   return result;
 }
+
+// Bundle the spec
+const bundledSpec = resolveReferences(mainSpec, mainSpecPath);
+
+// Ensure output directory exists
+const outputDir = path.dirname(OUTPUT_FILE);
+if (!fs.existsSync(outputDir)) {
+  fs.mkdirSync(outputDir, { recursive: true });
+}
+
+// Write bundled spec
+fs.writeFileSync(OUTPUT_FILE, JSON.stringify(bundledSpec, null, 2));
+console.log(`OpenAPI spec bundled to ${OUTPUT_FILE}`);

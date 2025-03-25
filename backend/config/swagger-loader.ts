@@ -15,17 +15,15 @@ const DEBUG = process.env.DEBUG_SWAGGER === 'true';
  * Try to find the correct path to the OpenAPI files
  * Useful when running in Docker or different environments
  */
-function findOpenApiPath(rootDir: string = 'backend/openapi'): string {
+function findOpenApiPath(rootDir: string = 'openapi'): string {
   // Possible locations for the OpenAPI files
   const possiblePaths = [
     rootDir,                           // Default
     path.join(process.cwd(), rootDir), // From current working dir
-    path.join(process.cwd(), 'backend', 'openapi'), // Backend specific
     path.join(process.cwd(), 'openapi'), // Root openapi folder
     path.join(__dirname, '..', 'openapi'), // Relative to this file
     path.join(__dirname, '..', '..', 'openapi'), // Two levels up
     '/app/openapi', // Docker common path
-    '/app/backend/openapi', // Docker backend path
   ];
 
   // Try each path until we find one with the main OpenAPI file
@@ -230,6 +228,22 @@ function resolveReferences(obj: any, rootDir: string, loadedFiles: Set<string>, 
 }
 
 /**
+ * Load bundled OpenAPI specification
+ */
+function loadBundledSpec() {
+  try {
+    const bundledPath = path.resolve(process.cwd(), 'dist/swagger.json');
+    if (fs.existsSync(bundledPath)) {
+      console.log('Loading bundled OpenAPI spec from ' + bundledPath);
+      return JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
+    }
+  } catch (error) {
+    console.error('Error loading bundled spec:', error);
+  }
+  return null;
+}
+
+/**
  * Load and bundle OpenAPI specification manually
  */
 function bundleOpenApiSpec(rootDir: string): any {
@@ -327,9 +341,15 @@ function bundleOpenApiSpec(rootDir: string): any {
 /**
  * Load and resolve OpenAPI spec from YAML files
  */
-export function loadOpenApiSpec(rootDir: string = 'backend/openapi'): any {
+export function loadOpenApiSpec(rootDir: string = 'openapi'): any {
   // Find the correct path to the OpenAPI files
   const openapiPath = findOpenApiPath(rootDir);
+
+
+  const bundledSpec = loadBundledSpec();
+  if (bundledSpec) {
+    return bundledSpec;
+  }
   
   // If we couldn't find the OpenAPI files, return a mock spec
   if (!openapiPath) {
