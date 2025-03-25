@@ -6,7 +6,7 @@
     "esModuleInterop": true,
     "lib": ["ESNext"],
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDir": "./src",
     "removeComments": true,
     "typeRoots": [
       "./node_modules/@types",
@@ -23,11 +23,11 @@
     "baseUrl": ".",
     "paths": {
       "@prisma/client": ["./prisma/generated/client"],
-      "common/*": ["./types/common/*"],
-      "dtos/*": ["./types/dtos/*"],
-      "models/*": ["./types/models/*"]
+      "common/*": ["src/types/common/*"],
+      "dtos/*": ["src/types/dtos/*"],
+      "models/*": ["src/types/models/*"]
     }
   },
-  "include": ["**/*.ts", "jest.setup.js"],
-  "exclude": ["node_modules", "**/*.test.ts", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

@@ -9,7 +9,7 @@ dotenv.config();
 
 import { bootstrap } from './core/Bootstrapper.js';
 import { DiContainer } from './core/DiContainer.js';
-import { Application } from './Application.js';
+import initializeApp  from './Application.js';
 import { ILoggingService } from './interfaces/ILoggingService.js';
 
 async function main() {
@@ -22,9 +22,7 @@ async function main() {
     logger.info('Starting application...');
     
     // Create and start application
-    const port = parseInt(process.env.PORT || '5000', 10);
-    const app = new Application(container, port);
-    await app.start();
+    await initializeApp();
     
     logger.info('Application started successfully');
   } catch (error) {
