@@ -127,8 +127,8 @@ model CustomerLog {
   action     String   @db.Text
   details    String?  @db.Text
   createdAt  DateTime @default(now()) @db.Timestamp(6)
-  user       User?    @relation(fields: [userId], references: [id])
-  customer   Customer @relation(fields: [customerId], references: [id])
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 }
 
 model Service {
@@ -154,8 +154,8 @@ model ServiceLog {
   action      String   @db.VarChar(255)
   details     String?  @db.Text
   createdAt   DateTime @default(now()) @db.Timestamp(6)
-  user        User?    @relation(fields: [userId], references: [id])
-  service     Service  @relation(fields: [serviceId], references: [id])
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 }
 
 model Project {
@@ -246,7 +246,7 @@ model AppointmentLog {
   action        String   @db.Text
   details       String?  @db.Text
   createdAt     DateTime @default(now()) @db.Timestamp(6)
-  user          User     @relation(fields: [userId], references: [id])
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 //==============================================================================
@@ -335,7 +335,7 @@ model RequestLog {
   action    String   @db.VarChar(255)
   details   String?  @db.Text
   createdAt DateTime @default(now()) @db.Timestamp(6)
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Notification {

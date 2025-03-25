@@ -520,6 +520,18 @@ customers-id:
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '400':
+        description: Validation error or business logic constraint
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
+      '409':
+        description: Cannot delete customer due to active related records
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
 
 customers-id-notes:
   post:
