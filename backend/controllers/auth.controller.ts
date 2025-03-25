@@ -4,7 +4,7 @@
  * Handles user authentication operations such as login, logout, and token refresh.
  */
 import { Request, Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../types/controller.types.js';
+import { AuthenticatedRequest, CustomRequest } from '../types/controller.types.js';
 import { 
   LoginDTO, 
   AuthResponseDTO, 
@@ -33,7 +33,7 @@ import crypto from 'crypto';
  * @route POST /api/v1/auth/login
  */
 export const login = asyncHandler(async (
-  req: Request, 
+  req: CustomRequest, 
   res: Response
 ): Promise<void> => {
   const { email, password, remember = false } = req.validatedData as LoginDTO;
@@ -103,6 +103,8 @@ export const login = asyncHandler(async (
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
     expiresIn: tokens.expiresIn,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     user: {
       id: user.id,
       name: user.name,
@@ -128,7 +130,7 @@ export const login = asyncHandler(async (
  * @route POST /api/v1/auth/refresh-token
  */
 export const refreshToken = asyncHandler(async (
-  req: Request, 
+  req: CustomRequest, 
   res: Response
 ): Promise<void> => {
   const { refreshToken: token } = req.validatedData as RefreshTokenDTO;
@@ -212,7 +214,9 @@ export const refreshToken = asyncHandler(async (
     id: refreshTokenDoc.user.id,
     accessToken: newTokens.accessToken,
     refreshToken: isTokenRotationEnabled() ? newTokens.refreshToken : token,
-    expiresIn: newTokens.expiresIn
+    expiresIn: newTokens.expiresIn,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
   
   // Send response
@@ -228,7 +232,7 @@ export const refreshToken = asyncHandler(async (
  * @route POST /api/v1/auth/forgot-password
  */
 export const forgotPassword = asyncHandler(async (
-  req: Request, 
+  req: CustomRequest, 
   res: Response
 ): Promise<void> => {
   const { email } = req.validatedData as ForgotPasswordDTO;
@@ -302,7 +306,7 @@ export const forgotPassword = asyncHandler(async (
  * @route GET /api/v1/auth/reset-token/:token
  */
 export const validateResetToken = asyncHandler(async (
-  req: Request, 
+  req: CustomRequest, 
   res: Response
 ): Promise<void> => {
   const { token } = req.params;
@@ -335,7 +339,7 @@ export const validateResetToken = asyncHandler(async (
  * @route POST /api/v1/auth/reset-password/:token
  */
 export const resetPassword = asyncHandler(async (
-  req: Request, 
+  req: CustomRequest, 
   res: Response
 ): Promise<void> => {
   const { token } = req.params;

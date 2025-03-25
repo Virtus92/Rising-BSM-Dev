@@ -34,6 +34,26 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
+ * Extension of Express Request with validated data but no authentication
+ */
+export interface CustomRequest extends Request {
+  /**
+   * Validated request body
+   */
+  validatedData?: any;
+  
+  /**
+   * Validated query parameters
+   */
+  validatedQuery?: any;
+  
+  /**
+   * Validated URL parameters
+   */
+  validatedParams?: any;
+}
+
+/**
  * Controller handler function type
  */
 export type ControllerHandler = (
