@@ -27,7 +27,7 @@ import { inject } from '../config/dependency-container.js';
 import { PrismaClient } from '@prisma/client';
 import { DeleteOptions, UpdateOptions } from '../types/service.types.js';
 import { EntityLogger } from '../utils/data.utils.js';
-import { IUserService } from '../types/interfaces/user-service.interface.js';
+import { IUserService } from '../src/interfaces/user-service.interface.js';
 
 /**
  * Service for user operations
