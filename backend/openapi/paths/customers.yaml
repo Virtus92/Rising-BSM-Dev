@@ -41,15 +41,42 @@ customers:
         schema:
           type: string
           enum: [name, email, company, city, status, createdAt]
-          default: name
+          default: createdAt
         description: Field to sort by
       - in: query
         name: sortDirection
         schema:
           type: string
           enum: [asc, desc]
-          default: asc
+          default: desc
         description: Sort direction
+      - in: query
+        name: city
+        schema:
+          type: string
+        description: Filter by city
+      - in: query
+        name: postalCode
+        schema:
+          type: string
+        description: Filter by postal code
+      - in: query
+        name: newsletter
+        schema:
+          type: boolean
+        description: Filter by newsletter subscription
+      - in: query
+        name: startDate
+        schema:
+          type: string
+          format: date
+        description: Filter by creation date (from)
+      - in: query
+        name: endDate
+        schema:
+          type: string
+          format: date
+        description: Filter by creation date (to)
     responses:
       '200':
         description: List of customers
@@ -87,6 +114,8 @@ customers:
                           type: string
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
   post:
     tags:
@@ -132,6 +161,8 @@ customers:
           application/json:
             schema:
               $ref: '../schemas/error.yaml#/Error'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
 customers-statistics:
   get:
@@ -164,6 +195,8 @@ customers-statistics:
                       format: date-time
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
 customers-search:
   get:
@@ -223,6 +256,8 @@ customers-search:
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
 customers-bulk-update:
   post:
@@ -285,6 +320,8 @@ customers-bulk-update:
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
       '403':
         $ref: '../openapi.yaml#/components/responses/ForbiddenError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
 customers-export:
   get:
@@ -346,6 +383,8 @@ customers-export:
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
 customers-id:
   get:
@@ -387,6 +426,8 @@ customers-id:
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
   put:
     tags:
@@ -436,11 +477,13 @@ customers-id:
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
       '409':
-        description: Email already exists
+        description: Email already exists or operation conflicts with business rules
         content:
           application/json:
             schema:
               $ref: '../schemas/error.yaml#/Error'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
   delete:
     tags:
@@ -486,6 +529,14 @@ customers-id:
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '409':
+        description: Cannot delete customer with active projects
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
 customers-id-notes:
   post:
@@ -523,8 +574,6 @@ customers-id-notes:
                   properties:
                     success:
                       type: boolean
-                    message:
-                      type: string
                 message:
                   type: string
                   example: "Note added successfully"
@@ -540,6 +589,8 @@ customers-id-notes:
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
 customers-id-status:
   patch:
@@ -579,8 +630,6 @@ customers-id-status:
                       type: integer
                     status:
                       type: string
-                    statusLabel:
-                      type: string
                 message:
                   type: string
                   example: "Customer status updated successfully"
@@ -596,6 +645,14 @@ customers-id-status:
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '409':
+        description: Cannot update status due to business rule violations
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/error.yaml#/Error'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
 customers-id-insights:
   get:
@@ -623,51 +680,7 @@ customers-id-insights:
                   type: boolean
                   example: true
                 data:
-                  type: object
-                  properties:
-                    customer:
-                      $ref: '../schemas/customers.yaml#/Customer'
-                    projectStats:
-                      type: object
-                      properties:
-                        total:
-                          type: integer
-                        byStatus:
-                          type: object
-                          additionalProperties:
-                            type: integer
-                    appointmentStats:
-                      type: object
-                      properties:
-                        total:
-                          type: integer
-                        upcoming:
-                          type: integer
-                    financials:
-                      type: object
-                      properties:
-                        totalRevenue:
-                          type: string
-                        averageProjectValue:
-                          type: string
-                    activity:
-                      type: object
-                      properties:
-                        recent:
-                          type: array
-                          items:
-                            type: object
-                            properties:
-                              action:
-                                type: string
-                              date:
-                                type: string
-                              by:
-                                type: string
-                              details:
-                                type: string
-                        lastUpdate:
-                          type: string
+                  $ref: '../schemas/customers.yaml#/CustomerInsights'
                 message:
                   type: string
                   example: "Customer insights retrieved successfully"
@@ -681,6 +694,8 @@ customers-id-insights:
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
 customers-id-similar:
   get:
@@ -731,6 +746,8 @@ customers-id-similar:
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'
 
 customers-id-history:
   get:
@@ -760,20 +777,7 @@ customers-id-history:
                 data:
                   type: array
                   items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      action:
-                        type: string
-                      timestamp:
-                        type: string
-                      relativeTime:
-                        type: string
-                      user:
-                        type: string
-                      details:
-                        type: string
+                    $ref: '../schemas/customers.yaml#/CustomerHistoryItem'
                 message:
                   type: string
                   example: "Customer history retrieved successfully"
@@ -787,3 +791,5 @@ customers-id-history:
         $ref: '../openapi.yaml#/components/responses/NotFoundError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+      '500':
+        $ref: '../openapi.yaml#/components/responses/ServerError'

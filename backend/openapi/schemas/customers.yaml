@@ -5,6 +5,10 @@ Customer:
     - name
     - status
     - type
+    - country
+    - newsletter
+    - createdAt
+    - updatedAt
   properties:
     id:
       type: integer
@@ -20,6 +24,7 @@ Customer:
       type: string
       format: email
       description: Customer email address
+      nullable: true
     phone:
       type: string
       nullable: true
@@ -38,7 +43,6 @@ Customer:
       description: City
     country:
       type: string
-      nullable: true
       description: Country (defaults to Austria)
     notes:
       type: string
@@ -51,19 +55,10 @@ Customer:
       type: string
       enum: [active, inactive, deleted]
       description: Customer status
-    statusLabel:
-      type: string
-      description: Formatted status label
-    statusClass:
-      type: string
-      description: CSS class for status
     type:
       type: string
       enum: [private, business]
       description: Customer type
-    typeLabel:
-      type: string
-      description: Formatted customer type label
     createdAt:
       type: string
       format: date-time
@@ -239,11 +234,8 @@ CustomerWithDetails:
                 type: string
               startDate:
                 type: string
+                format: date
               status:
-                type: string
-              statusLabel:
-                type: string
-              statusClass:
                 type: string
         appointments:
           type: array
@@ -256,11 +248,8 @@ CustomerWithDetails:
                 type: string
               appointmentDate:
                 type: string
+                format: date
               status:
-                type: string
-              statusLabel:
-                type: string
-              statusClass:
                 type: string
         notes:
           type: array
@@ -272,8 +261,6 @@ CustomerWithDetails:
               text:
                 type: string
               userName:
-                type: string
-              formattedDate:
                 type: string
               createdAt:
                 type: string
@@ -287,24 +274,19 @@ CustomerStatistics:
       description: Total number of customers
     byStatus:
       type: object
-      properties:
-        active:
-          type: integer
-        inactive:
-          type: integer
-        deleted:
-          type: integer
       additionalProperties:
         type: integer
+      example:
+        active: 120
+        inactive: 30
+        deleted: 5
     byType:
       type: object
-      properties:
-        private:
-          type: integer
-        business:
-          type: integer
       additionalProperties:
         type: integer
+      example:
+        private: 87
+        business: 68
     trend:
       type: object
       properties:
@@ -318,3 +300,66 @@ CustomerStatistics:
           type: number
           format: float
           description: Growth rate percentage
+
+CustomerInsights:
+  type: object
+  properties:
+    customer:
+      $ref: '#/Customer'
+    projectStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+    appointmentStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        upcoming:
+          type: integer
+    financials:
+      type: object
+      properties:
+        totalRevenue:
+          type: string
+        averageProjectValue:
+          type: string
+    activity:
+      type: object
+      properties:
+        recent:
+          type: array
+          items:
+            type: object
+            properties:
+              action:
+                type: string
+              date:
+                type: string
+              by:
+                type: string
+              details:
+                type: string
+        lastUpdate:
+          type: string
+
+CustomerHistoryItem:
+  type: object
+  properties:
+    id:
+      type: integer
+    action:
+      type: string
+    timestamp:
+      type: string
+    relativeTime:
+      type: string
+    user:
+      type: string
+    details:
+      type: string
