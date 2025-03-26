@@ -5,11 +5,11 @@ import { ValidationMiddleware } from '../middleware/ValidationMiddleware.js';
 import { IValidationService } from '../interfaces/IValidationService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { 
-  loginValidation, 
-  refreshTokenValidation,
-  forgotPasswordValidation,
-  resetPasswordValidation 
-} from '../dtos/auth.dto.js';
+  loginValidationSchema as loginValidation, 
+  refreshTokenValidationSchema as refreshTokenValidation,
+  forgotPasswordValidationSchema as forgotPasswordValidation,
+  resetPasswordValidationSchema as resetPasswordValidation 
+} from '../dtos/AuthDtos.js';
 export function createAuthRoutes(
   authController: AuthController, 
   authMiddleware: AuthMiddleware,

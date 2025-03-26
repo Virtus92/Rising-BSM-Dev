@@ -175,56 +175,16 @@ export class Bootstrapper {
     
     // Notification repository
     this.container.register<INotificationRepository>('NotificationRepository', () => {
-      const notificationRepo = new NotificationRepository(prisma, logger, errorHandler);
-      
-      // Create a wrapper that adapts the implementation to the interface
-      const wrapper: INotificationRepository = {
-        ...notificationRepo as unknown as INotificationRepository,
-        // Override the bulkUpdate method to match the interface
-        bulkUpdate: async (ids: number[], data: Partial<any>): Promise<number> => {
-          // Convert parameters to the format expected by the implementation
-          const updateData = ids.map(id => ({ id, data }));
-          const results = await notificationRepo.bulkUpdate(updateData);
-          // Return the count of updated records
-          return results.length;
-        }
-      };
-      
-      return wrapper;
+      return new NotificationRepository(prisma, logger, errorHandler) as INotificationRepository;
     }, { singleton: true });
     
     // Customer repository
-    // Customer repository
     this.container.register<ICustomerRepository>('CustomerRepository', () => {
-      const customerRepo = new CustomerRepository(prisma, logger, errorHandler);
-      
-      // Create a wrapper that adapts the implementation to the interface
-      const wrapper: ICustomerRepository = {
-        ...customerRepo as unknown as ICustomerRepository,
-        // Add the missing logActivity method to match the interface
-        logActivity: async (
-          userId: number, 
-          actionType: string, 
-          details?: string,
-          ipAddress?: string
-        ): Promise<any> => {
-          logger.info(`User activity: ${actionType}`, {
-            userId,
-            actionType,
-            details,
-            ipAddress,
-            entity: 'Customer'
-          });
-          return Promise.resolve();
-        }
-      };
-      
-      return wrapper;
+      return  new CustomerRepository(prisma, logger, errorHandler);
     }, { singleton: true });
       
       // Refresh token repository
     this.container.register<IRefreshTokenRepository>('RefreshTokenRepository', () => {
-      // Simply return the repository instance directly - it already implements all methods
       return new RefreshTokenRepository(prisma, logger, errorHandler);
     }, { singleton: true });
       

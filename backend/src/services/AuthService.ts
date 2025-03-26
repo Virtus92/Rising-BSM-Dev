@@ -15,9 +15,9 @@ import {
 import { ServiceOptions } from '../interfaces/IBaseService.js';
 import { RefreshToken } from '../entities/RefreshToken.js';
 import { User, UserStatus } from '../entities/User.js';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import * as jwt from 'jsonwebtoken';
+import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 
 /**
  * AuthService
@@ -386,22 +386,48 @@ export class AuthService implements IAuthService {
     try {
       let tokenCount = 0;
       
+      // Log debugging information
+      this.logger.debug('Processing logout', { 
+        userId, 
+        hasRefreshToken: !!refreshToken,
+        ipAddress: options?.ipAddress
+      });
+      
       // If a specific refresh token is provided, invalidate only that token
       if (refreshToken) {
+        this.logger.debug('Looking up refresh token', { tokenSubstring: refreshToken.substring(0, 10) + '...' });
+        
         const token = await this.refreshTokenRepository.findByToken(refreshToken);
         
-        if (token && token.userId === userId) {
-          token.revoke(options?.ipAddress);
-          await this.refreshTokenRepository.update(token.token, {
-            isRevoked: true,
-            revokedAt: new Date(),
-            revokedByIp: options?.ipAddress
+        if (token) {
+          this.logger.debug('Found token', { 
+            tokenId: token.token.substring(0, 10) + '...',
+            tokenUserId: token.userId,
+            requestUserId: userId,
+            isActive: token.isActive()
           });
-          tokenCount = 1;
+          
+          if (token.userId === userId) {
+            token.revoke(options?.ipAddress);
+            await this.refreshTokenRepository.update(token.token, {
+              isRevoked: true,
+              revokedAt: new Date(),
+              revokedByIp: options?.ipAddress
+            });
+            tokenCount = 1;
+            this.logger.debug('Successfully revoked token');
+          } else {
+            this.logger.warn('Token user ID mismatch', { tokenUserId: token.userId, requestUserId: userId });
+          }
+        } else {
+          this.logger.warn('Refresh token not found in database');
         }
       } else {
         // If no token provided, invalidate all refresh tokens for the user
+        this.logger.debug('No specific token provided, invalidating all tokens for user', { userId });
+        
         const tokens = await this.refreshTokenRepository.findByUserId(userId);
+        this.logger.debug('Found tokens for user', { count: tokens.length });
         
         for (const token of tokens) {
           if (token.isActive()) {
@@ -414,6 +440,8 @@ export class AuthService implements IAuthService {
             tokenCount++;
           }
         }
+        
+        this.logger.debug('Revoked tokens', { count: tokenCount });
       }
       
       return { success: true, tokenCount };

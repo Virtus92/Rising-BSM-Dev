@@ -51,4 +51,13 @@ export interface INotificationRepository extends IBaseRepository<Notification, n
    * @returns Promise with number of notifications deleted
    */
   deleteOld(userId: number, olderThan: Date, onlyRead?: boolean): Promise<number>;
+
+  /**
+   * Update multiple notifications at once
+   * 
+   * @param ids - Array of notification IDs to update
+   * @param data - Data to update for all notifications
+   * @returns Promise with number of notifications updated
+   */
+  bulkUpdate(ids: number[], data: Partial<Notification>): Promise<number>;
 }

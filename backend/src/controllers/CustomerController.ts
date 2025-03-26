@@ -10,7 +10,7 @@ import {
   CustomerNoteCreateDto,
   CustomerFilterParams
 } from '../dtos/CustomerDtos.js';
-import { AuthenticatedRequest } from '../types/RequestTypes.js';
+import { AuthenticatedRequest } from '../interfaces/IAuthTypes.js';
 
 /**
  * Implementation of ICustomerController

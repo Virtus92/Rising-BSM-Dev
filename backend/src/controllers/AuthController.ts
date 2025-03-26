@@ -1,38 +1,35 @@
-/**
- * AuthController
- * 
- * Handles authentication-related HTTP requests.
- * Implements the IAuthController interface.
- */
+// src/controllers/AuthController.ts
+
 import { Request, Response } from 'express';
 import { IAuthController } from '../interfaces/IAuthController.js';
 import { IAuthService } from '../interfaces/IAuthService.js';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
+import { BaseController } from '../core/BaseController.js';
+import { AuthenticatedRequest } from '../interfaces/IAuthTypes.js';
 import { 
   LoginDto, 
   RefreshTokenDto, 
   ForgotPasswordDto, 
   ResetPasswordDto 
 } from '../dtos/AuthDtos.js';
-import { AuthenticatedRequest } from '../types/RequestTypes.js';
 
-export class AuthController implements IAuthController {
+export class AuthController extends BaseController implements IAuthController {
   /**
-   * Creates a new AuthController instance
+   * Erstellt eine neue AuthController-Instanz
    * 
-   * @param authService - Authentication service
-   * @param logger - Logging service
-   * @param errorHandler - Error handler
+   * @param authService - Authentifizierungsservice
+   * @param logger - Logging-Service
+   * @param errorHandler - Fehlerbehandlung
    */
   constructor(
     private readonly authService: IAuthService,
-    private readonly logger: ILoggingService,
-    private readonly errorHandler: IErrorHandler
+    logger: ILoggingService,
+    errorHandler: IErrorHandler
   ) {
-    this.logger.debug('Initialized AuthController');
+    super(logger, errorHandler);
     
-    // Bind all methods to ensure 'this' context is preserved
+    // Methoden binden, um 'this'-Kontext zu erhalten
     this.login = this.login.bind(this);
     this.refreshToken = this.refreshToken.bind(this);
     this.forgotPassword = this.forgotPassword.bind(this);
@@ -43,193 +40,176 @@ export class AuthController implements IAuthController {
   }
 
   /**
-   * Handle user login
+   * Benutzer-Login behandeln
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   public async login(req: Request, res: Response): Promise<void> {
     try {
       const loginData = req.body as LoginDto;
       
-      // Authenticate user
+      // Benutzer authentifizieren
       const result = await this.authService.login(loginData, { ipAddress: req.ip });
       
-      // Send response
-      res.status(200).json({
-        success: true,
-        data: result,
-        message: 'Login successful'
-      });
+      // Antwort senden
+      this.sendSuccessResponse(res, result, 'Login erfolgreich');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
   /**
-   * Handle token refresh
+   * Token-Aktualisierung behandeln
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   public async refreshToken(req: Request, res: Response): Promise<void> {
     try {
       const refreshTokenData = req.body as RefreshTokenDto;
       
-      // Refresh token
+      // Token aktualisieren
       const result = await this.authService.refreshToken(refreshTokenData, { ipAddress: req.ip });
       
-      // Send response
-      res.status(200).json({
-        success: true,
-        data: result,
-        message: 'Token refreshed successfully'
-      });
+      // Antwort senden
+      this.sendSuccessResponse(res, result, 'Token erfolgreich aktualisiert');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
   /**
-   * Handle forgot password request
+   * "Passwort vergessen"-Anfrage behandeln
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   public async forgotPassword(req: Request, res: Response): Promise<void> {
     try {
       const forgotPasswordData = req.body as ForgotPasswordDto;
       
-      // Process forgot password request
+      // "Passwort vergessen"-Anfrage verarbeiten
       const result = await this.authService.forgotPassword(forgotPasswordData, {
         ipAddress: req.ip,
         origin: req.headers.origin || `${req.protocol}://${req.get('host')}`
       });
       
-      // Send response
-      res.status(200).json({
-        success: true,
-        data: result,
-        message: 'If the email exists in our system, password reset instructions have been sent'
-      });
+      // Antwort senden
+      this.sendSuccessResponse(res, result, 'Falls die E-Mail-Adresse in unserem System existiert, wurden Anweisungen zum Zurücksetzen des Passworts gesendet');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
   /**
-   * Validate reset token
+   * Reset-Token validieren
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   public async validateResetToken(req: Request, res: Response): Promise<void> {
     try {
       const { token } = req.params;
       
-      // Validate token
+      // Token validieren
       const isValid = await this.authService.validateResetToken(token);
       
-      // Send response
-      res.status(200).json({
-        success: true,
-        data: { valid: isValid },
-        message: isValid ? 'Token is valid' : 'Token is invalid or has expired'
-      });
+      // Antwort senden
+      this.sendSuccessResponse(
+        res, 
+        { valid: isValid }, 
+        isValid ? 'Token ist gültig' : 'Token ist ungültig oder abgelaufen'
+      );
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
   /**
-   * Reset password
+   * Passwort zurücksetzen
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   public async resetPassword(req: Request, res: Response): Promise<void> {
     try {
       const { token } = req.params;
       const resetPasswordData = req.body as ResetPasswordDto;
       
-      // Reset password
+      // Passwort zurücksetzen
       const result = await this.authService.resetPassword({
         token,
         ...resetPasswordData
       }, { ipAddress: req.ip });
       
-      // Send response
-      res.status(200).json({
-        success: true,
-        data: result,
-        message: 'Password has been reset successfully'
-      });
+      // Antwort senden
+      this.sendSuccessResponse(res, result, 'Passwort wurde erfolgreich zurückgesetzt');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
   /**
-   * Handle user logout
+   * Benutzer-Logout behandeln
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   public async logout(req: Request, res: Response): Promise<void> {
     try {
-      const authReq = req as AuthenticatedRequest;
+      const user = this.getAuthenticatedUser(req);
       
-      if (!authReq.user) {
-        throw this.errorHandler.createUnauthorizedError('Authentication required');
+      if (!user) {
+        throw this.errorHandler.createUnauthorizedError('Authentifizierung erforderlich');
       }
       
-      // Get refresh token from body
+      // Refresh-Token aus Body holen
       const { refreshToken } = req.body;
       
-      // Logout user
-      const result = await this.authService.logout(authReq.user.id, refreshToken, { ipAddress: req.ip });
-      
-      // Send response
-      res.status(200).json({
-        success: true,
-        data: result,
-        message: 'Logout successful'
+      // Debug-Informationen protokollieren
+      this.logger.debug('Logout-Versuch', { 
+        userId: user.id, 
+        hasRefreshToken: !!refreshToken,
+        refreshTokenLength: refreshToken ? refreshToken.length : 0
       });
+      
+      // Benutzer abmelden
+      const result = await this.authService.logout(user.id, refreshToken, { ipAddress: req.ip });
+      
+      // Antwort senden
+      this.sendSuccessResponse(res, result, 'Logout erfolgreich');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
   /**
-   * Get reset token for testing (development only)
+   * Reset-Token für Tests abrufen (nur Entwicklung)
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   public async getResetToken(req: Request, res: Response): Promise<void> {
     try {
-      // Check if we're in development mode
+      // Prüfen, ob wir im Entwicklungsmodus sind
       if (process.env.NODE_ENV !== 'development') {
-        throw this.errorHandler.createForbiddenError('This endpoint is only available in development mode');
+        throw this.errorHandler.createForbiddenError('Dieser Endpunkt ist nur im Entwicklungsmodus verfügbar');
       }
       
       const { email } = req.query;
       
       if (!email || typeof email !== 'string') {
-        throw this.errorHandler.createValidationError('Validation failed', ['Email is required']);
+        throw this.errorHandler.createValidationError('Validierung fehlgeschlagen', ['E-Mail ist erforderlich']);
       }
       
-      // Get reset token for testing
+      // Reset-Token für Tests abrufen
       const result = await this.authService.getResetTokenForTesting(email);
       
-      // Send response
-      res.status(200).json({
-        success: true,
-        data: result,
-        message: 'Reset token retrieved for testing'
-      });
+      // Antwort senden
+      this.sendSuccessResponse(res, result, 'Reset-Token für Tests abgerufen');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 }

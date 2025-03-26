@@ -38,9 +38,7 @@ RUN npx @redocly/cli bundle /app/openapi/openapi.yaml -o /app/dist/swagger.json
 # Copy the rest of the application
 COPY . .
 
-RUN chmod +x wait-for-db.sh
-
-RUN npm 
+RUN chmod +x scripts/wait-for-db.sh
 
 # Expose port and start application
 EXPOSE 5000

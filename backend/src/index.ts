@@ -6,7 +6,7 @@ import config from './config/index.js';
 import { bootstrap } from './core/Bootstrapper.js';
 import { setupMiddleware } from './core/middleware.js';
 import { ILoggingService } from './interfaces/ILoggingService.js';
-import { SwaggerConfig } from './config/SwaggerConfig.js';
+import { validateSecurityConfig } from './config/security.js';
 
 async function main() {
   // Erstelle Express-App
@@ -21,6 +21,9 @@ async function main() {
   const swaggerConfig = container.resolve<any>('SwaggerConfig');
   const errorMiddleware = container.resolve<any>('ErrorMiddleware');
   
+  // Validiere Sicherheitskonfiguration
+  validateSecurityConfig(logger);
+
   // Richte Middleware ein
   setupMiddleware(app, container);
   
