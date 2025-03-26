@@ -6,14 +6,20 @@ import { createFactory, DiContainer } from './core/DiContainer.js';
 // Repositories
 import { CustomerRepository } from './repositories/CustomerRepository.js';
 import { NotificationRepository } from './repositories/NotificationRepository.js';
+import { UserRepository } from './repositories/UserRepository.js';
+import { RefreshTokenRepository } from './repositories/RefreshTokenRepository.js';
 
 // Services
 import { CustomerService } from './services/CustomerService.js';
 import { NotificationService } from './services/NotificationService.js';
+import { AuthService } from './services/AuthService.js';
+import { UserService } from './services/UserService.js';
 
 // Controllers
 import { CustomerController } from './controllers/CustomerController.js';
 import { NotificationController } from './controllers/NotificationController.js';
+import { AuthController } from './controllers/AuthController.js';
+import { UserController } from './controllers/UserController.js';
 
 // Create repository factories
 export const createCustomerRepositoryFactory = () => createFactory(
@@ -23,6 +29,16 @@ export const createCustomerRepositoryFactory = () => createFactory(
 
 export const createNotificationRepositoryFactory = () => createFactory(
   NotificationRepository,
+  ['PrismaClient', 'LoggingService', 'ErrorHandler']
+);
+
+export const createUserRepositoryFactory = () => createFactory(
+  UserRepository,
+  ['PrismaClient', 'LoggingService', 'ErrorHandler']
+);
+
+export const createRefreshTokenRepositoryFactory = () => createFactory(
+  RefreshTokenRepository,
   ['PrismaClient', 'LoggingService', 'ErrorHandler']
 );
 
@@ -37,6 +53,16 @@ export const createNotificationServiceFactory = () => createFactory(
   ['NotificationRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
 );
 
+export const createAuthServiceFactory = () => createFactory(
+  AuthService,
+  ['UserRepository', 'RefreshTokenRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
+);
+
+export const createUserServiceFactory = () => createFactory(
+  UserService,
+  ['UserRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
+);
+
 // Create controller factories
 export const createCustomerControllerFactory = () => createFactory(
   CustomerController,
@@ -48,6 +74,16 @@ export const createNotificationControllerFactory = () => createFactory(
   ['NotificationService', 'LoggingService', 'ErrorHandler']
 );
 
+export const createAuthControllerFactory = () => createFactory(
+  AuthController,
+  ['AuthService', 'LoggingService', 'ErrorHandler']
+);
+
+export const createUserControllerFactory = () => createFactory(
+  UserController,
+  ['UserService', 'LoggingService', 'ErrorHandler']
+);
+
 /**
  * Register all repositories with the DI container
  * 
@@ -56,6 +92,8 @@ export const createNotificationControllerFactory = () => createFactory(
 export function registerRepositories(container: DiContainer): void {
   container.register('CustomerRepository', createCustomerRepositoryFactory(), { singleton: true });
   container.register('NotificationRepository', createNotificationRepositoryFactory(), { singleton: true });
+  container.register('UserRepository', createUserRepositoryFactory(), { singleton: true });
+  container.register('RefreshTokenRepository', createRefreshTokenRepositoryFactory(), { singleton: true });
 }
 
 /**
@@ -66,6 +104,8 @@ export function registerRepositories(container: DiContainer): void {
 export function registerServices(container: DiContainer): void {
   container.register('CustomerService', createCustomerServiceFactory(), { singleton: true });
   container.register('NotificationService', createNotificationServiceFactory(), { singleton: true });
+  container.register('AuthService', createAuthServiceFactory(), { singleton: true });
+  container.register('UserService', createUserServiceFactory(), { singleton: true });
 }
 
 /**
@@ -76,6 +116,8 @@ export function registerServices(container: DiContainer): void {
 export function registerControllers(container: DiContainer): void {
   container.register('CustomerController', createCustomerControllerFactory(), { singleton: true });
   container.register('NotificationController', createNotificationControllerFactory(), { singleton: true });
+  container.register('AuthController', createAuthControllerFactory(), { singleton: true });
+  container.register('UserController', createUserControllerFactory(), { singleton: true });
 }
 
 /**

@@ -415,15 +415,7 @@ export class AuthService implements IAuthService {
           }
         }
       }
-
-      // Log user activity
-      await this.userRepository.logActivity(
-        userId,
-        'logout',
-        'User logged out',
-        options?.ipAddress
-      );
-
+      
       return { success: true, tokenCount };
     } catch (error) {
       this.logger.error('Logout failed', error instanceof Error ? error : String(error));
@@ -432,101 +424,78 @@ export class AuthService implements IAuthService {
   }
 
   /**
-   * Get reset token for testing (development only)
-   * 
-   * @param email - User email
-   * @returns Reset token information
-   */
-  async getResetTokenForTesting(email: string): Promise<any> {
-    if (process.env.NODE_ENV !== 'development') {
-      throw this.errorHandler.createForbiddenError('This endpoint is only available in development mode');
-    }
-
-    try {
-      // Find user by email
-      const user = await this.userRepository.findByEmail(email);
-      
-      if (!user) {
-        throw this.errorHandler.createNotFoundError('No user found with this email');
-      }
-
-      // In a real implementation, get the token from the database
-      // For this example, we'll generate a new one
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      
-      return {
-        email: user.email,
-        userId: user.id,
-        resetToken,
-        resetUrl: `/reset-password?token=${resetToken}`
-      };
-    } catch (error) {
-      this.logger.error('Get reset token for testing failed', error instanceof Error ? error : String(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Generate access and refresh tokens
+   * Generate access and refresh tokens for a user
    * 
    * @param user - User entity
-   * @param ipAddress - IP address of the client
+   * @param ipAddress - IP address of the requester
    * @returns Token pair
    */
-  private async generateTokens(user: User, ipAddress?: string): Promise<{ accessToken: string; refreshToken: string }> {
-    // Generate access token
+  private async generateTokens(user: any, ipAddress?: string): Promise<{ accessToken: string; refreshToken: string }> {
     const accessToken = this.generateAccessToken(user);
     
-    // Generate refresh token
+    // Generate a refresh token
     const refreshToken = crypto.randomBytes(40).toString('hex');
     
-    // Calculate expiry date
-    const expiryDate = this.calculateExpiryDate(this.JWT_REFRESH_EXPIRES_IN);
-    
     // Save refresh token in database
-    await this.refreshTokenRepository.create({
+    const refreshTokenEntity = {
       token: refreshToken,
       userId: user.id,
-      expiresAt: expiryDate,
-      createdAt: new Date(),
-      createdByIp: ipAddress,
-      isRevoked: false
-    });
+      expiresAt: new Date(Date.now() + this.getTokenExpiryTime(this.JWT_REFRESH_EXPIRES_IN)),
+      createdByIp: ipAddress
+    };
+    
+    await this.refreshTokenRepository.create(refreshTokenEntity);
     
     return { accessToken, refreshToken };
   }
 
   /**
-   * Generate JWT access token
+   * Generate an access token for a user
    * 
    * @param user - User entity
-   * @returns JWT token
+   * @returns Access token string
    */
-  private generateAccessToken(user: User): string {
+  private generateAccessToken(user: any): string {
+    // Create token payload
     const payload = {
-      userId: user.id,
-      role: user.role,
+      sub: user.id,
       email: user.email,
-      name: user.getFullName()
+      role: user.role,
+      type: 'access'
     };
     
-    // Fixed type signature for jwt.sign
-    return jwt.sign(
-      payload, 
-      this.JWT_SECRET as jwt.Secret, 
-      { expiresIn: this.JWT_EXPIRES_IN  } as jwt.SignOptions
-    );
+    // Sign the token
+    return jwt.sign(payload, this.JWT_SECRET, { expiresIn: this.JWT_EXPIRES_IN }as jwt.SignOptions);
   }
 
   /**
-   * Verify password against hash
+   * Convert token expiry time string to milliseconds
    * 
-   * @param password - Plain text password
-   * @param hash - Hashed password
+   * @param expiryString - Expiry time string (e.g., '15m', '7d')
+   * @returns Time in milliseconds
+   */
+  private getTokenExpiryTime(expiryString: string): number {
+    const unit = expiryString.charAt(expiryString.length - 1);
+    const value = parseInt(expiryString.substring(0, expiryString.length - 1), 10);
+    
+    switch(unit) {
+      case 's': return value * 1000;
+      case 'm': return value * 60 * 1000;
+      case 'h': return value * 60 * 60 * 1000;
+      case 'd': return value * 24 * 60 * 60 * 1000;
+      default: return 15 * 60 * 1000; // Default to 15 minutes
+    }
+  }
+
+  /**
+   * Verify user password
+   * 
+   * @param plainPassword - Plain text password
+   * @param hashedPassword - Hashed password
    * @returns Whether password is valid
    */
-  private async verifyPassword(password: string, hash: string): Promise<boolean> {
-    return await bcrypt.compare(password, hash);
+  private async verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
+    return bcrypt.compare(plainPassword, hashedPassword);
   }
 
   /**
@@ -536,8 +505,8 @@ export class AuthService implements IAuthService {
    * @returns Hashed password
    */
   private async hashPassword(password: string): Promise<string> {
-    const saltRounds = 10;
-    return await bcrypt.hash(password, saltRounds);
+    const salt = await bcrypt.genSalt(10);
+    return bcrypt.hash(password, salt);
   }
 
   /**
@@ -547,55 +516,32 @@ export class AuthService implements IAuthService {
    * @returns Hashed token
    */
   private hashResetToken(token: string): string {
-    return crypto.createHash('sha256').update(token || '').digest('hex');
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   /**
-   * Calculate expiry date from duration string
+   * Get reset token for testing (required by IAuthService)
    * 
-   * @param duration - Duration string (e.g., '7d', '1h')
-   * @returns Expiry date
+   * @param email - User email
+   * @returns Reset token data
    */
-  private calculateExpiryDate(duration: string): Date {
-    const now = new Date();
-    const unit = duration.charAt(duration.length - 1);
-    const value = parseInt(duration.slice(0, -1));
-    
-    switch (unit) {
-      case 's': // seconds
-        return new Date(now.getTime() + value * 1000);
-      case 'm': // minutes
-        return new Date(now.getTime() + value * 60 * 1000);
-      case 'h': // hours
-        return new Date(now.getTime() + value * 60 * 60 * 1000);
-      case 'd': // days
-        return new Date(now.getTime() + value * 24 * 60 * 60 * 1000);
-      default:
-        return new Date(now.getTime() + 24 * 60 * 60 * 1000); // default to 1 day
+  async getResetTokenForTesting(email: string): Promise<any> {
+    // This is for testing purposes only and should not be used in production
+    const user = await this.userRepository.findByEmail(email);
+    if (!user) {
+      throw this.errorHandler.createNotFoundError('User not found');
     }
-  }
-
-  /**
-   * Get token expiry time in seconds
-   * 
-   * @param duration - Duration string
-   * @returns Expiry time in seconds
-   */
-  private getTokenExpiryTime(duration: string): number {
-    const unit = duration.charAt(duration.length - 1);
-    const value = parseInt(duration.slice(0, -1));
     
-    switch (unit) {
-      case 's': // seconds
-        return value;
-      case 'm': // minutes
-        return value * 60;
-      case 'h': // hours
-        return value * 60 * 60;
-      case 'd': // days
-        return value * 24 * 60 * 60;
-      default:
-        return 60 * 15; // default to 15 minutes
-    }
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = this.hashResetToken(resetToken);
+    
+    // In a real implementation, this would store the token in the database
+    
+    return {
+      token: resetToken,
+      hashedToken,
+      userId: user.id,
+      expiresAt: new Date(Date.now() + 3600000) // 1 hour
+    };
   }
 }
