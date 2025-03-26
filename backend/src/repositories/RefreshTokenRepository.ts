@@ -112,6 +112,7 @@ export class RefreshTokenRepository extends BaseRepository<RefreshToken, string>
     
     this.logger.debug('Initialized RefreshTokenRepository');
   }
+  
   /**
    * Log refresh token-related user activity
    * 
@@ -210,24 +211,6 @@ export class RefreshTokenRepository extends BaseRepository<RefreshToken, string>
   }
 
   /**
-   * Create a new refresh token
-   * 
-   * @param data - Refresh token data
-   * @returns Promise with created refresh token
-   */
-  async createRefreshToken(data: Partial<RefreshToken>): Promise<RefreshToken> {
-    try {
-      const refreshToken = await this.prisma.refreshToken.create({
-        data: this.mapToORMEntity(data)
-      });
-      return this.mapToDomainEntity(refreshToken);
-    } catch (error) {
-      this.logger.error('Error in RefreshTokenRepository.createRefreshToken', error instanceof Error ? error : String(error), { userId: data.userId });
-      throw this.handleError(error);
-    }
-  }
-
-  /**
    * Delete a refresh token
    * 
    * @param token - Token string
@@ -278,7 +261,7 @@ export class RefreshTokenRepository extends BaseRepository<RefreshToken, string>
       const now = new Date();
       
       const result = await this.prisma.refreshToken.deleteMany({
-        where: { expires: { lte: now } }
+        where: { expiresAt: { lte: now } }
       });
       
       return result.count;
@@ -411,16 +394,15 @@ export class RefreshTokenRepository extends BaseRepository<RefreshToken, string>
     }
     
     return new RefreshToken({
-      id: 0, // Provide a default value for id
       token: ormEntity.token,
       userId: ormEntity.userId,
-      expiresAt: ormEntity.expires, // Use the database column name
+      expiresAt: ormEntity.expiresAt,
+      createdAt: ormEntity.createdAt,
       createdByIp: ormEntity.createdByIp,
       isRevoked: ormEntity.isRevoked,
       revokedAt: ormEntity.revokedAt,
       revokedByIp: ormEntity.revokedByIp,
-      replacedByToken: ormEntity.replacedByToken,
-      updatedAt: new Date() // Provide a default value for updatedAt
+      replacedByToken: ormEntity.replacedByToken
     });
   }
 
@@ -436,12 +418,7 @@ export class RefreshTokenRepository extends BaseRepository<RefreshToken, string>
     
     Object.entries(domainEntity).forEach(([key, value]) => {
       if (value !== undefined) {
-        // Handle specific field name mappings
-        if (key === 'expiresAt') {
-          result.expires = value; // Map expiresAt to expires for the database
-        } else {
-          result[key] = value;
-        }
+        result[key] = value;
       }
     });
     

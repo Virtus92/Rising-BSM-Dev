@@ -23,8 +23,8 @@ if npx prisma migrate status | grep -q "Database schema is not empty"; then
 else
   echo "Running prisma migrate deploy..."
   npx prisma migrate deploy
-
-echo "Starting the application..."
-npm run dev
+fi
+  echo "Running db seed..."
+  npm run db:seed
 
 exec "$@"

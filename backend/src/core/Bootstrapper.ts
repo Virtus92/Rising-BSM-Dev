@@ -52,7 +52,6 @@ import { IUserController } from '../interfaces/IUserController.js';
 import { INotificationController } from '../interfaces/INotificationController.js';
 import { ICustomerController } from '../interfaces/ICustomerController.js';
 import { IAuthController } from '../interfaces/IAuthController.js';
-import { RefreshToken } from '../entities/RefreshToken.js';
 
 /**
  * Database provider (Prisma)
@@ -222,40 +221,17 @@ export class Bootstrapper {
       
       return wrapper;
     }, { singleton: true });
-
-    // Refresh token repository
+      
+      // Refresh token repository
     this.container.register<IRefreshTokenRepository>('RefreshTokenRepository', () => {
-      const refreshTokenRepo = new RefreshTokenRepository(prisma, logger, errorHandler);
-      
-      const wrapper: IRefreshTokenRepository = {
-        ...refreshTokenRepo as unknown as IRefreshTokenRepository,
-        createRefreshToken: async (data: Partial<RefreshToken>): Promise<RefreshToken> => {
-          return refreshTokenRepo.createRefreshToken(data);
-        },
-        // Add the missing logActivity method to match the interface
-        logActivity: async (
-          userId: number, 
-          actionType: string, 
-          details?: string,
-          ipAddress?: string
-        ): Promise<any> => {
-          logger.info(`User activity: ${actionType}`, {
-            userId,
-            actionType,
-            details,
-            ipAddress,
-            entity: 'RefreshToken'
-          });
-          return Promise.resolve();
-        }
-      };
-      
-      return wrapper;
+      // Simply return the repository instance directly - it already implements all methods
+      return new RefreshTokenRepository(prisma, logger, errorHandler);
     }, { singleton: true });
-    
+      
     logger.info('Repositories registered');
     return this;
   }
+
   /**
    * Register services
    * 
@@ -288,9 +264,15 @@ export class Bootstrapper {
     
     // Auth service
     this.container.register<IAuthService>('AuthService', () => {
-      const userRepo = this.container.resolve<IUserRepository>('UserRepository');
-      const refreshTokenRepo = this.container.resolve<IRefreshTokenRepository>('RefreshTokenRepository');
-      return new AuthService(userRepo, refreshTokenRepo, logger, validator, errorHandler);
+      const userRepository = this.container.resolve<IUserRepository>('UserRepository');
+      const refreshTokenRepository = this.container.resolve<IRefreshTokenRepository>('RefreshTokenRepository');
+      return new AuthService(
+        userRepository, 
+        refreshTokenRepository, 
+        logger, 
+        validator, 
+        errorHandler
+      );
     }, { singleton: true });
 
     logger.info('Services registered');

@@ -14,7 +14,7 @@ export interface IRefreshTokenRepository extends IBaseRepository<RefreshToken, s
    * @param tokenData - Refresh token data
    * @returns Promise with created refresh token
    */
-  createRefreshToken(tokenData: Partial<RefreshToken>): Promise<RefreshToken>;
+  create(tokenData: Partial<RefreshToken>): Promise<RefreshToken>;
   
   /**
    * Find refresh token by token string

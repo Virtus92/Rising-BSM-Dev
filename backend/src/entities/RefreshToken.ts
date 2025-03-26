@@ -1,26 +1,9 @@
-import { BaseEntity } from '../types/models/index.js';
-
 /**
  * RefreshToken entity
  * 
  * Domain entity representing a refresh token in the system.
  */
-interface RefreshTokenProps {
-  token: string;
-  userId: number;
-  expiresAt?: Date; // Our property name
-  expires?: Date; // Database column name
-  createdAt?: Date;
-  createdByIp?: string;
-  isRevoked?: boolean;
-  revokedAt?: Date;
-  revokedByIp?: string;
-  replacedByToken?: string;
-}
-
-export class RefreshToken implements BaseEntity {
-  id: number;
-  updatedAt: Date;
+export class RefreshToken {
   /**
    * Token string (primary key)
    */
@@ -67,22 +50,20 @@ export class RefreshToken implements BaseEntity {
   replacedByToken?: string;
 
   /**
+   * Creates a new RefreshToken instance
+   * 
    * @param data - RefreshToken data
    */
-  constructor(props: RefreshTokenProps & { id: number, updatedAt: Date }) {
-    this.id = props.id;
-    this.updatedAt = props.updatedAt;
-    this.token = props.token;
-    this.userId = props.userId;
-    this.expiresAt = props.expiresAt || props.expires || new Date(); // Support both property names
-    this.userId = props.userId;
-    this.expiresAt = props.expiresAt || props.expires || new Date(); // Support both property names
-    this.createdAt = props.createdAt || new Date();
-    this.createdByIp = props.createdByIp;
-    this.isRevoked = props.isRevoked || false;
-    this.revokedAt = props.revokedAt;
-    this.revokedByIp = props.revokedByIp;
-    this.replacedByToken = props.replacedByToken;
+  constructor(data: Partial<RefreshToken> = {}) {
+    this.token = data.token || '';
+    this.userId = data.userId || 0;
+    this.expiresAt = data.expiresAt || new Date();
+    this.createdAt = data.createdAt || new Date();
+    this.createdByIp = data.createdByIp;
+    this.isRevoked = data.isRevoked || false;
+    this.revokedAt = data.revokedAt;
+    this.revokedByIp = data.revokedByIp;
+    this.replacedByToken = data.replacedByToken;
   }
 
   /**
@@ -91,9 +72,7 @@ export class RefreshToken implements BaseEntity {
    * @returns Whether token is active
    */
   isActive(): boolean {
-    // Return false if token is revoked or expired
-    const now = new Date();
-    return !this.isRevoked && this.expiresAt > now;
+    return !this.isRevoked && this.expiresAt > new Date();
   }
 
   /**

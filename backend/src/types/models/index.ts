@@ -87,7 +87,7 @@ export interface BaseEntity {
   export interface RefreshToken {
     id: number;
     token: string;
-    expires: Date;
+    expiresAt: Date;
     createdAt: Date;
     createdByIp?: string | null;
     revoked: boolean;

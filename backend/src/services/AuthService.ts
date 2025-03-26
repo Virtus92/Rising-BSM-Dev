@@ -433,17 +433,18 @@ export class AuthService implements IAuthService {
   private async generateTokens(user: any, ipAddress?: string): Promise<{ accessToken: string; refreshToken: string }> {
     const accessToken = this.generateAccessToken(user);
     
+    // Generate a refresh token
     const refreshToken = crypto.randomBytes(40).toString('hex');
     
-    // Save refresh token in database - use expires instead of expiresAt to match DB
+    // Save refresh token in database
     const refreshTokenEntity = {
       token: refreshToken,
       userId: user.id,
-      expires: new Date(Date.now() + this.getTokenExpiryTime(this.JWT_REFRESH_EXPIRES_IN)), // Changed expiresAt to expires
+      expiresAt: new Date(Date.now() + this.getTokenExpiryTime(this.JWT_REFRESH_EXPIRES_IN)),
       createdByIp: ipAddress
     };
     
-    await this.refreshTokenRepository.createRefreshToken(refreshTokenEntity);
+    await this.refreshTokenRepository.create(refreshTokenEntity);
     
     return { accessToken, refreshToken };
   }

@@ -23,6 +23,7 @@ model User {
   profilePicture    String?            @db.VarChar(255)
   createdAt         DateTime           @default(now()) @db.Timestamp(6)
   updatedAt         DateTime           @updatedAt @db.Timestamp(6)
+  lastLoginAt       DateTime?
   resetToken        String?
   resetTokenExpiry  DateTime?
   settings          UserSettings?
@@ -37,6 +38,10 @@ model User {
   requestNotes      RequestNote[]
   appointmentNotes  AppointmentNote[]
   appointmentLogs   AppointmentLog[]
+
+
+  @@index([email])
+  @@index([name])
 }
 
 model UserSettings {
