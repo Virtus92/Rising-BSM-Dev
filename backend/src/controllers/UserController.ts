@@ -347,4 +347,54 @@ export class UserController {
       this.errorHandler.handleError(error, req, res);
     }
   }
+
+  /**
+   * Bulk update multiple users
+   * 
+   * @param req - HTTP request
+   * @param res - HTTP response
+   */
+  async bulkUpdateUsers(req: Request, res: Response): Promise<void> {
+    try {
+      const { userIds, data } = req.body;
+      
+      // Get authenticated user info
+      const userId = (req as any).user?.id;
+      
+      // Validate input
+      if (!Array.isArray(userIds) || userIds.length === 0) {
+        throw this.errorHandler.createValidationError('Invalid user IDs', ['User IDs must be a non-empty array']);
+      }
+      
+      if (!data || Object.keys(data).length === 0) {
+        throw this.errorHandler.createValidationError('Invalid update data', ['Update data is required']);
+      }
+      
+      // Prevent users from updating their own role or status
+      if (userIds.includes(userId) && (data.role !== undefined || data.status !== undefined)) {
+        throw this.errorHandler.createForbiddenError('Cannot update your own role or status');
+      }
+      
+      // Call service to bulk update users
+      // Note: You'll need to implement this method in the UserService
+      const updatedCount = await this.userService.bulkUpdate(userIds, data, {
+        context: {
+          userId,
+          ipAddress: req.ip
+        }
+      });
+      
+      // Send success response
+      res.status(200).json({
+        success: true,
+        data: { 
+          count: updatedCount,
+          ids: userIds
+        },
+        message: `${updatedCount} users updated successfully`
+      });
+    } catch (error) {
+      this.errorHandler.handleError(error, req, res);
+    }
+  }
 }

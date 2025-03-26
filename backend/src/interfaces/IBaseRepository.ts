@@ -9,6 +9,31 @@
  */
 export interface IBaseRepository<T, ID = number> {
     /**
+     * Bulk update multiple entities
+     * 
+     * @param ids - Array of entity IDs
+     * @param data - Update data
+     * @returns Promise with count of updated entities
+     */
+    bulkUpdate(ids: ID[], data: Partial<T>): Promise<number>;
+
+    /**
+     * Log activity for auditing purposes
+     * 
+     * @param userId - User ID performing the action
+     * @param actionType - Type of action performed
+     * @param details - Additional details about the action
+     * @param ipAddress - IP address of the client
+     * @returns Promise with created activity record
+     */
+    logActivity(
+      userId: number, 
+      actionType: string, 
+      details?: string,
+      ipAddress?: string
+    ): Promise<any>;
+  
+    /**
      * Find all entities, optionally with pagination
      * 
      * @param options - Query options like pagination, sorting, etc.
@@ -139,6 +164,8 @@ export interface IBaseRepository<T, ID = number> {
      */
     direction: 'ASC' | 'DESC';
   }
+
+  
   
   /**
    * Pagination result

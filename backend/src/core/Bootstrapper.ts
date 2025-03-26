@@ -295,7 +295,7 @@ export class Bootstrapper {
     
     // Routes config
     this.container.register('RoutesConfig', () => {
-      const authMiddleware = this.container.resolve('AuthMiddleware');
+      const authMiddleware = this.container.resolve<AuthMiddleware>('AuthMiddleware');
       const userController = this.container.resolve<IUserController>('UserController');
       const notificationController = this.container.resolve<INotificationController>('NotificationController');
       const customerController = this.container.resolve<ICustomerController>('CustomerController');

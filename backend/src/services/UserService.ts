@@ -18,7 +18,7 @@ import {
   changePasswordValidationSchema
 } from '../dtos/UserDtos.js';
 import { ServiceOptions } from '../interfaces/IBaseService.js';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 /**
  * UserService
@@ -252,6 +252,48 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
       throw this.handleError(error);
     }
   }
+
+  /**
+ * Bulk update multiple users
+ * 
+ * @param ids - Array of user IDs
+ * @param data - Update data
+ * @param options - Service options
+ * @returns Promise with count of updated users
+ */
+async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): Promise<number> {
+  try {
+    this.logger.info(`Bulk updating ${ids.length} users`, { count: ids.length, fields: Object.keys(data) });
+    
+    // Validate update data
+    await this.validate(data, true);
+    
+    // Prepare data with audit information
+    const auditedData = this.addAuditInfo(data, options?.context, 'update');
+    
+    // Map DTO to entity
+    const entityData = this.toEntity(auditedData);
+    
+    // Perform bulk update
+    const count = await this.repository.bulkUpdate(ids, entityData);
+    
+    // Log activity
+    if (options?.context?.userId) {
+      const activityDetails = `Bulk updated ${count} users with fields: ${Object.keys(data).join(', ')}`;
+      await this.repository.logActivity(
+        options.context.userId,
+        'bulk_update_users',
+        activityDetails,
+        options.context.ipAddress
+      );
+    }
+    
+    return count;
+  } catch (error) {
+    this.logger.error('Error in UserService.bulkUpdate', error instanceof Error ? error : String(error), { ids, data });
+    throw this.handleError(error);
+  }
+}
 
   /**
    * Authenticate user

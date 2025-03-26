@@ -192,6 +192,39 @@ export class UserRepository extends BaseRepository<User, number, any> implements
   }
 
   /**
+ * Bulk update multiple users
+ * 
+ * @param ids - Array of user IDs
+ * @param data - Update data
+ * @returns Promise with count of updated users
+ */
+async bulkUpdate(ids: number[], data: Partial<User>): Promise<number> {
+  try {
+    // Ensure the IDs are valid
+    if (!ids.length) {
+      return 0;
+    }
+    
+    // Prepare data for Prisma
+    const updateData = this.mapToORMEntity(data);
+    
+    // Always update the updatedAt timestamp
+    updateData.updatedAt = new Date();
+    
+    // Perform the update
+    const result = await this.dbClient.user.updateMany({
+      where: { id: { in: ids } },
+      data: updateData
+    });
+    
+    return result.count;
+  } catch (error) {
+    this.logger.error('Error in bulkUpdate', error instanceof Error ? error : String(error), { ids, data });
+    throw this.handleError(error);
+  }
+}
+
+  /**
    * Get user activity history
    * 
    * @param userId - User ID

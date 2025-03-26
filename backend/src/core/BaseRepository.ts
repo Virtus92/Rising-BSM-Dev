@@ -296,6 +296,36 @@ export abstract class BaseRepository<T, ID = number, M = any> implements IBaseRe
   }
 
   /**
+   * Bulk update entities
+   * 
+   * @param data - Array of entity data with IDs
+   * @returns Promise with updated entities
+   */
+  async bulkUpdate(data: { id: ID; data: Partial<T> }[]): Promise<T[]> {
+    try {
+      // Check if data is valid
+      if (!Array.isArray(data) || data.length === 0) {
+        throw new AppError('Invalid data provided for bulk update', 400, 'invalid_data');
+      }
+
+      // Map to ORM entities if necessary
+      const ormData = data.map(item => ({
+        id: item.id,
+        data: this.mapToORMEntity(item.data)
+      }));
+
+      // Execute query
+      const entities = await this.executeQuery('bulkUpdate', ormData);
+
+      // Map to domain entities if necessary
+      return entities.map((entity: any) => this.mapToDomainEntity(entity));
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.bulkUpdate`, error instanceof Error ? error : String(error), { data });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Begin a transaction
    */
   protected abstract beginTransaction(): Promise<void>;

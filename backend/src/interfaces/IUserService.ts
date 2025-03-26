@@ -9,6 +9,7 @@ import {
   UpdateUserStatusDto,
   UserFilterParams
 } from '../dtos/UserDtos.js';
+import { ServiceOptions } from './IBaseService.js';
 
 /**
  * IUserService
@@ -94,4 +95,14 @@ export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUs
    * @returns Promise with user statistics
    */
   getUserStatistics(): Promise<any>;
+
+  /**
+ * Bulk update multiple users
+ * 
+ * @param ids - Array of user IDs
+ * @param data - Update data
+ * @param options - Service options
+ * @returns Promise with count of updated users
+ */
+bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): Promise<number>;
 }
