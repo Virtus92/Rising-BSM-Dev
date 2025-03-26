@@ -3,7 +3,7 @@
  * 
  * Data Transfer Objects for Contact Request entity operations.
  */
-import { BaseCreateDTO, BaseResponseDTO, FilterParams, StatusChangeDTO, ServiceType } from '../common/types.js';
+import { BaseCreateDTO, BaseResponseDTO, FilterParams, StatusChangeDTO, ServiceType } from '../../types/common/types.js';
 
 /**
  * Enum for request status values

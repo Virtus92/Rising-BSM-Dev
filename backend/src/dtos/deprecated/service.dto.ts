@@ -3,7 +3,7 @@
  * 
  * Data Transfer Objects for Service entity operations.
  */
-import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, FilterParams } from '../common/types.js';
+import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, FilterParams } from '../../types/common/types.js';
 
 /**
  * DTO for creating a new service

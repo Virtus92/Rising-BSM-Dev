@@ -9,7 +9,7 @@ import {
   refreshTokenValidation,
   forgotPasswordValidation,
   resetPasswordValidation 
-} from '../types/dtos/auth.dto.js';
+} from '../dtos/auth.dto.js';
 export function createAuthRoutes(
   authController: AuthController, 
   authMiddleware: AuthMiddleware,

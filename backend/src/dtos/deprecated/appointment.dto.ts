@@ -3,7 +3,7 @@
  * 
  * Data Transfer Objects for Appointment entity operations.
  */
-import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, FilterParams, StatusChangeDTO } from '../common/types.js';
+import { BaseCreateDTO, BaseUpdateDTO, BaseResponseDTO, FilterParams, StatusChangeDTO } from '../../types/common/types.js';
 
 /**
  * Appointment status values

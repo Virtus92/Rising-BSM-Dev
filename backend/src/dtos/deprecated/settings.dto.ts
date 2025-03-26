@@ -3,7 +3,7 @@
  * 
  * Data Transfer Objects for application settings operations.
  */
-import { BaseFilterDTO } from '../common/types.js';
+import { BaseFilterDTO } from '../../types/common/types.js';
 
 /**
  * Enum for notification interval options

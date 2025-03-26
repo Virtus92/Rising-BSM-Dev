@@ -14,7 +14,7 @@ import { authenticate } from '../middleware/auth.middleware.js';
 import { 
   dashboardFilterValidation,
   globalSearchValidation
-} from '../types/dtos/dashboard.dto.js';
+} from '../dtos/deprecated/dashboard.dto.js';
 
 // Create router
 const router = Router();
