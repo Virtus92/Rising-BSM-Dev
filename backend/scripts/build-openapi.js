@@ -1,4 +1,3 @@
-// scripts/build-openapi.js
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
@@ -9,9 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Find OpenAPI directory - check multiple possible locations
 function findOpenApiDir() {
   const possiblePaths = [
-    path.resolve(process.cwd(), 'openapi'),
-    path.resolve(process.cwd(), 'backend/openapi'),
-    path.resolve(__dirname, '../openapi'),
+    path.resolve(process.cwd(), 'src/openapi'),
+    path.resolve(process.cwd(), 'backend/src/openapi'),
+    path.resolve(__dirname, '../src/openapi'),
     '/app/openapi'
   ];
   

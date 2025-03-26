@@ -20,7 +20,7 @@ RUN npx prisma generate
 ENV DATABASE_URL=postgresql://postgres:postgres@db:5432/rising_bsm?schema=public
 
 # Copy OpenAPI files first
-COPY openapi ./openapi/
+COPY src/openapi ./src/openapi/
 COPY scripts ./scripts/
 
 # Create output directory

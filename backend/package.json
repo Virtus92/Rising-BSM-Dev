@@ -9,8 +9,7 @@
         "generate-openapi": "ts-node generate-openapi.ts",
         "build": "npm run generate-openapi && tsc -p tsconfig.json",
         "start": "node dist/index.js",
-        "dev": "tsx watch src/index.ts",
-        "build:dev": "sh wait-for-db.sh && tsx watch src/index.ts",
+        "dev": "tsx watch src/index.ts","build:dev": "sh wait-for-db.sh && npm run openapi:build && tsx watch src/index.ts",
         "build:watch": "tsc -w",
         "db:seed": "tsx prisma/seed.ts",
         "migrate": "prisma migrate dev",
@@ -19,10 +18,10 @@
         "test:coverage": "jest --coverage",
         "lint": "eslint . --ext .ts",
         "format": "prettier --write .",
-        "openapi:validate": "swagger-cli validate openapi/openapi.yaml",
-        "openapi:build": "node scripts/build-openapi.js",
-        "openapi:serve": "redoc-cli serve openapi/openapi.yaml --port 8080",
-        "openapi:bundle": "redoc-cli bundle openapi/openapi.yaml -o public/api-docs.html"
+        "openapi:validate": "swagger-cli validate src/openapi/openapi.yaml",
+        "openapi:build": "node scripts/bundle-openapi.js",
+        "openapi:serve": "redoc-cli serve src/openapi/openapi.yaml --port 8080",
+        "openapi:bundle": "redoc-cli bundle src/openapi/openapi.yaml -o public/api-docs.html"
     },
     "dependencies": {
         "@dr.pogodin/csurf": "^1.12.3",
