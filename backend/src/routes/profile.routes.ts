@@ -18,7 +18,7 @@ import {
   profileUpdateValidation, 
   passwordUpdateValidation, 
   notificationSettingsUpdateValidation 
-} from '../types/dtos/profile.dto.js';
+} from '../dtos/deprecated/profile.dto.js';
 
 // Configure multer for profile picture uploads
 const storage = multer.memoryStorage();

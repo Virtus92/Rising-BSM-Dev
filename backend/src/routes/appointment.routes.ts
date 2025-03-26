@@ -22,7 +22,7 @@ import {
   appointmentStatusUpdateValidation,
   appointmentNoteCreateValidation,
   AppointmentStatus
-} from '../types/dtos/appointment.dto.js';
+} from '../dtos/deprecated/appointment.dto.js';
 
 // Create router
 const router = Router();

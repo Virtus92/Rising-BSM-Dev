@@ -3,7 +3,7 @@
  * 
  * Data Transfer Objects for Dashboard operations and data visualization.
  */
-import { BaseFilterDTO, Status } from '../common/types.js';
+import { BaseFilterDTO, Status } from '../../types/common/types.js';
 import { getRequestStatusLabel, getRequestStatusClass } from './request.dto.js';
 import { getAppointmentStatusLabel, getAppointmentStatusClass } from './appointment.dto.js';
 

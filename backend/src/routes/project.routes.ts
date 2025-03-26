@@ -21,7 +21,7 @@ import {
   projectUpdateValidation, 
   ProjectStatusUpdateDTO,
   projectNoteCreateValidation
-} from '../types/dtos/project.dto.js';
+} from '../dtos/deprecated/project.dto.js';
 
 // Create router
 const router = Router();

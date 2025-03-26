@@ -18,7 +18,7 @@ import {
   requestStatusUpdateSchema, 
   requestNoteCreateSchema,
   contactRequestCreateValidation
-} from '../types/dtos/request.dto.js';
+} from '../dtos/deprecated/request.dto.js';
 
 // Create router
 const router = Router();

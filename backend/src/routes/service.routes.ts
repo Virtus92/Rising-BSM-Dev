@@ -18,7 +18,7 @@ import {
   serviceCreateValidation, 
   serviceUpdateValidation, 
   serviceStatusUpdateValidation 
-} from '../types/dtos/service.dto.js';
+} from '../dtos/deprecated/service.dto.js';
 
 // Create router
 const router = Router();

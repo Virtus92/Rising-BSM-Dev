@@ -3,7 +3,7 @@
  * 
  * Data Transfer Objects for User Profile operations.
  */
-import { BaseDTO, BaseResponseDTO } from '../common/types.js';
+import { BaseDTO, BaseResponseDTO } from '../../types/common/types.js';
 import { NotificationInterval, LanguageOption } from './settings.dto.js';
 import { File } from 'buffer';
 

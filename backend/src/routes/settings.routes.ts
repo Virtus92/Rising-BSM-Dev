@@ -19,7 +19,7 @@ import {
   userSettingsUpdateValidation,
   systemSettingsUpdateValidation,
   backupSettingsUpdateValidation
-} from '../types/dtos/settings.dto.js';
+} from '../dtos/deprecated/settings.dto.js';
 
 // Create router
 const router = Router();
