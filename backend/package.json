@@ -10,7 +10,7 @@
         "build": "npm run generate-openapi && tsc -p tsconfig.json",
         "start": "node dist/index.js",
         "dev": "tsx watch src/index.ts",
-        "build:dev": "sh wait-for-db.sh && npm run openapi:build && tsx watch src/index.ts",
+        "build:dev": "sh wait-for-db.sh && tsx watch src/index.ts",
         "build:watch": "tsc -w",
         "db:seed": "tsx prisma/seed.ts",
         "migrate": "prisma migrate dev",

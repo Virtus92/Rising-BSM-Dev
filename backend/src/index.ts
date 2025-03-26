@@ -28,7 +28,7 @@ async function main() {
   routesConfig.registerRoutes(app);
   
   // Richte Swagger ein
-  swaggerConfig.setup(app);
+  swaggerConfig.setupSwagger(app);
   
   // Fehlerbehandlung als letztes Middleware
   errorMiddleware.register(app);

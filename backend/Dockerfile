@@ -26,8 +26,14 @@ COPY scripts ./scripts/
 # Create output directory
 RUN mkdir -p dist
 
-# Bundle OpenAPI files
-RUN node ./scripts/bundle-openapi.js
+# Install Redocly CLI for OpenAPI bundling
+RUN npm install --global @redocly/cli
+
+# Create directory for bundled output
+RUN mkdir -p /app/dist
+
+# Bundle OpenAPI specification
+RUN npx @redocly/cli bundle /app/openapi/openapi.yaml -o /app/dist/swagger.json
 
 # Copy the rest of the application
 COPY . .

@@ -10,6 +10,7 @@ import { Express } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import yaml from 'js-yaml';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
+import express from 'express';
 
 // Get the directory name equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -35,54 +36,23 @@ export class SwaggerConfig {
    * 
    * @param app - Express application
    */
-  public setup(app: Express): void {
+  private setupSwagger(app: Express): void {
     if (!this.swaggerEnabled) {
-      this.logger.info('Swagger documentation disabled');
+      this.logger.info('Swagger UI is disabled');
       return;
     }
+
+    // Serve the bundled Swagger JSON file
+    app.use('/swagger.json', express.static(path.join(__dirname, '../../dist/swagger.json')));
     
-    this.logger.info('Setting up Swagger UI documentation...');
+    // Configure Swagger UI to use the bundled file
+    const options = {
+      swaggerOptions: {
+        url: '/swagger.json',
+      },
+    };
     
-    try {
-      // Load bundled spec
-      this.openApiSpec = this.findBundledSpec();
-      
-      // Log spec information
-      const pathCount = Object.keys(this.openApiSpec?.paths || {}).length;
-      const schemaCount = Object.keys(this.openApiSpec?.components?.schemas || {}).length;
-      this.logger.info(`OpenAPI spec loaded with ${pathCount} paths and ${schemaCount} schemas`);
-      
-      // Register route for the bundled spec
-      app.get('/api-docs/swagger.json', (_req, res) => {
-        res.json(this.openApiSpec);
-      });
-      
-      // Default Swagger UI options
-      const uiOptions = {
-        explorer: true,
-        customCss: `
-          .swagger-ui .topbar { display: none }
-          .swagger-ui .opblock-body pre.microlight { max-height: 500px; overflow-y: auto; }
-          .swagger-ui .opblock-description-wrapper p, .swagger-ui .opblock-external-docs-wrapper p, .swagger-ui .opblock-title_normal p { font-size: 14px }
-        `,
-        swaggerOptions: {
-          persistAuthorization: true,
-          docExpansion: 'list',
-          defaultModelsExpandDepth: 3,
-          defaultModelExpandDepth: 3,
-          tryItOutEnabled: true,
-          spec: this.openApiSpec
-        }
-      };
-      
-      // Serve Swagger UI
-      app.use('/api-docs', swaggerUi.serve);
-      app.get('/api-docs', swaggerUi.setup(null, uiOptions));
-      
-      this.logger.info('Swagger UI documentation enabled at /api-docs');
-    } catch (error) {
-      this.logger.error('Error setting up Swagger UI:', error instanceof Error ? error : String(error));
-    }
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(null, options));
   }
 
   /**
