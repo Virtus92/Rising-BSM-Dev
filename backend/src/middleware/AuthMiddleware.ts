@@ -107,6 +107,57 @@ export class AuthMiddleware {
     };
   };
 
+  authorizePermission(requiredPermission: string) {
+    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        // Check if user is authenticated
+        if (!(req as any).user) {
+          throw new UnauthorizedError('Authentication required');
+        }
+        
+        const user = (req as any).user;
+        
+        // Admin bypass - consider removing this for strict permission checks
+        if (user.isAdmin) {
+          return next();
+        }
+        
+        // Check if user has the required permission
+        if (!user.hasPermission(requiredPermission)) {
+          throw new ForbiddenError(`Access denied. Required permission: ${requiredPermission}`);
+        }
+        
+        next();
+      } catch (error) {
+        next(error);
+      }
+    };
+  }
+  
+  // Predefined permissions
+  Permissions = {
+    // User management
+    USER_VIEW: 'user:view',
+    USER_CREATE: 'user:create',
+    USER_EDIT: 'user:edit',
+    USER_DELETE: 'user:delete',
+    
+    // Customer management
+    CUSTOMER_VIEW: 'customer:view',
+    CUSTOMER_CREATE: 'customer:create',
+    CUSTOMER_EDIT: 'customer:edit',
+    CUSTOMER_DELETE: 'customer:delete',
+    
+    // Notification management
+    NOTIFICATION_VIEW: 'notification:view',
+    NOTIFICATION_CREATE: 'notification:create',
+    NOTIFICATION_EDIT: 'notification:edit',
+    
+    // System settings
+    SETTINGS_VIEW: 'settings:view',
+    SETTINGS_EDIT: 'settings:edit',
+  };
+
   /**
    * Verify resource ownership
    * 

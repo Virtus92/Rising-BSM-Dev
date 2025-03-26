@@ -1,3 +1,4 @@
+import { Role } from './Role.js';
 /**
  * User entity
  * 
@@ -33,11 +34,11 @@ export class User {
      * Last name
      */
     lastName: string;
-    
+
     /**
-     * User role
+     * User roles
      */
-    role: UserRole;
+    roles: number[];
     
     /**
      * Account status
@@ -68,6 +69,9 @@ export class User {
      * Last login timestamp
      */
     lastLoginAt?: Date;
+
+    
+    private _roleObjects: Role[] = [];
   
     /**
      * Creates a new User instance
@@ -81,7 +85,7 @@ export class User {
       this.password = data.password;
       this.firstName = data.firstName || '';
       this.lastName = data.lastName || '';
-      this.role = data.role || UserRole.USER;
+      this.roles = data.roles || [];
       this.status = data.status || UserStatus.ACTIVE;
       this.createdAt = data.createdAt || new Date();
       this.updatedAt = data.updatedAt || new Date();
@@ -108,23 +112,17 @@ export class User {
       return this.status === UserStatus.ACTIVE;
     }
   
-    /**
-     * Check if user has the specified role
-     * 
-     * @param role - Role to check
-     * @returns Whether user has the role
-     */
-    hasRole(role: UserRole): boolean {
-      return this.role === role;
+    setRoles(roles: Role[]): void {
+      this._roleObjects = roles;
+      this.roles = roles.map(r => r.id);
     }
-  
-    /**
-     * Check if user is an administrator
-     * 
-     * @returns Whether user is an administrator
-     */
-    isAdmin(): boolean {
-      return this.role === UserRole.ADMIN;
+    
+    hasPermission(permission: string): boolean {
+      if (!this._roleObjects.length) {
+        return false; // Cannot verify without loaded roles
+      }
+      
+      return this._roleObjects.some(role => role.hasPermission(permission));
     }
   
     /**
@@ -138,7 +136,7 @@ export class User {
       if (data.email !== undefined) this.email = data.email;
       if (data.firstName !== undefined) this.firstName = data.firstName;
       if (data.lastName !== undefined) this.lastName = data.lastName;
-      if (data.role !== undefined) this.role = data.role;
+      if (data.roles !== undefined) this.roles = data.roles;
       if (data.status !== undefined) this.status = data.status;
       if (data.password !== undefined) this.password = data.password;
       

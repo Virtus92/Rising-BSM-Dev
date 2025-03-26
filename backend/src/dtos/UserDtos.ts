@@ -1,4 +1,5 @@
 import { UserRole, UserStatus } from '../entities/User.js';
+import { PasswordUtils } from '../utils/PasswordUtils.js';
 
 /**
  * Base interface for user DTOs
@@ -41,7 +42,7 @@ export interface CreateUserDto extends BaseUserDto {
   /**
    * User role
    */
-  role?: UserRole;
+  roles?: number[];
 }
 
 /**
@@ -136,7 +137,7 @@ export interface UserResponseDto extends BaseUserDto {
   /**
    * User role
    */
-  role: UserRole;
+  roles: number[];
   
   /**
    * Account status

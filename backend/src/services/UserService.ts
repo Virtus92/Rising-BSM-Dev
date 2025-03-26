@@ -19,6 +19,7 @@ import {
 } from '../dtos/UserDtos.js';
 import { ServiceOptions } from '../interfaces/IBaseService.js';
 import * as bcrypt from 'bcryptjs';
+import { PasswordUtils } from '../utils/PasswordUtils.js';
 
 /**
  * UserService
@@ -210,31 +211,31 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
    * @returns Promise with updated user response
    */
   async updateStatus(userId: number, data: UpdateUserStatusDto, options?: ServiceOptions): Promise<UserResponseDto> {
-    try {
-      // Get user
-      const user = await this.userRepository.findById(userId);
-      
-      if (!user) {
-        throw this.errorHandler.createNotFoundError(`User with ID ${userId} not found`);
-      }
-      
-      // Update status
+  try {
+    // Get user
+    const user = await this.userRepository.findById(userId);
+    
+    if (!user) {
+      throw this.errorHandler.createNotFoundError(`User with ID ${userId} not found`);
+    }
+    
+    // Update status
       user.status = data.status;
-      
-      // Save updated user
+    
+    // Save updated user
       const updatedUser = await this.userRepository.update(userId, { status: data.status });
-      
+    
       // Log activity
       const activityDetails = data.reason 
         ? `Status changed to ${data.status}: ${data.reason}`
         : `Status changed to ${data.status}`;
         
-      await this.userRepository.logActivity(
-        userId,
-        'status_change',
+    await this.userRepository.logActivity(
+      userId,
+      'status_change',
         activityDetails,
-        options?.context?.ipAddress
-      );
+      options?.context?.ipAddress
+    );
       
       // If the status change was performed by another user, log it for that user too
       if (options?.context?.userId && options.context.userId !== userId) {
@@ -245,13 +246,13 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
           options.context.ipAddress
         );
       }
-      
-      return this.toDTO(updatedUser);
-    } catch (error) {
-      this.logger.error('Error in UserService.updateStatus', error instanceof Error ? error : String(error), { userId, data });
-      throw this.handleError(error);
-    }
+    
+    return this.toDTO(updatedUser);
+  } catch (error) {
+    this.logger.error('Error in UserService.updateStatus', error instanceof Error ? error : String(error), { userId, data });
+    throw this.handleError(error);
   }
+}
 
   /**
  * Bulk update multiple users
@@ -434,7 +435,7 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
       firstName: entity.firstName,
       lastName: entity.lastName,
       fullName: entity.getFullName(),
-      role: entity.role,
+      roles: entity.roles,
       status: entity.status,
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),
@@ -552,10 +553,22 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
    * @param data - Create data
    * @param options - Service options
    */
-  protected async beforeCreate(data: CreateUserDto, _options?: ServiceOptions): Promise<void> {
+  protected async beforeCreate(data: CreateUserDto, options?: ServiceOptions): Promise<void> {
+    // Existing validation
+    await super.beforeCreate(data, options);
+    
+    // Validate password strength
+    const validation = PasswordUtils.validatePassword(data.password, data.username, data.email);
+    if (!validation.valid) {
+      throw this.errorHandler.createValidationError(
+        'Password does not meet security requirements',
+        validation.errors
+      );
+    }
+    
     // Hash password before creating user
     if (data.password) {
-      (data as any).password = await this.hashPassword(data.password);
+      (data as any).password = await PasswordUtils.hashPassword(data.password);
     }
   }
 
