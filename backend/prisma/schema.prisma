@@ -68,17 +68,20 @@ model UserSession {
 }
 
 model RefreshToken {
-  id              Int       @id @default(autoincrement())
-  token           String    @unique
-  expires         DateTime
+  token           String    @id
+  userId          Int
+  expiresAt       DateTime
   createdAt       DateTime  @default(now())
   createdByIp     String?
-  revoked         Boolean   @default(false)
+  isRevoked       Boolean   @default(false)
   revokedAt       DateTime?
   revokedByIp     String?
   replacedByToken String?
-  userId          Int
+  
+  // Relation to User model (assuming you have a User model)
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model SystemSettings {
