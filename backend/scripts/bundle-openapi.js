@@ -10,20 +10,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  */
 function findOpenApiDir() {
   const possiblePaths = [
+    '/app/openapi',  // Prioritize container path
     path.resolve(process.cwd(), 'openapi'),
-    path.resolve(process.cwd(), 'backend/openapi'),
     path.resolve(__dirname, '../openapi'),
-    '/app/openapi'
+    path.resolve(process.cwd(), 'backend/openapi')
   ];
   
+  console.log('Searching for OpenAPI directory in the following locations:');
   for (const dir of possiblePaths) {
+    console.log(`- Checking ${dir}`);
     if (fs.existsSync(path.join(dir, 'openapi.yaml'))) {
-      console.log(`Found OpenAPI directory at: ${dir}`);
+      console.log(`✅ Found OpenAPI directory at: ${dir}`);
       return dir;
     }
   }
   
-  console.error('Could not find OpenAPI directory!');
+  console.error('❌ Could not find OpenAPI directory!');
   return null;
 }
 
@@ -250,13 +252,42 @@ function processComponents(components, basePath, cache) {
  * Save the bundled spec to a file
  */
 function saveSpec(spec, outputPath) {
-  const dir = path.dirname(outputPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  try {
+    const dir = path.dirname(outputPath);
+    console.log(`Attempting to save to directory: ${dir}`);
+    
+    if (!fs.existsSync(dir)) {
+      console.log(`Directory doesn't exist, creating: ${dir}`);
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    fs.writeFileSync(outputPath, JSON.stringify(spec, null, 2));
+    console.log(`✅ Bundled spec saved successfully to: ${outputPath}`);
+    
+    // Also save to container path if applicable
+    if (!outputPath.startsWith('/app') && fs.existsSync('/app')) {
+      const containerPath = '/app/dist/swagger.json';
+      const containerDir = path.dirname(containerPath);
+      if (!fs.existsSync(containerDir)) {
+        fs.mkdirSync(containerDir, { recursive: true });
+      }
+      fs.writeFileSync(containerPath, JSON.stringify(spec, null, 2));
+      console.log(`✅ Also saved spec to container path: ${containerPath}`);
+    }
+  } catch (error) {
+    console.error(`❌ Failed to save spec to ${outputPath}: ${error.message}`);
+    console.error(error);
+    
+    // Fallback to saving in the current directory if dist fails
+    try {
+      const fallbackPath = path.join(process.cwd(), 'swagger.json');
+      console.log(`Trying fallback location: ${fallbackPath}`);
+      fs.writeFileSync(fallbackPath, JSON.stringify(spec, null, 2));
+      console.log(`Saved to fallback location: ${fallbackPath}`);
+    } catch (fallbackError) {
+      console.error(`Also failed to save to fallback location: ${fallbackError.message}`);
+    }
   }
-  
-  fs.writeFileSync(outputPath, JSON.stringify(spec, null, 2));
-  console.log(`Bundled spec saved to: ${outputPath}`);
 }
 
 /**

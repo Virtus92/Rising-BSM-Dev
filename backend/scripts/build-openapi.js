@@ -8,20 +8,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Find OpenAPI directory - check multiple possible locations
 function findOpenApiDir() {
   const possiblePaths = [
+    '/app/openapi',  // Prioritize container path
     path.resolve(process.cwd(), 'openapi'),
-    path.resolve(process.cwd(), 'backend/openapi'),
     path.resolve(__dirname, '../openapi'),
-    '/app/openapi'
+    path.resolve(process.cwd(), 'backend/openapi')
   ];
   
+  console.log('Searching for OpenAPI directory in the following locations:');
   for (const dir of possiblePaths) {
+    console.log(`- Checking ${dir}`);
     if (fs.existsSync(path.join(dir, 'openapi.yaml'))) {
-      console.log(`Found OpenAPI directory at: ${dir}`);
+      console.log(`✅ Found OpenAPI directory at: ${dir}`);
       return dir;
     }
   }
   
-  console.error('Could not find OpenAPI directory!');
+  console.error('❌ Could not find OpenAPI directory!');
   return null;
 }
 
@@ -268,12 +270,26 @@ try {
   // Ensure output directory exists
   const outputDir = path.dirname(OUTPUT_FILE);
   if (!fs.existsSync(outputDir)) {
+    console.log(`Creating output directory: ${outputDir}`);
     fs.mkdirSync(outputDir, { recursive: true });
   }
   
   // Write bundled spec
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(bundledSpec, null, 2));
   console.log(`✅ OpenAPI spec bundled successfully to ${OUTPUT_FILE}`);
+  
+  // Also copy to /app/dist if in container environment
+  if (fs.existsSync('/app') && !OUTPUT_FILE.startsWith('/app')) {
+    const containerPath = '/app/dist/swagger.json';
+    const containerDir = path.dirname(containerPath);
+    
+    if (!fs.existsSync(containerDir)) {
+      fs.mkdirSync(containerDir, { recursive: true });
+    }
+    
+    fs.copyFileSync(OUTPUT_FILE, containerPath);
+    console.log(`📋 Also copied spec to container path: ${containerPath}`);
+  }
   
   // Print stats
   const pathCount = Object.keys(resolvedPaths).length;

@@ -92,14 +92,15 @@ export class SwaggerConfig {
    */
   private findBundledSpec(): any {
     const possiblePaths = [
+      '/app/dist/swagger.json',  // Prioritize container path
       path.resolve(process.cwd(), 'dist/swagger.json'),
-      path.resolve(process.cwd(), 'backend/dist/swagger.json'),
+      path.resolve(__root, 'dist/swagger.json'),
       path.resolve(__root, '../dist/swagger.json'),
-      path.resolve(__root, '../../dist/swagger.json'),
-      '/app/dist/swagger.json'
+      path.resolve(process.cwd(), 'backend/dist/swagger.json'),
+      path.resolve(__root, '../../dist/swagger.json')
     ];
 
-    console.log(possiblePaths);
+    this.logger.debug('Looking for bundled OpenAPI spec at:', possiblePaths);
     
     for (const filePath of possiblePaths) {
       if (fs.existsSync(filePath)) {
@@ -113,12 +114,15 @@ export class SwaggerConfig {
       }
     }
     
-    // Wenn die bundled Spec nicht gefunden werden kann, suchen wir nach der source spec
+    // If bundled spec cannot be found, look for source spec
     const sourcePaths = [
-      path.resolve(process.cwd(), '../openapi/openapi.yaml'),
+      '/app/openapi/openapi.yaml',  // Prioritize container path
+      path.resolve(process.cwd(), 'openapi/openapi.yaml'),
       path.resolve(__dirname, '../openapi/openapi.yaml'),
-      '/app/openapi/openapi.yaml'
+      path.resolve(process.cwd(), '../openapi/openapi.yaml')
     ];
+    
+    this.logger.debug('Looking for source OpenAPI spec at:', sourcePaths);
     
     for (const filePath of sourcePaths) {
       if (fs.existsSync(filePath)) {
@@ -133,7 +137,7 @@ export class SwaggerConfig {
       }
     }
     
-    // Fallback zur Mock-Spezifikation
+    // Fallback to mock specification
     this.logger.warn('No OpenAPI spec found, using mock specification');
     return this.createMockOpenApiSpec();
   }
