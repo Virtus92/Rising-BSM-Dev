@@ -5,9 +5,15 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { Express } from 'express';
 import swaggerUi from 'swagger-ui-express';
+import yaml from 'js-yaml';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
+
+// Get the directory name equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export class SwaggerConfig {
   private readonly swaggerEnabled: boolean;
@@ -104,7 +110,28 @@ export class SwaggerConfig {
       }
     }
     
-    // Create a mock specification if none found
+    // Wenn die bundled Spec nicht gefunden werden kann, suchen wir nach der source spec
+    const sourcePaths = [
+      path.resolve(process.cwd(), 'src/openapi/openapi.yaml'),
+      path.resolve(__dirname, '../../src/openapi/openapi.yaml'),
+      '/app/src/openapi/openapi.yaml'
+    ];
+    
+    for (const filePath of sourcePaths) {
+      if (fs.existsSync(filePath)) {
+        this.logger.info(`Found source OpenAPI spec at: ${filePath}`);
+        try {
+          const content = fs.readFileSync(filePath, 'utf8');
+          const spec = yaml.load(content);
+          return spec;
+        } catch (error) {
+          this.logger.error(`Error reading source spec at ${filePath}:`, error instanceof Error ? error : String(error));
+        }
+      }
+    }
+    
+    // Fallback zur Mock-Spezifikation
+    this.logger.warn('No OpenAPI spec found, using mock specification');
     return this.createMockOpenApiSpec();
   }
 
