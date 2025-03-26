@@ -1,189 +1,58 @@
-/**
- * Authentication Routes
- * 
- * Route definitions for authentication operations with validation.
- */
 import { Router } from 'express';
-import { 
-  login, 
-  refreshToken, 
-  forgotPassword, 
-  validateResetToken, 
-  resetPassword, 
-  logout,
-  getResetToken 
-} from '../controllers/auth.controller.js';
-import { authenticate } from '../middleware/auth.middleware.js';
-import { validateBody, validateParams, validateQuery } from '../middleware/validation.middleware.js';
+import { AuthController } from '../controllers/AuthController.js';
+import { AuthMiddleware } from '../middleware/AuthMiddleware.js';
+import { ValidationMiddleware } from '../middleware/ValidationMiddleware.js';
+import { IValidationService } from '../interfaces/IValidationService.js';
+import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { 
   loginValidation, 
   refreshTokenValidation,
   forgotPasswordValidation,
-  resetPasswordValidation,
-  logoutValidation
+  resetPasswordValidation 
 } from '../types/dtos/auth.dto.js';
-import config from '../src/config/index.js';
+export function createAuthRoutes(
+  authController: AuthController, 
+  authMiddleware: AuthMiddleware,
+  validationService: IValidationService,
+  errorHandler: IErrorHandler
+): Router {
+  const router = Router();
+  const validationMiddleware = new ValidationMiddleware(validationService, errorHandler);
+  // Public routes (no authentication required)
+  router.post('/login', 
+    validationMiddleware.validate(loginValidation),
+    authController.login
+  );
+  router.post('/auth/refresh-token', 
+    validationMiddleware.validate(refreshTokenValidation),
+    authController.refreshToken
+  );
 
-const router = Router();
+  router.post('/auth/forgot-password', 
+    validationMiddleware.validate(forgotPasswordValidation),
+    authController.forgotPassword
+  );
 
-/**
- * @swagger
- * tags:
- *   name: Authentication
- *   description: User authentication operations
- */
+  router.get('/auth/reset-token/:token', 
+    authController.validateResetToken
+  );
+  router.post('/auth/reset-password/:token', 
+    validationMiddleware.validate(resetPasswordValidation),
+    authController.resetPassword
+  );
 
-/**
- * @swagger
- * /api/v1/auth/refresh-token:
- *   post:
- *     summary: Refresh access token
- *     description: Refresh access token using refresh token
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/RefreshTokenDTO'
- *     responses:
- *       200:
- *         description: Token refreshed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/RefreshTokenResponseDTO'
- *       401:
- *         description: Invalid or expired refresh token
- */
-router.post('/refresh-token', validateBody(refreshTokenValidation), refreshToken);
+  // Protected routes (require authentication)
+  router.post('/auth/logout', 
+    authMiddleware.authenticate(),
+    authController.logout
+  );
 
-/**
- * @swagger
- * /api/v1/auth/forgot-password:
- *   post:
- *     summary: Request password reset
- *     description: Send password reset link to user's email
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/ForgotPasswordDTO'
- *     responses:
- *       200:
- *         description: Password reset instructions sent
- */
-router.post('/forgot-password', validateBody(forgotPasswordValidation), forgotPassword);
+  // Development-only routes
+  if (process.env.NODE_ENV === 'development') {
+    router.get('/auth/dev/reset-token', 
+      authController.getResetToken
+    );
+  }
 
-/**
- * @swagger
- * /api/v1/auth/reset-token/{token}:
- *   get:
- *     summary: Validate reset token
- *     description: Check if password reset token is valid
- *     tags: [Authentication]
- *     parameters:
- *       - in: path
- *         name: token
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Token is valid
- *       401:
- *         description: Invalid or expired token
- */
-router.get('/reset-token/:token', validateResetToken);
-
-/**
- * @swagger
- * /api/v1/auth/reset-password/{token}:
- *   post:
- *     summary: Reset password
- *     description: Reset user password using reset token
- *     tags: [Authentication]
- *     parameters:
- *       - in: path
- *         name: token
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/ResetPasswordDTO'
- *     responses:
- *       200:
- *         description: Password reset successful
- *       401:
- *         description: Invalid or expired token
- */
-router.post('/reset-password/:token', validateBody(resetPasswordValidation), resetPassword);
-
-/**
- * @swagger
- * /api/v1/auth/logout:
- *   post:
- *     summary: Logout user
- *     description: Log user out and optionally invalidate refresh token
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               refreshToken:
- *                 type: string
- *                 description: Optional refresh token to invalidate
- *     responses:
- *       200:
- *         description: Logout successful
- *       401:
- *         description: Not authenticated
- */
-router.post('/logout', authenticate, validateBody(logoutValidation), logout);
-
-// Development mode only routes
-if (config.IS_DEVELOPMENT) {
-  /**
-   * @swagger
-   * /api/v1/auth/dev/reset-token:
-   *   get:
-   *     summary: Get reset token for testing
-   *     description: Retrieve a reset token for testing (development only)
-   *     tags: [Authentication, Development]
-   *     parameters:
-   *       - in: query
-   *         name: email
-   *         required: true
-   *         schema:
-   *           type: string
-   *           format: email
-   *     responses:
-   *       200:
-   *         description: Reset token retrieved
-   *       404:
-   *         description: No active token found
-   */
-  router.get('/dev/reset-token', validateQuery({
-    email: {
-      type: 'email' as const,
-      required: true,
-      messages: {
-        required: 'Email is required',
-        email: 'Invalid email format'
-      }
-    }
-  }), getResetToken);
+  return router;
 }
-
-export default router;

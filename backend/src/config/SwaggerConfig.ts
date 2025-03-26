@@ -14,6 +14,7 @@ import { ILoggingService } from '../interfaces/ILoggingService.js';
 // Get the directory name equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const __root = path.resolve(__dirname, '../..');
 
 export class SwaggerConfig {
   private readonly swaggerEnabled: boolean;
@@ -93,8 +94,8 @@ export class SwaggerConfig {
     const possiblePaths = [
       path.resolve(process.cwd(), 'dist/swagger.json'),
       path.resolve(process.cwd(), 'backend/dist/swagger.json'),
-      path.resolve(__dirname, '../dist/swagger.json'),
-      path.resolve(__dirname, '../../dist/swagger.json'),
+      path.resolve(__root, '../dist/swagger.json'),
+      path.resolve(__root, '../../dist/swagger.json'),
       '/app/dist/swagger.json'
     ];
     

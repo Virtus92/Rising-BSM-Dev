@@ -170,28 +170,89 @@ export class Bootstrapper {
 
     // User repository
     this.container.register<IUserRepository>('UserRepository', () => {
-      return new UserRepository(prisma, logger, errorHandler);
+      return new UserRepository(prisma, logger, errorHandler) as IUserRepository;
     }, { singleton: true });
     
     // Notification repository
     this.container.register<INotificationRepository>('NotificationRepository', () => {
-      return new NotificationRepository(prisma, logger, errorHandler);
+      const notificationRepo = new NotificationRepository(prisma, logger, errorHandler);
+      
+      // Create a wrapper that adapts the implementation to the interface
+      const wrapper: INotificationRepository = {
+        ...notificationRepo as unknown as INotificationRepository,
+        // Override the bulkUpdate method to match the interface
+        bulkUpdate: async (ids: number[], data: Partial<any>): Promise<number> => {
+          // Convert parameters to the format expected by the implementation
+          const updateData = ids.map(id => ({ id, data }));
+          const results = await notificationRepo.bulkUpdate(updateData);
+          // Return the count of updated records
+          return results.length;
+        }
+      };
+      
+      return wrapper;
     }, { singleton: true });
     
     // Customer repository
+    // Customer repository
     this.container.register<ICustomerRepository>('CustomerRepository', () => {
-      return new CustomerRepository(prisma, logger, errorHandler);
-    }, { singleton: true });
-    
-    // Refresh token repository
-    this.container.register<IRefreshTokenRepository>('RefreshTokenRepository', () => {
-      return new RefreshTokenRepository(prisma, logger, errorHandler);
+      const customerRepo = new CustomerRepository(prisma, logger, errorHandler);
+      
+      // Create a wrapper that adapts the implementation to the interface
+      const wrapper: ICustomerRepository = {
+        ...customerRepo as unknown as ICustomerRepository,
+        // Add the missing logActivity method to match the interface
+        logActivity: async (
+          userId: number, 
+          actionType: string, 
+          details?: string,
+          ipAddress?: string
+        ): Promise<any> => {
+          logger.info(`User activity: ${actionType}`, {
+            userId,
+            actionType,
+            details,
+            ipAddress,
+            entity: 'Customer'
+          });
+          return Promise.resolve();
+        }
+      };
+      
+      return wrapper;
     }, { singleton: true });
 
+    // Refresh token repository
+    this.container.register<IRefreshTokenRepository>('RefreshTokenRepository', () => {
+      const refreshTokenRepo = new RefreshTokenRepository(prisma, logger, errorHandler);
+      
+      // Create a wrapper that adapts the implementation to the interface
+      const wrapper: IRefreshTokenRepository = {
+        ...refreshTokenRepo as unknown as IRefreshTokenRepository,
+        // Add the missing logActivity method to match the interface
+        logActivity: async (
+          userId: number, 
+          actionType: string, 
+          details?: string,
+          ipAddress?: string
+        ): Promise<any> => {
+          logger.info(`User activity: ${actionType}`, {
+            userId,
+            actionType,
+            details,
+            ipAddress,
+            entity: 'RefreshToken'
+          });
+          return Promise.resolve();
+        }
+      };
+      
+      return wrapper;
+    }, { singleton: true });
+    
     logger.info('Repositories registered');
     return this;
   }
-
   /**
    * Register services
    * 
@@ -295,20 +356,8 @@ export class Bootstrapper {
     
     // Routes config
     this.container.register('RoutesConfig', () => {
-      const authMiddleware = this.container.resolve<AuthMiddleware>('AuthMiddleware');
-      const userController = this.container.resolve<IUserController>('UserController');
-      const notificationController = this.container.resolve<INotificationController>('NotificationController');
-      const customerController = this.container.resolve<ICustomerController>('CustomerController');
-      const authController = this.container.resolve<IAuthController>('AuthController');
-      
-      return new RoutesConfig(
-        logger,
-        authMiddleware,
-        userController,
-        notificationController,
-        customerController,
-        authController
-      );
+      // Pass the container itself instead of individual dependencies
+      return new RoutesConfig(this.container);
     }, { singleton: true });
     
     logger.info('Configuration registered');
