@@ -11,7 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 
-const OPENAPI_DIR = path.resolve(process.cwd(), 'backend/src/openapi');
+const OPENAPI_DIR = path.resolve(process.cwd(), 'backend/openapi');
 const PATHS_DIR = path.join(OPENAPI_DIR, 'paths');
 const SCHEMAS_DIR = path.join(OPENAPI_DIR, 'schemas');
 

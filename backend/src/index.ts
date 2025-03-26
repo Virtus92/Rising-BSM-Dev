@@ -11,16 +11,6 @@ import { SwaggerConfig } from './config/SwaggerConfig.js';
 async function main() {
   // Erstelle Express-App
   const app = express();
-
-  function setupSwagger(app: express.Express, logger: ILoggingService): void {
-    try {
-      const swaggerConfig = new SwaggerConfig(logger);
-      swaggerConfig.setup(app);
-      logger.info('Swagger documentation setup complete');
-    } catch (error) {
-      logger.error('Failed to setup Swagger:', error instanceof Error ? error : String(error));
-    }
-  }
   
   // Initialisiere alle Dienste über den Bootstrapper
   const container = bootstrap();
@@ -38,7 +28,7 @@ async function main() {
   routesConfig.registerRoutes(app);
   
   // Richte Swagger ein
-  setupSwagger(app, logger);
+  swaggerConfig.setup(app);
   
   // Fehlerbehandlung als letztes Middleware
   errorMiddleware.register(app);

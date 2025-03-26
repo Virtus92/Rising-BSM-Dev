@@ -98,6 +98,8 @@ export class SwaggerConfig {
       path.resolve(__root, '../../dist/swagger.json'),
       '/app/dist/swagger.json'
     ];
+
+    console.log(possiblePaths);
     
     for (const filePath of possiblePaths) {
       if (fs.existsSync(filePath)) {
@@ -115,7 +117,7 @@ export class SwaggerConfig {
     const sourcePaths = [
       path.resolve(process.cwd(), '../openapi/openapi.yaml'),
       path.resolve(__dirname, '../openapi/openapi.yaml'),
-      '/app/src/openapi/openapi.yaml'
+      '/app/openapi/openapi.yaml'
     ];
     
     for (const filePath of sourcePaths) {
