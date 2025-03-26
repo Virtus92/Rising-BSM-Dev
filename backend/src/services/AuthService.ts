@@ -325,6 +325,10 @@ export class AuthService implements IAuthService {
       }
 
       // Verify the token
+      if (!resetPasswordDto.token) {
+        throw this.errorHandler.createUnauthorizedError('Reset token is required');
+      }
+      
       const isValidToken = await this.validateResetToken(resetPasswordDto.token);
       
       if (!isValidToken) {

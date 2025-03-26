@@ -39,6 +39,35 @@ export class NotificationRepository extends BaseRepository<Notification, number>
     // Pass model reference to BaseRepository
     super(prisma.notification, logger, errorHandler);
   }
+  /**
+   * Log notification-related user activity
+   * 
+   * @param userId - User ID
+   * @param actionType - Type of action performed
+   * @param details - Optional activity details
+   * @param ipAddress - Optional IP address
+   * @returns Promise with created activity record or null if logging failed
+   */
+  async logActivity(userId: number, actionType: string, details?: string, ipAddress?: string): Promise<any> {
+    try {
+      return await this.prisma.userActivity.create({
+        data: {
+          userId,
+          type: actionType,
+          details,
+          ipAddress,
+          createdAt: new Date()
+        }
+      });
+    } catch (error) {
+      // Log error but don't throw - avoid disrupting main operations for logging failures
+      this.logger.error('Error logging notification activity', error instanceof Error ? error : String(error), { 
+        userId, 
+        actionType 
+      });
+      return null;
+    }
+  }
 
   /**
    * Mark notifications as read
@@ -331,3 +360,4 @@ export class NotificationRepository extends BaseRepository<Notification, number>
     return error.code === 'P2003';
   }
 }
+
