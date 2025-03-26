@@ -11,11 +11,89 @@ import { QueryOptions, FilterCriteria } from 'src/interfaces/IBaseRepository.js'
  * Handles CRUD operations for refresh tokens.
  */
 export class RefreshTokenRepository extends BaseRepository<RefreshToken, string> implements IRefreshTokenRepository {
-  protected buildQueryOptions(_options?: QueryOptions) {
-      throw new Error('Method not implemented.');
+  /**
+   * Build query options for ORM
+   * 
+   * @param options - Query options
+   * @returns ORM-specific query options
+   */
+  protected buildQueryOptions(options?: QueryOptions): any {
+    if (!options) {
+      return {};
+    }
+    
+    const result: any = {};
+    
+    // Add pagination
+    if (options.page !== undefined && options.limit !== undefined) {
+      result.skip = (options.page - 1) * options.limit;
+      result.take = options.limit;
+    }
+    
+    // Add select fields
+    if (options.select && options.select.length > 0) {
+      result.select = options.select.reduce((acc, field) => {
+        acc[field] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+    }
+    
+    // Add relations
+    if (options.relations && options.relations.length > 0) {
+      result.include = options.relations.reduce((acc, relation) => {
+        acc[relation] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+    }
+    
+    // Add sorting
+    if (options.sort) {
+      result.orderBy = {
+        [options.sort.field]: options.sort.direction.toLowerCase()
+      };
+    } else {
+      // Default sorting
+      result.orderBy = { createdAt: 'desc' };
+    }
+    
+    return result;
   }
-  protected processCriteria(_criteria: FilterCriteria) {
-      throw new Error('Method not implemented.');
+
+  /**
+   * Process criteria for ORM
+   * 
+   * @param criteria - Filter criteria
+   * @returns ORM-specific criteria
+   */
+  protected processCriteria(criteria: FilterCriteria): any {
+    const where: any = {};
+    
+    // Process standard criteria
+    Object.entries(criteria).forEach(([key, value]) => {
+      // Handle special cases
+      if (key === 'expiresAt' && typeof value === 'object') {
+        // Handle date range queries
+        where.expiresAt = {};
+        
+        if (value.before) {
+          where.expiresAt.lt = value.before;
+        }
+        
+        if (value.after) {
+          where.expiresAt.gt = value.after;
+        }
+      } else if (key === 'search' && typeof value === 'string') {
+        // Handle search (not applicable for refresh tokens, but included for consistency)
+        where.OR = [
+          { token: { contains: value } }
+        ];
+      } else {
+        // Default handling for most properties
+        where[key] = value;
+      }
+    });
+    
+    return where;
   }
   /**
    * Creates a new RefreshTokenRepository instance
@@ -33,6 +111,45 @@ export class RefreshTokenRepository extends BaseRepository<RefreshToken, string>
     super(prisma.refreshToken, logger, errorHandler);
     
     this.logger.debug('Initialized RefreshTokenRepository');
+  }
+  /**
+   * Log refresh token-related user activity
+   * 
+   * @param userId - User ID
+   * @param actionType - Type of action performed
+   * @param details - Optional activity details
+   * @param ipAddress - Optional IP address
+   * @returns Promise with created activity record or null if logging failed
+   */
+  async logActivity(
+    userId: number, 
+    actionType: string, 
+    details?: string,
+    ipAddress?: string
+  ): Promise<any> {
+    try {
+      this.logger.info(`User activity: ${actionType}`, {
+        userId,
+        actionType,
+        details,
+        ipAddress,
+        entity: 'RefreshToken'
+      });
+      
+      return await this.prisma.userActivity.create({
+        data: {
+          userId,
+          activity: actionType,
+          ipAddress
+        }
+      });
+    } catch (error) {
+      this.logger.error('Error logging refresh token activity', error instanceof Error ? error : String(error), { 
+        userId, 
+        actionType 
+      });
+      return null;
+    }
   }
 
   /**
@@ -325,5 +442,28 @@ export class RefreshTokenRepository extends BaseRepository<RefreshToken, string>
    */
   protected isForeignKeyConstraintError(error: any): boolean {
     return error.code === 'P2003';
+  }
+
+  /**
+   * Update multiple refresh tokens with the same data
+   * 
+   * @param ids - Array of token strings to update
+   * @param data - Data to update on all tokens
+   * @returns Promise with the number of updated tokens
+   */
+  async bulkUpdate(ids: string[], data: Partial<RefreshToken>): Promise<number> {
+    try {
+      const result = await this.prisma.refreshToken.updateMany({
+        where: {
+          token: { in: ids }
+        },
+        data: this.mapToORMEntity(data)
+      });
+      
+      return result.count;
+    } catch (error) {
+      this.logger.error('Error in RefreshTokenRepository.bulkUpdate', error instanceof Error ? error : String(error));
+      throw this.handleError(error);
+    }
   }
 }

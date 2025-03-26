@@ -31,6 +31,15 @@ export class AuthController implements IAuthController {
     private readonly errorHandler: IErrorHandler
   ) {
     this.logger.debug('Initialized AuthController');
+    
+    // Bind all methods to ensure 'this' context is preserved
+    this.login = this.login.bind(this);
+    this.refreshToken = this.refreshToken.bind(this);
+    this.forgotPassword = this.forgotPassword.bind(this);
+    this.validateResetToken = this.validateResetToken.bind(this);
+    this.resetPassword = this.resetPassword.bind(this);
+    this.logout = this.logout.bind(this);
+    this.getResetToken = this.getResetToken.bind(this);
   }
 
   /**

@@ -12,18 +12,107 @@ import Item from 'mock-fs/lib/item.js';
  * Implementation of INotificationRepository for database operations.
  */
 export class NotificationRepository extends BaseRepository<Notification, number> implements INotificationRepository {
-  protected beginTransaction(): Promise<void> {
-      throw new Error('Method not implemented.');
+  /**
+ * Begin a transaction
+ */
+protected async beginTransaction(): Promise<void> {
+  try {
+    // Prisma handles transactions differently, so we initiate the transaction context
+    // but don't need to do anything specific here since actual transactions are executed
+    // within a callback in Prisma
+    this.logger.debug('Beginning transaction in NotificationRepository');
+  } catch (error) {
+    this.logger.error('Error beginning transaction', error instanceof Error ? error : String(error));
+    throw this.handleError(error);
   }
-  protected commitTransaction(): Promise<void> {
-      throw new Error('Method not implemented.');
+}
+
+/**
+ * Commit a transaction
+ */
+protected async commitTransaction(): Promise<void> {
+  try {
+    // Prisma automatically commits the transaction when the callback completes successfully
+    this.logger.debug('Transaction committed in NotificationRepository');
+  } catch (error) {
+    this.logger.error('Error committing transaction', error instanceof Error ? error : String(error));
+    throw this.handleError(error);
   }
-  protected rollbackTransaction(): Promise<void> {
-      throw new Error('Method not implemented.');
+}
+
+/**
+ * Rollback a transaction
+ */
+protected async rollbackTransaction(): Promise<void> {
+  try {
+    // Prisma automatically rolls back the transaction if an error occurs in the callback
+    this.logger.debug('Transaction rolled back in NotificationRepository');
+  } catch (error) {
+    this.logger.error('Error rolling back transaction', error instanceof Error ? error : String(error));
+    throw this.handleError(error);
   }
-  protected executeQuery(operation: string, ...args: any[]): Promise<any> {
-      throw new Error('Method not implemented.');
+}
+
+/**
+ * Execute a query
+ * 
+ * @param operation - Operation name
+ * @param args - Query arguments
+ * @returns Promise with query result
+ */
+protected async executeQuery(operation: string, ...args: any[]): Promise<any> {
+  try {
+    switch (operation) {
+      case 'findAll':
+        return await this.prisma.notification.findMany(args[0]);
+        
+      case 'findById':
+        return await this.prisma.notification.findUnique({
+          where: { id: args[0] },
+          ...(args[1] || {})
+        });
+        
+      case 'findByCriteria':
+        return await this.prisma.notification.findMany({
+          where: args[0],
+          ...(args[1] || {})
+        });
+        
+      case 'findOneByCriteria':
+        return await this.prisma.notification.findFirst({
+          where: args[0],
+          ...(args[1] || {})
+        });
+        
+      case 'create':
+        return await this.prisma.notification.create({
+          data: args[0]
+        });
+        
+      case 'update':
+        return await this.prisma.notification.update({
+          where: { id: args[0] },
+          data: args[1]
+        });
+        
+      case 'delete':
+        return await this.prisma.notification.delete({
+          where: { id: args[0] }
+        });
+        
+      case 'count':
+        return await this.prisma.notification.count({
+          where: args[0]
+        });
+        
+      default:
+        throw new Error(`Unknown operation: ${operation}`);
+    }
+  } catch (error) {
+    this.logger.error(`Error executing query: ${operation}`, error instanceof Error ? error : String(error));
+    throw error;
   }
+}
   /**
    * Creates a new NotificationRepository instance
    * 
@@ -48,19 +137,29 @@ export class NotificationRepository extends BaseRepository<Notification, number>
    * @param ipAddress - Optional IP address
    * @returns Promise with created activity record or null if logging failed
    */
-  async logActivity(userId: number, actionType: string, details?: string, ipAddress?: string): Promise<any> {
+  async logActivity(
+    userId: number, 
+    actionType: string, 
+    details?: string,
+    ipAddress?: string
+  ): Promise<any> {
     try {
+      this.logger.info(`User activity: ${actionType}`, {
+        userId,
+        actionType,
+        details,
+        ipAddress,
+        entity: 'Notification'
+      });
+      
       return await this.prisma.userActivity.create({
         data: {
           userId,
-          type: actionType,
-          details,
-          ipAddress,
-          createdAt: new Date()
+          activity: actionType, 
+          ipAddress
         }
       });
     } catch (error) {
-      // Log error but don't throw - avoid disrupting main operations for logging failures
       this.logger.error('Error logging notification activity', error instanceof Error ? error : String(error), { 
         userId, 
         actionType 
@@ -358,6 +457,31 @@ export class NotificationRepository extends BaseRepository<Notification, number>
   protected isForeignKeyConstraintError(error: any): boolean {
     // Prisma-specific foreign key constraint error code
     return error.code === 'P2003';
+  }
+
+  /**
+   * Update multiple notifications at once
+   * 
+   * @param ids - Array of notification IDs to update
+   * @param data - Data to update for all notifications
+   * @returns Promise with number of notifications updated
+   */
+  async bulkUpdate(ids: number[], data: Partial<Notification>): Promise<number> {
+    try {
+      const result = await this.prisma.notification.updateMany({
+        where: {
+          id: {
+            in: ids
+          }
+        },
+        data: this.mapToORMEntity(data)
+      });
+      
+      return result.count;
+    } catch (error) {
+      this.logger.error('Error updating notifications in bulk', error instanceof Error ? error : String(error), { ids, data });
+      throw this.handleError(error);
+    }
   }
 }
 

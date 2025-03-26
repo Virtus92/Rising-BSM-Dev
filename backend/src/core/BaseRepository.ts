@@ -247,6 +247,56 @@ export abstract class BaseRepository<T, ID = number, M = any> implements IBaseRe
   }
 
   /**
+   * Log activity for auditing purposes
+   * 
+   * @param userId - User ID performing the action
+   * @param actionType - Type of action performed
+   * @param details - Additional details about the action
+   * @param ipAddress - IP address of the client
+   * @returns Promise with created activity record
+   */
+  async logActivity(
+    userId: number, 
+    actionType: string, 
+    details?: string,
+    ipAddress?: string
+  ): Promise<any> {
+    try {
+      this.logger.info(`User activity: ${actionType}`, {
+        userId,
+        actionType,
+        details,
+        ipAddress,
+        entity: (this.model as any).name || 'Unknown'
+      });
+      
+      // Using the UserActivity model directly through prisma client
+      const prismaClient = (this.model as any)['$queryRaw'] ? 
+      (this.model as any)['$queryRaw'].constructor :
+        null;
+      
+      if (prismaClient?.userActivity) {
+        return await prismaClient.userActivity.create({
+          data: {
+            userId,
+            activity: actionType, // Rename 'type' to 'activity' to match schema
+            details,
+            ipAddress
+          }
+        });
+      }
+      
+      return null;
+    } catch (error) {
+      this.logger.error('Error logging activity', error instanceof Error ? error : String(error), { 
+        userId, 
+        actionType 
+      });
+      return null;
+    }
+  }
+
+  /**
    * Count entities
    * 
    * @param criteria - Filter criteria
@@ -296,31 +346,22 @@ export abstract class BaseRepository<T, ID = number, M = any> implements IBaseRe
   }
 
   /**
-   * Bulk update entities
+   * Bulk update multiple entities
    * 
-   * @param data - Array of entity data with IDs
-   * @returns Promise with updated entities
+   * @param ids - Array of entity IDs
+   * @param data - Update data
+   * @returns Promise with count of updated entities
    */
-  async bulkUpdate(data: { id: ID; data: Partial<T> }[]): Promise<T[]> {
+  async bulkUpdate(ids: ID[], data: Partial<T>): Promise<number> {
     try {
-      // Check if data is valid
-      if (!Array.isArray(data) || data.length === 0) {
-        throw new AppError('Invalid data provided for bulk update', 400, 'invalid_data');
-      }
-
-      // Map to ORM entities if necessary
-      const ormData = data.map(item => ({
-        id: item.id,
-        data: this.mapToORMEntity(item.data)
-      }));
-
-      // Execute query
-      const entities = await this.executeQuery('bulkUpdate', ormData);
-
-      // Map to domain entities if necessary
-      return entities.map((entity: any) => this.mapToDomainEntity(entity));
+      // Use executeQuery to perform the bulk update operation
+      const ormData = this.mapToORMEntity(data);
+      const result = await this.executeQuery('bulkUpdate', ids, ormData);
+      
+      // Handle different result types that might be returned
+      return typeof result === 'number' ? result : (result?.count || 0);
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.bulkUpdate`, error instanceof Error ? error : String(error), { data });
+      this.logger.error('Error in bulkUpdate', error instanceof Error ? error : String(error), { ids, data });
       throw this.handleError(error);
     }
   }
