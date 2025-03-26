@@ -38,13 +38,11 @@ async function main() {
   routesConfig.registerRoutes(app);
   
   // Richte Swagger ein
-  swaggerConfig.setup(app);
+  setupSwagger(app, logger);
   
   // Fehlerbehandlung als letztes Middleware
   errorMiddleware.register(app);
 
-  setupSwagger(app, logger)
-  
   // Starte Server
   const port = config.PORT;
   app.listen(port, () => {

@@ -112,8 +112,8 @@ export class SwaggerConfig {
     
     // Wenn die bundled Spec nicht gefunden werden kann, suchen wir nach der source spec
     const sourcePaths = [
-      path.resolve(process.cwd(), 'src/openapi/openapi.yaml'),
-      path.resolve(__dirname, '../../src/openapi/openapi.yaml'),
+      path.resolve(process.cwd(), '../openapi/openapi.yaml'),
+      path.resolve(__dirname, '../openapi/openapi.yaml'),
       '/app/src/openapi/openapi.yaml'
     ];
     
