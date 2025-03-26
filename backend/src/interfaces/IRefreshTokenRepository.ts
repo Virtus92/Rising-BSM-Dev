@@ -9,6 +9,14 @@ import { RefreshToken } from '../entities/RefreshToken.js';
  */
 export interface IRefreshTokenRepository extends IBaseRepository<RefreshToken, string> {
   /**
+   * Create a new refresh token
+   * 
+   * @param tokenData - Refresh token data
+   * @returns Promise with created refresh token
+   */
+  createRefreshToken(tokenData: Partial<RefreshToken>): Promise<RefreshToken>;
+  
+  /**
    * Find refresh token by token string
    * 
    * @param token - Token string

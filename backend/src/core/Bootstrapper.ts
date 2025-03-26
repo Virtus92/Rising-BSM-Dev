@@ -52,6 +52,7 @@ import { IUserController } from '../interfaces/IUserController.js';
 import { INotificationController } from '../interfaces/INotificationController.js';
 import { ICustomerController } from '../interfaces/ICustomerController.js';
 import { IAuthController } from '../interfaces/IAuthController.js';
+import { RefreshToken } from '../entities/RefreshToken.js';
 
 /**
  * Database provider (Prisma)
@@ -226,9 +227,11 @@ export class Bootstrapper {
     this.container.register<IRefreshTokenRepository>('RefreshTokenRepository', () => {
       const refreshTokenRepo = new RefreshTokenRepository(prisma, logger, errorHandler);
       
-      // Create a wrapper that adapts the implementation to the interface
       const wrapper: IRefreshTokenRepository = {
         ...refreshTokenRepo as unknown as IRefreshTokenRepository,
+        createRefreshToken: async (data: Partial<RefreshToken>): Promise<RefreshToken> => {
+          return refreshTokenRepo.createRefreshToken(data);
+        },
         // Add the missing logActivity method to match the interface
         logActivity: async (
           userId: number, 
@@ -285,15 +288,9 @@ export class Bootstrapper {
     
     // Auth service
     this.container.register<IAuthService>('AuthService', () => {
-      const userRepository = this.container.resolve<IUserRepository>('UserRepository');
-      const refreshTokenRepository = this.container.resolve<IRefreshTokenRepository>('RefreshTokenRepository');
-      return new AuthService(
-        userRepository, 
-        refreshTokenRepository, 
-        logger, 
-        validator, 
-        errorHandler
-      );
+      const userRepo = this.container.resolve<IUserRepository>('UserRepository');
+      const refreshTokenRepo = this.container.resolve<IRefreshTokenRepository>('RefreshTokenRepository');
+      return new AuthService(userRepo, refreshTokenRepo, logger, validator, errorHandler);
     }, { singleton: true });
 
     logger.info('Services registered');
