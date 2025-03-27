@@ -15,9 +15,9 @@ import {
 import { ServiceOptions } from '../interfaces/IBaseService.js';
 import { RefreshToken } from '../entities/RefreshToken.js';
 import { User, UserStatus } from '../entities/User.js';
-import * as jwt from 'jsonwebtoken';
-import * as bcrypt from 'bcryptjs';
-import * as crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 /**
  * AuthService
@@ -493,7 +493,7 @@ export class AuthService implements IAuthService {
     };
     
     // Sign the token
-    return jwt.sign(payload, this.JWT_SECRET, { expiresIn: this.JWT_EXPIRES_IN }as jwt.SignOptions);
+    return jwt.sign(payload, this.JWT_SECRET, { expiresIn: this.JWT_EXPIRES_IN } as jwt.SignOptions);
   }
 
   /**

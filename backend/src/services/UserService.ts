@@ -18,7 +18,7 @@ import {
   changePasswordValidationSchema
 } from '../dtos/UserDtos.js';
 import { ServiceOptions } from '../interfaces/IBaseService.js';
-import * as bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs';
 
 /**
  * UserService

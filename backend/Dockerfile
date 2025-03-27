@@ -40,8 +40,6 @@ COPY . .
 
 RUN chmod +x scripts/wait-for-db.sh
 
-RUN npm 
-
 # Expose port and start application
 EXPOSE 5000
 CMD ["npm", "run", "build:dev"]
