@@ -9,6 +9,8 @@ import {
   UpdateUserStatusDto,
   UserFilterParams 
 } from '../dtos/UserDtos.js';
+import AuthenticatedRequest from '../middleware/AuthMiddleware.js';
+
 
 /**
  * UserController
@@ -30,6 +32,22 @@ export class UserController {
     private readonly errorHandler: IErrorHandler
   ) {
     this.logger.debug('Initialized UserController');
+  }
+  
+  /**
+   * Helper method to send a standardized success response
+   * 
+   * @param res - HTTP response
+   * @param data - Response data
+   * @param message - Success message
+   * @param statusCode - HTTP status code (default: 200)
+   */
+  private sendSuccessResponse(res: Response, data: any, message: string, statusCode: number = 200): void {
+    res.status(statusCode).json({
+      success: true,
+      data,
+      message
+    });
   }
 
   /**
@@ -96,6 +114,109 @@ export class UserController {
       this.errorHandler.handleError(error, req, res);
     }
   }
+
+  /**
+ * Get user with roles and permissions
+ * 
+ * @param req - HTTP request
+ * @param res - HTTP response
+ * @returns Promise
+ */
+async getUserWithRoles(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseInt(req.params.id, 10);
+    
+    // Get user with roles and permissions
+    const user = await this.userService.getUserWithRoles(id);
+    
+    if (!user) {
+      throw this.errorHandler.createNotFoundError(`User with ID ${id} not found`);
+    }
+    
+    // Send success response
+    this.sendSuccessResponse(res, user, 'User with roles retrieved successfully');
+  } catch (error) {
+    this.errorHandler.handleError(error, req, res);
+  }
+}
+
+/**
+ * Assign roles to a user
+ * 
+ * @param req - HTTP request
+ * @param res - HTTP response
+ */
+async assignRolesToUser(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const roleData = (req as any).validatedData || req.body;
+    // Fix: Need to properly cast the request to access the user property
+    const userId = (req as any).user?.id;
+    
+    // Assign roles to user
+    const user = await this.userService.assignRoles(id, roleData, {
+      context: {
+        userId,
+        ipAddress: req.ip
+      }
+    });
+    
+    // Send success response
+    this.sendSuccessResponse(res, user, 'Roles assigned successfully');
+  } catch (error) {
+    this.errorHandler.handleError(error, req, res);
+  }
+}
+/**
+ * Remove roles from a user
+ * 
+ * @param req - HTTP request
+ * @param res - HTTP response
+ */
+async removeRolesFromUser(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    const { roleIds } = req.body;
+    // Fix: Need to properly cast the request to access the user property
+    const currentUserId = (req as any).user?.id;
+    
+    if (!Array.isArray(roleIds) || roleIds.length === 0) {
+      throw this.errorHandler.createValidationError('Invalid role IDs', ['Role IDs must be a non-empty array']);
+    }
+    
+    // Remove roles from user
+    const user = await this.userService.removeRoles(userId, roleIds, {
+      context: {
+        userId: currentUserId,
+        ipAddress: req.ip
+      }
+    });
+    
+    // Send success response
+    this.sendSuccessResponse(res, user, 'Roles removed successfully');
+  } catch (error) {
+    this.errorHandler.handleError(error, req, res);
+  }
+}
+/**
+ * Get user permissions
+ * 
+ * @param req - HTTP request
+ * @param res - HTTP response
+ */
+async getUserPermissions(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseInt(req.params.id, 10);
+    
+    // Get user permissions
+    const permissions = await this.userService.getUserPermissions(id);
+    
+    // Send success response
+    this.sendSuccessResponse(res, permissions, 'User permissions retrieved successfully');
+  } catch (error) {
+    this.errorHandler.handleError(error, req, res);
+  }
+}
 
   /**
    * Create a new user

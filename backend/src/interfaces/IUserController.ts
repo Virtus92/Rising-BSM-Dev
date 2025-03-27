@@ -22,6 +22,38 @@ export interface IUserController {
    * @param res - HTTP response
    */
   getUserById(req: Request, res: Response): Promise<void>;
+
+  /**
+   * Get user with roles and permissions
+   * 
+   * @param req - HTTP request
+   * @param res - HTTP response
+   */
+  getUserWithRoles(req: Request, res: Response): Promise<void>;
+
+  /**
+   * Assign roles to a user
+   * 
+   * @param req - HTTP request
+   * @param res - HTTP response
+   */
+  assignRolesToUser(req: Request, res: Response): Promise<void>;
+
+  /**
+   * Remove roles from a user
+   * 
+   * @param req - HTTP request
+   * @param res - HTTP response
+   */
+  removeRolesFromUser(req: Request, res: Response): Promise<void>;
+
+  /**
+   * Get user permissions
+   * 
+   * @param req - HTTP request
+   * @param res - HTTP response
+   */
+  getUserPermissions(req: Request, res: Response): Promise<void>;
   
   /**
    * Create a new user

@@ -137,7 +137,7 @@ export interface UserResponseDto extends BaseUserDto {
   /**
    * User role
    */
-  roles: UserRole[];
+  role: UserRole;
   
   /**
    * Account status
@@ -168,6 +168,27 @@ export interface UserDetailResponseDto extends UserResponseDto {
    * User activity history
    */
   activities?: UserActivityResponseDto[];
+
+   /**
+   * User roles
+   */
+   roles?: {
+    id: number;
+    name: string;
+    description: string;
+    isSystem: boolean;
+  }[];
+  
+  /**
+   * User permissions
+   */
+  permissions?: {
+    id: number;
+    name: string;
+    description: string;
+    category: string;
+  }[];
+
 }
 
 /**
@@ -293,12 +314,16 @@ export const createUserValidationSchema = {
   password: {
     type: 'string',
     required: true,
-    min: 8,
-    max: 100,
+    min: 12,
+    max: 128,
+    validate: (value: string, data: any) => {
+      const validation = PasswordUtils.validatePassword(value, data.username, data.email);
+      return validation.valid || validation.errors[0];
+    },
     messages: {
       required: 'Password is required',
-      min: 'Password must be at least 8 characters',
-      max: 'Password cannot exceed 100 characters'
+      min: 'Password must be at least 12 characters',
+      max: 'Password cannot exceed 128 characters'
     }
   },
   firstName: {

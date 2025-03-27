@@ -2,6 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import { IErrorHandler, UnauthorizedError, ForbiddenError } from '../interfaces/IErrorHandler.js';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import jwt from 'jsonwebtoken';
+import { IPermissionRepository } from '../interfaces/IPermissionRepository.js';
+import { IUserService } from '../interfaces/IUserService.js';
+import NodeCache from 'node-cache';
+
 
 /**
  * AuthMiddleware
@@ -20,10 +24,20 @@ export class AuthMiddleware {
   constructor(
     private readonly errorHandler: IErrorHandler,
     private readonly logger: ILoggingService,
-    private readonly jwtSecret: string
+    private readonly jwtSecret: string,
+    private readonly permissionRepository?: IPermissionRepository,
+    private readonly userService?: IUserService
   ) {
     this.logger.debug('Initialized AuthMiddleware');
-  }
+
+  // Initialize permission cache with 5-minute TTL
+  this.permissionCache = new NodeCache({ 
+    stdTTL: 300, // 5 minutes
+    checkperiod: 60 // Check for expired keys every minute
+  });
+}
+
+private permissionCache: NodeCache;
 
   /**
    * Authenticate user by verifying JWT token
@@ -107,32 +121,81 @@ export class AuthMiddleware {
     };
   };
 
-  authorizePermission(requiredPermission: string) {
-    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-      try {
-        // Check if user is authenticated
-        if (!(req as any).user) {
-          throw new UnauthorizedError('Authentication required');
-        }
-        
-        const user = (req as any).user;
-        
-        // Admin bypass - consider removing this for strict permission checks
-        if (user.isAdmin) {
-          return next();
-        }
-        
-        // Check if user has the required permission
-        if (!user.hasPermission(requiredPermission)) {
-          throw new ForbiddenError(`Access denied. Required permission: ${requiredPermission}`);
-        }
-        
-        next();
-      } catch (error) {
-        next(error);
+  /**
+ * Authorize user based on required permissions
+ * 
+ * @param requiredPermissions - Array of required permission names
+ * @returns Express middleware function
+ */
+authorizePermission = (requiredPermissions: string[]) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      // Check if user is authenticated
+      if (!(req as any).user) {
+        throw this.errorHandler.createUnauthorizedError('Authentication required');
       }
-    };
-  }
+      
+      const user = (req as any).user;
+      
+      // Admin bypass - admin role has all permissions
+      if (user.role === 'admin') {
+        return next();
+      }
+      
+      // If no permission service is available, fall back to role-based authorization
+      if (!this.permissionRepository && !this.userService) {
+        throw this.errorHandler.createForbiddenError('Permission check failed: Permission service not available');
+      }
+      
+      // Check for each required permission
+      for (const permission of requiredPermissions) {
+        // Try to get from cache first
+        const cacheKey = `perm_${user.id}_${permission}`;
+        let hasPermission = this.permissionCache.get<boolean>(cacheKey);
+        
+        // If not in cache, check from repository
+        if (hasPermission === undefined) {
+          if (this.userService) {
+            hasPermission = await this.userService.hasPermission(user.id, permission);
+          } else {
+            hasPermission = await this.permissionRepository!.checkUserPermission(user.id, permission);
+          }
+          
+          // Store in cache
+          this.permissionCache.set(cacheKey, hasPermission);
+        }
+        
+        if (!hasPermission) {
+          throw this.errorHandler.createForbiddenError(`Access denied. Missing permission: ${permission}`);
+        }
+      }
+      
+      next();
+    } catch (error: unknown) {
+      const authError = error instanceof Error && 
+        (error instanceof UnauthorizedError || error instanceof ForbiddenError)
+        ? error
+        : this.errorHandler.createForbiddenError('Access denied');
+      
+      next(authError);
+    }
+  };
+};
+
+/**
+ * Invalidate permission cache for a user
+ * 
+ * @param userId - User ID
+ */
+invalidatePermissionCache(userId: number): void {
+  // Get all keys that match the user ID
+  const keys = this.permissionCache.keys().filter(key => key.startsWith(`perm_${userId}_`));
+  
+  // Delete all matching keys
+  keys.forEach(key => this.permissionCache.del(key));
+  
+  this.logger.debug(`Invalidated permission cache for user ${userId}`, { keyCount: keys.length });
+}
   
   // Predefined permissions
   Permissions = {

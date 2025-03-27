@@ -8,9 +8,6 @@ import container, { DiContainer, createFactory } from './DiContainer.js';
 import { LoggingService } from './LoggingService.js';
 import { ValidationService } from './ValidationService.js';
 import { ErrorHandler } from './ErrorHandler.js';
-import { ILoggingService, LogLevel, LogFormat } from '../interfaces/ILoggingService.js';
-import { IValidationService } from '../interfaces/IValidationService.js';
-import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 
 // Middleware
 import { AuthMiddleware } from '../middleware/AuthMiddleware.js';
@@ -19,6 +16,8 @@ import { RequestLoggerMiddleware } from '../middleware/RequestLoggerMiddleware.j
 
 // Repositories
 import { UserRepository } from '../repositories/UserRepository.js';
+import { RoleRepository } from '../repositories/RoleRepository.js';
+import { PermissionRepository } from '../repositories/PermissionRepository.js';
 import { NotificationRepository } from '../repositories/NotificationRepository.js';
 import { CustomerRepository } from '../repositories/CustomerRepository.js';
 import { RefreshTokenRepository } from '../repositories/RefreshTokenRepository.js';
@@ -28,30 +27,39 @@ import { UserService } from '../services/UserService.js';
 import { NotificationService } from '../services/NotificationService.js';
 import { CustomerService } from '../services/CustomerService.js';
 import { AuthService } from '../services/AuthService.js';
+import { RoleService } from '../services/RoleService.js';
 
 // Controllers
 import { UserController } from '../controllers/UserController.js';
 import { NotificationController } from '../controllers/NotificationController.js';
 import { CustomerController } from '../controllers/CustomerController.js';
 import { AuthController } from '../controllers/AuthController.js';
+import { RoleController } from '../controllers/RoleController.js';
 
 // Configuration
 import { SwaggerConfig } from '../config/SwaggerConfig.js';
 import { RoutesConfig } from '../config/RoutesConfig.js';
 
 // Interfaces
-import { IUserRepository } from '../interfaces/IUserRepository.js';
-import { INotificationRepository } from '../interfaces/INotificationRepository.js';
-import { ICustomerRepository } from '../interfaces/ICustomerRepository.js';
-import { IRefreshTokenRepository } from '../interfaces/IRefreshTokenRepository.js';
-import { IUserService } from '../interfaces/IUserService.js';
-import { INotificationService } from '../interfaces/INotificationService.js';
-import { ICustomerService } from '../interfaces/ICustomerService.js';
+import { IAuthController } from '../interfaces/IAuthController.js';
 import { IAuthService } from '../interfaces/IAuthService.js';
+import { IRefreshTokenRepository } from '../interfaces/IRefreshTokenRepository.js';
 import { IUserController } from '../interfaces/IUserController.js';
+import { IUserService } from '../interfaces/IUserService.js';
+import { IUserRepository } from '../interfaces/IUserRepository.js';
+import { IRoleController } from '../interfaces/IRoleController.js';
+import { IRoleRepository } from '../interfaces/IRoleRepository.js';
+import { IPermissionRepository } from '../interfaces/IPermissionRepository.js';
+import { INotificationService } from '../interfaces/INotificationService.js';
+import { INotificationRepository } from '../interfaces/INotificationRepository.js';
 import { INotificationController } from '../interfaces/INotificationController.js';
 import { ICustomerController } from '../interfaces/ICustomerController.js';
-import { IAuthController } from '../interfaces/IAuthController.js';
+import { ICustomerService } from '../interfaces/ICustomerService.js';
+import { ICustomerRepository } from '../interfaces/ICustomerRepository.js';
+import { IRoleService } from '../interfaces/IRoleService.js';
+import { ILoggingService, LogLevel, LogFormat } from '../interfaces/ILoggingService.js';
+import { IValidationService } from '../interfaces/IValidationService.js';
+import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 
 /**
  * Database provider (Prisma)
@@ -126,15 +134,18 @@ export class Bootstrapper {
   public registerMiddleware(): Bootstrapper {
     const logger = this.container.resolve<ILoggingService>('LoggingService');
     const errorHandler = this.container.resolve<IErrorHandler>('ErrorHandler');
+      const permissionRepository = this.container.resolve<IPermissionRepository>('PermissionRepository');
+      const userService = this.container.resolve<IUserService>('UserService');
     
     logger.info('Registering middleware...');
     
-    // Auth middleware
     this.container.register('AuthMiddleware', () => {
       return new AuthMiddleware(
         errorHandler,
         logger,
-        process.env.JWT_SECRET || 'default-secret-key'
+        process.env.JWT_SECRET || 'default-secret-key',
+        permissionRepository,
+        userService
       );
     }, { singleton: true });
     
@@ -187,6 +198,15 @@ export class Bootstrapper {
     this.container.register<IRefreshTokenRepository>('RefreshTokenRepository', () => {
       return new RefreshTokenRepository(prisma, logger, errorHandler);
     }, { singleton: true });
+
+    this.container.register<IRoleRepository>('RoleRepository', () => {
+      return new RoleRepository(prisma, logger, errorHandler);
+    }, { singleton: true });
+    
+    this.container.register<IPermissionRepository>('PermissionRepository', () => {
+      return new PermissionRepository(prisma, logger, errorHandler);
+    }, { singleton: true });
+    
       
     logger.info('Repositories registered');
     return this;
@@ -198,16 +218,18 @@ export class Bootstrapper {
    * @returns Bootstrapper instance for chaining
    */
   public registerServices(): Bootstrapper {
+    const userRepository = this.container.resolve<IUserRepository>('UserRepository');
     const logger = this.container.resolve<ILoggingService>('LoggingService');
     const validator = this.container.resolve<IValidationService>('ValidationService');
+    const roleRepository = this.container.resolve<IRoleRepository>('RoleRepository');
+    const permissionRepository = this.container.resolve<IPermissionRepository>('PermissionRepository');
     const errorHandler = this.container.resolve<IErrorHandler>('ErrorHandler');
     
     logger.info('Registering services...');
 
     // User service
     this.container.register<IUserService>('UserService', () => {
-      const userRepository = this.container.resolve<IUserRepository>('UserRepository');
-      return new UserService(userRepository, logger, validator, errorHandler);
+      return new UserService(userRepository, roleRepository, permissionRepository, logger, validator, errorHandler);
     }, { singleton: true });
     
     // Notification service
@@ -235,6 +257,13 @@ export class Bootstrapper {
       );
     }, { singleton: true });
 
+    // Role service
+    this.container.register<IRoleService>('RoleService', () => {
+      const roleRepository = this.container.resolve<IRoleRepository>('RoleRepository');
+      const permissionRepository = this.container.resolve<IPermissionRepository>('PermissionRepository');
+      return new RoleService(roleRepository, permissionRepository, logger, validator, errorHandler);
+    }, { singleton: true });
+
     logger.info('Services registered');
     return this;
   }
@@ -247,6 +276,7 @@ export class Bootstrapper {
   public registerControllers(): Bootstrapper {
     const logger = this.container.resolve<ILoggingService>('LoggingService');
     const errorHandler = this.container.resolve<IErrorHandler>('ErrorHandler');
+    const roleController = this.container.resolve<IRoleController>('RoleController');
     
     logger.info('Registering controllers...');
 
@@ -272,6 +302,12 @@ export class Bootstrapper {
     this.container.register<IAuthController>('AuthController', () => {
       const authService = this.container.resolve<IAuthService>('AuthService');
       return new AuthController(authService, logger, errorHandler);
+    }, { singleton: true });
+
+    
+    this.container.register<IRoleController>('RoleController', () => {
+      const roleService = this.container.resolve<IRoleService>('RoleService');
+      return new RoleController(roleService, logger, errorHandler);
     }, { singleton: true });
 
     logger.info('Controllers registered');

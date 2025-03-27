@@ -14,6 +14,9 @@ import { createAuthRoutes } from './auth.routes.js';
 import { createUserRoutes } from './users.routes.js';
 import { createCustomerRoutes } from './customers.routes.js';
 import { createNotificationRoutes } from './notifications.routes.js';
+import { createRoleRoutes } from './roles.routes.js';
+import { RoleController } from '../controllers/RoleController.js';
+
 // import { createProjectRoutes } from './projects.routes';
 // import { createAppointmentRoutes } from './appointments.routes';
 // import { createServiceRoutes } from './services.routes';
@@ -42,6 +45,16 @@ export class RouteManager {
     const notificationController = this.container.resolve<NotificationController>('NotificationController');
     const validationService = this.container.resolve<IValidationService>('ValidationService');
     const errorHandler = this.container.resolve<IErrorHandler>('ErrorHandler');
+    const roleController = this.container.resolve<RoleController>('RoleController');
+    const roleRoutes = createRoleRoutes(
+      roleController, 
+      authMiddleware, 
+      validationService, 
+      errorHandler
+    );
+
+    // Log the new routes
+    this.logger.info('Role routes registered');
     
     // Create main router
     const mainRouter = Router();
@@ -57,6 +70,7 @@ export class RouteManager {
     mainRouter.use('/users', userRoutes);
     mainRouter.use('/customers', customerRoutes);
     mainRouter.use('/notifications', notificationRoutes);
+    mainRouter.use('/roles', roleRoutes);
 
     // Mount the main router with the API prefix
     app.use(this.apiPrefix, mainRouter);

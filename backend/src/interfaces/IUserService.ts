@@ -10,6 +10,8 @@ import {
   UserFilterParams
 } from '../dtos/UserDtos.js';
 import { ServiceOptions } from './IBaseService.js';
+import { UserRoleAssignmentDto } from '../dtos/RoleDtos.js';
+import { PermissionResponseDto } from '../dtos/RoleDtos.js';
 
 /**
  * IUserService
@@ -26,6 +28,52 @@ export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUs
    * @returns Promise with detailed user response
    */
   getUserDetails(id: number, options?: any): Promise<UserDetailResponseDto | null>;
+
+  /**
+   * Get user with roles and permissions
+   * 
+   * @param id - User ID
+   * @param options - Service options
+   * @returns Promise with user including roles and permissions
+   */
+  getUserWithRoles(id: number, options?: ServiceOptions): Promise<UserDetailResponseDto | null>;
+
+  /**
+   * Assign roles to a user
+   * 
+   * @param userId - User ID
+   * @param data - Role assignment data
+   * @param options - Service options
+   * @returns Promise with updated user details
+   */
+  assignRoles(userId: number, data: UserRoleAssignmentDto, options?: ServiceOptions): Promise<UserDetailResponseDto>;
+
+  /**
+   * Remove roles from a user
+   * 
+   * @param userId - User ID
+   * @param roleIds - Role IDs to remove
+   * @param options - Service options
+   * @returns Promise with updated user details
+   */
+  removeRoles(userId: number, roleIds: number[], options?: ServiceOptions): Promise<UserDetailResponseDto>;
+
+  /**
+   * Check if a user has a specific permission
+   * 
+   * @param userId - User ID
+   * @param permissionName - Permission name to check
+   * @returns Promise with boolean indicating if user has permission
+   */
+  hasPermission(userId: number, permissionName: string): Promise<boolean>;
+
+  /**
+   * Get all permissions for a user
+   * 
+   * @param userId - User ID
+   * @returns Promise with user's permissions
+   */
+  getUserPermissions(userId: number): Promise<PermissionResponseDto[]>;
   
   /**
    * Find a user by username

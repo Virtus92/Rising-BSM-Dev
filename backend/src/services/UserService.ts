@@ -4,6 +4,8 @@ import { IUserRepository } from '../interfaces/IUserRepository.js';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IValidationService } from '../interfaces/IValidationService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
+import { IRoleRepository } from 'src/interfaces/IRoleRepository.js';
+import { IPermissionRepository } from 'src/interfaces/IPermissionRepository.js';
 import { User, UserStatus } from '../entities/User.js';
 import { 
   CreateUserDto, 
@@ -17,6 +19,7 @@ import {
   updateUserValidationSchema,
   changePasswordValidationSchema
 } from '../dtos/UserDtos.js';
+import { UserRoleAssignmentDto } from '../dtos/RoleDtos.js';
 import { ServiceOptions } from '../interfaces/IBaseService.js';
 import * as bcrypt from 'bcryptjs';
 import { PasswordUtils } from '../utils/PasswordUtils.js';
@@ -38,12 +41,13 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
    */
   constructor(
     private readonly userRepository: IUserRepository,
+    private readonly roleRepository: IRoleRepository,
+    private readonly permissionRepository: IPermissionRepository,
     logger: ILoggingService,
     validator: IValidationService,
     errorHandler: IErrorHandler
   ) {
     super(userRepository, logger, validator, errorHandler);
-    
     this.logger.debug('Initialized UserService');
   }
 
@@ -88,6 +92,184 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
       throw this.handleError(error);
     }
   }
+
+  /**
+ * Get user with roles and permissions
+ * 
+ * @param id - User ID
+ * @param options - Service options
+ * @returns Promise with user including roles and permissions
+ */
+async getUserWithRoles(id: number, options?: ServiceOptions): Promise<UserDetailResponseDto | null> {
+  try {
+    // Get basic user details
+    const user = await this.getById(id, options);
+    
+    if (!user) {
+      return null;
+    }
+    
+    // Get roles with permissions
+    const roles = await this.roleRepository.getUserRoles(id);
+    
+    // Get all user permissions (flattened)
+    const permissions = await this.permissionRepository.getUserPermissions(id);
+    
+    // Return detailed user DTO
+    return {
+      ...user,
+      roles: roles.map(role => ({
+        id: role.id,
+        name: role.name,
+        description: role.description || '',
+        isSystem: role.isSystem
+      })),
+      permissions: permissions.map(permission => ({
+        id: permission.id,
+        name: permission.name,
+        description: permission.description || '',
+        category: permission.category
+      }))
+    };
+  } catch (error) {
+    this.logger.error('Error in UserService.getUserWithRoles', error instanceof Error ? error : String(error), { id });
+    throw this.handleError(error);
+  }
+}
+
+/**
+ * Assign roles to a user
+ * 
+ * @param userId - User ID
+ * @param data - Role assignment data
+ * @param options - Service options
+ * @returns Promise with updated user details
+ */
+async assignRoles(userId: number, data: UserRoleAssignmentDto, options?: ServiceOptions): Promise<UserDetailResponseDto> {
+  try {
+    // Check if user exists
+    const user = await this.userRepository.findById(userId);
+    
+    if (!user) {
+      throw this.errorHandler.createNotFoundError(`User with ID ${userId} not found`);
+    }
+    
+    // Verify all roles exist
+    for (const roleId of data.roleIds) {
+      const roleExists = await this.roleRepository.findById(roleId);
+      if (!roleExists) {
+        throw this.errorHandler.createValidationError('Invalid role', [`Role with ID ${roleId} does not exist`]);
+      }
+    }
+    
+    // If replacing, remove all existing roles first
+    if (data.replaceExisting) {
+      // Get current user roles
+      const currentRoles = await this.roleRepository.getUserRoles(userId);
+      const currentRoleIds = currentRoles.map(role => role.id);
+      
+      // Remove all current roles
+      if (currentRoleIds.length > 0) {
+        await this.roleRepository.removeRolesFromUser(userId, currentRoleIds);
+      }
+    }
+    
+    // Assign roles
+    await this.roleRepository.assignRolesToUser(userId, data.roleIds);
+    
+    // Log activity
+    if (options?.context?.userId) {
+      await this.userRepository.logActivity(
+        options.context.userId,
+        'assign_roles',
+        `Assigned roles to user ${user.username || user.email}`,
+        options.context.ipAddress
+      );
+    }
+    
+    // Return updated user details
+    return await this.getUserWithRoles(userId, options) as UserDetailResponseDto;
+  } catch (error) {
+    this.logger.error('Error in UserService.assignRoles', error instanceof Error ? error : String(error), { userId, data });
+    throw this.handleError(error);
+  }
+}
+
+/**
+ * Remove roles from a user
+ * 
+ * @param userId - User ID
+ * @param roleIds - Role IDs to remove
+ * @param options - Service options
+ * @returns Promise with updated user details
+ */
+async removeRoles(userId: number, roleIds: number[], options?: ServiceOptions): Promise<UserDetailResponseDto> {
+  try {
+    // Check if user exists
+    const user = await this.userRepository.findById(userId);
+    
+    if (!user) {
+      throw this.errorHandler.createNotFoundError(`User with ID ${userId} not found`);
+    }
+    
+    // Remove roles
+    await this.roleRepository.removeRolesFromUser(userId, roleIds);
+    
+    // Log activity
+    if (options?.context?.userId) {
+      await this.userRepository.logActivity(
+        options.context.userId,
+        'remove_roles',
+        `Removed roles from user ${user.username || user.email}`,
+        options.context.ipAddress
+      );
+    }
+    
+    // Return updated user details
+    return await this.getUserWithRoles(userId, options) as UserDetailResponseDto;
+  } catch (error) {
+    this.logger.error('Error in UserService.removeRoles', error instanceof Error ? error : String(error), { userId, roleIds });
+    throw this.handleError(error);
+  }
+}
+
+/**
+ * Check if a user has a specific permission
+ * 
+ * @param userId - User ID
+ * @param permissionName - Permission name to check
+ * @returns Promise with boolean indicating if user has permission
+ */
+async hasPermission(userId: number, permissionName: string): Promise<boolean> {
+  try {
+    return await this.permissionRepository.checkUserPermission(userId, permissionName);
+  } catch (error) {
+    this.logger.error('Error in UserService.hasPermission', error instanceof Error ? error : String(error), { userId, permissionName });
+    throw this.handleError(error);
+  }
+}
+
+/**
+ * Get all permissions for a user
+ * 
+ * @param userId - User ID
+ * @returns Promise with user's permissions
+ */
+async getUserPermissions(userId: number): Promise<PermissionResponseDto[]> {
+  try {
+    const permissions = await this.permissionRepository.getUserPermissions(userId);
+    
+    return permissions.map(permission => ({
+      id: permission.id,
+      name: permission.name,
+      description: permission.description || '',
+      category: permission.category
+    }));
+  } catch (error) {
+    this.logger.error('Error in UserService.getUserPermissions', error instanceof Error ? error : String(error), { userId });
+    throw this.handleError(error);
+  }
+}
 
   /**
    * Find a user by username

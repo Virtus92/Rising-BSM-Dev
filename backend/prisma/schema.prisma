@@ -17,7 +17,7 @@ model User {
   name              String             @db.VarChar(100)
   email             String             @unique @db.VarChar(100)
   password          String             @db.VarChar(100)
-  roles             UserRole[]              
+  role              String             @default("user") @db.VarChar(20)      
   phone             String?            @db.VarChar(30)
   status            String             @default("active") @db.Text
   profilePicture    String?            @db.VarChar(255)
@@ -38,6 +38,7 @@ model User {
   requestNotes      RequestNote[]
   appointmentNotes  AppointmentNote[]
   appointmentLogs   AppointmentLog[]
+  userRoles         UserRole[]
 
 
   @@index([email])
@@ -90,12 +91,12 @@ model RefreshToken {
 }
 
 model Permission {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
+  id          Int               @id @default(autoincrement())
+  name        String            @unique
   description String?
   category    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
   roles       RolePermission[]
 }
 

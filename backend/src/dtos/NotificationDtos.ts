@@ -281,9 +281,9 @@ export function getNotificationClass(type: string): string {
  * @param referenceId - Reference ID
  * @returns Link to referenced content
  */
-export function getNotificationLink(type: string, referenceId?: number): string | undefined {
+export function getNotificationLink(type: string, referenceId?: number): string  {
   if (!referenceId) {
-    return undefined;
+    return '';
   }
   
   switch (type) {
@@ -294,7 +294,7 @@ export function getNotificationLink(type: string, referenceId?: number): string 
     case NotificationType.MESSAGE:
       return `/messages/${referenceId}`;
     default:
-      return undefined;
+      return '';
   }
 }
 

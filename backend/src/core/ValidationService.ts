@@ -434,7 +434,7 @@ import {
      * @param convert - Whether to convert types
      * @returns Error message or undefined if valid
      */
-    private validateType(value: any, type: string, rule: ValidationRule, convert: boolean): string | undefined {
+    private validateType(value: any, type: string, rule: ValidationRule, convert: boolean): string  {
       // Try to convert value if needed
       if (convert) {
         value = this.convertValueToType(value, type);
@@ -446,7 +446,7 @@ import {
         if (!validator(value, rule)) {
           return rule.messages?.type || `Value must be a valid ${type}`;
         }
-        return undefined;
+        return '';
       }
       
       // Built-in type checking
@@ -511,7 +511,7 @@ import {
           break;
       }
       
-      return undefined;
+      return '';
     }
   
     /**
