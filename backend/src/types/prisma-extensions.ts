@@ -2,6 +2,18 @@
  * Type extensions for Prisma models to improve TypeScript support
  */
 
+import { PrismaClient } from '@prisma/client';
+
+/**
+ * Extended PrismaClient interface with models that might not be properly typed
+ */
+export interface ExtendedPrismaClient extends PrismaClient {
+  permission: any;
+  role: any;
+  rolePermission: any;
+  userRole: any;
+}
+
 /**
  * Permission model from Prisma
  */

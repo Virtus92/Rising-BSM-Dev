@@ -5,6 +5,8 @@ import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { PrismaClient } from '@prisma/client';
 import { QueryOptions, FilterCriteria } from '../interfaces/IBaseRepository.js';
+import { ExtendedPrismaClient } from '../types/prisma-extensions.js';
+import { getPrismaExtended } from '../utils/PrismaDirectAccess.js';
 
 /**
  * PermissionRepository
@@ -12,6 +14,8 @@ import { QueryOptions, FilterCriteria } from '../interfaces/IBaseRepository.js';
  * Implementation of IPermissionRepository for data access operations related to permissions.
  */
 export class PermissionRepository extends BaseRepository<Permission, number> implements IPermissionRepository {
+  private prismaExt: ExtendedPrismaClient;
+
   /**
    * Creates a new PermissionRepository instance
    * 
@@ -27,6 +31,9 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
     // Pass model reference to BaseRepository
     super(prisma.permission, logger, errorHandler);
     
+    // Cast to extended client
+    this.prismaExt = getPrismaExtended(prisma);
+    
     this.logger.debug('Initialized PermissionRepository');
   }
 
@@ -38,7 +45,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
    */
   async findByName(name: string): Promise<Permission | null> {
     try {
-      const permission = await this.prisma.permission.findUnique({
+      const permission = await this.prismaExt.permission.findUnique({
         where: { name }
       });
       
@@ -57,7 +64,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
    */
   async findByCategory(category: string): Promise<Permission[]> {
     try {
-      const permissions = await this.prisma.permission.findMany({
+      const permissions = await this.prismaExt.permission.findMany({
         where: { category }
       });
       
@@ -77,7 +84,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
   async getPermissionsByRole(roleId: number): Promise<Permission[]> {
     try {
       // Get permission IDs from role permissions junction table
-      const rolePermissions = await this.prisma.rolePermission.findMany({
+      const rolePermissions = await this.prismaExt.rolePermission.findMany({
         where: { roleId },
         select: { permissionId: true }
       });
@@ -90,7 +97,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
       }
       
       // Fetch permissions by IDs
-      const permissions = await this.prisma.permission.findMany({
+      const permissions = await this.prismaExt.permission.findMany({
         where: { id: { in: permissionIds } }
       });
       
@@ -110,7 +117,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
   async getUserPermissions(userId: number): Promise<Permission[]> {
     try {
       // Get user roles with their permissions
-      const userRolesWithPermissions = await this.prisma.userRole.findMany({
+      const userRolesWithPermissions = await this.prismaExt.userRole.findMany({
         where: { userId },
         select: {
           role: {
@@ -153,7 +160,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
   async checkUserPermission(userId: number, permissionName: string): Promise<boolean> {
     try {
       // Find the permission
-      const permission = await this.prisma.permission.findUnique({
+      const permission = await this.prismaExt.permission.findUnique({
         where: { name: permissionName }
       });
       
@@ -187,7 +194,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
   async assignPermissionsToRole(roleId: number, permissionIds: number[]): Promise<number> {
     try {
       // Validate that the role exists
-      const role = await this.prisma.role.findUnique({
+      const role = await this.prismaExt.role.findUnique({
         where: { id: roleId }
       });
       
@@ -196,7 +203,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
       }
       
       // Get existing permissions for this role to avoid duplicates
-      const existingRolePermissions = await this.prisma.rolePermission.findMany({
+      const existingRolePermissions = await this.prismaExt.rolePermission.findMany({
         where: { roleId }
       });
       
@@ -212,7 +219,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
       // Create role-permission relationships in a transaction
       await this.prisma.$transaction(
         newPermissionIds.map(permissionId =>
-          this.prisma.rolePermission.create({
+          this.prismaExt.rolePermission.create({
             data: {
               roleId,
               permissionId
@@ -238,7 +245,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
   async removePermissionsFromRole(roleId: number, permissionIds: number[]): Promise<number> {
     try {
       // Delete the role-permission relationships
-      const result = await this.prisma.rolePermission.deleteMany({
+      const result = await this.prismaExt.rolePermission.deleteMany({
         where: {
           roleId,
           permissionId: { in: permissionIds }
@@ -259,7 +266,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
    */
   async getAllCategories(): Promise<string[]> {
     try {
-      const result = await this.prisma.permission.groupBy({
+      const result = await this.prismaExt.permission.groupBy({
         by: ['category']
       });
       
@@ -302,49 +309,49 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
     try {
       switch (operation) {
         case 'findAll':
-          return await this.prisma.permission.findMany(args[0]);
+          return await this.prismaExt.permission.findMany(args[0]);
           
         case 'findById':
-          return await this.prisma.permission.findUnique({
+          return await this.prismaExt.permission.findUnique({
             where: { id: args[0] },
             ...(args[1] || {})
           });
           
         case 'findByCriteria':
-          return await this.prisma.permission.findMany({
+          return await this.prismaExt.permission.findMany({
             where: args[0],
             ...(args[1] || {})
           });
           
         case 'findOneByCriteria':
-          return await this.prisma.permission.findFirst({
+          return await this.prismaExt.permission.findFirst({
             where: args[0],
             ...(args[1] || {})
           });
           
         case 'create':
-          return await this.prisma.permission.create({
+          return await this.prismaExt.permission.create({
             data: args[0]
           });
           
         case 'update':
-          return await this.prisma.permission.update({
+          return await this.prismaExt.permission.update({
             where: { id: args[0] },
             data: args[1]
           });
           
         case 'delete':
-          return await this.prisma.permission.delete({
+          return await this.prismaExt.permission.delete({
             where: { id: args[0] }
           });
           
         case 'count':
-          return await this.prisma.permission.count({
+          return await this.prismaExt.permission.count({
             where: args[0]
           });
           
         case 'bulkUpdate':
-          return await this.prisma.permission.updateMany({
+          return await this.prismaExt.permission.updateMany({
             where: { id: { in: args[0] } },
             data: args[1]
           });
@@ -481,31 +488,6 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
    */
   protected async directPermissionQuery(query: string, ...params: any[]): Promise<any> {
     return await this.prisma.$executeRawUnsafe(query, ...params);
-  }
-
-  // When accessing permission model through prisma, use a helper
-  protected get permissionModel(): any {
-    return (this.prisma as any).permission;
-  }
-
-  // When accessing rolePermission model through prisma, use a helper
-  protected get rolePermissionModel(): any {
-    return (this.prisma as any).rolePermission;
-  }
-
-  // When accessing userRole model through prisma, use a helper
-  protected get userRoleModel(): any {
-    return (this.prisma as any).userRole;
-  }
-
-  // When accessing role model through prisma, use a helper
-  protected get roleModel(): any {
-    return (this.prisma as any).role;
-  }
-
-  // When accessing count results, use proper type casting
-  protected asCountResult(result: any): { count: number } {
-    return result as { count: number };
   }
 
   // Use these methods in your queries - for example:

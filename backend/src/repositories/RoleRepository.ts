@@ -5,6 +5,8 @@ import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { PrismaClient } from '@prisma/client';
 import { QueryOptions, FilterCriteria } from '../interfaces/IBaseRepository.js';
+import { ExtendedPrismaClient } from '../types/prisma-extensions.js';
+import { getPrismaExtended } from '../utils/PrismaDirectAccess.js';
 
 /**
  * RoleRepository
@@ -12,6 +14,8 @@ import { QueryOptions, FilterCriteria } from '../interfaces/IBaseRepository.js';
  * Implementation of IRoleRepository for data access operations related to roles.
  */
 export class RoleRepository extends BaseRepository<Role, number> implements IRoleRepository {
+  private prismaExt: ExtendedPrismaClient;
+
   /**
    * Creates a new RoleRepository instance
    * 
@@ -27,6 +31,9 @@ export class RoleRepository extends BaseRepository<Role, number> implements IRol
     // Pass model reference to BaseRepository
     super(prisma.role, logger, errorHandler);
     
+    // Cast to extended client
+    this.prismaExt = getPrismaExtended(prisma);
+    
     this.logger.debug('Initialized RoleRepository');
   }
 
@@ -38,7 +45,7 @@ export class RoleRepository extends BaseRepository<Role, number> implements IRol
    */
   async findByName(name: string): Promise<Role | null> {
     try {
-      const role = await this.prisma.role.findUnique({
+      const role = await this.prismaExt.role.findUnique({
         where: { name }
       });
       

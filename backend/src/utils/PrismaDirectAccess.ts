@@ -6,6 +6,14 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { ExtendedPrismaClient } from '../types/prisma-extensions.js';
+
+/**
+ * Cast PrismaClient to ExtendedPrismaClient
+ */
+export function getPrismaExtended(prisma: PrismaClient): ExtendedPrismaClient {
+  return prisma as unknown as ExtendedPrismaClient;
+}
 
 /**
  * Access the Permission model
