@@ -18,10 +18,11 @@
         "test:coverage": "jest --coverage",
         "lint": "eslint . --ext .ts",
         "format": "prettier --write .",
-        "openapi:validate": "swagger-cli validate openapi/openapi.yaml",
-        "openapi:build": "node scripts/bundle-openapi.js",
-        "openapi:serve": "redoc-cli serve openapi/openapi.yaml --port 8080",
-        "openapi:bundle": "redoc-cli bundle openapi/openapi.yaml -o public/api-docs.html"
+        "openapi:validate": "node scripts/validate-openapi.js",
+        "openapi:bundle": "node scripts/bundle-openapi.js",
+        "openapi:serve": "redoc-cli serve dist/swagger.json --port 8080",
+        "prestart": "node scripts/ensure-swagger.js",
+        "predev": "node scripts/ensure-swagger.js"
     },
     "dependencies": {
         "@dr.pogodin/csurf": "^1.12.3",

@@ -36,6 +36,16 @@ async function main() {
   // Fehlerbehandlung als letztes Middleware
   errorMiddleware.register(app);
 
+  app.use(express.static('dist', {
+    setHeaders: (res, path) => {
+      if (path.endsWith('.json')) {
+        res.setHeader('Content-Type', 'application/json');
+      } else if (path.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      }
+    }
+  }));
+
   // Starte Server
   const port = config.PORT;
   app.listen(port, () => {

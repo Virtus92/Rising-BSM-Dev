@@ -3,6 +3,9 @@
 
 set -e
 
+echo "Ensuring Swagger documentation is available..."
+node /app/scripts/ensure-swagger.js
+
 echo "Running prisma migrations..."
 npx prisma migrate dev --name init
 npx prisma generate

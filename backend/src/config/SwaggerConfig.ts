@@ -61,49 +61,44 @@ export class SwaggerConfig {
         'utf8'
       );
       
-      // Allow CORS specifically for Swagger-related endpoints
-      app.use('/swagger.json', (req: Request, res: Response, next: NextFunction) => {
+      app.get('/swagger.json', (req: Request, res: Response) => {
+        // Explizite CORS-Header setzen
         res.header('Access-Control-Allow-Origin', '*');
         res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-        next();
+        
+        // Expliziter Content-Type
+        res.header('Content-Type', 'application/json');
+        
+        try {
+          const swaggerJsonPath = path.join(__dirname, '../../dist/swagger.json');
+          if (fs.existsSync(swaggerJsonPath)) {
+            const swaggerContent = fs.readFileSync(swaggerJsonPath, 'utf8');
+            res.send(swaggerContent);
+          } else {
+            // Schreibe den in-memory Spec in die Antwort
+            res.json(this.openApiSpec || this.createMockOpenApiSpec());
+          }
+        } catch (error) {
+          this.logger.error('Error serving swagger.json:', error instanceof Error ? error : String(error));
+          res.status(500).json({ error: 'Failed to serve OpenAPI specification' });
+        }
       });
-
-      // Serve the bundled Swagger JSON file
-      app.use('/swagger.json', express.static(swaggerJsonPath));
       
       // Configure Swagger UI with improved options
       const options = {
         swaggerOptions: {
           url: '/swagger.json',
-          // Configure fetch options to avoid CORS issues
-          responseInterceptor: (res: any) => {
-            // JavaScript function as string that will be injected into Swagger UI
-            return `
-              if (res.status >= 400) {
-                console.error('Swagger UI API request failed:', res);
-              }
-              return res;
-            `;
+            // Configure fetch options to avoid CORS issues
+            
+            requestInterceptor: function(req: { headers: Record<string, string> }): { headers: Record<string, string> } {
+            req.headers['Accept'] = 'application/json';
+            req.headers['Content-Type'] = 'application/json';
+            return req;
+            }
           },
-          // Add proper request handling
-          requestInterceptor: (req: any) => {
-            // JavaScript function as string that will be injected into Swagger UI
-            return `
-              console.log('Swagger UI sending request:', req);
-              // Ensure proper headers
-              if (!req.headers) req.headers = {};
-              req.headers['Accept'] = 'application/json';
-              req.headers['Content-Type'] = 'application/json';
-              return req;
-            `;
-          },
-          // Set Swagger UI to use standard fetch with credentials
-          withCredentials: true,
-          supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch', 'options', 'head'],
-        },
-        // Custom CSS to improve UI
+        // Einfacheres CSS für die UI
         customCss: '.swagger-ui .topbar { display: none }',
-        // Custom JS to fix potential issues
+        // Konsistenter Pfad
         customJs: '/swagger-custom.js'
       };
       

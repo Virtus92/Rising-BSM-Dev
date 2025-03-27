@@ -35,6 +35,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - ./backend/dist:/app/dist
     networks:
       - rising-bsm-network
     command: >

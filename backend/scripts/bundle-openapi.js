@@ -10,9 +10,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  */
 function findOpenApiDir() {
   const possiblePaths = [
-    '/app/openapi',  // Prioritize container path
+    '/app/openapi',
     path.resolve(process.cwd(), 'openapi'),
-    path.resolve(__dirname, '../openapi'),
     path.resolve(process.cwd(), 'backend/openapi')
   ];
   

@@ -32,8 +32,9 @@ RUN npm install --global @redocly/cli
 # Create directory for bundled output
 RUN mkdir -p /app/dist
 
-# Bundle OpenAPI specification
-RUN npx @redocly/cli bundle /app/openapi/openapi.yaml -o /app/dist/swagger.json
+# Bundle OpenAPI files
+COPY scripts/bundle-openapi.js /app/scripts/bundle-openapi.js
+RUN node /app/scripts/bundle-openapi.js
 
 # Copy the rest of the application
 COPY . .
