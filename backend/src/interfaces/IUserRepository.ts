@@ -1,6 +1,7 @@
 import { IBaseRepository } from './IBaseRepository.js';
 import { User } from '../entities/User.js';
 import { UserFilterParams } from '../dtos/UserDtos.js';
+import { QueryOptions } from './IBaseRepository.js';
 
 /**
  * IUserRepository
@@ -10,12 +11,12 @@ import { UserFilterParams } from '../dtos/UserDtos.js';
  */
 export interface IUserRepository extends IBaseRepository<User, number> {
   /**
-   * Find a user by username
+   * Find a user by name or email
    * 
-   * @param username - Username to search for
+   * @param name - name to search for
    * @returns Promise with user or null if not found
    */
-  findByUsername(username: string): Promise<User | null>;
+  findByName(name: string): Promise<User | null>;
   
   /**
    * Find a user by email
@@ -40,7 +41,7 @@ export interface IUserRepository extends IBaseRepository<User, number> {
    * @param options - Query options
    * @returns Promise with matching users
    */
-  searchUsers(searchText: string, options?: any): Promise<User[]>;
+  searchUsers(searchText: string, options?: QueryOptions): Promise<User[]>;
   
   /**
    * Update user password
@@ -75,4 +76,13 @@ export interface IUserRepository extends IBaseRepository<User, number> {
     details?: string,
     ipAddress?: string
   ): Promise<any>;
+  
+  /**
+   * Bulk update multiple users
+   * 
+   * @param ids - Array of user IDs
+   * @param data - Update data
+   * @returns Promise with count of updated users
+   */
+  bulkUpdate(ids: number[], data: Partial<User>): Promise<number>;
 }

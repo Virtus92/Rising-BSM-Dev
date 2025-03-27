@@ -5,6 +5,7 @@ import { UserFilterParams } from '../dtos/UserDtos.js';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { QueryOptions } from '../interfaces/IBaseRepository.js';
+import { PrismaClient } from '@prisma/client';
 
 /**
  * UserRepository
@@ -12,54 +13,53 @@ import { QueryOptions } from '../interfaces/IBaseRepository.js';
  * Implementation of IUserRepository for database operations related to User entities.
  * Extends BaseRepository to leverage common CRUD operations.
  */
-export class UserRepository extends BaseRepository<User, number, any> implements IUserRepository {
+export class UserRepository extends BaseRepository<User, number> implements IUserRepository {
   /**
    * Creates a new UserRepository instance
    * 
-   * @param dbClient - Database client (e.g., Prisma, Sequelize, etc.)
+   * @param prisma - Prisma client
    * @param logger - Logging service
    * @param errorHandler - Error handler
    */
   constructor(
-    private readonly dbClient: any,
+    private readonly prisma: PrismaClient,
     logger: ILoggingService,
     errorHandler: IErrorHandler
   ) {
-    // Pass model reference to BaseRepository - using the table name that exists in the database
-    // Determine the actual table name by checking the Prisma schema or database
-    super(dbClient.user || dbClient.users || dbClient["user"] || dbClient["User"], logger, errorHandler);
-    
-    // Store the actual model name for reuse
-    this.userModel = dbClient.user || dbClient.users || dbClient["user"] || dbClient["User"];
-    if (!this.userModel) {
-      logger.error('User model not found in database client');
-      throw new Error('User model not found in database client. Please check your database schema.');
-    }
+    // Pass user model to BaseRepository
+    super(prisma.user, logger, errorHandler);
     
     this.logger.debug('Initialized UserRepository');
   }
-
-  // Add a property to store the actual user model reference
-  private userModel: any;
-
   /**
-   * Find a user by username
+   * Find a user by name
    * 
-   * @param username - Username to search for
+   * @param name - name to search for
    * @returns Promise with user or null
    */
-  async findByUsername(username: string): Promise<User | null> {
+  async findByName(name: string): Promise<User | null> {
     try {
-      const user = await this.userModel.findUnique({
-        where: { username }
+      this.logger.debug(`Finding user by name: ${name}`);
+      
+      const user = await this.prisma.user.findFirst({
+        where: { 
+          name: { 
+            equals: name,
+            mode: 'insensitive'
+          },
+          status: { not: UserStatus.DELETED }
+        }
       });
       
       return user ? this.mapToDomainEntity(user) : null;
     } catch (error) {
-      this.logger.error('Error in UserRepository.findByUsername', error instanceof Error ? error : String(error), { username });
+      this.logger.error('Error in UserRepository.findByName', error instanceof Error ? error : String(error), { name });
       throw this.handleError(error);
     }
   }
+
+  // Transaction property for managing DB transactions
+  public transaction: any = null;
 
   /**
    * Find a user by email
@@ -69,7 +69,9 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    */
   async findByEmail(email: string): Promise<User | null> {
     try {
-      const user = await this.userModel.findUnique({
+      this.logger.debug(`Finding user by email: ${email}`);
+      
+      const user = await this.prisma.user.findUnique({
         where: { email }
       });
       
@@ -105,10 +107,10 @@ export class UserRepository extends BaseRepository<User, number, any> implements
       }
       
       // Execute count query
-      const total = await this.userModel.count({ where });
+      const total = await this.prisma.user.count({ where });
       
       // Execute main query
-      const users = await this.userModel.findMany({
+      const users = await this.prisma.user.findMany({
         where,
         skip,
         take: limit,
@@ -116,7 +118,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
       });
       
       // Map to domain entities
-      const data = users.map((user: any) => this.mapToDomainEntity(user));
+      const data = users.map(user => this.mapToDomainEntity(user));
       
       // Calculate pagination metadata
       const totalPages = Math.ceil(total / limit);
@@ -152,24 +154,22 @@ export class UserRepository extends BaseRepository<User, number, any> implements
       const limit = options?.limit || 10;
       const skip = options?.page ? (options.page - 1) * limit : 0;
       
-      // Execute search query
-      const users = await this.userModel.findMany({
+      // Execute search query - search by name or email
+      const users = await this.prisma.user.findMany({
         where: {
           OR: [
-            { username: { contains: search, mode: 'insensitive' } },
-            { email: { contains: search, mode: 'insensitive' } },
-            { firstName: { contains: search, mode: 'insensitive' } },
-            { lastName: { contains: search, mode: 'insensitive' } }
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } }
           ],
           status: { not: UserStatus.DELETED }
         },
         skip,
         take: limit,
-        orderBy: { username: 'asc' }
+        orderBy: { name: 'asc' }
       });
       
       // Map to domain entities
-      return users.map((user: any) => this.mapToDomainEntity(user));
+      return users.map(user => this.mapToDomainEntity(user));
     } catch (error) {
       this.logger.error('Error in UserRepository.searchUsers', error instanceof Error ? error : String(error), { searchText });
       throw this.handleError(error);
@@ -186,7 +186,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
   async updatePassword(userId: number, hashedPassword: string): Promise<User> {
     try {
       // Update password
-      const user = await this.userModel.update({
+      const user = await this.prisma.user.update({
         where: { id: userId },
         data: { 
           password: hashedPassword,
@@ -209,28 +209,28 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    * @param data - Update data
    * @returns Promise with count of updated users
    */
-    async bulkUpdate(ids: number[], data: Partial<User>): Promise<number> {
-      try {
-        // Ensure the IDs are valid
-        if (!ids.length) {
-          return 0;
-        }
-        
-        // Prepare data for Prisma
-        const updateData = this.mapToORMEntity(data);
-        
-        // Perform the update
-        const result = await this.userModel.updateMany({
-          where: { id: { in: ids } },
-          data: updateData
-        });
-        
-        return result.count;
-      } catch (error) {
-        this.logger.error('Error in bulk update', error instanceof Error ? error : String(error), { ids, data });
-        throw this.handleError(error);
+  async bulkUpdate(ids: number[], data: Partial<User>): Promise<number> {
+    try {
+      // Ensure the IDs are valid
+      if (!ids.length) {
+        return 0;
       }
+      
+      // Prepare data for Prisma
+      const updateData = this.mapToORMEntity(data);
+      
+      // Perform the update
+      const result = await this.prisma.user.updateMany({
+        where: { id: { in: ids } },
+        data: updateData
+      });
+      
+      return result.count;
+    } catch (error) {
+      this.logger.error('Error in bulk update', error instanceof Error ? error : String(error), { ids, data });
+      throw this.handleError(error);
     }
+  }
 
   /**
    * Get user activity history
@@ -241,9 +241,9 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    */
   async getUserActivity(userId: number, limit: number = 10): Promise<any[]> {
     try {
-      const activities = await this.dbClient.userActivity.findMany({
+      const activities = await this.prisma.userActivity.findMany({
         where: { userId },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { timestamp: 'desc' },
         take: limit
       });
       
@@ -270,13 +270,13 @@ export class UserRepository extends BaseRepository<User, number, any> implements
     ipAddress?: string
   ): Promise<any> {
     try {
-      return await this.dbClient.userActivity.create({
+      return await this.prisma.userActivity.create({
         data: {
           userId,
-          type: activityType,
+          activity: activityType,
           details,
           ipAddress,
-          createdAt: new Date()
+          timestamp: new Date()
         }
       });
     } catch (error) {
@@ -293,8 +293,8 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    * Begin a transaction
    */
   protected async beginTransaction(): Promise<void> {
-    // Most ORMs use a different approach, but this is a typical pattern
-    this.transaction = await this.dbClient.$transaction.start();
+    // Prisma transactions are handled differently
+    // This is a placeholder for the BaseRepository implementation
   }
 
   /**
@@ -302,7 +302,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    */
   protected async commitTransaction(): Promise<void> {
     if (this.transaction) {
-      await this.transaction.commit();
+      // Prisma handles this automatically
       this.transaction = null;
     }
   }
@@ -312,7 +312,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    */
   protected async rollbackTransaction(): Promise<void> {
     if (this.transaction) {
-      await this.transaction.rollback();
+      // Prisma handles this automatically
       this.transaction = null;
     }
   }
@@ -326,46 +326,44 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    */
   protected async executeQuery(operation: string, ...args: any[]): Promise<any> {
     try {
-      // Use transaction if available
-      const client = this.transaction || this.dbClient;
-      const userModel = this.userModel;
+      const model = this.prisma.user;
       
       switch (operation) {
         case 'findAll':
-          return await userModel.findMany(args[0]);
+          return await model.findMany(args[0]);
           
         case 'findById':
-          return await userModel.findUnique({
+          return await model.findUnique({
             where: { id: args[0] },
             ...(args[1] || {})
           });
           
         case 'findByCriteria':
-          return await userModel.findMany({
+          return await model.findMany({
             where: args[0],
             ...(args[1] || {})
           });
           
         case 'findOneByCriteria':
-          return await userModel.findFirst({
+          return await model.findFirst({
             where: args[0],
             ...(args[1] || {})
           });
           
         case 'create':
-          return await userModel.create({
+          return await model.create({
             data: args[0]
           });
           
         case 'update':
-          return await userModel.update({
+          return await model.update({
             where: { id: args[0] },
             data: args[1]
           });
           
         case 'delete':
           // Soft delete by default
-          return await userModel.update({
+          return await model.update({
             where: { id: args[0] },
             data: { 
               status: UserStatus.DELETED,
@@ -374,7 +372,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
           });
           
         case 'count':
-          return await userModel.count({
+          return await model.count({
             where: args[0]
           });
           
@@ -456,18 +454,18 @@ export class UserRepository extends BaseRepository<User, number, any> implements
     
     return new User({
       id: ormEntity.id,
-      username: ormEntity.username,
+      name: ormEntity.name,
       email: ormEntity.email,
       password: ormEntity.password,
-      firstName: ormEntity.firstName,
-      lastName: ormEntity.lastName,
-      role: ormEntity.role as UserRole,
-      status: ormEntity.status as UserStatus,
+      role: ormEntity.role,
+      phone: ormEntity.phone,
+      status: ormEntity.status,
+      profilePicture: ormEntity.profilePicture,
       createdAt: ormEntity.createdAt,
       updatedAt: ormEntity.updatedAt,
-      createdBy: ormEntity.createdBy,
-      updatedBy: ormEntity.updatedBy,
-      lastLoginAt: ormEntity.lastLoginAt
+      lastLoginAt: ormEntity.lastLoginAt,
+      resetToken: ormEntity.resetToken,
+      resetTokenExpiry: ormEntity.resetTokenExpiry
     });
   }
 
@@ -504,8 +502,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    * @returns Whether error is a unique constraint violation
    */
   protected isUniqueConstraintError(error: any): boolean {
-    // Implement based on your ORM's error structure
-    // Example for Prisma:
+    // Prisma-specific unique constraint error code
     return error.code === 'P2002';
   }
 
@@ -516,8 +513,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    * @returns Whether error is a foreign key constraint violation
    */
   protected isForeignKeyConstraintError(error: any): boolean {
-    // Implement based on your ORM's error structure
-    // Example for Prisma:
+    // Prisma-specific foreign key constraint error code
     return error.code === 'P2003';
   }
 
@@ -527,16 +523,14 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    * @param filters - User filter parameters
    * @returns ORM-specific where conditions
    */
-  private buildUserFilters(filters: UserFilterParams): any {
+  protected buildUserFilters(filters: UserFilterParams): any {
     const where: any = {};
     
     // Add search filter
     if (filters.search) {
       where.OR = [
-        { username: { contains: filters.search, mode: 'insensitive' } },
-        { email: { contains: filters.search, mode: 'insensitive' } },
-        { firstName: { contains: filters.search, mode: 'insensitive' } },
-        { lastName: { contains: filters.search, mode: 'insensitive' } }
+        { name: { contains: filters.search, mode: 'insensitive' } },
+        { email: { contains: filters.search, mode: 'insensitive' } }
       ];
     }
     
@@ -568,7 +562,4 @@ export class UserRepository extends BaseRepository<User, number, any> implements
     
     return where;
   }
-  
-  // Transaction property for managing DB transactions
-  public transaction: any = null;
 }

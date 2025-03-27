@@ -153,7 +153,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       const customer = await this.customerService.update(id, customerData, {
         context: {
           userId: authReq.user?.id,
-          userName: authReq.user?.name,
+          name: authReq.user?.name,
           ipAddress: req.ip
         }
       });
@@ -231,7 +231,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       const customer = await this.customerService.updateStatus(statusUpdateDto, {
         context: {
           userId: authReq.user?.id,
-          userName: authReq.user?.name,
+          name: authReq.user?.name,
           ipAddress: req.ip
         }
       });
@@ -445,7 +445,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       const count = await this.customerService.bulkUpdate(customerIds, data, {
         context: {
           userId: authReq.user?.id,
-          userName: authReq.user?.name,
+          name: authReq.user?.name,
           ipAddress: req.ip
         }
       });

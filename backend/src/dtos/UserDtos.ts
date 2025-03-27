@@ -14,9 +14,9 @@ interface BaseUserDto {
  */
 export interface CreateUserDto extends BaseUserDto {
   /**
-   * Username
+   * Name
    */
-  username: string;
+  name: string;
   
   /**
    * Email address
@@ -49,9 +49,9 @@ export interface CreateUserDto extends BaseUserDto {
  */
 export interface UpdateUserDto extends BaseUserDto {
   /**
-   * Username
+   * Name
    */
-  username?: string;
+  name?: string;
   
   /**
    * Email address
@@ -109,9 +109,9 @@ export interface UserResponseDto extends BaseUserDto {
   id: number;
   
   /**
-   * Username
+   * Name
    */
-  username: string;
+  name: string;
   
   /**
    * Email address
@@ -268,17 +268,17 @@ export interface UserFilterParams {
  * Validation schema for creating a user
  */
 export const createUserValidationSchema = {
-  username: {
+  name: {
     type: 'string',
     required: true,
     min: 3,
     max: 50,
     pattern: '^[a-zA-Z0-9_-]+$',
     messages: {
-      required: 'Username is required',
-      min: 'Username must be at least 3 characters',
-      max: 'Username cannot exceed 50 characters',
-      pattern: 'Username can only contain letters, numbers, underscores and hyphens'
+      required: 'Name is required',
+      min: 'Name must be at least 3 characters',
+      max: 'Name cannot exceed 50 characters',
+      pattern: 'Name can only contain letters, numbers, underscores and hyphens'
     }
   },
   email: {
@@ -337,16 +337,16 @@ export const createUserValidationSchema = {
  * Validation schema for updating a user
  */
 export const updateUserValidationSchema = {
-  username: {
+  name: {
     type: 'string',
     required: false,
     min: 3,
     max: 50,
     pattern: '^[a-zA-Z0-9_-]+$',
     messages: {
-      min: 'Username must be at least 3 characters',
-      max: 'Username cannot exceed 50 characters',
-      pattern: 'Username can only contain letters, numbers, underscores and hyphens'
+      min: 'Name must be at least 3 characters',
+      max: 'Name cannot exceed 50 characters',
+      pattern: 'Name can only contain letters, numbers, underscores and hyphens'
     }
   },
   email: {

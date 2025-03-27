@@ -37,7 +37,7 @@ describe('AuthService Integration Tests', () => {
   beforeAll(async () => {
     // Test-User erstellen
     testUser = await userRepository.create({
-      username: 'testuser',
+      name: 'testuser',
       email: 'test@example.com',
       password: await bcrypt.hash('password123', 10),
       firstName: 'Test',

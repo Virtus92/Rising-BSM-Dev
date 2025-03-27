@@ -15,9 +15,8 @@ import {
 import { ServiceOptions } from '../interfaces/IBaseService.js';
 import { RefreshToken } from '../entities/RefreshToken.js';
 import { User, UserStatus } from '../entities/User.js';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import { CryptoHelper } from '../utils/crypto-helper.js';
+import config from '../config/index.js';
 
 /**
  * AuthService
@@ -26,12 +25,6 @@ import crypto from 'crypto';
  * Handles user login, token management, password reset, etc.
  */
 export class AuthService implements IAuthService {
-  private readonly JWT_SECRET: string;
-  private readonly JWT_EXPIRES_IN: string;
-  private readonly JWT_REFRESH_SECRET: string;
-  private readonly JWT_REFRESH_EXPIRES_IN: string;
-  private readonly JWT_REFRESH_TOKEN_ROTATION: boolean;
-
   /**
    * Creates a new AuthService instance
    * 
@@ -49,13 +42,41 @@ export class AuthService implements IAuthService {
     private readonly errorHandler: IErrorHandler
   ) {
     this.logger.debug('Initialized AuthService');
+  }
+  /**
+   * Generates a password reset token for testing purposes
+   * This method should NOT be used in production environments
+   * 
+   * @param email - The email of the user to generate a reset token for
+   * @returns The raw reset token and its expiry date
+   */
+  async getResetTokenForTesting(email: string): Promise<{ token: string; expiry: Date }> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('This method cannot be used in production environments');
+    }
+    
+    // Find user by email
+    const user = await this.userRepository.findByEmail(email);
+    
+    if (!user) {
+      throw this.errorHandler.createNotFoundError(`User with email ${email} not found`);
+    }
 
-    // Load configuration from environment variables
-    this.JWT_SECRET = process.env.JWT_SECRET || 'default-jwt-secret';
-    this.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
-    this.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'default-refresh-secret';
-    this.JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
-    this.JWT_REFRESH_TOKEN_ROTATION = process.env.JWT_REFRESH_TOKEN_ROTATION === 'true';
+    // Generate reset token
+    const resetToken = CryptoHelper.generateRandomToken();
+    const hashedToken = CryptoHelper.hashToken(resetToken);
+    const tokenExpiry = CryptoHelper.calculateExpirationDate('24h');
+    
+    // Store reset token in database
+    await this.userRepository.update(user.id, {
+      resetToken: hashedToken,
+      resetTokenExpiry: tokenExpiry
+    });
+
+    this.logger.debug(`Generated test reset token for ${email}`);
+    
+    // Return the raw token for testing purposes
+    return { token: resetToken, expiry: tokenExpiry };
   }
 
   /**
@@ -80,13 +101,13 @@ export class AuthService implements IAuthService {
       }
 
       // Verify password
-      const isPasswordValid = await this.verifyPassword(loginDto.password, user.password || '');
+      const isPasswordValid = await CryptoHelper.verifyPassword(loginDto.password, user.password || '');
       if (!isPasswordValid) {
         throw this.errorHandler.createUnauthorizedError('Invalid email or password');
       }
 
       // Generate tokens
-      const { accessToken, refreshToken } = await this.generateTokens(user, options?.ipAddress);
+      const { accessToken, refreshToken } = await this.generateTokens(user, options?.context?.ipAddress);
 
       // Update last login timestamp
       user.recordLogin();
@@ -97,7 +118,7 @@ export class AuthService implements IAuthService {
         user.id,
         'login',
         'User logged in',
-        options?.ipAddress
+        options?.context?.ipAddress
       );
 
       // Return authentication response
@@ -105,7 +126,7 @@ export class AuthService implements IAuthService {
         id: user.id,
         accessToken,
         refreshToken,
-        expiresIn: this.getTokenExpiryTime(this.JWT_EXPIRES_IN),
+        expiresIn: this.getTokenExpiryTime(config.JWT_EXPIRES_IN),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         user: {
@@ -114,6 +135,7 @@ export class AuthService implements IAuthService {
           email: user.email,
           role: user.role,
           status: user.status,
+          profilePicture: user.profilePicture,
           createdAt: user.createdAt.toISOString(),
           updatedAt: user.updatedAt.toISOString()
         }
@@ -155,11 +177,11 @@ export class AuthService implements IAuthService {
 
       if (user.status !== UserStatus.ACTIVE) {
         // Revoke refresh token if user is no longer active
-        token.revoke(options?.ipAddress);
+        token.revoke(options?.context?.ipAddress);
         await this.refreshTokenRepository.update(token.token, { 
           isRevoked: true,
           revokedAt: new Date(),
-          revokedByIp: options?.ipAddress
+          revokedByIp: options?.context?.ipAddress
         });
         
         throw this.errorHandler.createUnauthorizedError('User account is inactive');
@@ -168,16 +190,16 @@ export class AuthService implements IAuthService {
       // Generate new tokens
       let newToken;
       
-      if (this.JWT_REFRESH_TOKEN_ROTATION) {
+      if (config.JWT_REFRESH_TOKEN_ROTATION) {
         // If token rotation is enabled, create a new refresh token
-        const tokenPair = await this.generateTokens(user, options?.ipAddress);
+        const tokenPair = await this.generateTokens(user, options?.context?.ipAddress);
         
         // Revoke old token and replace it with the new one
-        token.revoke(options?.ipAddress, tokenPair.refreshToken);
+        token.revoke(options?.context?.ipAddress, tokenPair.refreshToken);
         await this.refreshTokenRepository.update(token.token, {
           isRevoked: true,
           revokedAt: new Date(),
-          revokedByIp: options?.ipAddress,
+          revokedByIp: options?.context?.ipAddress,
           replacedByToken: tokenPair.refreshToken
         });
         
@@ -185,7 +207,7 @@ export class AuthService implements IAuthService {
           id: user.id,
           accessToken: tokenPair.accessToken,
           refreshToken: tokenPair.refreshToken,
-          expiresIn: this.getTokenExpiryTime(this.JWT_EXPIRES_IN),
+          expiresIn: this.getTokenExpiryTime(config.JWT_EXPIRES_IN),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -197,7 +219,7 @@ export class AuthService implements IAuthService {
           id: user.id,
           accessToken,
           refreshToken: token.token, // Return the same refresh token
-          expiresIn: this.getTokenExpiryTime(this.JWT_EXPIRES_IN),
+          expiresIn: this.getTokenExpiryTime(config.JWT_EXPIRES_IN),
           createdAt: token.createdAt.toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -208,7 +230,7 @@ export class AuthService implements IAuthService {
         user.id,
         'token_refresh',
         'User refreshed access token',
-        options?.ipAddress
+        options?.context?.ipAddress
       );
 
       return newToken;
@@ -242,18 +264,22 @@ export class AuthService implements IAuthService {
       }
 
       // Generate reset token
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const hashedToken = this.hashResetToken(resetToken);
+      const resetToken = CryptoHelper.generateRandomToken();
+      const hashedToken = CryptoHelper.hashToken(resetToken);
+      const tokenExpiry = CryptoHelper.calculateExpirationDate('24h');
       
-      // Store reset token in database (this would typically be in a password_resets table)
-      // For this example, we'll assume the schema and implementation
+      // Store reset token in database
+      await this.userRepository.update(user.id, {
+        resetToken: hashedToken,
+        resetTokenExpiry: tokenExpiry
+      });
       
       // Log activity
       await this.userRepository.logActivity(
         user.id,
         'password_reset_request',
         'User requested password reset',
-        options?.ipAddress
+        options?.context?.ipAddress
       );
 
       // In a real implementation, send an email with the reset link
@@ -275,12 +301,21 @@ export class AuthService implements IAuthService {
    */
   async validateResetToken(token: string): Promise<boolean> {
     try {
-      // In a real implementation, verify the token against stored hash
-      // For this example, we'll simulate a validation
-      const hashedToken = this.hashResetToken(token);
+      // Hash the token to compare with stored hash
+      const hashedToken = CryptoHelper.hashToken(token);
       
-      // Check if token exists and is not expired
-      // This would be a database check in a real implementation
+      // Find user with this reset token
+      const user = await this.userRepository.findOneByCriteria({ resetToken: hashedToken });
+      
+      if (!user) {
+        return false;
+      }
+      
+      // Check if token is expired
+      if (!user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
+        return false;
+      }
+      
       return true;
     } catch (error) {
       this.logger.error('Reset token validation failed', error instanceof Error ? error : String(error));
@@ -317,6 +352,13 @@ export class AuthService implements IAuthService {
           messages: {
             required: 'Confirm password is required'
           }
+        },
+        token: {
+          type: 'string',
+          required: true,
+          messages: {
+            required: 'Reset token is required'
+          }
         }
       });
 
@@ -325,43 +367,36 @@ export class AuthService implements IAuthService {
       }
 
       // Verify the token
-      if (!resetPasswordDto.token) {
-        throw this.errorHandler.createUnauthorizedError('Reset token is required');
-      }
+      const hashedToken = CryptoHelper.hashToken(resetPasswordDto.token);
       
-      const isValidToken = await this.validateResetToken(resetPasswordDto.token);
-      
-      if (!isValidToken) {
-        throw this.errorHandler.createUnauthorizedError('Invalid or expired reset token');
-      }
-
-      // Find the user associated with the token
-      // This would be a database lookup in a real implementation
-      // For this example, we'll assume it returns a valid user
-      const userId = 1; // Example user ID
-      
-      // Get the user
-      const user = await this.userRepository.findById(userId);
+      // Find user with this reset token
+      const user = await this.userRepository.findOneByCriteria({ resetToken: hashedToken });
       
       if (!user) {
-        throw this.errorHandler.createNotFoundError('User not found');
+        throw this.errorHandler.createUnauthorizedError('Invalid or expired reset token');
+      }
+      
+      // Check if token is expired
+      if (!user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
+        throw this.errorHandler.createUnauthorizedError('Reset token has expired');
       }
 
       // Hash the new password
-      const hashedPassword = await this.hashPassword(resetPasswordDto.password);
+      const hashedPassword = await CryptoHelper.hashPassword(resetPasswordDto.password);
       
-      // Update user's password
-      await this.userRepository.updatePassword(user.id, hashedPassword);
-      
-      // Invalidate the reset token
-      // This would be a database operation in a real implementation
+      // Update user's password and clear reset token
+      await this.userRepository.update(user.id, {
+        password: hashedPassword,
+        resetToken: undefined,
+        resetTokenExpiry: undefined
+      });
       
       // Log activity
       await this.userRepository.logActivity(
         user.id,
         'password_reset',
         'User reset password',
-        options?.ipAddress
+        options?.context?.ipAddress
       );
 
       // Invalidate all refresh tokens for the user
@@ -390,7 +425,7 @@ export class AuthService implements IAuthService {
       this.logger.debug('Processing logout', { 
         userId, 
         hasRefreshToken: !!refreshToken,
-        ipAddress: options?.ipAddress
+        ipAddress: options?.context?.ipAddress
       });
       
       // If a specific refresh token is provided, invalidate only that token
@@ -408,11 +443,11 @@ export class AuthService implements IAuthService {
           });
           
           if (token.userId === userId) {
-            token.revoke(options?.ipAddress);
+            token.revoke(options?.context?.ipAddress);
             await this.refreshTokenRepository.update(token.token, {
               isRevoked: true,
               revokedAt: new Date(),
-              revokedByIp: options?.ipAddress
+              revokedByIp: options?.context?.ipAddress
             });
             tokenCount = 1;
             this.logger.debug('Successfully revoked token');
@@ -431,11 +466,11 @@ export class AuthService implements IAuthService {
         
         for (const token of tokens) {
           if (token.isActive()) {
-            token.revoke(options?.ipAddress);
+            token.revoke(options?.context?.ipAddress);
             await this.refreshTokenRepository.update(token.token, {
               isRevoked: true,
               revokedAt: new Date(),
-              revokedByIp: options?.ipAddress
+              revokedByIp: options?.context?.ipAddress
             });
             tokenCount++;
           }
@@ -458,18 +493,23 @@ export class AuthService implements IAuthService {
    * @param ipAddress - IP address of the requester
    * @returns Token pair
    */
-  private async generateTokens(user: any, ipAddress?: string): Promise<{ accessToken: string; refreshToken: string }> {
+  private async generateTokens(user: User, ipAddress?: string): Promise<{ accessToken: string; refreshToken: string }> {
     const accessToken = this.generateAccessToken(user);
     
     // Generate a refresh token
-    const refreshToken = crypto.randomBytes(40).toString('hex');
+    const refreshToken = CryptoHelper.generateRandomToken();
+    
+    // Calculate expiration date
+    const expiresAt = CryptoHelper.calculateExpirationDate(config.JWT_REFRESH_EXPIRES_IN);
     
     // Save refresh token in database
-    const refreshTokenEntity = {
+    const refreshTokenEntity: Partial<RefreshToken> = {
       token: refreshToken,
       userId: user.id,
-      expiresAt: new Date(Date.now() + this.getTokenExpiryTime(this.JWT_REFRESH_EXPIRES_IN)),
-      createdByIp: ipAddress
+      expiresAt,
+      createdAt: new Date(),
+      createdByIp: ipAddress,
+      isRevoked: false
     };
     
     await this.refreshTokenRepository.create(refreshTokenEntity);
@@ -483,7 +523,7 @@ export class AuthService implements IAuthService {
    * @param user - User entity
    * @returns Access token string
    */
-  private generateAccessToken(user: any): string {
+  private generateAccessToken(user: User): string {
     // Create token payload
     const payload = {
       sub: user.id,
@@ -492,8 +532,10 @@ export class AuthService implements IAuthService {
       type: 'access'
     };
     
-    // Sign the token
-    return jwt.sign(payload, this.JWT_SECRET, { expiresIn: this.JWT_EXPIRES_IN } as jwt.SignOptions);
+    // Sign the token using CryptoHelper
+    return CryptoHelper.generateJwtToken(payload, { 
+      expiresIn: config.JWT_EXPIRES_IN
+    });
   }
 
   /**
@@ -513,63 +555,5 @@ export class AuthService implements IAuthService {
       case 'd': return value * 24 * 60 * 60 * 1000;
       default: return 15 * 60 * 1000; // Default to 15 minutes
     }
-  }
-
-  /**
-   * Verify user password
-   * 
-   * @param plainPassword - Plain text password
-   * @param hashedPassword - Hashed password
-   * @returns Whether password is valid
-   */
-  private async verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
-    return bcrypt.compare(plainPassword, hashedPassword);
-  }
-
-  /**
-   * Hash password
-   * 
-   * @param password - Plain text password
-   * @returns Hashed password
-   */
-  private async hashPassword(password: string): Promise<string> {
-    const salt = await bcrypt.genSalt(10);
-    return bcrypt.hash(password, salt);
-  }
-
-  /**
-   * Hash reset token
-   * 
-   * @param token - Reset token
-   * @returns Hashed token
-   */
-  private hashResetToken(token: string): string {
-    return crypto.createHash('sha256').update(token).digest('hex');
-  }
-
-  /**
-   * Get reset token for testing (required by IAuthService)
-   * 
-   * @param email - User email
-   * @returns Reset token data
-   */
-  async getResetTokenForTesting(email: string): Promise<any> {
-    // This is for testing purposes only and should not be used in production
-    const user = await this.userRepository.findByEmail(email);
-    if (!user) {
-      throw this.errorHandler.createNotFoundError('User not found');
-    }
-    
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = this.hashResetToken(resetToken);
-    
-    // In a real implementation, this would store the token in the database
-    
-    return {
-      token: resetToken,
-      hashedToken,
-      userId: user.id,
-      expiresAt: new Date(Date.now() + 3600000) // 1 hour
-    };
   }
 }

@@ -18,7 +18,7 @@ import {
   changePasswordValidationSchema
 } from '../dtos/UserDtos.js';
 import { ServiceOptions } from '../interfaces/IBaseService.js';
-import bcrypt from 'bcryptjs';
+import { CryptoHelper } from '../utils/crypto-helper.js';
 
 /**
  * UserService
@@ -44,6 +44,26 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
     super(userRepository, logger, validator, errorHandler);
     
     this.logger.debug('Initialized UserService');
+  }
+  /**
+   * Find a user by name
+   * 
+   * @param name - Name to search for
+   * @returns Promise with user response or null
+   */
+  async findByName(name: string): Promise<UserResponseDto | null> {
+    try {
+      const user = await this.userRepository.findByName(name);
+      
+      if (!user) {
+        return null;
+      }
+      
+      return this.toDTO(user);
+    } catch (error) {
+      this.logger.error('Error in UserService.findByName', error instanceof Error ? error : String(error), { name });
+      throw this.handleError(error);
+    }
   }
 
   /**
@@ -84,27 +104,6 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
       };
     } catch (error) {
       this.logger.error('Error in UserService.getUserDetails', error instanceof Error ? error : String(error), { id });
-      throw this.handleError(error);
-    }
-  }
-
-  /**
-   * Find a user by username
-   * 
-   * @param username - Username to search for
-   * @returns Promise with user response or null
-   */
-  async findByUsername(username: string): Promise<UserResponseDto | null> {
-    try {
-      const user = await this.userRepository.findByUsername(username);
-      
-      if (!user) {
-        return null;
-      }
-      
-      return this.toDTO(user);
-    } catch (error) {
-      this.logger.error('Error in UserService.findByUsername', error instanceof Error ? error : String(error), { username });
       throw this.handleError(error);
     }
   }
@@ -174,14 +173,14 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
       }
       
       // Verify current password
-      const passwordValid = await this.verifyPassword(data.currentPassword, user.password!);
+      const passwordValid = await CryptoHelper.verifyPassword(data.currentPassword, user.password!);
       
       if (!passwordValid) {
         throw this.errorHandler.createValidationError('Password change failed', ['Current password is incorrect']);
       }
       
       // Hash new password
-      const hashedPassword = await this.hashPassword(data.newPassword);
+      const hashedPassword = await CryptoHelper.hashPassword(data.newPassword);
       
       // Update password
       await this.userRepository.updatePassword(userId, hashedPassword);
@@ -254,64 +253,58 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
   }
 
   /**
- * Bulk update multiple users
- * 
- * @param ids - Array of user IDs
- * @param data - Update data
- * @param options - Service options
- * @returns Promise with count of updated users
- */
-async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): Promise<number> {
-  try {
-    this.logger.info(`Bulk updating ${ids.length} users`, { count: ids.length, fields: Object.keys(data) });
-    
-    // Validate update data
-    await this.validate(data, true);
-    
-    // Prepare data with audit information
-    const auditedData = this.addAuditInfo(data, options?.context, 'update');
-    
-    // Map DTO to entity
-    const entityData = this.toEntity(auditedData);
-    
-    // Perform bulk update
-    const count = await this.repository.bulkUpdate(ids, entityData);
-    
-    // Log activity
-    if (options?.context?.userId) {
-      const activityDetails = `Bulk updated ${count} users with fields: ${Object.keys(data).join(', ')}`;
-      await this.repository.logActivity(
-        options.context.userId,
-        'bulk_update_users',
-        activityDetails,
-        options.context.ipAddress
-      );
+   * Bulk update multiple users
+   * 
+   * @param ids - Array of user IDs
+   * @param data - Update data
+   * @param options - Service options
+   * @returns Promise with count of updated users
+   */
+  async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): Promise<number> {
+    try {
+      this.logger.info(`Bulk updating ${ids.length} users`, { count: ids.length, fields: Object.keys(data) });
+      
+      // Validate update data
+      await this.validate(data, true);
+      
+      // Prepare data with audit information
+      const auditedData = this.addAuditInfo(data, options?.context, 'update');
+      
+      // Map DTO to entity
+      const entityData = this.toEntity(auditedData);
+      
+      // Perform bulk update
+      const count = await this.repository.bulkUpdate(ids, entityData);
+      
+      // Log activity
+      if (options?.context?.userId) {
+        const activityDetails = `Bulk updated ${count} users with fields: ${Object.keys(data).join(', ')}`;
+        await this.repository.logActivity(
+          options.context.userId,
+          'bulk_update_users',
+          activityDetails,
+          options.context.ipAddress
+        );
+      }
+      
+      return count;
+    } catch (error) {
+      this.logger.error('Error in UserService.bulkUpdate', error instanceof Error ? error : String(error), { ids, data });
+      throw this.handleError(error);
     }
-    
-    return count;
-  } catch (error) {
-    this.logger.error('Error in UserService.bulkUpdate', error instanceof Error ? error : String(error), { ids, data });
-    throw this.handleError(error);
   }
-}
 
   /**
    * Authenticate user
    * 
-   * @param username - Username or email
+   * @param email - Email address
    * @param password - Password
    * @returns Promise with user response or null
    */
-  async authenticate(username: string, password: string): Promise<UserResponseDto | null> {
+  async authenticate(email: string, password: string): Promise<UserResponseDto | null> {
     try {
-      // Find user by username or email
-      let user: User | null = null;
-      
-      if (username.includes('@')) {
-        user = await this.userRepository.findByEmail(username);
-      } else {
-        user = await this.userRepository.findByUsername(username);
-      }
+      // Find user by email
+      const user = await this.userRepository.findByEmail(email);
       
       // If user not found or inactive, authentication fails
       if (!user || user.status !== UserStatus.ACTIVE) {
@@ -319,7 +312,7 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
       }
       
       // Verify password
-      const passwordValid = await this.verifyPassword(password, user.password!);
+      const passwordValid = await CryptoHelper.verifyPassword(password, user.password!);
       
       if (!passwordValid) {
         return null;
@@ -332,7 +325,7 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
       // Return user DTO
       return this.toDTO(user);
     } catch (error) {
-      this.logger.error('Error in UserService.authenticate', error instanceof Error ? error : String(error), { username });
+      this.logger.error('Error in UserService.authenticate', error instanceof Error ? error : String(error), { email });
       throw this.handleError(error);
     }
   }
@@ -429,39 +422,16 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
   toDTO(entity: User): UserResponseDto {
     return {
       id: entity.id,
-      username: entity.username,
+      name: entity.name,
       email: entity.email,
-      firstName: entity.firstName,
-      lastName: entity.lastName,
-      fullName: entity.getFullName(),
       role: entity.role,
       status: entity.status,
+      phone: entity.phone,
+      profilePicture: entity.profilePicture,
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),
       lastLoginAt: entity.lastLoginAt ? entity.lastLoginAt.toISOString() : undefined
     };
-  }
-
-  /**
-   * Hash a password
-   * 
-   * @param password - Plain text password
-   * @returns Hashed password
-   */
-  private async hashPassword(password: string): Promise<string> {
-    const saltRounds = 10;
-    return bcrypt.hash(password, saltRounds);
-  }
-
-  /**
-   * Verify a password
-   * 
-   * @param password - Plain text password
-   * @param hash - Hashed password
-   * @returns Whether password matches hash
-   */
-  private async verifyPassword(password: string, hash: string): Promise<boolean> {
-    return bcrypt.compare(password, hash);
   }
 
   /**
@@ -470,7 +440,63 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
    * @returns Validation schema
    */
   protected getCreateValidationSchema(): any {
-    return createUserValidationSchema;
+    return {
+      name: {
+        type: 'string',
+        required: true,
+        min: 2,
+        max: 100,
+        messages: {
+          required: 'Name is required',
+          min: 'Name must be at least 2 characters',
+          max: 'Name cannot exceed 100 characters'
+        }
+      },
+      email: {
+        type: 'email',
+        required: true,
+        messages: {
+          required: 'Email is required',
+          email: 'Invalid email format'
+        }
+      },
+      password: {
+        type: 'string',
+        required: true,
+        min: 8,
+        max: 100,
+        messages: {
+          required: 'Password is required',
+          min: 'Password must be at least 8 characters',
+          max: 'Password cannot exceed 100 characters'
+        }
+      },
+      role: {
+        type: 'string',
+        required: false,
+        enum: ['admin', 'manager', 'employee'],
+        default: 'employee',
+        messages: {
+          enum: 'Role must be one of: admin, manager, employee'
+        }
+      },
+      phone: {
+        type: 'string',
+        required: false,
+        max: 30,
+        messages: {
+          max: 'Phone number cannot exceed 30 characters'
+        }
+      },
+      profilePicture: {
+        type: 'string',
+        required: false,
+        max: 255,
+        messages: {
+          max: 'Profile picture URL cannot exceed 255 characters'
+        }
+      }
+    };
   }
 
   /**
@@ -479,7 +505,57 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
    * @returns Validation schema
    */
   protected getUpdateValidationSchema(): any {
-    return updateUserValidationSchema;
+    return {
+      name: {
+        type: 'string',
+        required: false,
+        min: 2,
+        max: 100,
+        messages: {
+          min: 'Name must be at least 2 characters',
+          max: 'Name cannot exceed 100 characters'
+        }
+      },
+      email: {
+        type: 'email',
+        required: false,
+        messages: {
+          email: 'Invalid email format'
+        }
+      },
+      role: {
+        type: 'string',
+        required: false,
+        enum: ['admin', 'manager', 'employee'],
+        messages: {
+          enum: 'Role must be one of: admin, manager, employee'
+        }
+      },
+      status: {
+        type: 'string',
+        required: false,
+        enum: ['active', 'inactive', 'suspended', 'deleted'],
+        messages: {
+          enum: 'Status must be one of: active, inactive, suspended, deleted'
+        }
+      },
+      phone: {
+        type: 'string',
+        required: false,
+        max: 30,
+        messages: {
+          max: 'Phone number cannot exceed 30 characters'
+        }
+      },
+      profilePicture: {
+        type: 'string',
+        required: false,
+        max: 255,
+        messages: {
+          max: 'Profile picture URL cannot exceed 255 characters'
+        }
+      }
+    };
   }
 
   /**
@@ -496,7 +572,7 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
         ...(dto as UpdateUserDto)
       };
     } else {
-      // Create operation - hash password
+      // Create operation - hash password will be handled in beforeCreate
       return {
         ...(dto as CreateUserDto),
         status: UserStatus.ACTIVE
@@ -511,35 +587,14 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
    * @param isUpdate - Whether validation is for update operation
    */
   protected async validateBusinessRules(data: CreateUserDto | UpdateUserDto, isUpdate: boolean): Promise<void> {
-    // For create operations, check if username or email already exists
-    if (!isUpdate) {
-      const createData = data as CreateUserDto;
+    // For create operations or when email is changed, check if email already exists
+    if (!isUpdate || (data as UpdateUserDto).email) {
+      const email = (data as any).email;
       
-      // Check username
-      const existingUsername = await this.userRepository.findByUsername(createData.username);
-      if (existingUsername) {
-        throw this.errorHandler.createValidationError('Validation failed', ['Username is already taken']);
-      }
-      
-      // Check email
-      const existingEmail = await this.userRepository.findByEmail(createData.email);
-      if (existingEmail) {
-        throw this.errorHandler.createValidationError('Validation failed', ['Email is already in use']);
-      }
-    } else if (data.email || data.username) {
-      // For update operations, check if username or email is being changed and already exists
-      const updateData = data as UpdateUserDto;
-      
-      if (updateData.username) {
-        const existingUsername = await this.userRepository.findByUsername(updateData.username);
-        if (existingUsername && existingUsername.id !== (updateData as any).id) {
-          throw this.errorHandler.createValidationError('Validation failed', ['Username is already taken']);
-        }
-      }
-      
-      if (updateData.email) {
-        const existingEmail = await this.userRepository.findByEmail(updateData.email);
-        if (existingEmail && existingEmail.id !== (updateData as any).id) {
+      if (email) {
+        const existingUser = await this.userRepository.findByEmail(email);
+        
+        if (existingUser && (!isUpdate || existingUser.id !== (data as any).id)) {
           throw this.errorHandler.createValidationError('Validation failed', ['Email is already in use']);
         }
       }
@@ -555,7 +610,7 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
   protected async beforeCreate(data: CreateUserDto, _options?: ServiceOptions): Promise<void> {
     // Hash password before creating user
     if (data.password) {
-      (data as any).password = await this.hashPassword(data.password);
+      (data as any).password = await CryptoHelper.hashPassword(data.password);
     }
   }
 
@@ -581,7 +636,7 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
       await this.userRepository.logActivity(
         options.context.userId,
         'user_created',
-        `Created user ${entity.username} (ID: ${entity.id})`,
+        `Created user ${entity.name} (ID: ${entity.id})`,
         options.context.ipAddress
       );
     }
@@ -619,7 +674,7 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
       await this.userRepository.logActivity(
         options.context.userId,
         'user_updated',
-        `Updated user ${entity.username} (ID: ${entity.id}). Changed fields: ${changes}`,
+        `Updated user ${entity.name} (ID: ${entity.id}). Changed fields: ${changes}`,
         options.context.ipAddress
       );
     }

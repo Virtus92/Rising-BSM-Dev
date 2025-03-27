@@ -28,12 +28,12 @@ export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUs
   getUserDetails(id: number, options?: any): Promise<UserDetailResponseDto | null>;
   
   /**
-   * Find a user by username
+   * Find a user by name
    * 
-   * @param username - Username to search for
+   * @param name - name to search for
    * @returns Promise with user response or null
    */
-  findByUsername(username: string): Promise<UserResponseDto | null>;
+  findByName(name: string): Promise<UserResponseDto | null>;
   
   /**
    * Find a user by email
@@ -74,11 +74,11 @@ export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUs
   /**
    * Authenticate user
    * 
-   * @param username - Username or email
+   * @param name - name or email
    * @param password - Password
    * @returns Promise with user response or null
    */
-  authenticate(username: string, password: string): Promise<UserResponseDto | null>;
+  authenticate(name: string, password: string): Promise<UserResponseDto | null>;
   
   /**
    * Search users by name or email

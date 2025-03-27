@@ -1,5 +1,3 @@
-// src/config/security.ts
-
 import { env } from './index.js';
 import { ILoggingService, LogLevel } from '../interfaces/ILoggingService.js';
 

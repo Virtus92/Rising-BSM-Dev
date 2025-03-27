@@ -1,5 +1,3 @@
-// src/core/EnhancedCorsMiddleware.ts
-
 import cors from 'cors';
 import { Express, Request, Response, NextFunction } from 'express';
 import { ILoggingService } from '../interfaces/ILoggingService.js';

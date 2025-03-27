@@ -82,10 +82,10 @@ export interface ICustomerService extends IBaseService<Customer, CustomerCreateD
    * @param customerId - Customer ID
    * @param text - Note text
    * @param userId - User ID
-   * @param userName - User name
+   * @param name - User name
    * @returns Promise indicating success
    */
-  addNote(customerId: number, text: string, userId: number, userName: string): Promise<void>;
+  addNote(customerId: number, text: string, userId: number, name: string): Promise<void>;
   
   /**
    * Bulk update multiple customers
