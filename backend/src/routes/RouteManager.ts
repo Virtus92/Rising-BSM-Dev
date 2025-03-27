@@ -8,6 +8,7 @@ import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { UserController } from '../controllers/UserController.js';
 import { CustomerController } from '../controllers/CustomerController.js';
 import { NotificationController } from '../controllers/NotificationController.js';
+import config from '../config/index.js';
 
 // Route creators
 import { createAuthRoutes } from './auth.routes.js';
@@ -30,7 +31,7 @@ export class RouteManager {
   constructor(container: DiContainer) {
     this.container = container;
     this.logger = container.resolve<ILoggingService>('LoggingService');
-    this.apiPrefix = process.env.API_PREFIX || '/api/v1';
+    this.apiPrefix = config.API_PREFIX || '/API/v1';
   }
 
   registerRoutes(app: Express): void {

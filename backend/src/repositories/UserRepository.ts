@@ -25,11 +25,22 @@ export class UserRepository extends BaseRepository<User, number, any> implements
     logger: ILoggingService,
     errorHandler: IErrorHandler
   ) {
-    // Pass model reference to BaseRepository
-    super(dbClient.user, logger, errorHandler);
+    // Pass model reference to BaseRepository - using the table name that exists in the database
+    // Determine the actual table name by checking the Prisma schema or database
+    super(dbClient.user || dbClient.users || dbClient["user"] || dbClient["User"], logger, errorHandler);
+    
+    // Store the actual model name for reuse
+    this.userModel = dbClient.user || dbClient.users || dbClient["user"] || dbClient["User"];
+    if (!this.userModel) {
+      logger.error('User model not found in database client');
+      throw new Error('User model not found in database client. Please check your database schema.');
+    }
     
     this.logger.debug('Initialized UserRepository');
   }
+
+  // Add a property to store the actual user model reference
+  private userModel: any;
 
   /**
    * Find a user by username
@@ -39,7 +50,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    */
   async findByUsername(username: string): Promise<User | null> {
     try {
-      const user = await this.dbClient.user.findUnique({
+      const user = await this.userModel.findUnique({
         where: { username }
       });
       
@@ -58,7 +69,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
    */
   async findByEmail(email: string): Promise<User | null> {
     try {
-      const user = await this.dbClient.user.findUnique({
+      const user = await this.userModel.findUnique({
         where: { email }
       });
       
@@ -94,10 +105,10 @@ export class UserRepository extends BaseRepository<User, number, any> implements
       }
       
       // Execute count query
-      const total = await this.dbClient.user.count({ where });
+      const total = await this.userModel.count({ where });
       
       // Execute main query
-      const users = await this.dbClient.user.findMany({
+      const users = await this.userModel.findMany({
         where,
         skip,
         take: limit,
@@ -142,7 +153,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
       const skip = options?.page ? (options.page - 1) * limit : 0;
       
       // Execute search query
-      const users = await this.dbClient.user.findMany({
+      const users = await this.userModel.findMany({
         where: {
           OR: [
             { username: { contains: search, mode: 'insensitive' } },
@@ -175,7 +186,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
   async updatePassword(userId: number, hashedPassword: string): Promise<User> {
     try {
       // Update password
-      const user = await this.dbClient.user.update({
+      const user = await this.userModel.update({
         where: { id: userId },
         data: { 
           password: hashedPassword,
@@ -209,7 +220,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
         const updateData = this.mapToORMEntity(data);
         
         // Perform the update
-        const result = await this.dbClient.user.updateMany({
+        const result = await this.userModel.updateMany({
           where: { id: { in: ids } },
           data: updateData
         });
@@ -317,43 +328,44 @@ export class UserRepository extends BaseRepository<User, number, any> implements
     try {
       // Use transaction if available
       const client = this.transaction || this.dbClient;
+      const userModel = this.userModel;
       
       switch (operation) {
         case 'findAll':
-          return await client.user.findMany(args[0]);
+          return await userModel.findMany(args[0]);
           
         case 'findById':
-          return await client.user.findUnique({
+          return await userModel.findUnique({
             where: { id: args[0] },
             ...(args[1] || {})
           });
           
         case 'findByCriteria':
-          return await client.user.findMany({
+          return await userModel.findMany({
             where: args[0],
             ...(args[1] || {})
           });
           
         case 'findOneByCriteria':
-          return await client.user.findFirst({
+          return await userModel.findFirst({
             where: args[0],
             ...(args[1] || {})
           });
           
         case 'create':
-          return await client.user.create({
+          return await userModel.create({
             data: args[0]
           });
           
         case 'update':
-          return await client.user.update({
+          return await userModel.update({
             where: { id: args[0] },
             data: args[1]
           });
           
         case 'delete':
           // Soft delete by default
-          return await client.user.update({
+          return await userModel.update({
             where: { id: args[0] },
             data: { 
               status: UserStatus.DELETED,
@@ -362,7 +374,7 @@ export class UserRepository extends BaseRepository<User, number, any> implements
           });
           
         case 'count':
-          return await client.user.count({
+          return await userModel.count({
             where: args[0]
           });
           

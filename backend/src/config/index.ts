@@ -60,7 +60,7 @@ export const IS_TEST = NODE_ENV === 'test';
 // Server settings
 export const PORT = env<number>('BACKEND_PORT', 5000);
 export const HOST = env<string>('BACKEND_HOST', 'localhost');
-export const API_PREFIX = env<string>('API_PREFIX', '/api/v1');
+export const API_PREFIX = env<string>('API_PREFIX', '/API/v1');
 
 // Security settings
 export const CORS_ENABLED = env<boolean>('CORS_ENABLED', true);

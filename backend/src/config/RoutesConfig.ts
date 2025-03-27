@@ -32,6 +32,7 @@ export class RoutesConfig {
     this.logger.info('Registering API routes with RouteManager...');
     this.routeManager.registerRoutes(app);
     this.logger.info('API routes registered successfully');
+    this.logger.debug(`Registered routes: ${JSON.stringify(Object.keys(app._router.stack))}`);
   }
 }
 

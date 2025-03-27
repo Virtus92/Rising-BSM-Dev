@@ -7,7 +7,7 @@ import {
   MarkNotificationReadDto, 
   NotificationFilterDto
 } from '../dtos/NotificationDtos.js';
-import { AuthenticatedRequest } from '../types/RequestTypes.js';
+import { AuthenticatedRequest } from '../interfaces/IAuthTypes.js';
 
 /**
  * Implementation of INotificationController

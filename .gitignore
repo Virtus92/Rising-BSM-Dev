@@ -1,4 +1,5 @@
 backend/dist/*
+backup/*
 node_modules/.package-lock.json
 node_modules/.bin/mime
 node_modules/.bin/mime.cmd
