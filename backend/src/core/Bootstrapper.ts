@@ -28,6 +28,7 @@ import { NotificationService } from '../services/NotificationService.js';
 import { CustomerService } from '../services/CustomerService.js';
 import { AuthService } from '../services/AuthService.js';
 import { RoleService } from '../services/RoleService.js';
+import { PrismaService, ExtendedPrismaClient } from '../services/PrismaService.js';
 
 // Controllers
 import { UserController } from '../controllers/UserController.js';
@@ -114,12 +115,13 @@ export class Bootstrapper {
     }, { singleton: true });
     
     // Register database provider
-    this.container.register<PrismaClient>('PrismaClient', () => {
-      return new PrismaClient({
-        log: process.env.NODE_ENV === 'development' 
-          ? ['query', 'error', 'warn'] 
-          : ['error'],
-      });
+    this.container.register<PrismaService>('PrismaService', () => {
+      return new PrismaService(logger);
+    }, { singleton: true });
+    
+    this.container.register<ExtendedPrismaClient>('PrismaClient', () => {
+      const prismaService = this.container.resolve<PrismaService>('PrismaService');
+      return prismaService.getClient();
     }, { singleton: true });
 
     logger.info('Core services registered');

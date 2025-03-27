@@ -1,9 +1,10 @@
-import { Role } from './Role.js';
 /**
  * User entity
  * 
  * Domain entity representing a user in the system.
  */
+import { Role } from './Role.js';
+
 export class User {
     /**
      * User ID
@@ -36,9 +37,14 @@ export class User {
     lastName: string;
 
     /**
-     * User roles
+     * User role (legacy field for backward compatibility)
      */
-    roles: UserRole[];
+    role: UserRole;
+
+    /**
+     * User roles (role IDs)
+     */
+    roles: number[];
     
     /**
      * Account status
@@ -69,8 +75,8 @@ export class User {
      * Last login timestamp
      */
     lastLoginAt?: Date;
-
     
+    // Role objects for permission checking
     private _roleObjects: Role[] = [];
   
     /**
@@ -85,6 +91,7 @@ export class User {
       this.password = data.password;
       this.firstName = data.firstName || '';
       this.lastName = data.lastName || '';
+      this.role = data.role || UserRole.USER;
       this.roles = data.roles || [];
       this.status = data.status || UserStatus.ACTIVE;
       this.createdAt = data.createdAt || new Date();
@@ -112,17 +119,61 @@ export class User {
       return this.status === UserStatus.ACTIVE;
     }
   
+    /**
+     * Set role objects for permission checking
+     * 
+     * @param roles - Role objects
+     */
     setRoles(roles: Role[]): void {
       this._roleObjects = roles;
       this.roles = roles.map(r => r.id);
     }
     
+    /**
+     * Check if user has a specific permission
+     * 
+     * @param permission - Permission name
+     * @returns Whether user has the permission
+     */
     hasPermission(permission: string): boolean {
-      if (!this._roleObjects.length) {
-        return false; // Cannot verify without loaded roles
+      // Admin role has all permissions
+      if (this.role === UserRole.ADMIN) {
+        return true;
       }
       
-      return this._roleObjects.some(role => role.hasPermission(permission));
+      // Check permissions from role objects
+      if (this._roleObjects.length > 0) {
+        return this._roleObjects.some(role => role.hasPermission(permission));
+      }
+      
+      // Fall back to checking based on role (legacy approach)
+      return this.getDefaultPermissions().includes(permission);
+    }
+    
+    /**
+     * Get default permissions based on role (legacy approach)
+     * 
+     * @returns Array of permission names
+     */
+    private getDefaultPermissions(): string[] {
+      // This is a fallback for when role objects aren't loaded
+      switch (this.role) {
+        case UserRole.ADMIN:
+          return ['*']; // Admin has all permissions
+        case UserRole.MANAGER:
+          return [
+            'user:view', 'customer:*', 'project:*', 'appointment:*',
+            'service:view', 'service:create', 'service:edit',
+            'notification:*', 'report:*'
+          ];
+        case UserRole.USER:
+          return [
+            'customer:view', 'project:view', 'appointment:view',
+            'service:view', 'notification:view'
+          ];
+        default:
+          return [];
+      }
     }
   
     /**
@@ -136,6 +187,7 @@ export class User {
       if (data.email !== undefined) this.email = data.email;
       if (data.firstName !== undefined) this.firstName = data.firstName;
       if (data.lastName !== undefined) this.lastName = data.lastName;
+      if (data.role !== undefined) this.role = data.role;
       if (data.roles !== undefined) this.roles = data.roles;
       if (data.status !== undefined) this.status = data.status;
       if (data.password !== undefined) this.password = data.password;
@@ -171,6 +223,15 @@ export class User {
       this.status = UserStatus.ACTIVE;
       this.updatedAt = new Date();
       if (updatedBy) this.updatedBy = updatedBy;
+    }
+    
+    /**
+     * Check if user is an admin
+     * 
+     * @returns Whether user is an admin
+     */
+    get isAdmin(): boolean {
+      return this.role === UserRole.ADMIN;
     }
   }
   

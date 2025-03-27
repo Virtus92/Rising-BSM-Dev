@@ -7,7 +7,9 @@ import { PrismaClient } from '@prisma/client';
 import { QueryOptions, FilterCriteria } from '../interfaces/IBaseRepository.js';
 
 /**
- * Implementation of IPermissionRepository for database operations.
+ * PermissionRepository
+ * 
+ * Implementation of IPermissionRepository for data access operations related to permissions.
  */
 export class PermissionRepository extends BaseRepository<Permission, number> implements IPermissionRepository {
   /**
@@ -24,13 +26,14 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
   ) {
     // Pass model reference to BaseRepository
     super(prisma.permission, logger, errorHandler);
+    
     this.logger.debug('Initialized PermissionRepository');
   }
 
   /**
    * Find a permission by name
    * 
-   * @param name - Permission name
+   * @param name - Permission name to search for
    * @returns Promise with permission or null if not found
    */
   async findByName(name: string): Promise<Permission | null> {
@@ -47,10 +50,10 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
   }
 
   /**
-   * Find permissions by category
+   * Get all permissions by category
    * 
-   * @param category - Permission category
-   * @returns Promise with permissions in that category
+   * @param category - Category name
+   * @returns Promise with array of permissions
    */
   async findByCategory(category: string): Promise<Permission[]> {
     try {
@@ -58,7 +61,7 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
         where: { category }
       });
       
-      return permissions.map(permission => this.mapToDomainEntity(permission));
+      return permissions.map(p => this.mapToDomainEntity(p));
     } catch (error) {
       this.logger.error('Error in PermissionRepository.findByCategory', error instanceof Error ? error : String(error), { category });
       throw this.handleError(error);
@@ -66,21 +69,76 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
   }
 
   /**
-   * Get all permission categories
+   * Get permissions for a role
    * 
-   * @returns Promise with unique category names
+   * @param roleId - Role ID
+   * @returns Promise with array of permissions
    */
-  async getAllCategories(): Promise<string[]> {
+  async getPermissionsByRole(roleId: number): Promise<Permission[]> {
     try {
-      // Use distinct to get unique categories
-      const categories = await this.prisma.permission.findMany({
-        distinct: ['category'],
-        select: { category: true }
+      // Get permission IDs from role permissions junction table
+      const rolePermissions = await this.prisma.rolePermission.findMany({
+        where: { roleId },
+        select: { permissionId: true }
       });
       
-      return categories.map(c => c.category);
+      // Extract permission IDs
+      const permissionIds = rolePermissions.map(rp => rp.permissionId);
+      
+      if (permissionIds.length === 0) {
+        return [];
+      }
+      
+      // Fetch permissions by IDs
+      const permissions = await this.prisma.permission.findMany({
+        where: { id: { in: permissionIds } }
+      });
+      
+      return permissions.map(p => this.mapToDomainEntity(p));
     } catch (error) {
-      this.logger.error('Error in PermissionRepository.getAllCategories', error instanceof Error ? error : String(error));
+      this.logger.error('Error in PermissionRepository.getPermissionsByRole', error instanceof Error ? error : String(error), { roleId });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get permissions for a user based on their roles
+   * 
+   * @param userId - User ID
+   * @returns Promise with array of permissions
+   */
+  async getUserPermissions(userId: number): Promise<Permission[]> {
+    try {
+      // Get user roles with their permissions
+      const userRolesWithPermissions = await this.prisma.userRole.findMany({
+        where: { userId },
+        select: {
+          role: {
+            select: {
+              permissions: {
+                select: {
+                  permission: true
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // Extract permissions from all roles, avoiding duplicates
+      const permissionMap = new Map<number, any>();
+      
+      userRolesWithPermissions.forEach(userRole => {
+        userRole.role.permissions.forEach(rolePermission => {
+          const permission = rolePermission.permission;
+          permissionMap.set(permission.id, permission);
+        });
+      });
+      
+      // Convert map to array and map to domain entities
+      return Array.from(permissionMap.values()).map(p => this.mapToDomainEntity(p));
+    } catch (error) {
+      this.logger.error('Error in PermissionRepository.getUserPermissions', error instanceof Error ? error : String(error), { userId });
       throw this.handleError(error);
     }
   }
@@ -89,30 +147,30 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
    * Check if a user has a specific permission
    * 
    * @param userId - User ID
-   * @param permissionName - Permission name
-   * @returns Promise with boolean indicating if user has permission
+   * @param permissionName - Permission name to check
+   * @returns Promise indicating whether the user has the permission
    */
   async checkUserPermission(userId: number, permissionName: string): Promise<boolean> {
     try {
-      // Query to check if user has the permission through roles
-      const count = await this.prisma.permission.count({
-        where: {
-          name: permissionName,
-          roles: {
-            some: {
-              role: {
-                users: {
-                  some: {
-                    userId
-                  }
-                }
-              }
-            }
-          }
-        }
+      // Find the permission
+      const permission = await this.prisma.permission.findUnique({
+        where: { name: permissionName }
       });
       
-      return count > 0;
+      if (!permission) {
+        return false;
+      }
+      
+      // Count the number of user roles that have this permission
+      const count = await this.prisma.$queryRaw`
+        SELECT COUNT(*) as c
+        FROM "UserRole" ur
+        JOIN "RolePermission" rp ON ur."roleId" = rp."roleId"
+        WHERE ur."userId" = ${userId}
+        AND rp."permissionId" = ${permission.id}
+      `;
+      
+      return count[0].c > 0;
     } catch (error) {
       this.logger.error('Error in PermissionRepository.checkUserPermission', error instanceof Error ? error : String(error), { userId, permissionName });
       throw this.handleError(error);
@@ -120,57 +178,94 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
   }
 
   /**
-   * Get all permissions for a user
+   * Assign permissions to a role
    * 
-   * @param userId - User ID
-   * @returns Promise with user's permissions
+   * @param roleId - Role ID
+   * @param permissionIds - Array of permission IDs to assign
+   * @returns Promise with the number of permissions assigned
    */
-  async getUserPermissions(userId: number): Promise<Permission[]> {
+  async assignPermissionsToRole(roleId: number, permissionIds: number[]): Promise<number> {
     try {
-      // Get all permissions assigned to the user's roles
-      const permissions = await this.prisma.permission.findMany({
-        where: {
-          roles: {
-            some: {
-              role: {
-                users: {
-                  some: {
-                    userId
-                  }
-                }
-              }
-            }
-          }
-        }
+      // Validate that the role exists
+      const role = await this.prisma.role.findUnique({
+        where: { id: roleId }
       });
       
-      return permissions.map(permission => this.mapToDomainEntity(permission));
+      if (!role) {
+        throw this.errorHandler.createNotFoundError(`Role with ID ${roleId} not found`);
+      }
+      
+      // Get existing permissions for this role to avoid duplicates
+      const existingRolePermissions = await this.prisma.rolePermission.findMany({
+        where: { roleId }
+      });
+      
+      const existingPermissionIds = existingRolePermissions.map(rp => rp.permissionId);
+      
+      // Filter out permissions that are already assigned
+      const newPermissionIds = permissionIds.filter(id => !existingPermissionIds.includes(id));
+      
+      if (newPermissionIds.length === 0) {
+        return 0;
+      }
+      
+      // Create role-permission relationships in a transaction
+      await this.prisma.$transaction(
+        newPermissionIds.map(permissionId =>
+          this.prisma.rolePermission.create({
+            data: {
+              roleId,
+              permissionId
+            }
+          })
+        )
+      );
+      
+      return newPermissionIds.length;
     } catch (error) {
-      this.logger.error('Error in PermissionRepository.getUserPermissions', error instanceof Error ? error : String(error), { userId });
+      this.logger.error('Error in PermissionRepository.assignPermissionsToRole', error instanceof Error ? error : String(error), { roleId, permissionIds });
       throw this.handleError(error);
     }
   }
 
   /**
-   * Create multiple permissions at once
+   * Remove permissions from a role
    * 
-   * @param permissions - Array of permission data
-   * @returns Promise with created permissions
+   * @param roleId - Role ID
+   * @param permissionIds - Array of permission IDs to remove
+   * @returns Promise with the number of permissions removed
    */
-  async createMany(permissions: Partial<Permission>[]): Promise<Permission[]> {
+  async removePermissionsFromRole(roleId: number, permissionIds: number[]): Promise<number> {
     try {
-      // Start a transaction to create all permissions
-      const createdPermissions = await this.prisma.$transaction(
-        permissions.map(permission => 
-          this.prisma.permission.create({
-            data: this.mapToORMEntity(permission)
-          })
-        )
-      );
+      // Delete the role-permission relationships
+      const result = await this.prisma.rolePermission.deleteMany({
+        where: {
+          roleId,
+          permissionId: { in: permissionIds }
+        }
+      });
       
-      return createdPermissions.map(permission => this.mapToDomainEntity(permission));
+      return result.count;
     } catch (error) {
-      this.logger.error('Error in PermissionRepository.createMany', error instanceof Error ? error : String(error));
+      this.logger.error('Error in PermissionRepository.removePermissionsFromRole', error instanceof Error ? error : String(error), { roleId, permissionIds });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get all unique categories
+   * 
+   * @returns Promise with array of category names
+   */
+  async getAllCategories(): Promise<string[]> {
+    try {
+      const result = await this.prisma.permission.groupBy({
+        by: ['category']
+      });
+      
+      return result.map(item => item.category);
+    } catch (error) {
+      this.logger.error('Error in PermissionRepository.getAllCategories', error instanceof Error ? error : String(error));
       throw this.handleError(error);
     }
   }
@@ -179,21 +274,21 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
    * Begin a transaction
    */
   protected async beginTransaction(): Promise<void> {
-    // Prisma handles transactions differently, so this is a placeholder
+    // Prisma handles transactions differently, no explicit begin needed
   }
 
   /**
    * Commit a transaction
    */
   protected async commitTransaction(): Promise<void> {
-    // Prisma handles transactions differently, so this is a placeholder
+    // Prisma handles transactions differently, no explicit commit needed
   }
 
   /**
    * Rollback a transaction
    */
   protected async rollbackTransaction(): Promise<void> {
-    // Prisma handles transactions differently, so this is a placeholder
+    // Prisma handles transactions differently, no explicit rollback needed
   }
 
   /**
@@ -248,6 +343,12 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
             where: args[0]
           });
           
+        case 'bulkUpdate':
+          return await this.prisma.permission.updateMany({
+            where: { id: { in: args[0] } },
+            data: args[1]
+          });
+          
         default:
           throw new Error(`Unknown operation: ${operation}`);
       }
@@ -255,6 +356,16 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
       this.logger.error(`Error executing query: ${operation}`, error instanceof Error ? error : String(error));
       throw error;
     }
+  }
+
+  /**
+   * Process criteria for ORM
+   * 
+   * @param criteria - Filter criteria
+   * @returns ORM-specific criteria
+   */
+  protected processCriteria(criteria: FilterCriteria): any {
+    return criteria;
   }
 
   /**
@@ -284,6 +395,14 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
       }, {} as Record<string, boolean>);
     }
     
+    // Add relations
+    if (options.relations && options.relations.length > 0) {
+      result.include = options.relations.reduce((acc, relation) => {
+        acc[relation] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+    }
+    
     // Add sorting
     if (options.sort) {
       result.orderBy = {
@@ -295,17 +414,6 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
     }
     
     return result;
-  }
-
-  /**
-   * Process criteria for ORM
-   * 
-   * @param criteria - Filter criteria
-   * @returns ORM-specific criteria
-   */
-  protected processCriteria(criteria: FilterCriteria): any {
-    // Simple pass-through for most cases
-    return criteria;
   }
 
   /**
@@ -369,23 +477,44 @@ export class PermissionRepository extends BaseRepository<Permission, number> imp
   }
 
   /**
-   * Update multiple permissions in bulk
-   * 
-   * @param ids - Array of permission IDs
-   * @param data - Data to update
-   * @returns Promise with count of updated permissions
+   * Execute queries directly on the Permission table if the model is not available
    */
-  async bulkUpdate(ids: number[], data: Partial<Permission>): Promise<number> {
-    try {
-      const result = await this.prisma.permission.updateMany({
-        where: { id: { in: ids } },
-        data: this.mapToORMEntity(data)
-      });
-      
-      return result.count;
-    } catch (error) {
-      this.logger.error('Error in PermissionRepository.bulkUpdate', error instanceof Error ? error : String(error), { ids });
-      throw this.handleError(error);
-    }
+  protected async directPermissionQuery(query: string, ...params: any[]): Promise<any> {
+    return await this.prisma.$executeRawUnsafe(query, ...params);
+  }
+
+  // When accessing permission model through prisma, use a helper
+  protected get permissionModel(): any {
+    return (this.prisma as any).permission;
+  }
+
+  // When accessing rolePermission model through prisma, use a helper
+  protected get rolePermissionModel(): any {
+    return (this.prisma as any).rolePermission;
+  }
+
+  // When accessing userRole model through prisma, use a helper
+  protected get userRoleModel(): any {
+    return (this.prisma as any).userRole;
+  }
+
+  // When accessing role model through prisma, use a helper
+  protected get roleModel(): any {
+    return (this.prisma as any).role;
+  }
+
+  // When accessing count results, use proper type casting
+  protected asCountResult(result: any): { count: number } {
+    return result as { count: number };
+  }
+
+  // Use these methods in your queries - for example:
+  // Replace this.prisma.permission with this.permissionModel
+  // Replace this.prisma.rolePermission with this.rolePermissionModel
+  // etc.
+
+  // For functions with implicit 'any' parameters, add types:
+  protected mapDomainEntities(items: any[]): Permission[] {
+    return items.map((item: any) => this.mapToDomainEntity(item));
   }
 }

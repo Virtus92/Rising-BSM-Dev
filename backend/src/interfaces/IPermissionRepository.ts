@@ -11,48 +11,66 @@ export interface IPermissionRepository extends IBaseRepository<Permission, numbe
   /**
    * Find a permission by name
    * 
-   * @param name - Permission name
+   * @param name - Permission name to search for
    * @returns Promise with permission or null if not found
    */
   findByName(name: string): Promise<Permission | null>;
   
   /**
-   * Find permissions by category
+   * Get all permissions by category
    * 
-   * @param category - Permission category
-   * @returns Promise with permissions in that category
+   * @param category - Category name
+   * @returns Promise with array of permissions
    */
   findByCategory(category: string): Promise<Permission[]>;
   
   /**
-   * Get all permission categories
+   * Get permissions for a role
    * 
-   * @returns Promise with unique category names
+   * @param roleId - Role ID
+   * @returns Promise with array of permissions
    */
-  getAllCategories(): Promise<string[]>;
+  getPermissionsByRole(roleId: number): Promise<Permission[]>;
+  
+  /**
+   * Get permissions for a user based on their roles
+   * 
+   * @param userId - User ID
+   * @returns Promise with array of permissions
+   */
+  getUserPermissions(userId: number): Promise<Permission[]>;
   
   /**
    * Check if a user has a specific permission
    * 
    * @param userId - User ID
-   * @param permissionName - Permission name
-   * @returns Promise with boolean indicating if user has permission
+   * @param permissionName - Permission name to check
+   * @returns Promise indicating whether the user has the permission
    */
   checkUserPermission(userId: number, permissionName: string): Promise<boolean>;
   
   /**
-   * Get all permissions for a user
+   * Assign permissions to a role
    * 
-   * @param userId - User ID
-   * @returns Promise with user's permissions
+   * @param roleId - Role ID
+   * @param permissionIds - Array of permission IDs to assign
+   * @returns Promise with the number of permissions assigned
    */
-  getUserPermissions(userId: number): Promise<Permission[]>;
+  assignPermissionsToRole(roleId: number, permissionIds: number[]): Promise<number>;
   
   /**
-   * Create multiple permissions at once
+   * Remove permissions from a role
    * 
-   * @param permissions - Array of permission data
-   * @returns Promise with created permissions
+   * @param roleId - Role ID
+   * @param permissionIds - Array of permission IDs to remove
+   * @returns Promise with the number of permissions removed
    */
-  createMany(permissions: Partial<Permission>[]): Promise<Permission[]>;
+  removePermissionsFromRole(roleId: number, permissionIds: number[]): Promise<number>;
+  
+  /**
+   * Get all unique categories
+   * 
+   * @returns Promise with array of category names
+   */
+  getAllCategories(): Promise<string[]>;
 }

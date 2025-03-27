@@ -96,7 +96,7 @@ export interface LoginDto {
       id: number;
       name: string;
       email: string;
-      roles: UserRole[];
+      roles: number[];
       status: string;
       profilePicture?: string;
       createdAt: string;

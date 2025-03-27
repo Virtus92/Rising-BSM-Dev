@@ -1,642 +1,590 @@
+/**
+ * ValidationService
+ * 
+ * Implementation of IValidationService.
+ * Provides validation functionality for DTOs and other data structures.
+ */
 import { 
-    IValidationService, 
-    ValidationSchema, 
-    ValidationRule, 
-    ValidationOptions,
-    ValidationResult,
-    ValidatorFunction
-  } from '../interfaces/IValidationService.js';
-  import { ILoggingService } from '../interfaces/ILoggingService.js';
-  
-  /**
-   * ValidationService
-   * 
-   * Implementation of IValidationService that provides data validation functionality.
-   * Validates data against schemas and rules using built-in and custom validators.
-   */
-  export class ValidationService implements IValidationService {
-    // Map of custom validation types
-    private customTypes: Map<string, ValidatorFunction> = new Map();
+  IValidationService, 
+  ValidationSchema, 
+  ValidationRule, 
+  ValidationResult, 
+  ValidationOptions,
+  ValidatorFunction
+} from '../interfaces/IValidationService.js';
+import { ILoggingService } from '../interfaces/ILoggingService.js';
+
+export class ValidationService implements IValidationService {
+  // Built-in validators
+  private validators: Record<string, ValidatorFunction> = {
+    // Basic type validators
+    string: (value) => typeof value === 'string' || 'Value must be a string',
+    number: (value) => typeof value === 'number' || 'Value must be a number',
+    boolean: (value) => typeof value === 'boolean' || 'Value must be a boolean',
+    object: (value) => typeof value === 'object' && value !== null || 'Value must be an object',
+    array: (value) => Array.isArray(value) || 'Value must be an array',
+    enum: (value, options) => {
+      if (!options.enum) return 'Enum values not provided';
+      return options.enum.includes(value) || `Value must be one of: ${options.enum.join(', ')}`;
+    },
     
-    // Map of custom validation rules
-    private customRules: Map<string, ValidatorFunction> = new Map();
-  
-    /**
-     * Creates a new ValidationService instance
-     * 
-     * @param logger - Logging service
-     */
-    constructor(private readonly logger: ILoggingService) {
-      // Register built-in types
-      this.registerBuiltInTypes();
-      
-      // Register built-in rules
-      this.registerBuiltInRules();
-    }
-  
-    /**
-     * Validate data against a schema
-     * 
-     * @param data - Data to validate
-     * @param schema - Validation schema
-     * @param options - Validation options
-     * @returns Validation result
-     */
-    public validate<T>(
-      data: any, 
-      schema: ValidationSchema, 
-      options: ValidationOptions = {}
-    ): ValidationResult<T> {
-      const errors: string[] = [];
-      const validatedData: any = {};
-      
-      const { throwOnError = false, abortEarly = false, stripUnknown = false, convert = true } = options;
-      
+    // String validators
+    email: (value) => {
+      if (typeof value !== 'string') return 'Email must be a string';
+      // Simple email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(value) || 'Invalid email format';
+    },
+    url: (value) => {
+      if (typeof value !== 'string') return 'URL must be a string';
       try {
-        // Process each field in the schema
-        for (const [field, rule] of Object.entries(schema)) {
-          if (errors.length > 0 && abortEarly) {
-            break;
-          }
-          
-          // Get field value from data
-          let value = data[field];
-          const fieldErrors: string[] = [];
-          
-          // Apply default value if field is undefined and default is specified
-          if ((value === undefined || value === null || value === '') && rule.default !== undefined) {
-            value = rule.default;
-          }
-          
-          // Required field validation
-          if (rule.required && (value === undefined || value === null || value === '')) {
-            const errorMsg = rule.messages?.required || `${field} is required`;
-            fieldErrors.push(errorMsg);
-          }
-          
-          // Skip further validation if field is not required and empty
-          if ((value === undefined || value === null || value === '') && !rule.required) {
-            validatedData[field] = rule.default !== undefined ? rule.default : null;
-            continue;
-          }
-          
-          // Apply transformations if provided
-          if (value !== undefined && value !== null && rule.transform && Array.isArray(rule.transform)) {
-            for (const transformFn of rule.transform) {
-              if (typeof transformFn === 'function') {
-                value = transformFn(value);
-              }
-            }
-          }
-          
-          // Validate value if it exists
-          if (value !== undefined && value !== null && value !== '') {
-            // Type-specific validation
-            const typeError = this.validateType(value, rule.type, rule, convert);
-            if (typeError) {
-              fieldErrors.push(typeError);
-            } else {
-              // Apply rule-specific validations if type validation passed
-              this.applyRuleValidations(value, rule, field, fieldErrors);
-              
-              // Apply custom validation function if provided
-              if (rule.validate && typeof rule.validate === 'function') {
-                try {
-                  const validateResult = rule.validate(value, data);
-                  if (validateResult === false || typeof validateResult === 'string') {
-                    fieldErrors.push(
-                      typeof validateResult === 'string' 
-                        ? validateResult 
-                        : (rule.message || `Invalid ${field}`)
-                    );
-                  }
-                } catch (error) {
-                  fieldErrors.push(`Validation function error: ${(error as Error).message}`);
-                }
-              }
-            }
-          }
-          
-          // Add field errors to the global errors list
-          if (fieldErrors.length > 0) {
-            errors.push(...fieldErrors.map(err => `${field}: ${err}`));
-          } else {
-            // Add valid value to the resulting object
-            validatedData[field] = value;
-          }
-        }
-        
-        // Add non-schema fields if not stripping unknown
-        if (!stripUnknown && data) {
-          for (const field in data) {
-            if (!schema[field] && data[field] !== undefined) {
-              validatedData[field] = data[field];
-            }
-          }
-        }
-        
-        const isValid = errors.length === 0;
-        
-        // Throw error if validation failed and throwOnError is true
-        if (!isValid && throwOnError) {
-          const error = new Error('Validation failed');
-          (error as any).errors = errors;
-          throw error;
-        }
-        
-        return {
-          isValid,
-          errors,
-          validatedData: validatedData as T
-        };
-      } catch (error) {
-        this.logger.error('Validation error', error instanceof Error ? error : String(error));
-        
-        // If error is from our own validation, rethrow it
-        if ((error as any).errors) {
-          throw error;
-        }
-        
-        // For other errors, return validation failure
-        return {
-          isValid: false,
-          errors: [(error as Error).message],
-          validatedData: {} as T
-        };
+        new URL(value);
+        return true;
+      } catch {
+        return 'Invalid URL format';
       }
+    },
+    uuid: (value) => {
+      if (typeof value !== 'string') return 'UUID must be a string';
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(value) || 'Invalid UUID format';
+    },
+    
+    // Number validators
+    integer: (value) => {
+      if (typeof value !== 'number') return 'Value must be a number';
+      return Number.isInteger(value) || 'Value must be an integer';
+    },
+    positive: (value) => {
+      if (typeof value !== 'number') return 'Value must be a number';
+      return value > 0 || 'Value must be positive';
+    },
+    negative: (value) => {
+      if (typeof value !== 'number') return 'Value must be a number';
+      return value < 0 || 'Value must be negative';
+    },
+    
+    // Date validator
+    date: (value) => {
+      if (value instanceof Date) return true;
+      if (typeof value === 'string' || typeof value === 'number') {
+        const date = new Date(value);
+        return !isNaN(date.getTime()) || 'Invalid date format';
+      }
+      return 'Value must be a date or a valid date string';
     }
+  };
   
-    /**
-     * Validate a specific field
-     * 
-     * @param value - Value to validate
-     * @param rule - Validation rule
-     * @param field - Field name
-     * @param options - Validation options
-     * @returns Validation result
-     */
-    public validateField(
-      value: any, 
-      rule: ValidationRule, 
-      field: string, 
-      options: ValidationOptions = {}
-    ): ValidationResult<any> {
-      const errors: string[] = [];
-      let validatedValue = value;
+  // Custom validation rules
+  private customRules: Record<string, ValidatorFunction> = {};
+
+  /**
+   * Creates a new ValidationService instance
+   * 
+   * @param logger - Logging service
+   */
+  constructor(private readonly logger: ILoggingService) {
+    this.logger.debug('Initialized ValidationService');
+  }
+
+  /**
+   * Validate data against a schema
+   * 
+   * @param data - Data to validate
+   * @param schema - Validation schema
+   * @param options - Validation options
+   * @returns Validation result
+   */
+  validate<T>(data: any, schema: ValidationSchema, options?: ValidationOptions): ValidationResult<T> {
+    // Default options
+    const opts = {
+      throwOnError: false,
+      abortEarly: false,
+      stripUnknown: true,
+      convert: true,
+      ...options
+    };
+    
+    // Initialize validation result
+    const result: ValidationResult<T> = {
+      isValid: true,
+      errors: [],
+      validatedData: {} as T
+    };
+    
+    // Handle null or undefined data
+    if (data === null || data === undefined) {
+      result.isValid = false;
+      result.errors.push('Data is null or undefined');
       
-      const { convert = true } = options;
+      if (opts.throwOnError) {
+        throw new Error('Validation failed: Data is null or undefined');
+      }
       
+      return result;
+    }
+    
+    // Validate each field according to schema
+    for (const [field, rule] of Object.entries(schema)) {
       try {
-        // Apply transformations if provided
-        if (value !== undefined && value !== null && rule.transform && Array.isArray(rule.transform)) {
-          for (const transformFn of rule.transform) {
-            if (typeof transformFn === 'function') {
-              validatedValue = transformFn(validatedValue);
-            }
-          }
-        }
-        
-        // Required validation
-        if (rule.required && (validatedValue === undefined || validatedValue === null || validatedValue === '')) {
-          const errorMsg = rule.messages?.required || `${field} is required`;
-          errors.push(errorMsg);
-        }
-        
-        // Skip further validation if field is not required and empty
-        if ((validatedValue === undefined || validatedValue === null || validatedValue === '') && !rule.required) {
-          validatedValue = rule.default !== undefined ? rule.default : null;
-        } else if (validatedValue !== undefined && validatedValue !== null && validatedValue !== '') {
-          // Type-specific validation
-          const typeError = this.validateType(validatedValue, rule.type, rule, convert);
-          if (typeError) {
-            errors.push(typeError);
-          } else {
-            // Apply rule-specific validations if type validation passed
-            this.applyRuleValidations(validatedValue, rule, field, errors);
+        // Skip fields not present in data unless required
+        if (!(field in data)) {
+          if (rule.required) {
+            result.isValid = false;
+            const errorMessage = this.getErrorMessage(rule, 'required', `${field} is required`);
+            result.errors.push(errorMessage);
             
-            // Apply custom validation function if provided
-            if (rule.validate && typeof rule.validate === 'function') {
-              try {
-                const validateResult = rule.validate(validatedValue);
-                if (validateResult === false || typeof validateResult === 'string') {
-                  errors.push(
-                    typeof validateResult === 'string' 
-                      ? validateResult 
-                      : (rule.message || `Invalid ${field}`)
-                  );
-                }
-              } catch (error) {
-                errors.push(`Validation function error: ${(error as Error).message}`);
-              }
-            }
+            if (opts.abortEarly) break;
+          } else if (rule.default !== undefined) {
+            // Use default value if field is missing
+            (result.validatedData as any)[field] = rule.default;
           }
-        }
-        
-        return {
-          isValid: errors.length === 0,
-          errors,
-          validatedData: validatedValue
-        };
-      } catch (error) {
-        this.logger.error('Field validation error', error instanceof Error ? error : String(error));
-        
-        return {
-          isValid: false,
-          errors: [(error as Error).message],
-          validatedData: value
-        };
-      }
-    }
-  
-    /**
-     * Register a custom validation type
-     * 
-     * @param type - Type name
-     * @param validator - Validator function
-     */
-    public registerType(type: string, validator: ValidatorFunction): void {
-      this.customTypes.set(type, validator);
-      this.logger.debug(`Registered custom validation type: ${type}`);
-    }
-  
-    /**
-     * Register a custom validation rule
-     * 
-     * @param name - Rule name
-     * @param validator - Validator function
-     */
-    public registerRule(name: string, validator: ValidatorFunction): void {
-      this.customRules.set(name, validator);
-      this.logger.debug(`Registered custom validation rule: ${name}`);
-    }
-  
-    /**
-     * Create a validation schema from a class or object
-     * 
-     * @param target - Class constructor or object
-     * @returns Validation schema
-     */
-    public createSchema(target: any): ValidationSchema {
-      // Simple implementation that extracts properties and infers types
-      const schema: ValidationSchema = {};
-      
-      // If target is a class constructor, create an instance
-      const instance = typeof target === 'function' ? new target() : target;
-      
-      // Extract properties and infer types
-      for (const key in instance) {
-        const value = instance[key];
-        const valueType = typeof value;
-        
-        // Skip functions and symbols
-        if (valueType === 'function' || valueType === 'symbol') {
           continue;
         }
         
-        // Create rule based on value type
-        const rule: ValidationRule = {
-          type: this.inferTypeFromValue(value)
-        };
+        // Get field value
+        let value = data[field];
         
-        // Add rule to schema
-        schema[key] = rule;
+        // Apply transforms if any
+        if (rule.transform && Array.isArray(rule.transform)) {
+          for (const transform of rule.transform) {
+            value = transform(value);
+          }
+        }
+        
+        // Check if field is required but null or undefined
+        if ((value === null || value === undefined) && rule.required) {
+          result.isValid = false;
+          const errorMessage = this.getErrorMessage(rule, 'required', `${field} is required`);
+          result.errors.push(errorMessage);
+          
+          if (opts.abortEarly) break;
+          continue;
+        }
+        
+        // Skip further validation if field is null or undefined and not required
+        if (value === null || value === undefined) {
+          if (rule.default !== undefined) {
+            (result.validatedData as any)[field] = rule.default;
+          } else {
+            (result.validatedData as any)[field] = value;
+          }
+          continue;
+        }
+        
+        // Type conversion if enabled
+        if (opts.convert) {
+          value = this.convertValue(value, rule.type);
+        }
+        
+        // Validate type
+        const typeValidation = this.validateType(value, rule);
+        
+        if (typeValidation !== true) {
+          result.isValid = false;
+          const errorMessage = this.getErrorMessage(rule, 'type', typeValidation);
+          result.errors.push(errorMessage);
+          
+          if (opts.abortEarly) break;
+          continue;
+        }
+        
+        // Validate additional constraints
+        const constraintErrors = this.validateConstraints(value, rule);
+        
+        if (constraintErrors.length > 0) {
+          result.isValid = false;
+          result.errors.push(...constraintErrors.map(err => `${field}: ${err}`));
+          
+          if (opts.abortEarly) break;
+          continue;
+        }
+        
+        // Validate with custom validator if provided
+        if (rule.validate) {
+          const validateResult = rule.validate(value, data);
+          
+          if (validateResult !== true) {
+            result.isValid = false;
+            const errorMessage = typeof validateResult === 'string' 
+              ? `${field}: ${validateResult}` 
+              : `${field}: Invalid value`;
+            result.errors.push(errorMessage);
+            
+            if (opts.abortEarly) break;
+            continue;
+          }
+        }
+        
+        // Validation passed, add to validated data
+        (result.validatedData as any)[field] = value;
+      } catch (error) {
+        result.isValid = false;
+        result.errors.push(`${field}: ${error instanceof Error ? error.message : String(error)}`);
+        
+        if (opts.abortEarly) break;
       }
-      
-      return schema;
     }
-  
-    /**
-     * Sanitize data against a schema
-     * 
-     * @param data - Data to sanitize
-     * @param schema - Validation schema
-     * @returns Sanitized data
-     */
-    public sanitize<T>(data: any, schema: ValidationSchema): T {
-      const result: any = {};
-      
-      // Only include fields defined in the schema
-      for (const key in schema) {
-        if (data && data[key] !== undefined) {
-          result[key] = data[key];
+    
+    // If stripUnknown is false, add unknown fields to validatedData
+    if (!opts.stripUnknown && typeof data === 'object' && data !== null) {
+      for (const field in data) {
+        if (!(field in schema) && data[field] !== undefined) {
+          (result.validatedData as any)[field] = data[field];
         }
       }
-      
-      return result as T;
     }
-  
-    /**
-     * Register built-in validation types
-     */
-    private registerBuiltInTypes(): void {
-      // Register string type validator
-      this.registerType('string', (value: any): boolean => {
-        return typeof value === 'string';
-      });
-      
-      // Register number type validator
-      this.registerType('number', (value: any): boolean => {
-        return typeof value === 'number' && !isNaN(value);
-      });
-      
-      // Register boolean type validator
-      this.registerType('boolean', (value: any): boolean => {
-        return typeof value === 'boolean';
-      });
-      
-      // Register date type validator
-      this.registerType('date', (value: any): boolean => {
-        return value instanceof Date && !isNaN(value.getTime());
-      });
-      
-      // Register email type validator
-      this.registerType('email', (value: any): boolean => {
-        if (typeof value !== 'string') return false;
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        return emailRegex.test(value);
-      });
-      
-      // Register array type validator
-      this.registerType('array', (value: any): boolean => {
-        return Array.isArray(value);
-      });
-      
-      // Register object type validator
-      this.registerType('object', (value: any): boolean => {
-        return typeof value === 'object' && value !== null && !Array.isArray(value);
-      });
-      
-      // Register enum type validator
-      this.registerType('enum', (value: any, options?: any): boolean => {
-        const enumValues = options?.enum || [];
-        return enumValues.includes(value);
-      });
+    
+    // Throw error if requested and validation failed
+    if (!result.isValid && opts.throwOnError) {
+      throw new Error(`Validation failed: ${result.errors.join(', ')}`);
     }
-  
-    /**
-     * Register built-in validation rules
-     */
-    private registerBuiltInRules(): void {
-      // Register min rule (min value for numbers, min length for strings/arrays)
-      this.registerRule('min', (value: any, options?: any): boolean => {
-        const min = options?.min;
-        if (min === undefined) return true;
-        
-        if (typeof value === 'number') {
-          return value >= min;
-        }
-        
-        if (typeof value === 'string' || Array.isArray(value)) {
-          return value.length >= min;
-        }
-        
-        return true;
-      });
-      
-      // Register max rule (max value for numbers, max length for strings/arrays)
-      this.registerRule('max', (value: any, options?: any): boolean => {
-        const max = options?.max;
-        if (max === undefined) return true;
-        
-        if (typeof value === 'number') {
-          return value <= max;
-        }
-        
-        if (typeof value === 'string' || Array.isArray(value)) {
-          return value.length <= max;
-        }
-        
-        return true;
-      });
-      
-      // Register pattern rule (regexp for strings)
-      this.registerRule('pattern', (value: any, options?: any): boolean => {
-        const pattern = options?.pattern;
-        if (!pattern || typeof value !== 'string') return true;
-        
-        const regex = pattern instanceof RegExp ? pattern : new RegExp(pattern);
-        return regex.test(value);
-      });
-      
-      // Register integer rule
-      this.registerRule('integer', (value: any): boolean => {
-        if (typeof value !== 'number') return true;
-        return Number.isInteger(value);
-      });
+    
+    return result;
+  }
+
+  /**
+   * Validate a specific field
+   * 
+   * @param value - Value to validate
+   * @param rule - Validation rule
+   * @param field - Field name
+   * @param options - Validation options
+   * @returns Validation result
+   */
+  validateField(value: any, rule: ValidationRule, field: string, options?: ValidationOptions): ValidationResult<any> {
+    // Create a schema with just this field
+    const schema: ValidationSchema = {
+      [field]: rule
+    };
+    
+    // Validate the field using the schema
+    return this.validate({ [field]: value }, schema, options);
+  }
+
+  /**
+   * Register a custom validation type
+   * 
+   * @param type - Type name
+   * @param validator - Validator function
+   */
+  registerType(type: string, validator: ValidatorFunction): void {
+    if (this.validators[type]) {
+      this.logger.warn(`Overriding existing validator for type: ${type}`);
     }
-  
-    /**
-     * Validate a value against a type
-     * 
-     * @param value - Value to validate
-     * @param type - Type to validate against
-     * @param rule - Full validation rule
-     * @param convert - Whether to convert types
-     * @returns Error message or undefined if valid
-     */
-    private validateType(value: any, type: string, rule: ValidationRule, convert: boolean): string  {
-      // Try to convert value if needed
-      if (convert) {
-        value = this.convertValueToType(value, type);
-      }
-      
-      // Check custom type validators first
-      if (this.customTypes.has(type)) {
-        const validator = this.customTypes.get(type)!;
-        if (!validator(value, rule)) {
-          return rule.messages?.type || `Value must be a valid ${type}`;
-        }
-        return '';
-      }
-      
-      // Built-in type checking
-      switch (type) {
-        case 'string':
-          if (typeof value !== 'string') {
-            return rule.messages?.type || 'Value must be a string';
-          }
-          break;
-          
-        case 'number':
-          if (typeof value !== 'number' || isNaN(value)) {
-            return rule.messages?.type || 'Value must be a number';
-          }
-          break;
-          
-        case 'boolean':
-          if (typeof value !== 'boolean') {
-            return rule.messages?.type || 'Value must be a boolean';
-          }
-          break;
-          
-        case 'date':
-          if (!(value instanceof Date) || isNaN(value.getTime())) {
-            return rule.messages?.type || 'Value must be a valid date';
-          }
-          break;
-          
-        case 'email':
-          if (typeof value !== 'string') {
-            return rule.messages?.type || 'Email must be a string';
-          }
-          
-          const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-          if (!emailRegex.test(value)) {
-            return rule.messages?.type || 'Invalid email format';
-          }
-          break;
-          
-        case 'array':
-          if (!Array.isArray(value)) {
-            return rule.messages?.type || 'Value must be an array';
-          }
-          break;
-          
-        case 'object':
-          if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-            return rule.messages?.type || 'Value must be an object';
-          }
-          break;
-          
-        case 'enum':
-          const enumValues = rule.enum || [];
-          if (!enumValues.includes(value)) {
-            return rule.messages?.enum || `Value must be one of: ${enumValues.join(', ')}`;
-          }
-          break;
-          
-        default:
-          // If type is unknown, consider it valid
-          this.logger.warn(`Unknown validation type: ${type}`);
-          break;
-      }
-      
-      return '';
+    
+    this.validators[type] = validator;
+    this.logger.debug(`Registered validator for type: ${type}`);
+  }
+
+  /**
+   * Register a custom validation rule
+   * 
+   * @param name - Rule name
+   * @param validator - Validator function
+   */
+  registerRule(name: string, validator: ValidatorFunction): void {
+    if (this.customRules[name]) {
+      this.logger.warn(`Overriding existing custom rule: ${name}`);
     }
-  
-    /**
-     * Apply rule-specific validations
-     * 
-     * @param value - Value to validate
-     * @param rule - Validation rule
-     * @param field - Field name
-     * @param errors - Array to collect errors
-     */
-    private applyRuleValidations(value: any, rule: ValidationRule, field: string, errors: string[]): void {
-      // Apply min/max validations for strings, arrays, numbers
-      if (rule.min !== undefined) {
-        if (
-          (typeof value === 'number' && value < rule.min) ||
-          ((typeof value === 'string' || Array.isArray(value)) && value.length < rule.min)
-        ) {
-          errors.push(rule.messages?.min || `Minimum ${typeof value === 'number' ? 'value' : 'length'} for ${field} is ${rule.min}`);
+    
+    this.customRules[name] = validator;
+    this.logger.debug(`Registered custom rule: ${name}`);
+  }
+
+  /**
+   * Create a validation schema from a class/interface
+   * 
+   * @param target - Class constructor or object with shape of interface
+   * @returns Validation schema
+   */
+  createSchema(target: any): ValidationSchema {
+    // If target is a constructor, create an instance
+    const instance = typeof target === 'function' ? new target() : target;
+    const schema: ValidationSchema = {};
+    
+    // Extract properties and their types
+    for (const key in instance) {
+      const value = instance[key];
+      let rule: ValidationRule;
+      
+      if (value === undefined) {
+        // Property exists but no value to infer type
+        rule = { type: 'any', required: false };
+      } else {
+        // Infer type from value
+        const type = this.inferType(value);
+        rule = { type, required: false };
+        
+        // Add constraints based on value type
+        if (type === 'string' && typeof value === 'string') {
+          rule.min = 0;
+          rule.max = value.length > 0 ? value.length : undefined;
+        } else if (type === 'number' && typeof value === 'number') {
+          rule.min = value;
+          rule.max = value;
+        } else if (type === 'array' && Array.isArray(value)) {
+          rule.min = 0;
+          rule.max = value.length > 0 ? value.length : undefined;
+          
+          // Infer item type if array is not empty
+          if (value.length > 0) {
+            rule.items = { type: this.inferType(value[0]) };
+          }
         }
       }
       
-      if (rule.max !== undefined) {
-        if (
-          (typeof value === 'number' && value > rule.max) ||
-          ((typeof value === 'string' || Array.isArray(value)) && value.length > rule.max)
-        ) {
-          errors.push(rule.messages?.max || `Maximum ${typeof value === 'number' ? 'value' : 'length'} for ${field} is ${rule.max}`);
-        }
+      schema[key] = rule;
+    }
+    
+    return schema;
+  }
+
+  /**
+   * Sanitize data against a schema (strip unknown properties)
+   * 
+   * @param data - Data to sanitize
+   * @param schema - Schema to sanitize against
+   * @returns Sanitized data
+   */
+  sanitize<T>(data: any, schema: ValidationSchema): T {
+    if (typeof data !== 'object' || data === null) {
+      return data as T;
+    }
+    
+    const sanitized: any = {};
+    
+    for (const key in schema) {
+      if (key in data) {
+        sanitized[key] = data[key];
+      }
+    }
+    
+    return sanitized as T;
+  }
+
+  /**
+   * Infer type from a value
+   * 
+   * @param value - Value to infer type from
+   * @returns Inferred type
+   */
+  private inferType(value: any): string {
+    if (value === null || value === undefined) return 'any';
+    if (typeof value === 'string') return 'string';
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'object') {
+      if (Array.isArray(value)) return 'array';
+      if (value instanceof Date) return 'date';
+      return 'object';
+    }
+    return 'any';
+  }
+
+  /**
+   * Validate value against type
+   * 
+   * @param value - Value to validate
+   * @param rule - Validation rule
+   * @returns Validation result
+   */
+  private validateType(value: any, rule: ValidationRule): true | string {
+    const type = rule.type;
+    
+    // Skip type validation for 'any' type
+    if (type === 'any') return true;
+    
+    // Get validator for type
+    const validator = this.validators[type];
+    
+    if (!validator) {
+      this.logger.warn(`No validator found for type: ${type}`);
+      return true; // Skip validation for unknown types
+    }
+    
+    // Run validator
+    const result = validator(value, rule);
+    
+    return result === true ? true : (typeof result === 'string' ? result : `Value must be of type ${type}`);
+  }
+
+  /**
+   * Validate value against constraints
+   * 
+   * @param value - Value to validate
+   * @param rule - Validation rule
+   * @returns Array of constraint errors
+   */
+  private validateConstraints(value: any, rule: ValidationRule): string[] {
+    const errors: string[] = [];
+    
+    // Validate string constraints
+    if (typeof value === 'string' && (rule.type === 'string' || rule.type === 'email' || rule.type === 'url')) {
+      if (rule.min !== undefined && value.length < rule.min) {
+        errors.push(this.getErrorMessage(rule, 'min', `Value must be at least ${rule.min} characters`));
       }
       
-      // Apply pattern validation for strings
-      if (rule.pattern && typeof value === 'string') {
+      if (rule.max !== undefined && value.length > rule.max) {
+        errors.push(this.getErrorMessage(rule, 'max', `Value cannot exceed ${rule.max} characters`));
+      }
+      
+      if (rule.pattern) {
         const pattern = rule.pattern instanceof RegExp ? rule.pattern : new RegExp(rule.pattern);
         if (!pattern.test(value)) {
-          errors.push(rule.messages?.pattern || `${field} does not match the required pattern`);
+          errors.push(this.getErrorMessage(rule, 'pattern', 'Value does not match required pattern'));
         }
       }
-      
-      // Apply integer validation for numbers
-      if (rule.integer === true && typeof value === 'number' && !Number.isInteger(value)) {
-        errors.push(rule.messages?.integer || `${field} must be an integer`);
+    }
+    
+    // Validate number constraints
+    if (typeof value === 'number' && rule.type === 'number') {
+      if (rule.min !== undefined && value < rule.min) {
+        errors.push(this.getErrorMessage(rule, 'min', `Value must be at least ${rule.min}`));
       }
       
-      // Check custom rules
-      for (const [ruleName, validator] of this.customRules.entries()) {
-        // Only apply rule if it exists in the rule object
-        if (rule[ruleName] !== undefined) {
-          if (!validator(value, rule)) {
-            errors.push(rule.messages?.[ruleName] || `${field} failed validation rule: ${ruleName}`);
+      if (rule.max !== undefined && value > rule.max) {
+        errors.push(this.getErrorMessage(rule, 'max', `Value cannot exceed ${rule.max}`));
+      }
+    }
+    
+    // Validate array constraints
+    if (Array.isArray(value) && rule.type === 'array') {
+      if (rule.min !== undefined && value.length < rule.min) {
+        errors.push(this.getErrorMessage(rule, 'min', `Array must contain at least ${rule.min} items`));
+      }
+      
+      if (rule.max !== undefined && value.length > rule.max) {
+        errors.push(this.getErrorMessage(rule, 'max', `Array cannot exceed ${rule.max} items`));
+      }
+      
+      // Validate array items if item rule is provided
+      if (rule.items && value.length > 0) {
+        for (let i = 0; i < value.length; i++) {
+          const itemResult = this.validateType(value[i], rule.items);
+          if (itemResult !== true) {
+            errors.push(`Item at index ${i}: ${itemResult}`);
+          }
+          
+          const itemConstraintErrors = this.validateConstraints(value[i], rule.items);
+          if (itemConstraintErrors.length > 0) {
+            errors.push(...itemConstraintErrors.map(err => `Item at index ${i}: ${err}`));
           }
         }
       }
     }
-  
-    /**
-     * Convert value to the specified type if possible
-     * 
-     * @param value - Value to convert
-     * @param type - Target type
-     * @returns Converted value
-     */
-    private convertValueToType(value: any, type: string): any {
-      if (value === undefined || value === null) {
-        return value;
+    
+    // Validate object constraints
+    if (typeof value === 'object' && value !== null && !Array.isArray(value) && rule.type === 'object' && rule.schema) {
+      const nestedResult = this.validate(value, rule.schema);
+      if (!nestedResult.isValid) {
+        errors.push(...nestedResult.errors);
       }
-      
-      switch (type) {
-        case 'string':
-          if (typeof value !== 'string') {
-            return String(value);
-          }
-          break;
-          
-        case 'number':
-          if (typeof value !== 'number') {
-            const num = Number(value);
-            return isNaN(num) ? value : num;
-          }
-          break;
-          
-        case 'boolean':
-          if (typeof value !== 'boolean') {
-            if (value === 'true') return true;
-            if (value === 'false') return false;
-          }
-          break;
-          
-        case 'date':
-          if (!(value instanceof Date)) {
-            try {
-              return new Date(value);
-            } catch {
-              // If conversion fails, return original value
-              return value;
-            }
-          }
-          break;
+    }
+    
+    // Validate custom rules
+    for (const [ruleName, validator] of Object.entries(this.customRules)) {
+      if (ruleName in rule && ruleName !== 'type' && ruleName !== 'required') {
+        const ruleValue = (rule as any)[ruleName];
+        const validationResult = validator(value, { ...rule, [ruleName]: ruleValue });
+        
+        if (validationResult !== true) {
+          errors.push(typeof validationResult === 'string' ? validationResult : `Failed ${ruleName} validation`);
+        }
       }
-      
+    }
+    
+    return errors;
+  }
+
+  /**
+   * Get error message for a validation error
+   * 
+   * @param rule - Validation rule
+   * @param errorType - Type of error
+   * @param defaultMessage - Default error message
+   * @returns Error message
+   */
+  private getErrorMessage(rule: ValidationRule, errorType: string, defaultMessage: string): string {
+    // Check for message in rule.messages
+    if (rule.messages && errorType in rule.messages) {
+      return rule.messages[errorType] as string;
+    }
+    
+    // Check for generic message
+    if (rule.message) {
+      return rule.message;
+    }
+    
+    return defaultMessage;
+  }
+
+  /**
+   * Convert value to specified type
+   * 
+   * @param value - Value to convert
+   * @param type - Target type
+   * @returns Converted value
+   */
+  private convertValue(value: any, type: string): any {
+    if (value === null || value === undefined) {
       return value;
     }
-  
-    /**
-     * Infer type from a value
-     * 
-     * @param value - Value to infer type from
-     * @returns Inferred type name
-     */
-    private inferTypeFromValue(value: any): string {
-      if (value === null || value === undefined) {
-        return 'string'; // Default to string for null/undefined
-      }
-      
-      if (value instanceof Date) {
-        return 'date';
-      }
-      
-      if (Array.isArray(value)) {
-        return 'array';
-      }
-      
-      if (typeof value === 'object') {
-        return 'object';
-      }
-      
-      return typeof value;
+    
+    switch (type) {
+      case 'string':
+        if (typeof value !== 'string') {
+          return String(value);
+        }
+        break;
+        
+      case 'number':
+        if (typeof value !== 'number') {
+          const num = Number(value);
+          if (!isNaN(num)) {
+            return num;
+          }
+        }
+        break;
+        
+      case 'boolean':
+        if (typeof value !== 'boolean') {
+          if (value === 'true' || value === '1' || value === 1) {
+            return true;
+          } else if (value === 'false' || value === '0' || value === 0) {
+            return false;
+          }
+        }
+        break;
+        
+      case 'date':
+        if (!(value instanceof Date)) {
+          try {
+            return new Date(value);
+          } catch {
+            // Failed to convert to date
+          }
+        }
+        break;
+        
+      case 'array':
+        if (!Array.isArray(value)) {
+          if (typeof value === 'string') {
+            try {
+              const parsed = JSON.parse(value);
+              if (Array.isArray(parsed)) {
+                return parsed;
+              }
+            } catch {
+              // Failed to parse JSON
+            }
+          }
+        }
+        break;
     }
+    
+    return value;
   }
+}
+
+export default ValidationService;

@@ -27,6 +27,73 @@ import { PermissionSeed } from '../src/utils/PermissionSeed.js';
 import { ErrorHandler } from '../src/core/ErrorHandler.js';
 
 /**
+ * Generate the Permission and Role tables if missing
+ * 
+ * @param prisma - Prisma client
+ */
+async function ensureTablesExist(prisma: PrismaClient) {
+  try {
+    // Check if Permission table exists, if not create it
+    try {
+      await prisma.$queryRaw`SELECT 1 FROM "Permission" LIMIT 1`;
+      console.log("Permission table exists");
+    } catch (e) {
+      console.log("Creating Permission table");
+      await prisma.$executeRaw`
+        CREATE TABLE IF NOT EXISTS "Permission" (
+          "id" SERIAL PRIMARY KEY,
+          "name" VARCHAR(255) UNIQUE NOT NULL,
+          "description" TEXT,
+          "category" VARCHAR(50) NOT NULL,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+    }
+
+    // Check if Role table exists, if not create it
+    try {
+      await prisma.$queryRaw`SELECT 1 FROM "Role" LIMIT 1`;
+      console.log("Role table exists");
+    } catch (e) {
+      console.log("Creating Role table");
+      await prisma.$executeRaw`
+        CREATE TABLE IF NOT EXISTS "Role" (
+          "id" SERIAL PRIMARY KEY,
+          "name" VARCHAR(50) UNIQUE NOT NULL,
+          "description" TEXT,
+          "isSystem" BOOLEAN NOT NULL DEFAULT false,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "createdBy" INTEGER,
+          "updatedBy" INTEGER
+        )
+      `;
+    }
+
+    // Check if RolePermission table exists, if not create it
+    try {
+      await prisma.$queryRaw`SELECT 1 FROM "RolePermission" LIMIT 1`;
+      console.log("RolePermission table exists");
+    } catch (e) {
+      console.log("Creating RolePermission table");
+      await prisma.$executeRaw`
+        CREATE TABLE IF NOT EXISTS "RolePermission" (
+          "id" SERIAL PRIMARY KEY,
+          "roleId" INTEGER NOT NULL,
+          "permissionId" INTEGER NOT NULL,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE("roleId", "permissionId")
+        )
+      `;
+    }
+  } catch (error) {
+    console.error("Error ensuring tables exist:", error);
+    throw error;
+  }
+}
+
+/**
  * Main function to seed permissions and roles
  */
 async function main() {
@@ -38,22 +105,22 @@ async function main() {
   const prisma = new PrismaClient();
   
   try {
+    // Ensure required tables exist
+    await ensureTablesExist(prisma);
+    
     // Setup repositories
     const permissionRepository = new PermissionRepository(prisma, logger, errorHandler);
     const roleRepository = new RoleRepository(prisma, logger, errorHandler);
     
-    // Create seeder
-    const permissionSeed = new PermissionSeed(permissionRepository, roleRepository, logger);
+    // Create seeder with the correct order of parameters
+    const permissionSeed = new PermissionSeed(
+      permissionRepository,
+      roleRepository,
+      logger
+    );
     
-    // Seed permissions
-    console.log('Seeding permissions...');
-    const permissionResult = await permissionSeed.seedPermissions();
-    console.log(`Permission seeding complete: ${permissionResult.created} created, ${permissionResult.existing} already existed`);
-    
-    // Seed roles
-    console.log('Seeding roles...');
-    await permissionSeed.seedRoles();
-    console.log('Role seeding complete');
+    // Seed permissions and roles
+    await permissionSeed.seed();
     
     console.log('Seeding completed successfully!');
   } catch (error) {

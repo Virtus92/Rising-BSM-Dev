@@ -23,6 +23,8 @@ import { UserRoleAssignmentDto } from '../dtos/RoleDtos.js';
 import { ServiceOptions } from '../interfaces/IBaseService.js';
 import * as bcrypt from 'bcryptjs';
 import { PasswordUtils } from '../utils/PasswordUtils.js';
+import { PermissionResponseDto } from '../dtos/PermissionDtos.js';
+import { PermissionResponseDto as RolePermissionResponseDto, RoleDtoUtils } from '../dtos/RoleDtos.js';
 
 /**
  * UserService
@@ -255,15 +257,18 @@ async hasPermission(userId: number, permissionName: string): Promise<boolean> {
  * @param userId - User ID
  * @returns Promise with user's permissions
  */
-async getUserPermissions(userId: number): Promise<PermissionResponseDto[]> {
+async getUserPermissions(userId: number): Promise<RolePermissionResponseDto[]> {
   try {
     const permissions = await this.permissionRepository.getUserPermissions(userId);
     
+    // Convert to RolePermissionResponseDto (with non-optional description)
     return permissions.map(permission => ({
       id: permission.id,
       name: permission.name,
-      description: permission.description || '',
-      category: permission.category
+      description: permission.description || '',  // Ensure description is never undefined
+      category: permission.category,
+      createdAt: permission.createdAt,
+      updatedAt: permission.updatedAt
     }));
   } catch (error) {
     this.logger.error('Error in UserService.getUserPermissions', error instanceof Error ? error : String(error), { userId });
@@ -610,6 +615,10 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
    * @returns User response DTO
    */
   toDTO(entity: User): UserResponseDto {
+    const roleNames: string[] = Array.isArray(entity.roles) 
+      ? entity.roles.map(role => typeof role === 'string' ? role : role.name)
+      : [];
+      
     return {
       id: entity.id,
       username: entity.username,
@@ -617,7 +626,8 @@ async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): 
       firstName: entity.firstName,
       lastName: entity.lastName,
       fullName: entity.getFullName(),
-      roles: entity.roles,
+      role: entity.role,
+      roles: roleNames, // This is string[]
       status: entity.status,
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),

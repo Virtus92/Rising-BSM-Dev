@@ -1,3 +1,6 @@
+import { Role } from '../entities/Role.js';
+import { Permission } from '../entities/Permission.js';
+
 /**
  * Base interface for role DTOs
  */
@@ -48,63 +51,82 @@ interface BaseRoleDto {
   }
   
   /**
-   * DTO for role responses
+   * Permission response DTO for role module
    */
-  export interface RoleResponseDto extends BaseRoleDto {
-    /**
-     * Role ID
-     */
+  export interface PermissionResponseDto {
     id: number;
-    
-    /**
-     * Role name
-     */
     name: string;
-    
-    /**
-     * Role description
-     */
-    description: string;
-    
-    /**
-     * Whether this is a system role (cannot be deleted)
-     */
-    isSystem: boolean;
-    
-    /**
-     * Creation timestamp
-     */
-    createdAt: string;
-    
-    /**
-     * Last update timestamp
-     */
-    updatedAt: string;
+    description: string; // Notice this is not optional
+    category: string;
+    createdAt?: Date;
+    updatedAt?: Date;
   }
   
   /**
-   * DTO for permission responses
+   * Role response DTO
    */
-  export interface PermissionResponseDto {
-    /**
-     * Permission ID
-     */
+  export interface RoleResponseDto {
     id: number;
-    
-    /**
-     * Permission name
-     */
     name: string;
-    
-    /**
-     * Permission description
-     */
     description: string;
-    
+    isSystem: boolean;
+    permissions?: PermissionResponseDto[];
+    createdAt?: Date;
+    updatedAt?: Date;
+  }
+  
+  /**
+   * Role assignment DTO
+   */
+  export interface RoleAssignmentDto {
+    roleId: number;
+  }
+  
+  /**
+   * User role assignment DTO
+   */
+  export interface UserRoleAssignmentDto {
+    roleIds: number[];
+    replaceExisting?: boolean;
+  }
+  
+  /**
+   * Helper functions for role DTOs
+   */
+  export class RoleDtoUtils {
     /**
-     * Permission category
+     * Convert a role entity to a response DTO
+     * 
+     * @param role - Role entity
+     * @returns Role response DTO
      */
-    category: string;
+    static toResponseDto(role: Role): RoleResponseDto {
+      return {
+        id: role.id,
+        name: role.name,
+        description: role.description || '',
+        isSystem: role.isSystem,
+        createdAt: role.createdAt,
+        updatedAt: role.updatedAt
+      };
+    }
+  
+    /**
+     * Convert a permission entity to a response DTO
+     * 
+     * @param permission - Permission entity
+     * @returns Permission response DTO
+     */
+    static permissionToDto(permission: Permission): PermissionResponseDto {
+      return {
+        id: permission.id,
+        name: permission.name,
+        description: permission.description || '',
+        category: permission.category,
+        createdAt: permission.createdAt,
+        updatedAt: permission.updatedAt
+      };
+    }
   }
   
   /**
@@ -128,21 +150,6 @@ interface BaseRoleDto {
     
     /**
      * Whether to replace existing permissions
-     */
-    replaceExisting: boolean;
-  }
-  
-  /**
-   * DTO for user role assignment
-   */
-  export interface UserRoleAssignmentDto {
-    /**
-     * Role IDs to assign
-     */
-    roleIds: number[];
-    
-    /**
-     * Whether to replace existing roles
      */
     replaceExisting: boolean;
   }
@@ -252,3 +259,4 @@ interface BaseRoleDto {
       default: false
     }
   };
+  

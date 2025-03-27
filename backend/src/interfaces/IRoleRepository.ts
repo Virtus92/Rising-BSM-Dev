@@ -1,95 +1,68 @@
-import { IBaseRepository } from './IBaseRepository.js';
 import { Role } from '../entities/Role.js';
-import { Permission } from '../entities/Permission.js';
+import { QueryOptions, FilterCriteria, IBaseRepository } from './IBaseRepository.js';
 
 /**
- * IRoleRepository
- * 
- * Repository interface for Role entity operations.
- * Extends the base repository interface with role-specific methods.
+ * Role repository interface
  */
 export interface IRoleRepository extends IBaseRepository<Role, number> {
   /**
-   * Find a role by name
+   * Find role by name
    * 
    * @param name - Role name
-   * @returns Promise with role or null if not found
+   * @returns Promise with found role or null
    */
   findByName(name: string): Promise<Role | null>;
   
   /**
-   * Find a role by ID and include its permissions
-   * 
-   * @param id - Role ID
-   * @returns Promise with role including permissions
-   */
-  findByIdWithPermissions(id: number): Promise<Role | null>;
-  
-  /**
-   * Find all roles with their permissions
-   * 
-   * @returns Promise with roles including permissions
-   */
-  findAllWithPermissions(): Promise<Role[]>;
-  
-  /**
-   * Get permissions assigned to a role
-   * 
-   * @param roleId - Role ID
-   * @returns Promise with role's permissions
-   */
-  getRolePermissions(roleId: number): Promise<Permission[]>;
-  
-  /**
-   * Add permissions to a role
-   * 
-   * @param roleId - Role ID
-   * @param permissionIds - Permission IDs to add
-   * @returns Promise with success indicator
-   */
-  addPermissions(roleId: number, permissionIds: number[]): Promise<boolean>;
-  
-  /**
-   * Remove permissions from a role
-   * 
-   * @param roleId - Role ID
-   * @param permissionIds - Permission IDs to remove
-   * @returns Promise with success indicator
-   */
-  removePermissions(roleId: number, permissionIds: number[]): Promise<boolean>;
-  
-  /**
-   * Replace all permissions for a role
-   * 
-   * @param roleId - Role ID
-   * @param permissionIds - New permission IDs
-   * @returns Promise with success indicator
-   */
-  replacePermissions(roleId: number, permissionIds: number[]): Promise<boolean>;
-  
-  /**
-   * Get user roles with their permissions
+   * Get roles for a user
    * 
    * @param userId - User ID
-   * @returns Promise with user's roles including permissions
+   * @returns Promise with array of roles
    */
-  getUserRoles(userId: number): Promise<Role[]>;
+  getRolesForUser(userId: number): Promise<Role[]>;
   
   /**
    * Assign roles to a user
    * 
    * @param userId - User ID
-   * @param roleIds - Role IDs to assign
-   * @returns Promise with success indicator
+   * @param roleIds - Array of role IDs
+   * @returns Promise with number of roles assigned
    */
-  assignRolesToUser(userId: number, roleIds: number[]): Promise<boolean>;
+  assignRolesToUser(userId: number, roleIds: number[]): Promise<number>;
   
   /**
    * Remove roles from a user
    * 
    * @param userId - User ID
-   * @param roleIds - Role IDs to remove
-   * @returns Promise with success indicator
+   * @param roleIds - Array of role IDs to remove (or all if undefined)
+   * @returns Promise with number of roles removed
    */
-  removeRolesFromUser(userId: number, roleIds: number[]): Promise<boolean>;
+  removeRolesFromUser(userId: number, roleIds?: number[]): Promise<number>;
+  
+  /**
+   * Set permissions for a role
+   * 
+   * @param roleId - Role ID
+   * @param permissionIds - Array of permission IDs
+   * @returns Promise with role with updated permissions
+   */
+  setPermissions(roleId: number, permissionIds: number[]): Promise<Role>;
+  
+  /**
+   * Add permissions to a role
+   * 
+   * @param roleId - Role ID
+   * @param permissionIds - Array of permission IDs
+   * @returns Promise with number of permissions added
+   */
+  addPermissions(roleId: number, permissionIds: number[]): Promise<number>;
+  
+  /**
+   * Remove permissions from a role
+   * 
+   * @param roleId - Role ID
+   * @param permissionIds - Array of permission IDs (or all if undefined)
+   * @returns Promise with number of permissions removed
+   */
+  removePermissions(roleId: number, permissionIds?: number[]): Promise<number>;
 }

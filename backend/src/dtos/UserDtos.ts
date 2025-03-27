@@ -42,7 +42,7 @@ export interface CreateUserDto extends BaseUserDto {
   /**
    * User role
    */
-  roles?: UserRole[];
+  roles?: number[];
 }
 
 /**
@@ -101,6 +101,16 @@ export interface ChangePasswordDto extends BaseUserDto {
 }
 
 /**
+ * User role object for detailed responses
+ */
+export interface RoleInfo {
+  id: number;
+  name: string;
+  description: string;
+  isSystem: boolean;
+}
+
+/**
  * DTO for user responses
  */
 export interface UserResponseDto extends BaseUserDto {
@@ -138,6 +148,11 @@ export interface UserResponseDto extends BaseUserDto {
    * User role
    */
   role: UserRole;
+
+  /**
+   * User roles for simple responses (just role names)
+   */
+  roles?: string[];
   
   /**
    * Account status
@@ -163,21 +178,16 @@ export interface UserResponseDto extends BaseUserDto {
 /**
  * DTO for detailed user responses
  */
-export interface UserDetailResponseDto extends UserResponseDto {
+export interface UserDetailResponseDto extends Omit<UserResponseDto, 'roles'> {
   /**
    * User activity history
    */
   activities?: UserActivityResponseDto[];
 
-   /**
-   * User roles
+  /**
+   * User roles with details
    */
-   roles?: {
-    id: number;
-    name: string;
-    description: string;
-    isSystem: boolean;
-  }[];
+  roles?: RoleInfo[];
   
   /**
    * User permissions
@@ -188,7 +198,6 @@ export interface UserDetailResponseDto extends UserResponseDto {
     description: string;
     category: string;
   }[];
-
 }
 
 /**
