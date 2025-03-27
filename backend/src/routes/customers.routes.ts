@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { CustomerController } from '../controllers/CustomerController.js';
 import { AuthMiddleware } from '../middleware/AuthMiddleware.js';
+import { ValidationMiddleware } from '../middleware/ValidationMiddleware.js';
+import { IValidationService } from '../interfaces/IValidationService.js';
+import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { UserRole } from '../entities/User.js';
 
 /**
@@ -8,13 +11,18 @@ import { UserRole } from '../entities/User.js';
  * 
  * @param customerController - Customer management controller
  * @param authMiddleware - Authentication and authorization middleware
+ * @param validationService - Service for validating request data
+ * @param errorHandler - Service for handling errors
  * @returns Configured router for customer endpoints
  */
 export function createCustomerRoutes(
   customerController: CustomerController, 
-  authMiddleware: AuthMiddleware
+  authMiddleware: AuthMiddleware,
+  validationService: IValidationService,
+  errorHandler: IErrorHandler
 ): Router {
   const router = Router();
+  const validationMiddleware = new ValidationMiddleware(validationService, errorHandler);
 
   // Middleware configurations
   const managerAndAdminAccess = [

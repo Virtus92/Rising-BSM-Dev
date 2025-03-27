@@ -8,11 +8,12 @@ import {
   NotificationFilterDto
 } from '../dtos/NotificationDtos.js';
 import { AuthenticatedRequest } from '../interfaces/IAuthTypes.js';
+import { BaseController } from '../core/BaseController.js';
 
 /**
  * Implementation of INotificationController
  */
-export class NotificationController implements INotificationController {
+export class NotificationController extends BaseController implements INotificationController {
   /**
    * Creates a new NotificationController instance
    * 
@@ -22,9 +23,17 @@ export class NotificationController implements INotificationController {
    */
   constructor(
     private readonly notificationService: INotificationService,
-    private readonly logger: ILoggingService,
-    private readonly errorHandler: IErrorHandler
+    logger: ILoggingService,
+    errorHandler: IErrorHandler
   ) {
+    super(logger, errorHandler);
+    
+    // Bind methods to preserve 'this' context when used as route handlers
+    this.getNotifications = this.getNotifications.bind(this);
+    this.markNotificationsRead = this.markNotificationsRead.bind(this);
+    this.getNotificationStats = this.getNotificationStats.bind(this);
+    this.deleteNotification = this.deleteNotification.bind(this);
+    
     this.logger.debug('Initialized NotificationController');
   }
 
@@ -151,50 +160,5 @@ export class NotificationController implements INotificationController {
     } catch (error) {
       this.handleError(error, req, res);
     }
-  }
-
-  /**
-   * Send success response
-   * 
-   * @param res - HTTP response
-   * @param data - Response data
-   * @param message - Success message
-   */
-  private sendSuccessResponse(res: Response, data: any, message?: string): void {
-    res.status(200).json({
-      success: true,
-      data,
-      message: message || 'Operation successful'
-    });
-  }
-
-  /**
-   * Send paginated response
-   * 
-   * @param res - HTTP response
-   * @param data - Response data
-   * @param pagination - Pagination information
-   * @param message - Success message
-   */
-  private sendPaginatedResponse(res: Response, data: any[], pagination: any, message?: string): void {
-    res.status(200).json({
-      success: true,
-      data,
-      meta: {
-        pagination
-      },
-      message: message || 'Operation successful'
-    });
-  }
-
-  /**
-   * Handle and format errors
-   * 
-   * @param error - Error object
-   * @param req - HTTP request
-   * @param res - HTTP response
-   */
-  private handleError(error: any, req: Request, res: Response): void {
-    this.errorHandler.handleError(error, req, res);
   }
 }

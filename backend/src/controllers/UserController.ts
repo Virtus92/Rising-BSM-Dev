@@ -9,6 +9,8 @@ import {
   UpdateUserStatusDto,
   UserFilterParams 
 } from '../dtos/UserDtos.js';
+import { BaseController } from '../core/BaseController.js';
+import { IUserController } from '../interfaces/IUserController.js';
 
 /**
  * UserController
@@ -16,7 +18,7 @@ import {
  * Controller for handling User-related HTTP requests.
  * Routes user requests to the appropriate service methods.
  */
-export class UserController {
+export class UserController extends BaseController implements IUserController {
   /**
    * Creates a new UserController instance
    * 
@@ -26,9 +28,23 @@ export class UserController {
    */
   constructor(
     private readonly userService: IUserService,
-    private readonly logger: ILoggingService,
-    private readonly errorHandler: IErrorHandler
+    logger: ILoggingService,
+    errorHandler: IErrorHandler
   ) {
+    super(logger, errorHandler);
+    
+    // Bind methods to preserve 'this' context when used as route handlers
+    this.getAllUsers = this.getAllUsers.bind(this);
+    this.getUserById = this.getUserById.bind(this);
+    this.createUser = this.createUser.bind(this);
+    this.updateUser = this.updateUser.bind(this);
+    this.deleteUser = this.deleteUser.bind(this);
+    this.updateUserStatus = this.updateUserStatus.bind(this);
+    this.changePassword = this.changePassword.bind(this);
+    this.searchUsers = this.searchUsers.bind(this);
+    this.getUserStatistics = this.getUserStatistics.bind(this);
+    this.bulkUpdateUsers = this.bulkUpdateUsers.bind(this);
+    
     this.logger.debug('Initialized UserController');
   }
 
@@ -53,15 +69,14 @@ export class UserController {
       const result = await this.userService.findUsers(filters);
       
       // Send response
-      res.status(200).json({
-        success: true,
-        data: result.data,
-        meta: {
-          pagination: result.pagination
-        }
-      });
+      this.sendPaginatedResponse(
+        res, 
+        result.data, 
+        result.pagination, 
+        'Users retrieved successfully'
+      );
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
@@ -79,21 +94,13 @@ export class UserController {
       const user = await this.userService.getUserDetails(id);
       
       if (!user) {
-        res.status(404).json({
-          success: false,
-          error: 'User not found',
-          statusCode: 404
-        });
-        return;
+        throw this.errorHandler.createNotFoundError(`User with ID ${id} not found`);
       }
       
       // Send response
-      res.status(200).json({
-        success: true,
-        data: user
-      });
+      this.sendSuccessResponse(res, user, 'User retrieved successfully');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
@@ -119,13 +126,9 @@ export class UserController {
       });
       
       // Send response
-      res.status(201).json({
-        success: true,
-        data: user,
-        message: 'User created successfully'
-      });
+      this.sendCreatedResponse(res, user, 'User created successfully');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
@@ -152,13 +155,9 @@ export class UserController {
       });
       
       // Send response
-      res.status(200).json({
-        success: true,
-        data: user,
-        message: 'User updated successfully'
-      });
+      this.sendSuccessResponse(res, user, 'User updated successfully');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
@@ -177,12 +176,7 @@ export class UserController {
       
       // Check if trying to delete self
       if (id === userId) {
-        res.status(400).json({
-          success: false,
-          error: 'Cannot delete your own account',
-          statusCode: 400
-        });
-        return;
+        throw this.errorHandler.createError('Cannot delete your own account', 400);
       }
       
       // Delete user with context
@@ -194,13 +188,13 @@ export class UserController {
       });
       
       // Send response
-      res.status(200).json({
-        success: true,
-        data: { id, deleted: success },
-        message: 'User deleted successfully'
-      });
+      this.sendSuccessResponse(
+        res, 
+        { id, deleted: success }, 
+        'User deleted successfully'
+      );
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
@@ -220,12 +214,7 @@ export class UserController {
       
       // Check if trying to update self
       if (id === userId) {
-        res.status(400).json({
-          success: false,
-          error: 'Cannot update your own status',
-          statusCode: 400
-        });
-        return;
+        throw this.errorHandler.createError('Cannot update your own status', 400);
       }
       
       // Update status with context
@@ -237,13 +226,9 @@ export class UserController {
       });
       
       // Send response
-      res.status(200).json({
-        success: true,
-        data: user,
-        message: 'User status updated successfully'
-      });
+      this.sendSuccessResponse(res, user, 'User status updated successfully');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
@@ -263,12 +248,7 @@ export class UserController {
       
       // Check if authorized to change this password
       if (id !== userId && (req as any).user?.role !== 'admin') {
-        res.status(403).json({
-          success: false,
-          error: 'Not authorized to change password for this user',
-          statusCode: 403
-        });
-        return;
+        throw this.errorHandler.createForbiddenError('Not authorized to change password for this user');
       }
       
       // Change password with context
@@ -280,13 +260,13 @@ export class UserController {
       });
       
       // Send response
-      res.status(200).json({
-        success: true,
-        data: { changed: success },
-        message: 'Password changed successfully'
-      });
+      this.sendSuccessResponse(
+        res, 
+        { changed: success }, 
+        'Password changed successfully'
+      );
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
@@ -303,12 +283,7 @@ export class UserController {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       
       if (!searchText || searchText.length < 2) {
-        res.status(400).json({
-          success: false,
-          error: 'Search text must be at least 2 characters',
-          statusCode: 400
-        });
-        return;
+        throw this.errorHandler.createValidationError('Invalid search term', ['Search text must be at least 2 characters']);
       }
       
       // Search users with pagination
@@ -318,12 +293,9 @@ export class UserController {
       });
       
       // Send response
-      res.status(200).json({
-        success: true,
-        data: users
-      });
+      this.sendSuccessResponse(res, users, 'Users found successfully');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
@@ -339,12 +311,9 @@ export class UserController {
       const statistics = await this.userService.getUserStatistics();
       
       // Send response
-      res.status(200).json({
-        success: true,
-        data: statistics
-      });
+      this.sendSuccessResponse(res, statistics, 'User statistics retrieved successfully');
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 
@@ -376,7 +345,6 @@ export class UserController {
       }
       
       // Call service to bulk update users
-      // Note: You'll need to implement this method in the UserService
       const updatedCount = await this.userService.bulkUpdate(userIds, data, {
         context: {
           userId,
@@ -385,16 +353,16 @@ export class UserController {
       });
       
       // Send success response
-      res.status(200).json({
-        success: true,
-        data: { 
+      this.sendSuccessResponse(
+        res,
+        { 
           count: updatedCount,
           ids: userIds
         },
-        message: `${updatedCount} users updated successfully`
-      });
+        `${updatedCount} users updated successfully`
+      );
     } catch (error) {
-      this.errorHandler.handleError(error, req, res);
+      this.handleError(error, req, res);
     }
   }
 }

@@ -1,20 +1,29 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { UserController } from '../controllers/UserController.js';
 import { AuthMiddleware } from '../middleware/AuthMiddleware.js';
+import { ValidationMiddleware } from '../middleware/ValidationMiddleware.js';
+import { IValidationService } from '../interfaces/IValidationService.js';
+import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { UserRole } from '../entities/User.js';
+// import { createUserValidationSchema, updateUserValidationSchema, changePasswordValidationSchema } from '../dtos/UserDtos.js';
 
 /**
  * Create user routes with comprehensive access control
  * 
  * @param userController - User management controller
  * @param authMiddleware - Authentication and authorization middleware
+ * @param validationService - Service for validating request data
+ * @param errorHandler - Service for handling errors
  * @returns Configured router for user endpoints
  */
 export function createUserRoutes(
   userController: UserController, 
-  authMiddleware: AuthMiddleware
+  authMiddleware: AuthMiddleware,
+  validationService: IValidationService,
+  errorHandler: IErrorHandler
 ): Router {
   const router = Router();
+  const validationMiddleware = new ValidationMiddleware(validationService, errorHandler);
 
   // Middleware configurations
   const adminOnlyAccess = [
@@ -95,6 +104,26 @@ export function createUserRoutes(
     selfOrAdminAccess,
     userController.changePassword
   );
+
+  // Example of how to add validation (uncomment and update when schemas are available)
+  // router.post('/', 
+  //   ...adminOnlyAccess, 
+  //   validationMiddleware.validate(createUserValidationSchema),
+  //   userController.createUser
+  // );
+
+  // router.put('/:id', 
+  //   ...adminOnlyAccess, 
+  //   validationMiddleware.validate(updateUserValidationSchema),
+  //   userController.updateUser
+  // );
+
+  // router.put('/:id/password', 
+  //   authMiddleware.authenticate(),
+  //   selfOrAdminAccess,
+  //   validationMiddleware.validate(changePasswordValidationSchema),
+  //   userController.changePassword
+  // );
 
   return router;
 }

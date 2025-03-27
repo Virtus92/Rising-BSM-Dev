@@ -11,11 +11,12 @@ import {
   CustomerFilterParams
 } from '../dtos/CustomerDtos.js';
 import { AuthenticatedRequest } from '../interfaces/IAuthTypes.js';
+import { BaseController } from '../core/BaseController.js';
 
 /**
  * Implementation of ICustomerController
  */
-export class CustomerController implements ICustomerController {
+export class CustomerController extends BaseController implements ICustomerController {
   /**
    * Creates a new CustomerController instance
    * 
@@ -25,9 +26,27 @@ export class CustomerController implements ICustomerController {
    */
   constructor(
     private readonly customerService: ICustomerService,
-    private readonly logger: ILoggingService,
-    private readonly errorHandler: IErrorHandler
+    logger: ILoggingService,
+    errorHandler: IErrorHandler
   ) {
+    super(logger, errorHandler);
+    
+    // Bind methods to preserve 'this' context when used as route handlers
+    this.getAllCustomers = this.getAllCustomers.bind(this);
+    this.getCustomerById = this.getCustomerById.bind(this);
+    this.createCustomer = this.createCustomer.bind(this);
+    this.updateCustomer = this.updateCustomer.bind(this);
+    this.deleteCustomer = this.deleteCustomer.bind(this);
+    this.updateCustomerStatus = this.updateCustomerStatus.bind(this);
+    this.addCustomerNote = this.addCustomerNote.bind(this);
+    this.getCustomerStatistics = this.getCustomerStatistics.bind(this);
+    this.exportCustomers = this.exportCustomers.bind(this);
+    this.searchCustomers = this.searchCustomers.bind(this);
+    this.getCustomerInsights = this.getCustomerInsights.bind(this);
+    this.getSimilarCustomers = this.getSimilarCustomers.bind(this);
+    this.getCustomerHistory = this.getCustomerHistory.bind(this);
+    this.bulkUpdateCustomers = this.bulkUpdateCustomers.bind(this);
+    
     this.logger.debug('Initialized CustomerController');
   }
 
@@ -440,65 +459,5 @@ export class CustomerController implements ICustomerController {
     } catch (error) {
       this.handleError(error, req, res);
     }
-  }
-
-  /**
-   * Send success response
-   * 
-   * @param res - HTTP response
-   * @param data - Response data
-   * @param message - Success message
-   */
-  private sendSuccessResponse(res: Response, data: any, message?: string): void {
-    res.status(200).json({
-      success: true,
-      data,
-      message: message || 'Operation successful'
-    });
-  }
-
-  /**
-   * Send created response
-   * 
-   * @param res - HTTP response
-   * @param data - Response data
-   * @param message - Success message
-   */
-  private sendCreatedResponse(res: Response, data: any, message?: string): void {
-    res.status(201).json({
-      success: true,
-      data,
-      message: message || 'Resource created successfully'
-    });
-  }
-
-  /**
-   * Send paginated response
-   * 
-   * @param res - HTTP response
-   * @param data - Response data
-   * @param pagination - Pagination information
-   * @param message - Success message
-   */
-  private sendPaginatedResponse(res: Response, data: any[], pagination: any, message?: string): void {
-    res.status(200).json({
-      success: true,
-      data,
-      meta: {
-        pagination
-      },
-      message: message || 'Operation successful'
-    });
-  }
-
-  /**
-   * Handle and format errors
-   * 
-   * @param error - Error object
-   * @param req - HTTP request
-   * @param res - HTTP response
-   */
-  private handleError(error: any, req: Request, res: Response): void {
-    this.errorHandler.handleError(error, req, res);
   }
 }

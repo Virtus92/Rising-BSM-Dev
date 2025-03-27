@@ -49,9 +49,9 @@ export class RouteManager {
 
     // Register individual route groups
     const authRoutes = createAuthRoutes(authController, authMiddleware, validationService, errorHandler);
-    const userRoutes = createUserRoutes(userController, authMiddleware);
-    const customerRoutes = createCustomerRoutes(customerController, authMiddleware);
-    const notificationRoutes = createNotificationRoutes(notificationController, authMiddleware);
+    const userRoutes = createUserRoutes(userController, authMiddleware, validationService, errorHandler);
+    const customerRoutes = createCustomerRoutes(customerController, authMiddleware, validationService, errorHandler);
+    const notificationRoutes = createNotificationRoutes(notificationController, authMiddleware, validationService, errorHandler);
 
     // Mount individual route groups
     mainRouter.use('/', authRoutes);
