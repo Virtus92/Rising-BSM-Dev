@@ -1,5 +1,3 @@
-// src/controllers/AuthController.ts
-
 import { Request, Response } from 'express';
 import { IAuthController } from '../interfaces/IAuthController.js';
 import { IAuthService } from '../interfaces/IAuthService.js';

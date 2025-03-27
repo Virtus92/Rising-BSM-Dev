@@ -15,9 +15,9 @@ import {
 import { ServiceOptions } from '../interfaces/IBaseService.js';
 import { RefreshToken } from '../entities/RefreshToken.js';
 import { User, UserStatus } from '../entities/User.js';
-import * as jwt from 'jsonwebtoken';
-import * as bcrypt from 'bcryptjs';
-import * as crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 /**
  * AuthService
@@ -112,7 +112,7 @@ export class AuthService implements IAuthService {
           id: user.id,
           name: user.getFullName(),
           email: user.email,
-          role: user.role,
+          roles: user.roles,
           status: user.status,
           createdAt: user.createdAt.toISOString(),
           updatedAt: user.updatedAt.toISOString()
@@ -523,7 +523,7 @@ export class AuthService implements IAuthService {
    * @returns Whether password is valid
    */
   private async verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
-    return bcrypt.compare(plainPassword, hashedPassword);
+    return await bcrypt.compare(plainPassword, hashedPassword);
   }
 
   /**

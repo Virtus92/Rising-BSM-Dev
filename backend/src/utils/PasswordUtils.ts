@@ -19,27 +19,6 @@ export class PasswordUtils {
   };
   
   /**
-   * Initialize common password list from file
-   */
-  static init(): void {
-    try {
-      // In ESM context
-      const __filename = fileURLToPath(import.meta.url);
-      const __dirname = path.dirname(__filename);
-      
-      const filePath = path.join(__dirname, '../assets/common-passwords.txt');
-      
-      if (fs.existsSync(filePath)) {
-        const data = fs.readFileSync(filePath, 'utf8');
-        const passwords = data.split('\n').map(p => p.trim());
-        this.commonPasswords = new Set(passwords);
-      }
-    } catch (error) {
-      console.error('Failed to load common passwords list:', error);
-    }
-  }
-  
-  /**
    * Validate password against policy
    * 
    * @param password - The password to validate
@@ -142,8 +121,3 @@ export class PasswordUtils {
     return bcrypt.compare(password, hash);
   }
 }
-
-
-
-// Initialize on module load
-PasswordUtils.init();

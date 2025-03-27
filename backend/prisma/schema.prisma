@@ -17,7 +17,7 @@ model User {
   name              String             @db.VarChar(100)
   email             String             @unique @db.VarChar(100)
   password          String             @db.VarChar(100)
-  roles             Int[]              @default("user") @db.VarChar(20)
+  roles             UserRole[]              
   phone             String?            @db.VarChar(30)
   status            String             @default("active") @db.Text
   profilePicture    String?            @db.VarChar(255)

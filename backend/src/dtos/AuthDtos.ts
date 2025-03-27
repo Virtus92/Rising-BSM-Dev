@@ -1,3 +1,4 @@
+import { UserRole } from '../entities/User.js';
 /**
  * Auth DTOs
  * 
@@ -95,7 +96,7 @@ export interface LoginDto {
       id: number;
       name: string;
       email: string;
-      role: string;
+      roles: UserRole[];
       status: string;
       profilePicture?: string;
       createdAt: string;

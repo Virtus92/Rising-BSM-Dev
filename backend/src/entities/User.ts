@@ -38,7 +38,7 @@ export class User {
     /**
      * User roles
      */
-    roles: number[];
+    roles: UserRole[];
     
     /**
      * Account status

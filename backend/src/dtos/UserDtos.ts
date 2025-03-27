@@ -42,7 +42,7 @@ export interface CreateUserDto extends BaseUserDto {
   /**
    * User role
    */
-  roles?: number[];
+  roles?: UserRole[];
 }
 
 /**
@@ -137,7 +137,7 @@ export interface UserResponseDto extends BaseUserDto {
   /**
    * User role
    */
-  roles: number[];
+  roles: UserRole[];
   
   /**
    * Account status
