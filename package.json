@@ -12,7 +12,8 @@
         "test:coverage": "jest --coverage",
         "lint": "eslint . --ext .ts",
         "migrate": "prisma migrate dev",
-        "seed": "ts-node prisma/seed.ts"
+        "seed": "ts-node prisma/seed.ts",
+        "dia": "node backend/tools/swagger-diagnostic.cjs"
     },
     "dependencies": {
         "@prisma/client": "^5.4.2",

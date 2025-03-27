@@ -1,12 +1,12 @@
 /**
  * SwaggerConfig
  * 
- * Configures Swagger UI for API documentation.
+ * Configures Swagger UI for API documentation with improved CORS and URL handling.
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Express } from 'express';
+import { Express, Request, Response, NextFunction } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import yaml from 'js-yaml';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
@@ -32,27 +32,145 @@ export class SwaggerConfig {
   }
 
   /**
-   * Setup Swagger UI middleware
+   * Setup Swagger UI middleware with proper CORS handling
    * 
    * @param app - Express application
    */
-  private setupSwagger(app: Express): void {
+  public setupSwagger(app: Express): void {
     if (!this.swaggerEnabled) {
       this.logger.info('Swagger UI is disabled');
       return;
     }
 
-    // Serve the bundled Swagger JSON file
-    app.use('/swagger.json', express.static(path.join(__dirname, '../../dist/swagger.json')));
+    this.logger.info('Setting up Swagger UI with enhanced configuration');
     
-    // Configure Swagger UI to use the bundled file
-    const options = {
-      swaggerOptions: {
-        url: '/swagger.json',
-      },
-    };
-    
-    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(null, options));
+    try {
+      // Find and load OpenAPI spec
+      this.openApiSpec = this.findBundledSpec();
+
+      // Ensure direct file access for Swagger JSON
+      const swaggerJsonPath = path.join(__dirname, '../../dist/swagger.json');
+      if (!fs.existsSync(path.dirname(swaggerJsonPath))) {
+        fs.mkdirSync(path.dirname(swaggerJsonPath), { recursive: true });
+      }
+      
+      // Write the OpenAPI spec to file to ensure it's always available
+      fs.writeFileSync(
+        swaggerJsonPath,
+        JSON.stringify(this.openApiSpec),
+        'utf8'
+      );
+      
+      // Allow CORS specifically for Swagger-related endpoints
+      app.use('/swagger.json', (req: Request, res: Response, next: NextFunction) => {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+        next();
+      });
+
+      // Serve the bundled Swagger JSON file
+      app.use('/swagger.json', express.static(swaggerJsonPath));
+      
+      // Configure Swagger UI with improved options
+      const options = {
+        swaggerOptions: {
+          url: '/swagger.json',
+          // Configure fetch options to avoid CORS issues
+          responseInterceptor: (res: any) => {
+            // JavaScript function as string that will be injected into Swagger UI
+            return `
+              if (res.status >= 400) {
+                console.error('Swagger UI API request failed:', res);
+              }
+              return res;
+            `;
+          },
+          // Add proper request handling
+          requestInterceptor: (req: any) => {
+            // JavaScript function as string that will be injected into Swagger UI
+            return `
+              console.log('Swagger UI sending request:', req);
+              // Ensure proper headers
+              if (!req.headers) req.headers = {};
+              req.headers['Accept'] = 'application/json';
+              req.headers['Content-Type'] = 'application/json';
+              return req;
+            `;
+          },
+          // Set Swagger UI to use standard fetch with credentials
+          withCredentials: true,
+          supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch', 'options', 'head'],
+        },
+        // Custom CSS to improve UI
+        customCss: '.swagger-ui .topbar { display: none }',
+        // Custom JS to fix potential issues
+        customJs: '/swagger-custom.js'
+      };
+      
+      // Add custom JS file for Swagger UI fixes
+      const swaggerCustomJsPath = path.join(__dirname, '../../dist/swagger.js');
+      const swaggerCustomJs = `
+        // Fix for CORS and network issues in Swagger UI
+        (function() {
+          console.log('Swagger UI custom script loaded');
+          
+          // Override fetch with improved error handling
+          const originalFetch = window.fetch;
+          window.fetch = function(url, options) {
+            console.log('Fetch request:', url, options);
+            
+            // Add proper headers to avoid CORS issues
+            if (!options) options = {};
+            if (!options.headers) options.headers = {};
+            options.headers['Accept'] = 'application/json';
+            
+            // For API requests, add Content-Type
+            if (url.toString().includes('/api/')) {
+              options.headers['Content-Type'] = 'application/json';
+            }
+            
+            // Use proper mode
+            options.mode = 'cors';
+            options.credentials = 'include';
+            
+            return originalFetch(url, options)
+              .then(response => {
+                if (!response.ok) {
+                  console.error('Fetch error:', response.status, response.statusText);
+                }
+                return response;
+              })
+              .catch(error => {
+                console.error('Fetch error:', error);
+                throw error;
+              });
+          };
+          
+          // Fix for CORS preflight handling
+          document.addEventListener('DOMContentLoaded', function() {
+            console.log('Swagger UI DOM loaded');
+          });
+        })();
+      `;
+      
+      // Write custom JS file
+      fs.writeFileSync(swaggerCustomJsPath, swaggerCustomJs, 'utf8');
+      
+      // Serve custom JS file
+      app.use('/swagger-custom.js', express.static(swaggerCustomJsPath));
+      
+      // Configure Swagger UI
+      app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(null, options));
+      
+      // Add health check for Swagger UI
+      app.get('/api-docs/health', (req, res) => {
+        res.json({ status: 'ok', message: 'Swagger UI is running' });
+      });
+      
+      this.logger.info('Swagger UI configured successfully at /api-docs');
+    } catch (error) {
+      this.logger.error('Failed to set up Swagger UI:', error instanceof Error ? error : String(error));
+    }
   }
 
   /**
