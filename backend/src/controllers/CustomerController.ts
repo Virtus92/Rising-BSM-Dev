@@ -267,8 +267,11 @@ export class CustomerController extends BaseController implements ICustomerContr
         authReq.user.name
       );
       
+      // Get updated customer to return
+      const updatedCustomer = await this.customerService.getCustomerDetails(id);
+      
       // Send success response
-      this.sendSuccessResponse(res, { success: true }, 'Note added successfully');
+      this.sendSuccessResponse(res, { success: true, customer: updatedCustomer }, 'Note added successfully');
     } catch (error) {
       this.handleError(error, req, res);
     }

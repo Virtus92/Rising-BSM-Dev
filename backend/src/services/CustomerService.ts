@@ -377,6 +377,16 @@ export class CustomerService extends BaseService<
         notes: customer.notes
       });
       
+      // Create a log entry for the note using the repository
+      // The customerRepository has access to the prisma client
+      await (this.customerRepository as any).createCustomerLog({
+        customerId,
+        userId,
+        userName: name,
+        action: 'note_added',
+        details: text
+      });
+      
       // Log note addition
       this.logger.info('Note added to customer', { customerId, userId, name });
     } catch (error) {

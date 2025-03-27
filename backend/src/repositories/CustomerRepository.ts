@@ -476,10 +476,11 @@ export class CustomerRepository extends BaseRepository<Customer, number> impleme
             notes: ormEntity.notes,
             createdAt: ormEntity.createdAt,
             updatedAt: ormEntity.updatedAt,
-            createdBy: ormEntity.createdBy,
-            updatedBy: ormEntity.updatedBy,
+            // Remove properties not in Customer entity
+            // createdBy and updatedBy are removed
             projects: ormEntity.projects,
-            appointments: ormEntity.appointments
+            appointments: ormEntity.appointments,
+            logs: ormEntity.logs
         });
     }
 
@@ -531,5 +532,35 @@ export class CustomerRepository extends BaseRepository<Customer, number> impleme
     protected isForeignKeyConstraintError(error: any): boolean {
         // Prisma-specific foreign key constraint error code
         return error.code === 'P2003';
+    }
+
+    /**
+     * Create a customer log entry
+     * 
+     * @param data - Log data
+     * @returns Promise with created log
+     */
+    async createCustomerLog(data: { 
+        customerId: number; 
+        userId?: number; 
+        userName: string; 
+        action: string; 
+        details?: string; 
+    }): Promise<any> {
+        try {
+            return await this.prisma.customerLog.create({
+                data: {
+                    customerId: data.customerId,
+                    userId: data.userId,
+                    userName: data.userName,
+                    action: data.action,
+                    details: data.details,
+                    createdAt: new Date()
+                }
+            });
+        } catch (error) {
+            this.logger.error('Error creating customer log', error instanceof Error ? error : String(error), { data });
+            throw this.handleError(error);
+        }
     }
 }

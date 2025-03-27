@@ -269,18 +269,18 @@ export class UserRepository extends BaseRepository<User, number> implements IUse
     details?: string,
     ipAddress?: string
   ): Promise<any> {
-    try {
+    try {      
+      this.logger.info(`Logging activity for user ${userId}: ${activityType}`);
+
       return await this.prisma.userActivity.create({
         data: {
           userId,
           activity: activityType,
-          details,
           ipAddress,
           timestamp: new Date()
         }
       });
     } catch (error) {
-      // Log error but don't throw - avoid disrupting main operations for logging failures
       this.logger.error('Error in UserRepository.logActivity', error instanceof Error ? error : String(error), { 
         userId, 
         activityType 

@@ -114,6 +114,11 @@ export class UserController extends BaseController implements IUserController {
     try {
       const userData: CreateUserDto = req.body;
       
+      // Ensure name is set if firstName and lastName are provided
+      if (!userData.name && userData.firstName && userData.lastName) {
+        userData.name = `${userData.firstName} ${userData.lastName}`;
+      }
+      
       // Get authenticated user info
       const userId = (req as any).user?.id;
       
@@ -142,6 +147,11 @@ export class UserController extends BaseController implements IUserController {
     try {
       const id = parseInt(req.params.id, 10);
       const userData: UpdateUserDto = req.body;
+      
+      // Ensure name is set if firstName and lastName are provided
+      if (userData.firstName && userData.lastName) {
+        userData.name = `${userData.firstName} ${userData.lastName}`;
+      }
       
       // Get authenticated user info
       const userId = (req as any).user?.id;

@@ -424,6 +424,9 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
       id: entity.id,
       name: entity.name,
       email: entity.email,
+      firstName: entity.firstName,
+      lastName: entity.lastName,
+      fullName: entity.getFullName(),
       role: entity.role,
       status: entity.status,
       phone: entity.phone,
@@ -566,15 +569,30 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
    * @returns Entity data
    */
   protected toEntity(dto: CreateUserDto | UpdateUserDto, existingEntity?: User): Partial<User> {
+    // Handle firstName and lastName by combining them into name
+    let name: string | undefined;
+    
+    if ('firstName' in dto && 'lastName' in dto) {
+      if (dto.firstName && dto.lastName) {
+        name = `${dto.firstName} ${dto.lastName}`;
+      } else if (dto.firstName) {
+        name = dto.firstName;
+      } else if (dto.lastName) {
+        name = dto.lastName;
+      }
+    }
+
     if (existingEntity) {
       // Update operation
       return {
-        ...(dto as UpdateUserDto)
+        ...(dto as UpdateUserDto),
+        name: name || dto.name
       };
     } else {
       // Create operation - hash password will be handled in beforeCreate
       return {
         ...(dto as CreateUserDto),
+        name: name || dto.name,
         status: UserStatus.ACTIVE
       };
     }

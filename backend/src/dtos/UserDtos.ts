@@ -137,6 +137,16 @@ export interface UserResponseDto extends BaseUserDto {
    * User role
    */
   role: UserRole;
+
+  /**
+   * Phone number
+   */
+  phone?: string;
+
+  /**
+   * Profile picture URL
+   */
+  profilePicture?: string;
   
   /**
    * Account status

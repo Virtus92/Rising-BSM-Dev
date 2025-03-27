@@ -44,4 +44,18 @@ export interface ICustomerRepository extends IBaseRepository<Customer, number> {
    * @returns Promise with customer including related data
    */
   findByIdWithRelations(id: number, options?: any): Promise<Customer | null>;
+
+  /**
+   * Create a customer log entry
+   * 
+   * @param data - Log data
+   * @returns Promise with created log
+   */
+  createCustomerLog(data: {
+    customerId: number;
+    userId?: number;
+    userName: string;
+    action: string;
+    details?: string;
+  }): Promise<any>;
 }

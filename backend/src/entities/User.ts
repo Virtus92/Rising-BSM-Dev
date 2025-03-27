@@ -109,6 +109,15 @@ export class User {
     return { firstName, lastName };
   }
 
+  get firstName(): string {
+    return this.name.split(' ')[0];
+  }
+  
+  get lastName(): string {
+    const nameParts = this.name.split(' ');
+    return nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+  }
+
   /**
    * Get full name
    * 
@@ -200,7 +209,8 @@ export class User {
 export enum UserRole {
   ADMIN = "admin",
   MANAGER = "manager",
-  EMPLOYEE = "employee"
+  EMPLOYEE = "employee",
+  USER = "user"
 }
 
 /**
