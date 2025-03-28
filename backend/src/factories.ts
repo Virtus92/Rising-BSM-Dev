@@ -14,12 +14,18 @@ import { CustomerService } from './services/CustomerService.js';
 import { NotificationService } from './services/NotificationService.js';
 import { AuthService } from './services/AuthService.js';
 import { UserService } from './services/UserService.js';
+import { ProfileService } from './services/ProfileService.js';
+import { SettingsService } from './services/SettingsService.js';
+import { ContactService } from './services/ContactService.js';
 
 // Controllers
 import { CustomerController } from './controllers/CustomerController.js';
 import { NotificationController } from './controllers/NotificationController.js';
 import { AuthController } from './controllers/AuthController.js';
 import { UserController } from './controllers/UserController.js';
+import { ProfileController } from './controllers/ProfileController.js';
+import { SettingsController } from './controllers/SettingsController.js';
+import { ContactController } from './controllers/ContactController.js';
 
 // Create repository factories
 export const createCustomerRepositoryFactory = () => createFactory(
@@ -63,6 +69,21 @@ export const createUserServiceFactory = () => createFactory(
   ['UserRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
 );
 
+export const createProfileServiceFactory = () => createFactory(
+  ProfileService,
+  ['PrismaClient', 'LoggingService', 'ErrorHandler']
+);
+
+export const createSettingsServiceFactory = () => createFactory(
+  SettingsService,
+  ['PrismaClient', 'LoggingService', 'ErrorHandler']
+);
+
+export const createContactServiceFactory = () => createFactory(
+  ContactService,
+  ['PrismaClient', 'LoggingService', 'ErrorHandler']
+);
+
 // Create controller factories
 export const createCustomerControllerFactory = () => createFactory(
   CustomerController,
@@ -82,6 +103,21 @@ export const createAuthControllerFactory = () => createFactory(
 export const createUserControllerFactory = () => createFactory(
   UserController,
   ['UserService', 'LoggingService', 'ErrorHandler']
+);
+
+export const createProfileControllerFactory = () => createFactory(
+  ProfileController,
+  ['ProfileService', 'LoggingService', 'ErrorHandler']
+);
+
+export const createSettingsControllerFactory = () => createFactory(
+  SettingsController,
+  ['SettingsService', 'LoggingService', 'ErrorHandler']
+);
+
+export const createContactControllerFactory = () => createFactory(
+  ContactController,
+  ['ContactService', 'LoggingService', 'ErrorHandler']
 );
 
 /**
@@ -106,6 +142,9 @@ export function registerServices(container: DiContainer): void {
   container.register('NotificationService', createNotificationServiceFactory(), { singleton: true });
   container.register('AuthService', createAuthServiceFactory(), { singleton: true });
   container.register('UserService', createUserServiceFactory(), { singleton: true });
+  container.register('ProfileService', createProfileServiceFactory(), { singleton: true });
+  container.register('SettingsService', createSettingsServiceFactory(), { singleton: true });
+  container.register('ContactService', createContactServiceFactory(), { singleton: true });
 }
 
 /**
@@ -118,6 +157,9 @@ export function registerControllers(container: DiContainer): void {
   container.register('NotificationController', createNotificationControllerFactory(), { singleton: true });
   container.register('AuthController', createAuthControllerFactory(), { singleton: true });
   container.register('UserController', createUserControllerFactory(), { singleton: true });
+  container.register('ProfileController', createProfileControllerFactory(), { singleton: true });
+  container.register('SettingsController', createSettingsControllerFactory(), { singleton: true });
+  container.register('ContactController', createContactControllerFactory(), { singleton: true });
 }
 
 /**

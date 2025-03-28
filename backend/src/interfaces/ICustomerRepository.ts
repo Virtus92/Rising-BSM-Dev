@@ -54,8 +54,23 @@ export interface ICustomerRepository extends IBaseRepository<Customer, number> {
   createCustomerLog(data: {
     customerId: number;
     userId?: number;
-    userName: string;
     action: string;
     details?: string;
   }): Promise<any>;
+
+  /**
+   * Hard delete a customer (permanently removes from database)
+   * 
+   * @param id - Customer ID
+   * @returns Promise with deletion result
+   */
+  hardDelete(id: number): Promise<any>;
+
+  /**
+   * Get customer logs
+   * 
+   * @param customerId - Customer ID
+   * @returns Promise with customer logs
+   */
+  getCustomerLogs(customerId: number): Promise<any[]>;
 }

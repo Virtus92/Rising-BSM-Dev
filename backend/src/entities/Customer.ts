@@ -160,10 +160,19 @@ export class Customer {
    * @param note - Note to add
    */
   addNote(note: string): void {
+    // Sanitize note to prevent issues with newlines
+    const sanitizedNote = note.trim();
+    
+    if (!sanitizedNote) {
+      return; // Don't add empty notes
+    }
+    
     if (!this.notes) {
-      this.notes = note;
+      this.notes = sanitizedNote;
     } else {
-      this.notes += '\n\n' + note;
+      // Add a timestamp to the note for better organization
+      const timestamp = new Date().toISOString().substring(0, 16).replace('T', ' ');
+      this.notes = `${this.notes}\n\n${timestamp}: ${sanitizedNote}`;
     }
     
     this.updatedAt = new Date();

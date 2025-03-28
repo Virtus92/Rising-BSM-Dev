@@ -543,16 +543,32 @@ export class CustomerRepository extends BaseRepository<Customer, number> impleme
     async createCustomerLog(data: { 
         customerId: number; 
         userId?: number; 
-        userName: string; 
         action: string; 
         details?: string; 
     }): Promise<any> {
         try {
+            // Get the user name from the userId if provided
+            let userName = "System";
+            
+            if (data.userId) {
+                try {
+                    const user = await this.prisma.user.findUnique({
+                        where: { id: data.userId },
+                        select: { name: true }
+                    });
+                    if (user) {
+                        userName = user.name;
+                    }
+                } catch (error) {
+                    this.logger.warn('Could not fetch user name for log', { userId: data.userId });
+                }
+            }
+            
             return await this.prisma.customerLog.create({
                 data: {
                     customerId: data.customerId,
                     userId: data.userId,
-                    userName: data.userName,
+                    userName: userName, // Use the looked-up userName
                     action: data.action,
                     details: data.details,
                     createdAt: new Date()
@@ -560,6 +576,93 @@ export class CustomerRepository extends BaseRepository<Customer, number> impleme
             });
         } catch (error) {
             this.logger.error('Error creating customer log', error instanceof Error ? error : String(error), { data });
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Hard delete a customer
+     * 
+     * @param id - Customer ID
+     * @returns Promise with deletion result
+     */
+    async hardDelete(id: number): Promise<any> {
+        try {
+            // Use a transaction to ensure atomicity
+            return await this.prisma.$transaction(async (prisma) => {
+                // First, handle foreign key constraints by setting them to null
+                
+                // Handle projects
+                await prisma.project.updateMany({
+                    where: { customerId: id },
+                    data: { customerId: null }
+                });
+                
+                // Handle appointments
+                await prisma.appointment.updateMany({
+                    where: { customerId: id },
+                    data: { customerId: null }
+                });
+                
+                // Handle invoices
+                await prisma.invoice.updateMany({
+                    where: { customerId: id },
+                    data: { customerId: null }
+                });
+                
+                // Logs are already set to cascade delete in the schema
+                
+                // Finally, delete the customer
+                return prisma.customer.delete({
+                    where: { id }
+                });
+            });
+        } catch (error) {
+            this.logger.error('Error in hard delete', error instanceof Error ? error : String(error), { id });
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Get customer logs
+     * 
+     * @param customerId - Customer ID
+     * @returns Promise with customer logs
+     */
+    async getCustomerLogs(customerId: number): Promise<any[]> {
+        try {
+            // Query logs with user data
+            const logs = await this.prisma.customerLog.findMany({
+                where: {
+                    customerId: customerId
+                },
+                include: {
+                    user: {
+                        select: {
+                            name: true
+                        }
+                    }
+                },
+                orderBy: {
+                    createdAt: 'desc'
+                }
+            });
+
+            return logs.map(log => ({
+                id: log.id,
+                customerId: log.customerId,
+                userId: log.userId,
+                userName: log.userName,
+                action: log.action,
+                details: log.details,
+                createdAt: log.createdAt,
+                // Include user name from relation if available
+                user: log.user ? {
+                    name: log.user.name
+                } : null
+            }));
+        } catch (error) {
+            this.logger.error('Error fetching customer logs', error instanceof Error ? error : String(error), { customerId });
             throw this.handleError(error);
         }
     }

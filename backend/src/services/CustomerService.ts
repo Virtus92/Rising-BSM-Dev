@@ -333,17 +333,16 @@ export class CustomerService extends BaseService<
         throw this.errorHandler.createNotFoundError(`Customer with ID ${id} not found`);
       }
       
-      // Get customer logs (this would need a proper implementation with a log repository)
-      // For now, we'll return sample data
-      const logs = await this.fetchCustomerLogs(id);
+      // Get customer logs from repository
+      const logs = await this.customerRepository.getCustomerLogs(id);
       
-      // Format logs
+      // Format logs for API response
       return logs.map(log => ({
         id: log.id,
         action: log.action,
         timestamp: DateTimeHelper.formatDate(log.createdAt, 'dd.MM.yyyy HH:mm'),
         relativeTime: DateTimeHelper.formatRelativeTime(log.createdAt),
-        user: log.name || 'System',
+        user: log.userName,
         details: log.details
       }));
     } catch (error) {
@@ -358,7 +357,7 @@ export class CustomerService extends BaseService<
    * @param customerId - Customer ID
    * @param text - Note text
    * @param userId - User ID
-   * @param name - User name
+   * @param name - User name (unused, will be fetched from userId)
    */
   async addNote(customerId: number, text: string, userId: number, name: string): Promise<void> {
     try {
@@ -378,17 +377,16 @@ export class CustomerService extends BaseService<
       });
       
       // Create a log entry for the note using the repository
-      // The customerRepository has access to the prisma client
+      // Only pass the userId - repository will look up the name
       await (this.customerRepository as any).createCustomerLog({
         customerId,
         userId,
-        userName: name,
         action: 'note_added',
         details: text
       });
       
       // Log note addition
-      this.logger.info('Note added to customer', { customerId, userId, name });
+      this.logger.info('Note added to customer', { customerId, userId });
     } catch (error) {
       this.logger.error('Error in CustomerService.addNote', error instanceof Error ? error : String(error), { customerId, userId });
       throw this.handleError(error);
@@ -508,24 +506,29 @@ export class CustomerService extends BaseService<
    */
   async hardDelete(id: number, options?: any): Promise<CustomerResponseDto> {
     try {
-      // Get customer first to return proper data if successful
-      const customer = await this.repository.findById(id);
-      
-      if (!customer) {
-        throw this.errorHandler.createNotFoundError(`Customer with ID ${id} not found`);
-      }
-      
-      // Map to DTO before deletion
-      const customerDto = this.toDTO(customer);
-      
-      // Perform hard delete (this would need to be implemented in the repository)
-      // For now, just mark as deleted
-      await this.update(id, { status: CustomerStatus.DELETED });
-      
-      return customerDto;
+        // Get customer first to return proper data if successful
+        const customer = await this.repository.findById(id);
+        
+        if (!customer) {
+            throw this.errorHandler.createNotFoundError(`Customer with ID ${id} not found`);
+        }
+        
+        // Map to DTO before deletion
+        const customerDto = this.toDTO(customer);
+        
+        // Perform hard delete using the repository
+        await (this.customerRepository as any).hardDelete(id);
+        
+        // Log the deletion
+        this.logger.info(`Customer ID ${id} was permanently deleted`, { 
+            userId: options?.context?.userId,
+            customerId: id
+        });
+        
+        return customerDto;
     } catch (error) {
-      this.logger.error('Error in CustomerService.hardDelete', error instanceof Error ? error : String(error), { id });
-      throw this.handleError(error);
+        this.logger.error('Error in CustomerService.hardDelete', error instanceof Error ? error : String(error), { id });
+        throw this.handleError(error);
     }
   }
 
@@ -647,36 +650,5 @@ export class CustomerService extends BaseService<
       buffer: Buffer.from(csvContent),
       filename: filename.replace('.xlsx', '.csv')
     };
-  }
-
-  /**
-   * Fetch customer logs
-   * 
-   * @param customerId - Customer ID
-   * @returns Customer logs
-   */
-  private async fetchCustomerLogs(customerId: number): Promise<any[]> {
-    // This would be implemented with a proper log repository
-    // For now, we'll return sample data
-    return [
-      {
-        id: 1,
-        customerId,
-        userId: 1,
-        name: 'Admin User',
-        action: 'create',
-        details: 'Customer created',
-        createdAt: new Date(Date.now() - 1000000)
-      },
-      {
-        id: 2,
-        customerId,
-        userId: 1,
-        name: 'Admin User',
-        action: 'update',
-        details: 'Customer data updated',
-        createdAt: new Date(Date.now() - 500000)
-      }
-    ];
   }
 }
