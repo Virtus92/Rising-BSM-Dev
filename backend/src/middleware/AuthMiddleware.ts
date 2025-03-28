@@ -45,7 +45,7 @@ export class AuthMiddleware {
         
         // Attach user to request
         (req as any).user = {
-          id: payload.userId,
+          id: payload.sub,
           role: payload.role,
           email: payload.email
         };

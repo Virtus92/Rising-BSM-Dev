@@ -19,6 +19,7 @@ const prisma = new PrismaClient();
 async function main() {
   // Lösche bestehende Daten (optional, aber empfohlen)
   await prisma.userActivity.deleteMany();
+  await prisma.requestNote.deleteMany();
   await prisma.user.deleteMany();
   await prisma.customer.deleteMany();
   

@@ -53,6 +53,12 @@ import { IContactController } from '../interfaces/IContactController.js';
 import { ContactService } from '../services/ContactService.js';
 import { ContactController } from '../controllers/ContactController.js';
 
+// Request Components
+import { IRequestService } from '../interfaces/IRequestService.js';
+import { IRequestController } from '../interfaces/IRequestController.js';
+import { RequestService } from '../services/RequestService.js';
+import { RequestController } from '../controllers/RequestController.js';
+
 // Configuration
 import { SwaggerConfig } from '../config/SwaggerConfig.js';
 import { RoutesConfig } from '../config/RoutesConfig.js';
@@ -270,6 +276,12 @@ export class Bootstrapper {
       const prisma = this.container.resolve<PrismaClient>('PrismaClient');
       return new ContactService(prisma, logger, errorHandler);
     }, { singleton: true });
+    
+    // Request service
+    this.container.register<IRequestService>('RequestService', () => {
+      const prisma = this.container.resolve<PrismaClient>('PrismaClient');
+      return new RequestService(prisma, logger, errorHandler);
+    }, { singleton: true });
 
     logger.info('Services registered');
     return this;
@@ -326,6 +338,12 @@ export class Bootstrapper {
     this.container.register<IContactController>('ContactController', () => {
       const contactService = this.container.resolve<IContactService>('ContactService');
       return new ContactController(contactService, logger, errorHandler);
+    }, { singleton: true });
+    
+    // Request controller
+    this.container.register<IRequestController>('RequestController', () => {
+      const requestService = this.container.resolve<IRequestService>('RequestService');
+      return new RequestController(requestService, logger, errorHandler);
     }, { singleton: true });
 
     logger.info('Controllers registered');

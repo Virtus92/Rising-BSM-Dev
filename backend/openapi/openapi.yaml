@@ -196,21 +196,26 @@ paths:
   # /services/{id}/statistics:
   #   $ref: './paths/services.yaml#/services-id-statistics'
 
-  # Requests (Zur Zeit nicht implementiert)
-  # /requests:
-  #   $ref: './paths/requests.yaml#/requests'
-  # /requests/{id}:
-  #   $ref: './paths/requests.yaml#/requests-id'
-  # /requests/{id}/status:
-  #   $ref: './paths/requests.yaml#/requests-id-status'
-  # /requests/{id}/notes:
-  #   $ref: './paths/requests.yaml#/requests-id-notes'
-  # /requests/export:
-  #   $ref: './paths/requests.yaml#/requests-export'
+  # Requests
+  /requests:
+    $ref: './paths/requests.yaml#/requests'
+  /requests/{id}:
+    $ref: './paths/requests.yaml#/requests-id'
+  /requests/{id}/status:
+    $ref: './paths/requests.yaml#/requests-id-status'
+  /requests/{id}/notes:
+    $ref: './paths/requests.yaml#/requests-id-notes'
+  /requests/{id}/assign:
+    $ref: './paths/requests.yaml#/requests-id-assign'
+  /requests/batch/status:
+    $ref: './paths/requests.yaml#/requests-batch-status'
+  /requests/export:
+    $ref: './paths/requests.yaml#/requests-export'
+  /requests/public:
+    $ref: './paths/requests.yaml#/requests-public'
   
-  # Contact (Public API)
-  /contacts:
-    $ref: './paths/public.yaml#/contacts'
+  # Public API
+  # Hinweis: Nutzung von /requests/public empfohlen, /contacts wird in zukünftigen Versionen entfernt
 
   # Profile
   /profile/me:

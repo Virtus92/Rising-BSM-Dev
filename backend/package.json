@@ -10,7 +10,7 @@
         "start": "node dist/index.js",
         "dev": "tsx watch src/index.ts",
         "build:watch": "tsc -w",
-        "db:seed": "tsx prisma/seed.ts",
+        "db:seed": "prisma migrate dev && tsx prisma/seed.ts",
         "migrate": "prisma migrate dev",
         "test": "jest",
         "test:watch": "jest --watch",

@@ -89,13 +89,15 @@ export abstract class BaseController {
     res: Response, 
     data: any[], 
     pagination: any,
-    message: string = 'Operation erfolgreich'
+    message: string = 'Operation erfolgreich',
+    meta: any = {}
   ): void {
     res.status(200).json({
       success: true,
       data,
       meta: {
-        pagination
+        pagination,
+        ...meta
       },
       message
     });

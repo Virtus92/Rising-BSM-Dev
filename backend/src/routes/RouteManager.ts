@@ -11,6 +11,7 @@ import { NotificationController } from '../controllers/NotificationController.js
 import { ProfileController } from '../controllers/ProfileController.js';
 import { SettingsController } from '../controllers/SettingsController.js';
 import { ContactController } from '../controllers/ContactController.js';
+import { RequestController } from '../controllers/RequestController.js';
 import config from '../config/index.js';
 
 // Route creators
@@ -24,7 +25,7 @@ import { createContactRoutes } from './contact.routes.js';
 // import { createProjectRoutes } from './projects.routes';
 // import { createAppointmentRoutes } from './appointments.routes';
 // import { createServiceRoutes } from './services.routes';
-// import { createRequestRoutes } from './requests.routes';
+import { createRequestRoutes } from './requests.routes.js';
 // import { createDashboardRoutes } from './dashboard.routes';
 
 export class RouteManager {
@@ -47,7 +48,7 @@ export class RouteManager {
     const notificationController = this.container.resolve<NotificationController>('NotificationController');
     const profileController = this.container.resolve<ProfileController>('ProfileController');
     const settingsController = this.container.resolve<SettingsController>('SettingsController');
-    const contactController = this.container.resolve<ContactController>('ContactController');
+    const requestController = this.container.resolve<RequestController>('RequestController');
     const validationService = this.container.resolve<IValidationService>('ValidationService');
     const errorHandler = this.container.resolve<IErrorHandler>('ErrorHandler');
     
@@ -61,7 +62,7 @@ export class RouteManager {
     const notificationRoutes = createNotificationRoutes(notificationController, authMiddleware, validationService, errorHandler);
     const profileRoutes = createProfileRoutes(profileController, authMiddleware, validationService, errorHandler);
     const settingsRoutes = createSettingsRoutes(settingsController, authMiddleware, validationService, errorHandler);
-    const contactRoutes = createContactRoutes(contactController, authMiddleware, validationService, errorHandler);
+    const requestRoutes = createRequestRoutes(requestController, authMiddleware, validationService, errorHandler);
 
     // Mount individual route groups
     mainRouter.use('/', authRoutes);
@@ -70,7 +71,7 @@ export class RouteManager {
     mainRouter.use('/notifications', notificationRoutes);
     mainRouter.use('/profile', profileRoutes);
     mainRouter.use('/settings', settingsRoutes);
-    mainRouter.use('/contacts', contactRoutes);
+    mainRouter.use('/requests', requestRoutes);
 
     // Mount the main router with the API prefix
     app.use(this.apiPrefix, mainRouter);
