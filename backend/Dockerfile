@@ -39,8 +39,6 @@ RUN node /app/scripts/bundle-openapi.js
 # Copy the rest of the application
 COPY . .
 
-RUN chmod +x scripts/wait-for-db.sh
-
 # Expose port and start application
 EXPOSE 5000
-CMD ["npm", "run", "build:dev"]
+CMD ["npm", "run", "dev"]

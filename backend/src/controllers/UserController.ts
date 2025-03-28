@@ -44,6 +44,8 @@ export class UserController extends BaseController implements IUserController {
     this.searchUsers = this.searchUsers.bind(this);
     this.getUserStatistics = this.getUserStatistics.bind(this);
     this.bulkUpdateUsers = this.bulkUpdateUsers.bind(this);
+    this.softDeleteUser = this.softDeleteUser.bind(this);
+    this.hardDeleteUser = this.hardDeleteUser.bind(this);
     
     this.logger.debug('Initialized UserController');
   }
@@ -370,6 +372,86 @@ export class UserController extends BaseController implements IUserController {
           ids: userIds
         },
         `${updatedCount} users updated successfully`
+      );
+    } catch (error) {
+      this.handleError(error, req, res);
+    }
+  }
+
+  /**
+   * Soft delete a user (marks as deleted)
+   * 
+   * @param req - HTTP request
+   * @param res - HTTP response
+   */
+  async softDeleteUser(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(req.params.id, 10);
+      
+      // Get authenticated user info
+      const userId = (req as any).user?.id;
+      
+      // Check if trying to delete self
+      if (id === userId) {
+        throw this.errorHandler.createError('Cannot delete your own account', 400);
+      }
+      
+      // Soft delete user with context
+      const success = await this.userService.softDelete(id, {
+        context: {
+          userId,
+          ipAddress: req.ip
+        }
+      });
+      
+      // Send response
+      this.sendSuccessResponse(
+        res, 
+        { id, deleted: success }, 
+        'User marked as deleted successfully'
+      );
+    } catch (error) {
+      this.handleError(error, req, res);
+    }
+  }
+
+  /**
+   * Hard delete a user (permanently removes)
+   * 
+   * @param req - HTTP request
+   * @param res - HTTP response
+   */
+  async hardDeleteUser(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(req.params.id, 10);
+      
+      // Get authenticated user info
+      const userId = (req as any).user?.id;
+      const userRole = (req as any).user?.role;
+      
+      // Check if trying to delete self
+      if (id === userId) {
+        throw this.errorHandler.createError('Cannot delete your own account', 400);
+      }
+      
+      // Only administrators can hard delete users
+      if (userRole !== 'admin') {
+        throw this.errorHandler.createForbiddenError('Only administrators can permanently delete users');
+      }
+      
+      // Hard delete user with context
+      const success = await this.userService.hardDelete(id, {
+        context: {
+          userId,
+          ipAddress: req.ip
+        }
+      });
+      
+      // Send response
+      this.sendSuccessResponse(
+        res, 
+        { id, deleted: success }, 
+        'User permanently deleted successfully'
       );
     } catch (error) {
       this.handleError(error, req, res);

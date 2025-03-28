@@ -70,9 +70,10 @@ export interface IBaseService<T, C, U, R, ID = number> {
      * 
      * @param data - Data to validate
      * @param isUpdate - Whether this is for an update operation
+     * @param userId - Optional user ID for update operations
      * @returns Promise that resolves if validation passes, or rejects with validation errors
      */
-    validate(data: C | U, isUpdate?: boolean): Promise<void>;
+    validate(data: C | U, isUpdate?: boolean, userId?: number): Promise<void>;
     
     /**
      * Transform entity to response DTO

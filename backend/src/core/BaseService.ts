@@ -144,8 +144,8 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
         );
       }
       
-      // Validate input data
-      await this.validate(data, true);
+      // Validate input data with userId for email validation
+      await this.validate(data, true, id as number);
       
       // Add audit information if context is provided
       const auditedData = this.addAuditInfo(data, options?.context, 'update');
@@ -233,8 +233,9 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
    * 
    * @param data - Data to validate
    * @param isUpdate - Whether validation is for update operation
+   * @param userId - Optional user ID for update operations
    */
-  async validate(data: C | U, isUpdate: boolean = false): Promise<void> {
+  async validate(data: C | U, isUpdate: boolean = false, userId?: number): Promise<void> {
     try {
       // Get validation schema based on operation
       const schema = isUpdate ? this.getUpdateValidationSchema() : this.getCreateValidationSchema();
@@ -251,7 +252,7 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
       }
       
       // Perform additional validations if needed
-      await this.validateBusinessRules(data, isUpdate);
+      await this.validateBusinessRules(data, isUpdate, userId);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -316,8 +317,9 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
    * 
    * @param data - Data to validate
    * @param isUpdate - Whether validation is for update operation
+   * @param userId - Optional user ID for update operations
    */
-  protected async validateBusinessRules(data: C | U, isUpdate: boolean): Promise<void> {
+  protected async validateBusinessRules(data: C | U, isUpdate: boolean, userId?: number): Promise<void> {
     // Default implementation does nothing
     // Override in subclasses for specific business rules
   }

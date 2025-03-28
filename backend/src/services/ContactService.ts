@@ -10,6 +10,8 @@ import {
   PaginatedContactRequests,
   ContactServiceOptions
 } from '../interfaces/IContactService.js';
+import { NotificationEventManager, NotificationEventType } from '../events/NotificationEventManager.js';
+import { ContactRequestCreatedEvent, ContactRequestAcceptedEvent } from '../interfaces/INotificationEvents.js';
 
 /**
  * Service for managing contact requests
@@ -60,6 +62,30 @@ export class ContactService implements IContactService {
         `New contact request created: ${contactRequest.id}`, 
         { ipAddress: context?.ipAddress }
       );
+      
+      // Get all administrators to notify about new contact request
+      const admins = await this.prisma.user.findMany({
+        where: {
+          role: 'admin',
+          status: 'active'
+        }
+      });
+      
+      if (admins.length > 0) {
+        // Emit notification event for each admin
+        admins.forEach(admin => {
+          NotificationEventManager.getInstance().emit(
+            NotificationEventType.CONTACT_REQUEST_CREATED,
+            {
+              senderId: 0, // System
+              senderName: data.name,
+              recipientId: admin.id,
+              requestId: contactRequest.id,
+              timestamp: new Date()
+            } as ContactRequestCreatedEvent
+          );
+        });
+      }
 
       return contactRequest;
     } catch (error) {
@@ -249,6 +275,37 @@ export class ContactService implements IContactService {
           createdAt: new Date()
         }
       });
+      
+      // Emit event if status changed to 'accepted' or 'rejected'
+      if (data.status === 'accepted' && contactRequest.status !== 'accepted') {
+        // Get contact request details
+        const contact = await this.prisma.contactRequest.findUnique({
+          where: { id }
+        });
+        
+        // Get processor details
+        let processorName = 'Administrator';
+        if (context?.userId) {
+          const processor = await this.prisma.user.findUnique({
+            where: { id: context.userId }
+          });
+          if (processor) {
+            processorName = processor.name;
+          }
+        }
+        
+        // Emit notification event
+        NotificationEventManager.getInstance().emit(
+          NotificationEventType.CONTACT_REQUEST_ACCEPTED,
+          {
+            senderId: contact?.processorId || context?.userId,
+            recipientId: contact?.id,  // User who created the contact request
+            recipientName: processorName,
+            requestId: id,
+            timestamp: new Date()
+          } as ContactRequestAcceptedEvent
+        );
+      }
 
       this.logger.info(
         `Contact request ${id} status updated to ${data.status}`, 

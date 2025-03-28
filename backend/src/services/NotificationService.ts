@@ -17,6 +17,7 @@ import {
 } from '../dtos/NotificationDtos.js';
 import { NotFoundError, ForbiddenError } from '../interfaces/IErrorHandler.js';
 import { ServiceOptions } from '../interfaces/IBaseService.js';
+import { NotificationEventManager, NotificationEventType } from '../events/NotificationEventManager.js';
 
 /**
  * Implementation of INotificationService
@@ -42,6 +43,87 @@ export class NotificationService extends BaseService<
     errorHandler: IErrorHandler
   ) {
     super(notificationRepository, logger, validator, errorHandler);
+    
+    // Set logger for event manager
+    NotificationEventManager.getInstance().setLogger(logger);
+    
+    // Register event listeners
+    this.registerEventListeners();
+    
+    this.logger.debug('Initialized NotificationService with event listeners');
+  }
+  
+  /**
+   * Register event listeners for notifications
+   */
+  private registerEventListeners(): void {
+    const eventManager = NotificationEventManager.getInstance();
+    
+    // Contact request events
+    eventManager.on(NotificationEventType.CONTACT_REQUEST_CREATED, async (data: any) => {
+      try {
+        await this.createNotification({
+          userId: data.recipientId,
+          title: 'New Contact Request',
+          message: `${data.senderName} has sent you a contact request`,
+          type: NotificationType.MESSAGE,
+          referenceId: data.requestId,
+          referenceType: 'contact_request'
+        });
+      } catch (error) {
+        this.logger.error('Error creating contact request notification', error instanceof Error ? error : String(error));
+      }
+    });
+    
+    eventManager.on(NotificationEventType.CONTACT_REQUEST_ACCEPTED, async (data: any) => {
+      try {
+        await this.createNotification({
+          userId: data.senderId,
+          title: 'Contact Request Accepted',
+          message: `${data.recipientName} has accepted your contact request`,
+          type: NotificationType.SUCCESS,
+          referenceId: data.requestId,
+          referenceType: 'contact_request'
+        });
+      } catch (error) {
+        this.logger.error('Error creating contact request accepted notification', error instanceof Error ? error : String(error));
+      }
+    });
+    
+    // User events
+    eventManager.on(NotificationEventType.USER_STATUS_CHANGED, async (data: any) => {
+      try {
+        await this.createNotification({
+          userId: data.userId,
+          title: 'Account Status Changed',
+          message: `Your account status has been changed to ${data.newStatus}`,
+          type: data.newStatus === 'active' ? NotificationType.SUCCESS : NotificationType.WARNING,
+          referenceType: 'user'
+        });
+      } catch (error) {
+        this.logger.error('Error creating user status notification', error instanceof Error ? error : String(error));
+      }
+    });
+    
+    // System events
+    eventManager.on(NotificationEventType.SYSTEM_MAINTENANCE, async (data: any) => {
+      try {
+        // Create notification for all affected users
+        const userIds = data.userIds || [];
+        if (userIds.length > 0) {
+          await this.createBulkNotifications(
+            userIds,
+            'Scheduled Maintenance',
+            data.message || 'The system will undergo maintenance soon',
+            NotificationType.INFO
+          );
+        }
+      } catch (error) {
+        this.logger.error('Error creating system maintenance notification', error instanceof Error ? error : String(error));
+      }
+    });
+    
+    // Add more event listeners as needed
   }
 
   /**

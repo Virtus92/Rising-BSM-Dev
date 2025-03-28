@@ -105,4 +105,22 @@ export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUs
  * @returns Promise with count of updated users
  */
 bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): Promise<number>;
+
+  /**
+   * Soft delete a user (marks as deleted but keeps in database)
+   * 
+   * @param userId - User ID
+   * @param options - Service options
+   * @returns Promise indicating success
+   */
+  softDelete(userId: number, options?: ServiceOptions): Promise<boolean>;
+
+  /**
+   * Hard delete a user (permanently removes from database)
+   * 
+   * @param userId - User ID
+   * @param options - Service options
+   * @returns Promise indicating success
+   */
+  hardDelete(userId: number, options?: ServiceOptions): Promise<boolean>;
 }

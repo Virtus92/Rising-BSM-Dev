@@ -94,4 +94,20 @@ export interface IUserController {
    * @param res - HTTP response
    */
   changePassword(req: Request, res: Response): Promise<void>;
+
+  /**
+   * Soft delete a user (marks as deleted)
+   * 
+   * @param req - HTTP request
+   * @param res - HTTP response
+   */
+  softDeleteUser(req: Request, res: Response): Promise<void>;
+
+  /**
+   * Hard delete a user (permanently removes)
+   * 
+   * @param req - HTTP request
+   * @param res - HTTP response
+   */
+  hardDeleteUser(req: Request, res: Response): Promise<void>;
 }

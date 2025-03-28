@@ -39,7 +39,7 @@ services:
     networks:
       - rising-bsm-network
     command: >
-      sh -c "npx prisma generate && npm run dev"
+      sh -c "npx prisma generate && npx prisma migrate deploy && npm run db:seed && npm run dev"
   
   # Frontend service 
   frontend:

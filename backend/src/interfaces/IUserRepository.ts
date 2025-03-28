@@ -85,4 +85,12 @@ export interface IUserRepository extends IBaseRepository<User, number> {
    * @returns Promise with count of updated users
    */
   bulkUpdate(ids: number[], data: Partial<User>): Promise<number>;
+
+  /**
+   * Permanently delete a user from the database
+   * 
+   * @param userId - User ID
+   * @returns Promise indicating success
+   */
+  hardDelete(userId: number): Promise<boolean>;
 }

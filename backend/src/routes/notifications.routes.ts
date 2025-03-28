@@ -60,5 +60,11 @@ export function createNotificationRoutes(
   //   notificationController.markNotificationsRead
   // );
 
+  // Test notification (development only)
+  router.post('/test', 
+    ...authenticatedUserAccess, 
+    notificationController.testNotification
+  );
+
   return router;
 }

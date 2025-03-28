@@ -1,4 +1,4 @@
-profile:
+profile-me:
   get:
     tags:
       - Profile
@@ -28,38 +28,27 @@ profile:
                           type: string
                         email:
                           type: string
-                        telefon:
+                        phone:
                           type: string
-                        rolle:
+                        role:
                           type: string
-                        profilbild:
+                        profilePicture:
                           type: string
-                        seit:
+                        createdAt:
                           type: string
                     settings:
                       type: object
                       properties:
-                        sprache:
+                        language:
                           type: string
-                        dark_mode:
+                        darkMode:
                           type: boolean
-                        benachrichtigungen_email:
+                        emailNotifications:
                           type: boolean
-                        benachrichtigungen_push:
+                        pushNotifications:
                           type: boolean
-                        benachrichtigungen_intervall:
+                        notificationInterval:
                           type: string
-                    activity:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          type:
-                            type: string
-                          ip:
-                            type: string
-                          date:
-                            type: string
                 message:
                   type: string
                   example: "Profile retrieved successfully"
@@ -101,7 +90,7 @@ profile:
                 type: string
                 format: email
                 description: Email address
-              telefon:
+              phone:
                 type: string
                 description: Phone number
     responses:
@@ -127,7 +116,7 @@ profile:
                           type: string
                         email:
                           type: string
-                        telefon:
+                        phone:
                           type: string
                 message:
                   type: string
@@ -143,7 +132,7 @@ profile:
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
-profile-password:
+profile-me-password:
   put:
     tags:
       - Profile
@@ -157,20 +146,20 @@ profile-password:
           schema:
             type: object
             required:
-              - current_password
-              - new_password
-              - confirm_password
+              - currentPassword
+              - newPassword
+              - confirmPassword
             properties:
-              current_password:
+              currentPassword:
                 type: string
                 format: password
                 description: Current password
-              new_password:
+              newPassword:
                 type: string
                 format: password
                 minLength: 8
                 description: New password
-              confirm_password:
+              confirmPassword:
                 type: string
                 format: password
                 description: Confirm new password
@@ -201,13 +190,13 @@ profile-password:
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
 
-profile-picture:
+profile-me-picture:
   post:
     tags:
       - Profile
-    summary: Update profile picture
+    summary: Upload profile picture
     description: Upload a new profile picture
-    operationId: updateProfilePicture
+    operationId: uploadProfilePicture
     requestBody:
       required: true
       content:
@@ -215,9 +204,9 @@ profile-picture:
           schema:
             type: object
             required:
-              - file
+              - profilePicture
             properties:
-              file:
+              profilePicture:
                 type: string
                 format: binary
                 description: Image file
@@ -250,31 +239,16 @@ profile-picture:
         $ref: '../openapi.yaml#/components/responses/ValidationError'
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-
-profile-notifications:
-  put:
+  
+  delete:
     tags:
       - Profile
-    summary: Update notification settings
-    description: Change notification preferences
-    operationId: updateNotificationSettings
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              benachrichtigungen_email:
-                type: boolean
-              benachrichtigungen_push:
-                type: boolean
-              benachrichtigungen_intervall:
-                type: string
-                enum: [sofort, taeglich, woechentlich]
+    summary: Delete profile picture
+    description: Remove current profile picture
+    operationId: deleteProfilePicture
     responses:
       '200':
-        description: Notification settings updated
+        description: Profile picture deleted
         content:
           application/json:
             schema:
@@ -287,14 +261,61 @@ profile-notifications:
                   type: object
                 message:
                   type: string
-                  example: "Notification settings updated successfully"
+                  example: "Profile picture deleted successfully"
                 meta:
                   type: object
                   properties:
                     timestamp:
                       type: string
                       format: date-time
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
+      '401':
+        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
+
+profile-me-activity:
+  get:
+    tags:
+      - Profile
+    summary: Get user activity log
+    description: Retrieve activity history for current user
+    operationId: getUserActivity
+    responses:
+      '200':
+        description: User activity log
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    activities:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          activity:
+                            type: string
+                          ipAddress:
+                            type: string
+                          timestamp:
+                            type: string
+                            format: date-time
+                          formattedDate:
+                            type: string
+                message:
+                  type: string
+                  example: "Activity log retrieved successfully"
+                meta:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
       '401':
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'

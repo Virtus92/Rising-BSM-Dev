@@ -290,6 +290,33 @@ export class UserRepository extends BaseRepository<User, number> implements IUse
   }
 
   /**
+   * Permanently delete a user from the database
+   * 
+   * @param userId - User ID
+   * @returns Promise indicating success
+   */
+  async hardDelete(userId: number): Promise<boolean> {
+    try {
+      this.logger.debug(`Hard deleting user with ID: ${userId}`);
+      
+      // Delete the user's activity records first to avoid foreign key constraints
+      await this.prisma.userActivity.deleteMany({
+        where: { userId }
+      });
+      
+      // Delete the user record
+      await this.prisma.user.delete({
+        where: { id: userId }
+      });
+      
+      return true;
+    } catch (error) {
+      this.logger.error('Error in UserRepository.hardDelete', error instanceof Error ? error : String(error), { userId });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Begin a transaction
    */
   protected async beginTransaction(): Promise<void> {

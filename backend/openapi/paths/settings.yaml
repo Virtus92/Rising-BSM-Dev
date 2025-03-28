@@ -17,10 +17,7 @@ settings-user:
                   type: boolean
                   example: true
                 data:
-                  type: object
-                  properties:
-                    settings:
-                      $ref: '../schemas/settings.yaml#/UserSettings'
+                  $ref: '../schemas/settings.yaml#/UserSettings'
                 message:
                   type: string
                   example: "User settings retrieved successfully"
@@ -57,7 +54,7 @@ settings-user:
                   type: boolean
                   example: true
                 data:
-                  type: object
+                  $ref: '../schemas/settings.yaml#/UserSettings'
                 message:
                   type: string
                   example: "Settings updated successfully"
@@ -91,10 +88,7 @@ settings-system:
                   type: boolean
                   example: true
                 data:
-                  type: object
-                  properties:
-                    settings:
-                      $ref: '../schemas/settings.yaml#/SystemSettings'
+                  $ref: '../schemas/settings.yaml#/SystemSettings'
                 message:
                   type: string
                   example: "System settings retrieved successfully"
@@ -112,21 +106,31 @@ settings-system:
   put:
     tags:
       - Settings
-    summary: Update system settings
-    description: Update system settings (admin only)
-    operationId: updateSystemSettings
+    summary: Update system setting
+    description: Update a specific system setting (admin only)
+    operationId: updateSystemSetting
     requestBody:
       required: true
       content:
         application/json:
           schema:
             type: object
+            required:
+              - key
+              - value
             properties:
-              settings:
-                $ref: '../schemas/settings.yaml#/SystemSettingsUpdate'
+              key:
+                type: string
+                description: Setting key
+              value:
+                type: string
+                description: Setting value
+              description:
+                type: string
+                description: Optional setting description
     responses:
       '200':
-        description: Settings updated
+        description: Setting updated
         content:
           application/json:
             schema:
@@ -136,10 +140,10 @@ settings-system:
                   type: boolean
                   example: true
                 data:
-                  type: object
+                  $ref: '../schemas/settings.yaml#/SystemSetting'
                 message:
                   type: string
-                  example: "System settings updated successfully"
+                  example: "System setting updated successfully"
                 meta:
                   type: object
                   properties:
@@ -152,123 +156,3 @@ settings-system:
         $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
       '403':
         $ref: '../openapi.yaml#/components/responses/ForbiddenError'
-
-settings-backup:
-  get:
-    tags:
-      - Settings
-    summary: Get backup settings
-    description: Retrieve backup settings and history (admin only)
-    operationId: getBackupSettings
-    responses:
-      '200':
-        description: Backup settings and history
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                data:
-                  $ref: '../schemas/settings.yaml#/BackupSettings'
-                message:
-                  type: string
-                  example: "Backup settings retrieved successfully"
-                meta:
-                  type: object
-                  properties:
-                    timestamp:
-                      type: string
-                      format: date-time
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-      '403':
-        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
-
-  put:
-    tags:
-      - Settings
-    summary: Update backup settings
-    description: Update backup settings (admin only)
-    operationId: updateBackupSettings
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '../schemas/settings.yaml#/BackupSettingsUpdate'
-    responses:
-      '200':
-        description: Settings updated
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                data:
-                  type: object
-                message:
-                  type: string
-                  example: "Backup settings updated successfully"
-                meta:
-                  type: object
-                  properties:
-                    timestamp:
-                      type: string
-                      format: date-time
-      '400':
-        $ref: '../openapi.yaml#/components/responses/ValidationError'
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-      '403':
-        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
-
-settings-backup-trigger:
-  post:
-    tags:
-      - Settings
-    summary: Trigger manual backup
-    description: Start a manual backup process (admin only)
-    operationId: triggerManualBackup
-    requestBody:
-      content:
-        application/json:
-          schema:
-            $ref: '../schemas/settings.yaml#/ManualBackup'
-    responses:
-      '200':
-        description: Backup triggered successfully
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                success:
-                  type: boolean
-                  example: true
-                data:
-                  type: object
-                  properties:
-                    status:
-                      type: string
-                      example: "pending"
-                message:
-                  type: string
-                  example: "Backup process initiated"
-                meta:
-                  type: object
-                  properties:
-                    timestamp:
-                      type: string
-                      format: date-time
-      '401':
-        $ref: '../openapi.yaml#/components/responses/UnauthorizedError'
-      '403':
-        $ref: '../openapi.yaml#/components/responses/ForbiddenError'
-      '500':
-        $ref: '../openapi.yaml#/components/responses/ServerError'

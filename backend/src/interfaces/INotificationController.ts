@@ -38,4 +38,12 @@ export interface INotificationController {
    * @param res - HTTP response
    */
   deleteNotification(req: Request, res: Response): Promise<void>;
+  
+  /**
+   * Test notification creation (for development only)
+   * 
+   * @param req - HTTP request
+   * @param res - HTTP response
+   */
+  testNotification(req: Request, res: Response): Promise<void>;
 }

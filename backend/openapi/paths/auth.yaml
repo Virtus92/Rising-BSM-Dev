@@ -100,11 +100,10 @@ refresh-token:
         application/json:
           schema:
             type: object
-            required:
-              - refreshToken
             properties:
               refreshToken:
                 type: string
+                description: "Refresh token to invalidate"
     responses:
       '200':
         description: Token refresh successful

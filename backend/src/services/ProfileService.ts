@@ -9,7 +9,7 @@ import {
 } from '../interfaces/IProfileService.js';
 import { UpdateProfileDto } from '../dtos/ProfileDtos.js';
 import { ChangePasswordDto } from '../dtos/UserDtos.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 

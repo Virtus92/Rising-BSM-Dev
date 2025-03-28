@@ -94,7 +94,7 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
         type: activity.type,
         details: activity.details,
         ipAddress: activity.ipAddress,
-        timestamp: activity.createdAt.toISOString()
+        timestamp: activity.createdAt ? activity.createdAt.toISOString() : undefined
       }));
       
       // Return detailed response
@@ -414,6 +414,89 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
   }
 
   /**
+   * Soft delete a user (marks as deleted but keeps in database)
+   * 
+   * @param userId - User ID
+   * @param options - Service options
+   * @returns Promise indicating success
+   */
+  async softDelete(userId: number, options?: ServiceOptions): Promise<boolean> {
+    try {
+      // Get user
+      const user = await this.userRepository.findById(userId);
+      
+      if (!user) {
+        throw this.errorHandler.createNotFoundError(`User with ID ${userId} not found`);
+      }
+      
+      // Update status to DELETED
+      user.status = UserStatus.DELETED;
+      
+      // Save updated user
+      await this.userRepository.update(userId, { status: UserStatus.DELETED });
+      
+      // Log activity
+      await this.userRepository.logActivity(
+        userId,
+        'user_soft_deleted',
+        'User account marked as deleted',
+        options?.context?.ipAddress
+      );
+      
+      // If the soft delete was performed by another user, log it for that user too
+      if (options?.context?.userId && options.context.userId !== userId) {
+        await this.userRepository.logActivity(
+          options.context.userId,
+          'user_soft_deleted',
+          `Soft deleted user ${user.name} (ID: ${userId})`,
+          options.context.ipAddress
+        );
+      }
+      
+      return true;
+    } catch (error) {
+      this.logger.error('Error in UserService.softDelete', error instanceof Error ? error : String(error), { userId });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Hard delete a user (permanently removes from database)
+   * 
+   * @param userId - User ID
+   * @param options - Service options
+   * @returns Promise indicating success
+   */
+  async hardDelete(userId: number, options?: ServiceOptions): Promise<boolean> {
+    try {
+      // Get user
+      const user = await this.userRepository.findById(userId);
+      
+      if (!user) {
+        throw this.errorHandler.createNotFoundError(`User with ID ${userId} not found`);
+      }
+      
+      // Log the activity before deleting the user
+      if (options?.context?.userId) {
+        await this.userRepository.logActivity(
+          options.context.userId,
+          'user_hard_deleted',
+          `Permanently deleted user ${user.name} (ID: ${userId})`,
+          options.context.ipAddress
+        );
+      }
+      
+      // Perform hard delete - permanently removes user from database
+      await (this.userRepository as any).hardDelete(userId);
+      
+      return true;
+    } catch (error) {
+      this.logger.error('Error in UserService.hardDelete', error instanceof Error ? error : String(error), { userId });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Map entity to response DTO
    * 
    * @param entity - User entity
@@ -604,15 +687,16 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
    * @param data - Data to validate
    * @param isUpdate - Whether validation is for update operation
    */
-  protected async validateBusinessRules(data: CreateUserDto | UpdateUserDto, isUpdate: boolean): Promise<void> {
-    // For create operations or when email is changed, check if email already exists
+  protected async validateBusinessRules(data: CreateUserDto | UpdateUserDto, isUpdate: boolean, userId?: number): Promise<void> {
+    // Für Create-Operationen oder wenn E-Mail geändert wird, prüfen, ob E-Mail bereits existiert
     if (!isUpdate || (data as UpdateUserDto).email) {
       const email = (data as any).email;
       
       if (email) {
         const existingUser = await this.userRepository.findByEmail(email);
         
-        if (existingUser && (!isUpdate || existingUser.id !== (data as any).id)) {
+        // Für Updates: Prüfen, ob existingUser der aktuelle Benutzer ist
+        if (existingUser && (!isUpdate || existingUser.id !== userId)) {
           throw this.errorHandler.createValidationError('Validation failed', ['Email is already in use']);
         }
       }

@@ -15,9 +15,9 @@ info:
     url: https://example.com/license
 
 servers:
-  - url: http://localhost:5000/api/v1
+  - url: http://localhost:5000/API/v1
     description: Local development server
-  - url: https://api.example.com/api/v1
+  - url: https://api.example.com/API/v1
     description: Production server
 
 # Tags for organizing operations
@@ -121,6 +121,8 @@ paths:
     $ref: './paths/auth.yaml#/reset-password'
   /auth/logout:
     $ref: './paths/auth.yaml#/logout'
+  /auth/dev/reset-token:
+    $ref: './paths/auth.yaml#/get-reset-token'
 
   # Users
   /users:
@@ -160,83 +162,79 @@ paths:
   /customers/{id}/history:
     $ref: './paths/customers.yaml#/customers-id-history'
 
-  # Projects
-  /projects:
-    $ref: './paths/projects.yaml#/projects'
-  /projects/statistics:
-    $ref: './paths/projects.yaml#/projects-statistics'
-  /projects/export:
-    $ref: './paths/projects.yaml#/projects-export'
-  /projects/{id}:
-    $ref: './paths/projects.yaml#/projects-id'
-  /projects/{id}/status:
-    $ref: './paths/projects.yaml#/projects-id-status'
-  /projects/{id}/notes:
-    $ref: './paths/projects.yaml#/projects-id-notes'
+  # Projects (Zur Zeit nicht implementiert)
+  # /projects:
+  #   $ref: './paths/projects.yaml#/projects'
+  # /projects/statistics:
+  #   $ref: './paths/projects.yaml#/projects-statistics'
+  # /projects/export:
+  #   $ref: './paths/projects.yaml#/projects-export'
+  # /projects/{id}:
+  #   $ref: './paths/projects.yaml#/projects-id'
+  # /projects/{id}/status:
+  #   $ref: './paths/projects.yaml#/projects-id-status'
+  # /projects/{id}/notes:
+  #   $ref: './paths/projects.yaml#/projects-id-notes'
 
-  # Appointments
-  /appointments:
-    $ref: './paths/appointments.yaml#/appointments'
-  /appointments/{id}:
-    $ref: './paths/appointments.yaml#/appointments-id'
-  /appointments/{id}/status:
-    $ref: './paths/appointments.yaml#/appointments-id-status'
-  /appointments/{id}/notes:
-    $ref: './paths/appointments.yaml#/appointments-id-notes'
+  # Appointments (Zur Zeit nicht implementiert)
+  # /appointments:
+  #   $ref: './paths/appointments.yaml#/appointments'
+  # /appointments/{id}:
+  #   $ref: './paths/appointments.yaml#/appointments-id'
+  # /appointments/{id}/status:
+  #   $ref: './paths/appointments.yaml#/appointments-id-status'
+  # /appointments/{id}/notes:
+  #   $ref: './paths/appointments.yaml#/appointments-id-notes'
 
-  # Services
-  /services:
-    $ref: './paths/services.yaml#/services'
-  /services/{id}:
-    $ref: './paths/services.yaml#/services-id'
-  /services/{id}/status:
-    $ref: './paths/services.yaml#/services-id-status'
-  /services/{id}/statistics:
-    $ref: './paths/services.yaml#/services-id-statistics'
+  # Services (Zur Zeit nicht implementiert)
+  # /services:
+  #   $ref: './paths/services.yaml#/services'
+  # /services/{id}:
+  #   $ref: './paths/services.yaml#/services-id'
+  # /services/{id}/status:
+  #   $ref: './paths/services.yaml#/services-id-status'
+  # /services/{id}/statistics:
+  #   $ref: './paths/services.yaml#/services-id-statistics'
 
-  # Requests
-  /requests:
-    $ref: './paths/requests.yaml#/requests'
-  /requests/{id}:
-    $ref: './paths/requests.yaml#/requests-id'
-  /requests/{id}/status:
-    $ref: './paths/requests.yaml#/requests-id-status'
-  /requests/{id}/notes:
-    $ref: './paths/requests.yaml#/requests-id-notes'
-  /requests/export:
-    $ref: './paths/requests.yaml#/requests-export'
+  # Requests (Zur Zeit nicht implementiert)
+  # /requests:
+  #   $ref: './paths/requests.yaml#/requests'
+  # /requests/{id}:
+  #   $ref: './paths/requests.yaml#/requests-id'
+  # /requests/{id}/status:
+  #   $ref: './paths/requests.yaml#/requests-id-status'
+  # /requests/{id}/notes:
+  #   $ref: './paths/requests.yaml#/requests-id-notes'
+  # /requests/export:
+  #   $ref: './paths/requests.yaml#/requests-export'
   
   # Contact (Public API)
-  /contact:
-    $ref: './paths/public.yaml#/contact'
+  /contacts:
+    $ref: './paths/public.yaml#/contacts'
 
   # Profile
-  /profile:
-    $ref: './paths/profile.yaml#/profile'
-  /profile/password:
-    $ref: './paths/profile.yaml#/profile-password'
-  /profile/picture:
-    $ref: './paths/profile.yaml#/profile-picture'
-  /profile/notifications:
-    $ref: './paths/profile.yaml#/profile-notifications'
+  /profile/me:
+    $ref: './paths/profile.yaml#/profile-me'
+  /profile/me/password:
+    $ref: './paths/profile.yaml#/profile-me-password'
+  /profile/me/picture:
+    $ref: './paths/profile.yaml#/profile-me-picture'
+  /profile/me/activity:
+    $ref: './paths/profile.yaml#/profile-me-activity'
 
-  # Dashboard
-  /dashboard:
-    $ref: './paths/dashboard.yaml#/dashboard'
-  /dashboard/stats:
-    $ref: './paths/dashboard.yaml#/dashboard-stats'
-  /dashboard/search:
-    $ref: './paths/dashboard.yaml#/dashboard-search'
+  # Dashboard (Zur Zeit nicht implementiert)
+  # /dashboard:
+  #   $ref: './paths/dashboard.yaml#/dashboard'
+  # /dashboard/stats:
+  #   $ref: './paths/dashboard.yaml#/dashboard-stats'
+  # /dashboard/search:
+  #   $ref: './paths/dashboard.yaml#/dashboard-search'
 
   # Settings
   /settings/user:
     $ref: './paths/settings.yaml#/settings-user'
   /settings/system:
     $ref: './paths/settings.yaml#/settings-system'
-  /settings/backup:
-    $ref: './paths/settings.yaml#/settings-backup'
-  /settings/backup/trigger:
-    $ref: './paths/settings.yaml#/settings-backup-trigger'
 
   # System
   /health:
