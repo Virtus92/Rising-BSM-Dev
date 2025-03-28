@@ -46,18 +46,32 @@ async function main() {
     }
   }));
 
-  // Starte Server
-  const port = config.PORT;
-  app.listen(port, () => {
-    logger.info(`Server running at http://localhost:${port}`);
-    logger.info(`Environment: ${config.NODE_ENV}`);
-  });
+  // Starte Server nur, wenn nicht im Testmodus
+  if (process.env.NODE_ENV !== 'test') {
+    const port = config.PORT;
+    app.listen(port, () => {
+      logger.info(`Server running at http://localhost:${port}`);
+      logger.info(`Environment: ${config.NODE_ENV}`);
+    });
+  } else {
+    logger.info(`App initialized in test mode - not starting server`);
+  }
   
   return app;
 }
 
 // Starte die Anwendung
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Check if this file is being run directly
+const isMainModule = () => {
+  try {
+    return import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
+  } catch (e) {
+    // Fallback for environments where import.meta might not be available
+    return require.main === module;
+  }
+};
+
+if (isMainModule()) {
   main().catch(err => {
     console.error('Application failed to start:', err);
     process.exit(1);

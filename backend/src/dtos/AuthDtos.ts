@@ -165,7 +165,7 @@ export interface LoginDto {
     /**
      * Reset token
      */
-    token?: string;
+    token: string;
     
     /**
      * New password

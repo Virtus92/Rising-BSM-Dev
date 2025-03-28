@@ -125,7 +125,9 @@ export class UserService extends BaseService<User, CreateUserDto, UpdateUserDto,
       return this.toDTO(user);
     } catch (error) {
       this.logger.error('Error in UserService.findByEmail', error instanceof Error ? error : String(error), { email });
-      throw this.handleError(error);
+      // Sicherstellen, dass der Fehler geworfen wird
+      const handledError = this.handleError(error);
+      throw handledError;
     }
   }
 

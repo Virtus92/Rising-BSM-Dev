@@ -367,7 +367,7 @@ export class AuthService implements IAuthService {
       }
 
       // Verify the token
-      const hashedToken = CryptoHelper.hashToken(resetPasswordDto.token);
+      const hashedToken = CryptoHelper.hashToken(resetPasswordDto.token || '');
       
       // Find user with this reset token
       const user = await this.userRepository.findOneByCriteria({ resetToken: hashedToken });

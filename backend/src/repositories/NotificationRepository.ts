@@ -414,7 +414,7 @@ protected async executeQuery(operation: string, ...args: any[]): Promise<any> {
       referenceId: ormEntity.referenceId,
       referenceType: ormEntity.referenceType,
       createdAt: ormEntity.createdAt,
-      readAt: ormEntity.readAt
+      updatedAt: ormEntity.updatedAt
     });
   }
 

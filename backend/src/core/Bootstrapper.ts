@@ -343,7 +343,8 @@ export class Bootstrapper {
     // Request controller
     this.container.register<IRequestController>('RequestController', () => {
       const requestService = this.container.resolve<IRequestService>('RequestService');
-      return new RequestController(requestService, logger, errorHandler);
+      const userService = this.container.resolve<IUserService>('UserService');
+      return new RequestController(requestService, userService, logger, errorHandler);
     }, { singleton: true });
 
     logger.info('Controllers registered');

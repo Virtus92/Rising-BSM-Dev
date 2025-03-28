@@ -137,8 +137,8 @@ export class AuthController extends BaseController implements IAuthController {
       
       // Passwort zurücksetzen
       const result = await this.authService.resetPassword({
-        token,
-        ...resetPasswordData
+        ...resetPasswordData,
+        token
       }, { ipAddress: req.ip });
       
       // Antwort senden

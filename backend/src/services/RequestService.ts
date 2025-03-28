@@ -225,16 +225,17 @@ export class RequestService implements IRequestService {
       };
     } catch (error) {
       // Enhanced error logging with more context
+      const sortField = filters.sortBy ? FieldMapper.toPrismaField(filters.sortBy) : 'createdAt';
       this.logger.error('Error getting contact requests', error instanceof Error ? error : String(error), {
         filters,
-        prismaSortField
+        sortField
       });
       
       // Handle Prisma validation errors more gracefully
-      if (error.name === 'PrismaClientValidationError') {
-        const message = error.message.includes('Unknown argument') 
+      if (error instanceof Error && error.name === 'PrismaClientValidationError') {
+        const message = error instanceof Error && error.message.includes('Unknown argument') 
           ? 'Invalid sort field. Please check your query parameters.'
-          : error.message;
+          : error instanceof Error ? error.message : 'An error occurred';
         
         throw this.errorHandler.createValidationError(message, [
           'Check that sortBy parameter uses valid field names.'
