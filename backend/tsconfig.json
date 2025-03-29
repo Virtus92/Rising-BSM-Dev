@@ -6,7 +6,7 @@
     "esModuleInterop": true,
     "lib": ["ESNext"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "removeComments": true,
     "typeRoots": [
       "./node_modules/@types",
@@ -28,6 +28,6 @@
       "models/*": ["src/types/models/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]
 }
