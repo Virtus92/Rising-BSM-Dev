@@ -1,29 +1,33 @@
-// backend/tests/integration/auth-flow.test.ts
-
-import request from 'supertest';
-import { PrismaClient } from '@prisma/client';
-import main from '../../src/index.js';
-import bcrypt from 'bcryptjs';
-import { setupTestEnvironment } from '../utils/test-helpers.js';
-
 /**
- * Integrationstests für den Authentifizierungsablauf
+ * Integration Tests - Authentication Flow
  * 
- * Diese Tests prüfen den Gesamtfluss der Authentifizierung:
+ * Tests the complete authentication flow:
  * - Login
- * - Token-Aktualisierung
- * - Passwort vergessen / zurücksetzen
+ * - Access protected resources
+ * - Token refresh
+ * - Password reset
  * - Logout
  */
+import request from 'supertest';
+import { PrismaClient } from '@prisma/client';
+import createTestApp from '../utils/test-app.js';
+import { 
+  setupTestEnvironment, 
+  createTestUser,
+  wait 
+} from '../utils/test-helpers.js';
 
-const prisma = new PrismaClient();
+// Create a dedicated database for these tests
+let prisma: PrismaClient;
 let app: any;
+let server: any;
 
-// Testdaten
+// Test data
 const testUser = {
   email: 'integration-test@example.com',
   password: 'IntegrationTest123!',
-  name: 'Integration Test User'
+  name: 'Integration Test User',
+  role: 'employee'
 };
 
 let userId: number;
@@ -31,63 +35,67 @@ let accessToken: string;
 let refreshToken: string;
 let resetToken: string;
 
-// Setup
+// Setup before all tests
 beforeAll(async () => {
-  // Umgebungsvariablen für Tests setzen
+  // Set up the test environment
   setupTestEnvironment();
   
   try {
-    console.log('Preparing integration test environment...');
+    console.log('🔧 Setting up authentication flow integration test...');
     
-    // Testdaten zurücksetzen (falls vorhanden)
+    // Create a new Prisma client
+    prisma = new PrismaClient();
+    
+    // Reset test data
     await prisma.userActivity.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.user.deleteMany({
-      where: {
-        email: testUser.email
-      }
+      where: { email: testUser.email }
     });
     
-    // Testbenutzer erstellen
-    const hashedPassword = await bcrypt.hash(testUser.password, 10);
-    const user = await prisma.user.create({
-      data: {
-        name: testUser.name,
-        email: testUser.email,
-        password: hashedPassword,
-        role: 'employee',
-        status: 'active'
-      }
-    });
-    
+    // Create test user
+    const user = await createTestUser(prisma, testUser);
     userId = user.id;
     
-    // Express-App initialisieren
-    app = await main();
-    console.log('Integration test setup completed');
+    // Initialize Express app
+    const result = await createTestApp();
+    app = result.app;
+    server = result.server;
+    
+    console.log('✅ Auth flow integration test setup completed');
   } catch (error) {
-    console.error('Integration test setup failed:', error);
+    console.error('❌ Integration test setup failed:', error);
     throw error;
   }
-}, 30000);
+}, 30000); // Longer timeout for setup
 
-// Cleanup
+// Cleanup after all tests
 afterAll(async () => {
-  // Testdaten löschen
+  console.log('🧹 Cleaning up integration test...');
+  
+  // Close server
+  if (server) {
+    await new Promise((resolve) => {
+      server.close(resolve);
+    });
+  }
+  
+  // Clean up test data
   await prisma.userActivity.deleteMany();
   await prisma.refreshToken.deleteMany();
   await prisma.user.deleteMany({
-    where: {
-      email: testUser.email
-    }
+    where: { email: testUser.email }
   });
   
+  // Disconnect Prisma client
   await prisma.$disconnect();
+  
+  console.log('✅ Integration test cleanup completed');
 });
 
 describe('Authentication Flow', () => {
-  // Enable first test to verify our fixes
   test('Step 1: User login', async () => {
+    // Arrange & Act
     const response = await request(app)
       .post('/API/v1/login')
       .send({
@@ -95,129 +103,150 @@ describe('Authentication Flow', () => {
         password: testUser.password
       });
     
+    // Assert
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data).toHaveProperty('accessToken');
     expect(response.body.data).toHaveProperty('refreshToken');
     
+    // Store tokens for subsequent tests
     accessToken = response.body.data.accessToken;
     refreshToken = response.body.data.refreshToken;
   });
   
-  test.skip('Step 2: Access protected resource', async () => {
+  test('Step 2: Access protected resource', async () => {
+    // Skip if login failed
+    if (!accessToken) {
+      console.warn('⚠️ Skipping test: No access token available');
+      return;
+    }
+
+    // Arrange & Act
     const response = await request(app)
       .get('/API/v1/users/profile')
       .set('Authorization', `Bearer ${accessToken}`);
     
+    // Assert
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data.id).toBe(userId);
     expect(response.body.data.email).toBe(testUser.email);
   });
   
-  test.skip('Step 3: Refresh token', async () => {
-    // Kurze Pause einlegen, um unterschiedliche Zeitstempel im Token zu erhalten
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  test('Step 3: Refresh token', async () => {
+    // Skip if login failed
+    if (!refreshToken) {
+      console.warn('⚠️ Skipping test: No refresh token available');
+      return;
+    }
+
+    // Arrange - Wait a moment to ensure different timestamps
+    await wait(1000);
     
+    // Act
     const response = await request(app)
       .post('/API/v1/auth/refresh-token')
-      .send({
-        refreshToken: refreshToken
-      });
+      .send({ refreshToken });
     
+    // Assert
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data).toHaveProperty('accessToken');
     expect(response.body.data).toHaveProperty('refreshToken');
     
-    // Tokens aktualisieren
+    // Store original token for comparison
     const oldAccessToken = accessToken;
+    
+    // Update tokens for subsequent tests
     accessToken = response.body.data.accessToken;
     refreshToken = response.body.data.refreshToken;
     
-    // Sicherstellen, dass der neue Token anders ist
+    // Ensure new token is different from the old one
     expect(accessToken).not.toBe(oldAccessToken);
   });
   
-  test.skip('Step 4: Password forgot/reset flow', async () => {
-    // Passwort vergessen anfordern
+  test('Step 4: Password forgot/reset flow', async () => {
+    // Arrange & Act - Request password reset
     const forgotResponse = await request(app)
       .post('/API/v1/auth/forgot-password')
-      .send({
-        email: testUser.email
-      });
+      .send({ email: testUser.email });
     
+    // Assert
     expect(forgotResponse.status).toBe(200);
     expect(forgotResponse.body.success).toBe(true);
     
-    // In Testumgebung den Reset-Token aus der Datenbank holen
-    if (process.env.NODE_ENV === 'test') {
-      const user = await prisma.user.findUnique({
-        where: {
-          email: testUser.email
-        },
-        select: {
-          resetToken: true
-        }
+    // In test environment, get the reset token from the database
+    const user = await prisma.user.findUnique({
+      where: { email: testUser.email },
+      select: { resetToken: true, resetTokenExpiry: true }
+    });
+    
+    // Ensure we have a reset token
+    expect(user?.resetToken).toBeTruthy();
+    resetToken = user?.resetToken || '';
+    
+    // Act - Validate token
+    const validateResponse = await request(app)
+      .get(`/API/v1/auth/reset-token/${resetToken}`);
+    
+    // Assert
+    expect(validateResponse.status).toBe(200);
+    expect(validateResponse.body.success).toBe(true);
+    expect(validateResponse.body.data.valid).toBe(true);
+    
+    // Act - Reset password
+    const resetResponse = await request(app)
+      .post(`/API/v1/auth/reset-password/${resetToken}`)
+      .send({
+        password: 'NewPassword123!',
+        confirmPassword: 'NewPassword123!'
       });
-      
-      resetToken = user?.resetToken || '';
-      expect(resetToken).toBeTruthy();
-      
-      // Token validieren
-      const validateResponse = await request(app)
-        .get(`/API/v1/auth/reset-token/${resetToken}`);
-      
-      expect(validateResponse.status).toBe(200);
-      expect(validateResponse.body.success).toBe(true);
-      expect(validateResponse.body.data.valid).toBe(true);
-      
-      // Passwort zurücksetzen
-      const resetResponse = await request(app)
-        .post(`/API/v1/auth/reset-password/${resetToken}`)
-        .send({
-          password: 'NewPassword123!',
-          confirmPassword: 'NewPassword123!'
-        });
-      
-      expect(resetResponse.status).toBe(200);
-      expect(resetResponse.body.success).toBe(true);
-      
-      // Mit neuem Passwort einloggen
-      const loginResponse = await request(app)
-        .post('/API/v1/login')
-        .send({
-          email: testUser.email,
-          password: 'NewPassword123!'
-        });
-      
-      expect(loginResponse.status).toBe(200);
-      expect(loginResponse.body.success).toBe(true);
-      
-      // Tokens aktualisieren
-      accessToken = loginResponse.body.data.token;
-      refreshToken = loginResponse.body.data.refreshToken;
-    }
+    
+    // Assert
+    expect(resetResponse.status).toBe(200);
+    expect(resetResponse.body.success).toBe(true);
+    
+    // Act - Login with new password
+    const loginResponse = await request(app)
+      .post('/API/v1/login')
+      .send({
+        email: testUser.email,
+        password: 'NewPassword123!'
+      });
+    
+    // Assert
+    expect(loginResponse.status).toBe(200);
+    expect(loginResponse.body.success).toBe(true);
+    
+    // Update tokens for final test
+    accessToken = loginResponse.body.data.accessToken;
+    refreshToken = loginResponse.body.data.refreshToken;
   });
   
-  test.skip('Step 5: Logout', async () => {
+  test('Step 5: Logout', async () => {
+    // Skip if login/reset failed
+    if (!accessToken || !refreshToken) {
+      console.warn('⚠️ Skipping test: No tokens available');
+      return;
+    }
+
+    // Arrange & Act
     const response = await request(app)
       .post('/API/v1/auth/logout')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        refreshToken: refreshToken
-      });
+      .send({ refreshToken });
     
+    // Assert
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     
-    // Verifizieren, dass der RefreshToken nicht mehr funktioniert
+    // Act - Verify refresh token no longer works
     const refreshResponse = await request(app)
       .post('/API/v1/auth/refresh-token')
-      .send({
-        refreshToken: refreshToken
-      });
+      .send({ refreshToken });
     
+    // Assert
     expect(refreshResponse.status).toBe(401);
+    expect(refreshResponse.body.success).toBe(false);
   });
 });

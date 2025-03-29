@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
-import main from '../../src/index.js';
+import createTestApp from '../utils/test-app.js';
 import bcrypt from 'bcryptjs';
 import { setupTestEnvironment } from '../utils/test-helpers.js';
 
@@ -83,7 +83,8 @@ beforeAll(async () => {
     });
     
     // Express-App initialisieren
-    app = await main();
+    const result = await createTestApp();
+    app = result.app;
     
     console.log('Test setup completed');
   } catch (error) {

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Admin User",
+    "email": "admin@example.com",
+    "password": "AdminPass123!",
+    "role": "admin",
+    "status": "active"
+  },
+  {
+    "name": "Manager User",
+    "email": "manager@example.com",
+    "password": "ManagerPass123!",
+    "role": "manager",
+    "status": "active"
+  },
+  {
+    "name": "Employee User",
+    "email": "employee@example.com",
+    "password": "EmployeePass123!",
+    "role": "employee",
+    "status": "active"
+  },
+  {
+    "name": "Inactive User",
+    "email": "inactive@example.com",
+    "password": "InactivePass123!",
+    "role": "employee",
+    "status": "inactive"
+  }
+]

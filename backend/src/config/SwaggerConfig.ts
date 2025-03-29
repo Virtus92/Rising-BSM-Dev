@@ -5,17 +5,18 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { Express, Request, Response, NextFunction } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import yaml from 'js-yaml';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import express from 'express';
 
-// Get the directory name equivalent for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const __root = path.resolve(__dirname, '../..');
+// Fixed path resolution for both development and production
+const projectRoot = process.cwd();
+const __root = projectRoot;
+
+// For debugging path resolution
+console.log('Project root path:', projectRoot);
 
 export class SwaggerConfig {
   private readonly swaggerEnabled: boolean;
@@ -49,7 +50,7 @@ export class SwaggerConfig {
       this.openApiSpec = this.findBundledSpec();
 
       // Ensure direct file access for Swagger JSON
-      const swaggerJsonPath = path.join(__dirname, '../../dist/swagger.json');
+      const swaggerJsonPath = path.join(projectRoot, 'dist/swagger.json');
       if (!fs.existsSync(path.dirname(swaggerJsonPath))) {
         fs.mkdirSync(path.dirname(swaggerJsonPath), { recursive: true });
       }
@@ -70,7 +71,7 @@ export class SwaggerConfig {
         res.header('Content-Type', 'application/json');
         
         try {
-          const swaggerJsonPath = path.join(__dirname, '../../dist/swagger.json');
+          const swaggerJsonPath = path.join(projectRoot, 'dist/swagger.json');
           if (fs.existsSync(swaggerJsonPath)) {
             const swaggerContent = fs.readFileSync(swaggerJsonPath, 'utf8');
             res.send(swaggerContent);
@@ -103,7 +104,7 @@ export class SwaggerConfig {
       };
       
       // Add custom JS file for Swagger UI fixes
-      const swaggerCustomJsPath = path.join(__dirname, '../../dist/swagger.js');
+      const swaggerCustomJsPath = path.join(projectRoot, 'dist/swagger.js');
       const swaggerCustomJs = `
         // Fix for CORS and network issues in Swagger UI
         (function() {
@@ -176,11 +177,9 @@ export class SwaggerConfig {
   private findBundledSpec(): any {
     const possiblePaths = [
       '/app/dist/swagger.json',  // Prioritize container path
-      path.resolve(process.cwd(), 'dist/swagger.json'),
-      path.resolve(__root, 'dist/swagger.json'),
-      path.resolve(__root, '../dist/swagger.json'),
-      path.resolve(process.cwd(), 'backend/dist/swagger.json'),
-      path.resolve(__root, '../../dist/swagger.json')
+      path.resolve(projectRoot, 'dist/swagger.json'),
+      path.resolve(projectRoot, 'backend/dist/swagger.json'),
+      path.resolve(projectRoot, '../dist/swagger.json')
     ];
 
     this.logger.debug('Looking for bundled OpenAPI spec at:', possiblePaths);
@@ -200,9 +199,9 @@ export class SwaggerConfig {
     // If bundled spec cannot be found, look for source spec
     const sourcePaths = [
       '/app/openapi/openapi.yaml',  // Prioritize container path
-      path.resolve(process.cwd(), 'openapi/openapi.yaml'),
-      path.resolve(__dirname, '../openapi/openapi.yaml'),
-      path.resolve(process.cwd(), '../openapi/openapi.yaml')
+      path.resolve(projectRoot, 'openapi/openapi.yaml'),
+      path.resolve(projectRoot, 'src/openapi/openapi.yaml'),
+      path.resolve(projectRoot, '../openapi/openapi.yaml')
     ];
     
     this.logger.debug('Looking for source OpenAPI spec at:', sourcePaths);
