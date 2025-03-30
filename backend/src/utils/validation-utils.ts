@@ -8,13 +8,13 @@ export class ValidationUtils {
   static sanitizeFilters<T extends Record<string, any>>(
     filters: Partial<T>,
     allowedFilters: string[],
-    defaults: Partial<T> = {}
+    defaults?: Record<string, any>
   ): Partial<T> {
-    const sanitized: Partial<T> = { ...defaults };
+    const sanitized: Partial<T> = { ...(defaults as Partial<T>) };
     
     for (const key of allowedFilters) {
       if (filters[key] !== undefined) {
-        sanitized[key] = filters[key];
+        sanitized[key as keyof T] = filters[key];
       }
     }
     

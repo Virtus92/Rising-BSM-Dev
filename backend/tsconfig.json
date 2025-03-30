@@ -28,6 +28,6 @@
       "models/*": ["src/types/models/*"]
     }
   },
-  "include": ["src/**/*", "test/**/*"],
+  "include": ["src/**/*", "test/**/*", "tests/unit/utils/crypto-helper.test.ts"],
   "exclude": ["node_modules", "dist"]
 }
