@@ -212,6 +212,16 @@ export interface CustomerResponseDto extends BaseCustomerDto {
    * Last update timestamp
    */
   updatedAt: string;
+  
+  /**
+   * ID of user who created this customer
+   */
+  createdBy?: number;
+  
+  /**
+   * ID of user who last updated this customer
+   */
+  updatedBy?: number;
 }
 
 /**
@@ -400,7 +410,7 @@ export const customerCreateValidationSchema = {
     type: 'string',
     required: false,
     maxLength: 100,
-    default: 'Deutschland',
+    default: 'Austria',
     messages: {
       maxLength: 'Country cannot exceed 100 characters'
     }
@@ -572,21 +582,27 @@ export const customerNoteCreateValidationSchema = {
  * Get label for customer status
  * 
  * @param status - Customer status
+ * @param language - Optional language code (default: 'de')
  * @returns Human-readable status label
  */
-export function getCustomerStatusLabel(status: CustomerStatus): string {
-  switch (status) {
-    case CustomerStatus.ACTIVE:
-      return 'Aktiv';
-    case CustomerStatus.INACTIVE:
-      return 'Inaktiv';
-    case CustomerStatus.ON_HOLD:
-      return 'Pausiert';
-    case CustomerStatus.DELETED:
-      return 'Gelöscht';
-    default:
-      return status;
-  }
+export function getCustomerStatusLabel(status: CustomerStatus, language: string = 'de'): string {
+  const labels: Record<string, Record<CustomerStatus, string>> = {
+    de: {
+      [CustomerStatus.ACTIVE]: 'Aktiv',
+      [CustomerStatus.INACTIVE]: 'Inaktiv',
+      [CustomerStatus.ON_HOLD]: 'Pausiert',
+      [CustomerStatus.DELETED]: 'Gelöscht'
+    },
+    en: {
+      [CustomerStatus.ACTIVE]: 'Active',
+      [CustomerStatus.INACTIVE]: 'Inactive',
+      [CustomerStatus.ON_HOLD]: 'On Hold',
+      [CustomerStatus.DELETED]: 'Deleted'
+    }
+  };
+  
+  // Return label in requested language, fallback to English, then to status code
+  return labels[language]?.[status] || labels.en[status] || status;
 }
 
 /**
@@ -614,15 +630,21 @@ export function getCustomerStatusClass(status: CustomerStatus): string {
  * Get label for customer type
  * 
  * @param type - Customer type
+ * @param language - Optional language code (default: 'de')
  * @returns Human-readable type label
  */
-export function getCustomerTypeLabel(type: CustomerType): string {
-  switch (type) {
-    case CustomerType.PRIVATE:
-      return 'Privatkunde';
-    case CustomerType.BUSINESS:
-      return 'Geschäftskunde';
-    default:
-      return type;
-  }
+export function getCustomerTypeLabel(type: CustomerType, language: string = 'de'): string {
+  const labels: Record<string, Record<CustomerType, string>> = {
+    de: {
+      [CustomerType.PRIVATE]: 'Privatkunde',
+      [CustomerType.BUSINESS]: 'Geschäftskunde'
+    },
+    en: {
+      [CustomerType.PRIVATE]: 'Private Customer',
+      [CustomerType.BUSINESS]: 'Business Customer'
+    }
+  };
+  
+  // Return label in requested language, fallback to English, then to type code
+  return labels[language]?.[type] || labels.en[type] || type;
 }

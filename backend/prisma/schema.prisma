@@ -23,6 +23,8 @@ model User {
   profilePicture    String?            @db.VarChar(255)
   createdAt         DateTime           @default(now()) @db.Timestamp(6)
   updatedAt         DateTime           @updatedAt @db.Timestamp(6)
+  createdBy         Int?                             
+  updatedBy         Int?
   lastLoginAt       DateTime?
   resetToken        String?
   resetTokenExpiry  DateTime?
@@ -118,6 +120,8 @@ model Customer {
   type         String         @default("private") @db.VarChar(20)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+  createdBy    Int?           // Benutzer-ID, der den Kunden erstellt hat
+  updatedBy    Int?           // Benutzer-ID, der den Kunden zuletzt aktualisiert hat
   projects     Project[]
   appointments Appointment[]
   invoices     Invoice[]
@@ -358,4 +362,6 @@ model Notification {
   read          Boolean   @default(false)
   createdAt     DateTime  @default(now()) @db.Timestamp(6)
   updatedAt     DateTime  @updatedAt
+  createdBy     Int?      // Benutzer-ID, der die Benachrichtigung erstellt hat
+  updatedBy     Int?      // Benutzer-ID, der die Benachrichtigung zuletzt aktualisiert hat
 }

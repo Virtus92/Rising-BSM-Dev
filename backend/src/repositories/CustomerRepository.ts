@@ -190,8 +190,8 @@ export class CustomerRepository extends BaseRepository<Customer, number> impleme
             notes: string;
             createdAt: Date;
             updatedAt: Date;
-            createdBy: number;
-            updatedBy: number;
+            createdBy?: number;
+            updatedBy?: number;
         }
         
         // Map to domain entities
@@ -248,8 +248,8 @@ export class CustomerRepository extends BaseRepository<Customer, number> impleme
             notes: string;
             createdAt: Date;
             updatedAt: Date;
-            createdBy: number;
-            updatedBy: number;
+            createdBy?: number;
+            updatedBy?: number;
         }
         return customers.map((customer: any) => this.mapToDomainEntity(customer));
         } catch (error) {
@@ -476,10 +476,11 @@ export class CustomerRepository extends BaseRepository<Customer, number> impleme
             notes: ormEntity.notes,
             createdAt: ormEntity.createdAt,
             updatedAt: ormEntity.updatedAt,
-            // Remove properties not in Customer entity
-            // createdBy and updatedBy are removed
+            // Map all relevant properties including audit fields
             projects: ormEntity.projects,
             appointments: ormEntity.appointments,
+            createdBy: ormEntity.createdBy,
+            updatedBy: ormEntity.updatedBy,
             logs: ormEntity.logs
         });
     }
@@ -497,7 +498,7 @@ export class CustomerRepository extends BaseRepository<Customer, number> impleme
         Object.entries(domainEntity).forEach(([key, value]) => {
             // Skip domain-specific properties that don't map to the database
             if (value !== undefined && 
-                    !['projects', 'appointments'].includes(key)) {
+                    !['projects', 'appointments', 'logs'].includes(key)) {
                 result[key] = value;
             }
         });

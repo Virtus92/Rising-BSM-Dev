@@ -61,6 +61,16 @@ export class Notification {
   updatedAt: Date;
 
   /**
+   * ID of user who created this notification
+   */
+  createdBy?: number;
+  
+  /**
+   * ID of user who last updated this notification
+   */
+  updatedBy?: number;
+
+  /**
    * Creates a new Notification instance
    * 
    * @param data - Notification data
@@ -77,14 +87,19 @@ export class Notification {
     this.referenceType = data.referenceType;
     this.createdAt = data.createdAt || new Date();
     this.updatedAt = data.updatedAt || new Date();
+    this.createdBy = data.createdBy;
+    this.updatedBy = data.updatedBy;
   }
 
   /**
    * Mark notification as read
    */
-  markAsRead(): void {
+  markAsRead(userId?: number): void {
     this.read = true;
     this.updatedAt = new Date();
+    if (userId) {
+      this.updatedBy = userId;
+    }
   }
 
   /**

@@ -554,7 +554,9 @@ export class CustomerService extends BaseService<
       newsletter: entity.newsletter,
       notes: entity.notes,
       createdAt: entity.createdAt.toISOString(),
-      updatedAt: entity.updatedAt.toISOString()
+      updatedAt: entity.updatedAt.toISOString(),
+      createdBy: entity.createdBy,
+      updatedBy: entity.updatedBy
     };
   }
 

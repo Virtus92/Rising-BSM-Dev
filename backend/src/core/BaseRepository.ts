@@ -262,26 +262,38 @@ export abstract class BaseRepository<T, ID = number, M = any> implements IBaseRe
     ipAddress?: string
   ): Promise<any> {
     try {
+      // Always log to application logs
       this.logger.info(`User activity: ${actionType}`, {
         userId,
         actionType,
         details,
         ipAddress,
-        entity: (this.model as any).name || 'Unknown'
+        entity: this.getEntityName()
       });
       
-      // Using the UserActivity model directly through prisma client
-      const prismaClient = (this.model as any)['$queryRaw'] ? 
-      (this.model as any)['$queryRaw'].constructor :
-        null;
+      // Safe access to prisma client
+      let prisma = null;
       
-      if (prismaClient?.userActivity) {
-        return await prismaClient.userActivity.create({
+      // Try to detect prisma client from the model
+      if (this.model && typeof this.model === 'object') {
+        // Check for a common prisma function
+        if ('$connect' in this.model || '$transaction' in this.model) {
+          prisma = this.model;
+        } else if ('$queryRaw' in this.model) {
+          // The model itself is a table model, try to access the client
+          prisma = (this.model as any).$queryRaw?.['_client'] || null;
+        }
+      }
+      
+      // Create activity log if prisma client is available and has the userActivity model
+      if (prisma && 'userActivity' in prisma) {
+        return await prisma.userActivity.create({
           data: {
             userId,
-            activity: actionType, // Rename 'type' to 'activity' to match schema
-            details,
-            ipAddress
+            activity: actionType, // Field name in schema is 'activity' not 'type'
+            details: details || '',
+            timestamp: new Date(),
+            ipAddress: ipAddress || null
           }
         });
       }
@@ -292,7 +304,7 @@ export abstract class BaseRepository<T, ID = number, M = any> implements IBaseRe
         userId, 
         actionType 
       });
-      return null;
+      return null; // Don't throw on logging errors
     }
   }
 

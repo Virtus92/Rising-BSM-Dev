@@ -96,6 +96,8 @@ CREATE TABLE "Customer" (
     "type" VARCHAR(20) NOT NULL DEFAULT 'private',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" INTEGER,
+    "updatedBy" INTEGER,
 
     CONSTRAINT "Customer_pkey" PRIMARY KEY ("id")
 );
@@ -327,6 +329,8 @@ CREATE TABLE "Notification" (
     "read" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" INTEGER,
+    "updatedBy" INTEGER,
 
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );

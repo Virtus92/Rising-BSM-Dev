@@ -81,6 +81,16 @@ export class Customer {
   updatedAt: Date;
   
   /**
+   * ID of user who created this customer
+   */
+  createdBy?: number;
+  
+  /**
+   * ID of user who last updated this customer
+   */
+  updatedBy?: number;
+  
+  /**
    * Related projects
    */
   projects?: any[];
@@ -116,6 +126,8 @@ export class Customer {
     this.notes = data.notes;
     this.createdAt = data.createdAt || new Date();
     this.updatedAt = data.updatedAt || new Date();
+    this.createdBy = data.createdBy;
+    this.updatedBy = data.updatedBy;
     this.projects = data.projects || [];
     this.appointments = data.appointments || [];
     this.logs = data.logs || [];
@@ -152,6 +164,9 @@ export class Customer {
     
     // Always update the updatedAt timestamp
     this.updatedAt = new Date();
+    
+    // If updatedBy is provided, update it
+    if (data.updatedBy !== undefined) this.updatedBy = data.updatedBy;
   }
 
   /**

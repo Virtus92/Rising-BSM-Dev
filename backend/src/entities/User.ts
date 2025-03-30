@@ -54,6 +54,16 @@ export class User {
    * Last update timestamp
    */
   updatedAt: Date;
+
+  /**
+   * ID of user who created this user
+   */
+  createdBy?: number;
+  
+  /**
+   * ID of user who last updated this user
+   */
+  updatedBy?: number;
   
   /**
    * Last login timestamp
@@ -86,6 +96,8 @@ export class User {
     this.profilePicture = data.profilePicture;
     this.createdAt = data.createdAt || new Date();
     this.updatedAt = data.updatedAt || new Date();
+    this.createdBy = data.createdBy;
+    this.updatedBy = data.updatedBy;
     this.lastLoginAt = data.lastLoginAt;
     this.resetToken = data.resetToken;
     this.resetTokenExpiry = data.resetTokenExpiry;
@@ -172,6 +184,9 @@ export class User {
     
     // Always update the updatedAt timestamp
     this.updatedAt = new Date();
+    
+    // If updatedBy is provided, update it
+    if (data.updatedBy !== undefined) this.updatedBy = data.updatedBy;
   }
 
   /**

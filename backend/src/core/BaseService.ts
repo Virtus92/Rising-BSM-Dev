@@ -337,14 +337,23 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
     const result = { ...data };
     
     // Add audit fields if context contains user information
+    // Always add audit information if userId is provided
     if (context?.userId) {
       if (operation === 'create') {
         result.createdBy = context.userId;
+        result.updatedBy = context.userId; // Set both for creation
       }
       
       if (operation === 'update') {
         result.updatedBy = context.userId;
       }
+      
+      // Log the audit information being added
+      this.logger.debug(`Adding audit info to ${operation} operation`, {
+        entity: this.getEntityName(),
+        userId: context.userId,
+        operation
+      });
     }
     
     return result;

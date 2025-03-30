@@ -30,6 +30,11 @@ export class RefreshToken {
   createdByIp?: string;
   
   /**
+   * ID of user who created this token (admin/system)
+   */
+  createdBy?: number;
+  
+  /**
    * Whether the token has been revoked
    */
   isRevoked: boolean;
@@ -60,6 +65,7 @@ export class RefreshToken {
     this.expiresAt = data.expiresAt || new Date();
     this.createdAt = data.createdAt || new Date();
     this.createdByIp = data.createdByIp;
+    this.createdBy = data.createdBy;
     this.isRevoked = data.isRevoked || false;
     this.revokedAt = data.revokedAt;
     this.revokedByIp = data.revokedByIp;
@@ -90,7 +96,7 @@ export class RefreshToken {
    * @param ipAddress - IP address of the client
    * @param replacedByToken - New token that replaces this one
    */
-  revoke(ipAddress?: string, replacedByToken?: string): void {
+  revoke(ipAddress?: string, replacedByToken?: string, revokedBy?: number): void {
     this.isRevoked = true;
     this.revokedAt = new Date();
     this.revokedByIp = ipAddress;
