@@ -496,4 +496,38 @@ export abstract class BaseRepository<T, ID = number, M = any> implements IBaseRe
    * @returns Whether error is a foreign key constraint violation
    */
   protected abstract isForeignKeyConstraintError(error: any): boolean;
+  
+  /**
+   * Helper method to convert snake_case to camelCase for database field names
+   * 
+   * @param field - Field name possibly in snake_case
+   * @returns Field name in camelCase
+   */
+  protected convertToCamelCase(field: string): string {
+    // Common field mappings
+    const fieldMap: Record<string, string> = {
+      'created_at': 'createdAt',
+      'updated_at': 'updatedAt',
+      'processor_id': 'processorId',
+      'ip_address': 'ipAddress',
+      'customer_id': 'customerId',
+      'service_id': 'serviceId',
+      'user_id': 'userId',
+      'user_name': 'userName',
+      'postal_code': 'postalCode',
+      'appointment_date': 'appointmentDate'
+    };
+    
+    // Return from map if exists
+    if (fieldMap[field]) {
+      return fieldMap[field];
+    }
+    
+    // Otherwise convert dynamically
+    if (field.includes('_')) {
+      return field.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+    }
+    
+    return field;
+  }
 }

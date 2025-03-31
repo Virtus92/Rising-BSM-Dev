@@ -5,8 +5,10 @@
  * Defines methods for handling customer-related HTTP requests.
  */
 import { Request, Response } from 'express';
+import { IBaseController } from './IBaseController.js';
+import { Customer } from '../entities/Customer.js';
 
-export interface ICustomerController {
+export interface ICustomerController extends IBaseController<Customer> {
   /**
    * Get all customers with pagination and filtering
    * 

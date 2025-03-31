@@ -6,16 +6,19 @@ import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { 
   MarkNotificationReadDto, 
   NotificationFilterDto,
-  NotificationType
+  NotificationType,
+  CreateNotificationDto,
+  UpdateNotificationDto,
+  NotificationResponseDto
 } from '../dtos/NotificationDtos.js';
 import { AuthenticatedRequest } from '../interfaces/IAuthTypes.js';
 import { BaseController } from '../core/BaseController.js';
-import { NotificationEventManager, NotificationEventType } from '../events/NotificationEventManager.js';
+import { Notification } from '../entities/Notification.js';
 
 /**
  * Implementation of INotificationController
  */
-export class NotificationController extends BaseController implements INotificationController {
+export class NotificationController extends BaseController<Notification, CreateNotificationDto, UpdateNotificationDto, NotificationResponseDto> implements INotificationController {
   /**
    * Creates a new NotificationController instance
    * 
@@ -28,7 +31,7 @@ export class NotificationController extends BaseController implements INotificat
     logger: ILoggingService,
     errorHandler: IErrorHandler
   ) {
-    super(logger, errorHandler);
+    super(notificationService, logger, errorHandler);
     
     // Bind methods to preserve 'this' context when used as route handlers
     this.getNotifications = this.getNotifications.bind(this);
@@ -77,7 +80,7 @@ export class NotificationController extends BaseController implements INotificat
       // Send paginated response
       this.sendPaginatedResponse(res, result.data, result.pagination, 'Notifications retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -108,7 +111,7 @@ export class NotificationController extends BaseController implements INotificat
         'Notifications marked as read'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -134,7 +137,7 @@ export class NotificationController extends BaseController implements INotificat
       // Send success response
       this.sendSuccessResponse(res, stats, 'Notification statistics retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -161,7 +164,7 @@ export class NotificationController extends BaseController implements INotificat
       // Send success response
       this.sendSuccessResponse(res, result, 'Notification deleted successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
   
@@ -217,7 +220,7 @@ export class NotificationController extends BaseController implements INotificat
         'Test notification created successfully'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 }

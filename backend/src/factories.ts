@@ -16,7 +16,7 @@ import { AuthService } from './services/AuthService.js';
 import { UserService } from './services/UserService.js';
 import { ProfileService } from './services/ProfileService.js';
 import { SettingsService } from './services/SettingsService.js';
-import { ContactService } from './services/ContactService.js';
+import { RequestService } from './services/RequestService.js';
 
 // Controllers
 import { CustomerController } from './controllers/CustomerController.js';
@@ -25,7 +25,10 @@ import { AuthController } from './controllers/AuthController.js';
 import { UserController } from './controllers/UserController.js';
 import { ProfileController } from './controllers/ProfileController.js';
 import { SettingsController } from './controllers/SettingsController.js';
-import { ContactController } from './controllers/ContactController.js';
+import { RequestController } from './controllers/RequestController.js';
+
+// Import Request Repository
+import { RequestRepository } from './repositories/RequestRepository.js';
 
 // Create repository factories
 export const createCustomerRepositoryFactory = () => createFactory(
@@ -45,6 +48,11 @@ export const createUserRepositoryFactory = () => createFactory(
 
 export const createRefreshTokenRepositoryFactory = () => createFactory(
   RefreshTokenRepository,
+  ['PrismaClient', 'LoggingService', 'ErrorHandler']
+);
+
+export const createRequestRepositoryFactory = () => createFactory(
+  RequestRepository,
   ['PrismaClient', 'LoggingService', 'ErrorHandler']
 );
 
@@ -79,9 +87,9 @@ export const createSettingsServiceFactory = () => createFactory(
   ['PrismaClient', 'LoggingService', 'ErrorHandler']
 );
 
-export const createContactServiceFactory = () => createFactory(
-  ContactService,
-  ['PrismaClient', 'LoggingService', 'ErrorHandler']
+export const createRequestServiceFactory = () => createFactory(
+  RequestService,
+  ['RequestRepository', 'LoggingService', 'ErrorHandler']
 );
 
 // Create controller factories
@@ -115,9 +123,9 @@ export const createSettingsControllerFactory = () => createFactory(
   ['SettingsService', 'LoggingService', 'ErrorHandler']
 );
 
-export const createContactControllerFactory = () => createFactory(
-  ContactController,
-  ['ContactService', 'LoggingService', 'ErrorHandler']
+export const createRequestControllerFactory = () => createFactory(
+  RequestController,
+  ['RequestService', 'UserService', 'LoggingService', 'ErrorHandler']
 );
 
 /**
@@ -130,6 +138,7 @@ export function registerRepositories(container: DiContainer): void {
   container.register('NotificationRepository', createNotificationRepositoryFactory(), { singleton: true });
   container.register('UserRepository', createUserRepositoryFactory(), { singleton: true });
   container.register('RefreshTokenRepository', createRefreshTokenRepositoryFactory(), { singleton: true });
+  container.register('RequestRepository', createRequestRepositoryFactory(), { singleton: true });
 }
 
 /**
@@ -144,7 +153,7 @@ export function registerServices(container: DiContainer): void {
   container.register('UserService', createUserServiceFactory(), { singleton: true });
   container.register('ProfileService', createProfileServiceFactory(), { singleton: true });
   container.register('SettingsService', createSettingsServiceFactory(), { singleton: true });
-  container.register('ContactService', createContactServiceFactory(), { singleton: true });
+  container.register('RequestService', createRequestServiceFactory(), { singleton: true });
 }
 
 /**
@@ -159,7 +168,7 @@ export function registerControllers(container: DiContainer): void {
   container.register('UserController', createUserControllerFactory(), { singleton: true });
   container.register('ProfileController', createProfileControllerFactory(), { singleton: true });
   container.register('SettingsController', createSettingsControllerFactory(), { singleton: true });
-  container.register('ContactController', createContactControllerFactory(), { singleton: true });
+  container.register('RequestController', createRequestControllerFactory(), { singleton: true });
 }
 
 /**

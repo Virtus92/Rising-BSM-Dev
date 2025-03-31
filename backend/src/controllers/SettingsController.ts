@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ISettingsService, UpdateUserSettingsData } from '../interfaces/ISettingsService.js';
+import { ISettingsService, UpdateUserSettingsData, UserSettings, SystemSettings } from '../interfaces/ISettingsService.js';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { BaseController } from '../core/BaseController.js';
@@ -10,7 +10,7 @@ import { ISettingsController } from '../interfaces/ISettingsController.js';
  * 
  * Controller for handling user and system settings-related HTTP requests.
  */
-export class SettingsController extends BaseController implements ISettingsController {
+export class SettingsController extends BaseController<UserSettings, UserSettings, UpdateUserSettingsData, UserSettings> implements ISettingsController {
   /**
    * Creates a new SettingsController instance
    * 
@@ -23,7 +23,7 @@ export class SettingsController extends BaseController implements ISettingsContr
     logger: ILoggingService,
     errorHandler: IErrorHandler
   ) {
-    super(logger, errorHandler);
+    super(settingsService as any, logger, errorHandler);
     
     // Bind methods to preserve 'this' context when used as route handlers
     this.getMySettings = this.getMySettings.bind(this);
@@ -64,7 +64,7 @@ export class SettingsController extends BaseController implements ISettingsContr
       // Send existing settings
       this.sendSuccessResponse(res, settings, 'Settings retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -90,7 +90,7 @@ export class SettingsController extends BaseController implements ISettingsContr
       // Send response
       this.sendSuccessResponse(res, settings, 'Settings updated successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -108,7 +108,7 @@ export class SettingsController extends BaseController implements ISettingsContr
       // Send response
       this.sendSuccessResponse(res, settings, 'System settings retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -158,7 +158,7 @@ export class SettingsController extends BaseController implements ISettingsContr
         existingSetting ? 'System setting updated successfully' : 'System setting created successfully'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 }

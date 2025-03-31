@@ -35,14 +35,49 @@ export class ExportUtils {
   /**
    * Generate Excel file from data
    * 
-   * Note: This is a placeholder. In a real implementation,
-   * you would use a library like xlsx to generate an Excel file.
+   * Note: This is a simplified implementation. In a production environment,
+   * you would likely use a more robust Excel library like exceljs or xlsx.
    */
   static async generateExcel(data: any[], sheetName: string = 'Data'): Promise<Buffer> {
     try {
-      // For now, return CSV as a placeholder
-      // In a real implementation, use xlsx or similar library
-      return this.generateCsv(data);
+      // Basic Excel XML format
+      const xmlHeader = '<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>';
+      const ssHeader = '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';
+      const ssFooter = '</Workbook>';
+      
+      // Start worksheet
+      let content = `${xmlHeader}${ssHeader}<Worksheet ss:Name="${sheetName}"><Table>`;
+      
+      // Add header row
+      if (data.length > 0) {
+        const headers = Object.keys(data[0]);
+        content += '<Row>';
+        for (const header of headers) {
+          content += `<Cell><Data ss:Type="String">${header}</Data></Cell>`;
+        }
+        content += '</Row>';
+        
+        // Add data rows
+        for (const row of data) {
+          content += '<Row>';
+          for (const header of headers) {
+            const cellValue = row[header];
+            if (typeof cellValue === 'number') {
+              content += `<Cell><Data ss:Type="Number">${cellValue}</Data></Cell>`;
+            } else if (cellValue instanceof Date) {
+              content += `<Cell><Data ss:Type="DateTime">${cellValue.toISOString()}</Data></Cell>`;
+            } else {
+              content += `<Cell><Data ss:Type="String">${cellValue !== null && cellValue !== undefined ? String(cellValue).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</Data></Cell>`;
+            }
+          }
+          content += '</Row>';
+        }
+      }
+      
+      // Close tags
+      content += '</Table></Worksheet>' + ssFooter;
+      
+      return Buffer.from(content, 'utf-8');
     } catch (error) {
       throw new Error(`Failed to generate Excel: ${error instanceof Error ? error.message : String(error)}`);
     }

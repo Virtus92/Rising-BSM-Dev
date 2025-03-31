@@ -16,6 +16,8 @@ export function validateSecurityConfig(logger: ILoggingService): void {
   if (IS_PRODUCTION) {
     const insecureSecrets = [
       'your-super-secret-key-change-in-production',
+      'test-secret-key-very-secure-for-testing',
+      'your-super-secret-refresh-key',
       'your-refresh-secret-key-change-in-production',
       'your-super-secret-development-key',
       'your-super-secret-refresh-key'

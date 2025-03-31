@@ -5,8 +5,9 @@
  * Defines methods for handling authentication-related HTTP requests.
  */
 import { Request, Response } from 'express';
+import { IBaseController } from './IBaseController.js';
 
-export interface IAuthController {
+export interface IAuthController extends IBaseController<any> {
   /**
    * Handle user login
    * 

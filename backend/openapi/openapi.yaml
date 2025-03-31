@@ -30,12 +30,12 @@ tags:
     description: User notification operations
   - name: Customers
     description: Customer management
-  - name: Projects
-    description: Project management
-  - name: Appointments
-    description: Appointment scheduling and management
-  - name: Services
-    description: Service management
+#  - name: Projects
+#    description: Project management
+#  - name: Appointments
+#    description: Appointment scheduling and management
+#  - name: Services
+#    description: Service management
   - name: Requests
     description: Contact request management
   - name: Profile
@@ -44,8 +44,8 @@ tags:
     description: Dashboard related operations
   - name: Settings
     description: User and system settings
-  - name: Public
-    description: Public accessible endpoints
+#  - name: Public
+#    description: Public accessible endpoints
   - name: System
     description: System and health check endpoints
 
@@ -228,12 +228,12 @@ paths:
     $ref: './paths/profile.yaml#/profile-me-activity'
 
   # Dashboard (Zur Zeit nicht implementiert)
-  # /dashboard:
-  #   $ref: './paths/dashboard.yaml#/dashboard'
-  # /dashboard/stats:
-  #   $ref: './paths/dashboard.yaml#/dashboard-stats'
-  # /dashboard/search:
-  #   $ref: './paths/dashboard.yaml#/dashboard-search'
+  /dashboard:
+    $ref: './paths/dashboard.yaml#/dashboard'
+  /dashboard/stats:
+    $ref: './paths/dashboard.yaml#/dashboard-stats'
+  /dashboard/search:
+    $ref: './paths/dashboard.yaml#/dashboard-search'
 
   # Settings
   /settings/user:

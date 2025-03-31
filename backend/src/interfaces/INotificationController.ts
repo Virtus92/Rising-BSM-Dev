@@ -5,8 +5,9 @@
  * Defines methods for handling notification-related HTTP requests.
  */
 import { Request, Response } from 'express';
+import { IBaseController } from './IBaseController.js';
 
-export interface INotificationController {
+export interface INotificationController extends IBaseController<any> {
   /**
    * Get user notifications
    * 

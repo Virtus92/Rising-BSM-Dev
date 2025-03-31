@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
+import { IBaseController } from './IBaseController.js';
 
 /**
  * Interface for ProfileController
  */
-export interface IProfileController {
+export interface IProfileController extends IBaseController<any> {
   /**
    * Get the profile of the current user
    */

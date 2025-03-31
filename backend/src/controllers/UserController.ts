@@ -7,33 +7,35 @@ import {
   UpdateUserDto, 
   ChangePasswordDto,
   UpdateUserStatusDto,
-  UserFilterParams 
+  UserFilterParams,
+  UserResponseDto 
 } from '../dtos/UserDtos.js';
 import { BaseController } from '../core/BaseController.js';
 import { IUserController } from '../interfaces/IUserController.js';
+import { User } from '../entities/User.js';
 
 /**
  * UserController
  * 
- * Controller for handling User-related HTTP requests.
- * Routes user requests to the appropriate service methods.
+ * Controller für die Bearbeitung von Benutzer-bezogenen HTTP-Anfragen.
+ * Leitet Benutzeranfragen an die entsprechenden Service-Methoden weiter.
  */
-export class UserController extends BaseController implements IUserController {
+export class UserController extends BaseController<User, CreateUserDto, UpdateUserDto, UserResponseDto> implements IUserController {
   /**
-   * Creates a new UserController instance
+   * Erstellt eine neue UserController-Instanz
    * 
-   * @param userService - User service
-   * @param logger - Logging service
-   * @param errorHandler - Error handler
+   * @param userService - Benutzer-Service
+   * @param logger - Logging-Service
+   * @param errorHandler - Fehlerbehandlung
    */
   constructor(
     private readonly userService: IUserService,
     logger: ILoggingService,
     errorHandler: IErrorHandler
   ) {
-    super(logger, errorHandler);
+    super(userService, logger, errorHandler);
     
-    // Bind methods to preserve 'this' context when used as route handlers
+    // Spezifische Methoden binden
     this.getAllUsers = this.getAllUsers.bind(this);
     this.getUserById = this.getUserById.bind(this);
     this.createUser = this.createUser.bind(this);
@@ -47,414 +49,259 @@ export class UserController extends BaseController implements IUserController {
     this.softDeleteUser = this.softDeleteUser.bind(this);
     this.hardDeleteUser = this.hardDeleteUser.bind(this);
     
-    this.logger.debug('Initialized UserController');
+    this.logger.debug('Initialisiert UserController');
   }
 
   /**
-   * Get all users
+   * Alle Benutzer abrufen
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async getAllUsers(req: Request, res: Response): Promise<void> {
-    try {
-      // Extract query parameters
-      const filters: UserFilterParams = {
-        search: req.query.search as string,
-        page: req.query.page ? parseInt(req.query.page as string) : undefined,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
-        sortBy: req.query.sortBy as string,
-        sortDirection: req.query.sortDirection as 'asc' | 'desc'
-      };
-      
-      // Get users from service
-      const result = await this.userService.findUsers(filters);
-      
-      // Send response
-      this.sendPaginatedResponse(
-        res, 
-        result.data, 
-        result.pagination, 
-        'Users retrieved successfully'
-      );
-    } catch (error) {
-      this.handleError(error, req, res);
-    }
+    return this.getAll(req, res);
   }
 
   /**
-   * Get user by ID
+   * Benutzer nach ID abrufen
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async getUserById(req: Request, res: Response): Promise<void> {
     try {
       const id = parseInt(req.params.id, 10);
       
-      // Get user details from service
+      // Benutzerdetails vom Service abrufen
       const user = await this.userService.getUserDetails(id);
       
       if (!user) {
-        throw this.errorHandler.createNotFoundError(`User with ID ${id} not found`);
+        throw this.errorHandler.createNotFoundError(`Benutzer mit ID ${id} nicht gefunden`);
       }
       
-      // Send response
-      this.sendSuccessResponse(res, user, 'User retrieved successfully');
+      // Antwort senden
+      this.sendSuccessResponse(res, user, 'Benutzer erfolgreich abgerufen');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
   /**
-   * Create a new user
+   * Neuen Benutzer erstellen
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async createUser(req: Request, res: Response): Promise<void> {
-    try {
-      const userData: CreateUserDto = req.body;
-      
-      // Ensure name is set if firstName and lastName are provided
-      if (!userData.name && userData.firstName && userData.lastName) {
-        userData.name = `${userData.firstName} ${userData.lastName}`;
-      }
-      
-      // Get authenticated user info
-      const userId = (req as any).user?.id;
-      
-      // Create user with context
-      const user = await this.userService.create(userData, {
-        context: {
-          userId,
-          ipAddress: req.ip
-        }
-      });
-      
-      // Send response
-      this.sendCreatedResponse(res, user, 'User created successfully');
-    } catch (error) {
-      this.handleError(error, req, res);
-    }
+    return this.create(req, res);
   }
 
   /**
-   * Update an existing user
+   * Bestehenden Benutzer aktualisieren
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async updateUser(req: Request, res: Response): Promise<void> {
-    try {
-      const id = parseInt(req.params.id, 10);
-      const userData: UpdateUserDto = req.body;
-      
-      // Ensure name is set if firstName and lastName are provided
-      if (userData.firstName && userData.lastName) {
-        userData.name = `${userData.firstName} ${userData.lastName}`;
-      }
-      
-      // Get authenticated user info
-      const userId = (req as any).user?.id;
-      
-      // Update user with context
-      const user = await this.userService.update(id, userData, {
-        context: {
-          userId,
-          ipAddress: req.ip
-        }
-      });
-      
-      // Send response
-      this.sendSuccessResponse(res, user, 'User updated successfully');
-    } catch (error) {
-      this.handleError(error, req, res);
-    }
+    return this.update(req, res);
   }
 
   /**
-   * Delete a user
+   * Benutzer löschen
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async deleteUser(req: Request, res: Response): Promise<void> {
-    try {
-      const id = parseInt(req.params.id, 10);
-      
-      // Get authenticated user info
-      const userId = (req as any).user?.id;
-      
-      // Check if trying to delete self
-      if (id === userId) {
-        throw this.errorHandler.createError('Cannot delete your own account', 400);
-      }
-      
-      // Delete user with context
-      const success = await this.userService.delete(id, {
-        context: {
-          userId,
-          ipAddress: req.ip
-        }
-      });
-      
-      // Send response
-      this.sendSuccessResponse(
-        res, 
-        { id, deleted: success }, 
-        'User deleted successfully'
-      );
-    } catch (error) {
-      this.handleError(error, req, res);
-    }
+    return this.delete(req, res);
   }
 
   /**
-   * Update user status
+   * Benutzerstatus aktualisieren
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async updateUserStatus(req: Request, res: Response): Promise<void> {
     try {
       const id = parseInt(req.params.id, 10);
       const statusData: UpdateUserStatusDto = req.body;
       
-      // Get authenticated user info
-      const userId = (req as any).user?.id;
+      // Authentifizierten Benutzer abrufen
+      const user = this.getAuthenticatedUser(req);
       
-      // Check if trying to update self
-      if (id === userId) {
-        throw this.errorHandler.createError('Cannot update your own status', 400);
+      // Prüfen, ob versucht wird, eigenen Status zu aktualisieren
+      if (id === user?.id) {
+        throw this.errorHandler.createError('Eigener Status kann nicht aktualisiert werden', 400);
       }
       
-      // Update status with context
-      const user = await this.userService.updateStatus(id, statusData, {
+      // Status mit Kontext aktualisieren
+      const updatedUser = await this.userService.updateStatus(id, statusData, {
         context: {
-          userId,
+          userId: user?.id,
           ipAddress: req.ip
         }
       });
       
-      // Send response
-      this.sendSuccessResponse(res, user, 'User status updated successfully');
+      // Antwort senden
+      this.sendSuccessResponse(res, updatedUser, 'Benutzerstatus erfolgreich aktualisiert');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
   /**
-   * Change user password
+   * Benutzerpasswort ändern
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async changePassword(req: Request, res: Response): Promise<void> {
     try {
       const id = parseInt(req.params.id, 10);
       const passwordData: ChangePasswordDto = req.body;
       
-      // Get authenticated user info
-      const userId = (req as any).user?.id;
+      // Authentifizierten Benutzer abrufen
+      const user = this.getAuthenticatedUser(req);
       
-      // Check if authorized to change this password
-      if (id !== userId && (req as any).user?.role !== 'admin') {
-        throw this.errorHandler.createForbiddenError('Not authorized to change password for this user');
+      // Prüfen, ob berechtigt, dieses Passwort zu ändern
+      if (id !== user?.id && user?.role !== 'admin') {
+        throw this.errorHandler.createForbiddenError('Nicht berechtigt, das Passwort für diesen Benutzer zu ändern');
       }
       
-      // Change password with context
+      // Passwort mit Kontext ändern
       const success = await this.userService.changePassword(id, passwordData, {
         context: {
-          userId,
+          userId: user?.id,
           ipAddress: req.ip
         }
       });
       
-      // Send response
+      // Antwort senden
       this.sendSuccessResponse(
-        res, 
-        { changed: success }, 
-        'Password changed successfully'
+        res,
+        { changed: success },
+        'Passwort erfolgreich geändert'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
   /**
-   * Search users
+   * Nach Benutzern suchen
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async searchUsers(req: Request, res: Response): Promise<void> {
-    try {
-      const searchText = req.query.q as string;
-      const page = req.query.page ? parseInt(req.query.page as string) : 1;
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-      
-      if (!searchText || searchText.length < 2) {
-        throw this.errorHandler.createValidationError('Invalid search term', ['Search text must be at least 2 characters']);
-      }
-      
-      // Search users with pagination
-      const users = await this.userService.searchUsers(searchText, {
-        page,
-        limit
-      });
-      
-      // Send response
-      this.sendSuccessResponse(res, users, 'Users found successfully');
-    } catch (error) {
-      this.handleError(error, req, res);
-    }
+    return this.search(req, res);
   }
 
   /**
-   * Get user statistics
+   * Benutzerstatistiken abrufen
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async getUserStatistics(req: Request, res: Response): Promise<void> {
     try {
-      // Get statistics from service
+      // Statistiken vom Service abrufen
       const statistics = await this.userService.getUserStatistics();
       
-      // Send response
-      this.sendSuccessResponse(res, statistics, 'User statistics retrieved successfully');
+      // Antwort senden
+      this.sendSuccessResponse(res, statistics, 'Benutzerstatistiken erfolgreich abgerufen');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
   /**
-   * Bulk update multiple users
+   * Mehrere Benutzer gleichzeitig aktualisieren
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async bulkUpdateUsers(req: Request, res: Response): Promise<void> {
-    try {
-      const { userIds, data } = req.body;
-      
-      // Get authenticated user info
-      const userId = (req as any).user?.id;
-      
-      // Validate input
-      if (!Array.isArray(userIds) || userIds.length === 0) {
-        throw this.errorHandler.createValidationError('Invalid user IDs', ['User IDs must be a non-empty array']);
-      }
-      
-      if (!data || Object.keys(data).length === 0) {
-        throw this.errorHandler.createValidationError('Invalid update data', ['Update data is required']);
-      }
-      
-      // Prevent users from updating their own role or status
-      if (userIds.includes(userId) && (data.role !== undefined || data.status !== undefined)) {
-        throw this.errorHandler.createForbiddenError('Cannot update your own role or status');
-      }
-      
-      // Call service to bulk update users
-      const updatedCount = await this.userService.bulkUpdate(userIds, data, {
-        context: {
-          userId,
-          ipAddress: req.ip
-        }
-      });
-      
-      // Send success response
-      this.sendSuccessResponse(
-        res,
-        { 
-          count: updatedCount,
-          ids: userIds
-        },
-        `${updatedCount} users updated successfully`
-      );
-    } catch (error) {
-      this.handleError(error, req, res);
-    }
+    return this.bulkUpdate(req, res);
   }
 
   /**
-   * Soft delete a user (marks as deleted)
+   * Benutzer als gelöscht markieren (Soft Delete)
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async softDeleteUser(req: Request, res: Response): Promise<void> {
     try {
       const id = parseInt(req.params.id, 10);
       
-      // Get authenticated user info
-      const userId = (req as any).user?.id;
+      // Authentifizierten Benutzer abrufen
+      const user = this.getAuthenticatedUser(req);
       
-      // Check if trying to delete self
-      if (id === userId) {
-        throw this.errorHandler.createError('Cannot delete your own account', 400);
+      // Prüfen, ob versucht wird, sich selbst zu löschen
+      if (id === user?.id) {
+        throw this.errorHandler.createError('Eigenes Konto kann nicht gelöscht werden', 400);
       }
       
-      // Soft delete user with context
+      // Benutzer mit Kontext als gelöscht markieren
       const success = await this.userService.softDelete(id, {
         context: {
-          userId,
+          userId: user?.id,
           ipAddress: req.ip
         }
       });
       
-      // Send response
+      // Antwort senden
       this.sendSuccessResponse(
-        res, 
-        { id, deleted: success }, 
-        'User marked as deleted successfully'
+        res,
+        { id, deleted: success },
+        'Benutzer erfolgreich als gelöscht markiert'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
   /**
-   * Hard delete a user (permanently removes)
+   * Benutzer dauerhaft löschen (Hard Delete)
    * 
-   * @param req - HTTP request
-   * @param res - HTTP response
+   * @param req - HTTP-Anfrage
+   * @param res - HTTP-Antwort
    */
   async hardDeleteUser(req: Request, res: Response): Promise<void> {
     try {
       const id = parseInt(req.params.id, 10);
       
-      // Get authenticated user info
-      const userId = (req as any).user?.id;
-      const userRole = (req as any).user?.role;
+      // Authentifizierten Benutzer abrufen
+      const user = this.getAuthenticatedUser(req);
       
-      // Check if trying to delete self
-      if (id === userId) {
-        throw this.errorHandler.createError('Cannot delete your own account', 400);
+      // Prüfen, ob versucht wird, sich selbst zu löschen
+      if (id === user?.id) {
+        throw this.errorHandler.createError('Eigenes Konto kann nicht gelöscht werden', 400);
       }
       
-      // Only administrators can hard delete users
-      if (userRole !== 'admin') {
-        throw this.errorHandler.createForbiddenError('Only administrators can permanently delete users');
+      // Nur Administratoren können Benutzer dauerhaft löschen
+      if (user?.role !== 'admin') {
+        throw this.errorHandler.createForbiddenError('Nur Administratoren können Benutzer dauerhaft löschen');
       }
       
-      // Hard delete user with context
+      // Benutzer mit Kontext dauerhaft löschen
       const success = await this.userService.hardDelete(id, {
         context: {
-          userId,
+          userId: user?.id,
           ipAddress: req.ip
         }
       });
       
-      // Send response
+      // Antwort senden
       this.sendSuccessResponse(
-        res, 
-        { id, deleted: success }, 
-        'User permanently deleted successfully'
+        res,
+        { id, deleted: success },
+        'Benutzer erfolgreich dauerhaft gelöscht'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 }

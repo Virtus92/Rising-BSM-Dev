@@ -85,6 +85,7 @@ model RefreshToken {
   revokedByIp     String?
   replacedByToken String?
   
+  // Relation to User model (assuming you have a User model)
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -119,8 +120,8 @@ model Customer {
   type         String         @default("private") @db.VarChar(20)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
-  createdBy    Int? 
-  updatedBy    Int?
+  createdBy    Int?           // Benutzer-ID, der den Kunden erstellt hat
+  updatedBy    Int?           // Benutzer-ID, der den Kunden zuletzt aktualisiert hat
   projects     Project[]
   appointments Appointment[]
   invoices     Invoice[]
@@ -316,6 +317,17 @@ model ContactRequest {
   notes       RequestNote[]
 }
 
+// Legacy table kept for backward compatibility
+model OldContactRequest {
+  id        BigInt   @id
+  name      String?
+  email     String?
+  phone     String?
+  service   String?
+  message   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+}
+
 model RequestNote {
   id        Int           @id @default(autoincrement())
   requestId Int
@@ -350,6 +362,6 @@ model Notification {
   read          Boolean   @default(false)
   createdAt     DateTime  @default(now()) @db.Timestamp(6)
   updatedAt     DateTime  @updatedAt
-  createdBy     Int?
-  updatedBy     Int?
+  createdBy     Int?      // Benutzer-ID, der die Benachrichtigung erstellt hat
+  updatedBy     Int?      // Benutzer-ID, der die Benachrichtigung zuletzt aktualisiert hat
 }

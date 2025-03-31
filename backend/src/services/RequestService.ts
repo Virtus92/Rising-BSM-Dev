@@ -1,43 +1,35 @@
-import { PrismaClient, ContactRequest } from '@prisma/client';
+import { ContactRequest } from '../entities/ContactRequest.js';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
+import { IRequestService } from '../interfaces/IRequestService.js';
 import { 
-  IRequestService, 
   CreateRequestDto, 
+  UpdateRequestDto,
   UpdateRequestStatusDto, 
   AddRequestNoteDto,
   RequestFilterParams,
-  PaginatedRequests,
-  ServiceOptions,
+  PaginatedRequestsResponse,
+  RequestResponseDto,
   AssignRequestDto,
   BatchUpdateStatusDto
-} from '../interfaces/IRequestService.js';
+} from '../dtos/RequestDtos.js';
+
+/**
+ * Extended DTO with additional UI display properties
+ */
+interface EnhancedRequestResponseDto extends RequestResponseDto {
+  serviceLabel?: string;
+  statusClass?: string;
+  formattedDate?: string;
+  notes?: any[];
+  processor?: any;
+}
+import { ServiceOptions, FilterCriteria } from '../interfaces/IBaseService.js';
 import { NotificationEventManager, NotificationEventType } from '../events/NotificationEventManager.js';
 import { ExportUtils } from '../utils/export-utils.js';
 import { ValidationUtils } from '../utils/validation-utils.js';
 import { ContactRequestCreatedEvent } from '../interfaces/INotificationEvents.js';
-
-/**
- * Utility class to map API field names to Prisma schema field names
- */
-class FieldMapper {
-  // Map from API field names (typically snake_case) to Prisma field names (camelCase)
-  private static fieldMap: Record<string, string> = {
-    'created_at': 'createdAt',
-    'updated_at': 'updatedAt',
-    'processor_id': 'processorId',
-    'ip_address': 'ipAddress'
-  };
-
-  /**
-   * Maps an API field name to the corresponding Prisma schema field name
-   * @param apiField - The field name from the API (e.g., 'created_at')
-   * @returns The corresponding Prisma field name (e.g., 'createdAt')
-   */
-  public static toPrismaField(apiField: string): string {
-    return this.fieldMap[apiField] || apiField;
-  }
-}
+import { IRequestRepository } from '../interfaces/IRequestRepository.js';
 
 /**
  * Service for managing contact requests
@@ -47,7 +39,7 @@ export class RequestService implements IRequestService {
    * Creates a new RequestService instance
    */
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly requestRepository: IRequestRepository,
     private readonly logger: ILoggingService,
     private readonly errorHandler: IErrorHandler
   ) {
@@ -65,16 +57,12 @@ export class RequestService implements IRequestService {
       const context = options?.context;
       
       // Create contact request
-      const contactRequest = await this.prisma.contactRequest.create({
-        data: {
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          service: data.service,
-          message: data.message,
-          status: 'neu',
-          ipAddress: context?.ipAddress
-        }
+      const contactRequest = await this.requestRepository.create({
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        service: data.service,
+        message: data.message
       });
 
       this.logger.info(
@@ -83,7 +71,7 @@ export class RequestService implements IRequestService {
       );
       
       // Get all administrators to notify about new contact request
-      const admins = await this.prisma.user.findMany({
+      const admins = await this.requestRepository.getPrismaClient().user.findMany({
         where: {
           role: 'admin',
           status: 'active'
@@ -92,7 +80,7 @@ export class RequestService implements IRequestService {
       
       if (admins.length > 0) {
         // Emit notification event for each admin
-        admins.forEach(admin => {
+        admins.forEach((admin: any) => {
           NotificationEventManager.getInstance().emit(
             NotificationEventType.CONTACT_REQUEST_CREATED,
             {
@@ -118,130 +106,31 @@ export class RequestService implements IRequestService {
    */
   async getRequests(
     filters: RequestFilterParams
-  ): Promise<PaginatedRequests> {
+  ): Promise<PaginatedRequestsResponse> {
     try {
-      const {
-        status,
-        service,
-        date,
-        search,
-        page = 1,
-        limit = 20,
-        sortBy = 'createdAt', // Default sort field
-        sortDirection = 'desc' // Default sort direction
-      } = filters;
-      
-      // Map API field name to Prisma schema field name
-      const prismaSortField = FieldMapper.toPrismaField(sortBy);
-
-      // Build where condition
-      const where: any = {};
-
-      if (status) {
-        where.status = status;
+      // Standardwerte setzen
+      if (!filters.sortBy) {
+        filters.sortBy = 'createdAt';
       }
       
-      if (service) {
-        where.service = service;
-      }
-
-      if (date) {
-        const dateObj = new Date(date);
-        const nextDay = new Date(dateObj);
-        nextDay.setDate(nextDay.getDate() + 1);
-        
-        where.createdAt = {
-          gte: dateObj,
-          lt: nextDay
-        };
-      }
-
-      if (search) {
-        where.OR = [
-          { name: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
-          { message: { contains: search, mode: 'insensitive' } }
-        ];
-      }
-
-      // Count total matching records
-      const total = await this.prisma.contactRequest.count({ where });
-
-      // Calculate pagination
-      const skip = (page - 1) * limit;
-      const totalPages = Math.ceil(total / limit);
-
-      // Get paginated data
-      const contactRequests = await this.prisma.contactRequest.findMany({
-        where,
-        orderBy: {
-          // Use mapped field name for Prisma schema
-          [prismaSortField]: sortDirection
-        },
-        skip,
-        take: limit,
-        include: {
-          notes: {
-            select: {
-              id: true,
-              userId: true,
-              userName: true,
-              text: true,
-              createdAt: true
-            },
-            orderBy: {
-              createdAt: 'desc'
-            },
-            take: 3 // Only include the 3 most recent notes
-          }
-        }
-      });
+      // Die Konvertierung von snake_case zu camelCase erfolgt jetzt in der Repository-Klasse
       
-      // Enhance data with additional formatting
-      const data = contactRequests.map(request => ({
+      const result = await this.requestRepository.findWithFilters(filters);
+      
+      // Add formatting enhancements to data if needed
+      const enhancedData = result.data.map((request: any) => ({
         ...request,
-        serviceLabel: this.getServiceLabel(request.service),
-        statusLabel: this.getStatusLabel(request.status),
         statusClass: this.getStatusClass(request.status),
+        serviceLabel: this.getServiceLabel(request.service),
         formattedDate: this.formatDate(request.createdAt)
       }));
 
       return {
-        data,
-        pagination: {
-          total,
-          page,
-          limit,
-          totalPages
-        },
-        meta: {
-          filters: {
-            status,
-            service,
-            date,
-            search
-          }
-        }
+        data: enhancedData,
+        pagination: result.pagination
       };
     } catch (error) {
-      // Enhanced error logging with more context
-      const sortField = filters.sortBy ? FieldMapper.toPrismaField(filters.sortBy) : 'createdAt';
-      this.logger.error('Error getting contact requests', error instanceof Error ? error : String(error), {
-        filters,
-        sortField
-      });
-      
-      // Handle Prisma validation errors more gracefully
-      if (error instanceof Error && error.name === 'PrismaClientValidationError') {
-        const message = error instanceof Error && error.message.includes('Unknown argument') 
-          ? 'Invalid sort field. Please check your query parameters.'
-          : error instanceof Error ? error.message : 'An error occurred';
-        
-        throw this.errorHandler.createValidationError(message, [
-          'Check that sortBy parameter uses valid field names.'
-        ]);
-      }
-      
+      this.logger.error('Error getting contact requests', error instanceof Error ? error : String(error));
       throw error;
     }
   }
@@ -249,46 +138,23 @@ export class RequestService implements IRequestService {
   /**
    * Get contact request by ID
    */
-  async getRequestById(id: number): Promise<any> {
+  async getRequestById(id: number): Promise<EnhancedRequestResponseDto> {
     try {
-      // Ensure id is a valid integer
+      // Validate ID format
       const requestId = parseInt(String(id), 10);
       if (isNaN(requestId)) {
         throw this.errorHandler.createValidationError(`Invalid ID: ${id}`, ['ID must be a valid integer']);
       }
       
-      const contactRequest = await this.prisma.contactRequest.findUnique({
-        where: { id: requestId },
-        include: {
-          notes: {
-            select: {
-              id: true,
-              userId: true,
-              userName: true,
-              text: true,
-              createdAt: true
-            },
-            orderBy: {
-              createdAt: 'desc'
-            }
-          }
-        }
-      });
-
-      if (!contactRequest) {
-        throw this.errorHandler.createNotFoundError(`Contact request with ID ${id} not found`);
-      }
+      // Use repository to fetch request with notes
+      const contactRequest = await this.requestRepository.findByIdWithNotes(requestId);
       
       // Get processor details if assigned
       let processor = null;
-      if (contactRequest.processorId) {
-        // Ensure processor ID is a valid integer
-        const processorId = parseInt(String(contactRequest.processorId), 10);
-        if (isNaN(processorId)) {
-          throw this.errorHandler.createValidationError(`Invalid processor ID: ${contactRequest.processorId}`, ['Processor ID must be a valid integer']);
-        }
+      if (contactRequest.processorId !== undefined && contactRequest.processorId !== null) {
+        const processorId = contactRequest.processorId;
         
-        const user = await this.prisma.user.findUnique({
+        const user = await this.requestRepository.getPrismaClient().user.findUnique({
           where: { id: processorId },
           select: {
             id: true,
@@ -308,16 +174,16 @@ export class RequestService implements IRequestService {
         statusLabel: this.getStatusLabel(contactRequest.status),
         statusClass: this.getStatusClass(contactRequest.status),
         formattedDate: this.formatDate(contactRequest.createdAt),
-        notes: contactRequest.notes.map(note => ({
+        notes: (contactRequest as any).notes ? (contactRequest as any).notes.map((note: any) => ({
           ...note,
           formattedDate: this.formatDate(note.createdAt)
-        })),
+        })) : [],
         processor
       };
 
       return enhancedRequest;
     } catch (error) {
-      this.logger.error(`Error getting contact request: ${id}`, error instanceof Error ? error : String(error));
+      this.logger.error(`Error getting contact request: ${id}`, error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -340,46 +206,39 @@ export class RequestService implements IRequestService {
       }
       
       // Check if contact request exists
-      const contactRequest = await this.prisma.contactRequest.findUnique({
-        where: { id: requestId }
-      });
+      const contactRequest = await this.requestRepository.findById(requestId);
 
       if (!contactRequest) {
         throw this.errorHandler.createNotFoundError(`Contact request with ID ${id} not found`);
       }
 
       // Update contact request status
-      const updatedRequest = await this.prisma.contactRequest.update({
-        where: { id: requestId },
-        data: {
-          status: data.status,
-          processorId: context?.userId || contactRequest.processorId
-        }
+      const updatedRequest = await this.requestRepository.update(requestId, {
+        status: data.status,
+        processorId: context?.userId || contactRequest.processorId
       });
 
-      // Create log entry
-      await this.prisma.requestLog.create({
-        data: {
-          requestId: id,
-          userId: context?.userId || 0,
-          userName: 'System',
-          action: `Status updated to ${data.status}`,
-          details: data.note ? `Status updated with note: ${data.note}` : `Status changed from ${contactRequest.status} to ${data.status}`,
-          createdAt: new Date()
-        }
-      });
+      // Create log entry for this action
+      const logDetails = data.note ? 
+        `Status updated with note: ${data.note}` : 
+        `Status changed from ${contactRequest.status} to ${data.status}`;
+      
+      await this.requestRepository.createLogEntry(
+        id,
+        context?.userId || 0,
+        'System',
+        `Status updated to ${data.status}`,
+        logDetails
+      );
       
       // Add note if provided
       if (data.note) {
-        await this.prisma.requestNote.create({
-          data: {
-            requestId: id,
-            userId: context?.userId || 0,
-            userName: 'System',
-            text: data.note,
-            createdAt: new Date()
-          }
-        });
+        await this.requestRepository.addNote(
+          id,
+          context?.userId || 0,
+          'System',
+          data.note
+        );
       }
 
       this.logger.info(
@@ -411,39 +270,31 @@ export class RequestService implements IRequestService {
       }
       
       // Check if contact request exists
-      const contactRequest = await this.prisma.contactRequest.findUnique({
-        where: { id: requestId }
-      });
+      const contactRequest = await this.requestRepository.findById(requestId);
 
       if (!contactRequest) {
         throw this.errorHandler.createNotFoundError(`Contact request with ID ${data.requestId} not found`);
       }
 
-      // Create note
-      const note = await this.prisma.requestNote.create({
-        data: {
-          requestId: data.requestId,
-          userId: data.userId,
-          userName: data.userName,
-          text: data.text,
-          createdAt: new Date()
-        }
-      });
+      // Create note using repository
+      const note = await this.requestRepository.addNote(
+        requestId,
+        data.userId ?? 0,
+        data.userName ?? 'System',
+        data.text
+      );
 
       // Create log entry
-      await this.prisma.requestLog.create({
-        data: {
-          requestId: data.requestId,
-          userId: data.userId,
-          userName: data.userName,
-          action: 'Note added',
-          details: `Note added to contact request ${data.requestId}`,
-          createdAt: new Date()
-        }
-      });
+      await this.requestRepository.createLogEntry(
+        requestId,
+        data.userId ?? 0,
+        data.userName ?? 'System',
+        'Note added',
+        `Note added to contact request ${requestId}`
+      );
 
       this.logger.info(
-        `Note added to contact request ${data.requestId}`, 
+        `Note added to contact request ${requestId}`, 
         { userId: context?.userId, ipAddress: context?.ipAddress }
       );
 
@@ -472,22 +323,16 @@ export class RequestService implements IRequestService {
       }
       
       // Check if contact request exists
-      const contactRequest = await this.prisma.contactRequest.findUnique({
-        where: { id: requestId }
-      });
+      const contactRequest = await this.requestRepository.findById(requestId);
 
       if (!contactRequest) {
         throw this.errorHandler.createNotFoundError(`Contact request with ID ${id} not found`);
       }
 
       // Check if processor exists
-      // Ensure processor ID is a valid integer
-      const processorId = parseInt(String(data.processorId), 10);
-      if (isNaN(processorId)) {
-        throw this.errorHandler.createValidationError(`Invalid processor ID: ${data.processorId}`, ['Processor ID must be a valid integer']);
-      }
+      const processorId = data.processorId;
       
-      const processor = await this.prisma.user.findUnique({
+      const processor = await this.requestRepository.getPrismaClient().user.findUnique({
         where: { id: processorId }
       });
 
@@ -495,26 +340,17 @@ export class RequestService implements IRequestService {
         throw this.errorHandler.createNotFoundError(`User with ID ${data.processorId} not found`);
       }
 
-      // Update contact request with processor
-      const updatedRequest = await this.prisma.contactRequest.update({
-        where: { id: requestId },
-        data: {
-          processorId: data.processorId,
-          status: contactRequest.status === 'neu' ? 'in_bearbeitung' : contactRequest.status,
-        }
-      });
+      // Update contact request with processor using repository
+      const updatedRequest = await this.requestRepository.updateProcessor(requestId, data.processorId);
 
       // Create log entry
-      await this.prisma.requestLog.create({
-        data: {
-          requestId: id,
-          userId: context?.userId || 0,
-          userName: processor.name,
-          action: 'Assigned',
-          details: `Contact request assigned to ${processor.name}`,
-          createdAt: new Date()
-        }
-      });
+      await this.requestRepository.createLogEntry(
+        id,
+        context?.userId || 0,
+        processor.name,
+        'Assigned',
+        `Contact request assigned to ${processor.name}`
+      );
 
       this.logger.info(
         `Contact request ${id} assigned to processor ${data.processorId}`, 
@@ -546,43 +382,28 @@ export class RequestService implements IRequestService {
         throw this.errorHandler.createValidationError('No IDs provided', ['At least one ID must be provided']);
       }
       
-      // Update all matching request statuses
-      const updateResult = await this.prisma.contactRequest.updateMany({
-        where: {
-          id: {
-            in: data.ids
-          }
-        },
-        data: {
-          status: data.status,
-          processorId: context?.userId
-        }
-      });
+      // Update all matching request statuses using repository
+      const updateResult = await this.requestRepository.batchUpdateStatus(data.ids, data.status);
       
       // Create log entries for each request
       for (const id of data.ids) {
-        await this.prisma.requestLog.create({
-          data: {
-            requestId: id,
-            userId: context?.userId || 0,
-            userName: 'System',
-            action: `Batch status update to ${data.status}`,
-            details: data.note ? `Status updated with note: ${data.note}` : `Status updated to ${data.status}`,
-            createdAt: new Date()
-          }
-        });
+        // Create log entry
+        await this.requestRepository.createLogEntry(
+          id,
+          context?.userId || 0,
+          'System',
+          `Batch status update to ${data.status}`,
+          data.note ? `Status updated with note: ${data.note}` : `Status updated to ${data.status}`
+        );
         
         // Add note if provided
         if (data.note) {
-          await this.prisma.requestNote.create({
-            data: {
-              requestId: id,
-              userId: context?.userId || 0,
-              userName: 'System',
-              text: data.note,
-              createdAt: new Date()
-            }
-          });
+          await this.requestRepository.addNote(
+            id,
+            context?.userId || 0,
+            'System',
+            data.note
+          );
         }
       }
       
@@ -609,20 +430,16 @@ export class RequestService implements IRequestService {
     filters: RequestFilterParams
   ): Promise<Buffer> {
     try {
-      // Get sort field with proper mapping
-      const sortBy = filters.sortBy || 'createdAt';
-      const sortField = FieldMapper.toPrismaField(sortBy);
-      
-      // Get requests data without pagination (for export)
-      const contactRequests = await this.prisma.contactRequest.findMany({
-        where: this.buildFilterWhere(filters),
-        orderBy: {
-          [sortField]: filters.sortDirection || 'desc'
-        }
+      // Get all requests without pagination for export
+      // We'll get everything first, then format and export
+      const result = await this.requestRepository.findWithFilters({
+        ...filters,
+        page: 1,
+        limit: 1000 // Using a high limit to get all results
       });
       
       // Prepare data for export
-      const exportData = contactRequests.map(request => ({
+      const exportData = result.data.map(request => ({
         ID: request.id,
         Name: request.name,
         Email: request.email,
@@ -647,59 +464,138 @@ export class RequestService implements IRequestService {
       throw error;
     }
   }
-  
-  // Helper Methods
+
+  // Implementation of IBaseService interface methods
   
   /**
-   * Build where condition for filters
+   * Get all entities with pagination
    */
-  private buildFilterWhere(filters: RequestFilterParams): any {
-    const where: any = {};
-    
-    // No need for local mapping here, using FieldMapper utility
-    
-    if (filters.status) {
-      where.status = filters.status;
-    }
-    
-    if (filters.service) {
-      where.service = filters.service;
-    }
-    
-    if (filters.date) {
-      const dateObj = new Date(filters.date);
-      const nextDay = new Date(dateObj);
-      nextDay.setDate(nextDay.getDate() + 1);
-      
-      where.createdAt = {
-        gte: dateObj,
-        lt: nextDay
-      };
-    } else if (filters.startDate && filters.endDate) {
-      where.createdAt = {
-        gte: new Date(filters.startDate),
-        lte: new Date(filters.endDate)
-      };
-    } else if (filters.startDate) {
-      where.createdAt = {
-        gte: new Date(filters.startDate)
-      };
-    } else if (filters.endDate) {
-      where.createdAt = {
-        lte: new Date(filters.endDate)
-      };
-    }
-    
-    if (filters.search) {
-      where.OR = [
-        { name: { contains: filters.search, mode: 'insensitive' } },
-        { email: { contains: filters.search, mode: 'insensitive' } },
-        { message: { contains: filters.search, mode: 'insensitive' } }
-      ];
-    }
-    
-    return where;
+  async getAll(options?: ServiceOptions): Promise<PaginatedRequestsResponse> {
+    return this.getRequests({
+      page: options?.page,
+      limit: options?.limit,
+      sortBy: options?.sort?.field,
+      sortDirection: options?.sort?.direction === 'DESC' ? 'desc' : 'asc'
+    });
   }
+  
+  /**
+   * Get entity by ID
+   */
+  async getById(id: number, options?: ServiceOptions): Promise<RequestResponseDto | null> {
+    return this.getRequestById(id);
+  }
+  
+  /**
+   * Create a new entity
+   */
+  async create(data: CreateRequestDto, options?: ServiceOptions): Promise<RequestResponseDto> {
+    const request = await this.createRequest(data, options);
+    return this.toDTO(request);
+  }
+  
+  /**
+   * Update an entity
+   */
+  async update(id: number, data: UpdateRequestDto, options?: ServiceOptions): Promise<RequestResponseDto> {
+    // If status is provided, use updateRequestStatus
+    if (data.status) {
+      const request = await this.updateRequestStatus(id, { status: data.status }, options);
+      return this.toDTO(request);
+    }
+    
+    // Otherwise perform a regular update
+    const existingRequest = await this.requestRepository.findById(id);
+    if (!existingRequest) {
+      throw this.errorHandler.createNotFoundError(`Contact request with ID ${id} not found`);
+    }
+    
+    const updatedRequest = await this.requestRepository.update(id, data);
+    return this.toDTO(updatedRequest);
+  }
+  
+  /**
+   * Delete an entity (not implemented for requests)
+   */
+  async delete(id: number, options?: ServiceOptions): Promise<boolean> {
+    // Contact requests are not deletable
+    throw this.errorHandler.createValidationError(
+      'Operation not supported', 
+      ['Contact requests cannot be deleted']
+    );
+  }
+  
+  /**
+   * Find entities by criteria
+   */
+  async findByCriteria(criteria: FilterCriteria, options?: ServiceOptions): Promise<RequestResponseDto[]> {
+    const result = await this.getRequests({
+      ...criteria as RequestFilterParams,
+      page: options?.page,
+      limit: options?.limit
+    });
+    
+    return result.data;
+  }
+  
+  /**
+   * Validate entity data
+   */
+  async validate(data: CreateRequestDto | UpdateRequestDto, isUpdate?: boolean): Promise<void> {
+    const errors: string[] = [];
+    
+    // Check required fields for new requests
+    if (!isUpdate) {
+      if (!data.name) errors.push('Name is required');
+      if (!data.email) errors.push('Email is required');
+      if (!data.service) errors.push('Service is required');
+      if (!data.message) errors.push('Message is required');
+    }
+    
+    // Validate email if provided
+    if (data.email && !this.isValidEmail(data.email)) {
+      errors.push('Email format is invalid');
+    }
+    
+    // Validate phone if provided
+    if (data.phone && !this.isValidPhone(data.phone)) {
+      errors.push('Phone format is invalid');
+    }
+    
+    if (errors.length > 0) {
+      throw this.errorHandler.createValidationError('Validation failed', errors);
+    }
+  }
+  
+  /**
+   * Transform entity to DTO
+   */
+  toDTO(entity: ContactRequest): RequestResponseDto {
+    return {
+      id: entity.id,
+      name: entity.name,
+      email: entity.email,
+      phone: entity.phone,
+      service: entity.service,
+      serviceLabel: this.getServiceLabel(entity.service!), // Added non-null assertion
+      message: entity.message,
+      status: entity.status,
+      statusLabel: this.getStatusLabel(entity.status),
+      processorId: entity.processorId,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt
+    };
+  }
+  
+  /**
+   * Execute within transaction - not implemented
+   */
+  async transaction<R>(callback: (service: IRequestService) => Promise<R>): Promise<R> {
+    // Simple implementation without actual transaction support
+    return callback(this);
+  }
+  
+  // Helper Methods
   
   /**
    * Get formatted service label
@@ -754,5 +650,21 @@ export class RequestService implements IRequestService {
       month: '2-digit',
       year: 'numeric'
     });
+  }
+
+  /**
+   * Check if email is valid
+   */
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+  
+  /**
+   * Check if phone number is valid
+   */
+  private isValidPhone(phone: string): boolean {
+    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/;
+    return phoneRegex.test(phone);
   }
 }

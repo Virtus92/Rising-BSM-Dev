@@ -8,15 +8,17 @@ import {
   CustomerUpdateDto, 
   CustomerStatusUpdateDto,
   CustomerNoteCreateDto,
-  CustomerFilterParams
+  CustomerFilterParams,
+  CustomerResponseDto
 } from '../dtos/CustomerDtos.js';
 import { AuthenticatedRequest } from '../interfaces/IAuthTypes.js';
 import { BaseController } from '../core/BaseController.js';
+import { Customer } from '../entities/Customer.js';
 
 /**
  * Implementation of ICustomerController
  */
-export class CustomerController extends BaseController implements ICustomerController {
+export class CustomerController extends BaseController<Customer, CustomerCreateDto, CustomerUpdateDto, CustomerResponseDto> implements ICustomerController {
   /**
    * Creates a new CustomerController instance
    * 
@@ -29,7 +31,7 @@ export class CustomerController extends BaseController implements ICustomerContr
     logger: ILoggingService,
     errorHandler: IErrorHandler
   ) {
-    super(logger, errorHandler);
+    super(customerService, logger, errorHandler);
     
     // Bind methods to preserve 'this' context when used as route handlers
     this.getAllCustomers = this.getAllCustomers.bind(this);
@@ -47,7 +49,7 @@ export class CustomerController extends BaseController implements ICustomerContr
     this.getCustomerHistory = this.getCustomerHistory.bind(this);
     this.bulkUpdateCustomers = this.bulkUpdateCustomers.bind(this);
     
-    this.logger.debug('Initialized CustomerController');
+    this.logger.debug('Initialisiert CustomerController');
   }
 
   /**
@@ -57,34 +59,7 @@ export class CustomerController extends BaseController implements ICustomerContr
    * @param res - HTTP response
    */
   public async getAllCustomers(req: Request, res: Response): Promise<void> {
-    try {
-      // Get validated query params or use raw query
-      const query = (req as any).validatedQuery || req.query;
-      
-      // Build filter parameters
-      const filters: CustomerFilterParams = {
-        search: query.search as string,
-        status: query.status as string,
-        type: query.type as string,
-        page: Number(query.page) || 1,
-        limit: Number(query.limit) || 20,
-        sortBy: query.sortBy as string || 'createdAt',
-        sortDirection: (query.sortDirection as 'asc' | 'desc') || 'desc',
-        city: query.city as string,
-        postalCode: query.postalCode as string,
-        newsletter: query.newsletter !== undefined ? Boolean(query.newsletter) : undefined,
-        startDate: query.startDate ? new Date(query.startDate as string) : undefined,
-        endDate: query.endDate ? new Date(query.endDate as string) : undefined
-      };
-      
-      // Get customers from service
-      const result = await this.customerService.findAll(filters);
-      
-      // Send paginated response
-      this.sendPaginatedResponse(res, result.data, result.pagination, 'Customers retrieved successfully');
-    } catch (error) {
-      this.handleError(error, req, res);
-    }
+    return this.getAll(req, res);
   }
 
   /**
@@ -107,7 +82,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       // Send success response
       this.sendSuccessResponse(res, customer, 'Customer retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -118,23 +93,7 @@ export class CustomerController extends BaseController implements ICustomerContr
    * @param res - HTTP response
    */
   public async createCustomer(req: Request, res: Response): Promise<void> {
-    try {
-      const customerData = (req as any).validatedData as CustomerCreateDto || req.body;
-      const authReq = req as AuthenticatedRequest;
-      
-      // Create customer with user context
-      const customer = await this.customerService.create(customerData, {
-        context: {
-          userId: authReq.user?.id,
-          ipAddress: req.ip
-        }
-      });
-      
-      // Send created response
-      this.sendCreatedResponse(res, customer, 'Customer created successfully');
-    } catch (error) {
-      this.handleError(error, req, res);
-    }
+    return this.create(req, res);
   }
 
   /**
@@ -144,25 +103,7 @@ export class CustomerController extends BaseController implements ICustomerContr
    * @param res - HTTP response
    */
   public async updateCustomer(req: Request, res: Response): Promise<void> {
-    try {
-      const id = parseInt(req.params.id, 10);
-      const customerData = (req as any).validatedData as CustomerUpdateDto || req.body;
-      const authReq = req as AuthenticatedRequest;
-      
-      // Update customer with user context
-      const customer = await this.customerService.update(id, customerData, {
-        context: {
-          userId: authReq.user?.id,
-          name: authReq.user?.name,
-          ipAddress: req.ip
-        }
-      });
-      
-      // Send success response
-      this.sendSuccessResponse(res, customer, 'Customer updated successfully');
-    } catch (error) {
-      this.handleError(error, req, res);
-    }
+    return this.update(req, res);
   }
 
   /**
@@ -188,23 +129,18 @@ export class CustomerController extends BaseController implements ICustomerContr
           }
         });
       } else {
-        // Default to soft delete
-        result = await this.customerService.delete(id, {
-          context: {
-            userId: authReq.user?.id,
-            softDelete: true
-          }
-        });
+        // Default to soft delete (using the base method)
+        return this.delete(req, res);
       }
       
       // Send success response
       this.sendSuccessResponse(
         res,
-        { success: true, id, mode: hardDelete ? 'hard' : 'soft' },
-        `Customer ${hardDelete ? 'permanently ' : ''}deleted successfully`
+        { success: true, id, mode: 'hard' },
+        'Customer permanently deleted successfully'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -239,7 +175,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       // Send success response
       this.sendSuccessResponse(res, customer, 'Customer status updated successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -273,7 +209,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       // Send success response
       this.sendSuccessResponse(res, { success: true, customer: updatedCustomer }, 'Note added successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -291,7 +227,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       // Send success response
       this.sendSuccessResponse(res, statistics, 'Customer statistics retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -327,7 +263,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       // Send buffer directly
       res.send(buffer);
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -338,29 +274,7 @@ export class CustomerController extends BaseController implements ICustomerContr
    * @param res - HTTP response
    */
   public async searchCustomers(req: Request, res: Response): Promise<void> {
-    try {
-      // Get validated query parameters
-      const query = (req as any).validatedQuery || req.query;
-      const term = query.term as string;
-      
-      if (!term || term.length < 2) {
-        throw this.errorHandler.createValidationError('Invalid search term', ['Search term must be at least 2 characters']);
-      }
-      
-      // Build service options with pagination
-      const options = {
-        page: Number(query.page) || 1,
-        limit: Number(query.limit) || 20
-      };
-      
-      // Search customers
-      const result = await this.customerService.searchCustomers(term, options);
-      
-      // Send paginated response
-      this.sendPaginatedResponse(res, result.data, result.pagination, 'Customers retrieved successfully');
-    } catch (error) {
-      this.handleError(error, req, res);
-    }
+    return this.search(req, res);
   }
 
   /**
@@ -379,7 +293,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       // Send success response
       this.sendSuccessResponse(res, insights, 'Customer insights retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -400,7 +314,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       // Send success response
       this.sendSuccessResponse(res, customers, 'Similar customers retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -420,7 +334,7 @@ export class CustomerController extends BaseController implements ICustomerContr
       // Send success response
       this.sendSuccessResponse(res, history, 'Customer history retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -460,7 +374,7 @@ export class CustomerController extends BaseController implements ICustomerContr
         `${count} customers updated successfully`
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 }

@@ -12,7 +12,7 @@ import {
   ResetPasswordDto 
 } from '../dtos/AuthDtos.js';
 
-export class AuthController extends BaseController implements IAuthController {
+export class AuthController extends BaseController<any, any, any, any> implements IAuthController {
   /**
    * Erstellt eine neue AuthController-Instanz
    * 
@@ -25,7 +25,9 @@ export class AuthController extends BaseController implements IAuthController {
     logger: ILoggingService,
     errorHandler: IErrorHandler
   ) {
-    super(logger, errorHandler);
+    // Wir übergeben den authService als nullobjekt für IBaseService, da AuthController
+    // nicht direkt mit dem Standard-Repository-Muster arbeitet
+    super(null as any, logger, errorHandler);
     
     // Methoden binden, um 'this'-Kontext zu erhalten
     this.login = this.login.bind(this);
@@ -35,6 +37,22 @@ export class AuthController extends BaseController implements IAuthController {
     this.resetPassword = this.resetPassword.bind(this);
     this.logout = this.logout.bind(this);
     this.getResetToken = this.getResetToken.bind(this);
+    
+    // Implementieren der erforderlichen IBaseController-Methoden als Stubs
+    this.getAll = this.notImplemented.bind(this, 'getAll');
+    this.getById = this.notImplemented.bind(this, 'getById');
+    this.create = this.notImplemented.bind(this, 'create');
+    this.update = this.notImplemented.bind(this, 'update');
+    this.delete = this.notImplemented.bind(this, 'delete');
+    this.search = this.notImplemented.bind(this, 'search');
+    this.bulkUpdate = this.notImplemented.bind(this, 'bulkUpdate');
+  }
+
+  /**
+   * Stub-Methode für nicht implementierte Basisfunktionen
+   */
+  private async notImplemented(method: string, req: Request, res: Response): Promise<void> {
+    throw this.errorHandler.createError(`Methode ${method} ist für Auth-Controller nicht implementiert`, 405);
   }
 
   /**
@@ -53,7 +71,7 @@ export class AuthController extends BaseController implements IAuthController {
       // Antwort senden
       this.sendSuccessResponse(res, result, 'Login erfolgreich');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -73,7 +91,7 @@ export class AuthController extends BaseController implements IAuthController {
       // Antwort senden
       this.sendSuccessResponse(res, result, 'Token erfolgreich aktualisiert');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -96,7 +114,7 @@ export class AuthController extends BaseController implements IAuthController {
       // Antwort senden
       this.sendSuccessResponse(res, result, 'Falls die E-Mail-Adresse in unserem System existiert, wurden Anweisungen zum Zurücksetzen des Passworts gesendet');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -120,7 +138,7 @@ export class AuthController extends BaseController implements IAuthController {
         isValid ? 'Token ist gültig' : 'Token ist ungültig oder abgelaufen'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -144,7 +162,7 @@ export class AuthController extends BaseController implements IAuthController {
       // Antwort senden
       this.sendSuccessResponse(res, result, 'Passwort wurde erfolgreich zurückgesetzt');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -178,7 +196,7 @@ export class AuthController extends BaseController implements IAuthController {
       // Antwort senden
       this.sendSuccessResponse(res, result, 'Logout erfolgreich');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -207,7 +225,44 @@ export class AuthController extends BaseController implements IAuthController {
       // Antwort senden
       this.sendSuccessResponse(res, result, 'Reset-Token für Tests abgerufen');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
+  }
+
+  // Implementierung der IBaseController Methoden
+  getAll(req: Request, res: Response): Promise<void> {
+    return this.notImplemented('getAll', req, res);
+  }
+
+  getById(req: Request, res: Response): Promise<void> {
+    return this.notImplemented('getById', req, res);
+  }
+
+  create(req: Request, res: Response): Promise<void> {
+    return this.notImplemented('create', req, res);
+  }
+
+  update(req: Request, res: Response): Promise<void> {
+    return this.notImplemented('update', req, res);
+  }
+
+  delete(req: Request, res: Response): Promise<void> {
+    return this.notImplemented('delete', req, res);
+  }
+
+  search(req: Request, res: Response): Promise<void> {
+    return this.notImplemented('search', req, res);
+  }
+
+  bulkUpdate(req: Request, res: Response): Promise<void> {
+    return this.notImplemented('bulkUpdate', req, res);
+  }
+
+  extractQueryOptions(req: Request): any {
+    return {};
+  }
+
+  extractFilterCriteria(req: Request): any {
+    return {};
   }
 }

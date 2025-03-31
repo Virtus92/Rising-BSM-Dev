@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
+import { IBaseController } from './IBaseController.js';
 
 /**
  * Interface for SettingsController
  */
-export interface ISettingsController {
+export interface ISettingsController extends IBaseController<any> {
   /**
    * Get settings of the current user
    */

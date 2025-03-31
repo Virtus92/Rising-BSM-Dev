@@ -56,6 +56,19 @@ export function createRequestRoutes(
     requestController.getAllRequests
   );
 
+  // Export route (must come before :id routes to avoid path conflicts)
+  router.get('/export',
+    ...adminOnlyAccess,
+    requestController.exportRequests
+  );
+
+  // Batch operations
+  router.patch('/batch/status',
+    ...adminOnlyAccess,
+    requestController.batchUpdateRequestStatus
+  );
+
+  // Single item routes with :id parameter
   router.get('/:id',
     ...adminOnlyAccess,
     requestController.getRequestById
@@ -74,16 +87,6 @@ export function createRequestRoutes(
   router.patch('/:id/assign',
     ...adminOnlyAccess,
     requestController.assignRequest
-  );
-
-  router.patch('/batch/status',
-    ...adminOnlyAccess,
-    requestController.batchUpdateRequestStatus
-  );
-
-  router.get('/export',
-    ...adminOnlyAccess,
-    requestController.exportRequests
   );
 
   return router;

@@ -4,8 +4,9 @@ import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { BaseController } from '../core/BaseController.js';
 import { IProfileController } from '../interfaces/IProfileController.js';
-import { UpdateProfileDto, ChangeMyPasswordDto, ActivityLogFilterParams } from '../dtos/ProfileDtos.js';
+import { UpdateProfileDto, ChangeMyPasswordDto, ActivityLogFilterParams, ProfileResponseDto } from '../dtos/ProfileDtos.js';
 import { ChangePasswordDto } from '../dtos/UserDtos.js';
+import { User } from '../entities/User.js';
 
 /**
  * ProfileController
@@ -13,7 +14,7 @@ import { ChangePasswordDto } from '../dtos/UserDtos.js';
  * Controller for handling user profile-related HTTP requests.
  * This controller allows users to manage their own profiles.
  */
-export class ProfileController extends BaseController implements IProfileController {
+export class ProfileController extends BaseController<User, any, UpdateProfileDto, ProfileResponseDto> implements IProfileController {
   /**
    * Creates a new ProfileController instance
    * 
@@ -26,7 +27,7 @@ export class ProfileController extends BaseController implements IProfileControl
     logger: ILoggingService,
     errorHandler: IErrorHandler
   ) {
-    super(logger, errorHandler);
+    super(profileService as any, logger, errorHandler);
     
     // Bind methods to preserve 'this' context when used as route handlers
     this.getMyProfile = this.getMyProfile.bind(this);
@@ -59,7 +60,7 @@ export class ProfileController extends BaseController implements IProfileControl
       // Send response
       this.sendSuccessResponse(res, user, 'Profile retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -90,7 +91,7 @@ export class ProfileController extends BaseController implements IProfileControl
       // Send response
       this.sendSuccessResponse(res, user, 'Profile updated successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -132,7 +133,7 @@ export class ProfileController extends BaseController implements IProfileControl
         'Password changed successfully'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -167,7 +168,7 @@ export class ProfileController extends BaseController implements IProfileControl
         profilePicture: user.profilePicture
       }, 'Profile picture uploaded successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -194,7 +195,7 @@ export class ProfileController extends BaseController implements IProfileControl
         success: true
       }, 'Profile picture removed successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -229,7 +230,7 @@ export class ProfileController extends BaseController implements IProfileControl
         'Activity logs retrieved successfully'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 }

@@ -1,107 +1,22 @@
-import { ContactRequest } from '@prisma/client';
-
-/**
- * Data for creating a new contact request
- */
-export interface CreateRequestDto {
-  name: string;
-  email: string;
-  phone?: string;
-  service: string;
-  message: string;
-  ipAddress?: string;
-}
-
-/**
- * Data for updating request status
- */
-export interface UpdateRequestStatusDto {
-  status: string;
-  note?: string;
-}
-
-/**
- * Data for adding a note to a request
- */
-export interface AddRequestNoteDto {
-  requestId: number;
-  userId: number;
-  userName: string;
-  text: string;
-}
-
-/**
- * Data for assigning a request to a processor
- */
-export interface AssignRequestDto {
-  processorId: number;
-}
-
-/**
- * Data for batch updating request statuses
- */
-export interface BatchUpdateStatusDto {
-  ids: number[];
-  status: string;
-  note?: string;
-}
-
-/**
- * Filter parameters for requests
- */
-export interface RequestFilterParams {
-  status?: string;
-  service?: string;
-  date?: string;
-  search?: string;
-  startDate?: string;
-  endDate?: string;
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortDirection?: 'asc' | 'desc';
-}
-
-/**
- * Pagination result for requests
- */
-export interface PaginatedRequests {
-  data: any[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-  meta?: {
-    filters: {
-      status?: string;
-      service?: string;
-      date?: string;
-      search?: string;
-    }
-  };
-}
-
-/**
- * Optional context for service calls
- */
-export interface ServiceContext {
-  userId?: number;
-  ipAddress?: string;
-}
-
-/**
- * Service options
- */
-export interface ServiceOptions {
-  context?: ServiceContext;
-}
+import { ContactRequest } from '../entities/ContactRequest.js';
+import { IBaseService, ServiceOptions, FilterCriteria } from '../interfaces/IBaseService.js';
+import {
+  PaginatedRequestsResponse,
+  CreateRequestDto,
+  UpdateRequestDto,
+  RequestResponseDto,
+  UpdateRequestStatusDto,
+  AddRequestNoteDto,
+  AssignRequestDto,
+  BatchUpdateStatusDto,
+  RequestFilterParams
+} from '../dtos/RequestDtos.js';
 
 /**
  * Interface for Request Service
+ * Extends the base service interface with request-specific operations
  */
-export interface IRequestService {
+export interface IRequestService extends IBaseService<ContactRequest, CreateRequestDto, UpdateRequestDto, RequestResponseDto> {
   /**
    * Create a new contact request
    */
@@ -115,10 +30,10 @@ export interface IRequestService {
    */
   getRequests(
     filters: RequestFilterParams
-  ): Promise<PaginatedRequests>;
+  ): Promise<PaginatedRequestsResponse>;
 
   /**
-   * Get contact request by ID
+   * Get contact request by ID with notes
    */
   getRequestById(id: number): Promise<any>;
 

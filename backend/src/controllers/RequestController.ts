@@ -6,20 +6,26 @@ import { BaseController } from '../core/BaseController.js';
 import { IRequestController } from '../interfaces/IRequestController.js';
 import { 
   CreateRequestDto, 
+  UpdateRequestDto,
   UpdateRequestStatusDto, 
   AddRequestNoteDto, 
   RequestFilterParams,
   AssignRequestDto,
-  BatchUpdateStatusDto 
+  BatchUpdateStatusDto,
+  RequestResponseDto,
+  RequestStatusUpdateResponse,
+  RequestAssignmentResponse,
+  BatchUpdateResponse
 } from '../dtos/RequestDtos.js';
 import { IUserService } from '../interfaces/IUserService.js';
+import { ContactRequest } from '../entities/ContactRequest.js';
 
 /**
  * RequestController
  * 
  * Controller for handling contact request-related HTTP requests.
  */
-export class RequestController extends BaseController implements IRequestController {
+export class RequestController extends BaseController<ContactRequest, CreateRequestDto, UpdateRequestDto, RequestResponseDto> implements IRequestController {
   /**
    * Creates a new RequestController instance
    */
@@ -29,7 +35,8 @@ export class RequestController extends BaseController implements IRequestControl
     logger: ILoggingService,
     errorHandler: IErrorHandler
   ) {
-    super(logger, errorHandler);
+    // Using the requestService as the base service works because IRequestService extends IBaseService
+    super(requestService, logger, errorHandler);
     
     // Bind methods to preserve 'this' context when used as route handlers
     this.submitRequest = this.submitRequest.bind(this);
@@ -61,7 +68,8 @@ export class RequestController extends BaseController implements IRequestControl
       // Create contact request with client IP
       const contactRequest = await this.requestService.createRequest(data, {
         context: {
-          ipAddress: req.ip
+          ipAddress: req.ip,
+          userId: (req as any).user?.id
         }
       });
       
@@ -78,7 +86,7 @@ export class RequestController extends BaseController implements IRequestControl
         'Contact request submitted successfully'
       );
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error instanceof Error ? error : new Error(String(error)), res);
     }
   }
 
@@ -93,32 +101,21 @@ export class RequestController extends BaseController implements IRequestControl
         service: req.query.service as string,
         date: req.query.date as string,
         search: req.query.search as string,
-        page: req.query.page ? parseInt(req.query.page as string) : undefined,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+        startDate: req.query.startDate as string,
+        endDate: req.query.endDate as string,
+        page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
+        limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 20,
         sortBy: req.query.sortBy as string,
         sortDirection: req.query.sortDirection as 'asc' | 'desc'
       };
-      
-      // Log the request parameters for debugging
-      this.logger.debug(`Request filters: ${JSON.stringify(filters)}`, {
-        method: req.method,
-        path: req.path,
-        query: req.query
-      });
-      
-      // Get contact requests from service
+
+      // Get paginated contact requests
       const result = await this.requestService.getRequests(filters);
       
       // Send response
-      this.sendPaginatedResponse(
-        res, 
-        result.data, 
-        result.pagination, 
-        'Contact requests retrieved successfully',
-        result.meta
-      );
+      this.sendSuccessResponse(res, result, 'Contact requests retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error instanceof Error ? error : new Error(String(error)), res);
     }
   }
 
@@ -129,13 +126,17 @@ export class RequestController extends BaseController implements IRequestControl
     try {
       const id = parseInt(req.params.id, 10);
       
-      // Get contact request details from service
-      const contactRequest = await this.requestService.getRequestById(id);
+      if (isNaN(id)) {
+        throw this.errorHandler.createValidationError('Invalid request ID', ['ID must be a valid number']);
+      }
+      
+      // Get detailed request with notes
+      const request = await this.requestService.getRequestById(id);
       
       // Send response
-      this.sendSuccessResponse(res, contactRequest, 'Contact request retrieved successfully');
+      this.sendSuccessResponse(res, request, 'Contact request retrieved successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error instanceof Error ? error : new Error(String(error)), res);
     }
   }
 
@@ -147,8 +148,14 @@ export class RequestController extends BaseController implements IRequestControl
       const id = parseInt(req.params.id, 10);
       const statusData: UpdateRequestStatusDto = req.body;
       
+      // Validate input
+      if (!statusData.status) {
+        throw this.errorHandler.createValidationError('Invalid status data', ['Status is required']);
+      }
+      
       // Get authenticated user info
       const userId = (req as any).user?.id;
+      const userName = (req as any).user?.name || 'System';
       
       // Update status with context
       const contactRequest = await this.requestService.updateRequestStatus(id, statusData, {
@@ -159,13 +166,15 @@ export class RequestController extends BaseController implements IRequestControl
       });
       
       // Send response
-      this.sendSuccessResponse(res, {
+      const response: RequestStatusUpdateResponse = {
         id: contactRequest.id,
         status: contactRequest.status,
         statusLabel: this.getStatusLabel(contactRequest.status)
-      }, 'Request status updated successfully');
+      };
+      
+      this.sendSuccessResponse(res, response, 'Request status updated successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error instanceof Error ? error : new Error(String(error)), res);
     }
   }
 
@@ -186,7 +195,7 @@ export class RequestController extends BaseController implements IRequestControl
       const userName = (req as any).user?.name || 'System';
       
       // Create note data
-      const noteData: any = {
+      const noteData: AddRequestNoteDto = {
         requestId,
         userId,
         userName,
@@ -210,7 +219,7 @@ export class RequestController extends BaseController implements IRequestControl
         createdAt: createdNote.createdAt
       }, 'Note added successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error instanceof Error ? error : new Error(String(error)), res);
     }
   }
 
@@ -239,19 +248,21 @@ export class RequestController extends BaseController implements IRequestControl
       
       // Get processor name from UserService
       let processorName = "Unassigned";
-      if (contactRequest.processorId !== null) {
+      if (contactRequest.processorId !== null && contactRequest.processorId !== undefined) {
         const processor = await this.userService.getUserDetails(contactRequest.processorId);
         processorName = processor ? processor.fullName || processor.name : "Unknown";
       }
       
       // Send response
-      this.sendSuccessResponse(res, {
+      const response: RequestAssignmentResponse = {
         id: contactRequest.id,
-        processorId: contactRequest.processorId,
+        processorId: contactRequest.processorId || null,
         processorName
-      }, 'Request assigned successfully');
+      };
+      
+      this.sendSuccessResponse(res, response, 'Request assigned successfully');
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error instanceof Error ? error : new Error(String(error)), res);
     }
   }
 
@@ -282,12 +293,14 @@ export class RequestController extends BaseController implements IRequestControl
       });
       
       // Send response
-      this.sendSuccessResponse(res, {
+      const response: BatchUpdateResponse = {
         success: true,
         count: result.count
-      }, `${result.count} requests updated successfully`);
+      };
+      
+      this.sendSuccessResponse(res, response, `${result.count} requests updated successfully`);
     } catch (error) {
-      this.handleError(error, req, res);
+      this.handleError(error, res);
     }
   }
 
@@ -306,6 +319,8 @@ export class RequestController extends BaseController implements IRequestControl
         endDate: req.query.endDate as string
       };
       
+      this.logger.debug(`Exporting requests in ${format} format with filters:`, filters);
+      
       // Export requests
       const fileBuffer = await this.requestService.exportRequests(format, filters);
       
@@ -318,10 +333,11 @@ export class RequestController extends BaseController implements IRequestControl
         res.setHeader('Content-Disposition', 'attachment; filename=contact-requests.xlsx');
       }
       
-      // Send file
-      res.send(fileBuffer);
+      // Send the file - this void is intentional, the response is handled manually
+      res.end(fileBuffer);
     } catch (error) {
-      this.handleError(error, req, res);
+      this.logger.error('Error exporting requests:', error instanceof Error ? error.message : String(error));
+      this.handleError(error instanceof Error ? error : new Error(String(error)), res);
     }
   }
   

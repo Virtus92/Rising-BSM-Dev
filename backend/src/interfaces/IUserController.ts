@@ -5,8 +5,10 @@
  * Defines methods for handling user-related HTTP requests.
  */
 import { Request, Response } from 'express';
+import { IBaseController } from './IBaseController.js';
+import { User } from '../entities/User.js';
 
-export interface IUserController {
+export interface IUserController extends IBaseController<User> {
   /**
    * Get all users
    * 

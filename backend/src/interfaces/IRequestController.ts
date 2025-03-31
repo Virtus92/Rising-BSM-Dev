@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
+import { IBaseController } from './IBaseController.js';
 
 /**
  * Interface for RequestController
  */
-export interface IRequestController {
+export interface IRequestController extends IBaseController<any> {
   /**
    * Submit a new contact request (public endpoint)
    */

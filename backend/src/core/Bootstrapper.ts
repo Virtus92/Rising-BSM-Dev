@@ -22,18 +22,21 @@ import { UserRepository } from '../repositories/UserRepository.js';
 import { NotificationRepository } from '../repositories/NotificationRepository.js';
 import { CustomerRepository } from '../repositories/CustomerRepository.js';
 import { RefreshTokenRepository } from '../repositories/RefreshTokenRepository.js';
+import { DashboardRepository } from '../repositories/DashboardRepository.js';
 
 // Services
 import { UserService } from '../services/UserService.js';
 import { NotificationService } from '../services/NotificationService.js';
 import { CustomerService } from '../services/CustomerService.js';
 import { AuthService } from '../services/AuthService.js';
+import { DashboardService } from '../services/DashboardService.js';
 
 // Controllers
 import { UserController } from '../controllers/UserController.js';
 import { NotificationController } from '../controllers/NotificationController.js';
 import { CustomerController } from '../controllers/CustomerController.js';
 import { AuthController } from '../controllers/AuthController.js';
+import { DashboardController } from '../controllers/DashboardController.js';
 
 // Profile Components
 import { IProfileService } from '../interfaces/IProfileService.js';
@@ -47,17 +50,18 @@ import { ISettingsController } from '../interfaces/ISettingsController.js';
 import { SettingsService } from '../services/SettingsService.js';
 import { SettingsController } from '../controllers/SettingsController.js';
 
-// Contact Components
-import { IContactService } from '../interfaces/IContactService.js';
-import { IContactController } from '../interfaces/IContactController.js';
-import { ContactService } from '../services/ContactService.js';
-import { ContactController } from '../controllers/ContactController.js';
-
 // Request Components
 import { IRequestService } from '../interfaces/IRequestService.js';
 import { IRequestController } from '../interfaces/IRequestController.js';
+import { IRequestRepository } from '../interfaces/IRequestRepository.js';
 import { RequestService } from '../services/RequestService.js';
 import { RequestController } from '../controllers/RequestController.js';
+import { RequestRepository } from '../repositories/RequestRepository.js';
+
+// Dashboard Components
+import { IDashboardRepository } from '../interfaces/IDashboardRepository.js';
+import { IDashboardService } from '../interfaces/IDashboardService.js';
+import { IDashboardController } from '../interfaces/IDashboardController.js';
 
 // Configuration
 import { SwaggerConfig } from '../config/SwaggerConfig.js';
@@ -204,12 +208,22 @@ export class Bootstrapper {
     
     // Customer repository
     this.container.register<ICustomerRepository>('CustomerRepository', () => {
-      return  new CustomerRepository(prisma, logger, errorHandler);
+      return new CustomerRepository(prisma, logger, errorHandler);
     }, { singleton: true });
       
-      // Refresh token repository
+    // Refresh token repository
     this.container.register<IRefreshTokenRepository>('RefreshTokenRepository', () => {
       return new RefreshTokenRepository(prisma, logger, errorHandler);
+    }, { singleton: true });
+    
+    // Dashboard repository
+    this.container.register<IDashboardRepository>('DashboardRepository', () => {
+      return new DashboardRepository(prisma, logger, errorHandler);
+    }, { singleton: true });
+
+    // Request repository
+    this.container.register<IRequestRepository>('RequestRepository', () => {
+      return new RequestRepository(prisma, logger, errorHandler);
     }, { singleton: true });
       
     logger.info('Repositories registered');
@@ -271,16 +285,16 @@ export class Bootstrapper {
       return new SettingsService(prisma, logger, errorHandler);
     }, { singleton: true });
     
-    // Contact service
-    this.container.register<IContactService>('ContactService', () => {
-      const prisma = this.container.resolve<PrismaClient>('PrismaClient');
-      return new ContactService(prisma, logger, errorHandler);
-    }, { singleton: true });
-    
     // Request service
     this.container.register<IRequestService>('RequestService', () => {
-      const prisma = this.container.resolve<PrismaClient>('PrismaClient');
-      return new RequestService(prisma, logger, errorHandler);
+      const requestRepository = this.container.resolve<IRequestRepository>('RequestRepository');
+      return new RequestService(requestRepository, logger, errorHandler);
+    }, { singleton: true });
+
+    // Dashboard service
+    this.container.register<IDashboardService>('DashboardService', () => {
+      const dashboardRepository = this.container.resolve<IDashboardRepository>('DashboardRepository');
+      return new DashboardService(dashboardRepository, logger, validator, errorHandler);
     }, { singleton: true });
 
     logger.info('Services registered');
@@ -334,17 +348,17 @@ export class Bootstrapper {
       return new SettingsController(settingsService, logger, errorHandler);
     }, { singleton: true });
     
-    // Contact controller
-    this.container.register<IContactController>('ContactController', () => {
-      const contactService = this.container.resolve<IContactService>('ContactService');
-      return new ContactController(contactService, logger, errorHandler);
-    }, { singleton: true });
-    
     // Request controller
     this.container.register<IRequestController>('RequestController', () => {
       const requestService = this.container.resolve<IRequestService>('RequestService');
       const userService = this.container.resolve<IUserService>('UserService');
       return new RequestController(requestService, userService, logger, errorHandler);
+    }, { singleton: true });
+
+    // Dashboard controller
+    this.container.register<IDashboardController>('DashboardController', () => {
+      const dashboardService = this.container.resolve<IDashboardService>('DashboardService');
+      return new DashboardController(dashboardService, logger, errorHandler);
     }, { singleton: true });
 
     logger.info('Controllers registered');

@@ -10,8 +10,8 @@ import { CustomerController } from '../controllers/CustomerController.js';
 import { NotificationController } from '../controllers/NotificationController.js';
 import { ProfileController } from '../controllers/ProfileController.js';
 import { SettingsController } from '../controllers/SettingsController.js';
-import { ContactController } from '../controllers/ContactController.js';
 import { RequestController } from '../controllers/RequestController.js';
+import { DashboardController } from '../controllers/DashboardController.js';
 import config from '../config/index.js';
 
 // Route creators
@@ -21,12 +21,11 @@ import { createCustomerRoutes } from './customers.routes.js';
 import { createNotificationRoutes } from './notifications.routes.js';
 import { createProfileRoutes } from './profile.routes.js';
 import { createSettingsRoutes } from './settings.routes.js';
-import { createContactRoutes } from './contact.routes.js';
 // import { createProjectRoutes } from './projects.routes';
 // import { createAppointmentRoutes } from './appointments.routes';
 // import { createServiceRoutes } from './services.routes';
 import { createRequestRoutes } from './requests.routes.js';
-// import { createDashboardRoutes } from './dashboard.routes';
+import { configureDashboardRoutes } from './dashboardRoutes.js';
 
 export class RouteManager {
   private readonly logger: ILoggingService;
@@ -49,6 +48,7 @@ export class RouteManager {
     const profileController = this.container.resolve<ProfileController>('ProfileController');
     const settingsController = this.container.resolve<SettingsController>('SettingsController');
     const requestController = this.container.resolve<RequestController>('RequestController');
+    const dashboardController = this.container.resolve<DashboardController>('DashboardController');
     const validationService = this.container.resolve<IValidationService>('ValidationService');
     const errorHandler = this.container.resolve<IErrorHandler>('ErrorHandler');
     
@@ -63,6 +63,7 @@ export class RouteManager {
     const profileRoutes = createProfileRoutes(profileController, authMiddleware, validationService, errorHandler);
     const settingsRoutes = createSettingsRoutes(settingsController, authMiddleware, validationService, errorHandler);
     const requestRoutes = createRequestRoutes(requestController, authMiddleware, validationService, errorHandler);
+    const dashboardRoutes = configureDashboardRoutes(dashboardController, authMiddleware);
 
     // Mount individual route groups
     mainRouter.use('/', authRoutes);
@@ -71,7 +72,11 @@ export class RouteManager {
     mainRouter.use('/notifications', notificationRoutes);
     mainRouter.use('/profile', profileRoutes);
     mainRouter.use('/settings', settingsRoutes);
+    // Fix: Register a special route for the public request submission endpoint
+    // This is needed to match the OpenAPI definition
+    mainRouter.post('/requests/public', (req, res) => requestController.submitRequest(req, res));
     mainRouter.use('/requests', requestRoutes);
+    mainRouter.use('/dashboard', dashboardRoutes);
 
     // Mount the main router with the API prefix
     app.use(this.apiPrefix, mainRouter);
