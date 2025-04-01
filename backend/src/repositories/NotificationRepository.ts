@@ -105,6 +105,9 @@ protected async executeQuery(operation: string, ...args: any[]): Promise<any> {
           where: args[0]
         });
         
+      case 'bulkUpdate':
+        return await this.bulkUpdate(args[0], args[1]);
+        
       default:
         throw new Error(`Unknown operation: ${operation}`);
     }

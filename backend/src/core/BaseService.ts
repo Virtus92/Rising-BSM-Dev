@@ -488,6 +488,35 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
   }
 
   /**
+   * Update multiple entities at once
+   *
+   * @param ids - Array of entity IDs to update
+   * @param data - Update data to apply to all entities
+   * @param options - Service options
+   * @returns Promise with count of updated entities
+   */
+  async bulkUpdate(ids: ID[], data: U, options?: ServiceOptions): Promise<number> {
+    try {
+      // Validate input data
+      await this.validate(data, true);
+      
+      // Add audit information if context is provided
+      const auditedData = this.addAuditInfo(data, options?.context, 'update');
+      
+      // Prepare entity data
+      const entityData = this.toEntity(auditedData);
+      
+      // Call repository to update entities
+      const count = await this.repository.bulkUpdate(ids, entityData);
+      
+      return count;
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.bulkUpdate`, error instanceof Error ? error : String(error), { ids, data });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Handle and transform errors
    * 
    * @param error - Original error

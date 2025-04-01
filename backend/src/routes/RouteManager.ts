@@ -21,11 +21,13 @@ import { createCustomerRoutes } from './customers.routes.js';
 import { createNotificationRoutes } from './notifications.routes.js';
 import { createProfileRoutes } from './profile.routes.js';
 import { createSettingsRoutes } from './settings.routes.js';
-// import { createProjectRoutes } from './projects.routes';
-// import { createAppointmentRoutes } from './appointments.routes';
+import { createProjectRoutes } from './projects.routes.js';
+import { createAppointmentRoutes } from './appointment-routes.js';
 // import { createServiceRoutes } from './services.routes';
 import { createRequestRoutes } from './requests.routes.js';
 import { configureDashboardRoutes } from './dashboardRoutes.js';
+import { AppointmentController } from '../controllers/AppointmentController.js';
+import { ProjectController } from '../controllers/ProjectController.js';
 
 export class RouteManager {
   private readonly logger: ILoggingService;
@@ -49,6 +51,8 @@ export class RouteManager {
     const settingsController = this.container.resolve<SettingsController>('SettingsController');
     const requestController = this.container.resolve<RequestController>('RequestController');
     const dashboardController = this.container.resolve<DashboardController>('DashboardController');
+    const appointmentController = this.container.resolve<AppointmentController>('AppointmentController');
+    const projectController = this.container.resolve<ProjectController>('ProjectController');
     const validationService = this.container.resolve<IValidationService>('ValidationService');
     const errorHandler = this.container.resolve<IErrorHandler>('ErrorHandler');
     
@@ -64,6 +68,8 @@ export class RouteManager {
     const settingsRoutes = createSettingsRoutes(settingsController, authMiddleware, validationService, errorHandler);
     const requestRoutes = createRequestRoutes(requestController, authMiddleware, validationService, errorHandler);
     const dashboardRoutes = configureDashboardRoutes(dashboardController, authMiddleware);
+    const appointmentRoutes = createAppointmentRoutes(appointmentController, authMiddleware, validationService, errorHandler);
+    const projectRoutes = createProjectRoutes(projectController, authMiddleware, validationService, errorHandler);
 
     // Mount individual route groups
     mainRouter.use('/', authRoutes);
@@ -77,6 +83,8 @@ export class RouteManager {
     mainRouter.post('/requests/public', (req, res) => requestController.submitRequest(req, res));
     mainRouter.use('/requests', requestRoutes);
     mainRouter.use('/dashboard', dashboardRoutes);
+    mainRouter.use('/appointments', appointmentRoutes);
+    mainRouter.use('/projects', projectRoutes);
 
     // Mount the main router with the API prefix
     app.use(this.apiPrefix, mainRouter);

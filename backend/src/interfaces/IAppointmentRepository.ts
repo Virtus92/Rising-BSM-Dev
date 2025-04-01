@@ -18,19 +18,19 @@ export interface IAppointmentRepository extends IBaseRepository<Appointment, num
   /**
    * Find appointments for a specific date
    * 
-   * @param date - Date to search for (YYYY-MM-DD)
+   * @param date - Date to search for (YYYY-MM-DD) or Date object
    * @returns Promise with appointments
    */
-  findByDate(date: string): Promise<Appointment[]>;
+  findByDate(date: string | Date): Promise<Appointment[]>;
   
   /**
    * Find appointments for a date range
    * 
-   * @param startDate - Start date (YYYY-MM-DD)
-   * @param endDate - End date (YYYY-MM-DD)
+   * @param startDate - Start date (YYYY-MM-DD) or Date object
+   * @param endDate - End date (YYYY-MM-DD) or Date object
    * @returns Promise with appointments
    */
-  findByDateRange(startDate: string, endDate: string): Promise<Appointment[]>;
+  findByDateRange(startDate: string | Date, endDate: string | Date): Promise<Appointment[]>;
   
   /**
    * Find appointments for a customer
@@ -59,13 +59,16 @@ export interface IAppointmentRepository extends IBaseRepository<Appointment, num
   /**
    * Add a note to an appointment
    * 
-   * @param appointmentId - Appointment ID
+   * @param appointmentId - Appointment ID or note data object
    * @param userId - User ID
    * @param userName - User name
    * @param text - Note text
    * @returns Promise with created note
    */
-  addNote(appointmentId: number, userId: number, userName: string, text: string): Promise<any>;
+  addNote(appointmentId: number | { appointmentId: number; userId: number; userName: string; text: string }, 
+          userId?: number, 
+          userName?: string, 
+          text?: string): Promise<any>;
   
   /**
    * Get all notes for an appointment
@@ -76,14 +79,36 @@ export interface IAppointmentRepository extends IBaseRepository<Appointment, num
   getNotes(appointmentId: number): Promise<any[]>;
   
   /**
-   * Log activity for an appointment
+   * Get appointment notes with details
    * 
    * @param appointmentId - Appointment ID
+   * @returns Promise with detailed notes
+   */
+  getAppointmentNotes(appointmentId: number): Promise<any[]>;
+  
+  /**
+   * Get appointment with all related details
+   * 
+   * @param id - Appointment ID
+   * @returns Promise with appointment including relations
+   */
+  getAppointmentWithDetails(id: number): Promise<Appointment | null>;
+  
+  /**
+   * Log activity for an appointment
+   * 
+   * @param appointmentId - Appointment ID or activity data object
    * @param userId - User ID
    * @param userName - User name
    * @param action - Activity type
    * @param details - Activity details
    * @returns Promise with created activity log
    */
-  logActivity(appointmentId: number, userId: number, userName: string, action: string, details?: string): Promise<any>;
+  logActivity(
+    appointmentId: number | { appointmentId: number; userId: number; userName: string; action: string; details?: string }, 
+    userId?: number, 
+    userName?: string, 
+    action?: string, 
+    details?: string
+  ): Promise<any>;
 }

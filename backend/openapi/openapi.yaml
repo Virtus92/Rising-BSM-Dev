@@ -30,12 +30,12 @@ tags:
     description: User notification operations
   - name: Customers
     description: Customer management
-#  - name: Projects
-#    description: Project management
-#  - name: Appointments
-#    description: Appointment scheduling and management
-#  - name: Services
-#    description: Service management
+  - name: Projects
+    description: Project management
+  - name: Appointments
+    description: Appointment scheduling and management
+  - name: Services
+    description: Service management
   - name: Requests
     description: Contact request management
   - name: Profile
@@ -163,38 +163,38 @@ paths:
     $ref: './paths/customers.yaml#/customers-id-history'
 
   # Projects (Zur Zeit nicht implementiert)
-  # /projects:
-  #   $ref: './paths/projects.yaml#/projects'
-  # /projects/statistics:
-  #   $ref: './paths/projects.yaml#/projects-statistics'
-  # /projects/export:
-  #   $ref: './paths/projects.yaml#/projects-export'
-  # /projects/{id}:
-  #   $ref: './paths/projects.yaml#/projects-id'
-  # /projects/{id}/status:
-  #   $ref: './paths/projects.yaml#/projects-id-status'
-  # /projects/{id}/notes:
-  #   $ref: './paths/projects.yaml#/projects-id-notes'
+  /projects:
+    $ref: './paths/projects.yaml#/projects'
+  /projects/statistics:
+    $ref: './paths/projects.yaml#/projects-statistics'
+  /projects/export:
+    $ref: './paths/projects.yaml#/projects-export'
+  /projects/{id}:
+    $ref: './paths/projects.yaml#/projects-id'
+  /projects/{id}/status:
+    $ref: './paths/projects.yaml#/projects-id-status'
+  /projects/{id}/notes:
+    $ref: './paths/projects.yaml#/projects-id-notes'
 
   # Appointments (Zur Zeit nicht implementiert)
-  # /appointments:
-  #   $ref: './paths/appointments.yaml#/appointments'
-  # /appointments/{id}:
-  #   $ref: './paths/appointments.yaml#/appointments-id'
-  # /appointments/{id}/status:
-  #   $ref: './paths/appointments.yaml#/appointments-id-status'
-  # /appointments/{id}/notes:
-  #   $ref: './paths/appointments.yaml#/appointments-id-notes'
+  /appointments:
+    $ref: './paths/appointments.yaml#/appointments'
+  /appointments/{id}:
+    $ref: './paths/appointments.yaml#/appointments-id'
+  /appointments/{id}/status:
+    $ref: './paths/appointments.yaml#/appointments-id-status'
+  /appointments/{id}/notes:
+    $ref: './paths/appointments.yaml#/appointments-id-notes'
 
-  # Services (Zur Zeit nicht implementiert)
-  # /services:
-  #   $ref: './paths/services.yaml#/services'
-  # /services/{id}:
-  #   $ref: './paths/services.yaml#/services-id'
-  # /services/{id}/status:
-  #   $ref: './paths/services.yaml#/services-id-status'
-  # /services/{id}/statistics:
-  #   $ref: './paths/services.yaml#/services-id-statistics'
+  # Services
+  /services:
+    $ref: './paths/services.yaml#/services'
+  /services/{id}:
+    $ref: './paths/services.yaml#/services-id'
+  /services/{id}/status:
+    $ref: './paths/services.yaml#/services-id-status'
+  /services/{id}/statistics:
+    $ref: './paths/services.yaml#/services-id-statistics'
 
   # Requests
   /requests:

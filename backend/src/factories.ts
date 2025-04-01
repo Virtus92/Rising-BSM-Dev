@@ -29,6 +29,9 @@ import { RequestController } from './controllers/RequestController.js';
 
 // Import Request Repository
 import { RequestRepository } from './repositories/RequestRepository.js';
+import { ProjectRepository } from './repositories/ProjectRepository.js';
+import { ProjectService } from './services/ProjectService.js';
+import { ProjectController } from './controllers/ProjectController.js';
 
 // Create repository factories
 export const createCustomerRepositoryFactory = () => createFactory(
@@ -53,6 +56,11 @@ export const createRefreshTokenRepositoryFactory = () => createFactory(
 
 export const createRequestRepositoryFactory = () => createFactory(
   RequestRepository,
+  ['PrismaClient', 'LoggingService', 'ErrorHandler']
+);
+
+export const createProjectRepositoryFactory = () => createFactory(
+  ProjectRepository,
   ['PrismaClient', 'LoggingService', 'ErrorHandler']
 );
 
@@ -92,6 +100,11 @@ export const createRequestServiceFactory = () => createFactory(
   ['RequestRepository', 'LoggingService', 'ErrorHandler']
 );
 
+export const createProjectServiceFactory = () => createFactory(
+  ProjectService,
+  ['ProjectRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
+);
+
 // Create controller factories
 export const createCustomerControllerFactory = () => createFactory(
   CustomerController,
@@ -128,6 +141,11 @@ export const createRequestControllerFactory = () => createFactory(
   ['RequestService', 'UserService', 'LoggingService', 'ErrorHandler']
 );
 
+export const createProjectControllerFactory = () => createFactory(
+  ProjectController,
+  ['ProjectService', 'LoggingService', 'ErrorHandler']
+);
+
 /**
  * Register all repositories with the DI container
  * 
@@ -139,6 +157,7 @@ export function registerRepositories(container: DiContainer): void {
   container.register('UserRepository', createUserRepositoryFactory(), { singleton: true });
   container.register('RefreshTokenRepository', createRefreshTokenRepositoryFactory(), { singleton: true });
   container.register('RequestRepository', createRequestRepositoryFactory(), { singleton: true });
+  container.register('ProjectRepository', createProjectRepositoryFactory(), { singleton: true });
 }
 
 /**
@@ -154,6 +173,7 @@ export function registerServices(container: DiContainer): void {
   container.register('ProfileService', createProfileServiceFactory(), { singleton: true });
   container.register('SettingsService', createSettingsServiceFactory(), { singleton: true });
   container.register('RequestService', createRequestServiceFactory(), { singleton: true });
+  container.register('ProjectService', createProjectServiceFactory(), { singleton: true });
 }
 
 /**
@@ -169,6 +189,7 @@ export function registerControllers(container: DiContainer): void {
   container.register('ProfileController', createProfileControllerFactory(), { singleton: true });
   container.register('SettingsController', createSettingsControllerFactory(), { singleton: true });
   container.register('RequestController', createRequestControllerFactory(), { singleton: true });
+  container.register('ProjectController', createProjectControllerFactory(), { singleton: true });
 }
 
 /**

@@ -6,12 +6,35 @@ import { QueryOptions } from '../interfaces/IBaseRepository.js';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { PrismaClient } from '@prisma/client';
-import { datetime } from '../utils/datetime-helper.js';
+import { DateTimeHelper } from '../utils/datetime-helper.js';
 
 /**
  * Implementation of IProjectRepository for database operations.
  */
 export class ProjectRepository extends BaseRepository<Project, number> implements IProjectRepository {
+    /**
+     * Bulk update multiple projects
+     * 
+     * @param ids - Array of project IDs
+     * @param data - Update data
+     * @returns Promise with count of updated projects
+     */
+    async bulkUpdate(ids: number[], data: Partial<Project>): Promise<number> {
+        try {
+            const result = await this.prisma.project.updateMany({
+                where: {
+                    id: { in: ids }
+                },
+                data: this.mapToORMEntity(data)
+            });
+            
+            return result.count;
+        } catch (error) {
+            this.logger.error('Error in bulk update', error instanceof Error ? error : String(error), { ids, data });
+            throw this.handleError(error);
+        }
+    }
+
     /**
      * Creates a new ProjectRepository instance
      * 
@@ -28,6 +51,46 @@ export class ProjectRepository extends BaseRepository<Project, number> implement
         super(prisma.project, logger, errorHandler);
         
         this.logger.debug('Initialized ProjectRepository');
+    }
+    
+    /**
+     * Find projects by customer
+     * 
+     * @param customerId - Customer ID
+     * @returns Promise with projects
+     */
+    async findByCustomer(customerId: number): Promise<Project[]> {
+        return this.findByCustomerId(customerId);
+    }
+    
+    /**
+     * Find projects by service
+     * 
+     * @param serviceId - Service ID
+     * @returns Promise with projects
+     */
+    async findByService(serviceId: number): Promise<Project[]> {
+        return this.findByServiceId(serviceId);
+    }
+    
+    /**
+     * Get project with detailed relations
+     * 
+     * @param id - Project ID
+     * @returns Promise with project including all related data
+     */
+    async findByIdWithDetails(id: number): Promise<Project | null> {
+        return this.getProjectWithDetails(id);
+    }
+    
+    /**
+     * Get all notes for a project
+     * 
+     * @param projectId - Project ID
+     * @returns Promise with notes
+     */
+    async getNotes(projectId: number): Promise<any[]> {
+        return this.getProjectNotes(projectId);
     }
 
     /**
@@ -125,7 +188,7 @@ export class ProjectRepository extends BaseRepository<Project, number> implement
                 userName: note.userName,
                 text: note.text,
                 createdAt: note.createdAt,
-                formattedDate: datetime.formatDateTime(note.createdAt)
+                formattedDate: DateTimeHelper.formatDate(note.createdAt, 'dd.MM.yyyy HH:mm')
             }));
         } catch (error) {
             this.logger.error('Error fetching project notes', error instanceof Error ? error : String(error), { projectId });
@@ -134,12 +197,21 @@ export class ProjectRepository extends BaseRepository<Project, number> implement
     }
 
     /**
-     * Add note to project
+     * Add a note to a project
      * 
-     * @param data - Note data
+     * @param projectId - Project ID
+     * @param userId - User ID
+     * @param userName - User name
+     * @param text - Note text
      * @returns Promise with created note
      */
-    async addNote(data: { projectId: number; userId: number; userName: string; text: string }): Promise<any> {
+    async addNote(projectId: number, userId: number, userName: string, text: string): Promise<any> {
+        const data = {
+            projectId,
+            userId,
+            userName,
+            text
+        };
         try {
             const note = await this.prisma.projectNote.create({
                 data: {
@@ -152,7 +224,7 @@ export class ProjectRepository extends BaseRepository<Project, number> implement
             
             return {
                 ...note,
-                formattedDate: datetime.formatDateTime(note.createdAt)
+                formattedDate: DateTimeHelper.formatDate(note.createdAt, 'dd.MM.yyyy HH:mm')
             };
         } catch (error) {
             this.logger.error('Error adding project note', error instanceof Error ? error : String(error), { data });
@@ -161,12 +233,23 @@ export class ProjectRepository extends BaseRepository<Project, number> implement
     }
 
     /**
-     * Log project activity
+     * Log activity for a project
      * 
-     * @param data - Activity log data
-     * @returns Promise with created log entry
+     * @param projectId - Project ID
+     * @param userId - User ID
+     * @param userName - User name
+     * @param action - Activity type
+     * @param details - Activity details
+     * @returns Promise with created activity log
      */
-    async logActivity(data: { projectId: number; userId: number; userName: string; action: string; details?: string }): Promise<any> {
+    async logActivity(projectId: number, userId: number, userName: string, action: string, details?: string): Promise<any> {
+        const data = {
+            projectId,
+            userId,
+            userName,
+            action,
+            details
+        };
         try {
             return await this.prisma.projectLog.create({
                 data: {
@@ -500,6 +583,9 @@ export class ProjectRepository extends BaseRepository<Project, number> implement
                         where: args[0]
                     });
                     
+                case 'bulkUpdate':
+                    return await this.bulkUpdate(args[0], args[1]);
+                    
                 default:
                     throw new Error(`Unknown operation: ${operation}`);
             }
@@ -666,7 +752,7 @@ export class ProjectRepository extends BaseRepository<Project, number> implement
             project.appointments = ormEntity.appointments.map((appointment: any) => ({
                 id: appointment.id,
                 title: appointment.title,
-                date: datetime.formatDate(appointment.appointmentDate),
+                date: DateTimeHelper.formatDate(appointment.appointmentDate),
                 status: appointment.status,
                 statusLabel: appointment.status
             }));

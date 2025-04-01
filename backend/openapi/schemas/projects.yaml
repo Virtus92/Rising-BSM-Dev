@@ -1,0 +1,276 @@
+Project:
+  type: object
+  required:
+    - id
+    - title
+    - startDate
+    - status
+  properties:
+    id:
+      type: integer
+      description: Project ID (auto-generated)
+    title:
+      type: string
+      description: Project title
+    customerId:
+      type: integer
+      nullable: true
+      description: ID of the associated customer
+    customerName:
+      type: string
+      description: Name of the associated customer
+    serviceId:
+      type: integer
+      nullable: true
+      description: ID of the associated service
+    serviceName:
+      type: string
+      description: Name of the associated service
+    startDate:
+      type: string
+      format: date
+      description: Project start date (YYYY-MM-DD)
+    endDate:
+      type: string
+      format: date
+      nullable: true
+      description: Project end date (YYYY-MM-DD)
+    amount:
+      type: number
+      format: float
+      nullable: true
+      description: Project amount/budget
+    description:
+      type: string
+      nullable: true
+      description: Project description
+    status:
+      type: string
+      enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+      description: Project status
+    statusLabel:
+      type: string
+      description: Formatted status label
+    statusClass:
+      type: string
+      description: CSS class for status
+    createdAt:
+      type: string
+      format: date-time
+      description: Creation timestamp
+    updatedAt:
+      type: string
+      format: date-time
+      description: Last update timestamp
+
+ProjectCreate:
+  type: object
+  required:
+    - title
+    - startDate
+  properties:
+    title:
+      type: string
+      description: Project title
+      minLength: 2
+      maxLength: 200
+    customerId:
+      type: integer
+      nullable: true
+      description: Customer ID
+    serviceId:
+      type: integer
+      nullable: true
+      description: Service ID
+    startDate:
+      type: string
+      format: date
+      description: Project start date (YYYY-MM-DD)
+    endDate:
+      type: string
+      format: date
+      nullable: true
+      description: Project end date (YYYY-MM-DD)
+    amount:
+      type: number
+      format: float
+      nullable: true
+      description: Project amount/budget
+      minimum: 0
+    description:
+      type: string
+      nullable: true
+      description: Project description
+      maxLength: 2000
+    status:
+      type: string
+      enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+      default: neu
+      description: Project status
+
+ProjectUpdate:
+  type: object
+  properties:
+    title:
+      type: string
+      description: Project title
+      minLength: 2
+      maxLength: 200
+    customerId:
+      type: integer
+      nullable: true
+      description: Customer ID
+    serviceId:
+      type: integer
+      nullable: true
+      description: Service ID
+    startDate:
+      type: string
+      format: date
+      description: Project start date (YYYY-MM-DD)
+    endDate:
+      type: string
+      format: date
+      nullable: true
+      description: Project end date (YYYY-MM-DD)
+    amount:
+      type: number
+      format: float
+      nullable: true
+      description: Project amount/budget
+      minimum: 0
+    description:
+      type: string
+      nullable: true
+      description: Project description
+      maxLength: 2000
+    status:
+      type: string
+      enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+      description: Project status
+
+ProjectStatusUpdate:
+  type: object
+  required:
+    - status
+  properties:
+    status:
+      type: string
+      enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+      description: New project status
+    note:
+      type: string
+      description: Optional note about the status change
+      maxLength: 1000
+
+ProjectNote:
+  type: object
+  required:
+    - note
+  properties:
+    note:
+      type: string
+      description: Note text
+      minLength: 1
+      maxLength: 1000
+
+ProjectWithDetails:
+  allOf:
+    - $ref: '#/Project'
+    - type: object
+      properties:
+        notes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              text:
+                type: string
+              userName:
+                type: string
+              formattedDate:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+        customer:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+        service:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            priceBase:
+              type: number
+            unit:
+              type: string
+        appointments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              date:
+                type: string
+              status:
+                type: string
+              statusLabel:
+                type: string
+
+ProjectStatistics:
+  type: object
+  properties:
+    statusCounts:
+      type: object
+      properties:
+        neu:
+          type: integer
+        in_bearbeitung:
+          type: integer
+        abgeschlossen:
+          type: integer
+        storniert:
+          type: integer
+    totalValue:
+      type: number
+      description: Total project value
+    byMonth:
+      type: array
+      description: Projects grouped by month
+      items:
+        type: object
+        properties:
+          month:
+            type: string
+          count:
+            type: integer
+          value:
+            type: number
+    topCustomers:
+      type: array
+      description: Top customers by project count or value
+      items:
+        type: object
+        properties:
+          id:
+            type: integer
+          name:
+            type: string
+          projectCount:
+            type: integer
+          totalValue:
+            type: number

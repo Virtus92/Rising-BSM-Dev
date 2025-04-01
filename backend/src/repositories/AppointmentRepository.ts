@@ -2,11 +2,12 @@ import { BaseRepository } from '../core/BaseRepository.js';
 import { IAppointmentRepository } from '../interfaces/IAppointmentRepository.js';
 import { Appointment, AppointmentStatus } from '../entities/Appointment.js';
 import { AppointmentFilterParams } from '../dtos/AppointmentDtos.js';
-import { QueryOptions } from '../interfaces/IBaseRepository.js';
+import { QueryOptions, FilterCriteria } from '../interfaces/IBaseRepository.js';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
+// Korrigierter Import für PrismaClient
 import { PrismaClient } from '@prisma/client';
-import { datetime } from '../utils/datetime-helper.js';
+import { DateTimeHelper } from '../utils/datetime-helper.js';
 
 /**
  * Implementation of IAppointmentRepository for database operations.
@@ -93,7 +94,7 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
                 }
             };
         } catch (error) {
-            this.logger.error('Error in AppointmentRepository.findAppointments', error instanceof Error ? error : String(error), { filters });
+            this.logger.error('Error in AppointmentRepository.findAppointments', error instanceof Error ? error.message : String(error), { filters });
             throw this.handleError(error);
         }
     }
@@ -103,6 +104,16 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
      * 
      * @param appointmentId - Appointment ID
      * @returns Promise with appointment notes
+     */
+    async getNotes(appointmentId: number): Promise<any[]> {
+        return this.getAppointmentNotes(appointmentId);
+    }
+
+    /**
+     * Get appointment notes with details
+     * 
+     * @param appointmentId - Appointment ID
+     * @returns Promise with detailed notes
      */
     async getAppointmentNotes(appointmentId: number): Promise<any[]> {
         try {
@@ -127,7 +138,7 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
                 createdAt: note.createdAt
             }));
         } catch (error) {
-            this.logger.error('Error fetching appointment notes', error instanceof Error ? error : String(error), { appointmentId });
+            this.logger.error('Error fetching appointment notes', error instanceof Error ? error.message : String(error), { appointmentId });
             throw this.handleError(error);
         }
     }
@@ -135,11 +146,35 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
     /**
      * Add note to appointment
      * 
-     * @param data - Note data
+     * @param appointmentIdOrData - Appointment ID or note data object
+     * @param userId - User ID
+     * @param userName - User name
+     * @param text - Note text
      * @returns Promise with created note
      */
-    async addNote(data: { appointmentId: number; userId: number; userName: string; text: string }): Promise<any> {
+    async addNote(
+        appointmentIdOrData: number | { appointmentId: number; userId: number; userName: string; text: string },
+        userId?: number,
+        userName?: string,
+        text?: string
+    ): Promise<any> {
         try {
+            let data: { appointmentId: number; userId: number; userName: string; text: string };
+            
+            if (typeof appointmentIdOrData === 'number') {
+                if (userId === undefined || userName === undefined || text === undefined) {
+                    throw new Error('Missing parameters for addNote');
+                }
+                data = {
+                    appointmentId: appointmentIdOrData,
+                    userId,
+                    userName,
+                    text
+                };
+            } else {
+                data = appointmentIdOrData;
+            }
+            
             const note = await this.prisma.appointmentNote.create({
                 data: {
                     appointmentId: data.appointmentId,
@@ -151,7 +186,11 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
             
             return note;
         } catch (error) {
-            this.logger.error('Error adding appointment note', error instanceof Error ? error : String(error), { data });
+            this.logger.error('Error adding appointment note', error instanceof Error ? error.message : String(error), { 
+                appointmentIdOrData, 
+                userId, 
+                userName 
+            });
             throw this.handleError(error);
         }
     }
@@ -159,11 +198,38 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
     /**
      * Log appointment activity
      * 
-     * @param data - Activity log data
+     * @param appointmentIdOrData - Appointment ID or activity data object
+     * @param userId - User ID
+     * @param userName - User name
+     * @param action - Activity type
+     * @param details - Activity details
      * @returns Promise with created log entry
      */
-    async logActivity(data: { appointmentId: number; userId: number; userName: string; action: string; details?: string }): Promise<any> {
+    async logActivity(
+        appointmentIdOrData: number | { appointmentId: number; userId: number; userName: string; action: string; details?: string },
+        userId?: number,
+        userName?: string,
+        action?: string,
+        details?: string
+    ): Promise<any> {
         try {
+            let data: { appointmentId: number; userId: number; userName: string; action: string; details?: string };
+            
+            if (typeof appointmentIdOrData === 'number') {
+                if (userId === undefined || userName === undefined || action === undefined) {
+                    throw new Error('Missing parameters for logActivity');
+                }
+                data = {
+                    appointmentId: appointmentIdOrData,
+                    userId,
+                    userName,
+                    action,
+                    details
+                };
+            } else {
+                data = appointmentIdOrData;
+            }
+            
             return await this.prisma.appointmentLog.create({
                 data: {
                     appointmentId: data.appointmentId,
@@ -175,7 +241,11 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
                 }
             });
         } catch (error) {
-            this.logger.error('Error logging appointment activity', error instanceof Error ? error : String(error), { data });
+            this.logger.error('Error logging appointment activity', error instanceof Error ? error.message : String(error), { 
+                appointmentIdOrData, 
+                userId, 
+                action 
+            });
             // Don't throw error for logging failures, just return null
             return null;
         }
@@ -185,13 +255,15 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
      * Find appointments for a specific date
      * 
      * @param date - Date to find appointments for
-     * @param options - Query options
      * @returns Promise with appointments for the date
      */
-    async findByDate(date: Date, options?: QueryOptions): Promise<Appointment[]> {
+    async findByDate(date: string | Date): Promise<Appointment[]> {
         try {
-            const startOfDay = datetime.startOfDay(date);
-            const endOfDay = datetime.endOfDay(date);
+            // Convert string to Date if needed
+            const dateObj = typeof date === 'string' ? new Date(date) : date;
+            
+            const startOfDay = DateTimeHelper.startOfDay(dateObj);
+            const endOfDay = DateTimeHelper.endOfDay(dateObj);
             
             const appointments = await this.prisma.appointment.findMany({
                 where: {
@@ -214,13 +286,122 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
                 },
                 orderBy: {
                     appointmentDate: 'asc'
-                },
-                ...this.buildQueryOptions(options)
+                }
             });
             
             return appointments.map(appointment => this.mapToDomainEntity(appointment));
         } catch (error) {
-            this.logger.error('Error finding appointments by date', error instanceof Error ? error : String(error), { date });
+            this.logger.error('Error finding appointments by date', error instanceof Error ? error.message : String(error), { date });
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Find appointments for a date range
+     * 
+     * @param startDate - Start date
+     * @param endDate - End date
+     * @returns Promise with appointments for the date range
+     */
+    async findByDateRange(startDate: string | Date, endDate: string | Date): Promise<Appointment[]> {
+        try {
+            // Convert strings to Date if needed
+            const startObj = typeof startDate === 'string' ? new Date(startDate) : startDate;
+            const endObj = typeof endDate === 'string' ? new Date(endDate) : endDate;
+            
+            // Add time components to the dates
+            const start = DateTimeHelper.startOfDay(startObj);
+            const end = DateTimeHelper.endOfDay(endObj);
+            
+            const appointments = await this.prisma.appointment.findMany({
+                where: {
+                    appointmentDate: {
+                        gte: start,
+                        lte: end
+                    }
+                },
+                include: {
+                    customer: {
+                        select: {
+                            name: true
+                        }
+                    },
+                    project: {
+                        select: {
+                            title: true
+                        }
+                    }
+                },
+                orderBy: {
+                    appointmentDate: 'asc'
+                }
+            });
+            
+            return appointments.map(appointment => this.mapToDomainEntity(appointment));
+        } catch (error) {
+            this.logger.error('Error finding appointments by date range', error instanceof Error ? error.message : String(error), { startDate, endDate });
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Find appointments for a customer
+     * 
+     * @param customerId - Customer ID
+     * @returns Promise with customer's appointments
+     */
+    async findByCustomer(customerId: number): Promise<Appointment[]> {
+        try {
+            const appointments = await this.prisma.appointment.findMany({
+                where: {
+                    customerId
+                },
+                include: {
+                    project: {
+                        select: {
+                            title: true
+                        }
+                    }
+                },
+                orderBy: {
+                    appointmentDate: 'desc'
+                }
+            });
+            
+            return appointments.map(appointment => this.mapToDomainEntity(appointment));
+        } catch (error) {
+            this.logger.error('Error finding appointments by customer', error instanceof Error ? error.message : String(error), { customerId });
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Find appointments for a project
+     * 
+     * @param projectId - Project ID
+     * @returns Promise with project's appointments
+     */
+    async findByProject(projectId: number): Promise<Appointment[]> {
+        try {
+            const appointments = await this.prisma.appointment.findMany({
+                where: {
+                    projectId
+                },
+                include: {
+                    customer: {
+                        select: {
+                            name: true
+                        }
+                    }
+                },
+                orderBy: {
+                    appointmentDate: 'desc'
+                }
+            });
+            
+            return appointments.map(appointment => this.mapToDomainEntity(appointment));
+        } catch (error) {
+            this.logger.error('Error finding appointments by project', error instanceof Error ? error.message : String(error), { projectId });
             throw this.handleError(error);
         }
     }
@@ -229,10 +410,9 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
      * Find upcoming appointments
      * 
      * @param limit - Number of appointments to return
-     * @param options - Query options
      * @returns Promise with upcoming appointments
      */
-    async findUpcoming(limit: number = 5, options?: QueryOptions): Promise<Appointment[]> {
+    async findUpcoming(limit: number = 5): Promise<Appointment[]> {
         try {
             const now = new Date();
             
@@ -260,79 +440,12 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
                 orderBy: {
                     appointmentDate: 'asc'
                 },
-                take: limit,
-                ...this.buildQueryOptions(options)
+                take: limit
             });
             
             return appointments.map(appointment => this.mapToDomainEntity(appointment));
         } catch (error) {
-            this.logger.error('Error finding upcoming appointments', error instanceof Error ? error : String(error));
-            throw this.handleError(error);
-        }
-    }
-
-    /**
-     * Find appointments by customer ID
-     * 
-     * @param customerId - Customer ID
-     * @param options - Query options
-     * @returns Promise with customer's appointments
-     */
-    async findByCustomerId(customerId: number, options?: QueryOptions): Promise<Appointment[]> {
-        try {
-            const appointments = await this.prisma.appointment.findMany({
-                where: {
-                    customerId
-                },
-                include: {
-                    project: {
-                        select: {
-                            title: true
-                        }
-                    }
-                },
-                orderBy: {
-                    appointmentDate: 'desc'
-                },
-                ...this.buildQueryOptions(options)
-            });
-            
-            return appointments.map(appointment => this.mapToDomainEntity(appointment));
-        } catch (error) {
-            this.logger.error('Error finding appointments by customer ID', error instanceof Error ? error : String(error), { customerId });
-            throw this.handleError(error);
-        }
-    }
-
-    /**
-     * Find appointments by project ID
-     * 
-     * @param projectId - Project ID
-     * @param options - Query options
-     * @returns Promise with project's appointments
-     */
-    async findByProjectId(projectId: number, options?: QueryOptions): Promise<Appointment[]> {
-        try {
-            const appointments = await this.prisma.appointment.findMany({
-                where: {
-                    projectId
-                },
-                include: {
-                    customer: {
-                        select: {
-                            name: true
-                        }
-                    }
-                },
-                orderBy: {
-                    appointmentDate: 'desc'
-                },
-                ...this.buildQueryOptions(options)
-            });
-            
-            return appointments.map(appointment => this.mapToDomainEntity(appointment));
-        } catch (error) {
-            this.logger.error('Error finding appointments by project ID', error instanceof Error ? error : String(error), { projectId });
+            this.logger.error('Error finding upcoming appointments', error instanceof Error ? error.message : String(error));
             throw this.handleError(error);
         }
     }
@@ -371,9 +484,53 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
             
             return this.mapToDomainEntity(appointment);
         } catch (error) {
-            this.logger.error('Error getting appointment with details', error instanceof Error ? error : String(error), { id });
+            this.logger.error('Error getting appointment with details', error instanceof Error ? error.message : String(error), { id });
             throw this.handleError(error);
         }
+    }
+
+    /**
+     * Process filter criteria for entity-specific properties
+     * 
+     * @param criteria - Filter criteria
+     * @returns Processed criteria object
+     */
+    protected processCriteria(criteria: FilterCriteria): any {
+        const processed = { ...criteria };
+        
+        // Handle date criteria if present
+        if (processed.appointmentDate && processed.appointmentDate instanceof Date) {
+            const date = processed.appointmentDate;
+            processed.appointmentDate = {
+                gte: DateTimeHelper.startOfDay(date),
+                lte: DateTimeHelper.endOfDay(date)
+            };
+        }
+        
+        // Handle date range if present
+        if (processed.startDate || processed.endDate) {
+            processed.appointmentDate = {};
+            
+            if (processed.startDate) {
+                const startDate = processed.startDate instanceof Date 
+                    ? processed.startDate 
+                    : new Date(processed.startDate);
+                    
+                processed.appointmentDate.gte = DateTimeHelper.startOfDay(startDate);
+                delete processed.startDate;
+            }
+            
+            if (processed.endDate) {
+                const endDate = processed.endDate instanceof Date 
+                    ? processed.endDate 
+                    : new Date(processed.endDate);
+                    
+                processed.appointmentDate.lte = DateTimeHelper.endOfDay(endDate);
+                delete processed.endDate;
+            }
+        }
+        
+        return processed;
     }
 
     /**
@@ -451,12 +608,30 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
                         where: args[0]
                     });
                     
+                case 'bulkUpdate':
+                    return await this.prisma.$transaction(async (tx: any) => {
+                        let count = 0;
+                        for (const id of args[0]) {
+                            try {
+                                await tx.appointment.update({
+                                    where: { id },
+                                    data: args[1]
+                                });
+                                count++;
+                            } catch (err) {
+                                this.logger.error(`Failed to update appointment ${id}`, err instanceof Error ? err.message : String(err));
+                                // Continue with other updates
+                            }
+                        }
+                        return count;
+                    });
+                    
                 default:
                     throw new Error(`Unknown operation: ${operation}`);
             }
         } catch (error) {
-            this.logger.error(`Error executing query: ${operation}`, error instanceof Error ? error : String(error));
-            throw error;
+            this.logger.error(`Error executing query: ${operation}`, error instanceof Error ? error.message : String(error));
+            throw this.handleError(error);
         }
     }
 
@@ -478,8 +653,8 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
         if (filters.date) {
             const date = new Date(filters.date);
             where.appointmentDate = {
-                gte: datetime.startOfDay(date),
-                lte: datetime.endOfDay(date)
+                gte: DateTimeHelper.startOfDay(date),
+                lte: DateTimeHelper.endOfDay(date)
             };
         }
         
@@ -583,7 +758,7 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
                 userName: note.userName || (note.user ? note.user.name : 'System'),
                 text: note.text,
                 createdAt: note.createdAt,
-                formattedDate: datetime.formatDateTime(note.createdAt)
+                formattedDate: DateTimeHelper.formatDate(note.createdAt, 'dd.MM.yyyy HH:mm')
             }));
         }
         
@@ -610,6 +785,7 @@ export class AppointmentRepository extends BaseRepository<Appointment, number> i
         if (domainEntity.description !== undefined) result.description = domainEntity.description;
         if (domainEntity.status !== undefined) result.status = domainEntity.status;
         if (domainEntity.createdBy !== undefined) result.createdBy = domainEntity.createdBy;
+        if (domainEntity.updatedBy !== undefined) result.updatedBy = domainEntity.updatedBy;
         
         // Set timestamps for creates/updates
         if (!result.createdAt && !domainEntity.id) {

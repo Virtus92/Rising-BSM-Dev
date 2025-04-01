@@ -1,0 +1,161 @@
+Service:
+  type: object
+  required:
+    - id
+    - name
+    - basePrice
+    - unit
+  properties:
+    id:
+      type: integer
+      description: Service ID (auto-generated)
+    name:
+      type: string
+      description: Service name
+    description:
+      type: string
+      nullable: true
+      description: Service description
+    basePrice:
+      type: number
+      format: float
+      description: Base price
+      minimum: 0
+    unit:
+      type: string
+      description: Unit (e.g., hour, piece, m²)
+    vatRate:
+      type: number
+      format: float
+      default: 20
+      description: VAT rate in percentage
+    active:
+      type: boolean
+      description: Service status (active/inactive)
+    createdAt:
+      type: string
+      format: date-time
+      description: Timestamp of service creation
+    updatedAt:
+      type: string
+      format: date-time
+      description: Timestamp of last update
+
+ServiceCreate:
+  type: object
+  required:
+    - name
+    - basePrice
+    - unit
+  properties:
+    name:
+      type: string
+      description: Service name
+      minLength: 2
+      maxLength: 100
+    description:
+      type: string
+      nullable: true
+      description: Service description
+      maxLength: 2000
+    basePrice:
+      type: number
+      format: float
+      description: Base price
+      minimum: 0
+    unit:
+      type: string
+      description: Unit (e.g., hour, piece, m²)
+      maxLength: 20
+    vatRate:
+      type: number
+      format: float
+      default: 20
+      description: VAT rate in percentage
+      minimum: 0
+      maximum: 100
+    active:
+      type: boolean
+      default: true
+      description: Service status (active/inactive)
+
+ServiceUpdate:
+  type: object
+  properties:
+    name:
+      type: string
+      description: Service name
+      minLength: 2
+      maxLength: 100
+    description:
+      type: string
+      nullable: true
+      description: Service description
+      maxLength: 2000
+    basePrice:
+      type: number
+      format: float
+      description: Base price
+      minimum: 0
+    unit:
+      type: string
+      description: Unit (e.g., hour, piece, m²)
+      maxLength: 20
+    vatRate:
+      type: number
+      format: float
+      description: VAT rate in percentage
+      minimum: 0
+      maximum: 100
+    active:
+      type: boolean
+      description: Service status (active/inactive)
+
+ServiceStatusUpdate:
+  type: object
+  required:
+    - active
+  properties:
+    active:
+      type: boolean
+      description: Service status (true=active, false=inactive)
+
+ServiceStatistics:
+  type: object
+  properties:
+    service:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        active:
+          type: boolean
+    usage:
+      type: object
+      properties:
+        totalRevenue:
+          type: number
+        invoiceCount:
+          type: integer
+        monthlyRevenue:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+              revenue:
+                type: number
+        topCustomers:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              revenue:
+                type: number

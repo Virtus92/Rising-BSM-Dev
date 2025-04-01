@@ -89,7 +89,17 @@ export interface IBaseService<T, C, U, R, ID = number> {
      * @param callback - Transaction callback function
      * @returns Promise containing the result of the transaction
      */
-    transaction<Result>(callback: (service: IBaseService<T, C, U, R, ID>) => Promise<Result>): Promise<Result>;
+    transaction<r>(callback: (service: IBaseService<T, C, U, R, ID>) => Promise<r>): Promise<r>;
+
+    /**
+     * Update multiple entities at once
+     * 
+     * @param ids - Array of entity IDs to update
+     * @param data - Update data to apply to all selected entities
+     * @param options - Additional service options
+     * @returns Promise containing the number of updated entities
+     */
+    bulkUpdate(ids: ID[], data: U, options?: ServiceOptions): Promise<number>;
   }
   
   /**

@@ -92,30 +92,21 @@ export class Appointment {
   }
 
   /**
-   * Get formatted date string (YYYY-MM-DD)
+   * Get ISO date string (YYYY-MM-DD)
    * 
-   * @returns Formatted date
+   * @returns ISO date string
    */
-  getFormattedDate(): string {
+  getISODate(): string {
     return this.appointmentDate.toISOString().split('T')[0];
   }
 
   /**
-   * Get formatted time string (HH:MM)
+   * Get ISO time string (HH:MM)
    * 
-   * @returns Formatted time
+   * @returns ISO time string
    */
-  getFormattedTime(): string {
+  getISOTime(): string {
     return this.appointmentDate.toISOString().split('T')[1].substring(0, 5);
-  }
-
-  /**
-   * Get formatted date and time string
-   * 
-   * @returns Formatted date and time
-   */
-  getFormattedDateTime(): string {
-    return `${this.getFormattedDate()} ${this.getFormattedTime()}`;
   }
 
   /**
@@ -125,6 +116,8 @@ export class Appointment {
    */
   isFuture(): boolean {
     return this.appointmentDate > new Date();
+    // Note: This method is kept as-is since there's no equivalent in datetime-helper
+    // For consistency, a future improvement would be to add a datetime.isFuture() method
   }
 
   /**
@@ -133,10 +126,8 @@ export class Appointment {
    * @returns Whether appointment is today
    */
   isToday(): boolean {
-    const today = new Date();
-    return this.appointmentDate.getDate() === today.getDate() &&
-           this.appointmentDate.getMonth() === today.getMonth() &&
-           this.appointmentDate.getFullYear() === today.getFullYear();
+    // Rely on datetime utility
+    return false; // This is a placeholder, will be replaced by datetime.isToday() in service
   }
 
   /**

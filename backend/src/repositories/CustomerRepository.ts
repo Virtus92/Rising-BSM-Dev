@@ -122,6 +122,9 @@ export class CustomerRepository extends BaseRepository<Customer, number> impleme
                         where: args[0]
                     });
                     
+                case 'bulkUpdate':
+                    return await this.bulkUpdate(args[0], args[1]);
+                    
                 default:
                     throw new Error(`Unknown operation: ${operation}`);
             }
