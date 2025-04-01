@@ -42,23 +42,23 @@ services:
       sh -c "npx prisma generate && npx prisma migrate deploy && npm run db:seed && npm run dev"
   
   # Frontend service 
-  #frontend:
-  #  build:
-  #    context: ./frontend
-  #    dockerfile: Dockerfile
-  #  container_name: rising-bsm-frontend
-  #  env_file:
-  #    - ./.env
-  #  ports:
-  #    - "3000:3000"
-  #  depends_on:
-  #    - backend
-  #  volumes:
-  #    - ./frontend:/app
-  #    - /app/node_modules
-  #  networks:
-  #    - rising-bsm-network
-  #  command: npm run dev
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rising-bsm-frontend
+    env_file:
+      - ./.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - rising-bsm-network
+    command: npm run dev
 
 networks:
   rising-bsm-network:

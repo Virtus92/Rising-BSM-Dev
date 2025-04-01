@@ -2,15 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Bell, Search, Menu, Moon, Sun, User, LogOut, X 
 } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
 
 const DashboardHeader = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const router = useRouter();
   
   // For demo purposes, we're adding some dummy notifications
   const notifications = [
@@ -47,6 +51,21 @@ const DashboardHeader = () => {
     setIsProfileOpen(!isProfileOpen);
     // Close other dropdowns
     if (isNotificationsOpen) setIsNotificationsOpen(false);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/auth/login');
+  };
+
+  // Get user initials for avatar
+  const getInitials = () => {
+    if (!user || !user.name) return 'U';
+    
+    const nameParts = user.name.split(' ');
+    if (nameParts.length === 1) return nameParts[0].charAt(0).toUpperCase();
+    
+    return (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase();
   };
   
   return (
@@ -159,15 +178,19 @@ const DashboardHeader = () => {
               onClick={toggleProfile}
             >
               <div className="h-8 w-8 rounded-full bg-green-500 text-white flex items-center justify-center">
-                <span className="text-sm font-medium">JD</span>
+                <span className="text-sm font-medium">{getInitials()}</span>
               </div>
             </button>
             
             {isProfileOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md shadow-lg py-1 z-50">
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">John Doe</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">john.doe@example.com</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {user?.name || 'Benutzer'}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {user?.email || 'user@example.com'}
+                  </p>
                 </div>
                 
                 <ul>
@@ -181,13 +204,13 @@ const DashboardHeader = () => {
                     </Link>
                   </li>
                   <li>
-                    <Link 
-                      href="/logout" 
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700"
+                    <button 
+                      onClick={handleLogout}
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 w-full text-left"
                     >
                       <LogOut className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
                       Abmelden
-                    </Link>
+                    </button>
                   </li>
                 </ul>
               </div>

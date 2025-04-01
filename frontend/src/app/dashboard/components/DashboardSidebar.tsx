@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   Home, 
   Users, 
@@ -16,11 +16,14 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
 
 const DashboardSidebar = () => {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
+  const { logout } = useAuth();
+  const router = useRouter();
   
   const toggleSubmenu = (key: string) => {
     setOpenSubmenu(prev => prev === key ? null : key);
@@ -32,6 +35,11 @@ const DashboardSidebar = () => {
   
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/auth/login');
   };
 
   const menuItems = [
@@ -178,7 +186,7 @@ const DashboardSidebar = () => {
         <div className="px-4 mt-8">
           <button 
             className="flex items-center w-full p-2 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-            onClick={() => console.log('Logout')}
+            onClick={handleLogout}
           >
             <LogOut className="w-5 h-5" />
             <span className="ml-3">Abmelden</span>
