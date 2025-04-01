@@ -17,11 +17,31 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  // Lösche bestehende Daten (optional, aber empfohlen)
+  // Lösche bestehende Daten in der richtigen Reihenfolge
+  // Zuerst alle abhängigen Tabellen löschen
   await prisma.userActivity.deleteMany();
   await prisma.requestNote.deleteMany();
-  await prisma.user.deleteMany();
+  await prisma.appointmentNote.deleteMany();
+  await prisma.appointmentLog.deleteMany();
+  await prisma.projectNote.deleteMany();
+  await prisma.customerLog.deleteMany();
+  await prisma.serviceLog.deleteMany();
+  await prisma.requestLog.deleteMany();
+  await prisma.refreshToken.deleteMany();
+  await prisma.userSettings.deleteMany();
+  
+  // Dann die Haupttabellen löschen
+  await prisma.appointment.deleteMany();
+  await prisma.invoiceItem.deleteMany();
+  await prisma.invoice.deleteMany();
+  await prisma.project.deleteMany();
+  await prisma.service.deleteMany();
+  await prisma.contactRequest.deleteMany();
   await prisma.customer.deleteMany();
+  await prisma.notification.deleteMany();
+  
+  // Zuletzt die Benutzer löschen
+  await prisma.user.deleteMany();
   
   // Passwort-Hashing-Funktion
   const hashPassword = async (password: string) => {

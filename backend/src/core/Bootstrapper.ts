@@ -25,6 +25,7 @@ import { RefreshTokenRepository } from '../repositories/RefreshTokenRepository.j
 import { DashboardRepository } from '../repositories/DashboardRepository.js';
 import { AppointmentRepository } from '../repositories/AppointmentRepository.js';
 import { ProjectRepository } from '../repositories/ProjectRepository.js';
+import { ServiceRepository } from '../repositories/ServiceRepository.js';
 
 // Services
 import { UserService } from '../services/UserService.js';
@@ -34,6 +35,7 @@ import { AuthService } from '../services/AuthService.js';
 import { DashboardService } from '../services/DashboardService.js';
 import { AppointmentService } from '../services/AppointmentService.js';
 import { ProjectService } from '../services/ProjectService.js';
+import { ServiceService } from '../services/ServiceService.js';
 
 // Controllers
 import { UserController } from '../controllers/UserController.js';
@@ -43,6 +45,7 @@ import { AuthController } from '../controllers/AuthController.js';
 import { DashboardController } from '../controllers/DashboardController.js';
 import { AppointmentController } from '../controllers/AppointmentController.js';
 import { ProjectController } from '../controllers/ProjectController.js';
+import { ServiceController } from '../controllers/ServiceController.js';
 
 // Profile Components
 import { IProfileService } from '../interfaces/IProfileService.js';
@@ -76,6 +79,11 @@ import { IProjectService } from '../interfaces/IProjectService.js';
 import { IProjectController } from '../interfaces/IProjectController.js';
 import { IAppointmentService } from '../interfaces/IAppointmentService.js';
 import { IAppointmentController } from '../interfaces/IAppointmentController.js';
+
+// Service Components
+import { IServiceRepository } from '../interfaces/IServiceRepository.js';
+import { IServiceService } from '../interfaces/IServiceService.js';
+import { IServiceController } from '../interfaces/IServiceController.js';
 
 // Configuration
 import { SwaggerConfig } from '../config/SwaggerConfig.js';
@@ -249,6 +257,11 @@ export class Bootstrapper {
     this.container.register<IProjectRepository>('ProjectRepository', () => {
       return new ProjectRepository(prisma, logger, errorHandler);
     }, { singleton: true });
+    
+    // Service repository
+    this.container.register<IServiceRepository>('ServiceRepository', () => {
+      return new ServiceRepository(prisma, logger, errorHandler);
+    }, { singleton: true });
       
     logger.info('Repositories registered');
     return this;
@@ -334,6 +347,12 @@ export class Bootstrapper {
       const projectRepository = this.container.resolve<IProjectRepository>('ProjectRepository');
       return new ProjectService(projectRepository, logger, validator, errorHandler);
     }, { singleton: true });
+    
+    // Service service
+    this.container.register<IServiceService>('ServiceService', () => {
+      const serviceRepository = this.container.resolve<IServiceRepository>('ServiceRepository');
+      return new ServiceService(serviceRepository, logger, validator, errorHandler);
+    }, { singleton: true });
 
     logger.info('Services registered');
     return this;
@@ -409,6 +428,12 @@ export class Bootstrapper {
     this.container.register<IProjectController>('ProjectController', () => {
       const projectService = this.container.resolve<IProjectService>('ProjectService');
       return new ProjectController(projectService, logger, errorHandler);
+    }, { singleton: true });
+    
+    // Service controller
+    this.container.register<IServiceController>('ServiceController', () => {
+      const serviceService = this.container.resolve<IServiceService>('ServiceService');
+      return new ServiceController(serviceService, logger, errorHandler);
     }, { singleton: true });
 
     logger.info('Controllers registered');

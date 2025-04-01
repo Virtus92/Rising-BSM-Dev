@@ -39,16 +39,4 @@ export interface IServiceRepository extends IBaseRepository<Service, number> {
    * @returns Promise with statistics
    */
   getStatistics(serviceId: number): Promise<any>;
-  
-  /**
-   * Log activity for a service
-   * 
-   * @param serviceId - Service ID
-   * @param userId - User ID
-   * @param userName - User name
-   * @param action - Activity type
-   * @param details - Activity details
-   * @returns Promise with created activity log
-   */
-  logActivity(serviceId: number, userId: number, userName: string, action: string, details?: string): Promise<any>;
 }

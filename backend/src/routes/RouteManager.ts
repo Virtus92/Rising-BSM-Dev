@@ -23,11 +23,12 @@ import { createProfileRoutes } from './profile.routes.js';
 import { createSettingsRoutes } from './settings.routes.js';
 import { createProjectRoutes } from './projects.routes.js';
 import { createAppointmentRoutes } from './appointment-routes.js';
-// import { createServiceRoutes } from './services.routes';
+import { createServiceRoutes } from './services.routes.js';
 import { createRequestRoutes } from './requests.routes.js';
 import { configureDashboardRoutes } from './dashboardRoutes.js';
 import { AppointmentController } from '../controllers/AppointmentController.js';
 import { ProjectController } from '../controllers/ProjectController.js';
+import { ServiceController } from '../controllers/ServiceController.js';
 
 export class RouteManager {
   private readonly logger: ILoggingService;
@@ -53,6 +54,7 @@ export class RouteManager {
     const dashboardController = this.container.resolve<DashboardController>('DashboardController');
     const appointmentController = this.container.resolve<AppointmentController>('AppointmentController');
     const projectController = this.container.resolve<ProjectController>('ProjectController');
+    const serviceController = this.container.resolve<ServiceController>('ServiceController');
     const validationService = this.container.resolve<IValidationService>('ValidationService');
     const errorHandler = this.container.resolve<IErrorHandler>('ErrorHandler');
     
@@ -70,6 +72,7 @@ export class RouteManager {
     const dashboardRoutes = configureDashboardRoutes(dashboardController, authMiddleware);
     const appointmentRoutes = createAppointmentRoutes(appointmentController, authMiddleware, validationService, errorHandler);
     const projectRoutes = createProjectRoutes(projectController, authMiddleware, validationService, errorHandler);
+    const serviceRoutes = createServiceRoutes(serviceController, validationService, authMiddleware, errorHandler);
 
     // Mount individual route groups
     mainRouter.use('/', authRoutes);
@@ -78,13 +81,12 @@ export class RouteManager {
     mainRouter.use('/notifications', notificationRoutes);
     mainRouter.use('/profile', profileRoutes);
     mainRouter.use('/settings', settingsRoutes);
-    // Fix: Register a special route for the public request submission endpoint
-    // This is needed to match the OpenAPI definition
     mainRouter.post('/requests/public', (req, res) => requestController.submitRequest(req, res));
     mainRouter.use('/requests', requestRoutes);
     mainRouter.use('/dashboard', dashboardRoutes);
     mainRouter.use('/appointments', appointmentRoutes);
     mainRouter.use('/projects', projectRoutes);
+    mainRouter.use('/services', serviceRoutes);
 
     // Mount the main router with the API prefix
     app.use(this.apiPrefix, mainRouter);

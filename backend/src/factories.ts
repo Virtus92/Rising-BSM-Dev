@@ -8,6 +8,7 @@ import { CustomerRepository } from './repositories/CustomerRepository.js';
 import { NotificationRepository } from './repositories/NotificationRepository.js';
 import { UserRepository } from './repositories/UserRepository.js';
 import { RefreshTokenRepository } from './repositories/RefreshTokenRepository.js';
+import { ServiceRepository } from './repositories/ServiceRepository.js';
 
 // Services
 import { CustomerService } from './services/CustomerService.js';
@@ -17,6 +18,7 @@ import { UserService } from './services/UserService.js';
 import { ProfileService } from './services/ProfileService.js';
 import { SettingsService } from './services/SettingsService.js';
 import { RequestService } from './services/RequestService.js';
+import { ServiceService } from './services/ServiceService.js';
 
 // Controllers
 import { CustomerController } from './controllers/CustomerController.js';
@@ -26,6 +28,7 @@ import { UserController } from './controllers/UserController.js';
 import { ProfileController } from './controllers/ProfileController.js';
 import { SettingsController } from './controllers/SettingsController.js';
 import { RequestController } from './controllers/RequestController.js';
+import { ServiceController } from './controllers/ServiceController.js';
 
 // Import Request Repository
 import { RequestRepository } from './repositories/RequestRepository.js';
@@ -61,6 +64,11 @@ export const createRequestRepositoryFactory = () => createFactory(
 
 export const createProjectRepositoryFactory = () => createFactory(
   ProjectRepository,
+  ['PrismaClient', 'LoggingService', 'ErrorHandler']
+);
+
+export const createServiceRepositoryFactory = () => createFactory(
+  ServiceRepository,
   ['PrismaClient', 'LoggingService', 'ErrorHandler']
 );
 
@@ -105,6 +113,11 @@ export const createProjectServiceFactory = () => createFactory(
   ['ProjectRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
 );
 
+export const createServiceServiceFactory = () => createFactory(
+  ServiceService,
+  ['ServiceRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
+);
+
 // Create controller factories
 export const createCustomerControllerFactory = () => createFactory(
   CustomerController,
@@ -146,6 +159,11 @@ export const createProjectControllerFactory = () => createFactory(
   ['ProjectService', 'LoggingService', 'ErrorHandler']
 );
 
+export const createServiceControllerFactory = () => createFactory(
+  ServiceController,
+  ['ServiceService', 'LoggingService', 'ErrorHandler']
+);
+
 /**
  * Register all repositories with the DI container
  * 
@@ -158,6 +176,7 @@ export function registerRepositories(container: DiContainer): void {
   container.register('RefreshTokenRepository', createRefreshTokenRepositoryFactory(), { singleton: true });
   container.register('RequestRepository', createRequestRepositoryFactory(), { singleton: true });
   container.register('ProjectRepository', createProjectRepositoryFactory(), { singleton: true });
+  container.register('ServiceRepository', createServiceRepositoryFactory(), { singleton: true });
 }
 
 /**
@@ -174,6 +193,7 @@ export function registerServices(container: DiContainer): void {
   container.register('SettingsService', createSettingsServiceFactory(), { singleton: true });
   container.register('RequestService', createRequestServiceFactory(), { singleton: true });
   container.register('ProjectService', createProjectServiceFactory(), { singleton: true });
+  container.register('ServiceService', createServiceServiceFactory(), { singleton: true });
 }
 
 /**
@@ -190,6 +210,7 @@ export function registerControllers(container: DiContainer): void {
   container.register('SettingsController', createSettingsControllerFactory(), { singleton: true });
   container.register('RequestController', createRequestControllerFactory(), { singleton: true });
   container.register('ProjectController', createProjectControllerFactory(), { singleton: true });
+  container.register('ServiceController', createServiceControllerFactory(), { singleton: true });
 }
 
 /**

@@ -2,7 +2,7 @@ import { BaseRepository } from '../core/BaseRepository.js';
 import { IServiceRepository } from '../interfaces/IServiceRepository.js';
 import { Service } from '../entities/Service.js';
 import { ServiceFilterParams } from '../dtos/ServiceDtos.js';
-import { QueryOptions } from '../interfaces/IBaseRepository.js';
+import { FilterCriteria, QueryOptions } from '../interfaces/IBaseRepository.js';
 import { ILoggingService } from '../interfaces/ILoggingService.js';
 import { IErrorHandler } from '../interfaces/IErrorHandler.js';
 import { PrismaClient } from '@prisma/client';
@@ -11,6 +11,48 @@ import { PrismaClient } from '@prisma/client';
  * Implementation of IServiceRepository for database operations.
  */
 export class ServiceRepository extends BaseRepository<Service, number> implements IServiceRepository {
+  /**
+   * Processes filter criteria to build ORM-specific where conditions.
+   * 
+   * @param criteria - Filter criteria
+   * @returns ORM-specific where conditions
+   */
+  protected processCriteria(criteria: FilterCriteria): any {
+    const where: any = {};
+    
+    // Iterate over each filter criteria
+    for (const key in criteria) {
+      if (criteria.hasOwnProperty(key)) {
+        const value = criteria[key];
+        
+        // Handle different filter types
+        if (typeof value === 'string') {
+          // String equality
+          where[key] = value;
+        } else if (typeof value === 'number') {
+          // Number equality
+          where[key] = value;
+        } else if (Array.isArray(value)) {
+          // IN condition
+          where[key] = { in: value };
+        } else if (value && typeof value === 'object' && value.hasOwnProperty('gt')) {
+          // Greater than
+          where[key] = { gt: value.gt };
+        } else if (value && typeof value === 'object' && value.hasOwnProperty('lt')) {
+          // Less than
+          where[key] = { lt: value.lt };
+        } else if (value && typeof value === 'object' && value.hasOwnProperty('gte')) {
+          // Greater than or equal to
+          where[key] = { gte: value.gte };
+        } else if (value && typeof value === 'object' && value.hasOwnProperty('lte')) {
+          // Less than or equal to
+          where[key] = { lte: value.lte };
+        }
+      }
+    }
+    
+    return where;
+  }
   /**
    * Creates a new ServiceRepository instance
    * 
@@ -245,39 +287,6 @@ export class ServiceRepository extends BaseRepository<Service, number> implement
     } catch (error) {
       this.logger.error('Error in ServiceRepository.getStatistics', error instanceof Error ? error : String(error), { serviceId });
       throw this.handleError(error);
-    }
-  }
-
-  /**
-   * Log activity for a service
-   * 
-   * @param serviceId - Service ID
-   * @param userId - User ID
-   * @param userName - User name
-   * @param action - Activity type
-   * @param details - Activity details
-   * @returns Promise with created activity log
-   */
-  async logActivity(serviceId: number, userId: number, userName: string, action: string, details?: string): Promise<any> {
-    try {
-      return await this.prisma.serviceLog.create({
-        data: {
-          serviceId,
-          userId,
-          userName,
-          action,
-          details,
-          createdAt: new Date()
-        }
-      });
-    } catch (error) {
-      this.logger.error('Error logging service activity', error instanceof Error ? error : String(error), { 
-        serviceId, 
-        userId, 
-        action 
-      });
-      // Don't throw error for logging failures, just return null
-      return null;
     }
   }
 

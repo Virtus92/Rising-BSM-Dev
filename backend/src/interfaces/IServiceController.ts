@@ -1,13 +1,12 @@
 import { Request, Response } from 'express';
 import { IBaseController } from './IBaseController.js';
 import { Service } from '../entities/Service.js';
-import { ServiceCreateDto, ServiceUpdateDto, ServiceResponseDto } from '../dtos/ServiceDtos.js';
 
 /**
  * Interface for service controller
  * Extends the base controller with service-specific methods
  */
-export interface IServiceController extends IBaseController<Service, ServiceCreateDto, ServiceUpdateDto, ServiceResponseDto> {
+export interface IServiceController extends IBaseController<Service> {
   /**
    * Get all services with pagination and filtering
    * 
