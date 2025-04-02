@@ -2,14 +2,15 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import * as api from '@/lib/api';
+import * as authApi from '@/lib/api/auth';
+import { setTokens, clearTokens, getAccessToken, getRefreshToken, getUserFromToken } from '@/lib/auth';
 
 // Typen definieren
 export interface User {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'manager' | 'employee';
+  role: string;
 }
 
 interface AuthContextType {
@@ -17,55 +18,92 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, remember?: boolean) => Promise<void>;
   logout: () => Promise<void>;
+  refreshAuth: () => Promise<boolean>;
   clearError: () => void;
 }
 
-// AuthContext erstellen
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Provider erstellen
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  // Refresh Token Funktion
+  const refreshAuth = async (): Promise<boolean> => {
+    const refreshToken = getRefreshToken();
+    
+    if (!refreshToken) {
+      return false;
+    }
+    
+    try {
+      setLoading(true);
+      const response = await authApi.refreshToken(refreshToken);
+      
+      if (response.success && response.data) {
+        setTokens(response.data.accessToken, response.data.refreshToken);
+        
+        // User-Daten aus Token extrahieren
+        const user = getUserFromToken(response.data.accessToken);
+        if (user) {
+          setUser(user);
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Token refresh failed', error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Beim Laden prüfen, ob der Benutzer bereits angemeldet ist
   useEffect(() => {
-    const checkUserAuthentication = async () => {
-      try {
-        // Eine Möglichkeit wäre, einen API-Endpunkt zum Abrufen des aktuellen Benutzers aufzurufen
-        // Für dieses Beispiel simulieren wir, dass wir den Benutzer aus dem localStorage abrufen
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+    const initializeAuth = async () => {
+      const accessToken = getAccessToken();
+      
+      if (accessToken) {
+        const user = getUserFromToken(accessToken);
+        
+        if (user) {
+          setUser(user);
+        } else {
+          // Versuchen, das Token zu aktualisieren, wenn das Access Token abgelaufen ist
+          const refreshed = await refreshAuth();
+          
+          if (!refreshed) {
+            clearTokens();
+          }
         }
-      } catch (error) {
-        console.error('Authentication check failed', error);
-      } finally {
-        setLoading(false);
       }
+      
+      setLoading(false);
     };
 
-    checkUserAuthentication();
+    initializeAuth();
   }, []);
 
   // Login-Funktion
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, remember = false) => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await api.login(email, password);
+      const response = await authApi.login(email, password, remember);
       
       if (response.success && response.data) {
+        // Tokens speichern
+        setTokens(response.data.accessToken, response.data.refreshToken);
+        
+        // User-Daten direkt aus der Antwort verwenden
         setUser(response.data.user);
-        // Token und User im localStorage speichern
-        localStorage.setItem('auth_token', response.data.token);
-        localStorage.setItem('refresh_token', response.data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
         
         // Zur Dashboard-Seite navigieren
         router.push('/dashboard');
@@ -73,7 +111,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(response.message || 'Anmeldung fehlgeschlagen');
       }
     } catch (error: any) {
-      setError(error.message || 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.');
+      const errorMessage = error.message || 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
+      setError(errorMessage);
+      console.error('Login failed:', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -84,14 +124,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     
     try {
-      await api.logout();
+      const refreshToken = getRefreshToken();
+      if (refreshToken) {
+        await authApi.logout(refreshToken);
+      }
     } catch (error) {
-      console.error('Logout failed', error);
+      console.error('Logout API call failed', error);
     } finally {
-      // Token und User aus dem localStorage entfernen
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
+      // Tokens löschen
+      clearTokens();
       
       // User-State zurücksetzen
       setUser(null);
@@ -117,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         logout,
+        refreshAuth,
         clearError
       }}
     >

@@ -2,7 +2,7 @@
  * API service to communicate with the backend
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
 // Helper function to handle API responses
 async function handleResponse(response: Response) {
@@ -99,6 +99,13 @@ export async function updateCustomer(id: string, data: Record<string, any>) {
 export async function deleteCustomer(id: string) {
   return fetchApi(`/customers/${id}`, {
     method: 'DELETE',
+  });
+}
+
+export async function addCustomerNote(id: string, data: { note: string }) {
+  return fetchApi(`/customers/${id}/notes`, {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 }
 
@@ -202,6 +209,19 @@ export async function updateProjectStatus(id: string, status: string, note?: str
   return fetchApi(`/projects/${id}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status, note }),
+  });
+}
+
+export async function deleteProject(id: string) {
+  return fetchApi(`/projects/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function addProjectNote(id: string, data: { text: string }) {
+  return fetchApi(`/projects/${id}/notes`, {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 }
 

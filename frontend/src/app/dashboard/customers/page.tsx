@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import CustomerList from './components/CustomerList';
 import { getCustomers } from '@/lib/api';
 
-export default function CustomersPage() {
+function CustomersContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [customersData, setCustomersData] = useState<any>(null);
@@ -13,11 +13,11 @@ export default function CustomersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '10');
-  const status = searchParams.get('status') || 'all';
-  const type = searchParams.get('type') || 'all';
-  const search = searchParams.get('search') || '';
+  const page = parseInt(searchParams?.get('page') || '1');
+  const limit = parseInt(searchParams?.get('limit') || '10');
+  const status = searchParams?.get('status') || 'all';
+  const type = searchParams?.get('type') || 'all';
+  const search = searchParams?.get('search') || '';
 
   useEffect(() => {
     async function loadCustomers() {
@@ -56,9 +56,11 @@ export default function CustomersPage() {
     const newParams = new URLSearchParams();
     
     // Aktuelle Parameter beibehalten
-    for (const [key, value] of Array.from(searchParams.entries())) {
-      if (!(key in params)) {
-        newParams.append(key, value);
+    if (searchParams) {
+      for (const [key, value] of Array.from(searchParams.entries())) {
+        if (!(key in params)) {
+          newParams.append(key, value);
+        }
       }
     }
     
@@ -95,5 +97,14 @@ export default function CustomersPage() {
         onFilterChange={handleFilterChange}
       />
     </div>
+  );
+}
+
+// Wrap the component that uses useSearchParams in a Suspense boundary
+export default function CustomersPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CustomersContent />
+    </Suspense>
   );
 }

@@ -6,95 +6,156 @@
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 250, 250, 250;
   --background-end-rgb: 255, 255, 255;
-
-  --primary: 22, 163, 74;
-  --primary-foreground: 255, 255, 255;
-
-  --secondary: 241, 245, 249;
-  --secondary-foreground: 30, 41, 59;
-
-  --accent: 249, 250, 251;
-  --accent-foreground: 15, 23, 42;
-
-  --destructive: 239, 68, 68;
-  --destructive-foreground: 255, 255, 255;
-
-  --muted: 241, 245, 249;
-  --muted-foreground: 100, 116, 139;
-
-  --card: 255, 255, 255;
-  --card-foreground: 15, 23, 42;
-
-  --border: 226, 232, 240;
-  --input: 226, 232, 240;
-  --ring: 22, 163, 74;
-
+  
+  /* Added required HSL variables for Tailwind */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  
+  --primary: 142 76% 36%;
+  --primary-foreground: 0 0% 100%;
+  
+  --secondary: 217 24% 96%;
+  --secondary-foreground: 222 16% 17%;
+  
+  --accent: 210 40% 98%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215 16% 47%;
+  
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 142 76% 36%;
+  
   --radius: 0.5rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 15, 23, 42;
-    --background-end-rgb: 30, 41, 59;
-
-    --primary: 34, 197, 94;
-    --primary-foreground: 255, 255, 255;
-
-    --secondary: 30, 41, 59;
-    --secondary-foreground: 241, 245, 249;
-
-    --accent: 15, 23, 42;
-    --accent-foreground: 241, 245, 249;
-
-    --muted: 30, 41, 59;
-    --muted-foreground: 148, 163, 184;
-
-    --card: 15, 23, 42;
-    --card-foreground: 241, 245, 249;
-
-    --border: 51, 65, 85;
-    --input: 51, 65, 85;
-    --ring: 34, 197, 94;
-  }
+.dark {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 15, 23, 42;
+  --background-end-rgb: 30, 41, 59;
+  
+  /* Added required HSL variables for Tailwind */
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  
+  --primary: 142 71% 45%;
+  --primary-foreground: 0 0% 100%;
+  
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 40% 98%;
+  
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 142.1 76.2% 36.3%;
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 }
 
 @layer components {
   .hero-section {
-    @apply relative flex items-center justify-center overflow-hidden py-20 lg:py-32;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding-top: 5rem;
+    padding-bottom: 5rem;
     min-height: 85vh;
+  }
+  
+  @media (min-width: 1024px) {
+    .hero-section {
+      padding-top: 8rem;
+      padding-bottom: 8rem;
+    }
   }
 
   .hero-backdrop {
-    @apply absolute inset-0 z-0;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
   }
 
   .hero-overlay {
-    @apply absolute inset-0 z-10 bg-black/50;
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background-color: rgba(0, 0, 0, 0.5);
   }
 
   .animate-fade-up {
-    @apply opacity-0 translate-y-4 transition duration-700 ease-out;
+    opacity: 0;
+    transform: translateY(1rem);
+    transition-property: opacity, transform;
+    transition-duration: 700ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .animate-fade-up.animate-visible {
-    @apply opacity-100 translate-y-0;
+    opacity: 1;
+    transform: translateY(0);
   }
 
   .section-padding {
-    @apply py-12 md:py-16 lg:py-24;
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+  }
+  
+  @media (min-width: 768px) {
+    .section-padding {
+      padding-top: 4rem;
+      padding-bottom: 4rem;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .section-padding {
+      padding-top: 6rem;
+      padding-bottom: 6rem;
+    }
   }
 
   .card-hover {
-    @apply transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-1;
+    transition-property: all;
+    transition-duration: 300ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .card-hover:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transform: translateY(-0.25rem);
   }
 }

@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # Build Next.js app
-RUN npm run build
+RUN npm run build:docker
 
 # Command to run the app
 CMD ["npm", "start"]

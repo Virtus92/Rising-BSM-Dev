@@ -1,114 +1,188 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { User, Calendar, Briefcase, Inbox, Clock } from 'lucide-react';
+import { getDashboardData } from '../utils/dashboard-service';
+
 const RecentActivities = () => {
-    const activities = [
-      {
-        id: 1,
-        type: 'request',
-        title: 'Neue Anfrage',
-        description: 'Facility Management für Bürogebäude',
-        user: 'Max Mustermann',
-        time: 'Vor 30 Minuten',
-      },
-      {
-        id: 2,
-        type: 'appointment',
-        title: 'Termin bestätigt',
-        description: 'Beratungsgespräch für Winterdienst',
-        user: 'Julia Schneider',
-        time: 'Vor 2 Stunden',
-      },
-      {
-        id: 3,
-        type: 'project',
-        title: 'Projekt abgeschlossen',
-        description: 'Umzug Firmensitz Linz',
-        user: 'Thomas Huber',
-        time: 'Vor 5 Stunden',
-      },
-      {
-        id: 4,
-        type: 'customer',
-        title: 'Neuer Kunde',
-        description: 'Immobilienverwaltung Haus & Grund',
-        user: 'Laura Müller',
-        time: 'Vor 1 Tag',
-      },
-      {
-        id: 5,
-        type: 'invoice',
-        title: 'Rechnung beglichen',
-        description: 'Winterdienst Dezember 2023',
-        user: 'System',
-        time: 'Vor 1 Tag',
-      },
-    ];
-    
-    // Function to get icon based on activity type
-    const getActivityIcon = (type: string) => {
-      switch (type) {
-        case 'request':
-          return (
-            <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full">
-              <svg className="h-5 w-5 text-blue-600 dark:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </div>
-          );
-        case 'invoice':
-          return (
-            <div className="bg-red-100 dark:bg-red-900/30 p-2 rounded-full">
-              <svg className="h-5 w-5 text-red-600 dark:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-              </svg>
-            </div>
-          );
-        default:
-          return (
-            <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded-full">
-              <svg className="h-5 w-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          );
-      }
-    };
-  
-    return (
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 mt-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Aktuelle Aktivitäten</h3>
-          <button className="text-sm text-green-600 dark:text-green-500 hover:underline">
-            Alle anzeigen
-          </button>
-        </div>
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadActivities() {
+      try {
+        setLoading(true);
+        const response = await getDashboardData();
         
-        <div className="space-y-4">
-          {activities.map((activity) => (
-            <div key={activity.id} className="flex items-start">
-              <div className="flex-shrink-0 mr-4">
-                {getActivityIcon(activity.type)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {activity.title}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                  {activity.description}
-                </p>
-                <div className="flex items-center mt-1">
-                  <p className="text-xs text-gray-500 dark:text-gray-500">
-                    {activity.user}
-                  </p>
-                  <span className="mx-2 text-gray-400 dark:text-gray-600">•</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-500">
-                    {activity.time}
-                  </p>
+        if (response.success && response.data.activities) {
+          setActivities(response.data.activities);
+        } else {
+          // Wenn keine echten Daten verfügbar sind, verwende Beispieldaten
+          setActivities([
+            {
+              id: 1,
+              userId: 2,
+              userName: 'Max Mustermann',
+              activity: 'Neuen Kunden erstellt: Anna Schmidt',
+              timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString() // 30 Minuten zuvor
+            },
+            {
+              id: 2,
+              userId: 3,
+              userName: 'Maria Schmidt',
+              activity: 'Termin aktualisiert: Projektbesprechung',
+              timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString() // 45 Minuten zuvor
+            },
+            {
+              id: 3,
+              userId: 1,
+              userName: 'Admin User',
+              activity: 'Neues Projekt erstellt: Website-Redesign',
+              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString() // 2 Stunden zuvor
+            },
+            {
+              id: 4,
+              userId: 2,
+              userName: 'Max Mustermann',
+              activity: 'Kundenanfrage beantwortet: Steuerberatung',
+              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString() // 3 Stunden zuvor
+            },
+            {
+              id: 5,
+              userId: 3,
+              userName: 'Maria Schmidt',
+              activity: 'Projektdokumentation aktualisiert: SEO-Kampagne',
+              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString() // 4 Stunden zuvor
+            }
+          ]);
+        }
+      } catch (err) {
+        console.error('Error loading activities:', err);
+        setError('Fehler beim Laden der Aktivitäten');
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadActivities();
+  }, []);
+
+  // Icon für Aktivitätstyp
+  const getActivityIcon = (activity: string) => {
+    if (activity.includes('Kunde')) {
+      return <User className="h-5 w-5 text-blue-500" />;
+    } else if (activity.includes('Termin')) {
+      return <Calendar className="h-5 w-5 text-purple-500" />;
+    } else if (activity.includes('Projekt')) {
+      return <Briefcase className="h-5 w-5 text-green-500" />;
+    } else if (activity.includes('Anfrage')) {
+      return <Inbox className="h-5 w-5 text-amber-500" />;
+    } else {
+      return <Clock className="h-5 w-5 text-gray-500" />;
+    }
+  };
+
+  // Formatiere relative Zeit
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    if (diffSec < 60) {
+      return 'gerade eben';
+    } else if (diffMin < 60) {
+      return `vor ${diffMin} ${diffMin === 1 ? 'Minute' : 'Minuten'}`;
+    } else if (diffHour < 24) {
+      return `vor ${diffHour} ${diffHour === 1 ? 'Stunde' : 'Stunden'}`;
+    } else if (diffDay < 7) {
+      return `vor ${diffDay} ${diffDay === 1 ? 'Tag' : 'Tagen'}`;
+    } else {
+      return date.toLocaleDateString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+  };
+
+  // Lade-Indikator
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden col-span-2">
+        <div className="px-4 py-5 sm:px-6 animate-pulse">
+          <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-1"></div>
+        </div>
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-5 sm:p-0">
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="py-4 px-6 animate-pulse">
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                  </div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     );
-  };
-  
-  export default RecentActivities;
+  }
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden col-span-2">
+      <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+          Letzte Aktivitäten
+        </h2>
+        <Link 
+          href="/dashboard/activities" 
+          className="text-sm text-green-600 dark:text-green-500 hover:text-green-800 dark:hover:text-green-400"
+        >
+          Alle anzeigen
+        </Link>
+      </div>
+      <div className="border-t border-gray-200 dark:border-gray-700">
+        {activities.length === 0 ? (
+          <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+            Keine Aktivitäten gefunden.
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {activities.map((activity) => (
+              <div key={activity.id} className="py-4 px-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 mr-3">
+                    {getActivityIcon(activity.activity)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {activity.userName}
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {activity.activity}
+                    </div>
+                  </div>
+                  <div className="ml-3 flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                    {formatRelativeTime(activity.timestamp)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default RecentActivities;

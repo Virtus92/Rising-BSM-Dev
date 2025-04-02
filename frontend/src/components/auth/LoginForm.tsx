@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProvider';
 import { Eye, EyeOff } from 'lucide-react';
@@ -20,12 +20,36 @@ const loginSchema = z.object({
 });
 
 // Typ für das Formular erstellen
-type LoginFormValues = z.infer<typeof loginSchema>;
+interface LoginFormValues {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+}
 
 export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
-  const { login, loading, error } = useAuth();
+  const [redirectPath, setRedirectPath] = useState('/dashboard');
+  const { login, loading, error, clearError, isAuthenticated } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Sicherer Umgang mit searchParams in einem useEffect
+  useEffect(() => {
+    // Redirect-Parameter aus der URL abrufen
+    if (searchParams) {
+      const redirect = searchParams.get('redirect');
+      if (redirect) {
+        setRedirectPath(redirect);
+      }
+    }
+  }, [searchParams]);
+
+  // Weiterleitung zum Dashboard, wenn bereits angemeldet
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, router]);
 
   const { 
     register, 
@@ -41,7 +65,12 @@ export default function LoginForm() {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
-    await login(data.email, data.password);
+    try {
+      await login(data.email, data.password, data.rememberMe);
+      router.push(redirectPath);
+    } catch (error) {
+      // Fehler wird bereits im AuthProvider behandelt
+    }
   };
 
   return (
@@ -70,6 +99,7 @@ export default function LoginForm() {
             {...register('email')}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
             placeholder="ihre.email@beispiel.de"
+            onChange={() => error && clearError()}
           />
           {errors.email && (
             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email.message}</p>
@@ -92,6 +122,7 @@ export default function LoginForm() {
               {...register('password')}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
               placeholder="••••••••"
+              onChange={() => error && clearError()}
             />
             <button
               type="button"

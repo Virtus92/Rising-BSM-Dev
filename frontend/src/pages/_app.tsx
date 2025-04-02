@@ -2,7 +2,7 @@ import type { AppProps } from 'next/app';
 import { Inter } from 'next/font/google';
 import { ThemeProvider } from '../providers/ThemeProvider';
 import Layout from '../components/documentation/Layout';
-import '../styles/globals.css';
+import '../styles/globals.css'; // Import the documentation-specific CSS
 
 // Configure Inter font
 const inter = Inter({ 

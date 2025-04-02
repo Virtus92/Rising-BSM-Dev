@@ -29,32 +29,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     setIsSidebarOpen(!isSidebarOpen);
   };
   
-  // If it's the home page, use a different layout
-  const isHomePage = router.pathname === '/';
+  // Check if we're in a documentation page or app directory page
+  // If the pathname starts with /docs, we're in documentation
+  const isDocsPage = router.pathname.startsWith('/docs') || router.pathname === '/';
+  const isAppDirPage = !isDocsPage;
   
-  if (isHomePage) {
-    return (
-      <div className="flex min-h-screen flex-col bg-white dark:bg-gray-950">
-        <Header toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
-        <main className="flex-1">{children}</main>
-        <Footer />
-      </div>
-    );
+  // For app directory routes, return just the children to avoid layering issues
+  if (isAppDirPage) {
+    return <>{children}</>;
   }
   
+  // Documentation layout
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-gray-950">
       <Header toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
       
       <div className="flex flex-1">
-        <Sidebar isOpen={isSidebarOpen} />
+        {router.pathname !== '/' && <Sidebar isOpen={isSidebarOpen} />}
         
-        <main className="flex-1 md:ml-64 px-4 py-8 md:px-8">
+        <main className={`flex-1 ${router.pathname !== '/' ? 'md:ml-64' : ''} px-4 py-8 md:px-8`}>
           <div className="mx-auto max-w-4xl">{children}</div>
         </main>
       </div>
       
-      <div className="md:ml-64">
+      <div className={router.pathname !== '/' ? 'md:ml-64' : ''}>
         <Footer />
       </div>
       

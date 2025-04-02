@@ -7,6 +7,7 @@ import {
   Bell, Search, Menu, Moon, Sun, User, LogOut, X 
 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
+import { useToast } from '@/hooks/useToast';
 
 const DashboardHeader = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -15,6 +16,7 @@ const DashboardHeader = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { user, logout } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   
   // For demo purposes, we're adding some dummy notifications
   const notifications = [
@@ -54,8 +56,22 @@ const DashboardHeader = () => {
   };
 
   const handleLogout = async () => {
-    await logout();
-    router.push('/auth/login');
+    try {
+      await logout();
+      router.push('/auth/login');
+      toast({
+        title: 'Erfolgreich abgemeldet',
+        description: 'Sie wurden erfolgreich abgemeldet.',
+        variant: 'success'
+      });
+    } catch (error) {
+      console.error('Logout failed', error);
+      toast({
+        title: 'Fehler bei der Abmeldung',
+        description: 'Bitte versuchen Sie es erneut.',
+        variant: 'error'
+      });
+    }
   };
 
   // Get user initials for avatar
@@ -69,7 +85,7 @@ const DashboardHeader = () => {
   };
   
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 z-40 shadow-sm">
+    <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 shadow-sm h-16">
       <div className="flex items-center justify-between h-full px-4">
         {/* Left side - Logo and Mobile Menu */}
         <div className="flex items-center">
@@ -190,6 +206,9 @@ const DashboardHeader = () => {
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                     {user?.email || 'user@example.com'}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Mitarbeiter'}
                   </p>
                 </div>
                 

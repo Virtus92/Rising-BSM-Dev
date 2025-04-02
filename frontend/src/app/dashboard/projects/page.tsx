@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProjectList from './components/ProjectList';
 import { getProjects } from '@/lib/api';
 
-export default function ProjectsPage() {
+function ProjectsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [projectsData, setProjectsData] = useState<any>(null);
@@ -13,10 +13,10 @@ export default function ProjectsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '10');
-  const status = searchParams.get('status') || 'all';
-  const customerId = searchParams.get('customerId') || '';
+  const page = parseInt(searchParams?.get('page') || '1');
+  const limit = parseInt(searchParams?.get('limit') || '10');
+  const status = searchParams?.get('status') || 'all';
+  const customerId = searchParams?.get('customerId') || '';
 
   useEffect(() => {
     async function loadProjects() {
@@ -54,7 +54,8 @@ export default function ProjectsPage() {
     const newParams = new URLSearchParams();
     
     // Aktuelle Parameter beibehalten
-    for (const [key, value] of Array.from(searchParams.entries())) {
+    const currentParams = searchParams || new URLSearchParams();
+    for (const [key, value] of Array.from(currentParams.entries())) {
       if (!(key in params)) {
         newParams.append(key, value);
       }
@@ -93,5 +94,14 @@ export default function ProjectsPage() {
         onFilterChange={handleFilterChange}
       />
     </div>
+  );
+}
+
+// Wrap the component that uses useSearchParams in a Suspense boundary
+export default function ProjectsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ProjectsContent />
+    </Suspense>
   );
 }

@@ -1,10 +1,39 @@
-import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import LoginForm from '@/components/auth/LoginForm';
 
-export const metadata: Metadata = {
-  title: 'Anmelden - Rising BSM',
-  description: 'Melden Sie sich bei Rising BSM an',
-};
+// Loader-Komponente als Fallback für Suspense
+function LoginFormSkeleton() {
+  return (
+    <div className="max-w-md mx-auto bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8 animate-pulse">
+      <div className="text-center mb-8">
+        <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded w-3/4 mx-auto"></div>
+        <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-2/3 mx-auto mt-2"></div>
+      </div>
+      
+      <div className="space-y-6">
+        <div>
+          <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/3 mb-1"></div>
+          <div className="h-10 bg-gray-200 dark:bg-slate-700 rounded w-full"></div>
+        </div>
+        
+        <div>
+          <div className="flex justify-between mb-1">
+            <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/4"></div>
+            <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/4"></div>
+          </div>
+          <div className="h-10 bg-gray-200 dark:bg-slate-700 rounded w-full"></div>
+        </div>
+        
+        <div className="flex items-center">
+          <div className="h-4 w-4 bg-gray-200 dark:bg-slate-700 rounded"></div>
+          <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/3 ml-2"></div>
+        </div>
+        
+        <div className="h-10 bg-gray-200 dark:bg-slate-700 rounded w-full"></div>
+      </div>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   return (
@@ -15,7 +44,10 @@ export default function LoginPage() {
             <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">Rising BSM</h2>
           </div>
           
-          <LoginForm />
+          {/* LoginForm in Suspense einbetten */}
+          <Suspense fallback={<LoginFormSkeleton />}>
+            <LoginForm />
+          </Suspense>
             
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">

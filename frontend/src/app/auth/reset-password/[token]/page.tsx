@@ -1,18 +1,20 @@
 import type { Metadata } from 'next';
 import ResetPasswordForm from '@/components/auth/ResetPasswordForm';
 
-export const metadata: Metadata = {
-  title: 'Passwort zurücksetzen - Rising BSM',
-  description: 'Setzen Sie Ihr Passwort für Rising BSM zurück',
-};
+type Props = {
+  params: { token: string };
+  searchParams: Record<string, string | string[] | undefined>;
+}
 
-interface ResetPasswordPageProps {
-  params: {
-    token: string;
+// Generate dynamic metadata including the token
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  return {
+    title: `Passwort zurücksetzen (${params.token}) - Rising BSM`,
+    description: 'Setzen Sie Ihr Passwort für Rising BSM zurück',
   };
 }
 
-export default function ResetPasswordPage({ params }: ResetPasswordPageProps) {
+export default async function ResetPasswordPage({ params }: Props) {
   const { token } = params;
   
   return (

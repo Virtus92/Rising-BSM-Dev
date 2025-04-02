@@ -1,8 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* styles/globals.css */
+/* This file is no longer used - main CSS is in src/app/globals.css */
 
-/* Custom styles for documentation pages */
 @layer base {
   body {
     @apply bg-background text-foreground;

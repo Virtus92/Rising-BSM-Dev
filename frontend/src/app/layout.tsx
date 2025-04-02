@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
+import { QueryProvider } from '@/providers/QueryProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -20,9 +21,12 @@ export default function RootLayout({
     <html lang="de" className="scroll-smooth">
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          <QueryProvider>
+            <AuthProvider>
+              {children}
+              {/* Toaster entfernt, da sonner nicht verfügbar ist */}
+            </AuthProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>
