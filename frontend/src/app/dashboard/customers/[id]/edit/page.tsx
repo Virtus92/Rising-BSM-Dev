@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Save } from 'lucide-react';
 import { getCustomerById, updateCustomer } from '@/lib/api';
+import { ApiResponse, Customer } from '@/lib/api/types';
 
 // Parameter Type erweitern
 interface PageParams {
@@ -44,8 +45,8 @@ export default function EditCustomerPage() {
         
         const response = await getCustomerById(customerId);
         
-        if (response.success) {
-          const customer = response.data.customer;
+        if (response.success && response.data) {
+          const customer = response.data as Customer;
           
           setFormData({
             name: customer.name || '',
@@ -58,7 +59,7 @@ export default function EditCustomerPage() {
             country: customer.country || 'Austria',
             type: customer.type || 'private',
             newsletter: customer.newsletter || false,
-            notes: customer.notes || '',
+            notes: Array.isArray(customer.notes) ? customer.notes.join('\n') : (customer.notes || ''),
             status: customer.status || 'active'
           });
         } else {

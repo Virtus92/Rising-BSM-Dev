@@ -54,7 +54,7 @@ const Contact = () => {
     
     try {
       // Send form data directly to the backend
-      const response = await fetch('http://localhost:5000/api/v1/contact', {
+      const response = await fetch('http://localhost:5000/api/v1/requests/public', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

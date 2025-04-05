@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as appointmentsApi from '@/lib/api/appointments';
-import { Appointment, AppointmentCreate, AppointmentUpdate } from '@/types/appointments';
+import { Appointment, AppointmentCreateRequest as AppointmentCreate, AppointmentUpdateRequest as AppointmentUpdate } from '@/lib/api/types';
 import { useToast } from '@/hooks/useToast';
 
 export function useAppointments(params: Record<string, any> = {}) {
@@ -10,11 +10,31 @@ export function useAppointments(params: Record<string, any> = {}) {
     queryKey: ['appointments', params],
     queryFn: async () => {
       try {
-        return await appointmentsApi.getAppointments(params);
+        const response = await appointmentsApi.getAppointments(params);
+        
+        // Datenstruktur normalisieren
+        if (response.success) {
+          if (Array.isArray(response.data)) {
+            // Wenn response.data bereits ein Array ist
+            return {
+              ...response,
+              data: response.data
+            };
+          } else if (response.data && response.data.appointments && Array.isArray(response.data.appointments)) {
+            // Wenn appointments im data-Objekt eingebettet sind
+            return {
+              ...response,
+              data: response.data.appointments
+            };
+          }
+        }
+        
+        return response;
       } catch (error: any) {
+        console.error('Error in useAppointments hook:', error);
         toast({
-          title: 'Fehler beim Laden der Termine',
-          description: error.message || 'Bitte versuchen Sie es später erneut.',
+          title: 'Error loading appointments',
+          description: error.message || 'Please try again later.',
           variant: 'error',
         });
         throw error;
@@ -33,8 +53,8 @@ export function useAppointment(id: number | string) {
         return await appointmentsApi.getAppointmentById(id);
       } catch (error: any) {
         toast({
-          title: 'Fehler beim Laden des Termins',
-          description: error.message || 'Bitte versuchen Sie es später erneut.',
+          title: 'Error loading appointment',
+          description: error.message || 'Please try again later.',
           variant: 'error',
         });
         throw error;
@@ -51,19 +71,19 @@ export function useCreateAppointment() {
   return useMutation({
     mutationFn: (data: AppointmentCreate) => appointmentsApi.createAppointment(data),
     onSuccess: () => {
-      // Alle Termine-Abfragen ungültig machen
+      // Invalidate all appointments queries
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       
       toast({
-        title: 'Termin erstellt',
-        description: 'Der Termin wurde erfolgreich erstellt.',
+        title: 'Appointment created',
+        description: 'The appointment was successfully created.',
         variant: 'success',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Fehler beim Erstellen des Termins',
-        description: error.message || 'Bitte versuchen Sie es später erneut.',
+        title: 'Error creating appointment',
+        description: error.message || 'Please try again later.',
         variant: 'error',
       });
     },
@@ -77,20 +97,20 @@ export function useUpdateAppointment(id: number | string) {
   return useMutation({
     mutationFn: (data: AppointmentUpdate) => appointmentsApi.updateAppointment(id, data),
     onSuccess: () => {
-      // Einzelnen Termin und Liste der Termine ungültig machen
+      // Invalidate the individual appointment and the list of appointments
       queryClient.invalidateQueries({ queryKey: ['appointment', id] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       
       toast({
-        title: 'Termin aktualisiert',
-        description: 'Der Termin wurde erfolgreich aktualisiert.',
+        title: 'Appointment updated',
+        description: 'The appointment was successfully updated.',
         variant: 'success',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Fehler beim Aktualisieren des Termins',
-        description: error.message || 'Bitte versuchen Sie es später erneut.',
+        title: 'Error updating appointment',
+        description: error.message || 'Please try again later.',
         variant: 'error',
       });
     },
@@ -110,15 +130,15 @@ export function useUpdateAppointmentStatus(id: number | string) {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       
       toast({
-        title: 'Status aktualisiert',
-        description: 'Der Status des Termins wurde erfolgreich aktualisiert.',
+        title: 'Status updated',
+        description: 'The appointment status was successfully updated.',
         variant: 'success',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Fehler beim Aktualisieren des Status',
-        description: error.message || 'Bitte versuchen Sie es später erneut.',
+        title: 'Error updating status',
+        description: error.message || 'Please try again later.',
         variant: 'error',
       });
     },
@@ -132,19 +152,19 @@ export function useDeleteAppointment() {
   return useMutation({
     mutationFn: (id: number | string) => appointmentsApi.deleteAppointment(id),
     onSuccess: () => {
-      // Liste der Termine ungültig machen
+      // Invalidate the appointments list
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       
       toast({
-        title: 'Termin gelöscht',
-        description: 'Der Termin wurde erfolgreich gelöscht.',
+        title: 'Appointment deleted',
+        description: 'The appointment was successfully deleted.',
         variant: 'success',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Fehler beim Löschen des Termins',
-        description: error.message || 'Bitte versuchen Sie es später erneut.',
+        title: 'Error deleting appointment',
+        description: error.message || 'Please try again later.',
         variant: 'error',
       });
     },
@@ -158,19 +178,19 @@ export function useAddAppointmentNote(id: number | string) {
   return useMutation({
     mutationFn: (note: string) => appointmentsApi.addAppointmentNote(id, note),
     onSuccess: () => {
-      // Einzelnen Termin ungültig machen
+      // Invalidate the individual appointment
       queryClient.invalidateQueries({ queryKey: ['appointment', id] });
       
       toast({
-        title: 'Notiz hinzugefügt',
-        description: 'Die Notiz wurde erfolgreich hinzugefügt.',
+        title: 'Note added',
+        description: 'The note was successfully added.',
         variant: 'success',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Fehler beim Hinzufügen der Notiz',
-        description: error.message || 'Bitte versuchen Sie es später erneut.',
+        title: 'Error adding note',
+        description: error.message || 'Please try again later.',
         variant: 'error',
       });
     },

@@ -5,11 +5,25 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Save } from 'lucide-react';
 import { getProjectById, updateProject, getCustomers, getServices } from '@/lib/api';
+import { Project } from '@/lib/api/types';
 
 // Parameter Type erweitern
 interface PageParams {
   id: string;
   [key: string]: string | string[] | undefined;
+}
+
+// Interfaces for API responses
+interface ProjectResponse {
+  project: Project;
+}
+
+interface CustomerResponse {
+  customers: Array<{id: number, name: string, [key: string]: any}>;
+}
+
+interface ServiceResponse {
+  services: Array<{id: number, name: string, basePrice: number, [key: string]: any}>;
 }
 
 export default function EditProjectPage() {
@@ -46,9 +60,9 @@ export default function EditProjectPage() {
         setError(null);
         
         // Load project data
-        const projectResponse = await getProjectById(projectId);
+        const projectResponse = await getProjectById<ProjectResponse>(projectId);
         
-        if (projectResponse.success) {
+        if (projectResponse.success && projectResponse.data) {
           const project = projectResponse.data.project;
           
           setFormData({
@@ -66,14 +80,14 @@ export default function EditProjectPage() {
         }
         
         // Load customers
-        const customersResponse = await getCustomers();
-        if (customersResponse.success) {
+        const customersResponse = await getCustomers<CustomerResponse>();
+        if (customersResponse.success && customersResponse.data) {
           setCustomers(customersResponse.data.customers);
         }
         
         // Load services
-        const servicesResponse = await getServices();
-        if (servicesResponse.success) {
+        const servicesResponse = await getServices<ServiceResponse>();
+        if (servicesResponse.success && servicesResponse.data) {
           setServices(servicesResponse.data.services);
         }
       } catch (err) {
@@ -106,7 +120,7 @@ export default function EditProjectPage() {
       setSaving(true);
       setError(null);
       
-      const response = await updateProject(projectId, formData);
+      const response = await updateProject<{success: boolean, message?: string}>(projectId, formData);
       
       if (response.success) {
         router.push(`/dashboard/projects/${projectId}`);

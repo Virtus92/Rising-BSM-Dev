@@ -14,10 +14,16 @@ export default function DashboardLayout({
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
 
+  // Debug-Informationen
+  useEffect(() => {
+    console.log('Dashboard Auth Status:', { isAuthenticated, loading });
+  }, [isAuthenticated, loading]);
+
   // Zusätzlicher Client-Side-Schutz für das Dashboard
   useEffect(() => {
     // Warten, bis der Auth-Status geladen ist, um Flackern zu vermeiden
     if (!loading && !isAuthenticated) {
+      console.log('Nicht authentifiziert, leite um zu Login...');
       router.push('/auth/login?redirect=/dashboard');
     }
   }, [isAuthenticated, loading, router]);

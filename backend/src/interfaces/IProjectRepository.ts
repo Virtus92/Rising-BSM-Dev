@@ -84,5 +84,5 @@ export interface IProjectRepository extends IBaseRepository<Project, number> {
    * @param filters - Optional filter parameters
    * @returns Promise with statistics
    */
-  getStatistics(filters?: Partial<ProjectFilterParams>): Promise<any>;
+  getProjectStatistics(filters?: Partial<ProjectFilterParams>): Promise<any>;
 }

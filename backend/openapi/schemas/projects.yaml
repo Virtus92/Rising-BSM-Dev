@@ -46,7 +46,7 @@ Project:
       description: Project description
     status:
       type: string
-      enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+      enum: [new, in_progress, completed, canceled]
       description: Project status
     statusLabel:
       type: string
@@ -104,8 +104,8 @@ ProjectCreate:
       maxLength: 2000
     status:
       type: string
-      enum: [neu, in_bearbeitung, abgeschlossen, storniert]
-      default: neu
+      enum: [new, in_progress, completed, canceled]
+      default: new
       description: Project status
 
 ProjectUpdate:
@@ -146,7 +146,7 @@ ProjectUpdate:
       maxLength: 2000
     status:
       type: string
-      enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+      enum: [new, in_progress, completed, canceled]
       description: Project status
 
 ProjectStatusUpdate:
@@ -156,7 +156,7 @@ ProjectStatusUpdate:
   properties:
     status:
       type: string
-      enum: [neu, in_bearbeitung, abgeschlossen, storniert]
+      enum: [new, in_progress, completed, canceled]
       description: New project status
     note:
       type: string
@@ -237,13 +237,13 @@ ProjectStatistics:
     statusCounts:
       type: object
       properties:
-        neu:
+        new:
           type: integer
-        in_bearbeitung:
+        in_progress:
           type: integer
-        abgeschlossen:
+        completed:
           type: integer
-        storniert:
+        canceled:
           type: integer
     totalValue:
       type: number

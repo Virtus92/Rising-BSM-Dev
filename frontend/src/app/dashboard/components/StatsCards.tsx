@@ -7,11 +7,23 @@ import {
   Inbox, 
   Briefcase, 
   TrendingUp, 
-  TrendingDown 
+  TrendingDown,
+  AlertCircle 
 } from 'lucide-react';
-import { getDashboardData } from '../utils/dashboard-service';
+import { getDashboardData, StatItem } from '../utils/dashboard-service';
+import { ApiRequestError } from '@/lib/api/config';
 
-type StatCardProps = {
+// Definieren von Typen für Stats-Daten
+export interface DashboardStats {
+  customers?: StatItem;
+  appointments?: StatItem;
+  requests?: StatItem;
+  projects?: StatItem;
+  [key: string]: StatItem | undefined;
+}
+
+// Props für eine einzelne Statistik-Karte
+interface StatCardProps {
   title: string;
   value: string | number;
   description: string;
@@ -20,18 +32,51 @@ type StatCardProps = {
     value: number;
     isPositive: boolean;
   };
+  loading?: boolean;
   className?: string;
-};
+}
 
-const StatCard = ({ title, value, description, icon, trend, className }: StatCardProps) => {
+/**
+ * Einzelne Statistik-Karte Komponente
+ */
+const StatCard: React.FC<StatCardProps> = ({ 
+  title, 
+  value, 
+  description, 
+  icon, 
+  trend, 
+  loading = false,
+  className = '' 
+}) => {
+  // Skeleton UI, wenn Daten geladen werden
+  if (loading) {
+    return (
+      <div className={`bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 animate-pulse ${className}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-2"></div>
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+          </div>
+          <div className="bg-gray-200 dark:bg-gray-700 p-3 rounded-full h-12 w-12"></div>
+        </div>
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+      </div>
+    );
+  }
+
+  // Farbschema basierend auf dem Trend
+  const iconBgColor = trend?.isPositive 
+    ? 'bg-green-100 dark:bg-green-900/30' 
+    : trend ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30';
+  
   return (
-    <div className={`bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 ${className}`}>
+    <div className={`bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 transition-all hover:shadow-lg ${className}`}>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</h3>
           <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
         </div>
-        <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-full">
+        <div className={`${iconBgColor} p-3 rounded-full`}>
           {icon}
         </div>
       </div>
@@ -40,9 +85,9 @@ const StatCard = ({ title, value, description, icon, trend, className }: StatCar
         {trend && (
           <div className={`flex items-center mr-2 ${trend.isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
             {trend.isPositive ? (
-              <TrendingUp className="h-4 w-4 mr-1" />
+              <TrendingUp className="h-4 w-4 mr-1" aria-hidden="true" />
             ) : (
-              <TrendingDown className="h-4 w-4 mr-1" />
+              <TrendingDown className="h-4 w-4 mr-1" aria-hidden="true" />
             )}
             <span className="text-sm font-medium">{trend.value}%</span>
           </div>
@@ -53,147 +98,175 @@ const StatCard = ({ title, value, description, icon, trend, className }: StatCar
   );
 };
 
-const StatsCards = () => {
-  const [stats, setStats] = useState<any>(null);
+/**
+ * Error Message Komponente für Fehleranzeigen
+ */
+const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
+  <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg mb-6 flex items-start">
+    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2 mt-0.5 flex-shrink-0" />
+    <p className="text-red-700 dark:text-red-400">{message}</p>
+  </div>
+);
+
+/**
+ * Hauptkomponente für Statistik-Karten
+ */
+const StatsCards: React.FC = () => {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Laden der Dashboard-Daten
   useEffect(() => {
-    async function loadDashboardData() {
+    const loadDashboardData = async () => {
       try {
         setLoading(true);
+        setError(null);
         const response = await getDashboardData();
         
-        if (response.success) {
-          setStats(response.data);
+        if (response.success && response.data?.stats) {
+          setStats(response.data.stats);
         } else {
-          setError(response.error || 'Fehler beim Laden der Dashboard-Daten');
+          throw new Error('Keine Statistikdaten verfügbar');
         }
       } catch (err) {
-        console.error('Error loading dashboard data:', err);
-        setError('Fehler beim Laden der Dashboard-Daten. Bitte versuchen Sie es später erneut.');
+        console.error('Fehler beim Laden der Dashboard-Daten:', err);
+        let errorMessage = 'Fehler beim Laden der Dashboard-Daten';
+        
+        if (err instanceof ApiRequestError) {
+          errorMessage = err.message;
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
-    }
+    };
     
     loadDashboardData();
+    
+    // Polling-Intervall für Dashboard-Daten (alle 5 Minuten)
+    const intervalId = setInterval(loadDashboardData, 5 * 60 * 1000);
+    
+    // Intervall bereinigen, wenn die Komponente unmontiert wird
+    return () => clearInterval(intervalId);
   }, []);
 
-  // Lade-Indikator
-  if (loading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="animate-pulse bg-white dark:bg-slate-800 rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-2"></div>
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-              </div>
-              <div className="bg-gray-200 dark:bg-gray-700 p-3 rounded-full h-12 w-12"></div>
-            </div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-          </div>
-        ))}
-      </div>
-    );
+  // Sicherstellen, dass alle benötigten Statsobjekte existieren
+  useEffect(() => {
+    if (stats && !loading) {
+      console.log('Verarbeitete Stats im Frontend:', stats);
+    }
+  }, [stats, loading]);
+
+  // Array von Statistikkarten für einfacheres Rendern
+  const statCards = [
+    {
+      title: "Kunden",
+      getValue: () => {
+        const total = stats?.customers?.total;
+        return typeof total === 'number' && !isNaN(total) ? total : 0;
+      },
+      getDescription: () => {
+        const newCustomers = stats?.customers?.new;
+        return `Gesamt (${typeof newCustomers === 'number' && !isNaN(newCustomers) ? newCustomers : 0} neue im letzten Monat)`;
+      },
+      getIcon: () => <Users className="h-6 w-6 text-green-600 dark:text-green-500" aria-hidden="true" />,
+      getTrend: () => {
+        const newCustomers = stats?.customers?.new || 0;
+        const total = stats?.customers?.total || 1;
+        return {
+          value: Math.round((newCustomers / total * 100)) || 0,
+          isPositive: newCustomers > 0
+        };
+      }
+    },
+    {
+      title: "Termine",
+      getValue: () => {
+        const upcoming = stats?.appointments?.upcoming;
+        return typeof upcoming === 'number' && !isNaN(upcoming) ? upcoming : 0;
+      },
+      getDescription: () => {
+        const today = stats?.appointments?.today;
+        return `Anstehend (${typeof today === 'number' && !isNaN(today) ? today : 0} heute)`;
+      },
+      getIcon: () => <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-500" aria-hidden="true" />,
+      getTrend: () => {
+        const trend = stats?.appointments?.trend;
+        if (typeof trend !== 'number' || isNaN(trend)) return undefined;
+        return {
+          value: Math.abs(trend),
+          isPositive: trend > 0
+        };
+      }
+    },
+    {
+      title: "Anfragen",
+      getValue: () => {
+        const newReq = stats?.requests?.new || 0;
+        const inProgress = stats?.requests?.inProgress || 0;
+        return (typeof newReq === 'number' && !isNaN(newReq) ? newReq : 0) + 
+               (typeof inProgress === 'number' && !isNaN(inProgress) ? inProgress : 0);
+      },
+      getDescription: () => {
+        const newReq = stats?.requests?.new;
+        const inProgress = stats?.requests?.inProgress;
+        return `${typeof newReq === 'number' && !isNaN(newReq) ? newReq : 0} neu, ${typeof inProgress === 'number' && !isNaN(inProgress) ? inProgress : 0} in Bearbeitung`;
+      },
+      getIcon: () => <Inbox className="h-6 w-6 text-purple-600 dark:text-purple-500" aria-hidden="true" />,
+      getTrend: () => {
+        const trend = stats?.requests?.trend;
+        if (typeof trend !== 'number' || isNaN(trend)) return undefined;
+        return {
+          value: Math.abs(trend),
+          isPositive: trend < 0 // Weniger offene Anfragen ist positiv
+        };
+      }
+    },
+    {
+      title: "Projekte",
+      getValue: () => {
+        const active = stats?.projects?.active;
+        return typeof active === 'number' && !isNaN(active) ? active : 0;
+      },
+      getDescription: () => {
+        const newProj = stats?.projects?.new;
+        const completed = stats?.projects?.completed;
+        return `Aktiv (${typeof newProj === 'number' && !isNaN(newProj) ? newProj : 0} neu, ${typeof completed === 'number' && !isNaN(completed) ? completed : 0} abgeschlossen)`;
+      },
+      getIcon: () => <Briefcase className="h-6 w-6 text-yellow-600 dark:text-yellow-500" aria-hidden="true" />,
+      getTrend: () => {
+        const trend = stats?.projects?.trend;
+        if (typeof trend !== 'number' || isNaN(trend)) return undefined;
+        return {
+          value: Math.abs(trend),
+          isPositive: trend > 0
+        };
+      }
+    }
+  ];
+
+  // Wenn ein Fehler aufgetreten ist und das Laden abgeschlossen ist
+  if (error && !loading) {
+    return <ErrorMessage message={error} />;
   }
 
-  // Fehler-Anzeige
-  if (error) {
-    return (
-      <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg mb-6">
-        <p className="text-red-700 dark:text-red-400">{error}</p>
-      </div>
-    );
-  }
-
-  // Wenn keine Daten verfügbar sind, zeige Dummydaten
-  if (!stats) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Kunden"
-          value="124"
-          description="Gesamt (12 neue im letzten Monat)"
-          icon={<Users className="h-6 w-6 text-green-600 dark:text-green-500" />}
-          trend={{ value: 8, isPositive: true }}
-        />
-        
-        <StatCard
-          title="Termine"
-          value="36"
-          description="Anstehend in diesem Monat"
-          icon={<Calendar className="h-6 w-6 text-green-600 dark:text-green-500" />}
-          trend={{ value: 5, isPositive: true }}
-        />
-        
-        <StatCard
-          title="Anfragen"
-          value="18"
-          description="Neue unbearbeitete Anfragen"
-          icon={<Inbox className="h-6 w-6 text-green-600 dark:text-green-500" />}
-          trend={{ value: 12, isPositive: false }}
-        />
-        
-        <StatCard
-          title="Projekte"
-          value="42"
-          description="Aktive Projekte"
-          icon={<Briefcase className="h-6 w-6 text-green-600 dark:text-green-500" />}
-          trend={{ value: 2, isPositive: true }}
-        />
-      </div>
-    );
-  }
-
-  // Zeige echte Daten aus dem Backend
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <StatCard
-        title="Kunden"
-        value={stats.customers?.total || 0}
-        description={`Gesamt (${stats.customers?.new || 0} neue im letzten Monat)`}
-        icon={<Users className="h-6 w-6 text-green-600 dark:text-green-500" />}
-        trend={{ 
-          value: Math.round((stats.customers?.new || 0) / (stats.customers?.total || 1) * 100), 
-          isPositive: true 
-        }}
-      />
-      
-      <StatCard
-        title="Termine"
-        value={stats.appointments?.upcoming || 0}
-        description={`Anstehend (${stats.appointments?.today || 0} heute)`}
-        icon={<Calendar className="h-6 w-6 text-green-600 dark:text-green-500" />}
-        trend={stats.appointments?.trend ? {
-          value: Math.abs(stats.appointments.trend),
-          isPositive: stats.appointments.trend > 0
-        } : undefined}
-      />
-      
-      <StatCard
-        title="Anfragen"
-        value={(stats.requests?.new || 0) + (stats.requests?.inProgress || 0)}
-        description={`${stats.requests?.new || 0} neu, ${stats.requests?.inProgress || 0} in Bearbeitung`}
-        icon={<Inbox className="h-6 w-6 text-green-600 dark:text-green-500" />}
-        trend={stats.requests?.trend ? {
-          value: Math.abs(stats.requests.trend),
-          isPositive: stats.requests.trend < 0 // Weniger Anfragen ist positiv
-        } : undefined}
-      />
-      
-      <StatCard
-        title="Projekte"
-        value={stats.projects?.active || 0}
-        description={`Aktiv (${stats.projects?.new || 0} neu, ${stats.projects?.completed || 0} abgeschlossen)`}
-        icon={<Briefcase className="h-6 w-6 text-green-600 dark:text-green-500" />}
-        trend={stats.projects?.trend ? {
-          value: Math.abs(stats.projects.trend),
-          isPositive: stats.projects.trend > 0
-        } : undefined}
-      />
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" role="region" aria-label="Dashboard Statistiken">
+      {statCards.map((card, index) => (
+        <StatCard
+          key={index}
+          title={card.title}
+          value={card.getValue()}
+          description={card.getDescription()}
+          icon={card.getIcon()}
+          trend={!loading ? card.getTrend() : undefined}
+          loading={loading}
+        />
+      ))}
     </div>
   );
 };

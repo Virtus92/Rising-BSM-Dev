@@ -2,70 +2,60 @@
  * API service to communicate with the backend
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-
-// Helper function to handle API responses
-async function handleResponse(response: Response) {
-  if (!response.ok) {
-    // Try to get error details from the response
-    try {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Ein Fehler ist aufgetreten');
-    } catch (error) {
-      // If parsing the response fails, throw a generic error with the status
-      throw new Error(`API-Fehler: ${response.status}`);
-    }
-  }
-  
-  return response.json();
-}
-
-// Generic fetch function with error handling
-async function fetchApi(endpoint: string, options: RequestInit = {}) {
-  try {
-    const url = `${API_BASE_URL}${endpoint}`;
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-    
-    return await handleResponse(response);
-  } catch (error) {
-    console.error('API request failed:', error);
-    throw error;
-  }
-}
+import { fetchApi } from './api/config';
+import { getAccessToken } from './auth';
 
 // API functions
 
 // Auth
-export async function login(email: string, password: string) {
-  return fetchApi('/auth/login', {
+export async function login(email: string, password: string, remember: boolean = false) {
+  console.log('Attempting login with email:', email);
+  return fetchApi('/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
+    body: JSON.stringify({ email, password, remember }),
+  }, false);
 }
 
-export async function logout() {
+export async function logout(refreshToken: string) {
   return fetchApi('/auth/logout', {
     method: 'POST',
-  });
+    body: JSON.stringify({ refreshToken }),
+  }, true);
 }
 
 // Dashboard
+export async function getDashboard(params: Record<string, any> = {}) {
+  const queryParams = new URLSearchParams();
+  
+  // Füge alle Parameter zur Query-String hinzu
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      queryParams.append(key, String(value));
+    }
+  });
+  
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  console.log('Getting full dashboard data, authenticated:', !!getAccessToken());
+  return fetchApi(`/dashboard${queryString}`, {
+    method: 'GET'
+  }, true);
+}
+
 export async function getDashboardStats() {
-  return fetchApi('/dashboard/stats');
+  console.log('Getting dashboard stats, authenticated:', !!getAccessToken());
+  return fetchApi('/dashboard/stats', {
+    method: 'GET'
+  }, true);
 }
 
 export async function getNotifications() {
-  return fetchApi('/dashboard/notifications');
+  return fetchApi('/notifications', {
+    method: 'GET'
+  }, true);
 }
 
 // Customers
-export async function getCustomers(params: Record<string, any> = {}) {
+export async function getCustomers<T = any>(params: Record<string, any> = {}) {
   const queryParams = new URLSearchParams();
   
   Object.entries(params).forEach(([key, value]) => {
@@ -75,38 +65,42 @@ export async function getCustomers(params: Record<string, any> = {}) {
   });
   
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
-  return fetchApi(`/customers${queryString}`);
+  return fetchApi<T>(`/customers${queryString}`, {
+    method: 'GET'
+  }, true);
 }
 
-export async function getCustomerById(id: string) {
-  return fetchApi(`/customers/${id}`);
+export async function getCustomerById<T = any>(id: string) {
+  return fetchApi<T>(`/customers/${id}`, {
+    method: 'GET'
+  }, true);
 }
 
-export async function createCustomer(data: Record<string, any>) {
-  return fetchApi('/customers', {
+export async function createCustomer<T = any>(data: Record<string, any>) {
+  return fetchApi<T>('/customers', {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  }, true);
 }
 
-export async function updateCustomer(id: string, data: Record<string, any>) {
-  return fetchApi(`/customers/${id}`, {
+export async function updateCustomer<T = any>(id: string, data: Record<string, any>) {
+  return fetchApi<T>(`/customers/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
-  });
+  }, true);
 }
 
-export async function deleteCustomer(id: string) {
-  return fetchApi(`/customers/${id}`, {
+export async function deleteCustomer<T = any>(id: string) {
+  return fetchApi<T>(`/customers/${id}`, {
     method: 'DELETE',
-  });
+  }, true);
 }
 
 export async function addCustomerNote(id: string, data: { note: string }) {
   return fetchApi(`/customers/${id}/notes`, {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  }, true);
 }
 
 // Appointments
@@ -120,32 +114,36 @@ export async function getAppointments(params: Record<string, any> = {}) {
   });
   
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
-  return fetchApi(`/appointments${queryString}`);
+  return fetchApi(`/appointments${queryString}`, {
+    method: 'GET'
+  }, true);
 }
 
 export async function getAppointmentById(id: string) {
-  return fetchApi(`/appointments/${id}`);
+  return fetchApi(`/appointments/${id}`, {
+    method: 'GET'
+  }, true);
 }
 
 export async function createAppointment(data: Record<string, any>) {
   return fetchApi('/appointments', {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  }, true);
 }
 
 export async function updateAppointment(id: string, data: Record<string, any>) {
   return fetchApi(`/appointments/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
-  });
+  }, true);
 }
 
 export async function updateAppointmentStatus(id: string, status: string, note?: string) {
   return fetchApi(`/appointments/${id}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status, note }),
-  });
+  }, true);
 }
 
 // Requests
@@ -159,22 +157,26 @@ export async function getRequests(params: Record<string, any> = {}) {
   });
   
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
-  return fetchApi(`/requests${queryString}`);
+  return fetchApi(`/requests${queryString}`, {
+    method: 'GET'
+  }, true);
 }
 
 export async function getRequestById(id: string) {
-  return fetchApi(`/requests/${id}`);
+  return fetchApi(`/requests/${id}`, {
+    method: 'GET'
+  }, true);
 }
 
 export async function updateRequestStatus(id: string, status: string, note?: string) {
   return fetchApi(`/requests/${id}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status, note }),
-  });
+  }, true);
 }
 
 // Projects
-export async function getProjects(params: Record<string, any> = {}) {
+export async function getProjects<T = any>(params: Record<string, any> = {}) {
   const queryParams = new URLSearchParams();
   
   Object.entries(params).forEach(([key, value]) => {
@@ -184,49 +186,53 @@ export async function getProjects(params: Record<string, any> = {}) {
   });
   
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
-  return fetchApi(`/projects${queryString}`);
+  return fetchApi<T>(`/projects${queryString}`, {
+    method: 'GET'
+  }, true);
 }
 
-export async function getProjectById(id: string) {
-  return fetchApi(`/projects/${id}`);
+export async function getProjectById<T = any>(id: string) {
+  return fetchApi<T>(`/projects/${id}`, {
+    method: 'GET'
+  }, true);
 }
 
-export async function createProject(data: Record<string, any>) {
-  return fetchApi('/projects', {
+export async function createProject<T = any>(data: Record<string, any>) {
+  return fetchApi<T>('/projects', {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  }, true);
 }
 
-export async function updateProject(id: string, data: Record<string, any>) {
-  return fetchApi(`/projects/${id}`, {
+export async function updateProject<T = any>(id: string, data: Record<string, any>) {
+  return fetchApi<T>(`/projects/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
-  });
+  }, true);
 }
 
-export async function updateProjectStatus(id: string, status: string, note?: string) {
-  return fetchApi(`/projects/${id}/status`, {
+export async function updateProjectStatus<T = any>(id: string, status: string, note?: string) {
+  return fetchApi<T>(`/projects/${id}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status, note }),
-  });
+  }, true);
 }
 
-export async function deleteProject(id: string) {
-  return fetchApi(`/projects/${id}`, {
+export async function deleteProject<T = any>(id: string) {
+  return fetchApi<T>(`/projects/${id}`, {
     method: 'DELETE',
-  });
+  }, true);
 }
 
-export async function addProjectNote(id: string, data: { text: string }) {
-  return fetchApi(`/projects/${id}/notes`, {
+export async function addProjectNote<T = any>(id: string, data: { text: string }) {
+  return fetchApi<T>(`/projects/${id}/notes`, {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  }, true);
 }
 
 // Services
-export async function getServices(params: Record<string, any> = {}) {
+export async function getServices<T = any>(params: Record<string, any> = {}) {
   const queryParams = new URLSearchParams();
   
   Object.entries(params).forEach(([key, value]) => {
@@ -236,30 +242,90 @@ export async function getServices(params: Record<string, any> = {}) {
   });
   
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
-  return fetchApi(`/services${queryString}`);
+  return fetchApi<T>(`/services${queryString}`, {
+    method: 'GET'
+  }, true);
 }
 
-export async function getServiceById(id: string) {
-  return fetchApi(`/services/${id}`);
+export async function getServiceById<T = any>(id: string) {
+  return fetchApi<T>(`/services/${id}`, {
+    method: 'GET'
+  }, true);
 }
 
-export async function createService(data: Record<string, any>) {
-  return fetchApi('/services', {
+export async function createService<T = any>(data: Record<string, any>) {
+  return fetchApi<T>('/services', {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  }, true);
 }
 
-export async function updateService(id: string, data: Record<string, any>) {
-  return fetchApi(`/services/${id}`, {
+export async function updateService<T = any>(id: string, data: Record<string, any>) {
+  return fetchApi<T>(`/services/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
-  });
+  }, true);
 }
 
-export async function toggleServiceStatus(id: string, active: boolean) {
-  return fetchApi(`/services/${id}/status`, {
+export async function toggleServiceStatus<T = any>(id: string, active: boolean) {
+  return fetchApi<T>(`/services/${id}/status`, {
     method: 'PUT',
     body: JSON.stringify({ active }),
+  }, true);
+}
+
+// Invoices
+export async function getInvoices<T = any>(params: Record<string, any> = {}) {
+  const queryParams = new URLSearchParams();
+  
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      queryParams.append(key, String(value));
+    }
   });
+  
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  return fetchApi<T>(`/invoices${queryString}`, {
+    method: 'GET'
+  }, true);
+}
+
+export async function getInvoiceById<T = any>(id: string) {
+  return fetchApi<T>(`/invoices/${id}`, {
+    method: 'GET'
+  }, true);
+}
+
+export async function createInvoice<T = any>(data: Record<string, any>) {
+  return fetchApi<T>('/invoices', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, true);
+}
+
+export async function updateInvoice<T = any>(id: string, data: Record<string, any>) {
+  return fetchApi<T>(`/invoices/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, true);
+}
+
+export async function deleteInvoice<T = any>(id: string) {
+  return fetchApi<T>(`/invoices/${id}`, {
+    method: 'DELETE',
+  }, true);
+}
+
+export async function sendInvoice<T = any>(id: string, emailData?: { to?: string, message?: string }) {
+  return fetchApi<T>(`/invoices/${id}/send`, {
+    method: 'POST',
+    body: JSON.stringify(emailData || {}),
+  }, true);
+}
+
+export async function markInvoiceAsPaid<T = any>(id: string, paymentData: { paymentDate: string, paymentMethod: string, note?: string }) {
+  return fetchApi<T>(`/invoices/${id}/mark-paid`, {
+    method: 'PUT',
+    body: JSON.stringify(paymentData),
+  }, true);
 }

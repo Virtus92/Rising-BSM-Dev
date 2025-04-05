@@ -169,6 +169,6 @@ export class Service {
    * @returns Status label
    */
   getStatusLabel(): string {
-    return this.active ? 'Aktiv' : 'Inaktiv';
+    return this.active ? 'Active' : 'Inactive';
   }
 }

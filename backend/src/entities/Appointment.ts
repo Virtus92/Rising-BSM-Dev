@@ -183,13 +183,13 @@ export class Appointment {
   getStatusLabel(): string {
     switch (this.status) {
       case AppointmentStatus.PLANNED:
-        return 'Geplant';
+        return 'Planned';
       case AppointmentStatus.CONFIRMED:
-        return 'Bestätigt';
+        return 'Confirmed';
       case AppointmentStatus.COMPLETED:
-        return 'Abgeschlossen';
+        return 'Completed';
       case AppointmentStatus.CANCELED:
-        return 'Storniert';
+        return 'Canceled';
       default:
         return this.status;
     }

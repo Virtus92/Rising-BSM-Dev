@@ -23,14 +23,14 @@ User:
       description: Phone number
     role:
       type: string
-      enum: [admin, manager, mitarbeiter, benutzer]
+      enum: [admin, manager, employee, user]
       description: User role determining access permissions
     roleLabel:
       type: string
       description: Formatted role label
     status:
       type: string
-      enum: [aktiv, inaktiv, gesperrt]
+      enum: [active, inactive, suspended, deleted]
       description: User account status
     statusLabel:
       type: string
@@ -78,13 +78,13 @@ UserCreate:
       nullable: true
     role:
       type: string
-      enum: [admin, manager, mitarbeiter, benutzer]
-      default: mitarbeiter
+      enum: [admin, manager, employee, user]
+      default: employee
       description: User role determining access permissions
     status:
       type: string
-      enum: [aktiv, inaktiv, gesperrt]
-      default: aktiv
+      enum: [active, inactive, suspended, deleted]
+      default: active
       description: User account status
 
 UserUpdate:
@@ -111,11 +111,11 @@ UserUpdate:
       nullable: true
     role:
       type: string
-      enum: [admin, manager, mitarbeiter, benutzer]
+      enum: [admin, manager, employee, user]
       description: User role determining access permissions
     status:
       type: string
-      enum: [aktiv, inaktiv, gesperrt]
+      enum: [active, inactive, suspended, deleted]
       description: User account status
 
 UserActivity:

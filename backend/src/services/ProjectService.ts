@@ -345,7 +345,7 @@ export class ProjectService extends BaseService<
   async getProjectStatistics(filters?: Partial<ProjectFilterParams>, options?: ServiceOptions): Promise<ProjectStatisticsDto> {
     try {
       // Get statistics using repository
-      const stats = await this.projectRepository.getStatistics(filters);
+      const stats = await this.projectRepository.getProjectStatistics(filters);
       
       // Format statistics
       return {

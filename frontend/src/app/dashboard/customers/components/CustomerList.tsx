@@ -75,6 +75,17 @@ export default function CustomerList({
     }
   }, [externalError]);
 
+  // Define the response type for customer data
+  interface CustomerResponse {
+    customers: Customer[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      pages: number;
+    };
+  }
+
   // Fetch customers data if no external data provided
   useEffect(() => {
     if (initialData || externalLoading !== undefined) return;
@@ -101,9 +112,9 @@ export default function CustomerList({
           params.type = typeFilter;
         }
         
-        const result = await api.getCustomers(params);
+        const result = await api.getCustomers<CustomerResponse>(params);
         
-        if (result.success) {
+        if (result.success && result.data) {
           setCustomers(result.data.customers);
           setTotalPages(result.data.pagination.pages);
         } else {
@@ -169,7 +180,8 @@ export default function CustomerList({
     if (!customerToDelete) return;
     
     try {
-      const result = await api.deleteCustomer(customerToDelete.id.toString());
+      // Use any as a simple response type for delete operation
+      const result = await api.deleteCustomer<any>(customerToDelete.id.toString());
       
       if (result.success) {
         // Remove the deleted customer from the list
@@ -475,8 +487,8 @@ export default function CustomerList({
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Zeige <span className="font-medium">{(page - 1) * limit + 1}</span> bis <span className="font-medium">{Math.min(page * limit, initialData?.pagination.total || customers.length)}</span> von{' '}
-                  <span className="font-medium">{initialData?.pagination.total || customers.length}</span> Ergebnissen
+                  Zeige <span className="font-medium">{(page - 1) * limit + 1}</span> bis <span className="font-medium">{Math.min(page * limit, initialData?.pagination?.total || customers.length)}</span> von{' '}
+                  <span className="font-medium">{initialData?.pagination?.total || customers.length}</span> Ergebnissen
                 </p>
               </div>
               <div>

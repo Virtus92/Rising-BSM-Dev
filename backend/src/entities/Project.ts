@@ -186,13 +186,13 @@ export class Project {
   getStatusLabel(): string {
     switch (this.status) {
       case ProjectStatus.NEW:
-        return 'Neu';
+        return 'New';
       case ProjectStatus.IN_PROGRESS:
-        return 'In Bearbeitung';
+        return 'In Progress';
       case ProjectStatus.COMPLETED:
-        return 'Abgeschlossen';
+        return 'Completed';
       case ProjectStatus.CANCELED:
-        return 'Storniert';
+        return 'Canceled';
       default:
         return this.status;
     }

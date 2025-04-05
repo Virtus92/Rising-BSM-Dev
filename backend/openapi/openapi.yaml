@@ -15,9 +15,9 @@ info:
     url: https://example.com/license
 
 servers:
-  - url: http://localhost:5000/API/v1
+  - url: http://localhost:5000
     description: Local development server
-  - url: https://api.example.com/API/v1
+  - url: https://api.example.com
     description: Production server
 
 # Tags for organizing operations

@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     }
     
     // Make a request to the backend running on port 5000
-    const response = await fetch('http://localhost:5000/contact', {
+    const response = await fetch('http://localhost:5000/api/v1/requests/public', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

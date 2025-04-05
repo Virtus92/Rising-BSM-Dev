@@ -43,8 +43,11 @@ export default function NewCustomerPage() {
       
       const response = await createCustomer(formData);
       
-      if (response.success) {
+      if (response.success && response.data?.customer) {
         router.push(`/dashboard/customers/${response.data.customer.id}`);
+      } else if (response.success && response.data?.id) {
+        // Fallback wenn die Antwort eine direkte ID enthält
+        router.push(`/dashboard/customers/${response.data.id}`);
       } else {
         setError(response.message || 'Fehler beim Erstellen des Kunden');
       }

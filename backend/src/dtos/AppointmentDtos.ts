@@ -255,7 +255,7 @@ export interface AppointmentNoteDto {
   /**
    * Note text
    */
-  note: string;
+  text: string;
   
   /**
    * User ID
@@ -328,23 +328,23 @@ export const appointmentCreateValidationSchema = {
     min: 2,
     max: 200,
     messages: {
-      required: 'Titel ist erforderlich',
-      min: 'Titel muss mindestens 2 Zeichen lang sein',
-      max: 'Titel darf nicht länger als 200 Zeichen sein'
+      required: 'Title is required',
+      min: 'Title must be at least 2 characters long',
+      max: 'Title cannot exceed 200 characters'
     }
   },
   customerId: {
     type: 'number',
     required: false,
     messages: {
-      type: 'Kunden-ID muss eine Zahl sein'
+      type: 'Customer ID must be a number'
     }
   },
   projectId: {
     type: 'number',
     required: false,
     messages: {
-      type: 'Projekt-ID muss eine Zahl sein'
+      type: 'Project ID must be a number'
     }
   },
   appointmentDate: {
@@ -352,8 +352,8 @@ export const appointmentCreateValidationSchema = {
     required: true,
     pattern: /^\d{4}-\d{2}-\d{2}$/,
     messages: {
-      required: 'Terminsdatum ist erforderlich',
-      pattern: 'Terminsdatum muss im Format YYYY-MM-DD sein'
+      required: 'Appointment date is required',
+      pattern: 'Appointment date must be in YYYY-MM-DD format'
     }
   },
   appointmentTime: {
@@ -361,8 +361,8 @@ export const appointmentCreateValidationSchema = {
     required: true,
     pattern: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/,
     messages: {
-      required: 'Terminszeit ist erforderlich',
-      pattern: 'Terminszeit muss im Format HH:MM sein'
+      required: 'Appointment time is required',
+      pattern: 'Appointment time must be in HH:MM format'
     }
   },
   duration: {
@@ -370,8 +370,8 @@ export const appointmentCreateValidationSchema = {
     required: false,
     min: 1,
     messages: {
-      type: 'Dauer muss eine Zahl sein',
-      min: 'Dauer muss mindestens 1 Minute betragen'
+      type: 'Duration must be a number',
+      min: 'Duration must be at least 1 minute'
     }
   },
   location: {
@@ -379,7 +379,7 @@ export const appointmentCreateValidationSchema = {
     required: false,
     max: 200,
     messages: {
-      max: 'Ort darf nicht länger als 200 Zeichen sein'
+      max: 'Location cannot exceed 200 characters'
     }
   },
   description: {
@@ -387,7 +387,7 @@ export const appointmentCreateValidationSchema = {
     required: false,
     max: 2000,
     messages: {
-      max: 'Beschreibung darf nicht länger als 2000 Zeichen sein'
+      max: 'Description cannot exceed 2000 characters'
     }
   },
   status: {
@@ -395,7 +395,7 @@ export const appointmentCreateValidationSchema = {
     required: false,
     enum: Object.values(AppointmentStatus),
     messages: {
-      enum: `Status muss einer der folgenden sein: ${Object.values(AppointmentStatus).join(', ')}`
+      enum: `Status must be one of: ${Object.values(AppointmentStatus).join(', ')}`
     }
   }
 };
@@ -410,22 +410,22 @@ export const appointmentUpdateValidationSchema = {
     min: 2,
     max: 200,
     messages: {
-      min: 'Titel muss mindestens 2 Zeichen lang sein',
-      max: 'Titel darf nicht länger als 200 Zeichen sein'
+      min: 'Title must be at least 2 characters long',
+      max: 'Title cannot exceed 200 characters'
     }
   },
   customerId: {
     type: 'number',
     required: false,
     messages: {
-      type: 'Kunden-ID muss eine Zahl sein'
+      type: 'Customer ID must be a number'
     }
   },
   projectId: {
     type: 'number',
     required: false,
     messages: {
-      type: 'Projekt-ID muss eine Zahl sein'
+      type: 'Project ID must be a number'
     }
   },
   appointmentDate: {
@@ -433,7 +433,7 @@ export const appointmentUpdateValidationSchema = {
     required: false,
     pattern: /^\d{4}-\d{2}-\d{2}$/,
     messages: {
-      pattern: 'Terminsdatum muss im Format YYYY-MM-DD sein'
+      pattern: 'Appointment date must be in YYYY-MM-DD format'
     }
   },
   appointmentTime: {
@@ -441,7 +441,7 @@ export const appointmentUpdateValidationSchema = {
     required: false,
     pattern: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/,
     messages: {
-      pattern: 'Terminszeit muss im Format HH:MM sein'
+      pattern: 'Appointment time must be in HH:MM format'
     }
   },
   duration: {
@@ -449,8 +449,8 @@ export const appointmentUpdateValidationSchema = {
     required: false,
     min: 1,
     messages: {
-      type: 'Dauer muss eine Zahl sein',
-      min: 'Dauer muss mindestens 1 Minute betragen'
+      type: 'Duration must be a number',
+      min: 'Duration must be at least 1 minute'
     }
   },
   location: {
@@ -458,7 +458,7 @@ export const appointmentUpdateValidationSchema = {
     required: false,
     max: 200,
     messages: {
-      max: 'Ort darf nicht länger als 200 Zeichen sein'
+      max: 'Location cannot exceed 200 characters'
     }
   },
   description: {
@@ -466,7 +466,7 @@ export const appointmentUpdateValidationSchema = {
     required: false,
     max: 2000,
     messages: {
-      max: 'Beschreibung darf nicht länger als 2000 Zeichen sein'
+      max: 'Description cannot exceed 2000 characters'
     }
   },
   status: {
@@ -474,7 +474,7 @@ export const appointmentUpdateValidationSchema = {
     required: false,
     enum: Object.values(AppointmentStatus),
     messages: {
-      enum: `Status muss einer der folgenden sein: ${Object.values(AppointmentStatus).join(', ')}`
+      enum: `Status must be one of: ${Object.values(AppointmentStatus).join(', ')}`
     }
   }
 };
@@ -488,8 +488,8 @@ export const appointmentStatusUpdateValidationSchema = {
     required: true,
     enum: Object.values(AppointmentStatus),
     messages: {
-      required: 'Status ist erforderlich',
-      enum: `Status muss einer der folgenden sein: ${Object.values(AppointmentStatus).join(', ')}`
+      required: 'Status is required',
+      enum: `Status must be one of: ${Object.values(AppointmentStatus).join(', ')}`
     }
   },
   note: {
@@ -497,7 +497,7 @@ export const appointmentStatusUpdateValidationSchema = {
     required: false,
     max: 1000,
     messages: {
-      max: 'Notiz darf nicht länger als 1000 Zeichen sein'
+      max: 'Note cannot exceed 1000 characters'
     }
   }
 };
@@ -506,15 +506,15 @@ export const appointmentStatusUpdateValidationSchema = {
  * Validation schema for adding a note to an appointment
  */
 export const appointmentNoteValidationSchema = {
-  note: {
+  text: {
     type: 'string',
     required: true,
     min: 1,
     max: 1000,
     messages: {
-      required: 'Notiztext ist erforderlich',
-      min: 'Notiztext darf nicht leer sein',
-      max: 'Notiztext darf nicht länger als 1000 Zeichen sein'
+      required: 'Note text is required',
+      min: 'Note text cannot be empty',
+      max: 'Note text cannot exceed 1000 characters'
     }
   }
 };

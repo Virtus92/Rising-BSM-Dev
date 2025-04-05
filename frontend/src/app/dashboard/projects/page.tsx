@@ -4,11 +4,56 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProjectList from './components/ProjectList';
 import { getProjects } from '@/lib/api';
+import { ApiResponse, Project as ApiProject, PaginatedList } from '@/lib/api/types';
+
+// Type from ProjectList component
+interface Project {
+  id: number;
+  title: string;
+  customerId?: number;
+  customerName?: string;
+  serviceId?: number;
+  serviceName?: string;
+  status: string;
+  startDate?: string;
+  endDate?: string;
+  amount?: number;
+}
+
+// Interface to match what ProjectList expects
+interface Pagination {
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
 
 function ProjectsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [projectsData, setProjectsData] = useState<any>(null);
+  const [projectsData, setProjectsData] = useState<PaginatedList<ApiProject> | null>(null);
+  
+  // Transformed data for ProjectList component
+  const transformedData = projectsData && projectsData.items ? {
+    projects: projectsData.items.map(item => ({
+      id: item.id,
+      title: item.title,
+      customerId: item.customerId,
+      customerName: item.customerName,
+      serviceId: item.serviceId,
+      serviceName: item.serviceName,
+      status: item.status,
+      startDate: item.startDate,
+      endDate: item.endDate,
+      amount: item.amount
+    })),
+    pagination: {
+      total: projectsData.pagination.totalRecords,
+      page: projectsData.pagination.current,
+      limit: projectsData.pagination.limit,
+      pages: Math.ceil(projectsData.pagination.totalRecords / projectsData.pagination.limit)
+    }
+  } : undefined;
   
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,16 +77,16 @@ function ProjectsContent() {
         if (status !== 'all') params.status = status;
         if (customerId) params.customerId = customerId;
         
-        const response = await getProjects(params);
+        const response = await getProjects<PaginatedList<ApiProject>>(params);
         
-        if (response.success) {
+        if (response.success && response.data) {
           setProjectsData(response.data);
         } else {
-          setError('Fehler beim Laden der Projektdaten');
+          setError('Error loading project data');
         }
       } catch (err) {
         console.error('Error loading projects:', err);
-        setError('Fehler beim Laden der Projektdaten. Bitte versuchen Sie es später erneut.');
+        setError('Error loading project data. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -53,7 +98,7 @@ function ProjectsContent() {
   const updateUrlParams = (params: Record<string, any>) => {
     const newParams = new URLSearchParams();
     
-    // Aktuelle Parameter beibehalten
+    // Keep current parameters
     const currentParams = searchParams || new URLSearchParams();
     for (const [key, value] of Array.from(currentParams.entries())) {
       if (!(key in params)) {
@@ -61,7 +106,7 @@ function ProjectsContent() {
       }
     }
     
-    // Neue Parameter hinzufügen
+    // Add new parameters
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== null && value !== '') {
         newParams.append(key, String(value));
@@ -76,18 +121,18 @@ function ProjectsContent() {
   };
 
   const handleFilterChange = (filters: Record<string, any>) => {
-    // Seite zurücksetzen, wenn Filter geändert werden
+    // Reset page when filters change
     updateUrlParams({ ...filters, page: 1 });
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projektverwaltung</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Project Management</h1>
       </div>
       
       <ProjectList 
-        initialData={projectsData}
+        initialData={transformedData}
         loading={loading}
         error={error}
         onPageChange={handlePageChange}

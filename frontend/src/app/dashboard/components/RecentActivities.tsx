@@ -3,10 +3,13 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { User, Calendar, Briefcase, Inbox, Clock } from 'lucide-react';
-import { getDashboardData } from '../utils/dashboard-service';
+import { getDashboardData, DashboardActivity } from '../utils/dashboard-service';
 
 const RecentActivities = () => {
-  const [activities, setActivities] = useState<any[]>([]);
+  // Definieren eines Typs für Activity-Objekte
+  type Activity = DashboardActivity;
+
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,47 +19,44 @@ const RecentActivities = () => {
         setLoading(true);
         const response = await getDashboardData();
         
-        if (response.success && response.data.activities) {
-          setActivities(response.data.activities);
-        } else {
-          // Wenn keine echten Daten verfügbar sind, verwende Beispieldaten
-          setActivities([
-            {
-              id: 1,
-              userId: 2,
-              userName: 'Max Mustermann',
-              activity: 'Neuen Kunden erstellt: Anna Schmidt',
-              timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString() // 30 Minuten zuvor
-            },
-            {
-              id: 2,
-              userId: 3,
-              userName: 'Maria Schmidt',
-              activity: 'Termin aktualisiert: Projektbesprechung',
-              timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString() // 45 Minuten zuvor
-            },
-            {
-              id: 3,
-              userId: 1,
-              userName: 'Admin User',
-              activity: 'Neues Projekt erstellt: Website-Redesign',
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString() // 2 Stunden zuvor
-            },
-            {
-              id: 4,
-              userId: 2,
-              userName: 'Max Mustermann',
-              activity: 'Kundenanfrage beantwortet: Steuerberatung',
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString() // 3 Stunden zuvor
-            },
-            {
-              id: 5,
-              userId: 3,
-              userName: 'Maria Schmidt',
-              activity: 'Projektdokumentation aktualisiert: SEO-Kampagne',
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString() // 4 Stunden zuvor
+        if (response.success && response.data) {
+          console.log('Activity data successfully received');
+          // Normalisiere Aktivitätsdaten zum einheitlichen Format
+          let activityData = response.data.recentActivity || response.data.activities || [];
+          
+          // Konvertiere Aktivitäten zum einheitlichen Format, falls notwendig
+          const normalizedActivities = activityData.map(activity => {
+            // Wenn das activity-Feld bereits existiert, verwende es
+            if (activity.activity && activity.userName) {
+              return activity;
             }
-          ]);
+            
+            // Ansonsten erstelle ein normalisiertes Format
+            let normalizedActivity = { ...activity };
+            
+            if (!normalizedActivity.activity && normalizedActivity.action && normalizedActivity.entity) {
+              // Erstelle eine beschreibende Aktivität aus Aktion und Entity
+              const actionText = {
+                'create': 'hat erstellt',
+                'update': 'hat aktualisiert',
+                'delete': 'hat gelöscht',
+                'complete': 'hat abgeschlossen'
+              }[normalizedActivity.action] || normalizedActivity.action;
+              
+              normalizedActivity.activity = `${actionText} ${normalizedActivity.entity.type} "${normalizedActivity.entity.name}"`;
+            }
+            
+            if (!normalizedActivity.userName && normalizedActivity.user) {
+              normalizedActivity.userName = normalizedActivity.user.name;
+            }
+            
+            return normalizedActivity;
+          });
+          
+          setActivities(normalizedActivities);
+        } else {
+          console.warn('No activities data received from API');
+          setError('Keine Aktivitätsdaten verfügbar. Bitte überprüfen Sie die Verbindung zum Backend.');
         }
       } catch (err) {
         console.error('Error loading activities:', err);
@@ -84,30 +84,41 @@ const RecentActivities = () => {
     }
   };
 
-  // Formatiere relative Zeit
+  // Formatiere relative Zeit mit Fehlerbehandlung
   const formatRelativeTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
+    try {
+      const date = new Date(dateString);
+      
+      // Überprüfung auf ungültiges Datum
+      if (isNaN(date.getTime())) {
+        return 'Unbekanntes Datum';
+      }
+      
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffSec = Math.floor(diffMs / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHour = Math.floor(diffMin / 60);
+      const diffDay = Math.floor(diffHour / 24);
 
-    if (diffSec < 60) {
-      return 'gerade eben';
-    } else if (diffMin < 60) {
-      return `vor ${diffMin} ${diffMin === 1 ? 'Minute' : 'Minuten'}`;
-    } else if (diffHour < 24) {
-      return `vor ${diffHour} ${diffHour === 1 ? 'Stunde' : 'Stunden'}`;
-    } else if (diffDay < 7) {
-      return `vor ${diffDay} ${diffDay === 1 ? 'Tag' : 'Tagen'}`;
-    } else {
-      return date.toLocaleDateString('de-DE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
+      if (diffSec < 60) {
+        return 'gerade eben';
+      } else if (diffMin < 60) {
+        return `vor ${diffMin} ${diffMin === 1 ? 'Minute' : 'Minuten'}`;
+      } else if (diffHour < 24) {
+        return `vor ${diffHour} ${diffHour === 1 ? 'Stunde' : 'Stunden'}`;
+      } else if (diffDay < 7) {
+        return `vor ${diffDay} ${diffDay === 1 ? 'Tag' : 'Tagen'}`;
+      } else {
+        return date.toLocaleDateString('de-DE', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+      }
+    } catch (error) {
+      console.error('Fehler beim Formatieren des Datums', error);
+      return 'Unbekanntes Datum';
     }
   };
 
@@ -162,18 +173,18 @@ const RecentActivities = () => {
               <div key={activity.id} className="py-4 px-6">
                 <div className="flex items-center">
                   <div className="flex-shrink-0 mr-3">
-                    {getActivityIcon(activity.activity)}
+                    {getActivityIcon(activity.activity || '')}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {activity.userName}
+                      {activity.userName || 'Unbekannter Benutzer'}
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {activity.activity}
+                      {activity.activity || 'Unbekannte Aktivität'}
                     </div>
                   </div>
                   <div className="ml-3 flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                    {formatRelativeTime(activity.timestamp)}
+                    {activity.formattedTime || formatRelativeTime(activity.timestamp)}
                   </div>
                 </div>
               </div>

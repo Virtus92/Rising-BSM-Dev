@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Building, Calendar, Briefcase, Plus } from 'lucide-react';
 import { getCustomerById, deleteCustomer, addCustomerNote } from '@/lib/api';
+import { ApiResponse, Customer } from '@/lib/api/types';
 
 // Typ-Definitionen
 interface CustomerDetails {
@@ -73,8 +74,8 @@ export default function CustomerDetailPage() {
         
         const response = await getCustomerById(customerId);
         
-        if (response.success) {
-          setCustomer(response.data.customer);
+        if (response.success && response.data) {
+          setCustomer(response.data as CustomerDetails);
         } else {
           setError('Error loading customer data');
         }
@@ -116,8 +117,8 @@ export default function CustomerDetailPage() {
       if (response.success) {
         // Reload customer data to get updated notes
         const customerResponse = await getCustomerById(customerId);
-        if (customerResponse.success) {
-          setCustomer(customerResponse.data.customer);
+        if (customerResponse.success && customerResponse.data) {
+          setCustomer(customerResponse.data as CustomerDetails);
         }
         setNewNote('');
       } else {

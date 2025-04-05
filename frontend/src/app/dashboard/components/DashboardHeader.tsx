@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
-  Bell, Search, Menu, Moon, Sun, User, LogOut, X 
+  Bell, Search, Menu, Moon, Sun, User, LogOut, X, Check, 
+  Clock, AlarmClock, Calendar, FileText, AlertCircle, Info
 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useToast } from '@/hooks/useToast';
+import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, Notification } from '@/lib/api/notifications';
 
 const DashboardHeader = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -18,12 +20,141 @@ const DashboardHeader = () => {
   const router = useRouter();
   const { toast } = useToast();
   
-  // For demo purposes, we're adding some dummy notifications
-  const notifications = [
-    { id: 1, title: 'Neuer Kundentermin', time: 'Vor 5 Minuten', read: false },
-    { id: 2, title: 'Projektaktualisierung', time: 'Vor 2 Stunden', read: false },
-    { id: 3, title: 'Neue Anfrage', time: 'Gestern', read: true },
-  ];
+  // Zustand für Benachrichtigungen
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  
+  // Benachrichtigungen laden
+  useEffect(() => {
+    const loadNotifications = async () => {
+      try {
+        setLoading(true);
+        setNotificationError(null);
+        const response = await getNotifications();
+        
+        if (response.success && response.data) {
+          setNotifications(response.data.notifications || []);
+          // Ungelesene Benachrichtigungen zählen
+          const unread = response.data.notifications.filter(n => !n.read).length;
+          setUnreadCount(unread);
+        } else {
+          setNotificationError('Fehler beim Laden der Benachrichtigungen');
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Benachrichtigungen:', error);
+        setNotificationError('Fehler beim Laden der Benachrichtigungen');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Benachrichtigungen laden, wenn das Dropdown geöffnet wird
+    if (isNotificationsOpen) {
+      loadNotifications();
+    }
+  }, [isNotificationsOpen]);
+  
+  // Benachrichtigung als gelesen markieren
+  const handleMarkAsRead = async (notificationId: number) => {
+    try {
+      const response = await markNotificationAsRead(notificationId);
+      
+      if (response.success) {
+        // Benachrichtigungsstatus in der UI aktualisieren
+        setNotifications(prevNotifications =>
+          prevNotifications.map(notification =>
+            notification.id === notificationId
+              ? { ...notification, read: true }
+              : notification
+          )
+        );
+        
+        // Ungelesenen Zähler aktualisieren
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Fehler beim Markieren als gelesen:', error);
+      toast({
+        title: 'Fehler',
+        description: 'Benachrichtigung konnte nicht als gelesen markiert werden',
+        variant: 'error'
+      });
+    }
+  };
+  
+  // Alle Benachrichtigungen als gelesen markieren
+  const handleMarkAllAsRead = async () => {
+    try {
+      const response = await markAllNotificationsAsRead();
+      
+      if (response.success) {
+        // Alle Benachrichtigungen in der UI als gelesen markieren
+        setNotifications(prevNotifications =>
+          prevNotifications.map(notification => ({ ...notification, read: true }))
+        );
+        
+        // Ungelesenen Zähler zurücksetzen
+        setUnreadCount(0);
+        
+        toast({
+          title: 'Erfolg',
+          description: 'Alle Benachrichtigungen wurden als gelesen markiert',
+          variant: 'success'
+        });
+      }
+    } catch (error) {
+      console.error('Fehler beim Markieren aller als gelesen:', error);
+      toast({
+        title: 'Fehler',
+        description: 'Benachrichtigungen konnten nicht als gelesen markiert werden',
+        variant: 'error'
+      });
+    }
+  };
+  
+  // Icon für die jeweilige Benachrichtigungsart
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'anfrage':
+        return <FileText className="h-4 w-4 text-purple-500" />;
+      case 'termin':
+        return <Calendar className="h-4 w-4 text-blue-500" />;
+      case 'projekt':
+        return <Clock className="h-4 w-4 text-green-500" />;
+      case 'warnung':
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
+      case 'system':
+        return <AlarmClock className="h-4 w-4 text-amber-500" />;
+      case 'info':
+      default:
+        return <Info className="h-4 w-4 text-gray-500" />;
+    }
+  };
+  
+  // Ziel-URL für Benachrichtigungen ermitteln
+  const getNotificationUrl = (notification: Notification): string => {
+    if (notification.link) return notification.link;
+    
+    // Standardlinks basierend auf Referenztyp und ID
+    if (notification.referenceType && notification.referenceId) {
+      switch (notification.referenceType) {
+        case 'kunde':
+          return `/dashboard/customers/${notification.referenceId}`;
+        case 'projekt':
+          return `/dashboard/projects/${notification.referenceId}`;
+        case 'termin':
+          return `/dashboard/appointments#appointment-${notification.referenceId}`;
+        case 'anfrage':
+          return `/dashboard/requests/${notification.referenceId}`;
+        default:
+          return '#';
+      }
+    }
+    
+    return '#';
+  };
   
   useEffect(() => {
     // Check for user preference or system preference
@@ -124,7 +255,11 @@ const DashboardHeader = () => {
               onClick={toggleNotifications}
             >
               <Bell className="h-5 w-5" />
-              <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
+              {unreadCount > 0 && (
+                <span className="absolute top-0 right-0 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             
             {isNotificationsOpen && (
@@ -134,27 +269,58 @@ const DashboardHeader = () => {
                 </div>
                 
                 <div className="max-h-64 overflow-y-auto">
-                  {notifications.length > 0 ? (
+                  {loading ? (
+                    <div className="px-4 py-4">
+                      <div className="animate-pulse flex flex-col space-y-2">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mt-2"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                      </div>
+                    </div>
+                  ) : notificationError ? (
+                    <div className="px-4 py-4 text-center">
+                      <p className="text-sm text-red-500 dark:text-red-400">{notificationError}</p>
+                    </div>
+                  ) : notifications.length > 0 ? (
                     <div>
                       {notifications.map((notification) => (
-                        <div 
+                        <Link 
                           key={notification.id} 
-                          className={`px-4 py-2 hover:bg-gray-50 dark:hover:bg-slate-700 ${
+                          href={getNotificationUrl(notification)}
+                          onClick={() => {
+                            if (!notification.read) {
+                              handleMarkAsRead(notification.id);
+                            }
+                          }}
+                          className={`px-4 py-2 hover:bg-gray-50 dark:hover:bg-slate-700 block ${
                             !notification.read ? 'bg-blue-50 dark:bg-blue-900/10' : ''
                           }`}
                         >
-                          <div className="flex justify-between items-start">
-                            <p className={`text-sm ${!notification.read ? 'font-semibold' : ''} text-gray-800 dark:text-gray-200`}>
-                              {notification.title}
-                            </p>
-                            {!notification.read && (
-                              <span className="h-2 w-2 bg-blue-500 rounded-full"></span>
-                            )}
+                          <div className="flex items-start">
+                            <div className="mr-2 mt-0.5">
+                              {getNotificationIcon(notification.type)}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex justify-between items-start">
+                                <p className={`text-sm ${!notification.read ? 'font-semibold' : ''} text-gray-800 dark:text-gray-200`}>
+                                  {notification.title}
+                                </p>
+                                {!notification.read && (
+                                  <span className="h-2 w-2 bg-blue-500 rounded-full ml-2 mt-1.5"></span>
+                                )}
+                              </div>
+                              {notification.message && (
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-1">
+                                  {notification.message}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {notification.time}
+                              </p>
+                            </div>
                           </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {notification.time}
-                          </p>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   ) : (
@@ -164,10 +330,14 @@ const DashboardHeader = () => {
                   )}
                 </div>
                 
-                {notifications.length > 0 && (
+                {notifications.length > 0 && unreadCount > 0 && (
                   <div className="px-4 py-2 border-t border-gray-200 dark:border-slate-700">
-                    <button className="text-sm text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 font-medium">
-                      Alle lesen
+                    <button 
+                      onClick={handleMarkAllAsRead}
+                      className="text-sm text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 font-medium flex items-center"
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      Alle als gelesen markieren
                     </button>
                   </div>
                 )}

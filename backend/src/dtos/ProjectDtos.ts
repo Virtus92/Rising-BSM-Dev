@@ -242,7 +242,7 @@ export interface ProjectNoteDto {
   /**
    * Note text
    */
-  note: string;
+  text: string;
   
   /**
    * User ID
@@ -366,23 +366,23 @@ export const projectCreateValidationSchema = {
     min: 2,
     max: 200,
     messages: {
-      required: 'Titel ist erforderlich',
-      min: 'Titel muss mindestens 2 Zeichen lang sein',
-      max: 'Titel darf nicht länger als 200 Zeichen sein'
+      required: 'Title is required',
+      min: 'Title must be at least 2 characters long',
+      max: 'Title cannot exceed 200 characters'
     }
   },
   customerId: {
     type: 'number',
     required: false,
     messages: {
-      type: 'Kunden-ID muss eine Zahl sein'
+      type: 'Customer ID must be a number'
     }
   },
   serviceId: {
     type: 'number',
     required: false,
     messages: {
-      type: 'Dienstleistungs-ID muss eine Zahl sein'
+      type: 'Service ID must be a number'
     }
   },
   startDate: {
@@ -390,7 +390,7 @@ export const projectCreateValidationSchema = {
     required: false,
     pattern: /^\d{4}-\d{2}-\d{2}$/,
     messages: {
-      pattern: 'Startdatum muss im Format YYYY-MM-DD sein'
+      pattern: 'Start date must be in YYYY-MM-DD format'
     }
   },
   endDate: {
@@ -398,7 +398,7 @@ export const projectCreateValidationSchema = {
     required: false,
     pattern: /^\d{4}-\d{2}-\d{2}$/,
     messages: {
-      pattern: 'Enddatum muss im Format YYYY-MM-DD sein'
+      pattern: 'End date must be in YYYY-MM-DD format'
     }
   },
   amount: {
@@ -406,8 +406,8 @@ export const projectCreateValidationSchema = {
     required: false,
     min: 0,
     messages: {
-      type: 'Betrag muss eine Zahl sein',
-      min: 'Betrag darf nicht negativ sein'
+      type: 'Amount must be a number',
+      min: 'Amount cannot be negative'
     }
   },
   description: {
@@ -415,7 +415,7 @@ export const projectCreateValidationSchema = {
     required: false,
     max: 2000,
     messages: {
-      max: 'Beschreibung darf nicht länger als 2000 Zeichen sein'
+      max: 'Description cannot exceed 2000 characters'
     }
   },
   status: {
@@ -423,7 +423,7 @@ export const projectCreateValidationSchema = {
     required: false,
     enum: Object.values(ProjectStatus),
     messages: {
-      enum: `Status muss einer der folgenden sein: ${Object.values(ProjectStatus).join(', ')}`
+      enum: `Status must be one of: ${Object.values(ProjectStatus).join(', ')}`
     }
   }
 };
@@ -438,22 +438,22 @@ export const projectUpdateValidationSchema = {
     min: 2,
     max: 200,
     messages: {
-      min: 'Titel muss mindestens 2 Zeichen lang sein',
-      max: 'Titel darf nicht länger als 200 Zeichen sein'
+      min: 'Title must be at least 2 characters long',
+      max: 'Title cannot exceed 200 characters'
     }
   },
   customerId: {
     type: 'number',
     required: false,
     messages: {
-      type: 'Kunden-ID muss eine Zahl sein'
+      type: 'Customer ID must be a number'
     }
   },
   serviceId: {
     type: 'number',
     required: false,
     messages: {
-      type: 'Dienstleistungs-ID muss eine Zahl sein'
+      type: 'Service ID must be a number'
     }
   },
   startDate: {
@@ -461,7 +461,7 @@ export const projectUpdateValidationSchema = {
     required: false,
     pattern: /^\d{4}-\d{2}-\d{2}$/,
     messages: {
-      pattern: 'Startdatum muss im Format YYYY-MM-DD sein'
+      pattern: 'Start date must be in YYYY-MM-DD format'
     }
   },
   endDate: {
@@ -469,7 +469,7 @@ export const projectUpdateValidationSchema = {
     required: false,
     pattern: /^\d{4}-\d{2}-\d{2}$/,
     messages: {
-      pattern: 'Enddatum muss im Format YYYY-MM-DD sein'
+      pattern: 'End date must be in YYYY-MM-DD format'
     }
   },
   amount: {
@@ -477,8 +477,8 @@ export const projectUpdateValidationSchema = {
     required: false,
     min: 0,
     messages: {
-      type: 'Betrag muss eine Zahl sein',
-      min: 'Betrag darf nicht negativ sein'
+      type: 'Amount must be a number',
+      min: 'Amount cannot be negative'
     }
   },
   description: {
@@ -486,7 +486,7 @@ export const projectUpdateValidationSchema = {
     required: false,
     max: 2000,
     messages: {
-      max: 'Beschreibung darf nicht länger als 2000 Zeichen sein'
+      max: 'Description cannot exceed 2000 characters'
     }
   },
   status: {
@@ -494,7 +494,7 @@ export const projectUpdateValidationSchema = {
     required: false,
     enum: Object.values(ProjectStatus),
     messages: {
-      enum: `Status muss einer der folgenden sein: ${Object.values(ProjectStatus).join(', ')}`
+      enum: `Status must be one of: ${Object.values(ProjectStatus).join(', ')}`
     }
   }
 };
@@ -508,8 +508,8 @@ export const projectStatusUpdateValidationSchema = {
     required: true,
     enum: Object.values(ProjectStatus),
     messages: {
-      required: 'Status ist erforderlich',
-      enum: `Status muss einer der folgenden sein: ${Object.values(ProjectStatus).join(', ')}`
+      required: 'Status is required',
+      enum: `Status must be one of: ${Object.values(ProjectStatus).join(', ')}`
     }
   },
   note: {
@@ -517,7 +517,7 @@ export const projectStatusUpdateValidationSchema = {
     required: false,
     max: 1000,
     messages: {
-      max: 'Notiz darf nicht länger als 1000 Zeichen sein'
+      max: 'Note cannot exceed 1000 characters'
     }
   }
 };
@@ -526,15 +526,15 @@ export const projectStatusUpdateValidationSchema = {
  * Validation schema for adding a note to a project
  */
 export const projectNoteValidationSchema = {
-  note: {
+  text: {
     type: 'string',
     required: true,
     min: 1,
     max: 1000,
     messages: {
-      required: 'Notiztext ist erforderlich',
-      min: 'Notiztext darf nicht leer sein',
-      max: 'Notiztext darf nicht länger als 1000 Zeichen sein'
+      required: 'Note text is required',
+      min: 'Note text cannot be empty',
+      max: 'Note text cannot exceed 1000 characters'
     }
   }
 };

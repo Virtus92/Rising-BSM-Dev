@@ -57,8 +57,8 @@ export default function ProjectList({
   const [serviceFilter, setServiceFilter] = useState<string>('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
-  const [customers, setCustomers] = useState<Array<{id: number, name: string}>>([]);
-  const [services, setServices] = useState<Array<{id: number, name: string}>>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [loadingFilters, setLoadingFilters] = useState(false);
 
   // Update state when props change
@@ -82,22 +82,53 @@ export default function ProjectList({
     }
   }, [externalError]);
 
+  // Define API response types
+  interface ApiResponse<T> {
+    success: boolean;
+    data?: T;
+    message?: string;
+  }
+  
+  type Customer = {id: number, name: string};
+  type Service = {id: number, name: string};
+  
+  interface CustomersData {
+    customers: Customer[];
+  }
+  
+  interface ServicesData {
+    services: Service[];
+  }
+
+  interface ProjectsData {
+    projects: Project[];
+    pagination: {
+      pages: number;
+    };
+  }
+
+  // Generic response for delete operations
+  type DeleteResponse = ApiResponse<any>;
+
   // Fetch filter options (customers and services)
   useEffect(() => {
     async function loadFilterOptions() {
       try {
         setLoadingFilters(true);
         const [customersResponse, servicesResponse] = await Promise.all([
-          getCustomers({ limit: 100, status: 'active' }),
-          getServices({ active: true })
+          getCustomers<ApiResponse<CustomersData>>({
+            limit: 100,
+            status: 'active'
+          }),
+          getServices<ApiResponse<ServicesData>>({ active: true })
         ]);
         
-        if (customersResponse.success) {
-          setCustomers(customersResponse.data.customers);
+        if (customersResponse.success && customersResponse.data && 'customers' in customersResponse.data) {
+          setCustomers((customersResponse.data as CustomersData).customers);
         }
         
-        if (servicesResponse.success) {
-          setServices(servicesResponse.data.services);
+        if (servicesResponse.success && servicesResponse.data && 'services' in servicesResponse.data) {
+          setServices((servicesResponse.data as ServicesData).services);
         }
       } catch (err) {
         console.error('Error loading filter options:', err);
@@ -135,17 +166,19 @@ export default function ProjectList({
           params.serviceId = serviceFilter;
         }
         
-        const result = await api.getProjects(params);
+        const result = await api.getProjects<ApiResponse<ProjectsData>>(
+          params
+        );
         
-        if (result.success) {
-          setProjects(result.data.projects);
-          setTotalPages(result.data.pagination.pages);
+        if (result.success && result.data && 'projects' in result.data && 'pagination' in result.data) {
+          setProjects((result.data as ProjectsData).projects);
+          setTotalPages((result.data as ProjectsData).pagination.pages);
         } else {
-          setError('Fehler beim Laden der Projektdaten');
+          setError('Error loading project data');
         }
       } catch (err) {
         console.error('Error fetching projects:', err);
-        setError('Fehler beim Laden der Projektdaten. Bitte versuchen Sie es später erneut.');
+        setError('Error loading project data. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -203,8 +236,9 @@ export default function ProjectList({
     if (!projectToDelete) return;
     
     try {
-      const result = await api.deleteProject(projectToDelete.id.toString());
+      const result = await api.deleteProject<DeleteResponse>(projectToDelete.id.toString());
       
+      // For delete operations, we may not have data coming back, just success flag
       if (result.success) {
         // Remove the deleted project from the list
         setProjects(prevProjects => 
@@ -212,11 +246,11 @@ export default function ProjectList({
         );
         setShowDeleteModal(false);
       } else {
-        setError('Fehler beim Löschen des Projekts');
+        setError('Error deleting project');
       }
     } catch (err) {
       console.error('Error deleting project:', err);
-      setError('Fehler beim Löschen des Projekts. Bitte versuchen Sie es später erneut.');
+      setError('Error deleting project. Please try again later.');
     }
   };
 
@@ -243,7 +277,7 @@ export default function ProjectList({
           className="mt-2 text-red-700 dark:text-red-400 font-medium underline"
           onClick={() => window.location.reload()}
         >
-          Seite neu laden
+          Reload page
         </button>
       </div>
     );
@@ -548,8 +582,8 @@ export default function ProjectList({
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Zeige <span className="font-medium">{(page - 1) * limit + 1}</span> bis <span className="font-medium">{Math.min(page * limit, initialData?.pagination.total || projects.length)}</span> von{' '}
-                  <span className="font-medium">{initialData?.pagination.total || projects.length}</span> Ergebnissen
+                  Zeige <span className="font-medium">{(page - 1) * limit + 1}</span> bis <span className="font-medium">{Math.min(page * limit, initialData?.pagination?.total || projects.length)}</span> von{' '}
+                  <span className="font-medium">{initialData?.pagination?.total || projects.length}</span> Ergebnissen
                 </p>
               </div>
               <div>
