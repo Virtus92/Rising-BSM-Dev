@@ -143,45 +143,48 @@ const DashboardCharts = () => {
     );
   }
 
-  // Wenn keine Daten vorhanden sind oder ein Fehler aufgetreten ist
-  if (error || !chartData || Object.keys(chartData).length === 0) {
+  // Wenn ein Fehler aufgetreten ist
+  if (error) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
         <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Umsatz & Gewinn</h3>
           <div className="h-60 flex items-center justify-center">
-            <p className="text-gray-500 dark:text-gray-400">
-              {error || "Keine Umsatzdaten verfügbar"}
-            </p>
+            <p className="text-gray-500 dark:text-gray-400">{error}</p>
           </div>
         </div>
         <div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Projekte nach Status</h3>
           <div className="h-60 flex items-center justify-center">
-            <p className="text-gray-500 dark:text-gray-400">
-              {error || "Keine Projektdaten verfügbar"}
-            </p>
+            <p className="text-gray-500 dark:text-gray-400">{error}</p>
           </div>
         </div>
       </div>
     );
   }
 
+  // Wenn keine Chartdaten vorhanden sind, zeigen wir Platzhalter an
+  const hasRevenueData = !!(chartData?.revenue?.datasets?.[0]?.data?.length > 0 && chartData?.revenue?.labels?.length > 0);
+  const hasProjectData = !!(chartData?.projectStatus?.datasets?.[0]?.data?.length > 0 && chartData?.projectStatus?.labels?.length > 0);
+  
+  console.log('Render DashboardCharts mit Daten:', { hasRevenueData, hasProjectData });
+  
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
       {/* Umsatz-/Gewinn-Diagramm */}
       <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Umsatz & Gewinn</h3>
         <div className="h-60">
-          {chartData.revenue && chartData.revenue.datasets && chartData.revenue.datasets.length > 0 && 
-           chartData.revenue.labels && chartData.revenue.labels.length > 0 ? (
+          {hasRevenueData ? (
             <Line 
-              data={chartData.revenue} 
+              data={chartData.revenue!} 
               options={revenueOptions}
             />
           ) : (
             <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500 dark:text-gray-400">Keine Umsatzdaten verfügbar</p>
+              <p className="text-gray-500 dark:text-gray-400">
+                Keine Umsatzdaten verfügbar – Bitte implementieren Sie die Umsatzerfassung
+              </p>
             </div>
           )}
         </div>
@@ -191,15 +194,16 @@ const DashboardCharts = () => {
       <div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Projekte nach Status</h3>
         <div className="h-60">
-          {chartData.projectStatus && chartData.projectStatus.datasets && chartData.projectStatus.datasets.length > 0 && 
-           chartData.projectStatus.labels && chartData.projectStatus.labels.length > 0 ? (
+          {hasProjectData ? (
             <Doughnut 
-              data={chartData.projectStatus} 
+              data={chartData.projectStatus!} 
               options={projectOptions}
             />
           ) : (
             <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500 dark:text-gray-400">Keine Projektdaten verfügbar</p>
+              <p className="text-gray-500 dark:text-gray-400">
+                Keine Projektdaten verfügbar – Erstellen Sie Projekte mit verschiedenen Status
+              </p>
             </div>
           )}
         </div>

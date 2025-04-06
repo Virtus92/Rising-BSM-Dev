@@ -3,9 +3,14 @@
 import { useState, useEffect } from 'react';
 import * as api from '@/lib/api';
 import { ApiResponse, Request } from '@/lib/api/types';
+import { useSettings } from '@/contexts/SettingsContext';
+import { exportRequests, downloadBlob } from '@/lib/export/exportService';
+import { PlusCircle, Download, Filter } from 'lucide-react';
 
 export default function RequestsPage() {
+  const { settings } = useSettings();
   const [requests, setRequests] = useState<Request[]>([]);
+  const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -58,10 +63,65 @@ export default function RequestsPage() {
     loadRequests();
   }, []);
 
+  // Format status for display
+  const formatStatus = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      'new': 'New',
+      'in_progress': 'In Progress',
+      'completed': 'Completed',
+      'cancelled': 'Cancelled',
+      'pending': 'Pending'
+    };
+    
+    return statusMap[status] || status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
+  };
+  
+  // Get status styling based on status value
+  const getStatusStyles = (status: string): string => {
+    const styleMap: Record<string, string> = {
+      'new': 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400',
+      'in_progress': 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400',
+      'completed': 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
+      'cancelled': 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400',
+      'pending': 'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400'
+    };
+    
+    return styleMap[status] || 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
+  };
+  
+  // Export data function
+  const exportRequestsData = async (format: 'csv' | 'excel') => {
+    try {
+      setExporting(true);
+      const blob = await exportRequests({ format });
+      downloadBlob(blob, 'requests', format);
+    } catch (error) {
+      console.error('Failed to export requests:', error);
+    } finally {
+      setExporting(false);
+    }
+  };
+  
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Requests</h1>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => exportRequestsData('csv')}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </button>
+          <button
+            onClick={() => exportRequestsData('excel')}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export Excel
+          </button>
+        </div>
       </div>
       
       {loading ? (
@@ -129,8 +189,8 @@ export default function RequestsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400">
-                        {request.status.charAt(0).toUpperCase() + request.status.slice(1).replace('_', ' ')}
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusStyles(request.status)}`}>
+                        {formatStatus(request.status)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

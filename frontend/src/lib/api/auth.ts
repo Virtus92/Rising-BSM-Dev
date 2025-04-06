@@ -1,28 +1,18 @@
-import { fetchApi, ApiResponse, setRefreshTokenFunction, post, get } from './config';
+import { 
+  fetchApi, 
+  ApiResponse, 
+  post, 
+  get 
+} from './client';
 
-export interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-    role: string;
-  };
-}
-
-export interface TokenResponse {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-}
-
-export interface ResetTokenResponse {
-  valid: boolean;
-  userId: number;
-  email: string;
-}
+import {
+  LoginDto,
+  AuthResponseDto,
+  RefreshTokenDto,
+  RefreshTokenResponseDto,
+  ForgotPasswordDto,
+  ResetPasswordDto
+} from '../dtos/AuthDtos';
 
 /**
  * Führt die Benutzeranmeldung durch
@@ -31,13 +21,15 @@ export interface ResetTokenResponse {
  * @param remember Flag, ob der Benutzer länger angemeldet bleiben soll
  * @returns API-Antwort mit Login-Daten
  */
-export function login(email: string, password: string, remember: boolean = false): Promise<ApiResponse<LoginResponse>> {
+export function login(email: string, password: string, remember: boolean = false): Promise<ApiResponse<AuthResponseDto>> {
   console.log("Sending login request with:", { email, password: "***", remember });
   
+  const loginData: LoginDto = { email, password, remember };
+  
   // Hier senden wir die Anfrage an den korrekten Endpoint
-  return post<LoginResponse>(
-    '/login',
-    { email, password, remember },
+  return post<AuthResponseDto>(
+    '/auth/login',
+    loginData,
     false // Keine Authentifizierung erforderlich für Login
   );
 }
@@ -47,23 +39,22 @@ export function login(email: string, password: string, remember: boolean = false
  * @param refreshToken Das aktuelle Refresh Token
  * @returns API-Antwort mit neuen Tokens
  */
-export function refreshToken(refreshToken: string): Promise<ApiResponse<TokenResponse>> {
-  return post<TokenResponse>(
-    '/auth/refresh-token',
-    { refreshToken },
+export function refreshToken(refreshToken: string): Promise<ApiResponse<RefreshTokenResponseDto>> {
+  const refreshData: RefreshTokenDto = { refreshToken };
+  
+  return post<RefreshTokenResponseDto>(
+    '/auth/refresh', // Korrigiert auf den korrekten Endpunkt
+    refreshData,
     false // Keine Authentifizierung erforderlich für Token-Aktualisierung
   );
 }
-
-// Registriere die refreshToken-Funktion bei der API-Konfiguration
-setRefreshTokenFunction(refreshToken);
 
 /**
  * Führt den Benutzer-Logout durch
  * @param refreshToken Das aktuelle Refresh Token zum Invalidieren
  * @returns API-Antwort
  */
-export function logout(refreshToken: string): Promise<ApiResponse> {
+export function logout(refreshToken: string): Promise<ApiResponse<{ success: boolean; tokenCount: number }>> {
   return post(
     '/auth/logout',
     { refreshToken },
@@ -76,10 +67,12 @@ export function logout(refreshToken: string): Promise<ApiResponse> {
  * @param email E-Mail-Adresse des Benutzers
  * @returns API-Antwort
  */
-export function forgotPassword(email: string): Promise<ApiResponse> {
+export function forgotPassword(email: string): Promise<ApiResponse<{ success: boolean }>> {
+  const forgotPasswordData: ForgotPasswordDto = { email };
+  
   return post(
     '/auth/forgot-password',
-    { email },
+    forgotPasswordData,
     false // Keine Authentifizierung erforderlich
   );
 }
@@ -95,10 +88,16 @@ export function resetPassword(
   token: string, 
   password: string, 
   confirmPassword: string
-): Promise<ApiResponse> {
+): Promise<ApiResponse<{ success: boolean }>> {
+  const resetPasswordData: ResetPasswordDto = { 
+    token,
+    password, 
+    confirmPassword 
+  };
+  
   return post(
-    `/auth/reset-password/${token}`,
-    { password, confirmPassword },
+    '/auth/reset-password',
+    resetPasswordData,
     false // Keine Authentifizierung erforderlich
   );
 }
@@ -108,9 +107,9 @@ export function resetPassword(
  * @param token Das zu validierende Reset-Token
  * @returns API-Antwort mit Validierungsinformationen
  */
-export function validateResetToken(token: string): Promise<ApiResponse<ResetTokenResponse>> {
-  return get<ResetTokenResponse>(
-    `/auth/reset-token/${token}`,
+export function validateResetToken(token: string): Promise<ApiResponse<{ valid: boolean }>> {
+  return get<{ valid: boolean }>(
+    `/auth/validate-reset-token/${token}`,
     false // Keine Authentifizierung erforderlich
   );
 }

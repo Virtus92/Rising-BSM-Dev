@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   Loader2
 } from 'lucide-react';
-import { getCustomers, CustomerType, exportCustomers } from './utils/customer-service';
+import { getCustomers, CustomerType } from './utils/customer-service';
+import ExportButton from '@/components/ExportButton';
 import { useAuth } from '@/providers/AuthProvider';
 import CustomerListItem from './components/CustomerListItem';
 import CustomerFilterPanel from './components/CustomerFilterPanel';
@@ -143,18 +144,7 @@ export default function CustomersPage() {
     router.push(newUrl);
   }, [filters, router]);
 
-  // Kunden exportieren
-  const handleExport = async (format: 'csv' | 'excel') => {
-    try {
-      setExportLoading(true);
-      await exportCustomers({ ...filters, format });
-    } catch (err) {
-      console.error('Fehler beim Exportieren der Kunden:', err);
-      setError('Der Export konnte nicht abgeschlossen werden.');
-    } finally {
-      setExportLoading(false);
-    }
-  };
+  // ExportButton handles the export functionality
 
   return (
     <div className="space-y-6">
@@ -192,23 +182,12 @@ export default function CustomersPage() {
           </button>
           
           {/* Export-Button */}
-          <div className="dropdown dropdown-end">
-            <button 
-              className="flex items-center px-3 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800"
-              disabled={exportLoading}
-            >
-              {exportLoading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" aria-hidden="true" />
-              )}
-              Exportieren
-            </button>
-            <ul className="dropdown-content z-[1] menu p-2 shadow bg-white dark:bg-slate-800 rounded-md w-52">
-              <li><button onClick={() => handleExport('csv')}>Als CSV exportieren</button></li>
-              <li><button onClick={() => handleExport('excel')}>Als Excel exportieren</button></li>
-            </ul>
-          </div>
+          <ExportButton
+            entityType="customers"
+            filters={filters}
+            buttonText="Exportieren"
+            className="flex items-center px-3 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800"
+          />
           
           {/* Neuer Kunde Button */}
           {hasPermission(['admin', 'manager', 'mitarbeiter']) && (

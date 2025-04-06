@@ -78,8 +78,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       
+      // Wenn Refresh fehlschlägt, behalten wir den Benutzer trotzdem angemeldet
+      // bis ein expliziter Logout erfolgt - verhindert automatisches Ausloggen
+      if (getAccessToken()) {
+        return true;
+      }
+      
       return false;
     } catch (error) {
+      console.error('Token-Refresh Fehler:', error);
+      
+      // Token-Aktualisierungsfehler ignorieren und Benutzer eingeloggt lassen
+      if (getAccessToken()) {
+        return true;
+      }
+      
       if (error instanceof ApiRequestError) {
         setError(error.message);
       } else {

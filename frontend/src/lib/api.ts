@@ -316,6 +316,87 @@ export async function deleteInvoice<T = any>(id: string) {
   }, true);
 }
 
+// Export data endpoints
+export async function exportCustomers(format: 'csv' | 'excel' = 'csv', filters: Record<string, any> = {}) {
+  const queryParams = new URLSearchParams();
+  queryParams.append('format', format);
+
+  // Add filters
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      queryParams.append(key, String(value));
+    }
+  });
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  return fetchApi(`/customers/export${queryString}`, {
+    method: 'GET',
+    headers: {
+      'Accept': format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }
+  }, true, true);
+}
+
+export async function exportAppointments(format: 'csv' | 'excel' = 'csv', filters: Record<string, any> = {}) {
+  const queryParams = new URLSearchParams();
+  queryParams.append('format', format);
+
+  // Add filters
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      queryParams.append(key, String(value));
+    }
+  });
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  return fetchApi(`/appointments/export${queryString}`, {
+    method: 'GET',
+    headers: {
+      'Accept': format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }
+  }, true, true);
+}
+
+export async function exportProjects(format: 'csv' | 'excel' = 'csv', filters: Record<string, any> = {}) {
+  const queryParams = new URLSearchParams();
+  queryParams.append('format', format);
+
+  // Add filters
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      queryParams.append(key, String(value));
+    }
+  });
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  return fetchApi(`/projects/export${queryString}`, {
+    method: 'GET',
+    headers: {
+      'Accept': format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }
+  }, true, true);
+}
+
+export async function exportRequests(format: 'csv' | 'excel' = 'csv', filters: Record<string, any> = {}) {
+  const queryParams = new URLSearchParams();
+  queryParams.append('format', format);
+
+  // Add filters
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      queryParams.append(key, String(value));
+    }
+  });
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  return fetchApi(`/requests/export${queryString}`, {
+    method: 'GET',
+    headers: {
+      'Accept': format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }
+  }, true, true);
+}
+
 export async function sendInvoice<T = any>(id: string, emailData?: { to?: string, message?: string }) {
   return fetchApi<T>(`/invoices/${id}/send`, {
     method: 'POST',
@@ -327,5 +408,19 @@ export async function markInvoiceAsPaid<T = any>(id: string, paymentData: { paym
   return fetchApi<T>(`/invoices/${id}/mark-paid`, {
     method: 'PUT',
     body: JSON.stringify(paymentData),
+  }, true);
+}
+
+// Settings
+export async function getSettings<T = any>() {
+  return fetchApi<T>('/settings', {
+    method: 'GET'
+  }, true);
+}
+
+export async function updateSetting<T = any>(key: string, value: any) {
+  return fetchApi<T>('/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ key, value }),
   }, true);
 }

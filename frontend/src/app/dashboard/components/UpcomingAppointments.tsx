@@ -20,7 +20,27 @@ const UpcomingAppointments = () => {
         
         if (response.success && response.data && response.data.upcomingAppointments) {
           console.log('Appointment data received:', response.data.upcomingAppointments);
-          setAppointments(response.data.upcomingAppointments || []);
+          
+          // Normalisieren der Appointments, um sicherzustellen, dass alle Felder korrekt formatiert sind
+          const normalizedAppointments = (response.data.upcomingAppointments || []).map((appointment: any) => {
+            // Sicherstellen, dass customer ein String ist, falls es ein Objekt ist
+            let customerName = appointment.customerName || 'Kein Kunde zugewiesen';
+            
+            // Wenn customer ein Objekt ist, verwenden wir seinen Namen
+            if (appointment.customer && typeof appointment.customer === 'object') {
+              customerName = appointment.customer.name || 'Kein Name';
+              // Customer-Feld auf den String-Namen setzen
+              appointment.customer = customerName;
+            }
+            
+            return {
+              ...appointment,
+              customerName: customerName,
+              // Weitere Normalisierungen hier...
+            };
+          });
+          
+          setAppointments(normalizedAppointments);
         } else {
           console.warn('No appointments data received from API');
           setError('No appointment data available. Please check the connection to the backend.');
@@ -40,11 +60,12 @@ const UpcomingAppointments = () => {
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
     try {
-      // Es kann sein, dass wir dateLabel statt eines Datums bekommen
+      // Prüfen, ob es sich um ein bereits formatiertes Datum handelt
       if (dateString.includes('.') || dateString.includes('/')) {
         return dateString;
       }
       
+      // Sonst versuchen, das Datum zu parsen
       const date = new Date(dateString);
       // Überprüfen, ob das Datum gültig ist
       if (isNaN(date.getTime())) {
@@ -104,6 +125,7 @@ const UpcomingAppointments = () => {
         // Extrahiere den Tag aus einem formatierten String (z.B. "01.02.2023")
         const parts = dateString.split(/[.,/\s]/);
         if (parts.length >= 3) {
+          // Korrigierte Reihenfolge für das deutsche Datumsformat (Tag.Monat.Jahr)
           const day = parseInt(parts[0], 10);
           const month = parseInt(parts[1], 10) - 1;
           const year = parseInt(parts[2], 10);
@@ -115,6 +137,7 @@ const UpcomingAppointments = () => {
         return '-';
       }
       
+      // Versuche, ein ISO-Datum zu parsen
       const date = new Date(dateString);
       // Überprüfen, ob das Datum gültig ist
       if (isNaN(date.getTime())) {
@@ -137,18 +160,20 @@ const UpcomingAppointments = () => {
         // Extrahiere den Tag aus einem formatierten String (z.B. "01.02.2023")
         const parts = dateString.split(/[.,/\s]/);
         if (parts.length >= 1) {
+          // Im deutschen Datumsformat ist der Tag an erster Stelle
           return parts[0];
         }
         return '-';
       }
       
+      // Versuche, ein ISO-Datum zu parsen
       const date = new Date(dateString);
       // Überprüfen, ob das Datum gültig ist
       if (isNaN(date.getTime())) {
         console.warn('Ungültiges Datum:', dateString);
         return '-';
       }
-      return date.getDate().toString();
+      return date.getDate().toString().padStart(2, '0'); // Füge eine führende Null hinzu, falls nötig
     } catch (error) {
       console.error('Fehler beim Parsen des Datums:', dateString, error);
       return '-';
@@ -233,7 +258,10 @@ const UpcomingAppointments = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-600 dark:text-gray-300">
-                      {appointment.customer || appointment.customerName || 'Kein Kunde zugewiesen'}
+                      {/* Verwenden Sie den customerName oder den aufgelösten String aus dem customer-Objekt */}
+                      {typeof appointment.customer === 'string' 
+                        ? appointment.customer 
+                        : appointment.customerName || 'Kein Kunde zugewiesen'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -247,7 +275,7 @@ const UpcomingAppointments = () => {
                         </span>
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-300">
-                        {formatDate(appointment.dateLabel || appointment.appointmentDate)} • {appointment.time || appointment.appointmentTime || 'Keine Zeit'}
+                      {formatDate(appointment.dateLabel || appointment.appointmentDate)} • {appointment.time || appointment.appointmentTime || 'Keine Zeit angegeben'}
                       </div>
                     </div>
                   </td>

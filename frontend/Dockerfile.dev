@@ -1,0 +1,38 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install necessary tools
+RUN apk --no-cache add curl bash openssl && \
+    chmod 755 /bin/bash
+
+# Copy package.json and package-lock.json
+COPY package*.json ./
+
+# Install all dependencies including dev dependencies
+RUN npm install
+
+# Copy prisma schema, migrations, and seed files
+COPY prisma ./prisma/
+
+# Copy entry point script
+COPY docker-entrypoint.sh ./
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy the rest of the application
+COPY . .
+
+# Environment variables
+ENV PORT=3000
+ENV NODE_ENV=development
+ENV SEED_DATABASE=true
+
+# Expose port
+EXPOSE $PORT
+
+# Set up entry point to handle migrations and start app
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["npm", "run", "dev"]

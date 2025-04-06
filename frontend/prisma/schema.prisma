@@ -1,0 +1,355 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//==============================================================================
+// CORE: USERS & AUTHENTICATION
+//==============================================================================
+
+model User {
+  id                Int                @id @default(autoincrement())
+  name              String             @db.VarChar(100)
+  email             String             @unique @db.VarChar(100)
+  password          String             @db.VarChar(100)
+  role              String             @default("employee") @db.VarChar(20)
+  phone             String?            @db.VarChar(30)
+  status            String             @default("active") @db.Text
+  profilePicture    String?            @db.VarChar(255)
+  createdAt         DateTime           @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime           @updatedAt @db.Timestamp(6)
+  createdBy         Int?                             
+  updatedBy         Int?
+  lastLoginAt       DateTime?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  settings          UserSettings?
+  activities        UserActivity[]
+  projects          Project[]
+  appointments      Appointment[]
+  refreshTokens     RefreshToken[]
+  serviceLogs       ServiceLog[]
+  customerLogs      CustomerLog[]
+  requestLogs       RequestLog[]
+  projectNotes      ProjectNote[]
+  requestNotes      RequestNote[]
+  appointmentNotes  AppointmentNote[]
+  appointmentLogs   AppointmentLog[]
+
+
+  @@index([email])
+  @@index([name])
+}
+
+model UserSettings {
+  id                  Int      @id @default(autoincrement())
+  userId              Int      @unique
+  darkMode            Boolean  @default(false)
+  emailNotifications  Boolean  @default(true)
+  pushNotifications   Boolean  @default(false)
+  language            String   @default("de") @db.VarChar(10)
+  notificationInterval String   @default("immediate") @db.VarChar(20)
+  createdAt           DateTime @default(now()) @db.Timestamp(6)
+  updatedAt           DateTime @updatedAt @db.Timestamp(6)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserActivity {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  timestamp DateTime? @default(now()) @db.Timestamp(6)
+  activity  String    @db.VarChar(255)
+  ipAddress String?   @db.VarChar(255)
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model UserSession {
+  sid    String   @id @db.VarChar
+  sess   Json
+  expire DateTime @db.Timestamp(6)
+}
+
+model RefreshToken {
+  token           String    @id
+  userId          Int
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+  createdByIp     String?
+  isRevoked       Boolean   @default(false)
+  revokedAt       DateTime?
+  revokedByIp     String?
+  replacedByToken String?
+  
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SystemSettings {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @db.VarChar(100)
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+//==============================================================================
+// CRM: CUSTOMERS, PROJECTS & SERVICES
+//==============================================================================
+
+model Customer {
+  id           Int            @id @default(autoincrement())
+  name         String         @db.VarChar(100)
+  company      String?        @db.VarChar(100)
+  email        String?        @db.VarChar(100)
+  phone        String?        @db.VarChar(30)
+  address      String?        @db.Text
+  postalCode   String?        @db.VarChar(10)
+  city         String?        @db.VarChar(100)
+  country      String         @default("Austria") @db.VarChar(100)
+  notes        String?        @db.Text
+  newsletter   Boolean        @default(false)
+  status       String         @default("active") @db.VarChar(20)
+  type         String         @default("private") @db.VarChar(20)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  createdBy    Int? 
+  updatedBy    Int?
+  projects     Project[]
+  appointments Appointment[]
+  invoices     Invoice[]
+  logs         CustomerLog[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model CustomerLog {
+  id         Int      @id @default(autoincrement())
+  customerId Int
+  userId     Int?
+  userName   String   @db.Text
+  action     String   @db.Text
+  details    String?  @db.Text
+  createdAt  DateTime @default(now()) @db.Timestamp(6)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model Service {
+  id           Int               @id @default(autoincrement())
+  name         String            @db.VarChar(100)
+  description  String?           @db.Text
+  basePrice    Decimal           @db.Decimal
+  vatRate      Decimal           @default(20.00) @db.Decimal
+  active       Boolean           @default(true)
+  unit         String?           @db.VarChar(20)
+  createdAt    DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime          @updatedAt @db.Timestamp(6)
+  projects     Project[]
+  invoiceItems InvoiceItem[]
+  logs         ServiceLog[]
+}
+
+model ServiceLog {
+  id          Int      @id @default(autoincrement())
+  serviceId   Int
+  userId      Int?
+  userName    String?  @db.VarChar(255)
+  action      String   @db.VarChar(255)
+  details     String?  @db.Text
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id          Int            @id @default(autoincrement())
+  title       String         @db.VarChar(200)
+  customerId  Int?
+  serviceId   Int?
+  startDate   DateTime?      @db.Date
+  endDate     DateTime?      @db.Date
+  amount      Decimal?       @db.Decimal
+  description String?        @db.Text
+  status      String         @default("new") @db.VarChar(20)
+  createdBy   Int?
+  createdAt   DateTime       @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime       @updatedAt @db.Timestamp(6)
+  customer    Customer?      @relation(fields: [customerId], references: [id])
+  service     Service?       @relation(fields: [serviceId], references: [id])
+  creator     User?          @relation(fields: [createdBy], references: [id])
+  invoices    Invoice[]
+  appointments Appointment[]
+  notes       ProjectNote[]
+}
+
+model ProjectNote {
+  id        Int      @id @default(autoincrement())
+  projectId Int?
+  userId    Int?
+  userName  String   @db.Text
+  text      String   @db.Text
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  project   Project? @relation(fields: [projectId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model ProjectLog {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  userId    Int
+  userName  String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+//==============================================================================
+// SCHEDULING: APPOINTMENTS & CALENDAR
+//==============================================================================
+
+model Appointment {
+  id              Int               @id @default(autoincrement())
+  title           String            @db.VarChar(200)
+  customerId      Int?
+  projectId       Int?
+  appointmentDate DateTime          @db.Timestamp(6)
+  duration        Int?
+  location        String?           @db.VarChar(200)
+  description     String?           @db.Text
+  status          String            @default("planned") @db.VarChar(20)
+  createdBy       Int?
+  createdAt       DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime          @updatedAt @db.Timestamp(6)
+  customer        Customer?         @relation(fields: [customerId], references: [id])
+  project         Project?          @relation(fields: [projectId], references: [id])
+  creator         User?             @relation(fields: [createdBy], references: [id])
+  notes           AppointmentNote[]
+
+  @@index([customerId])
+  @@index([appointmentDate])
+  @@index([status])
+}
+
+model AppointmentNote {
+  id            Int         @id @default(autoincrement())
+  appointmentId Int
+  userId        Int
+  userName      String      @db.VarChar(100)
+  text          String      @db.Text
+  createdAt     DateTime    @default(now()) @db.Timestamp(6)
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+}
+
+model AppointmentLog {
+  id            Int      @id @default(autoincrement())
+  appointmentId Int
+  userId        Int
+  userName      String   @db.Text
+  action        String   @db.Text
+  details       String?  @db.Text
+  createdAt     DateTime @default(now()) @db.Timestamp(6)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+//==============================================================================
+// FINANCE: INVOICES & PAYMENTS
+//==============================================================================
+
+model Invoice {
+  id              Int           @id @default(autoincrement())
+  invoiceNumber   String        @db.VarChar(50)
+  projectId       Int?
+  customerId      Int?
+  amount          Decimal       @db.Decimal
+  vatAmount       Decimal       @db.Decimal
+  totalAmount     Decimal       @db.Decimal
+  invoiceDate     DateTime      @db.Date
+  dueDate         DateTime      @db.Date
+  paidAt          DateTime?     @db.Timestamp(6)
+  status          String        @default("open") @db.VarChar(20)
+  createdAt       DateTime      @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime      @updatedAt @db.Timestamp(6)
+  items           InvoiceItem[]
+  project         Project?      @relation(fields: [projectId], references: [id])
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+
+  @@index([invoiceDate], name: "idx_invoice_date")
+}
+
+model InvoiceItem {
+  id         Int      @id @default(autoincrement())
+  invoiceId  Int
+  serviceId  Int
+  quantity   Int
+  unitPrice  Decimal  @db.Decimal
+  createdAt  DateTime @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime @updatedAt @db.Timestamp(6)
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id])
+  service    Service  @relation(fields: [serviceId], references: [id])
+}
+
+//==============================================================================
+// CONTACT & NOTIFICATIONS
+//==============================================================================
+
+model ContactRequest {
+  id          Int           @id @default(autoincrement())
+  name        String        @db.VarChar(100)
+  email       String        @db.VarChar(100)
+  phone       String?       @db.VarChar(30)
+  service     String        @db.VarChar(50)
+  message     String        @db.Text
+  status      String        @default("new") @db.VarChar(20)
+  processorId Int?
+  ipAddress   String?       @db.VarChar(255)
+  createdAt   DateTime      @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime      @updatedAt @db.Timestamp(6)
+  notes       RequestNote[]
+}
+
+model RequestNote {
+  id        Int           @id @default(autoincrement())
+  requestId Int
+  userId    Int
+  userName  String        @db.VarChar(100)
+  text      String        @db.Text
+  createdAt DateTime      @default(now()) @db.Timestamp(6)
+  request   ContactRequest @relation(fields: [requestId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+}
+
+model RequestLog {
+  id        Int      @id @default(autoincrement())
+  requestId Int
+  userId    Int
+  userName  String   @db.VarChar(255)
+  action    String   @db.VarChar(255)
+  details   String?  @db.Text
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id            Int       @id @default(autoincrement())
+  userId        Int?
+  referenceId   Int?
+  referenceType String?   @db.VarChar(50)
+  type          String    @db.VarChar(20)
+  title         String    @db.VarChar(100)
+  message       String?   @db.Text
+  description   String?   @db.Text
+  read          Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime  @updatedAt
+  createdBy     Int?
+  updatedBy     Int?
+}

@@ -1,7 +1,7 @@
 import { getAccessToken, getRefreshToken, setTokens, clearTokens } from '../auth';
 
-// API Basis-URL aus der Umgebungskonfiguration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/API/v1';
+// API Basis-URL für lokale API-Routes
+const API_BASE_URL = '/api';
 
 console.log('API Base URL:', API_BASE_URL);
 
@@ -91,6 +91,7 @@ const prepareHeaders = (headers: HeadersInit = {}, requiresAuth: boolean): Heade
 export async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
   const contentType = response.headers.get('content-type');
   const isJson = contentType?.includes('application/json');
+  const isBinary = contentType?.includes('application/vnd.openxmlformats-officedocument') || contentType?.includes('text/csv');
   
   console.log('API Response:', {
     status: response.status,
@@ -187,8 +188,16 @@ const refreshAuthToken = async (): Promise<boolean> => {
   refreshPromise = new Promise(async (resolve) => {
     try {
       const refreshToken = getRefreshToken();
+      const accessToken = getAccessToken();
       
+      // Wenn kein Refresh-Token vorhanden ist aber ein Access-Token, 
+      // behalten wir den Benutzer dennoch eingeloggt
       if (!refreshToken) {
+        if (accessToken) {
+          console.log('Kein Refresh-Token, aber Access-Token vorhanden - Benutzer bleibt eingeloggt');
+          resolve(true);
+          return;
+        }
         resolve(false);
         return;
       }
@@ -199,13 +208,26 @@ const refreshAuthToken = async (): Promise<boolean> => {
         setTokens(response.data.accessToken, response.data.refreshToken);
         resolve(true);
       } else {
-        clearTokens();
-        resolve(false);
+        // Bei Fehlschlag prüfen, ob wir noch ein altes Token haben und damit weitermachen können
+        if (accessToken) {
+          console.log('Token-Refresh fehlgeschlagen, aber altes Token wird weiterhin verwendet');
+          resolve(true);
+        } else {
+          clearTokens();
+          resolve(false);
+        }
       }
     } catch (error) {
       console.error('Token-Aktualisierung fehlgeschlagen', error);
-      clearTokens();
-      resolve(false);
+      
+      // Auch bei Fehlern nicht ausloggen, wenn noch ein altes Token da ist
+      if (getAccessToken()) {
+        console.log('Token-Refresh-Fehler aufgetreten, aber altes Token wird weiterhin verwendet');
+        resolve(true);
+      } else {
+        clearTokens();
+        resolve(false);
+      }
     } finally {
       isRefreshing = false;
       refreshPromise = null;
@@ -221,7 +243,8 @@ const refreshAuthToken = async (): Promise<boolean> => {
 export async function fetchApi<T = any>(
   endpoint: string,
   options: RequestInit = {},
-  requiresAuth: boolean = true
+  requiresAuth: boolean = true,
+  isBinary: boolean = false
 ): Promise<ApiResponse<T>> {
   // URL zusammenbauen
   let processedEndpoint = endpoint;
@@ -265,12 +288,23 @@ export async function fetchApi<T = any>(
         
         response = await fetch(url, newOptions);
       } else {
-        // Weiterleiten zur Login-Seite, wenn die Token-Aktualisierung fehlschlägt
-        if (typeof window !== 'undefined') {
+        // Bei Fehlern trotzdem versuchen, die Anfrage zu bearbeiten
+        // Nur zur Login-Seite weiterleiten, wenn keine Tokens mehr vorhanden sind
+        if (!getAccessToken() && !getRefreshToken() && typeof window !== 'undefined') {
+          console.log('Keine gültigen Tokens vorhanden - Weiterleitung zur Login-Seite');
           window.location.href = '/auth/login?session=expired';
+          throw new ApiRequestError(ERROR_MESSAGES.SESSION_EXPIRED, 401);
         }
-        throw new ApiRequestError(ERROR_MESSAGES.SESSION_EXPIRED, 401);
+        // Bei 401 trotzdem weitermachen und den Fehler an die Anwendung zurückgeben,
+        // statt automatisch auszuloggen
+        console.warn('Auth-Fehler 401, aber keine Auto-Weiterleitung zum Login');
       }
+    }
+    
+    // For binary responses, return the raw response
+    if (isBinary) {
+      const blob = await response.blob();
+      return { success: true, data: blob as any };
     }
     
     return await handleResponse<T>(response);

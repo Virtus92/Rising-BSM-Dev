@@ -76,7 +76,7 @@ export const isTokenValid = (token: string | undefined): boolean => {
  * Typdefinition für decodierte Token-Daten
  */
 export interface DecodedToken {
-  sub: number;
+  sub: number; // Benutzer-ID im JWT ist unter 'sub' gespeichert
   name: string;
   email: string;
   role: string;
@@ -105,7 +105,7 @@ export const getUserFromToken = (token: string | undefined): {
     }
     
     return {
-      id: decoded.sub,
+      id: decoded.sub, // Benutzer-ID aus 'sub' extrahieren
       name: decoded.name,
       email: decoded.email,
       role: decoded.role

@@ -114,8 +114,7 @@ export const getDashboardData = async (): Promise<ApiResponse<DashboardData>> =>
     // Speichere Backend-Daten
     const backendData = response.data;
     
-    // Transformiere Backend-Daten ins Frontend-Format 
-    // (ohne Dummy-Daten oder Fallback-Werte)
+    // Transformiere Backend-Daten ins Frontend-Format
     const frontendData: DashboardData = {
       stats: {}
     };
@@ -124,43 +123,137 @@ export const getDashboardData = async (): Promise<ApiResponse<DashboardData>> =>
     if (backendData.stats?.totalCustomers) {
       frontendData.stats.customers = {
         total: backendData.stats.totalCustomers.count || 0,
-        new: 0, // Keine Informationen über neue Kunden
+        new: backendData.stats.customers?.new || 0,
         trend: backendData.stats.totalCustomers.trend || 0
       };
+    } else if (backendData.stats?.customers) {
+      frontendData.stats.customers = backendData.stats.customers;
+    } else {
+      // Wenn keine Daten vom Backend kommen, API neu abfragen
+      console.error('Keine Kundendaten vom Backend erhalten!');
     }
     
     // Projekte-Statistiken
     if (backendData.stats?.activeProjects) {
+      // Ensure values are valid numbers
+      const activeCount = Math.max(0, backendData.stats.activeProjects.count || 0);
+      const newProjects = Math.max(0, backendData.stats.projects?.new || 0);
+      const completedProjects = Math.max(0, backendData.stats.projects?.completed || 0);
+      
       frontendData.stats.projects = {
-        active: backendData.stats.activeProjects.count || 0,
-        new: 0, // Keine Informationen über neue Projekte
-        completed: 0, // Keine Informationen über abgeschlossene Projekte
-        total: backendData.stats.activeProjects.count || 0,
+        active: activeCount,
+        new: newProjects,
+        completed: completedProjects,
+        total: activeCount + newProjects,  // Only count active and new
         trend: backendData.stats.activeProjects.trend || 0
       };
+    } else if (backendData.stats?.projects) {
+      // Ensure we have valid numbers if using the projects object directly
+      const projects = { ...backendData.stats.projects };
+      
+      // Convert any NaN or negative values to 0
+      Object.keys(projects).forEach(key => {
+        if (typeof projects[key] === 'number') {
+          projects[key] = isNaN(projects[key]) ? 0 : Math.max(0, projects[key]);
+        }
+      });
+      
+      // Calculate total if missing
+      if (!projects.total && (projects.active || projects.new)) {
+        projects.total = (projects.active || 0) + (projects.new || 0);
+      }
+      
+      frontendData.stats.projects = projects;
+    } else {
+      // Default values if no data
+      frontendData.stats.projects = {
+        active: 0,
+        new: 0,
+        completed: 0,
+        total: 0,
+        trend: 0
+      };
+      console.error('Keine Projektdaten vom Backend erhalten!');
     }
     
     // Anfragen-Statistiken
     if (backendData.stats?.newRequests) {
+      // Calculate correct total, ensure all numeric values are valid
+      const newRequests = Math.max(0, backendData.stats.newRequests.count || 0);
+      const inProgress = Math.max(0, backendData.stats.requests?.inProgress || 0);
+      const completed = Math.max(0, backendData.stats.requests?.completed || 0);
+      
       frontendData.stats.requests = {
-        new: backendData.stats.newRequests.count || 0,
-        inProgress: 0, // Keine Informationen über Anfragen in Bearbeitung
-        completed: 0, // Keine Informationen über abgeschlossene Anfragen
-        total: backendData.stats.newRequests.count || 0,
+        new: newRequests,
+        inProgress: inProgress,
+        completed: completed,
+        total: newRequests + inProgress, // Only count active requests, not completed
         trend: backendData.stats.newRequests.trend || 0
       };
+      
+      // Debug-Ausgabe für Anfragen
+      console.log('Dashboard API: Anfragen aus newRequests berechnet:', frontendData.stats.requests);
+    } else if (backendData.stats?.requests) {
+      // Ensure we have valid numbers if using the requests object directly
+      const requests = { ...backendData.stats.requests };
+      
+      // Convert any NaN or negative values to 0
+      Object.keys(requests).forEach(key => {
+        if (typeof requests[key] === 'number') {
+          requests[key] = isNaN(requests[key]) ? 0 : Math.max(0, requests[key]);
+        }
+      });
+      
+      // If total is missing, calculate it from available data
+      if (!requests.total && (requests.new || requests.inProgress)) {
+        requests.total = (requests.new || 0) + (requests.inProgress || 0);
+      }
+      
+      frontendData.stats.requests = requests;
+      
+      // Debug-Ausgabe für Anfragen
+      console.log('Dashboard API: Anfragen direkt aus requests-Objekt:', frontendData.stats.requests);
+    } else if (backendData.recentRequests && Array.isArray(backendData.recentRequests)) {
+      // Wenn nur recentRequests verfügbar sind, versuchen wir diese zu zählen
+      const recentRequests = backendData.recentRequests;
+      const newCount = recentRequests.filter(req => req.status === 'new' || req.status === 'received').length;
+      const inProgressCount = recentRequests.filter(req => req.status === 'in_progress' || req.status === 'processing').length;
+      const completedCount = recentRequests.filter(req => req.status === 'completed' || req.status === 'done').length;
+      
+      frontendData.stats.requests = {
+        new: newCount,
+        inProgress: inProgressCount,
+        completed: completedCount,
+        total: newCount + inProgressCount,
+        trend: 0
+      };
+      
+      console.log('Dashboard API: Anfragen aus recentRequests berechnet:', frontendData.stats.requests);
+    } else {
+      // If no data from backend, set default values
+      frontendData.stats.requests = {
+        new: 0,
+        inProgress: 0,
+        completed: 0,
+        total: 0,
+        trend: 0
+      };
+      console.error('Keine Anfragedaten vom Backend erhalten!');
     }
     
     // Termine-Statistiken
-    // Da keine direkten Statistiken für Termine vorhanden sind,
-    // setzen wir nur die Felder, die wir haben (upcomingAppointments)
-    const upcomingAppointmentsCount = backendData.upcomingAppointments?.length || 0;
-    frontendData.stats.appointments = {
-      upcoming: upcomingAppointmentsCount,
-      today: 0, // Keine Informationen über heutige Termine
-      total: upcomingAppointmentsCount,
-      trend: 0 // Keine Informationen über Trend
-    };
+    if (backendData.stats?.appointments) {
+      frontendData.stats.appointments = backendData.stats.appointments;
+    } else {
+      const upcomingAppointmentsCount = backendData.upcomingAppointments?.length || 0;
+      frontendData.stats.appointments = {
+        upcoming: upcomingAppointmentsCount,
+        today: 0,
+        total: upcomingAppointmentsCount,
+        trend: 0
+      };
+      console.log('Termine direkt aus upcomingAppointments berechnet:', upcomingAppointmentsCount);
+    }
     
     // Charts nur übernehmen, wenn sie existieren
     if (backendData.charts) {
@@ -172,11 +265,15 @@ export const getDashboardData = async (): Promise<ApiResponse<DashboardData>> =>
       }
       
       // Project Status Chart
-      if (backendData.charts.projectStatus) {
+      if (backendData.charts.projectStatus && backendData.charts.projectStatus.labels?.length > 0 && backendData.charts.projectStatus.data?.length > 0) {
         frontendData.charts.projectStatus = backendData.charts.projectStatus;
-      } else if (backendData.charts.services) {
+        console.log('Verwende projectStatus Chart:', frontendData.charts.projectStatus);
+      } else if (backendData.charts.services && backendData.charts.services.labels?.length > 0 && backendData.charts.services.data?.length > 0) {
         // Verwende services-Chart falls kein projectStatus vorhanden
         frontendData.charts.projectStatus = backendData.charts.services;
+        console.log('Verwende services Chart als Ersatz für projectStatus:', frontendData.charts.projectStatus);
+      } else {
+        console.log('Keine gültigen Daten für Projekt-Status-Chart verfügbar');
       }
     }
     
@@ -236,43 +333,45 @@ export const getDashboardStats = async (): Promise<ApiResponse<{
     // Transformiere zu Frontend-Format ohne Annahmen oder Berechnungen
     const frontendStats: Record<string, StatItem> = {};
     
-    // Verwende nur die tatsächlich vorhandenen Daten
+    // Verwende nur die tatsächlich vorhandenen Daten vom Backend
     if (response.data.totalCustomers) {
       frontendStats.customers = {
         total: response.data.totalCustomers.count || 0,
-        new: 0, // Keine Informationen über neue Kunden
+        new: response.data.customers?.new || 0,
         trend: response.data.totalCustomers.trend || 0
       };
+    } else if (response.data.customers) {
+      frontendStats.customers = response.data.customers;
     }
     
     if (response.data.activeProjects) {
       frontendStats.projects = {
-        active: response.data.activeProjects.count || 0,
-        new: 0,
-        completed: 0,
-        total: response.data.activeProjects.count || 0,
+        active: response.data.activeProjects.count,
+        new: response.data.projects?.new || 0,
+        completed: response.data.projects?.completed || 0,
+        total: response.data.activeProjects.count,
         trend: response.data.activeProjects.trend || 0
       };
+    } else if (response.data.projects) {
+      frontendStats.projects = response.data.projects;
     }
     
     if (response.data.newRequests) {
       frontendStats.requests = {
-        new: response.data.newRequests.count || 0,
-        inProgress: 0,
-        completed: 0,
-        total: response.data.newRequests.count || 0,
+        new: response.data.newRequests.count,
+        inProgress: response.data.requests?.inProgress || 0,
+        completed: response.data.requests?.completed || 0,
+        total: response.data.newRequests.count,
         trend: response.data.newRequests.trend || 0
       };
+    } else if (response.data.requests) {
+      frontendStats.requests = response.data.requests;
     }
     
-    // Da keine direkten Statistiken für Termine existieren,
-    // initialisieren wir sie mit 0
-    frontendStats.appointments = {
-      upcoming: 0,
-      today: 0,
-      total: 0,
-      trend: 0
-    };
+    // Verwende tatsächliche Terminzahlen
+    if (response.data.appointments) {
+      frontendStats.appointments = response.data.appointments;
+    }
     
     return {
       ...response,
@@ -355,7 +454,7 @@ export const getDashboardChartData = async (): Promise<ApiResponse<DashboardChar
     const chartData: DashboardCharts = {};
     
     // Revenue chart - nur wenn Daten vorhanden sind
-    if (data.charts?.revenue?.labels && data.charts.revenue.data) {
+    if (data.charts?.revenue?.labels && data.charts.revenue.data && data.charts.revenue.labels.length > 0 && data.charts.revenue.data.length > 0) {
       chartData.revenue = {
         labels: data.charts.revenue.labels,
         datasets: [{
@@ -366,7 +465,8 @@ export const getDashboardChartData = async (): Promise<ApiResponse<DashboardChar
           tension: 0.4
         }]
       };
-    } else if (data.revenue?.labels && data.revenue.data) {
+      console.log('Chart data from charts.revenue:', chartData.revenue);
+    } else if (data.revenue?.labels && data.revenue.data && data.revenue.labels.length > 0 && data.revenue.data.length > 0) {
       chartData.revenue = {
         labels: data.revenue.labels,
         datasets: [{
@@ -377,6 +477,7 @@ export const getDashboardChartData = async (): Promise<ApiResponse<DashboardChar
           tension: 0.4
         }]
       };
+      console.log('Chart data from revenue:', chartData.revenue);
     }
     
     // Project status chart - nur wenn Daten vorhanden sind

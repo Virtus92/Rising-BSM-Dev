@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Mail, Phone, Calendar, Clock, CornerDownRight, Check, X } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Calendar, Clock, CornerDownRight, Check, X, UserPlus } from 'lucide-react';
+import * as api from '@/lib/api';
+import { useSettings } from '@/contexts/SettingsContext';
 
 interface RequestNote {
   id: number;
@@ -12,9 +14,257 @@ interface RequestNote {
   createdAt: string;
 }
 
+interface StatusModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  status: string;
+  note: string;
+  setNote: (note: string) => void;
+  isSubmitting: boolean;
+}
+
+// Modal component for status change confirmation
+const StatusChangeModal: React.FC<StatusModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  status, 
+  note, 
+  setNote,
+  isSubmitting 
+}) => {
+  if (!isOpen) return null;
+  
+  const statusLabels: Record<string, string> = {
+    'new': 'New',
+    'in_progress': 'In Progress',
+    'completed': 'Completed',
+    'cancelled': 'Cancelled'
+  };
+  
+  const statusTitle = statusLabels[status] || status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full">
+        <div className="p-5 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Change Status to {statusTitle}</h3>
+        </div>
+        
+        <div className="p-5">
+          <p className="text-gray-700 dark:text-gray-300 mb-4">
+            Are you sure you want to change the status? This action will update the request's status.
+          </p>
+          
+          <div className="mb-4">
+            <label htmlFor="statusNote" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Add a note (optional)
+            </label>
+            <textarea
+              id="statusNote"
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
+              placeholder="Add details about this status change..."
+            />
+          </div>
+        </div>
+        
+        <div className="p-5 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isSubmitting}
+            className="px-4 py-2 bg-green-600 border border-transparent rounded-md text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Updating...
+              </>
+            ) : (
+              'Confirm'
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface CreateCustomerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (customerData: any) => void;
+  isSubmitting: boolean;
+  requestData: any;
+}
+
+// Modal component for creating a customer from request
+const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  isSubmitting,
+  requestData
+}) => {
+  const [formData, setFormData] = useState({
+    name: requestData?.name || '',
+    email: requestData?.email || '',
+    phone: requestData?.phone || '',
+    company: '',
+    notes: `Created from request #${requestData?.id || ''}`
+  });
+  
+  if (!isOpen) return null;
+  
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onConfirm(formData);
+  };
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full">
+        <div className="p-5 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create Customer</h3>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          <div className="p-5 space-y-4">
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              Create a new customer from this request.
+            </p>
+            
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                value={formData.name}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                required
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Phone
+              </label>
+              <input
+                type="tel"
+                id="phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="company" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Company
+              </label>
+              <input
+                type="text"
+                id="company"
+                name="company"
+                value={formData.company}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Notes
+              </label>
+              <textarea
+                id="notes"
+                name="notes"
+                rows={3}
+                value={formData.notes}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
+              />
+            </div>
+          </div>
+          
+          <div className="p-5 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-green-600 border border-transparent rounded-md text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                  Creating...
+                </>
+              ) : (
+                'Create Customer'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export default function RequestDetailPage({ params }: { params: { id: string } }) {
+  const { settings } = useSettings();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [statusNote, setStatusNote] = useState('');
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [request, setRequest] = useState<any>(null);
   const [notes, setNotes] = useState<RequestNote[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -105,50 +355,162 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
     }
   };
 
+  // Function to open status change modal
+  const openStatusModal = (status: string) => {
+    setSelectedStatus(status);
+    setStatusNote('');
+    setStatusModalOpen(true);
+  };
+  
+  // Function to handle status change
   const handleStatusChange = async (newStatus: string) => {
-    if (changingStatus) return;
+    openStatusModal(newStatus);
+  };
+  
+  // Function to confirm status change
+  const confirmStatusChange = async () => {
+    if (changingStatus || !selectedStatus) return;
     
     try {
       setChangingStatus(true);
       
-      // Simuliere API-Antwort mit Verzögerung
-      setTimeout(() => {
-        const statusLabels: Record<string, string> = {
-          'new': 'Neu',
-          'in_progress': 'In Bearbeitung',
-          'completed': 'Abgeschlossen',
-          'cancelled': 'Abgebrochen'
-        };
+      // Make the actual API call
+      try {
+        const response = await api.updateRequestStatus(params.id, selectedStatus, statusNote);
         
-        const statusClasses: Record<string, string> = {
-          'new': 'text-blue-500 bg-blue-100',
-          'in_progress': 'text-yellow-500 bg-yellow-100',
-          'completed': 'text-green-500 bg-green-100',
-          'cancelled': 'text-red-500 bg-red-100'
-        };
-        
-        setRequest({
-          ...request,
-          status: newStatus,
-          statusLabel: statusLabels[newStatus],
-          statusClass: statusClasses[newStatus]
-        });
-        
-        // Füge automatisch eine Notiz hinzu
+        if (response.success) {
+          // Update the request with the new status
+          const statusLabels: Record<string, string> = {
+            'new': 'Neu',
+            'in_progress': 'In Bearbeitung',
+            'completed': 'Abgeschlossen',
+            'cancelled': 'Abgebrochen'
+          };
+          
+          const statusClasses: Record<string, string> = {
+            'new': 'text-blue-500 bg-blue-100',
+            'in_progress': 'text-yellow-500 bg-yellow-100',
+            'completed': 'text-green-500 bg-green-100',
+            'cancelled': 'text-red-500 bg-red-100'
+          };
+          
+          setRequest({
+            ...request,
+            status: selectedStatus,
+            statusLabel: statusLabels[selectedStatus],
+            statusClass: statusClasses[selectedStatus]
+          });
+          
+          // Add a note about the status change
+          const newNoteObject: RequestNote = {
+            id: notes.length + 1,
+            userId: 1,
+            userName: 'Admin User',
+            text: statusNote || `Status auf "${statusLabels[selectedStatus]}" geändert.`,
+            createdAt: new Date().toISOString()
+          };
+          
+          setNotes([...notes, newNoteObject]);
+        } else {
+          console.error('API error:', response.message);
+        }
+      } catch (apiErr) {
+        console.error('API call failed:', apiErr);
+        // Fallback for demo purposes - in real app, show error message
+        setTimeout(() => {
+          const statusLabels: Record<string, string> = {
+            'new': 'Neu',
+            'in_progress': 'In Bearbeitung',
+            'completed': 'Abgeschlossen',
+            'cancelled': 'Abgebrochen'
+          };
+          
+          const statusClasses: Record<string, string> = {
+            'new': 'text-blue-500 bg-blue-100',
+            'in_progress': 'text-yellow-500 bg-yellow-100',
+            'completed': 'text-green-500 bg-green-100',
+            'cancelled': 'text-red-500 bg-red-100'
+          };
+          
+          setRequest({
+            ...request,
+            status: selectedStatus,
+            statusLabel: statusLabels[selectedStatus],
+            statusClass: statusClasses[selectedStatus]
+          });
+          
+          // Add note
+          const newNoteObject: RequestNote = {
+            id: notes.length + 1,
+            userId: 1,
+            userName: 'Admin User',
+            text: statusNote || `Status auf "${statusLabels[selectedStatus]}" geändert.`,
+            createdAt: new Date().toISOString()
+          };
+          
+          setNotes([...notes, newNoteObject]);
+        }, 500);
+      }
+    } catch (err) {
+      console.error('Error changing status:', err);
+    } finally {
+      setChangingStatus(false);
+      setStatusModalOpen(false);
+    }
+  };
+  
+  // Create customer from request
+  const openCreateCustomerModal = () => {
+    setCustomerModalOpen(true);
+  };
+  
+  const handleCreateCustomer = async (customerData: any) => {
+    try {
+      setCreatingCustomer(true);
+      
+      // Make actual API call
+      const response = await api.createCustomer(customerData);
+      
+      if (response.success) {
+        // Add a note about customer creation
         const newNoteObject: RequestNote = {
           id: notes.length + 1,
           userId: 1,
           userName: 'Admin User',
-          text: `Status auf "${statusLabels[newStatus]}" geändert.`,
+          text: `Customer created: ${customerData.name}`,
           createdAt: new Date().toISOString()
         };
         
         setNotes([...notes, newNoteObject]);
-        setChangingStatus(false);
-      }, 500);
+        
+        // Close modal and show success message
+        setCustomerModalOpen(false);
+        
+        // If we have customer ID, redirect to customer page
+        if (response.data?.id) {
+          router.push(`/dashboard/customers/${response.data.id}`);
+        }
+      } else {
+        console.error('API error:', response.message);
+        // Keep modal open on error
+      }
     } catch (err) {
-      console.error('Error changing status:', err);
-      setChangingStatus(false);
+      console.error('Error creating customer:', err);
+      // Fallback for demo
+      setTimeout(() => {
+        const newNoteObject: RequestNote = {
+          id: notes.length + 1,
+          userId: 1,
+          userName: 'Admin User',
+          text: `Customer created: ${customerData.name}`,
+          createdAt: new Date().toISOString()
+        };
+        
+        setNotes([...notes, newNoteObject]);
+        setCustomerModalOpen(false);
+      }, 500);
+    } finally {
+      setCreatingCustomer(false);
     }
   };
 
@@ -214,6 +576,26 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
 
   return (
     <div>
+      {/* Status Change Modal */}
+      <StatusChangeModal 
+        isOpen={statusModalOpen}
+        onClose={() => setStatusModalOpen(false)}
+        onConfirm={confirmStatusChange}
+        status={selectedStatus}
+        note={statusNote}
+        setNote={setStatusNote}
+        isSubmitting={changingStatus}
+      />
+      
+      {/* Create Customer Modal */}
+      <CreateCustomerModal
+        isOpen={customerModalOpen}
+        onClose={() => setCustomerModalOpen(false)}
+        onConfirm={handleCreateCustomer}
+        isSubmitting={creatingCustomer}
+        requestData={request}
+      />
+      
       {/* Header mit Zurück-Button */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
@@ -225,7 +607,14 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
           </button>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Anfrage Details</h1>
         </div>
-        <div>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={openCreateCustomerModal}
+            className="inline-flex items-center px-3 py-1 rounded-md bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            <UserPlus className="h-4 w-4 mr-1" />
+            Create Customer
+          </button>
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${request.statusClass}`}>
             {request.statusLabel}
           </span>

@@ -3,7 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Building, Calendar, Briefcase, Plus } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Building, Calendar, Briefcase, Plus, Download } from 'lucide-react';
+import Modal from '@/components/shared/Modal';
+import ProjectForm from '@/components/projects/ProjectForm';
+import AppointmentForm from '@/components/appointments/AppointmentForm';
+import { formatDate } from '@/lib/utils/date-formatter';
+import { getStatusClass, getStatusLabel } from '@/lib/utils/status-formatter';
 import { getCustomerById, deleteCustomer, addCustomerNote } from '@/lib/api';
 import { ApiResponse, Customer } from '@/lib/api/types';
 
@@ -64,6 +69,9 @@ export default function CustomerDetailPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [newNote, setNewNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Load customer data
   useEffect(() => {
@@ -118,7 +126,7 @@ export default function CustomerDetailPage() {
         // Reload customer data to get updated notes
         const customerResponse = await getCustomerById(customerId);
         if (customerResponse.success && customerResponse.data) {
-          setCustomer(customerResponse.data as CustomerDetails);
+        setCustomer(customerResponse.data as CustomerDetails);
         }
         setNewNote('');
       } else {
@@ -130,6 +138,36 @@ export default function CustomerDetailPage() {
     } finally {
       setAddingNote(false);
     }
+  };
+
+  // Handle project creation success
+  const handleProjectCreated = async (project: any) => {
+    // Reload customer data to get the new project
+    const customerResponse = await getCustomerById(customerId);
+    if (customerResponse.success && customerResponse.data) {
+      setCustomer(customerResponse.data as CustomerDetails);
+      setShowProjectModal(false);
+      // Switch to the projects tab
+      setActiveTab('projects');
+    }
+  };
+
+  // Handle appointment creation success
+  const handleAppointmentCreated = async (appointment: any) => {
+    // Reload customer data to get the new appointment
+    const customerResponse = await getCustomerById(customerId);
+    if (customerResponse.success && customerResponse.data) {
+      setCustomer(customerResponse.data as CustomerDetails);
+      setShowAppointmentModal(false);
+      // Switch to the appointments tab
+      setActiveTab('appointments');
+    }
+  };
+
+  // Handle Export
+  const handleExport = () => {
+    // TODO: Implement actual export functionality
+    alert('Export functionality is not yet implemented');
   };
 
   if (loading) {
@@ -203,17 +241,24 @@ export default function CustomerDetailPage() {
           </span>
         </div>
         
-        <div className="flex mt-4 sm:mt-0">
+        <div className="flex mt-4 sm:mt-0 space-x-2">
+          <button
+            onClick={handleExport}
+            className="flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-slate-600"
+          >
+            <Download size={16} className="mr-1" />
+            Export
+          </button>
           <Link 
             href={`/dashboard/customers/${customerId}/edit`}
-            className="flex items-center mr-3 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             <Edit size={16} className="mr-1" />
             Edit
           </Link>
           <button 
             onClick={() => setShowDeleteModal(true)}
-            className="flex items-center px-4 py-2 bg-white border border-red-600 text-red-600 rounded-md hover:bg-red-50"
+            className="flex items-center px-4 py-2 bg-white border border-red-600 text-red-600 rounded-md hover:bg-red-50 dark:bg-slate-700 dark:border-red-500 dark:text-red-500 dark:hover:bg-red-900/20"
           >
             <Trash2 size={16} className="mr-1" />
             Delete
@@ -375,16 +420,16 @@ export default function CustomerDetailPage() {
         
         {/* Projects tab */}
         {activeTab === 'projects' && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-white rounded-lg shadow overflow-hidden dark:bg-slate-800">
             <div className="flex justify-between items-center p-6 pb-2">
-              <h2 className="text-lg font-medium">Projects</h2>
-              <Link 
-                href={`/dashboard/projects/new?customerId=${customer.id}`}
-                className="flex items-center text-sm text-blue-600 hover:text-blue-800"
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white">Projects</h2>
+              <button 
+                onClick={() => setShowProjectModal(true)}
+                className="flex items-center text-sm text-blue-600 hover:text-blue-800 dark:text-blue-500 dark:hover:text-blue-400"
               >
                 <Plus size={16} className="mr-1" />
                 New Project
-              </Link>
+              </button>
             </div>
             {customer.projects && customer.projects.length > 0 ? (
               <div className="overflow-x-auto">
@@ -450,16 +495,16 @@ export default function CustomerDetailPage() {
         
         {/* Appointments tab */}
         {activeTab === 'appointments' && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-white rounded-lg shadow overflow-hidden dark:bg-slate-800">
             <div className="flex justify-between items-center p-6 pb-2">
-              <h2 className="text-lg font-medium">Appointments</h2>
-              <Link 
-                href={`/dashboard/appointments/new?customerId=${customer.id}`}
-                className="flex items-center text-sm text-blue-600 hover:text-blue-800"
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white">Appointments</h2>
+              <button 
+                onClick={() => setShowAppointmentModal(true)}
+                className="flex items-center text-sm text-blue-600 hover:text-blue-800 dark:text-blue-500 dark:hover:text-blue-400"
               >
                 <Plus size={16} className="mr-1" />
                 New Appointment
-              </Link>
+              </button>
             </div>
             {customer.appointments && customer.appointments.length > 0 ? (
               <div className="overflow-x-auto">
@@ -601,18 +646,18 @@ export default function CustomerDetailPage() {
           <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full dark:bg-slate-800">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 dark:bg-slate-800">
                 <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <Trash2 className="h-6 w-6 text-red-600" />
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10 dark:bg-red-900/30">
+                    <Trash2 className="h-6 w-6 text-red-600 dark:text-red-500" />
                   </div>
                   <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
                       Delete Customer
                     </h3>
                     <div className="mt-2">
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         Are you sure you want to delete this customer? All data associated with this customer will be permanently removed.
                         This action cannot be undone.
                       </p>
@@ -620,7 +665,7 @@ export default function CustomerDetailPage() {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse dark:bg-slate-700">
                 <button
                   type="button"
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
@@ -630,7 +675,7 @@ export default function CustomerDetailPage() {
                 </button>
                 <button
                   type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-slate-600 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-slate-500"
                   onClick={() => setShowDeleteModal(false)}
                 >
                   Cancel
@@ -640,6 +685,36 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       )}
+      
+      {/* Project Modal */}
+      <Modal
+        isOpen={showProjectModal}
+        onClose={() => setShowProjectModal(false)}
+        title="Create New Project"
+        size="lg"
+      >
+        <ProjectForm
+          customerId={customer?.id}
+          customerName={customer?.name}
+          onSuccess={handleProjectCreated}
+          onCancel={() => setShowProjectModal(false)}
+        />
+      </Modal>
+      
+      {/* Appointment Modal */}
+      <Modal
+        isOpen={showAppointmentModal}
+        onClose={() => setShowAppointmentModal(false)}
+        title="Schedule New Appointment"
+        size="lg"
+      >
+        <AppointmentForm
+          customerId={customer?.id}
+          customerName={customer?.name}
+          onSuccess={handleAppointmentCreated}
+          onCancel={() => setShowAppointmentModal(false)}
+        />
+      </Modal>
     </div>
   );
 }

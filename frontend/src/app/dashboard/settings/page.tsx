@@ -1,11 +1,66 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
+import { useSettings } from '@/contexts/SettingsContext';
+import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { settings, isLoading, error, updateSetting } = useSettings();
   const [activeTab, setActiveTab] = useState('profile');
+  const [formData, setFormData] = useState({
+    companyName: '',
+    timezone: 'Europe/Berlin',
+    dateFormat: 'dd.MM.yyyy',
+    language: 'de'
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load settings into form when they change
+  useEffect(() => {
+    if (!isLoading && settings) {
+      setFormData({
+        companyName: settings.companyName || '',
+        timezone: settings.timezone || 'Europe/Berlin',
+        dateFormat: settings.dateFormat || 'dd.MM.yyyy',
+        language: settings.language || 'de'
+      });
+    }
+  }, [isLoading, settings]);
+
+  // Handle form input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle system settings save
+  const handleSystemSettingsSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+
+    try {
+      // Update each setting individually
+      const promises = [
+        updateSetting('companyName', formData.companyName),
+        updateSetting('timezone', formData.timezone),
+        updateSetting('dateFormat', formData.dateFormat),
+        updateSetting('language', formData.language)
+      ];
+
+      await Promise.all(promises);
+      toast.success('Settings saved successfully');
+    } catch (err) {
+      console.error('Error saving settings:', err);
+      toast.error('Failed to save settings');
+    } finally {
+      setIsSaving(false);
+    }
+  };
   
   return (
     <div>
@@ -247,18 +302,25 @@ export default function SettingsPage() {
             <div className="space-y-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Systemeinstellungen</h2>
               
+              {error && (
+                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
+                  <p className="text-red-700 dark:text-red-400">{error}</p>
+                </div>
+              )}
+              
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Allgemeine Einstellungen</h3>
-                <form className="space-y-4">
+                <form className="space-y-4" onSubmit={handleSystemSettingsSave}>
                   <div>
-                    <label htmlFor="company-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Firmenname
                     </label>
                     <input
                       type="text"
-                      id="company-name"
-                      name="company-name"
-                      defaultValue="Rising BSM"
+                      id="companyName"
+                      name="companyName"
+                      value={formData.companyName}
+                      onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
                     />
                   </div>
@@ -270,20 +332,57 @@ export default function SettingsPage() {
                     <select
                       id="timezone"
                       name="timezone"
+                      value={formData.timezone}
+                      onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
                     >
                       <option value="Europe/Berlin">Europe/Berlin (UTC+1/UTC+2)</option>
+                      <option value="Europe/Vienna">Europe/Vienna (UTC+1/UTC+2)</option>
                       <option value="Europe/London">Europe/London (UTC+0/UTC+1)</option>
                       <option value="America/New_York">America/New_York (UTC-5/UTC-4)</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="dateFormat" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Datumsformat
+                    </label>
+                    <select
+                      id="dateFormat"
+                      name="dateFormat"
+                      value={formData.dateFormat}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
+                    >
+                      <option value="dd.MM.yyyy">DD.MM.YYYY (31.12.2023)</option>
+                      <option value="yyyy-MM-dd">YYYY-MM-DD (2023-12-31)</option>
+                      <option value="MM/dd/yyyy">MM/DD/YYYY (12/31/2023)</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="language" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Sprache
+                    </label>
+                    <select
+                      id="language"
+                      name="language"
+                      value={formData.language}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:text-white"
+                    >
+                      <option value="de">Deutsch</option>
+                      <option value="en">English</option>
                     </select>
                   </div>
                   
                   <div className="flex justify-end">
                     <button
                       type="submit"
-                      className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                      disabled={isSaving || isLoading}
+                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed"
                     >
-                      Einstellungen speichern
+                      {isSaving ? 'Speichern...' : 'Einstellungen speichern'}
                     </button>
                   </div>
                 </form>

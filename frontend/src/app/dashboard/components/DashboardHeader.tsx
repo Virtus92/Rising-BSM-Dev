@@ -5,22 +5,25 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   Bell, Search, Menu, Moon, Sun, User, LogOut, X, Check, 
-  Clock, AlarmClock, Calendar, FileText, AlertCircle, Info
+  Clock, AlarmClock, Calendar, FileText, AlertCircle, Info,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
+import { useSettings } from '@/contexts/SettingsContext';
 import { useToast } from '@/hooks/useToast';
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, Notification } from '@/lib/api/notifications';
 
 const DashboardHeader = () => {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
   const router = useRouter();
   const { toast } = useToast();
   
-  // Zustand für Benachrichtigungen
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
@@ -156,21 +159,46 @@ const DashboardHeader = () => {
     return '#';
   };
   
+  // Update theme when settings change
   useEffect(() => {
-    // Check for user preference or system preference
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
-      document.documentElement.classList.add('dark');
+    if (settings) {
+      // Apply settings theme or use system preference if set to system
+      if (settings.theme === 'dark') {
+        setTheme('dark');
+        document.documentElement.classList.add('dark');
+      } else if (settings.theme === 'light') {
+        setTheme('light');
+        document.documentElement.classList.remove('dark');
+      } else if (settings.theme === 'system') {
+        // Use system preference
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          setTheme('dark');
+          document.documentElement.classList.add('dark');
+        } else {
+          setTheme('light');
+          document.documentElement.classList.remove('dark');
+        }
+      }
     }
-  }, []);
+  }, [settings?.theme]);
   
-  const toggleTheme = () => {
-    if (theme === 'light') {
-      setTheme('dark');
-      document.documentElement.classList.add('dark');
-    } else {
-      setTheme('light');
-      document.documentElement.classList.remove('dark');
+  const toggleTheme = async () => {
+    try {
+      const newTheme = theme === 'light' ? 'dark' : 'light';
+      setTheme(newTheme);
+      
+      if (newTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      
+      // Update theme in global settings if available
+      if (settings && settings.updateSetting) {
+        await settings.updateSetting('theme', newTheme);
+      }
+    } catch (error) {
+      console.error('Failed to toggle theme:', error);
     }
   };
   
@@ -232,7 +260,9 @@ const DashboardHeader = () => {
           </button>
           
           <Link href="/dashboard" className="flex items-center">
-            <span className="text-xl font-bold text-green-600 dark:text-green-500">Rising BSM</span>
+            <span className="text-xl font-bold text-green-600 dark:text-green-500">
+              {settings?.companyName || 'Rising BSM'}
+            </span>
           </Link>
         </div>
         
@@ -390,6 +420,15 @@ const DashboardHeader = () => {
                     >
                       <User className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
                       Profil
+                    </Link>
+                  </li>
+                  <li>
+                    <Link 
+                      href="/dashboard/settings" 
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700"
+                    >
+                      <Settings className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
+                      Einstellungen
                     </Link>
                   </li>
                   <li>

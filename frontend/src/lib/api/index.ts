@@ -1,7 +1,15 @@
-// Re-export all API services and functions
+/**
+ * Zentraler Export aller API-Funktionen
+ * Konsistente Benennungen und Gruppierungen sorgen für bessere DX
+ */
 
-// Config
-export * from './config';
+// Base API client
+import apiClient from './client';
+export const api = apiClient;
+
+// Re-export API response und error types
+export type { ApiResponse, ApiRequestError } from './client';
+export { ERROR_MESSAGES } from './client';
 
 // Auth API
 export * from './auth';
@@ -12,8 +20,16 @@ export * from './customers';
 // Projects API
 export * from './projects';
 
-// Appointments API
-export * from './appointments';
+// Appointments API - explizite Exporte für bessere Typsicherheit
+export {
+  getAppointments,
+  getAppointmentById,
+  createAppointment,
+  updateAppointment,
+  updateAppointmentStatus,
+  deleteAppointment,
+  addAppointmentNote
+} from './appointments';
 
 // Services API
 export * from './services';
@@ -24,11 +40,10 @@ export * from './requests';
 // Notifications API
 export * from './notifications';
 
-// Types - import and re-export with different name to avoid conflicts
-import * as ApiTypes from './types';
-export { ApiTypes };
+// Settings API
+export * from './settings';
 
-// Also export common types that don't conflict
+// Datenmodell-Typen für konsistente Verwendung
 export type {
   CustomerStatus,
   CustomerType,
@@ -41,6 +56,7 @@ export type {
   Service,
   Request,
   RequestNote,
+  // Response types
   CustomerResponse,
   CustomersResponse,
   ProjectResponse,
@@ -51,6 +67,7 @@ export type {
   ServicesResponse,
   RequestResponse,
   RequestsResponse,
+  // Request types
   CustomerCreateRequest,
   CustomerUpdateRequest,
   CustomerStatusUpdateRequest,
@@ -66,6 +83,7 @@ export type {
   RequestStatusUpdateRequest,
   RequestAssignRequest,
   RequestNoteCreateRequest,
+  // Utility types
   PaginatedList,
   CustomerWithDetails
 } from './types';

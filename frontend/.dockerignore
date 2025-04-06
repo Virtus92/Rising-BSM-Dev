@@ -1,4 +1,41 @@
+# Node.js dependencies
 node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Build output
+.next
+out
+
+# Version control
 .git
+.gitignore
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production.local
+
+# OS files
 .DS_Store
-build
+Thumbs.db
+
+# IDEs and editors
+.idea
+.vscode
+*.swp
+*.swo
+
+# Testing
+coverage
+.nyc_output
+cypress/videos
+cypress/screenshots
+
+# Misc
+README.md
+LICENSE
+docker-compose*.yml

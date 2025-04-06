@@ -82,16 +82,7 @@ const StatCard: React.FC<StatCardProps> = ({
       </div>
       
       <div className="flex items-center">
-        {trend && (
-          <div className={`flex items-center mr-2 ${trend.isPositive ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-            {trend.isPositive ? (
-              <TrendingUp className="h-4 w-4 mr-1" aria-hidden="true" />
-            ) : (
-              <TrendingDown className="h-4 w-4 mr-1" aria-hidden="true" />
-            )}
-            <span className="text-sm font-medium">{trend.value}%</span>
-          </div>
-        )}
+        {/* Prozentanzeige entfernt */}
         <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
       </div>
     </div>
@@ -170,8 +161,8 @@ const StatsCards: React.FC = () => {
         return typeof total === 'number' && !isNaN(total) ? total : 0;
       },
       getDescription: () => {
-        const newCustomers = stats?.customers?.new;
-        return `Gesamt (${typeof newCustomers === 'number' && !isNaN(newCustomers) ? newCustomers : 0} neue im letzten Monat)`;
+        // Prozentinfos entfernen
+        return `Gesamt`;
       },
       getIcon: () => <Users className="h-6 w-6 text-green-600 dark:text-green-500" aria-hidden="true" />,
       getTrend: () => {
@@ -190,8 +181,8 @@ const StatsCards: React.FC = () => {
         return typeof upcoming === 'number' && !isNaN(upcoming) ? upcoming : 0;
       },
       getDescription: () => {
-        const today = stats?.appointments?.today;
-        return `Anstehend (${typeof today === 'number' && !isNaN(today) ? today : 0} heute)`;
+        // Prozentinfos entfernen
+        return `Anstehend`;
       },
       getIcon: () => <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-500" aria-hidden="true" />,
       getTrend: () => {
@@ -212,9 +203,8 @@ const StatsCards: React.FC = () => {
                (typeof inProgress === 'number' && !isNaN(inProgress) ? inProgress : 0);
       },
       getDescription: () => {
-        const newReq = stats?.requests?.new;
-        const inProgress = stats?.requests?.inProgress;
-        return `${typeof newReq === 'number' && !isNaN(newReq) ? newReq : 0} neu, ${typeof inProgress === 'number' && !isNaN(inProgress) ? inProgress : 0} in Bearbeitung`;
+        // Prozentinfos entfernen
+        return `Offen`;
       },
       getIcon: () => <Inbox className="h-6 w-6 text-purple-600 dark:text-purple-500" aria-hidden="true" />,
       getTrend: () => {
@@ -233,9 +223,8 @@ const StatsCards: React.FC = () => {
         return typeof active === 'number' && !isNaN(active) ? active : 0;
       },
       getDescription: () => {
-        const newProj = stats?.projects?.new;
-        const completed = stats?.projects?.completed;
-        return `Aktiv (${typeof newProj === 'number' && !isNaN(newProj) ? newProj : 0} neu, ${typeof completed === 'number' && !isNaN(completed) ? completed : 0} abgeschlossen)`;
+        // Prozentinfos entfernen
+        return `Aktiv`;
       },
       getIcon: () => <Briefcase className="h-6 w-6 text-yellow-600 dark:text-yellow-500" aria-hidden="true" />,
       getTrend: () => {

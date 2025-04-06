@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Save } from 'lucide-react';
 import { createProject, getCustomers, getServices } from '@/lib/api';
+import { useSettings } from '@/contexts/SettingsContext';
 
 function ProjectForm() {
+  const { settings } = useSettings();
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialCustomerId = searchParams?.get('customerId');
@@ -16,6 +18,7 @@ function ProjectForm() {
   const [customers, setCustomers] = useState<Array<{id: number, name: string}>>([]);
   const [services, setServices] = useState<Array<{id: number, name: string, basePrice: number}>>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     title: '',
     customerId: initialCustomerId || '',
@@ -144,6 +147,20 @@ function ProjectForm() {
     }
   };
 
+  // Format dates according to settings
+  const formatDate = (date: string) => {
+    if (!date) return '';
+    
+    try {
+      const d = new Date(date);
+      // Use the date format from settings, default to ISO format
+      return d.toISOString().split('T')[0]; // Always use ISO format for API
+    } catch (err) {
+      console.error('Error formatting date:', err);
+      return date;
+    }
+  };
+  
   // Formular absenden
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,19 +169,46 @@ function ProjectForm() {
       setLoading(true);
       setError(null);
       
-      // Prüfen, ob alle erforderlichen Felder ausgefüllt sind
-      if (!formData.title || !formData.status) {
-        setError('Bitte füllen Sie alle Pflichtfelder aus.');
+      // Validate form fields
+      const errors: Record<string, string> = {};
+      
+      if (!formData.title.trim()) {
+        errors.title = 'Project title is required';
+      }
+      
+      if (!formData.status) {
+        errors.status = 'Status is required';
+      }
+      
+      if (formData.startDate && formData.endDate) {
+        const start = new Date(formData.startDate);
+        const end = new Date(formData.endDate);
+        
+        if (end < start) {
+          errors.endDate = 'End date cannot be before start date';
+        }
+      }
+      
+      if (formData.amount && isNaN(parseFloat(formData.amount as string))) {
+        errors.amount = 'Amount must be a valid number';
+      }
+      
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
         setLoading(false);
         return;
       }
+      
+      setValidationErrors({});
       
       // Formatiere die Daten für die API
       const projectData = {
         ...formData,
         customerId: formData.customerId ? parseInt(formData.customerId as string) : undefined,
         serviceId: formData.serviceId ? parseInt(formData.serviceId as string) : undefined,
-        amount: formData.amount ? parseFloat(formData.amount as string) : undefined
+        amount: formData.amount ? parseFloat(formData.amount as string) : undefined,
+        startDate: formatDate(formData.startDate),
+        endDate: formatDate(formData.endDate)
       };
       
       console.log('Sending project data to API:', projectData);
@@ -256,9 +300,12 @@ function ProjectForm() {
                       required
                       value={formData.title}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-md"
+                      className={`shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm ${validationErrors.title ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} dark:bg-slate-700 dark:text-white rounded-md`}
                       disabled={loadingOptions}
                     />
+                    {validationErrors.title && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-500">{validationErrors.title}</p>
+                    )}
                   </div>
                 </div>
                 
@@ -354,9 +401,12 @@ function ProjectForm() {
                       id="endDate"
                       value={formData.endDate}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-md"
+                      className={`shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm ${validationErrors.endDate ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} dark:bg-slate-700 dark:text-white rounded-md`}
                       disabled={loadingOptions}
                     />
+                    {validationErrors.endDate && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-500">{validationErrors.endDate}</p>
+                    )}
                   </div>
                 </div>
                 
@@ -376,9 +426,12 @@ function ProjectForm() {
                       min="0"
                       value={formData.amount}
                       onChange={handleChange}
-                      className="focus:ring-green-500 focus:border-green-500 block w-full pl-9 sm:text-sm border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-md"
+                      className={`focus:ring-green-500 focus:border-green-500 block w-full pl-9 sm:text-sm ${validationErrors.amount ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} dark:bg-slate-700 dark:text-white rounded-md`}
                       disabled={loadingOptions}
                     />
+                    {validationErrors.amount && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-500">{validationErrors.amount}</p>
+                    )}
                   </div>
                 </div>
                 
