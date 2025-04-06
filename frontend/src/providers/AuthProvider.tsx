@@ -2,9 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import * as authApi from '@/lib/api/auth';
+import * as authClient from '@/components/auth/api-client';
 import { setTokens, clearTokens, getAccessToken, getRefreshToken, getUserFromToken, hasRole } from '@/lib/auth';
-import { ApiRequestError } from '@/lib/api/config';
 
 // Typdefinitionen
 export interface User {
@@ -65,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     try {
       setLoading(true);
-      const response = await authApi.refreshToken(refreshToken);
+      const response = await authClient.refreshToken(refreshToken);
       
       if (response.success && response.data) {
         setTokens(response.data.accessToken, response.data.refreshToken);
@@ -93,11 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return true;
       }
       
-      if (error instanceof ApiRequestError) {
-        setError(error.message);
-      } else {
-        setError('Token-Aktualisierung fehlgeschlagen.');
-      }
+      setError('Token-Aktualisierung fehlgeschlagen.');
       return false;
     } finally {
       setLoading(false);
@@ -146,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     
     try {
-      const response = await authApi.login(email, password, remember);
+      const response = await authClient.login(email, password, remember);
       
       if (response.success && response.data) {
         // Tokens speichern
@@ -163,31 +158,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       
-      throw new Error('Unerwarteter Antworttyp vom Server');
+      throw new Error(response.message || 'Unerwarteter Antworttyp vom Server');
     } catch (error) {
       let errorMessage = 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
       
-      if (error instanceof ApiRequestError) {
-        // Spezifischere Fehlermeldungen basierend auf dem Statuscode
-        if (error.statusCode === 401) {
-          errorMessage = 'Falsche E-Mail oder Passwort. Bitte überprüfen Sie Ihre Eingaben.';
-        } else if (error.statusCode === 404) {
-          errorMessage = 'Benutzer mit dieser E-Mail wurde nicht gefunden.';
-        } else if (error.statusCode === 400) {
-          errorMessage = 'Ungültige Anmeldedaten. Bitte überprüfen Sie Ihre Eingaben.';
-        } else if (error.statusCode === 403) {
-          errorMessage = 'Ihr Konto ist gesperrt oder deaktiviert.';
-        } else {
-          // Verwende die vom Server zurückgegebene Fehlermeldung, falls vorhanden
-          errorMessage = error.message || errorMessage;
-        }
-        
-        // Verwende zusätzliche Fehlerdetails, falls vorhanden
-        if (error.errors && error.errors.length > 0) {
-          errorMessage = error.errors[0];
-        }
-      } else if (error instanceof Error) {
+      if (error instanceof Error) {
         errorMessage = error.message;
+      }
+      
+      // Verwende zusätzliche Fehlerdetails, falls vorhanden
+      if (error instanceof Error && 'errors' in error && Array.isArray((error as any).errors) && (error as any).errors.length > 0) {
+        errorMessage = (error as any).errors[0];
       }
       
       setError(errorMessage);
@@ -206,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const refreshToken = getRefreshToken();
       if (refreshToken) {
-        await authApi.logout(refreshToken);
+        await authClient.logout(refreshToken);
       }
     } catch (error) {
       console.error('Logout API-Aufruf fehlgeschlagen', error);

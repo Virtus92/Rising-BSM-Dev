@@ -19,9 +19,14 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
-    }
+      "@/*": ["./src/*"],
+      "common/*": ["./src/lib/types/common/*"],
+      "dtos/*": ["./src/lib/dtos/*"],
+      "models/*": ["./src/lib/types/models/*"]
+    },
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "../backend/prisma/seed.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "prisma/seed.ts"],
   "exclude": ["node_modules"]
 }

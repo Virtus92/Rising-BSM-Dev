@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProvider';
 import { Eye, EyeOff } from 'lucide-react';
+import * as authClient from './api-client'; // Import des direkten API-Clients
 
 // Login-Schema erstellen
 const loginSchema = z.object({
@@ -75,9 +76,24 @@ export default function LoginForm() {
     clearError();
     console.log("Form Submitted with:", data);
     
-    // Login-Funktion aufrufen
-    await login(data.email, data.password, data.rememberMe);
-    // Die Weiterleitung erfolgt innerhalb des AuthProviders
+    try {
+      // Direkte API-Anfrage
+      const response = await authClient.login(data.email, data.password, data.rememberMe);
+      
+      if (response.success && response.data) {
+        // Tokens speichern und Benutzer anmelden
+        login(data.email, data.password, data.rememberMe);
+      } else {
+        // Fehlermeldung anzeigen - hier muss man die vom AuthProvider verwenden
+        clearError();
+        login(data.email, data.password, data.rememberMe);
+      }
+    } catch (error) {
+      console.error('Login fehlgeschlagen:', error);
+      // Hier müssen wir die Error-Funktion vom AuthProvider verwenden
+      clearError();
+      login(data.email, data.password, data.rememberMe);
+    }
   };
 
   // Expliziter Event-Handler für das native Formular-Submit-Event

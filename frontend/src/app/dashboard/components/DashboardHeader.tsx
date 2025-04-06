@@ -11,7 +11,7 @@ import {
 import { useAuth } from '@/providers/AuthProvider';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useToast } from '@/hooks/useToast';
-import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, Notification } from '@/lib/api/notifications';
+import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, Notification, NotificationType } from '@/lib/api/notifications';
 
 const DashboardHeader = () => {
   const { user, logout } = useAuth();
@@ -38,9 +38,9 @@ const DashboardHeader = () => {
         const response = await getNotifications();
         
         if (response.success && response.data) {
-          setNotifications(response.data.notifications || []);
+          setNotifications(response.data || []);
           // Ungelesene Benachrichtigungen zählen
-          const unread = response.data.notifications.filter(n => !n.read).length;
+          const unread = response.data.filter(n => !n.isRead).length;
           setUnreadCount(unread);
         } else {
           setNotificationError('Fehler beim Laden der Benachrichtigungen');
@@ -69,7 +69,7 @@ const DashboardHeader = () => {
         setNotifications(prevNotifications =>
           prevNotifications.map(notification =>
             notification.id === notificationId
-              ? { ...notification, read: true }
+              ? { ...notification, isRead: true }
               : notification
           )
         );
@@ -95,7 +95,7 @@ const DashboardHeader = () => {
       if (response.success) {
         // Alle Benachrichtigungen in der UI als gelesen markieren
         setNotifications(prevNotifications =>
-          prevNotifications.map(notification => ({ ...notification, read: true }))
+          prevNotifications.map(notification => ({ ...notification, isRead: true }))
         );
         
         // Ungelesenen Zähler zurücksetzen
@@ -118,19 +118,19 @@ const DashboardHeader = () => {
   };
   
   // Icon für die jeweilige Benachrichtigungsart
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: NotificationType | string) => {
     switch (type) {
-      case 'anfrage':
+      case NotificationType.MESSAGE:
         return <FileText className="h-4 w-4 text-purple-500" />;
-      case 'termin':
+      case NotificationType.APPOINTMENT:
         return <Calendar className="h-4 w-4 text-blue-500" />;
-      case 'projekt':
+      case NotificationType.PROJECT:
         return <Clock className="h-4 w-4 text-green-500" />;
-      case 'warnung':
+      case NotificationType.ERROR:
         return <AlertCircle className="h-4 w-4 text-red-500" />;
-      case 'system':
+      case NotificationType.SYSTEM:
         return <AlarmClock className="h-4 w-4 text-amber-500" />;
-      case 'info':
+      case NotificationType.INFO:
       default:
         return <Info className="h-4 w-4 text-gray-500" />;
     }
@@ -140,23 +140,19 @@ const DashboardHeader = () => {
   const getNotificationUrl = (notification: Notification): string => {
     if (notification.link) return notification.link;
     
-    // Standardlinks basierend auf Referenztyp und ID
-    if (notification.referenceType && notification.referenceId) {
-      switch (notification.referenceType) {
-        case 'kunde':
-          return `/dashboard/customers/${notification.referenceId}`;
-        case 'projekt':
-          return `/dashboard/projects/${notification.referenceId}`;
-        case 'termin':
-          return `/dashboard/appointments#appointment-${notification.referenceId}`;
-        case 'anfrage':
-          return `/dashboard/requests/${notification.referenceId}`;
-        default:
-          return '#';
-      }
+    // Standardlinks basierend auf Typ
+    switch (notification.type) {
+      case NotificationType.APPOINTMENT:
+        return `/dashboard/appointments`;
+      case NotificationType.PROJECT:
+        return `/dashboard/projects`;
+      case NotificationType.TASK:
+        return `/dashboard/tasks`;
+      case NotificationType.MESSAGE:
+        return `/dashboard/messages`;
+      default:
+        return '#';
     }
-    
-    return '#';
   };
   
   // Update theme when settings change
@@ -324,7 +320,7 @@ const DashboardHeader = () => {
                             }
                           }}
                           className={`px-4 py-2 hover:bg-gray-50 dark:hover:bg-slate-700 block ${
-                            !notification.read ? 'bg-blue-50 dark:bg-blue-900/10' : ''
+                            !notification.isRead ? 'bg-blue-50 dark:bg-blue-900/10' : ''
                           }`}
                         >
                           <div className="flex items-start">
@@ -333,10 +329,10 @@ const DashboardHeader = () => {
                             </div>
                             <div className="flex-1">
                               <div className="flex justify-between items-start">
-                                <p className={`text-sm ${!notification.read ? 'font-semibold' : ''} text-gray-800 dark:text-gray-200`}>
+                                <p className={`text-sm ${!notification.isRead ? 'font-semibold' : ''} text-gray-800 dark:text-gray-200`}>
                                   {notification.title}
                                 </p>
-                                {!notification.read && (
+                                {!notification.isRead && (
                                   <span className="h-2 w-2 bg-blue-500 rounded-full ml-2 mt-1.5"></span>
                                 )}
                               </div>
@@ -346,7 +342,7 @@ const DashboardHeader = () => {
                                 </p>
                               )}
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {notification.time}
+                                {new Date(notification.createdAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}
                               </p>
                             </div>
                           </div>

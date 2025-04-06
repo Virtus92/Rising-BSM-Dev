@@ -1,0 +1,269 @@
+openapi: 3.0.0
+info:
+  title: Rising BSM API
+  version: 1.0.0
+  description: |-
+    API für Rising BSM - Facility Management System
+    
+    Diese API bietet Zugriff auf alle Funktionen des Rising BSM Systems.
+  contact:
+    name: Rising BSM Support
+    email: support@example.com
+servers:
+  - url: /api
+    description: Current API
+paths:
+  /health:
+    get:
+      summary: Systemstatus abrufen
+      description: Liefert Informationen über den Status des Systems
+      operationId: getHealth
+      tags:
+        - System
+      responses:
+        '200':
+          description: Erfolgreiche Statusabfrage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Anfrage erfolgreich
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: healthy
+                      environment:
+                        type: string
+                        example: development
+                      timestamp:
+                        type: string
+                        format: date-time
+                      responseTime:
+                        type: string
+                        example: 123ms
+                      uptime:
+                        type: number
+                        example: 3600
+                      database:
+                        type: object
+                        properties:
+                          connected:
+                            type: boolean
+                            example: true
+                          type:
+                            type: string
+                            example: postgresql
+                      memory:
+                        type: object
+                        properties:
+                          rss:
+                            type: string
+                            example: 123MB
+                          heapTotal:
+                            type: string
+                            example: 50MB
+                          heapUsed:
+                            type: string
+                            example: 35MB
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /auth/login:
+    post:
+      summary: Benutzeranmeldung
+      description: Authentifiziert einen Benutzer mit E-Mail und Passwort
+      operationId: login
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: MySecurePassword123
+                remember:
+                  type: boolean
+                  description: Falls true, bleibt der Benutzer länger angemeldet
+                  default: false
+      responses:
+        '200':
+          description: Erfolgreiche Anmeldung
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Anmeldung erfolgreich
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      accessToken:
+                        type: string
+                        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                      refreshToken:
+                        type: string
+                        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: Max Mustermann
+        email:
+          type: string
+          format: email
+          example: max.mustermann@example.com
+        role:
+          type: string
+          enum:
+            - admin
+            - manager
+            - mitarbeiter
+            - benutzer
+          example: mitarbeiter
+        active:
+          type: boolean
+          example: true
+        lastLogin:
+          type: string
+          format: date-time
+          nullable: true
+  responses:
+    BadRequest:
+      description: Ungültige Anfrage
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Ungültige Anfrage
+              errors:
+                type: array
+                items:
+                  type: string
+                example:
+                  - E-Mail ist erforderlich
+                  - Passwort muss mindestens 8 Zeichen lang sein
+    Unauthorized:
+      description: Nicht autorisiert
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Nicht autorisiert
+    Forbidden:
+      description: Zugriff verweigert
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Zugriff verweigert
+    NotFound:
+      description: Ressource nicht gefunden
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Ressource nicht gefunden
+    ValidationError:
+      description: Validierungsfehler
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Validierungsfehler
+              errors:
+                type: array
+                items:
+                  type: string
+                example:
+                  - Name darf nicht leer sein
+                  - E-Mail muss gültig sein
+    InternalServerError:
+      description: Interner Serverfehler
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Ein interner Serverfehler ist aufgetreten
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT-Token basierte Authentifizierung
+security:
+  - bearerAuth: []

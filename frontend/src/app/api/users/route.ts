@@ -1,86 +1,55 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { container } from '@/lib/server/di-container';
-import { IUserService } from '@/lib/server/interfaces/IUserService';
-import { withAuth, withRoles } from '@/lib/server/core/auth';
+/**
+ * Benutzer-API-Route
+ */
+import { NextRequest } from 'next/server';
+import { getUserService } from '@/lib/services/factory';
+import { responseHelpers } from '@/lib/utils/api/express-compat';
+import config from '@/lib/config';
 
 /**
  * GET /api/users
- * Gibt alle Benutzer zurück (Nur für Admin und Manager)
+ * Alle Benutzer abrufen (mit Paginierung)
  */
-export const GET = withRoles(['admin', 'manager'], async (req: NextRequest) => {
+export async function GET(request: NextRequest) {
   try {
-    const userService = container.resolve<IUserService>('UserService');
-    const users = await userService.findAll();
+    const { searchParams } = new URL(request.url);
+    const page = Number(searchParams.get('page') || '1');
+    const limit = Number(searchParams.get('limit') || config.DEFAULT_PAGE_SIZE.toString());
+    const search = searchParams.get('search') || '';
     
-    return NextResponse.json({
-      success: true,
-      data: users,
-      meta: {
-        timestamp: new Date().toISOString()
-      }
+    const userService = getUserService();
+    const { users, total, totalPages } = await userService.getUsers({
+      page,
+      limit,
+      search
     });
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Internal Server Error',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
-    );
+    
+    return responseHelpers.paginated(users, {
+      page,
+      limit,
+      total,
+      totalPages
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
+    return responseHelpers.error(message);
   }
-});
+}
 
 /**
  * POST /api/users
- * Erstellt einen neuen Benutzer (Nur für Admin)
+ * Neuen Benutzer erstellen
  */
-export const POST = withRoles(['admin'], async (req: NextRequest) => {
+export async function POST(request: NextRequest) {
   try {
-    const userService = container.resolve<IUserService>('UserService');
-    const data = await req.json();
+    const userData = await request.json();
     
-    const validationResult = userService.validateCreateUserData(data);
-    if (!validationResult.isValid) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Validation Error',
-          errors: validationResult.errors,
-          meta: {
-            timestamp: new Date().toISOString()
-          }
-        },
-        { status: 400 }
-      );
-    }
+    const userService = getUserService();
+    const newUser = await userService.createUser(userData);
     
-    const user = await userService.create(data);
-    
-    return NextResponse.json(
-      {
-        success: true,
-        data: user,
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: 201 }
-    );
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Internal Server Error',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
-    );
+    return responseHelpers.created(newUser);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
+    return responseHelpers.error(message);
   }
-});
+}

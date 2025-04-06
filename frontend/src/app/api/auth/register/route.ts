@@ -1,40 +1,85 @@
+/**
+ * Register API Route Handler
+ */
 import { NextRequest, NextResponse } from 'next/server';
-import { container } from '@/lib/server/di-container';
-import { IAuthService } from '@/lib/server/interfaces/IAuthService';
-import { withRoles } from '@/lib/server/core/auth';
+import { getAuthService, getUserService } from '@/lib/services/factory';
+import { createdResponse } from '@/lib/utils/api/response';
+import { ApiError, BadRequestError, ConflictError } from '@/lib/utils/api/error';
 
 /**
  * POST /api/auth/register
- * Registriert einen neuen Benutzer (Nur für Admins)
+ * Neuen Benutzer registrieren
  */
-export const POST = withRoles(['admin'], async (req: NextRequest) => {
+export async function POST(request: NextRequest) {
   try {
-    const authService = container.resolve<IAuthService>('AuthService');
+    const userData = await request.json();
+    const { email, password, firstName, lastName } = userData;
     
-    // Daten aus dem Request extrahieren
-    const userData = await req.json();
+    // Grundlegende Validierung
+    if (!email || !password) {
+      throw new BadRequestError('E-Mail und Passwort sind erforderlich');
+    }
     
-    // Benutzer registrieren
-    const user = await authService.register(userData);
+    // E-Mail-Format validieren
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new BadRequestError('Ungültiges E-Mail-Format');
+    }
     
-    return NextResponse.json({
+    // Prüfen, ob ein Benutzer mit dieser E-Mail bereits existiert
+    const userService = getUserService();
+    const existingUser = await userService.getUserByEmail(email);
+    
+    if (existingUser) {
+      throw new ConflictError('Ein Benutzer mit dieser E-Mail existiert bereits');
+    }
+    
+    // Benutzer erstellen
+    const authService = getAuthService();
+    const newUser = await authService.register({
+      email,
+      password,
+      firstName: firstName || '',
+      lastName: lastName || '',
+      role: 'user'  // Standard-Rolle
+    });
+    
+    // Optional: Auto-Login nach Registrierung
+    const { accessToken, refreshToken } = await authService.login(email, password);
+    
+    // Cookies setzen
+    const response = NextResponse.json({
       success: true,
-      data: user,
-      meta: {
-        timestamp: new Date().toISOString()
+      message: 'Registrierung erfolgreich',
+      data: {
+        user: newUser,
+        accessToken
       }
     }, { status: 201 });
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
-    );
+    
+    // HTTP-Only-Cookie für Refresh-Token setzen
+    response.cookies.set({
+      name: 'refreshToken',
+      value: refreshToken,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 // 7 Tage
+    });
+    
+    // Normales Cookie für Access-Token setzen (für JS-Zugriff)
+    response.cookies.set({
+      name: 'token',
+      value: accessToken,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 15 * 60 // 15 Minuten
+    });
+    
+    return response;
+  } catch (error) {
+    return ApiError.handleError(error);
   }
-});
+}

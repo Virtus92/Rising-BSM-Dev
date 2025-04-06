@@ -1,85 +1,102 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { container } from '@/lib/server/di-container';
-import { IAuthService } from '@/lib/server/interfaces/IAuthService';
-import { cookies } from 'next/headers';
+/**
+ * Refresh Token API-Route
+ * 
+ * Diese Route ermöglicht die Erneuerung des Access Tokens mit einem gültigen Refresh Token.
+ */
+import { NextRequest } from 'next/server';
+import { successResponse } from '@/lib/utils/api/response';
+import { ApiError, BadRequestError, UnauthorizedError } from '@/lib/utils/api/error';
+import { getLogger } from '@/lib/core/bootstrap';
+import jwt from 'jsonwebtoken';
 
 /**
  * POST /api/auth/refresh
- * Aktualisiert ein Access-Token mit einem Refresh-Token
+ * Erneuert das Access Token mit einem Refresh Token
  */
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
+  const logger = getLogger();
+  
   try {
-    const authService = container.resolve<IAuthService>('AuthService');
+    const { refreshToken } = await request.json();
     
-    // Refresh-Token aus dem Cookie oder Request Body abrufen
-    const cookieStore = cookies();
-    let refreshToken = cookieStore.get('refresh_token')?.value;
-    
-    // Falls kein Cookie, versuchen aus dem Request Body zu lesen
+    // Eingabe validieren
     if (!refreshToken) {
-      const body = await req.json();
-      refreshToken = body.refreshToken;
+      throw new BadRequestError('Refresh Token ist erforderlich');
     }
     
-    if (!refreshToken) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Kein Refresh-Token vorhanden',
-          meta: {
-            timestamp: new Date().toISOString()
-          }
-        },
-        { status: 400 }
-      );
+    // JWT-Secret aus Umgebungsvariablen oder Standard
+    const jwtSecret = process.env.JWT_SECRET || 'your-default-super-secret-key-change-in-production';
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'your-refresh-default-key-change-in-production';
+    
+    // Refresh Token verifizieren
+    let decodedRefreshToken;
+    try {
+      decodedRefreshToken = jwt.verify(refreshToken, jwtRefreshSecret);
+    } catch (error) {
+      throw new UnauthorizedError('Ungültiges Refresh Token');
     }
     
-    // IP-Adresse ermitteln
-    const ipAddress = req.headers.get('x-forwarded-for') || 
-                      req.headers.get('x-real-ip') || 
-                      '0.0.0.0';
+    // Neues Access Token erstellen
+    const userId = typeof decodedRefreshToken === 'object' ? decodedRefreshToken.userId : null;
     
-    // Token aktualisieren
-    const tokenResult = await authService.refreshToken(refreshToken, ipAddress as string);
+    if (!userId) {
+      throw new UnauthorizedError('Ungültiges Refresh Token');
+    }
     
-    // Cookies aktualisieren
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60, // 7 Tage
-      path: '/'
-    };
+    // In einer realen Anwendung würden wir hier den Benutzer aus der Datenbank laden
+    // Für die Demo verwenden wir fest codierte Benutzer
     
-    cookieStore.set('access_token', tokenResult.accessToken, cookieOptions as any);
-    cookieStore.set('refresh_token', tokenResult.refreshToken, cookieOptions as any);
-    
-    return NextResponse.json({
-      success: true,
-      data: {
-        accessToken: tokenResult.accessToken
-      },
-      meta: {
-        timestamp: new Date().toISOString()
-      }
-    });
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    
-    // Cookies löschen bei Fehler
-    const cookieStore = cookies();
-    cookieStore.delete('access_token');
-    cookieStore.delete('refresh_token');
-    
-    return NextResponse.json(
+    // Demo-Benutzer für Admin und normalen Benutzer
+    const demoUsers = [
       {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
+        id: 1,
+        name: 'Admin',
+        email: 'admin@example.com',
+        role: 'admin'
       },
-      { status: statusCode }
+      {
+        id: 2,
+        name: 'Benutzer',
+        email: 'user@example.com',
+        role: 'employee'
+      }
+    ];
+    
+    // Benutzer finden
+    const user = demoUsers.find(u => u.id === userId);
+    
+    if (!user) {
+      throw new UnauthorizedError('Ungültiges Refresh Token');
+    }
+    
+    // Neues Access Token erstellen
+    const accessToken = jwt.sign(
+      {
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      },
+      jwtSecret,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
     );
+    
+    // Neues Refresh Token erstellen
+    const newRefreshToken = jwt.sign(
+      { userId: user.id },
+      jwtRefreshSecret,
+      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
+    );
+    
+    logger.info(`Token erneuert für Benutzer ID: ${user.id}`);
+    
+    return successResponse({
+      accessToken,
+      refreshToken: newRefreshToken,
+      user
+    }, 'Token erfolgreich erneuert');
+  } catch (error) {
+    logger.error('Fehler bei Token-Erneuerung:', error);
+    return ApiError.handleError(error);
   }
 }

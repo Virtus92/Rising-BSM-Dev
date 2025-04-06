@@ -1,56 +1,25 @@
-import { getAccessToken, getRefreshToken, setTokens, clearTokens } from '../auth';
+/**
+ * API-Konfiguration und Hilfsfunktionen
+ * Definiert die grundlegenden Funktionen für API-Anfragen
+ */
+import { getAccessToken, refreshAccessToken } from '@/lib/auth';
 
-// API Basis-URL für lokale API-Routes
-const API_BASE_URL = '/api';
+// API-Basis-URL aus der Umgebung oder Standard-URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
-console.log('API Base URL:', API_BASE_URL);
+// Standard-Request-Optionen
+export const defaultOptions: RequestInit = {
+  headers: {
+    'Content-Type': 'application/json',
+  },
+};
 
-// Standard-Fehlermeldungen
-export const ERROR_MESSAGES = {
-  NETWORK: 'Netzwerkfehler: Bitte überprüfen Sie Ihre Internetverbindung',
-  SERVER: 'Ein Serverfehler ist aufgetreten. Bitte versuchen Sie es später erneut',
-  UNAUTHORIZED: 'Nicht autorisiert. Bitte melden Sie sich an',
-  FORBIDDEN: 'Zugriff verweigert. Sie haben keine Berechtigung für diese Aktion',
-  NOT_FOUND: 'Die angeforderte Ressource wurde nicht gefunden',
-  VALIDATION: 'Die eingegebenen Daten sind ungültig',
-  DEFAULT: 'Ein unerwarteter Fehler ist aufgetreten',
-  SESSION_EXPIRED: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an',
-  PARSE_ERROR: 'Fehler beim Verarbeiten der Serverantwort'
-}
-
-// Typen für API-Antworten
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  meta?: {
-    timestamp: string;
-    pagination?: {
-      current: number;
-      limit: number;
-      total: number;
-      totalRecords: number;
-    };
-    filters?: Record<string, any>;
-  };
-}
-
-export interface ApiError {
-  success: boolean;
-  error: string;
-  statusCode: number;
-  errors?: string[];
-  meta?: {
-    timestamp: string;
-  };
-}
-
-// Typisierte Error-Klasse für API-Fehler
+// Benutzerdefinierte Fehlerklasse für API-Anfragen
 export class ApiRequestError extends Error {
   statusCode: number;
-  errors?: string[];
+  errors: string[];
   
-  constructor(message: string, statusCode: number = 500, errors?: string[]) {
+  constructor(message: string, statusCode = 500, errors: string[] = []) {
     super(message);
     this.name = 'ApiRequestError';
     this.statusCode = statusCode;
@@ -59,321 +28,140 @@ export class ApiRequestError extends Error {
 }
 
 /**
- * Bereitet Headers mit Auth-Token vor, falls erforderlich
- */
-const prepareHeaders = (headers: HeadersInit = {}, requiresAuth: boolean): HeadersInit => {
-  const baseHeaders = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    ...headers
-  };
-  
-  if (!requiresAuth) {
-    return baseHeaders;
-  }
-  
-  const accessToken = getAccessToken();
-  
-  if (!accessToken) {
-    console.warn('Kein Auth-Token verfügbar für authentifizierte Anfrage');
-    return baseHeaders;
-  }
-  
-  return {
-    ...baseHeaders,
-    'Authorization': `Bearer ${accessToken}`
-  };
-};
-
-/**
- * Verarbeitet API-Antworten und behandelt Fehler
- */
-export async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
-  const contentType = response.headers.get('content-type');
-  const isJson = contentType?.includes('application/json');
-  const isBinary = contentType?.includes('application/vnd.openxmlformats-officedocument') || contentType?.includes('text/csv');
-  
-  console.log('API Response:', {
-    status: response.status,
-    statusText: response.statusText,
-    isJson,
-    url: response.url
-  });
-  
-  if (!response.ok) {
-    // Versuchen, Fehlerdetails aus der Antwort zu extrahieren
-    if (isJson) {
-      try {
-        const errorData = await response.json() as ApiError;
-        console.error('API Error Response:', errorData);
-        
-        throw new ApiRequestError(
-          errorData.error || getDefaultErrorMessage(response.status),
-          errorData.statusCode || response.status,
-          errorData.errors
-        );
-      } catch (error) {
-        // Falls die JSON-Verarbeitung fehlschlägt, den ursprünglichen Fehler werfen
-        if (error instanceof ApiRequestError) throw error;
-        
-        throw new ApiRequestError(
-          getDefaultErrorMessage(response.status),
-          response.status
-        );
-      }
-    }
-    
-    // Wenn keine JSON-Antwort, generischen Fehler basierend auf Status werfen
-    throw new ApiRequestError(
-      getDefaultErrorMessage(response.status),
-      response.status
-    );
-  }
-  
-  // Erfolgreiche Antwort verarbeiten
-  if (isJson) {
-    try {
-      const jsonData = await response.json() as ApiResponse<T>;
-      console.log('API Success Response:', jsonData);
-      return jsonData;
-    } catch (error) {
-      console.error('JSON Parse Error:', error);
-      throw new ApiRequestError(
-        ERROR_MESSAGES.PARSE_ERROR,
-        500
-      );
-    }
-  }
-  
-  // Leere erfolgreiche Antwort
-  return { success: true };
-}
-
-/**
- * Gibt eine Standardfehlermeldung basierend auf dem HTTP-Statuscode zurück
- */
-function getDefaultErrorMessage(status: number): string {
-  switch (status) {
-    case 400: return ERROR_MESSAGES.VALIDATION;
-    case 401: return ERROR_MESSAGES.UNAUTHORIZED;
-    case 403: return ERROR_MESSAGES.FORBIDDEN;
-    case 404: return ERROR_MESSAGES.NOT_FOUND;
-    case 500: return ERROR_MESSAGES.SERVER;
-    default: return ERROR_MESSAGES.DEFAULT;
-  }
-}
-
-// Referenz auf refreshToken-Funktion für späteren Import
-let refreshTokenFunc: (refreshToken: string) => Promise<ApiResponse<any>> = 
-  () => Promise.reject('refreshToken-Funktion nicht initialisiert');
-
-export const setRefreshTokenFunction = (fn: (refreshToken: string) => Promise<ApiResponse<any>>) => {
-  refreshTokenFunc = fn;
-};
-
-// Token-Aktualisierung mit Vermeidung von Race Conditions
-let isRefreshing = false;
-let refreshPromise: Promise<boolean> | null = null;
-
-/**
- * Aktualisiert das Access Token mit dem Refresh Token
- */
-const refreshAuthToken = async (): Promise<boolean> => {
-  if (isRefreshing) {
-    return refreshPromise as Promise<boolean>;
-  }
-  
-  isRefreshing = true;
-  
-  refreshPromise = new Promise(async (resolve) => {
-    try {
-      const refreshToken = getRefreshToken();
-      const accessToken = getAccessToken();
-      
-      // Wenn kein Refresh-Token vorhanden ist aber ein Access-Token, 
-      // behalten wir den Benutzer dennoch eingeloggt
-      if (!refreshToken) {
-        if (accessToken) {
-          console.log('Kein Refresh-Token, aber Access-Token vorhanden - Benutzer bleibt eingeloggt');
-          resolve(true);
-          return;
-        }
-        resolve(false);
-        return;
-      }
-      
-      const response = await refreshTokenFunc(refreshToken);
-      
-      if (response.success && response.data) {
-        setTokens(response.data.accessToken, response.data.refreshToken);
-        resolve(true);
-      } else {
-        // Bei Fehlschlag prüfen, ob wir noch ein altes Token haben und damit weitermachen können
-        if (accessToken) {
-          console.log('Token-Refresh fehlgeschlagen, aber altes Token wird weiterhin verwendet');
-          resolve(true);
-        } else {
-          clearTokens();
-          resolve(false);
-        }
-      }
-    } catch (error) {
-      console.error('Token-Aktualisierung fehlgeschlagen', error);
-      
-      // Auch bei Fehlern nicht ausloggen, wenn noch ein altes Token da ist
-      if (getAccessToken()) {
-        console.log('Token-Refresh-Fehler aufgetreten, aber altes Token wird weiterhin verwendet');
-        resolve(true);
-      } else {
-        clearTokens();
-        resolve(false);
-      }
-    } finally {
-      isRefreshing = false;
-      refreshPromise = null;
-    }
-  });
-  
-  return refreshPromise;
-};
-
-/**
- * Hauptfunktion für API-Anfragen mit automatischem Token-Refresh
+ * Führt eine API-Anfrage durch
+ * 
+ * @param endpoint - API-Endpunkt (ohne Basis-URL)
+ * @param options - Anfrage-Optionen
+ * @returns Antwort als JSON
+ * @throws ApiRequestError bei Fehlern
  */
 export async function fetchApi<T = any>(
   endpoint: string,
-  options: RequestInit = {},
-  requiresAuth: boolean = true,
-  isBinary: boolean = false
+  options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  // URL zusammenbauen
-  let processedEndpoint = endpoint;
-  if (!processedEndpoint.startsWith('/')) {
-    processedEndpoint = '/' + processedEndpoint;
-  }
+  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   
-  const url = `${API_BASE_URL}${processedEndpoint}`;
+  // Token aus dem Speicher holen
+  const token = getAccessToken();
   
-  console.log('API Request:', {
-    url,
-    method: options.method || 'GET',
-    requiresAuth,
-    body: options.body ? JSON.parse(options.body as string) : null
-  });
+  // Optionen mit Authentifizierung vorbereiten
+  const fetchOptions: RequestInit = {
+    ...defaultOptions,
+    ...options,
+    headers: {
+      ...defaultOptions.headers,
+      ...options.headers,
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  };
   
   try {
-    // Headers vorbereiten
-    const headers = prepareHeaders(options.headers, requiresAuth);
+    const response = await fetch(url, fetchOptions);
     
-    // Optionen zusammenstellen
-    const requestOptions: RequestInit = {
-      ...options,
-      headers
-    };
+    // JSON-Antwort parsen
+    let data;
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      // Für Nicht-JSON-Antworten
+      const text = await response.text();
+      data = { message: text };
+    }
     
-    // Anfrage ausführen
-    let response = await fetch(url, requestOptions);
-    
-    // Token-Aktualisierung versuchen, wenn 401 Unauthorized zurückgegeben wird
-    if (response.status === 401 && requiresAuth) {
-      const refreshed = await refreshAuthToken();
+    // Fehler behandeln
+    if (!response.ok) {
+      const errorMessage = data.message || data.error || 'Unbekannter Fehler';
+      const errorDetails = data.errors || [];
       
-      if (refreshed) {
-        // Anfrage mit neuem Token wiederholen
-        const newHeaders = prepareHeaders(options.headers, true);
-        const newOptions = {
-          ...options,
-          headers: newHeaders
-        };
-        
-        response = await fetch(url, newOptions);
-      } else {
-        // Bei Fehlern trotzdem versuchen, die Anfrage zu bearbeiten
-        // Nur zur Login-Seite weiterleiten, wenn keine Tokens mehr vorhanden sind
-        if (!getAccessToken() && !getRefreshToken() && typeof window !== 'undefined') {
-          console.log('Keine gültigen Tokens vorhanden - Weiterleitung zur Login-Seite');
-          window.location.href = '/auth/login?session=expired';
-          throw new ApiRequestError(ERROR_MESSAGES.SESSION_EXPIRED, 401);
-        }
-        // Bei 401 trotzdem weitermachen und den Fehler an die Anwendung zurückgeben,
-        // statt automatisch auszuloggen
-        console.warn('Auth-Fehler 401, aber keine Auto-Weiterleitung zum Login');
-      }
-    }
-    
-    // For binary responses, return the raw response
-    if (isBinary) {
-      const blob = await response.blob();
-      return { success: true, data: blob as any };
-    }
-    
-    return await handleResponse<T>(response);
-  } catch (error) {
-    // Netzwerkfehler oder andere nicht-HTTP-Fehler abfangen
-    if (!(error instanceof ApiRequestError)) {
-      console.error('Network Error:', error);
       throw new ApiRequestError(
-        ERROR_MESSAGES.NETWORK,
-        0
+        errorMessage,
+        response.status,
+        errorDetails
       );
     }
     
-    throw error;
+    // Standard-Antwortstruktur
+    return {
+      success: true,
+      message: data.message || 'Anfrage erfolgreich',
+      data: data.data || data,
+    };
+  } catch (error) {
+    // Fehler behandeln
+    if (error instanceof ApiRequestError) {
+      throw error;
+    }
+    
+    // Netzwerkfehler oder andere Fehler
+    throw new ApiRequestError(
+      error instanceof Error ? error.message : 'Unbekannter Fehler',
+      0,
+      []
+    );
   }
 }
 
 /**
- * Hilfsfunktion für GET-Anfragen
+ * API-Antwortstruktur
  */
-export function get<T = any>(endpoint: string, requiresAuth: boolean = true): Promise<ApiResponse<T>> {
-  return fetchApi<T>(endpoint, { method: 'GET' }, requiresAuth);
+export interface ApiResponse<T = any> {
+  success: boolean;
+  message: string;
+  data?: T;
 }
 
 /**
- * Hilfsfunktion für POST-Anfragen
+ * GET-Anfrage
  */
-export function post<T = any>(endpoint: string, data?: any, requiresAuth: boolean = true): Promise<ApiResponse<T>> {
-  return fetchApi<T>(
-    endpoint, 
-    { 
-      method: 'POST',
-      body: data ? JSON.stringify(data) : undefined
-    }, 
-    requiresAuth
-  );
+export function get<T = any>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  return fetchApi<T>(endpoint, { ...options, method: 'GET' });
 }
 
 /**
- * Hilfsfunktion für PUT-Anfragen
+ * POST-Anfrage
  */
-export function put<T = any>(endpoint: string, data?: any, requiresAuth: boolean = true): Promise<ApiResponse<T>> {
-  return fetchApi<T>(
-    endpoint, 
-    { 
-      method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined
-    }, 
-    requiresAuth
-  );
+export function post<T = any>(endpoint: string, data: any, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  return fetchApi<T>(endpoint, {
+    ...options,
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 /**
- * Hilfsfunktion für PATCH-Anfragen
+ * PUT-Anfrage
  */
-export function patch<T = any>(endpoint: string, data?: any, requiresAuth: boolean = true): Promise<ApiResponse<T>> {
-  return fetchApi<T>(
-    endpoint, 
-    { 
-      method: 'PATCH',
-      body: data ? JSON.stringify(data) : undefined
-    }, 
-    requiresAuth
-  );
+export function put<T = any>(endpoint: string, data: any, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  return fetchApi<T>(endpoint, {
+    ...options,
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
 }
 
 /**
- * Hilfsfunktion für DELETE-Anfragen
+ * DELETE-Anfrage
  */
-export function del<T = any>(endpoint: string, requiresAuth: boolean = true): Promise<ApiResponse<T>> {
-  return fetchApi<T>(endpoint, { method: 'DELETE' }, requiresAuth);
+export function del<T = any>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  return fetchApi<T>(endpoint, { ...options, method: 'DELETE' });
 }
+
+/**
+ * PATCH-Anfrage
+ */
+export function patch<T = any>(endpoint: string, data: any, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  return fetchApi<T>(endpoint, {
+    ...options,
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export default {
+  get,
+  post,
+  put,
+  delete: del,
+  patch,
+};

@@ -1,37 +1,61 @@
-import { get, post, put } from './config';
+/**
+ * Settings API-Client
+ * Enthält alle Funktionen für Systemeinstellungen
+ */
+import { get, put, ApiResponse } from './config';
 
 /**
- * Get all system settings
- * @returns {Promise<any>} Promise resolving to settings
+ * Systemeinstellungen-Modell
  */
-export function getSettings() {
+export interface SystemSettings {
+  id?: number;
+  companyName: string;
+  companyLogo?: string;
+  primaryColor: string;
+  accentColor: string;
+  defaultCurrency: string;
+  dateFormat: string;
+  timeFormat: string;
+  language: string;
+  emailSignature?: string;
+  contactEmail: string;
+  contactPhone?: string;
+  maxUploadSize: number;
+  maintenanceMode: boolean;
+  updatedAt?: string;
+}
+
+/**
+ * Hole alle Systemeinstellungen
+ */
+export async function getSettings(): Promise<ApiResponse<SystemSettings>> {
   return get('/settings');
 }
 
 /**
- * Get a specific setting by key
- * @param {string} key The setting key to retrieve
- * @returns {Promise<any>} Promise resolving to the setting value
+ * Aktualisiere Systemeinstellungen
  */
-export function getSetting(key: string) {
-  return get(`/settings/${key}`);
+export async function updateSettings(settings: Partial<SystemSettings>): Promise<ApiResponse<SystemSettings>> {
+  return put('/settings', settings);
 }
 
 /**
- * Update a setting value
- * @param {string} key The setting key to update
- * @param {any} value The new value for the setting
- * @returns {Promise<any>} Promise resolving to the updated setting
+ * Hole Benutzereinstellungen für den aktuellen Benutzer
  */
-export function updateSetting(key: string, value: any) {
-  return put(`/settings/${key}`, { value });
+export async function getUserSettings(): Promise<ApiResponse<any>> {
+  return get('/settings/user');
 }
 
 /**
- * Update multiple settings at once
- * @param {Record<string, any>} settings Object with key-value pairs to update
- * @returns {Promise<any>} Promise resolving to update status
+ * Aktualisiere Benutzereinstellungen
  */
-export function updateMultipleSettings(settings: Record<string, any>) {
-  return post('/settings', { settings });
+export async function updateUserSettings(settings: any): Promise<ApiResponse<any>> {
+  return put('/settings/user', settings);
+}
+
+/**
+ * Hole System-Informationen (Version, Status, etc.)
+ */
+export async function getSystemInfo(): Promise<ApiResponse<any>> {
+  return get('/settings/system-info');
 }

@@ -1,0 +1,116 @@
+/**
+ * Vereinfachter Dependency Injection Container
+ * 
+ * Diese Version ist für die Verwendung in NextJS optimiert und behält die Schnittstelle
+ * zur leichteren Migration bei, verwendet jedoch einen vereinfachten Mechanismus im Hintergrund.
+ */
+
+// Factory-Typen
+export type Factory<T> = () => T;
+export type FactoryWithDeps<T, D extends any[]> = (...deps: D) => T;
+
+// Optionen für die Registrierung
+export interface RegistrationOptions {
+  singleton?: boolean;
+}
+
+/**
+ * Dependency Injection Container
+ */
+export class DiContainer {
+  private instances: Map<string, any> = new Map();
+  private factories: Map<string, Factory<any>> = new Map();
+  private singletons: Set<string> = new Set();
+
+  /**
+   * Einen Dienst registrieren
+   * 
+   * @param name Name des Dienstes
+   * @param factory Factory-Funktion
+   * @param options Optionen für die Registrierung
+   */
+  register<T>(name: string, factory: Factory<T>, options: RegistrationOptions = {}): void {
+    this.factories.set(name, factory);
+    
+    if (options.singleton) {
+      this.singletons.add(name);
+    }
+  }
+
+  /**
+   * Einen Dienst auflösen
+   * 
+   * @param name Name des Dienstes
+   * @returns Instanz des Dienstes
+   */
+  resolve<T>(name: string): T {
+    // Überprüfen, ob bereits eine Instanz existiert (für Singletons)
+    if (this.singletons.has(name) && this.instances.has(name)) {
+      return this.instances.get(name) as T;
+    }
+    
+    // Factory auflösen
+    const factory = this.factories.get(name);
+    
+    if (!factory) {
+      throw new Error(`Dienst ${name} ist nicht registriert`);
+    }
+    
+    // Instanz erstellen
+    const instance = factory();
+    
+    // Speichern, falls es sich um einen Singleton handelt
+    if (this.singletons.has(name)) {
+      this.instances.set(name, instance);
+    }
+    
+    return instance as T;
+  }
+
+  /**
+   * Überprüfen, ob ein Dienst registriert ist
+   * 
+   * @param name Name des Dienstes
+   * @returns True, wenn der Dienst registriert ist
+   */
+  has(name: string): boolean {
+    return this.factories.has(name);
+  }
+
+  /**
+   * Alle registrierten Dienste auflisten
+   * 
+   * @returns Array mit den Namen aller registrierten Dienste
+   */
+  listRegistrations(): string[] {
+    return Array.from(this.factories.keys());
+  }
+
+  /**
+   * Container zurücksetzen
+   */
+  reset(): void {
+    this.instances.clear();
+    this.factories.clear();
+    this.singletons.clear();
+  }
+}
+
+/**
+ * Factory-Erzeuger für die Verwendung mit dem DI-Container
+ * Behält die alte Schnittstelle bei, um die Migration zu erleichtern
+ */
+export function createFactory<T, D extends any[]>(
+  factory: FactoryWithDeps<T, D>,
+  ...deps: string[]
+): Factory<T> {
+  return () => {
+    const resolvedDeps = deps.map(dep => container.resolve(dep));
+    return factory(...(resolvedDeps as any));
+  };
+}
+
+// Singleton-Container-Instanz
+const container = new DiContainer();
+
+export default container;

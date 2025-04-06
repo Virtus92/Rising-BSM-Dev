@@ -18,7 +18,20 @@ COPY prisma ./prisma/
 # Generate Prisma client
 RUN npx prisma generate
 
-# Copy application code
+# Copy OpenAPI files and scripts first
+COPY openapi ./openapi/
+COPY scripts ./scripts/
+
+# Create dist directory for bundled OpenAPI
+RUN mkdir -p dist
+
+# Install Redocly CLI for OpenAPI bundling if not already in package.json
+RUN npm list @redocly/cli || npm install --no-save @redocly/cli
+
+# Bundle OpenAPI files
+RUN node scripts/bundle-openapi.js
+
+# Copy rest of the application code
 COPY . .
 
 # Build Next.js app

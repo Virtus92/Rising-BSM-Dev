@@ -4,7 +4,7 @@ import 'jest';
 process.env.JWT_SECRET = 'test-jwt-secret';
 process.env.JWT_REFRESH_SECRET = 'test-jwt-refresh-secret';
 process.env.NODE_ENV = 'test';
-process.env.PORT = '5000';
+process.env.PORT = '3000';
 process.env.HOST = 'localhost';
 process.env.DB_USER = 'test';
 process.env.DB_PASSWORD = 'test';
