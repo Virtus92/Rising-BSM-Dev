@@ -1,26 +1,16 @@
 /**
  * Haupteinstiegspunkt für die API-Bibliothek
  * 
- * In der NextJS-Welt benötigen wir keinen separaten Express-Server,
- * sondern exportieren stattdessen die erforderlichen Dienste und Hilfsfunktionen
+ * Vereinfachter Export der wichtigsten Funktionen und Dienstleistungen
  * für die API-Routen.
  */
 
-// Re-exporte für einfacheren Zugriff
-export * from './services/factory';
+// Saubere Exporte für einfacheren Zugriff auf die wichtigsten Funktionen
+export * from './factories';
 export * from './utils/api/error';
-export * from './utils/api/response';
-export * from './config';
 
-// Initialisierungsfunktion für den API-Teil der Anwendung
-export function initializeApi() {
-  // Import dynamisch, um SSR-Kompatibilität sicherzustellen
-  const { initializeCore, initializeRepositories, initializeServices } = require('./services/factory');
-  
-  // Initialisiere alle erforderlichen Dienste
-  initializeCore();
-  initializeRepositories();
-  initializeServices();
-  
-  console.log('API-Bibliothek initialisiert');
-}
+// Verwende nur unified-response.ts für ApiResponse, um doppelte Exporte zu vermeiden
+export * from './utils/api/unified-response';
+
+export * from './config';
+export * from './core/bootstrap';

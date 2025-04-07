@@ -2,7 +2,7 @@
  * Register API Route Handler
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthService, getUserService } from '@/lib/services/factory';
+import { getAuthService, getUserService } from '@/services/factory';
 import { createdResponse } from '@/lib/utils/api/response';
 import { ApiError, BadRequestError, ConflictError } from '@/lib/utils/api/error';
 

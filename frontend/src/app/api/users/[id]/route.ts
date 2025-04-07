@@ -1,10 +1,9 @@
 /**
- * User API Route Handler für spezifische Benutzer-ID
+ * User API Route Handler (für spezifische Benutzer-ID)
  */
-import { NextRequest, NextResponse } from 'next/server';
-import { getUserService } from '@/lib/services/factory';
-import { successResponse, noContentResponse } from '@/lib/utils/api/response';
-import { ApiError, NotFoundError } from '@/lib/utils/api/error';
+import { NextRequest } from 'next/server';
+import { getUserService } from '@/lib/factories';
+import apiResponse from '@/lib/utils/api/unified-response';
 
 interface RouteParams {
   params: {
@@ -14,7 +13,7 @@ interface RouteParams {
 
 /**
  * GET /api/users/[id]
- * Einzelnen Benutzer abrufen
+ * Holt einen einzelnen Benutzer
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
@@ -24,18 +23,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const user = await userService.getUserById(id);
     
     if (!user) {
-      throw new NotFoundError(`Benutzer mit ID ${id} nicht gefunden`);
+      return apiResponse.notFound(`User with ID ${id} not found`);
     }
     
-    return successResponse(user);
+    return apiResponse.success(user, 'User retrieved successfully');
   } catch (error) {
-    return ApiError.handleError(error);
+    return apiResponse.handleError(error);
   }
 }
 
 /**
  * PUT /api/users/[id]
- * Benutzer aktualisieren
+ * Aktualisiert einen Benutzer
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
@@ -45,15 +44,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const userService = getUserService();
     const updatedUser = await userService.updateUser(id, userData);
     
-    return successResponse(updatedUser);
+    return apiResponse.success(updatedUser, 'User updated successfully');
   } catch (error) {
-    return ApiError.handleError(error);
+    return apiResponse.handleError(error);
   }
 }
 
 /**
  * DELETE /api/users/[id]
- * Benutzer löschen
+ * Löscht einen Benutzer
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
@@ -62,8 +61,43 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const userService = getUserService();
     await userService.deleteUser(id);
     
-    return noContentResponse();
+    return apiResponse.noContent();
   } catch (error) {
-    return ApiError.handleError(error);
+    return apiResponse.handleError(error);
+  }
+}
+
+/**
+ * PATCH /api/users/[id]
+ * Teilweise Aktualisierung eines Benutzers (z.B. Status)
+ */
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { id } = params;
+    const updates = await request.json();
+    
+    // Extrahieren der Benutzerinformationen aus den Headers
+    const userId = request.headers.get('x-user-id');
+    const userService = getUserService();
+    
+    // Überprüfen, ob es eine Statusaktualisierung ist
+    if (updates.status) {
+      const updatedUser = await userService.updateUserStatus(
+        Number(id),
+        updates.status,
+        {
+          userId: userId ? Number(userId) : undefined,
+          ipAddress: request.headers.get('x-forwarded-for') || request.ip
+        }
+      );
+      
+      return apiResponse.success(updatedUser, 'User status updated successfully');
+    }
+    
+    // Ansonsten normale Teilaktualisierung durchführen
+    const updatedUser = await userService.updateUser(id, updates);
+    return apiResponse.success(updatedUser, 'User updated successfully');
+  } catch (error) {
+    return apiResponse.handleError(error);
   }
 }

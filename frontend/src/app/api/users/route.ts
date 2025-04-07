@@ -1,55 +1,69 @@
 /**
- * Benutzer-API-Route
+ * Users API Route
+ * Implementiert die API-Endpunkte für die Benutzerverwaltung
  */
 import { NextRequest } from 'next/server';
-import { getUserService } from '@/lib/services/factory';
-import { responseHelpers } from '@/lib/utils/api/express-compat';
-import config from '@/lib/config';
+import { getUserService } from '@/lib/factories';
+import apiResponse from '@/lib/utils/api/unified-response';
 
 /**
  * GET /api/users
- * Alle Benutzer abrufen (mit Paginierung)
+ * Holt eine Liste von Benutzern mit Paginierung und optionaler Filterung
  */
 export async function GET(request: NextRequest) {
   try {
+    // Query-Parameter extrahieren
     const { searchParams } = new URL(request.url);
     const page = Number(searchParams.get('page') || '1');
-    const limit = Number(searchParams.get('limit') || config.DEFAULT_PAGE_SIZE.toString());
+    const limit = Number(searchParams.get('limit') || '20');
     const search = searchParams.get('search') || '';
+    const role = searchParams.get('role') || '';
+    const status = searchParams.get('status') || '';
     
+    // Service aufrufen
     const userService = getUserService();
-    const { users, total, totalPages } = await userService.getUsers({
+    const result = await userService.getUsers({
       page,
       limit,
-      search
+      search,
+      role: role || undefined,
+      status: status || undefined
     });
     
-    return responseHelpers.paginated(users, {
-      page,
-      limit,
-      total,
-      totalPages
-    });
+    // Antwort formatieren
+    return apiResponse.paginated(
+      result.users,
+      {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages
+      },
+      'Users retrieved successfully'
+    );
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
-    return responseHelpers.error(message);
+    // Fehlerbehandlung
+    return apiResponse.handleError(error);
   }
 }
 
 /**
  * POST /api/users
- * Neuen Benutzer erstellen
+ * Erstellt einen neuen Benutzer
  */
 export async function POST(request: NextRequest) {
   try {
+    // Request-Body extrahieren
     const userData = await request.json();
     
+    // Service aufrufen
     const userService = getUserService();
     const newUser = await userService.createUser(userData);
     
-    return responseHelpers.created(newUser);
+    // Antwort formatieren
+    return apiResponse.created(newUser, 'User created successfully');
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
-    return responseHelpers.error(message);
+    // Fehlerbehandlung
+    return apiResponse.handleError(error);
   }
 }

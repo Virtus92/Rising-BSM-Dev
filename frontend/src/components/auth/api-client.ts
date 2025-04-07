@@ -23,11 +23,11 @@ export interface AuthResponse {
   errors?: string[];
 }
 
-// Login mit Benutzername und Passwort
+// Login mit Email und Passwort
 export async function login(email: string, password: string, remember = false): Promise<AuthResponse> {
   try {
     // Wir versuchen zuerst den einfachen Login
-    const response = await fetch(`${API_URL}/auth/login-simple`, {
+    const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

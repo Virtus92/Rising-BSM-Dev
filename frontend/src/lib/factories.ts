@@ -1,248 +1,255 @@
 /**
- * Factory-Funktionen für die Verwendung mit NextJS
+ * Service and Repository Factories
  * 
- * Diese Datei bietet eine Kompatibilitätsschicht für den Übergang von Express zu NextJS.
- * Sie unterstützt sowohl den alten DiContainer als auch das neue Factory-System.
+ * Diese Datei bietet ein optimiertes Factory-System für Service- und Repository-Instanzen
+ * mit Dependency Injection und wiederverwendet zentrale Dienste aus dem Bootstrap-System.
  */
-import { createFactory, DiContainer } from './core/DiContainer';
-import { 
-  initializeCore, 
-  initializeRepositories, 
-  initializeServices
-} from './services/factory';
+import { prisma } from './db';
+import { getLogger, getErrorHandler, getValidationService } from './core/bootstrap';
 
 // Repositories
-import { CustomerRepository } from './repositories/CustomerRepository';
-import { NotificationRepository } from './repositories/NotificationRepository';
-import { UserRepository } from './repositories/UserRepository';
-import { RefreshTokenRepository } from './repositories/RefreshTokenRepository';
-import { ServiceRepository } from './repositories/ServiceRepository';
-import { RequestRepository } from './repositories/RequestRepository';
-import { ProjectRepository } from './repositories/ProjectRepository';
+import { UserRepository } from '../repositories/UserRepository';
+import { CustomerRepository } from '../repositories/CustomerRepository';
+import { ProjectRepository } from '../repositories/ProjectRepository';
+import { ServiceRepository } from '../repositories/ServiceRepository';
+import { AppointmentRepository } from '../repositories/AppointmentRepository';
+import { NotificationRepository } from '../repositories/NotificationRepository';
+import { RequestRepository } from '../repositories/RequestRepository';
+import { RefreshTokenRepository } from '../repositories/RefreshTokenRepository';
 
 // Services
-import { CustomerService } from './services/CustomerService';
-import { NotificationService } from './services/NotificationService';
-import { AuthService } from './services/AuthService';
-import { UserService } from './services/UserService';
-import { ProfileService } from './services/ProfileService';
-import { SettingsService } from './services/SettingsService';
-import { RequestService } from './services/RequestService';
-import { ServiceService } from './services/ServiceService';
-import { ProjectService } from './services/ProjectService';
+import { UserService } from '../services/UserService';
+import { AuthService } from '../services/AuthService';
+import { CustomerService } from '../services/CustomerService';
+import { ProjectService } from '../services/ProjectService';
+import { ServiceService } from '../services/ServiceService';
+import { AppointmentService } from '../services/AppointmentService';
+import { NotificationService } from '../services/NotificationService';
+import { RequestService } from '../services/RequestService';
 
-// Controllers - werden für NextJS API-Routen durch direkte Dienst-Aufrufe ersetzt
-import { CustomerController } from './controllers/CustomerController';
-import { NotificationController } from './controllers/NotificationController';
-import { AuthController } from './controllers/AuthController';
-import { UserController } from './controllers/UserController';
-import { ProfileController } from './controllers/ProfileController';
-import { SettingsController } from './controllers/SettingsController';
-import { RequestController } from './controllers/RequestController';
-import { ServiceController } from './controllers/ServiceController';
-import { ProjectController } from './controllers/ProjectController';
+// Singleton-Instanzen für Repositories
+let userRepository: UserRepository;
+let customerRepository: CustomerRepository;
+let serviceRepository: ServiceRepository;
+let projectRepository: ProjectRepository;
+let appointmentRepository: AppointmentRepository;
+let notificationRepository: NotificationRepository;
+let refreshTokenRepository: RefreshTokenRepository;
+let requestRepository: RequestRepository;
 
-// Legacy Factory-Funktionen für Repository-Erstellung
-export const createCustomerRepositoryFactory = () => createFactory(
-  CustomerRepository,
-  ['PrismaClient', 'LoggingService', 'ErrorHandler']
-);
+// Singleton-Instanzen für Services
+let userService: UserService;
+let authService: AuthService;
+let customerService: CustomerService;
+let serviceService: ServiceService;
+let projectService: ProjectService;
+let appointmentService: AppointmentService;
+let notificationService: NotificationService;
+let requestService: RequestService;
 
-export const createNotificationRepositoryFactory = () => createFactory(
-  NotificationRepository,
-  ['PrismaClient', 'LoggingService', 'ErrorHandler']
-);
-
-export const createUserRepositoryFactory = () => createFactory(
-  UserRepository,
-  ['PrismaClient', 'LoggingService', 'ErrorHandler']
-);
-
-export const createRefreshTokenRepositoryFactory = () => createFactory(
-  RefreshTokenRepository,
-  ['PrismaClient', 'LoggingService', 'ErrorHandler']
-);
-
-export const createRequestRepositoryFactory = () => createFactory(
-  RequestRepository,
-  ['PrismaClient', 'LoggingService', 'ErrorHandler']
-);
-
-export const createProjectRepositoryFactory = () => createFactory(
-  ProjectRepository,
-  ['PrismaClient', 'LoggingService', 'ErrorHandler']
-);
-
-export const createServiceRepositoryFactory = () => createFactory(
-  ServiceRepository,
-  ['PrismaClient', 'LoggingService', 'ErrorHandler']
-);
-
-// Legacy Factory-Funktionen für Service-Erstellung
-export const createCustomerServiceFactory = () => createFactory(
-  CustomerService,
-  ['CustomerRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
-);
-
-export const createNotificationServiceFactory = () => createFactory(
-  NotificationService,
-  ['NotificationRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
-);
-
-export const createAuthServiceFactory = () => createFactory(
-  AuthService,
-  ['UserRepository', 'RefreshTokenRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
-);
-
-export const createUserServiceFactory = () => createFactory(
-  UserService,
-  ['UserRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
-);
-
-export const createProfileServiceFactory = () => createFactory(
-  ProfileService,
-  ['PrismaClient', 'LoggingService', 'ErrorHandler']
-);
-
-export const createSettingsServiceFactory = () => createFactory(
-  SettingsService,
-  ['PrismaClient', 'LoggingService', 'ErrorHandler']
-);
-
-export const createRequestServiceFactory = () => createFactory(
-  RequestService,
-  ['RequestRepository', 'LoggingService', 'ErrorHandler']
-);
-
-export const createProjectServiceFactory = () => createFactory(
-  ProjectService,
-  ['ProjectRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
-);
-
-export const createServiceServiceFactory = () => createFactory(
-  ServiceService,
-  ['ServiceRepository', 'LoggingService', 'ValidationService', 'ErrorHandler']
-);
-
-// Legacy Factory-Funktionen für Controller-Erstellung
-export const createCustomerControllerFactory = () => createFactory(
-  CustomerController,
-  ['CustomerService', 'LoggingService', 'ErrorHandler']
-);
-
-export const createNotificationControllerFactory = () => createFactory(
-  NotificationController,
-  ['NotificationService', 'LoggingService', 'ErrorHandler']
-);
-
-export const createAuthControllerFactory = () => createFactory(
-  AuthController,
-  ['AuthService', 'LoggingService', 'ErrorHandler']
-);
-
-export const createUserControllerFactory = () => createFactory(
-  UserController,
-  ['UserService', 'LoggingService', 'ErrorHandler']
-);
-
-export const createProfileControllerFactory = () => createFactory(
-  ProfileController,
-  ['ProfileService', 'LoggingService', 'ErrorHandler']
-);
-
-export const createSettingsControllerFactory = () => createFactory(
-  SettingsController,
-  ['SettingsService', 'LoggingService', 'ErrorHandler']
-);
-
-export const createRequestControllerFactory = () => createFactory(
-  RequestController,
-  ['RequestService', 'UserService', 'LoggingService', 'ErrorHandler']
-);
-
-export const createProjectControllerFactory = () => createFactory(
-  ProjectController,
-  ['ProjectService', 'LoggingService', 'ErrorHandler']
-);
-
-export const createServiceControllerFactory = () => createFactory(
-  ServiceController,
-  ['ServiceService', 'LoggingService', 'ErrorHandler']
-);
+// Repository Factory-Funktionen
 
 /**
- * Repositories im DI-Container registrieren
- * 
- * @param container - DI-Container
+ * Gibt das UserRepository zurück
  */
-export function registerRepositories(container: DiContainer): void {
-  container.register('CustomerRepository', createCustomerRepositoryFactory(), { singleton: true });
-  container.register('NotificationRepository', createNotificationRepositoryFactory(), { singleton: true });
-  container.register('UserRepository', createUserRepositoryFactory(), { singleton: true });
-  container.register('RefreshTokenRepository', createRefreshTokenRepositoryFactory(), { singleton: true });
-  container.register('RequestRepository', createRequestRepositoryFactory(), { singleton: true });
-  container.register('ProjectRepository', createProjectRepositoryFactory(), { singleton: true });
-  container.register('ServiceRepository', createServiceRepositoryFactory(), { singleton: true });
+export function getUserRepository(): UserRepository {
+  if (!userRepository) {
+    userRepository = new UserRepository(prisma, getLogger(), getErrorHandler());
+  }
+  return userRepository;
 }
 
 /**
- * Services im DI-Container registrieren
- * 
- * @param container - DI-Container
+ * Gibt das CustomerRepository zurück
  */
-export function registerServices(container: DiContainer): void {
-  container.register('CustomerService', createCustomerServiceFactory(), { singleton: true });
-  container.register('NotificationService', createNotificationServiceFactory(), { singleton: true });
-  container.register('AuthService', createAuthServiceFactory(), { singleton: true });
-  container.register('UserService', createUserServiceFactory(), { singleton: true });
-  container.register('ProfileService', createProfileServiceFactory(), { singleton: true });
-  container.register('SettingsService', createSettingsServiceFactory(), { singleton: true });
-  container.register('RequestService', createRequestServiceFactory(), { singleton: true });
-  container.register('ProjectService', createProjectServiceFactory(), { singleton: true });
-  container.register('ServiceService', createServiceServiceFactory(), { singleton: true });
+export function getCustomerRepository(): CustomerRepository {
+  if (!customerRepository) {
+    customerRepository = new CustomerRepository(prisma, getLogger(), getErrorHandler());
+  }
+  return customerRepository;
 }
 
 /**
- * Controller im DI-Container registrieren
- * 
- * @param container - DI-Container
+ * Gibt das ProjectRepository zurück
  */
-export function registerControllers(container: DiContainer): void {
-  container.register('CustomerController', createCustomerControllerFactory(), { singleton: true });
-  container.register('NotificationController', createNotificationControllerFactory(), { singleton: true });
-  container.register('AuthController', createAuthControllerFactory(), { singleton: true });
-  container.register('UserController', createUserControllerFactory(), { singleton: true });
-  container.register('ProfileController', createProfileControllerFactory(), { singleton: true });
-  container.register('SettingsController', createSettingsControllerFactory(), { singleton: true });
-  container.register('RequestController', createRequestControllerFactory(), { singleton: true });
-  container.register('ProjectController', createProjectControllerFactory(), { singleton: true });
-  container.register('ServiceController', createServiceControllerFactory(), { singleton: true });
+export function getProjectRepository(): ProjectRepository {
+  if (!projectRepository) {
+    projectRepository = new ProjectRepository(prisma, getLogger(), getErrorHandler());
+  }
+  return projectRepository;
 }
 
 /**
- * Alle Komponenten im DI-Container registrieren
- * 
- * @param container - DI-Container
+ * Gibt das ServiceRepository zurück
  */
-export function registerAll(container: DiContainer) {
-  registerRepositories(container);
-  registerServices(container);
-  registerControllers(container);
+export function getServiceRepository(): ServiceRepository {
+  if (!serviceRepository) {
+    serviceRepository = new ServiceRepository(prisma, getLogger(), getErrorHandler());
+  }
+  return serviceRepository;
 }
 
 /**
- * Neue NextJS-optimierte Initialisierungsfunktion
- * Diese Funktion initialisiert alle erforderlichen Dienste durch das neue Factory-System
+ * Gibt das AppointmentRepository zurück
  */
-export function initializeAll() {
-  // Core-Dienste initialisieren (Logger, Validierung, Fehlerbehandlung)
-  initializeCore();
-  
-  // Repositories initialisieren
-  initializeRepositories();
-  
-  // Services initialisieren
-  initializeServices();
-  
-  return true;
+export function getAppointmentRepository(): AppointmentRepository {
+  if (!appointmentRepository) {
+    appointmentRepository = new AppointmentRepository(prisma, getLogger(), getErrorHandler());
+  }
+  return appointmentRepository;
+}
+
+/**
+ * Gibt das NotificationRepository zurück
+ */
+export function getNotificationRepository(): NotificationRepository {
+  if (!notificationRepository) {
+    notificationRepository = new NotificationRepository(prisma, getLogger(), getErrorHandler());
+  }
+  return notificationRepository;
+}
+
+/**
+ * Gibt das RequestRepository zurück
+ */
+export function getRequestRepository(): RequestRepository {
+  if (!requestRepository) {
+    requestRepository = new RequestRepository(prisma, getLogger(), getErrorHandler());
+  }
+  return requestRepository;
+}
+
+/**
+ * Gibt das RefreshTokenRepository zurück
+ */
+export function getRefreshTokenRepository(): RefreshTokenRepository {
+  if (!refreshTokenRepository) {
+    refreshTokenRepository = new RefreshTokenRepository(prisma, getLogger(), getErrorHandler());
+  }
+  return refreshTokenRepository;
+}
+
+// Service Factory-Funktionen
+
+/**
+ * Gibt den UserService zurück
+ */
+export function getUserService(): UserService {
+  if (!userService) {
+    userService = new UserService(
+      getUserRepository(),
+      getLogger(),
+      getValidationService(),
+      getErrorHandler()
+    );
+  }
+  return userService;
+}
+
+/**
+ * Gibt den AuthService zurück
+ */
+export function getAuthService(): AuthService {
+  if (!authService) {
+    authService = new AuthService(
+      getUserRepository(),
+      getRefreshTokenRepository(),
+      getLogger(),
+      getValidationService(),
+      getErrorHandler()
+    );
+  }
+  return authService;
+}
+
+/**
+ * Gibt den CustomerService zurück
+ */
+export function getCustomerService(): CustomerService {
+  if (!customerService) {
+    customerService = new CustomerService(
+      getCustomerRepository(),
+      getLogger(),
+      getValidationService(),
+      getErrorHandler()
+    );
+  }
+  return customerService;
+}
+
+/**
+ * Gibt den ProjectService zurück
+ */
+export function getProjectService(): ProjectService {
+  if (!projectService) {
+    projectService = new ProjectService(
+      getProjectRepository(),
+      getLogger(),
+      getValidationService(),
+      getErrorHandler()
+    );
+  }
+  return projectService;
+}
+
+/**
+ * Gibt den ServiceService zurück
+ */
+export function getServiceService(): ServiceService {
+  if (!serviceService) {
+    serviceService = new ServiceService(
+      getServiceRepository(),
+      getLogger(),
+      getValidationService(),
+      getErrorHandler()
+    );
+  }
+  return serviceService;
+}
+
+/**
+ * Gibt den AppointmentService zurück
+ */
+export function getAppointmentService(): AppointmentService {
+  if (!appointmentService) {
+    appointmentService = new AppointmentService(
+      getAppointmentRepository(),
+      getCustomerRepository(),
+      getProjectRepository(),
+      getLogger(),
+      getValidationService(),
+      getErrorHandler()
+    );
+  }
+  return appointmentService;
+}
+
+/**
+ * Gibt den NotificationService zurück
+ */
+export function getNotificationService(): NotificationService {
+  if (!notificationService) {
+    notificationService = new NotificationService(
+      getNotificationRepository(),
+      getLogger(),
+      getValidationService(),
+      getErrorHandler()
+    );
+  }
+  return notificationService;
+}
+
+/**
+ * Gibt den RequestService zurück
+ */
+export function getRequestService(): RequestService {
+  if (!requestService) {
+    requestService = new RequestService(
+      getRequestRepository(),
+      getLogger(),
+      getValidationService(),
+      getErrorHandler()
+    );
+  }
+  return requestService;
 }

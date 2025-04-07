@@ -3,8 +3,14 @@
  * 
  * Diese Datei enthält einfache Hilfsfunktionen, um Express-ähnliche Funktionalität 
  * in NextJS API-Routen zu verwenden.
+ * 
+ * HINWEIS: Diese Datei wird für Kompatibilität mit altem Code beibehalten.
+ * Für neue Implementierungen verwende bitte die unified-response.ts.
+ * 
+ * @deprecated Verwende stattdessen unified-response.ts
  */
 import { NextRequest, NextResponse } from 'next/server';
+import apiResponse from './unified-response';
 
 /**
  * Extrahiert Benutzerinformationen aus den Request-Headern
@@ -21,58 +27,42 @@ export function extractUserFromRequest(req: NextRequest) {
 
 /**
  * Einfache Antwortformatierung (Express-ähnlich)
+ * 
+ * @deprecated Verwende stattdessen apiResponse aus unified-response.ts
  */
 export const responseHelpers = {
   /**
    * Erfolgsantwort mit Daten
    */
   success: (data: any, message = 'Erfolg') => {
-    return NextResponse.json({
-      success: true,
-      message,
-      data
-    });
+    return apiResponse.success(data, message);
   },
   
   /**
    * Paginierte Antwort
    */
   paginated: (data: any[], pagination: any) => {
-    return NextResponse.json({
-      success: true,
-      data,
-      pagination
-    });
+    return apiResponse.paginated(data, pagination);
   },
   
   /**
    * Fehlerantwort
    */
   error: (message: string, statusCode = 500) => {
-    return NextResponse.json({
-      success: false,
-      error: message
-    }, { status: statusCode });
+    return apiResponse.error(message, statusCode);
   },
   
   /**
    * Nicht-gefunden-Antwort
    */
   notFound: (message = 'Ressource nicht gefunden') => {
-    return NextResponse.json({
-      success: false,
-      error: message
-    }, { status: 404 });
+    return apiResponse.notFound(message);
   },
   
   /**
    * Erfolgreiche Erstellung
    */
   created: (data: any, message = 'Ressource erfolgreich erstellt') => {
-    return NextResponse.json({
-      success: true,
-      message,
-      data
-    }, { status: 201 });
+    return apiResponse.created(data, message);
   }
 };
