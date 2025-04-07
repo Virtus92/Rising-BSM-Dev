@@ -1,44 +1,46 @@
+/**
+ * API-Route für Login
+ */
 import { NextRequest } from 'next/server';
+import { apiResponse } from '@/lib/utils/api/unified-response';
+import { withOptionalAuth } from '@/lib/middleware/withAuth';
 import { getAuthService } from '@/lib/factories';
-import apiResponse from '@/lib/utils/api/unified-response';
 
 /**
- * POST /api/auth/login
- * Authentifiziert einen Benutzer mit E-Mail und Passwort
+ * POST-Handler für die Login-Route
  */
-export async function POST(request: NextRequest) {
+async function POST(req: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    // Request-Daten parsen
+    const data = await req.json();
+    const { email, password, remember } = data;
     
-    // Eingaben validieren
+    // Validierung
     if (!email || !password) {
-      return apiResponse.validationError(
-        'E-Mail und Passwort sind erforderlich',
-        ['Bitte geben Sie eine E-Mail-Adresse und ein Passwort ein']
-      );
+      return apiResponse.validationError('E-Mail und Passwort sind erforderlich');
     }
     
-    // Service aus Factory holen
+    // Auth-Service verwenden
     const authService = getAuthService();
     
-    // IP-Adresse des Clients ermitteln
-    const ipAddress = request.headers.get('x-forwarded-for') || 
-                     request.headers.get('x-real-ip') || 
-                     'unknown';
+    // Login-Versuch
+    const result = await authService.login({
+      email,
+      password,
+      remember: !!remember
+    });
     
-    // Login durchführen
-    const authResult = await authService.login(
-      { email, password },
-      typeof ipAddress === 'string' ? ipAddress : ipAddress[0]
-    );
+    if (!result.success) {
+      return apiResponse.unauthorized(result.message || 'Anmeldung fehlgeschlagen');
+    }
     
-    // Erfolgsantwort zurückgeben
-    return apiResponse.success(
-      authResult,
-      'Anmeldung erfolgreich'
-    );
+    // Erfolgreiche Antwort
+    return apiResponse.success(result.data, 'Anmeldung erfolgreich');
   } catch (error) {
-    // Fehlerbehandlung
-    return apiResponse.handleError(error);
+    console.error('Login-Fehler:', error);
+    return apiResponse.error('Anmeldung fehlgeschlagen: ' + (error instanceof Error ? error.message : 'Unbekannter Fehler'));
   }
 }
+
+// Mit optionaler Auth-Middleware exportieren
+export { withOptionalAuth(POST) as POST };

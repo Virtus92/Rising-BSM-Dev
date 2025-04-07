@@ -1,5 +1,5 @@
-import { IBaseService, ServiceOptions, PaginatedResult } from './IBaseService.js';
-import { Service } from '../entities/Service.js';
+import { IBaseService } from './IBaseService';
+import { Service } from '../entities/Service';
 import { 
   ServiceCreateDto, 
   ServiceUpdateDto, 
@@ -7,55 +7,80 @@ import {
   ServiceStatusUpdateDto,
   ServiceFilterParams,
   ServiceStatisticsDto
-} from '../dtos/ServiceDtos.js';
+} from '../dtos/ServiceDtos';
+import { PaginatedResult, OperationOptions, FilterCriteria, ErrorDetails } from '@/types/core/shared';
+import { AuthContext } from '@/types/core/auth';
 
-/**
- * Interface for service service
- * Extends the base service with service-specific methods
- */
-export interface IServiceService extends IBaseService<Service, ServiceCreateDto, ServiceUpdateDto, ServiceResponseDto> {
+export interface IServiceService extends IBaseService<
+  Service, 
+  ServiceCreateDto, 
+  ServiceUpdateDto, 
+  ServiceResponseDto
+> {
   /**
-   * Find services with filtering
+   * Find services with advanced filtering
    * 
-   * @param filters - Filter parameters
-   * @returns Promise with services and pagination info
+   * @param filters - Complex service filter parameters
+   * @param options - Operation options
+   * @returns Paginated service results
    */
-  findServices(filters: ServiceFilterParams): Promise<PaginatedResult<ServiceResponseDto>>;
+  findServices(
+    filters: ServiceFilterParams, 
+    options?: OperationOptions
+  ): Promise<PaginatedResult<ServiceResponseDto>>;
   
   /**
    * Find active services
    * 
-   * @param limit - Maximum number of services to return
-   * @param options - Service options
-   * @returns Promise with services
+   * @param limit - Maximum number of active services to return
+   * @param options - Operation options with optional auth context
+   * @returns Active service responses
    */
-  findActive(limit?: number, options?: ServiceOptions): Promise<ServiceResponseDto[]>;
+  findActive(
+    limit?: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ServiceResponseDto[]>;
   
   /**
    * Toggle service active status
    * 
    * @param id - Service ID
-   * @param statusData - Status update data
-   * @param options - Service options
-   * @returns Promise with updated service
+   * @param statusData - Status update details
+   * @param options - Operation options with auth context
+   * @returns Updated service response
+   * @throws {ErrorDetails} When status update fails
    */
-  toggleStatus(id: number, statusData: ServiceStatusUpdateDto, options?: ServiceOptions): Promise<ServiceResponseDto>;
+  toggleStatus(
+    id: number, 
+    statusData: ServiceStatusUpdateDto, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ServiceResponseDto>;
   
   /**
-   * Get service statistics
+   * Get comprehensive service statistics
    * 
    * @param id - Service ID
-   * @param options - Service options
-   * @returns Promise with statistics
+   * @param options - Operation options with auth context
+   * @returns Service statistics
    */
-  getServiceStatistics(id: number, options?: ServiceOptions): Promise<ServiceStatisticsDto>;
+  getServiceStatistics(
+    id: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ServiceStatisticsDto>;
   
   /**
-   * Get price with VAT
+   * Calculate price with VAT
    * 
    * @param id - Service ID
-   * @param options - Service options
-   * @returns Promise with price information
+   * @param options - Operation options with auth context
+   * @returns Price breakdown
    */
-  getPriceWithVat(id: number, options?: ServiceOptions): Promise<{ basePrice: number; vatAmount: number; totalPrice: number }>;
+  getPriceWithVat(
+    id: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<{
+    basePrice: number;
+    vatAmount: number;
+    totalPrice: number;
+  }>;
 }

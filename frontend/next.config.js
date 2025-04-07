@@ -1,4 +1,18 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
+
+// Lade Umgebungsvariablen aus dem Root-Verzeichnis
+const rootEnvPath = path.resolve(__dirname, '../.env');
+if (fs.existsSync(rootEnvPath)) {
+  console.log('Lade Umgebungsvariablen aus dem Root-Verzeichnis (./.env)');
+  dotenv.config({ path: rootEnvPath });
+} else {
+  console.log('Keine .env im Root-Verzeichnis gefunden, verwende Prozessumgebungsvariablen');
+  dotenv.config();
+}
+
 const nextConfig = {
   env: {
     // API-URLs

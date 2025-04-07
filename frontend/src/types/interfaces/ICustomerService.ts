@@ -1,126 +1,160 @@
-import { IBaseService } from './IBaseService.js';
-import { Customer } from '../entities/Customer.js';
+import { IBaseService } from './IBaseService';
+import { Customer } from '../entities/Customer';
 import { 
   CustomerCreateDto, 
   CustomerUpdateDto, 
   CustomerResponseDto, 
   CustomerDetailResponseDto,
-  CustomerFilterParams,
-  CustomerStatusUpdateDto
-} from '../dtos/CustomerDtos.js';
-import { ServiceOptions } from './IBaseService.js';
+  CustomerStatusUpdateDto,
+  CustomerFilterParams
+} from '../dtos/CustomerDtos';
+import { PaginatedResult, OperationOptions, FilterCriteria, ErrorDetails } from '@/types/core/shared';
+import { AuthContext } from '@/types/core/auth';
 
-/**
- * ICustomerService
- * 
- * Service interface for Customer entity operations.
- * Extends the base service interface with customer-specific methods.
- */
-export interface ICustomerService extends IBaseService<Customer, CustomerCreateDto, CustomerUpdateDto, CustomerResponseDto> {
+export interface ICustomerService extends IBaseService<
+  Customer, 
+  CustomerCreateDto, 
+  CustomerUpdateDto, 
+  CustomerResponseDto
+> {
   /**
-   * Get detailed customer information
+   * Retrieve detailed customer information
    * 
    * @param id - Customer ID
-   * @param options - Service options
-   * @returns Promise with detailed customer response
+   * @param options - Operation options with optional auth context
+   * @returns Detailed customer response or null
+   * @throws {ErrorDetails} When retrieval fails
    */
-  getCustomerDetails(id: number, options?: ServiceOptions): Promise<CustomerDetailResponseDto | null>;
+  getCustomerDetails(
+    id: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<CustomerDetailResponseDto | null>;
   
   /**
    * Update customer status
    * 
-   * @param statusUpdateDto - Status update data
-   * @param options - Service options
-   * @returns Promise with updated customer response
+   * @param statusUpdateDto - Status update details
+   * @param options - Operation options with auth context
+   * @returns Updated customer response
+   * @throws {ErrorDetails} When status update fails
    */
-  updateStatus(statusUpdateDto: CustomerStatusUpdateDto, options?: ServiceOptions): Promise<CustomerResponseDto>;
+  updateStatus(
+    statusUpdateDto: CustomerStatusUpdateDto, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<CustomerResponseDto>;
   
   /**
-   * Get customer statistics
+   * Retrieve comprehensive customer statistics
    * 
-   * @returns Promise with customer statistics
+   * @param options - Operation options with auth context
+   * @returns Customer statistics
    */
-  getCustomerStatistics(): Promise<any>;
+  getCustomerStatistics(
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<{
+    totalCustomers: number;
+    activeCustomers: number;
+    newCustomersLastMonth: number;
+    customersByType: Record<string, number>;
+  }>;
   
-  /**
-   * Get customer insights with detailed analytics
-   * 
-   * @param id - Customer ID
-   * @returns Promise with customer insights
-   */
-  getCustomerInsights(id: number): Promise<any>;
-  
-  /**
-   * Find all customers with filtering and pagination
-   * 
-   * @param filters - Filter parameters
-   * @param options - Service options
-   * @returns Promise with paginated customer data
-   */
-  findAll(filters: CustomerFilterParams, options?: ServiceOptions): Promise<{data: CustomerResponseDto[], pagination: any}>;
-
   /**
    * Find similar customers based on attributes
    * 
-   * @param id - Customer ID
-   * @param limit - Maximum number of customers to return
-   * @returns Promise with similar customers
+   * @param id - Base customer ID
+   * @param limit - Maximum number of similar customers to return
+   * @param options - Operation options with optional auth context
+   * @returns Similar customer responses
    */
-  findSimilarCustomers(id: number, limit?: number): Promise<CustomerResponseDto[]>;
+  findSimilarCustomers(
+    id: number, 
+    limit?: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<CustomerResponseDto[]>;
   
   /**
-   * Get customer activity history
+   * Retrieve customer activity history
    * 
    * @param id - Customer ID
-   * @returns Promise with customer history
+   * @param options - Operation options with optional auth context
+   * @returns Customer history records
    */
-  getCustomerHistory(id: number): Promise<any[]>;
+  getCustomerHistory(
+    id: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<Array<{
+    type: string;
+    timestamp: Date;
+    details?: string;
+  }>>;
   
   /**
-   * Add note to customer
+   * Add a note to a customer record
    * 
    * @param customerId - Customer ID
    * @param text - Note text
-   * @param userId - User ID
+   * @param userId - User adding the note
    * @param name - User name
-   * @returns Promise indicating success
+   * @param options - Operation options with auth context
+   * @returns Promise indicating successful note addition
+   * @throws {ErrorDetails} When note addition fails
    */
-  addNote(customerId: number, text: string, userId: number, name: string): Promise<void>;
+  addNote(
+    customerId: number, 
+    text: string, 
+    userId: number, 
+    name: string, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<void>;
   
   /**
-   * Bulk update multiple customers
+   * Advanced customer search with comprehensive filtering
    * 
-   * @param ids - Array of customer IDs
-   * @param data - Update data
-   * @param options - Service options
-   * @returns Promise with count of updated customers
+   * @param filters - Complex customer filter parameters
+   * @param options - Operation options
+   * @returns Paginated customer results
    */
-  bulkUpdate(ids: number[], data: CustomerUpdateDto, options?: ServiceOptions): Promise<number>;
+  findAll(
+    filters: CustomerFilterParams, 
+    options?: OperationOptions
+  ): Promise<PaginatedResult<CustomerResponseDto>>;
   
   /**
    * Export customer data
    * 
-   * @param filters - Filter parameters
-   * @param format - Export format (csv or excel)
-   * @returns Promise with export result
+   * @param filters - Optional filter parameters
+   * @param format - Export format
+   * @param options - Operation options with auth context
+   * @returns Exported data buffer and filename
    */
-  exportData(filters: CustomerFilterParams, format?: string): Promise<{buffer: Buffer, filename: string}>;
+  exportData(
+    filters: CustomerFilterParams, 
+    format?: 'csv' | 'excel', 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<{ buffer: Buffer; filename: string }>;
   
   /**
-   * Search customers with advanced filtering
+   * Perform advanced customer search
    * 
-   * @param searchTerm - Search term
-   * @param options - Service options
-   * @returns Promise with paginated search results
+   * @param searchTerm - Search query
+   * @param options - Operation options
+   * @returns Paginated customer search results
    */
-  searchCustomers(searchTerm: string, options?: ServiceOptions): Promise<{data: CustomerResponseDto[], pagination: any}>;
+  searchCustomers(
+    searchTerm: string, 
+    options?: OperationOptions
+  ): Promise<PaginatedResult<CustomerResponseDto>>;
   
   /**
-   * Hard delete a customer (permanent deletion)
+   * Permanently remove a customer from the system
    * 
    * @param id - Customer ID
-   * @param options - Service options
-   * @returns Promise with deleted customer
+   * @param options - Operation options with auth context
+   * @returns Deleted customer response
+   * @throws {ErrorDetails} When deletion fails
    */
-  hardDelete(id: number, options?: any): Promise<CustomerResponseDto>;
+  hardDelete(
+    id: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<CustomerResponseDto>;
 }

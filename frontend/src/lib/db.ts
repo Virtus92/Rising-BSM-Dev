@@ -1,14 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 
-// Globale Deklaration für Entwicklungsmodus-Persistenz
+// PrismaClient ist in den Produktionsbuild eingebettet.
+// PrismaClient wird im Entwicklungsmodus bei webpack-hmr-Updates mehrmals initialisiert.
+// Um globale Singleton-Instanz zu bewahren für NextJS-Entwicklungsmodus
+// Siehe: https://www.prisma.io/docs/guides/other/troubleshooting-orm/help-articles/nextjs-prisma-client-dev-practices
+
 declare global {
+  // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined;
 }
 
-// Prisma-Client mit Logging im Entwicklungsmodus
-export const prisma = global.prisma || new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-});
+export const prisma =
+  global.prisma ||
+  new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  });
 
-// Verhindern mehrfacher Instanzen im Entwicklungsmodus
-if (process.env.NODE_ENV === 'development') global.prisma = prisma;
+if (process.env.NODE_ENV !== 'production') global.prisma = prisma;

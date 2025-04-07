@@ -1,3 +1,5 @@
+import { PaginatedResult, FilterCriteria, OperationOptions, ErrorDetails } from '@/types/core/shared';
+
 /**
  * IBaseService
  * 
@@ -9,15 +11,23 @@
  * @template U - Update DTO type
  * @template R - Response DTO type
  * @template ID - Primary key type (default: number)
+ * @template FilterType - Type for filter criteria
  */
-export interface IBaseService<T, C, U, R, ID = number> {
+export interface IBaseService<
+  T, 
+  C, 
+  U, 
+  R, 
+  ID = number, 
+  FilterType = Record<string, any>
+> {
     /**
      * Get all entities with optional filtering and pagination
      * 
      * @param options - Service options including filters, pagination, etc.
      * @returns Promise containing array of response DTOs and pagination metadata
      */
-    getAll(options?: ServiceOptions): Promise<PaginatedResult<R>>;
+    getAll(options?: OperationOptions): Promise<PaginatedResult<R>>;
     
     /**
      * Get an entity by its ID
@@ -26,7 +36,7 @@ export interface IBaseService<T, C, U, R, ID = number> {
      * @param options - Additional service options
      * @returns Promise containing the response DTO or null if not found
      */
-    getById(id: ID, options?: ServiceOptions): Promise<R | null>;
+    getById(id: ID, options?: OperationOptions): Promise<R | null>;
     
     /**
      * Create a new entity
@@ -35,7 +45,7 @@ export interface IBaseService<T, C, U, R, ID = number> {
      * @param options - Additional service options
      * @returns Promise containing the response DTO for the created entity
      */
-    create(data: C, options?: ServiceOptions): Promise<R>;
+    create(data: C, options?: OperationOptions): Promise<R>;
     
     /**
      * Update an existing entity
@@ -45,7 +55,7 @@ export interface IBaseService<T, C, U, R, ID = number> {
      * @param options - Additional service options
      * @returns Promise containing the response DTO for the updated entity
      */
-    update(id: ID, data: U, options?: ServiceOptions): Promise<R>;
+    update(id: ID, data: U, options?: OperationOptions): Promise<R>;
     
     /**
      * Delete an entity
@@ -54,7 +64,7 @@ export interface IBaseService<T, C, U, R, ID = number> {
      * @param options - Additional service options
      * @returns Promise containing boolean indicating success
      */
-    delete(id: ID, options?: ServiceOptions): Promise<boolean>;
+    delete(id: ID, options?: OperationOptions): Promise<boolean>;
     
     /**
      * Find entities based on specific criteria
@@ -63,7 +73,7 @@ export interface IBaseService<T, C, U, R, ID = number> {
      * @param options - Additional service options
      * @returns Promise containing array of matching response DTOs
      */
-    findByCriteria(criteria: FilterCriteria, options?: ServiceOptions): Promise<R[]>;
+    findByCriteria(criteria: FilterCriteria<FilterType>, options?: OperationOptions): Promise<R[]>;
     
     /**
      * Validate entity data before persistence
@@ -71,7 +81,8 @@ export interface IBaseService<T, C, U, R, ID = number> {
      * @param data - Data to validate
      * @param isUpdate - Whether this is for an update operation
      * @param userId - Optional user ID for update operations
-     * @returns Promise that resolves if validation passes, or rejects with validation errors
+     * @returns Promise that resolves if validation passes, or throws with validation errors
+     * @throws {ErrorDetails} Validation error details
      */
     validate(data: C | U, isUpdate?: boolean, userId?: number): Promise<void>;
     
@@ -99,130 +110,5 @@ export interface IBaseService<T, C, U, R, ID = number> {
      * @param options - Additional service options
      * @returns Promise containing the number of updated entities
      */
-    bulkUpdate(ids: ID[], data: U, options?: ServiceOptions): Promise<number>;
-  }
-  
-  /**
-   * Service options for service operations
-   */
-  export interface ServiceOptions {
-    /**
-     * Page number (1-indexed)
-     */
-    page?: number;
-    
-    /**
-     * Number of items per page
-     */
-    limit?: number;
-    
-    /**
-     * Fields to select/include
-     */
-    select?: string[];
-    
-    /**
-     * Related entities to include
-     */
-    relations?: string[];
-    
-    /**
-     * Sorting options
-     */
-    sort?: SortOptions;
-    
-    /**
-     * Whether to include soft-deleted items
-     */
-    withDeleted?: boolean;
-    
-    /**
-     * Context information (like authenticated user)
-     */
-    context?: ContextInfo;
-    
-    /**
-     * Additional operation-specific options
-     */
-    [key: string]: any;
-  }
-  
-  /**
-   * Context information for service operations
-   */
-  export interface ContextInfo {
-    /**
-     * ID of the authenticated user
-     */
-    userId?: number;
-    
-    /**
-     * Role of the authenticated user
-     */
-    userRole?: string;
-    
-    /**
-     * IP address of the client
-     */
-    ipAddress?: string;
-    
-    /**
-     * Additional context properties
-     */
-    [key: string]: any;
-  }
-  
-  /**
-   * Sorting options
-   */
-  export interface SortOptions {
-    /**
-     * Field to sort by
-     */
-    field: string;
-    
-    /**
-     * Sort direction
-     */
-    direction: 'ASC' | 'DESC';
-  }
-  
-  /**
-   * Pagination result
-   */
-  export interface PaginatedResult<T> {
-    /**
-     * Array of items
-     */
-    data: T[];
-    
-    /**
-     * Pagination metadata
-     */
-    pagination: {
-      /**
-       * Current page
-       */
-      page: number;
-      
-      /**
-       * Items per page
-       */
-      limit: number;
-      
-      /**
-       * Total number of items
-       */
-      total: number;
-      
-      /**
-       * Total number of pages
-       */
-      totalPages: number;
-    };
-  }
-  
-  /**
-   * Filter criteria type for queries
-   */
-  export type FilterCriteria = Record<string, any>;
+    bulkUpdate(ids: ID[], data: U, options?: OperationOptions): Promise<number>;
+}

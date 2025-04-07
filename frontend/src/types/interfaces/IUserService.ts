@@ -1,5 +1,5 @@
-import { IBaseService } from './IBaseService.js';
-import { User } from '../entities/User.js';
+import { IBaseService } from './IBaseService';
+import { User } from '../entities/User';
 import { 
   CreateUserDto, 
   UpdateUserDto, 
@@ -8,119 +8,168 @@ import {
   ChangePasswordDto,
   UpdateUserStatusDto,
   UserFilterParams
-} from '../dtos/UserDtos.js';
-import { ServiceOptions } from './IBaseService.js';
+} from '../dtos/UserDtos';
+import { PaginatedResult, OperationOptions, FilterCriteria, ErrorDetails } from '@/types/core/shared';
+import { AuthContext } from '@/types/core/auth';
 
 /**
- * IUserService
- * 
- * Service interface for User entity operations.
- * Extends the base service interface with user-specific methods.
+ * User Service Interface
+ * Defines contract for user-related operations with enhanced type safety and error handling
  */
-export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUserDto, UserResponseDto> {
+export interface IUserService extends IBaseService<
+  User, 
+  CreateUserDto, 
+  UpdateUserDto, 
+  UserResponseDto
+> {
   /**
-   * Get detailed user information
+   * Retrieve detailed user information
    * 
    * @param id - User ID
-   * @param options - Service options
-   * @returns Promise with detailed user response
+   * @param options - Operation options with optional auth context
+   * @returns Detailed user response or null
+   * @throws {ErrorDetails} When retrieval fails
    */
-  getUserDetails(id: number, options?: any): Promise<UserDetailResponseDto | null>;
+  getUserDetails(
+    id: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<UserDetailResponseDto | null>;
   
   /**
-   * Find a user by name
+   * Find user by username or identifier
    * 
-   * @param name - name to search for
-   * @returns Promise with user response or null
+   * @param identifier - Username or identifier
+   * @returns User response or null
    */
-  findByName(name: string): Promise<UserResponseDto | null>;
+  findByName(identifier: string): Promise<UserResponseDto | null>;
   
   /**
-   * Find a user by email
+   * Find user by email address
    * 
-   * @param email - Email to search for
-   * @returns Promise with user response or null
+   * @param email - User email
+   * @returns User response or null
    */
   findByEmail(email: string): Promise<UserResponseDto | null>;
   
   /**
-   * Find users with advanced filtering
+   * Advanced user search with comprehensive filtering
    * 
-   * @param filters - Filter parameters
-   * @returns Promise with user responses and pagination info
+   * @param filters - Complex user filter parameters
+   * @param options - Operation options
+   * @returns Paginated user results
    */
-  findUsers(filters: UserFilterParams): Promise<{ data: UserResponseDto[]; pagination: any }>;
+  findUsers(
+    filters: UserFilterParams, 
+    options?: OperationOptions
+  ): Promise<PaginatedResult<UserResponseDto>>;
   
   /**
-   * Change user password
+   * Change user password with robust validation
    * 
-   * @param userId - User ID
-   * @param data - Password change data
-   * @param options - Service options
-   * @returns Promise indicating success
+   * @param userId - Target user ID
+   * @param passwordData - Password change details
+   * @param options - Operation options with auth context
+   * @returns Success indicator
+   * @throws {ErrorDetails} When password change fails
    */
-  changePassword(userId: number, data: ChangePasswordDto, options?: any): Promise<boolean>;
+  changePassword(
+    userId: number, 
+    passwordData: ChangePasswordDto, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<boolean>;
   
   /**
-   * Update user status
+   * Update user account status
    * 
-   * @param userId - User ID
-   * @param data - Status update data
-   * @param options - Service options
-   * @returns Promise with updated user response
+   * @param userId - Target user ID
+   * @param statusData - Status update details
+   * @param options - Operation options with auth context
+   * @returns Updated user response
+   * @throws {ErrorDetails} When status update fails
    */
-  updateStatus(userId: number, data: UpdateUserStatusDto, options?: any): Promise<UserResponseDto>;
+  updateStatus(
+    userId: number, 
+    statusData: UpdateUserStatusDto, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<UserResponseDto>;
   
   /**
-   * Authenticate user
+   * Authenticate user credentials
    * 
-   * @param name - name or email
-   * @param password - Password
-   * @returns Promise with user response or null
+   * @param identifier - Username or email
+   * @param password - User password
+   * @returns Authenticated user response or null
    */
-  authenticate(name: string, password: string): Promise<UserResponseDto | null>;
+  authenticate(
+    identifier: string, 
+    password: string
+  ): Promise<UserResponseDto | null>;
   
   /**
-   * Search users by name or email
+   * Search users by text query
    * 
-   * @param searchText - Search text
-   * @param options - Service options
-   * @returns Promise with matching user responses
+   * @param searchText - Search query
+   * @param options - Operation options
+   * @returns Matching user responses
    */
-  searchUsers(searchText: string, options?: any): Promise<UserResponseDto[]>;
+  searchUsers(
+    searchText: string, 
+    options?: OperationOptions
+  ): Promise<UserResponseDto[]>;
   
   /**
-   * Get user statistics
+   * Retrieve comprehensive user statistics
    * 
-   * @returns Promise with user statistics
+   * @param options - Operation options with auth context
+   * @returns User statistics
    */
-  getUserStatistics(): Promise<any>;
+  getUserStatistics(
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<{
+    totalUsers: number;
+    activeUsers: number;
+    newUsersLastMonth: number;
+    usersByRole: Record<string, number>;
+  }>;
 
   /**
- * Bulk update multiple users
- * 
- * @param ids - Array of user IDs
- * @param data - Update data
- * @param options - Service options
- * @returns Promise with count of updated users
- */
-bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): Promise<number>;
+   * Bulk update multiple user records
+   * 
+   * @param userIds - Array of user IDs
+   * @param updateData - Bulk update details
+   * @param options - Operation options with auth context
+   * @returns Count of updated users
+   * @throws {ErrorDetails} When bulk update fails
+   */
+  bulkUpdate(
+    userIds: number[], 
+    updateData: UpdateUserDto, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<number>;
 
   /**
-   * Soft delete a user (marks as deleted but keeps in database)
+   * Soft delete user (mark as inactive)
    * 
-   * @param userId - User ID
-   * @param options - Service options
-   * @returns Promise indicating success
+   * @param userId - User ID to soft delete
+   * @param options - Operation options with auth context
+   * @returns Success indicator
+   * @throws {ErrorDetails} When soft delete fails
    */
-  softDelete(userId: number, options?: ServiceOptions): Promise<boolean>;
+  softDelete(
+    userId: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<boolean>;
 
   /**
-   * Hard delete a user (permanently removes from database)
+   * Permanently remove user from system
    * 
-   * @param userId - User ID
-   * @param options - Service options
-   * @returns Promise indicating success
+   * @param userId - User ID to hard delete
+   * @param options - Operation options with auth context
+   * @returns Success indicator
+   * @throws {ErrorDetails} When hard delete fails
    */
-  hardDelete(userId: number, options?: ServiceOptions): Promise<boolean>;
+  hardDelete(
+    userId: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<boolean>;
 }

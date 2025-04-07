@@ -1,12 +1,7 @@
 /**
- * Unified API Response Utilities
- * 
- * Diese Datei enthält vereinheitlichte Funktionen für API-Antworten.
- * Sie integriert die bestehenden Response-Utilities und stellt
- * eine einheitliche Schnittstelle zur Verfügung.
+ * Einheitliche API-Antwortfunktionen für Next.js
  */
 import { NextResponse } from 'next/server';
-import { ApiError } from './error';
 
 /**
  * Standardisierte API-Antwortstruktur
@@ -21,7 +16,7 @@ export interface ApiResponse<T = any> {
 }
 
 /**
- * Standardisierte Paginierungsinformationen
+ * Paginierungsinformationen
  */
 export interface ApiPagination {
   page: number;
@@ -31,15 +26,15 @@ export interface ApiPagination {
 }
 
 /**
- * API Response helpers
+ * API-Antwort-Hilfsfunktionen
  */
 export const apiResponse = {
   /**
-   * Erfolgsantwort mit optionalen Daten
+   * Erfolgsantwort
    */
   success<T = any>(
     data?: T,
-    message = 'Request successful',
+    message = 'Anfrage erfolgreich',
     status = 200
   ): NextResponse<ApiResponse<T>> {
     return NextResponse.json({
@@ -54,7 +49,7 @@ export const apiResponse = {
    * Fehlerantwort
    */
   error(
-    message = 'An error occurred',
+    message = 'Ein Fehler ist aufgetreten',
     status = 500,
     errors: string[] = []
   ): NextResponse<ApiResponse<null>> {
@@ -67,20 +62,20 @@ export const apiResponse = {
   },
 
   /**
-   * "Ressource erfolgreich erstellt"-Antwort
+   * "Ressource erstellt"-Antwort
    */
   created<T = any>(
     data?: T,
-    message = 'Resource created successfully',
+    message = 'Ressource erfolgreich erstellt',
   ): NextResponse<ApiResponse<T>> {
     return this.success(data, message, 201);
   },
 
   /**
-   * "Keine Inhalte"-Antwort (für erfolgreiche Löschoperationen)
+   * "Keine Inhalte"-Antwort
    */
   noContent(
-    message = 'Operation completed successfully'
+    message = 'Operation erfolgreich abgeschlossen'
   ): NextResponse<ApiResponse<null>> {
     return NextResponse.json({
       success: true,
@@ -93,7 +88,7 @@ export const apiResponse = {
    * "Nicht gefunden"-Antwort
    */
   notFound(
-    message = 'Resource not found',
+    message = 'Ressource nicht gefunden',
     errors: string[] = []
   ): NextResponse<ApiResponse<null>> {
     return this.error(message, 404, errors);
@@ -103,7 +98,7 @@ export const apiResponse = {
    * "Nicht autorisiert"-Antwort
    */
   unauthorized(
-    message = 'Authentication required',
+    message = 'Authentifizierung erforderlich',
     errors: string[] = []
   ): NextResponse<ApiResponse<null>> {
     return this.error(message, 401, errors);
@@ -113,7 +108,7 @@ export const apiResponse = {
    * "Zugriff verweigert"-Antwort
    */
   forbidden(
-    message = 'Access denied',
+    message = 'Zugriff verweigert',
     errors: string[] = []
   ): NextResponse<ApiResponse<null>> {
     return this.error(message, 403, errors);
@@ -123,7 +118,7 @@ export const apiResponse = {
    * "Validierungsfehler"-Antwort
    */
   validationError(
-    message = 'Validation failed',
+    message = 'Validierung fehlgeschlagen',
     errors: string[] = []
   ): NextResponse<ApiResponse<null>> {
     return this.error(message, 422, errors);
@@ -135,7 +130,7 @@ export const apiResponse = {
   paginated<T = any>(
     data: T[],
     pagination: ApiPagination,
-    message = 'Request successful'
+    message = 'Anfrage erfolgreich'
   ): NextResponse<ApiResponse<T[]>> {
     return NextResponse.json({
       success: true,
@@ -144,25 +139,7 @@ export const apiResponse = {
       pagination,
       timestamp: new Date().toISOString(),
     }, { status: 200 });
-  },
-
-  /**
-   * Behandelt einen Fehler und gibt eine passende Antwort zurück
-   */
-  handleError(error: unknown): NextResponse {
-    if (error instanceof ApiError) {
-      return this.error(error.message, error.statusCode, error.errors);
-    }
-    
-    if (error instanceof Error) {
-      return this.error(error.message);
-    }
-    
-    return this.error('An unknown error occurred');
   }
 };
 
-/**
- * Exportiere die Response-Utilities unter einem gemeinsamen Namen
- */
 export default apiResponse;

@@ -1,6 +1,5 @@
 /**
- * Users API-Client
- * Enthält alle Funktionen für Benutzerverwaltung
+ * Users API-Client für Next.js
  */
 import { get, post, put, del, ApiResponse } from './config';
 
@@ -48,8 +47,6 @@ export interface UpdateUserRequest {
   profile?: Partial<UserProfile>;
 }
 
-// Benutzer API-Funktionen
-
 /**
  * Hole alle Benutzer
  */
@@ -61,61 +58,61 @@ export async function getUsers(options: { limit?: number; page?: number; search?
   if (options.search) params.append('search', options.search);
   
   const queryString = params.toString() ? `?${params.toString()}` : '';
-  return get(`/users${queryString}`);
+  return get(`/api/users${queryString}`);
 }
 
 /**
  * Hole einen Benutzer nach ID
  */
 export async function getUser(id: number): Promise<ApiResponse<User>> {
-  return get(`/users/${id}`);
+  return get(`/api/users/${id}`);
 }
 
 /**
  * Hole das Profil des aktuellen Benutzers
  */
 export async function getCurrentUser(): Promise<ApiResponse<User>> {
-  return get('/users/me');
+  return get('/api/users/me');
 }
 
 /**
  * Erstelle einen neuen Benutzer
  */
 export async function createUser(user: CreateUserRequest): Promise<ApiResponse<User>> {
-  return post('/users', user);
+  return post('/api/users', user);
 }
 
 /**
  * Aktualisiere einen Benutzer
  */
 export async function updateUser(id: number, user: UpdateUserRequest): Promise<ApiResponse<User>> {
-  return put(`/users/${id}`, user);
+  return put(`/api/users/${id}`, user);
 }
 
 /**
  * Aktualisiere das Profil des aktuellen Benutzers
  */
 export async function updateCurrentUser(user: UpdateUserRequest): Promise<ApiResponse<User>> {
-  return put('/users/me', user);
+  return put('/api/users/me', user);
 }
 
 /**
  * Lösche einen Benutzer
  */
 export async function deleteUser(id: number): Promise<ApiResponse<{ success: boolean }>> {
-  return del(`/users/${id}`);
+  return del(`/api/users/${id}`);
 }
 
 /**
  * Benutzer aktivieren
  */
 export async function activateUser(id: number): Promise<ApiResponse<User>> {
-  return put(`/users/${id}/activate`, {});
+  return put(`/api/users/${id}/activate`, {});
 }
 
 /**
  * Benutzer deaktivieren
  */
 export async function deactivateUser(id: number): Promise<ApiResponse<User>> {
-  return put(`/users/${id}/deactivate`, {});
+  return put(`/api/users/${id}/deactivate`, {});
 }

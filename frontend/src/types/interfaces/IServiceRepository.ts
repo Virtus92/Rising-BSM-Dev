@@ -1,42 +1,70 @@
-import { Service } from '../entities/Service.js';
-import { IBaseRepository } from './IBaseRepository.js';
-import { ServiceFilterParams } from '../dtos/ServiceDtos.js';
+import { IBaseRepository } from './IBaseRepository';
+import { Service } from '../entities/Service';
+import { ServiceFilterParams } from '../dtos/ServiceDtos';
+import { 
+  PaginatedResult, 
+  OperationOptions,
+  FilterCriteria,
+  ErrorDetails 
+} from '@/types/core/shared';
 
-/**
- * Interface for service repository
- * Extends the base repository with service-specific methods
- */
-export interface IServiceRepository extends IBaseRepository<Service, number> {
+export interface IServiceRepository extends IBaseRepository<Service, number, ServiceFilterParams> {
   /**
-   * Find services by filter parameters
+   * Find services with advanced filtering
    * 
-   * @param filters - Filter parameters
-   * @returns Promise with services and pagination info
+   * @param filters - Complex service filter parameters
+   * @param options - Query options
+   * @returns Paginated service results
    */
-  findServices(filters: ServiceFilterParams): Promise<{ data: Service[]; pagination: any }>;
+  findServices(
+    filters: ServiceFilterParams, 
+    options?: OperationOptions
+  ): Promise<PaginatedResult<Service>>;
   
   /**
    * Find active services
    * 
-   * @param limit - Maximum number of services to return
-   * @returns Promise with services
+   * @param limit - Maximum number of active services to return
+   * @param options - Query options
+   * @returns Active service entities
    */
-  findActive(limit?: number): Promise<Service[]>;
+  findActive(
+    limit?: number, 
+    options?: OperationOptions
+  ): Promise<Service[]>;
   
   /**
    * Toggle service active status
    * 
    * @param id - Service ID
-   * @param active - Active status
-   * @returns Promise with updated service
+   * @param active - New active status
+   * @returns Updated service entity
    */
-  toggleStatus(id: number, active: boolean): Promise<Service>;
+  toggleStatus(
+    id: number, 
+    active: boolean
+  ): Promise<Service>;
   
   /**
-   * Get service statistics
+   * Get comprehensive service statistics
    * 
    * @param serviceId - Service ID
-   * @returns Promise with statistics
+   * @returns Detailed service statistics
    */
-  getStatistics(serviceId: number): Promise<any>;
+  getStatistics(
+    serviceId: number
+  ): Promise<{
+    totalRevenue: number;
+    usageCount: number;
+    averagePrice: number;
+    topCustomers: Array<{
+      customerId: number;
+      customerName: string;
+      revenue: number;
+    }>;
+    monthlyRevenue: Array<{
+      month: string;
+      revenue: number;
+    }>;
+  }>;
 }

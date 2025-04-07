@@ -1,6 +1,5 @@
 /**
- * Auth API-Client
- * Enthält alle Funktionen für Authentifizierung und Autorisierung
+ * Auth API-Client für Next.js
  */
 import { get, post, ApiResponse } from './config';
 
@@ -8,7 +7,7 @@ import { get, post, ApiResponse } from './config';
  * Login mit Benutzername und Passwort
  */
 export async function login(email: string, password: string, remember = false): Promise<ApiResponse<any>> {
-  return post('/auth/login', { email, password, remember });
+  return post('/api/auth/login', { email, password, remember });
 }
 
 /**
@@ -20,28 +19,28 @@ export async function register(userData: {
   password: string;
   passwordConfirm: string;
 }): Promise<ApiResponse<any>> {
-  return post('/auth/register', userData);
+  return post('/api/auth/register', userData);
 }
 
 /**
  * Token-Aktualisierung mit Refresh-Token
  */
 export async function refreshToken(refreshToken: string): Promise<ApiResponse<any>> {
-  return post('/auth/refresh', { refreshToken });
+  return post('/api/auth/refresh', { refreshToken });
 }
 
 /**
  * Passwort vergessen (Anfrage zum Zurücksetzen)
  */
 export async function forgotPassword(email: string): Promise<ApiResponse<any>> {
-  return post('/auth/forgot-password', { email });
+  return post('/api/auth/forgot-password', { email });
 }
 
 /**
  * Passwort zurücksetzen
  */
 export async function resetPassword(token: string, password: string, passwordConfirm: string): Promise<ApiResponse<any>> {
-  return post(`/auth/reset-password/${token}`, { password, passwordConfirm });
+  return post(`/api/auth/reset-password/${token}`, { password, passwordConfirm });
 }
 
 /**
@@ -52,7 +51,7 @@ export async function changePassword(
   newPassword: string,
   newPasswordConfirm: string
 ): Promise<ApiResponse<any>> {
-  return post('/auth/change-password', {
+  return post('/api/auth/change-password', {
     currentPassword,
     newPassword,
     newPasswordConfirm
@@ -63,5 +62,5 @@ export async function changePassword(
  * Benutzer-Logout
  */
 export async function logout(refreshToken?: string): Promise<ApiResponse<any>> {
-  return post('/auth/logout', { refreshToken });
+  return post('/api/auth/logout', { refreshToken });
 }

@@ -1,20 +1,17 @@
 /**
- * API-Konfiguration und Hilfsfunktionen
- * Definiert die grundlegenden Funktionen für API-Anfragen
+ * API-Konfiguration für Next.js
  */
-import { getAccessToken, refreshAccessToken } from '@/lib/auth';
+import { getAccessToken } from '@/lib/auth';
 
-// API-Basis-URL aus der Umgebung oder Standard-URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+// API-URLs werden in Next.js typischerweise relativ definiert
+const API_BASE_URL = '';
 
-// Standard-Request-Optionen
-export const defaultOptions: RequestInit = {
-  headers: {
-    'Content-Type': 'application/json',
-  },
-};
+export interface ApiResponse<T = any> {
+  success: boolean;
+  message: string;
+  data?: T;
+}
 
-// Benutzerdefinierte Fehlerklasse für API-Anfragen
 export class ApiRequestError extends Error {
   statusCode: number;
   errors: string[];
@@ -28,99 +25,66 @@ export class ApiRequestError extends Error {
 }
 
 /**
- * Führt eine API-Anfrage durch
- * 
- * @param endpoint - API-Endpunkt (ohne Basis-URL)
- * @param options - Anfrage-Optionen
- * @returns Antwort als JSON
- * @throws ApiRequestError bei Fehlern
+ * Basis-API-Anfrage Funktion
  */
 export async function fetchApi<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const isAbsoluteUrl = endpoint.startsWith('http');
+  const url = isAbsoluteUrl ? endpoint : `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   
-  // Token aus dem Speicher holen
   const token = getAccessToken();
   
-  // Optionen mit Authentifizierung vorbereiten
   const fetchOptions: RequestInit = {
-    ...defaultOptions,
-    ...options,
     headers: {
-      ...defaultOptions.headers,
-      ...options.headers,
+      'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...options.headers,
     },
+    ...options,
   };
   
   try {
     const response = await fetch(url, fetchOptions);
     
-    // JSON-Antwort parsen
     let data;
     const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
+    if (contentType?.includes('application/json')) {
       data = await response.json();
     } else {
-      // Für Nicht-JSON-Antworten
       const text = await response.text();
       data = { message: text };
     }
     
-    // Fehler behandeln
     if (!response.ok) {
-      const errorMessage = data.message || data.error || 'Unbekannter Fehler';
-      const errorDetails = data.errors || [];
-      
       throw new ApiRequestError(
-        errorMessage,
+        data.message || data.error || 'Anfragefehler',
         response.status,
-        errorDetails
+        data.errors || []
       );
     }
     
-    // Standard-Antwortstruktur
     return {
       success: true,
-      message: data.message || 'Anfrage erfolgreich',
+      message: data.message || 'Erfolg',
       data: data.data || data,
     };
   } catch (error) {
-    // Fehler behandeln
-    if (error instanceof ApiRequestError) {
-      throw error;
-    }
+    if (error instanceof ApiRequestError) throw error;
     
-    // Netzwerkfehler oder andere Fehler
     throw new ApiRequestError(
-      error instanceof Error ? error.message : 'Unbekannter Fehler',
-      0,
-      []
+      error instanceof Error ? error.message : 'Netzwerkfehler',
+      0
     );
   }
 }
 
-/**
- * API-Antwortstruktur
- */
-export interface ApiResponse<T = any> {
-  success: boolean;
-  message: string;
-  data?: T;
-}
-
-/**
- * GET-Anfrage
- */
+// HTTP-Methoden
 export function get<T = any>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
   return fetchApi<T>(endpoint, { ...options, method: 'GET' });
 }
 
-/**
- * POST-Anfrage
- */
 export function post<T = any>(endpoint: string, data: any, options: RequestInit = {}): Promise<ApiResponse<T>> {
   return fetchApi<T>(endpoint, {
     ...options,
@@ -129,9 +93,6 @@ export function post<T = any>(endpoint: string, data: any, options: RequestInit 
   });
 }
 
-/**
- * PUT-Anfrage
- */
 export function put<T = any>(endpoint: string, data: any, options: RequestInit = {}): Promise<ApiResponse<T>> {
   return fetchApi<T>(endpoint, {
     ...options,
@@ -140,16 +101,10 @@ export function put<T = any>(endpoint: string, data: any, options: RequestInit =
   });
 }
 
-/**
- * DELETE-Anfrage
- */
 export function del<T = any>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
   return fetchApi<T>(endpoint, { ...options, method: 'DELETE' });
 }
 
-/**
- * PATCH-Anfrage
- */
 export function patch<T = any>(endpoint: string, data: any, options: RequestInit = {}): Promise<ApiResponse<T>> {
   return fetchApi<T>(endpoint, {
     ...options,

@@ -1,96 +1,125 @@
-import { IBaseRepository } from './IBaseRepository.js';
-import { User } from '../entities/User.js';
-import { UserFilterParams } from '../dtos/UserDtos.js';
-import { QueryOptions } from './IBaseRepository.js';
+import { IBaseRepository } from './IBaseRepository';
+import { User } from '../entities/User';
+import { UserFilterParams } from '../dtos/UserDtos';
+import { 
+  PaginatedResult, 
+  FilterCriteria, 
+  OperationOptions,
+  ErrorDetails 
+} from '@/types/core/shared';
 
 /**
- * IUserRepository
- * 
- * Repository interface for User entity operations.
- * Extends the base repository interface with user-specific methods.
+ * User Repository Interface
+ * Defines low-level data access operations for user entities
  */
-export interface IUserRepository extends IBaseRepository<User, number> {
+export interface IUserRepository extends IBaseRepository<User, number, UserFilterParams> {
   /**
-   * Find a user by name or email
+   * Find user by username or unique identifier
    * 
-   * @param name - name to search for
-   * @returns Promise with user or null if not found
-   */
-  findByName(name: string): Promise<User | null>;
-  
-  /**
-   * Find a user by email
-   * 
-   * @param email - Email to search for
-   * @returns Promise with user or null if not found
-   */
-  findByEmail(email: string): Promise<User | null>;
-  
-  /**
-   * Find users with advanced filtering
-   * 
-   * @param filters - Filter parameters
-   * @returns Promise with users and pagination info
-   */
-  findUsers(filters: UserFilterParams): Promise<{ data: User[]; pagination: any }>;
-  
-  /**
-   * Search users by name or email
-   * 
-   * @param searchText - Search text
+   * @param identifier - Username or identifier
    * @param options - Query options
-   * @returns Promise with matching users
+   * @returns User entity or null
    */
-  searchUsers(searchText: string, options?: QueryOptions): Promise<User[]>;
+  findByName(
+    identifier: string, 
+    options?: OperationOptions
+  ): Promise<User | null>;
+  
+  /**
+   * Find user by email address
+   * 
+   * @param email - User email
+   * @param options - Query options
+   * @returns User entity or null
+   */
+  findByEmail(
+    email: string, 
+    options?: OperationOptions
+  ): Promise<User | null>;
+  
+  /**
+   * Advanced user search with comprehensive filtering
+   * 
+   * @param filters - Complex user filter parameters
+   * @param options - Query options
+   * @returns Paginated user results
+   */
+  findUsers(
+    filters: UserFilterParams, 
+    options?: OperationOptions
+  ): Promise<PaginatedResult<User>>;
+  
+  /**
+   * Search users by text query
+   * 
+   * @param searchText - Search query
+   * @param options - Query options
+   * @returns Matching user entities
+   */
+  searchUsers(
+    searchText: string, 
+    options?: OperationOptions
+  ): Promise<User[]>;
   
   /**
    * Update user password
    * 
    * @param userId - User ID
-   * @param hashedPassword - New hashed password
-   * @returns Promise with updated user
+   * @param hashedPassword - New bcrypt-hashed password
+   * @returns Updated user entity
+   * @throws {ErrorDetails} When password update fails
    */
-  updatePassword(userId: number, hashedPassword: string): Promise<User>;
+  updatePassword(
+    userId: number, 
+    hashedPassword: string
+  ): Promise<User>;
   
   /**
-   * Get user activity history
+   * Retrieve user activity log
    * 
    * @param userId - User ID
    * @param limit - Maximum number of activities to return
-   * @returns Promise with activity history
+   * @returns User activity records
    */
-  getUserActivity(userId: number, limit?: number): Promise<any[]>;
+  getUserActivity(
+    userId: number, 
+    limit?: number
+  ): Promise<Array<{
+    id: number;
+    type: string;
+    timestamp: Date;
+    details?: string;
+  }>>;
   
   /**
-   * Log user activity
+   * Log user-related activity
    * 
    * @param userId - User ID
-   * @param activityType - Activity type
-   * @param details - Activity details
-   * @param ipAddress - IP address
-   * @returns Promise with created activity
+   * @param activityType - Type of activity
+   * @param details - Optional activity details
+   * @param ipAddress - Client IP address
+   * @returns Created activity record
    */
   logActivity(
     userId: number, 
     activityType: string, 
     details?: string,
     ipAddress?: string
-  ): Promise<any>;
-  
-  /**
-   * Bulk update multiple users
-   * 
-   * @param ids - Array of user IDs
-   * @param data - Update data
-   * @returns Promise with count of updated users
-   */
-  bulkUpdate(ids: number[], data: Partial<User>): Promise<number>;
+  ): Promise<{
+    id: number;
+    userId: number;
+    type: string;
+    details?: string;
+    ipAddress?: string;
+    timestamp: Date;
+  }>;
 
   /**
-   * Permanently delete a user from the database
+   * Permanently remove user from system
    * 
-   * @param userId - User ID
-   * @returns Promise indicating success
+   * @param userId - User ID to delete
+   * @returns Success indicator
+   * @throws {ErrorDetails} When deletion fails
    */
   hardDelete(userId: number): Promise<boolean>;
 }

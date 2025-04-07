@@ -1,76 +1,106 @@
-import { IBaseRepository } from './IBaseRepository.js';
-import { Customer } from '../entities/Customer.js';
-import { CustomerFilterParams } from '../dtos/CustomerDtos.js';
+import { IBaseRepository } from './IBaseRepository';
+import { Customer } from '../entities/customer/customer';
+import { CustomerFilterParams } from '../dtos/customer-dto';
+import { 
+  PaginatedResult, 
+  OperationOptions,
+  FilterCriteria,
+  ErrorDetails 
+} from '@/types/core/shared';
 
-/**
- * ICustomerRepository
- * 
- * Repository interface for Customer entity operations.
- * Extends the base repository interface with customer-specific methods.
- */
-export interface ICustomerRepository extends IBaseRepository<Customer, number> {
+export interface ICustomerRepository extends IBaseRepository<Customer, number, CustomerFilterParams> {
   /**
-   * Find customers with similar attributes
+   * Find customers similar to a given customer
    * 
-   * @param customerId - Customer ID
-   * @param limit - Maximum number of customers to return
-   * @returns Promise with similar customers
+   * @param customerId - Base customer ID
+   * @param limit - Maximum number of similar customers
+   * @returns Similar customer entities
    */
-  findSimilarCustomers(customerId: number, limit?: number): Promise<Customer[]>;
+  findSimilarCustomers(
+    customerId: number, 
+    limit?: number
+  ): Promise<Customer[]>;
   
   /**
-   * Search customers with advanced filtering
+   * Advanced customer search
    * 
    * @param term - Search term
-   * @param limit - Maximum number of customers to return
-   * @returns Promise with matching customers
+   * @param limit - Maximum number of results
+   * @returns Matching customer entities
    */
-  searchCustomers(term: string, limit?: number): Promise<Customer[]>;
+  searchCustomers(
+    term: string, 
+    limit?: number
+  ): Promise<Customer[]>;
   
   /**
-   * Bulk update multiple customers
+   * Find customers with advanced filtering
    * 
-   * @param ids - Array of customer IDs
-   * @param data - Update data
-   * @returns Promise with count of updated customers
+   * @param filters - Complex customer filter parameters
+   * @param options - Query options
+   * @returns Paginated customer results
    */
-  bulkUpdate(ids: number[], data: Partial<Customer>): Promise<number>;
+  findUsers(
+    filters: CustomerFilterParams, 
+    options?: OperationOptions
+  ): Promise<PaginatedResult<Customer>>;
   
   /**
-   * Get customer by ID with related data
+   * Retrieve customer with detailed relations
    * 
    * @param id - Customer ID
    * @param options - Query options
-   * @returns Promise with customer including related data
+   * @returns Customer entity with related data or null
    */
-  findByIdWithRelations(id: number, options?: any): Promise<Customer | null>;
+  findByIdWithRelations(
+    id: number, 
+    options?: OperationOptions
+  ): Promise<Customer | null>;
 
   /**
    * Create a customer log entry
    * 
    * @param data - Log data
-   * @returns Promise with created log
+   * @returns Created log entry
    */
-  createCustomerLog(data: {
+  createCustomerLog(
+    data: {
+      customerId: number;
+      userId?: number;
+      action: string;
+      details?: string;
+    }
+  ): Promise<{
+    id: number;
     customerId: number;
     userId?: number;
     action: string;
     details?: string;
-  }): Promise<any>;
+    createdAt: Date;
+  }>;
 
   /**
-   * Hard delete a customer (permanently removes from database)
+   * Permanently remove customer from database
    * 
    * @param id - Customer ID
-   * @returns Promise with deletion result
+   * @returns Deletion result
    */
-  hardDelete(id: number): Promise<any>;
+  hardDelete(id: number): Promise<boolean>;
 
   /**
-   * Get customer logs
+   * Retrieve customer logs
    * 
    * @param customerId - Customer ID
-   * @returns Promise with customer logs
+   * @returns Customer log entries
    */
-  getCustomerLogs(customerId: number): Promise<any[]>;
+  getCustomerLogs(
+    customerId: number
+  ): Promise<Array<{
+    id: number;
+    customerId: number;
+    userId?: number;
+    action: string;
+    details?: string;
+    createdAt: Date;
+  }>>;
 }

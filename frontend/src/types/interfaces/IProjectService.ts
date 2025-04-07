@@ -1,5 +1,5 @@
-import { IBaseService, ServiceOptions, PaginatedResult } from './IBaseService.js';
-import { Project } from '../entities/Project.js';
+import { IBaseService } from './IBaseService';
+import { Project } from '../entities/Project';
 import { 
   ProjectCreateDto, 
   ProjectUpdateDto, 
@@ -9,104 +9,146 @@ import {
   ProjectNoteDto,
   ProjectFilterParams,
   ProjectStatisticsDto
-} from '../dtos/ProjectDtos.js';
+} from '../dtos/ProjectDtos';
+import { PaginatedResult, OperationOptions, FilterCriteria, ErrorDetails } from '@/types/core/shared';
+import { AuthContext } from '@/types/core/auth';
 
-/**
- * Interface for project service
- * Extends the base service with project-specific methods
- */
-export interface IProjectService extends IBaseService<Project, ProjectCreateDto, ProjectUpdateDto, ProjectResponseDto> {
+export interface IProjectService extends IBaseService<
+  Project, 
+  ProjectCreateDto, 
+  ProjectUpdateDto, 
+  ProjectResponseDto
+> {
   /**
-   * Get detailed project information
+   * Retrieve detailed project information
    * 
    * @param id - Project ID
-   * @param options - Service options
-   * @returns Promise with detailed project response
+   * @param options - Operation options with optional auth context
+   * @returns Detailed project response or null
+   * @throws {ErrorDetails} When retrieval fails
    */
-  getProjectDetails(id: number, options?: ServiceOptions): Promise<ProjectDetailResponseDto | null>;
+  getProjectDetails(
+    id: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ProjectDetailResponseDto | null>;
   
   /**
-   * Find projects with filtering
+   * Advanced project search with comprehensive filtering
    * 
-   * @param filters - Filter parameters
-   * @returns Promise with projects and pagination info
+   * @param filters - Complex project filter parameters
+   * @param options - Operation options
+   * @returns Paginated project results
    */
-  findProjects(filters: ProjectFilterParams): Promise<PaginatedResult<ProjectResponseDto>>;
+  findProjects(
+    filters: ProjectFilterParams, 
+    options?: OperationOptions
+  ): Promise<PaginatedResult<ProjectResponseDto>>;
   
   /**
-   * Find projects for a customer
+   * Find projects for a specific customer
    * 
    * @param customerId - Customer ID
-   * @param options - Service options
-   * @returns Promise with projects
+   * @param options - Operation options with optional auth context
+   * @returns Project responses
    */
-  findByCustomer(customerId: number, options?: ServiceOptions): Promise<ProjectResponseDto[]>;
+  findByCustomer(
+    customerId: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ProjectResponseDto[]>;
   
   /**
-   * Find projects for a service
+   * Find projects for a specific service
    * 
    * @param serviceId - Service ID
-   * @param options - Service options
-   * @returns Promise with projects
+   * @param options - Operation options with optional auth context
+   * @returns Project responses
    */
-  findByService(serviceId: number, options?: ServiceOptions): Promise<ProjectResponseDto[]>;
+  findByService(
+    serviceId: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ProjectResponseDto[]>;
   
   /**
    * Find active projects
    * 
-   * @param limit - Maximum number of projects to return
-   * @param options - Service options
-   * @returns Promise with projects
+   * @param limit - Maximum number of active projects to return
+   * @param options - Operation options with optional auth context
+   * @returns Active project responses
    */
-  findActive(limit?: number, options?: ServiceOptions): Promise<ProjectResponseDto[]>;
+  findActive(
+    limit?: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ProjectResponseDto[]>;
   
   /**
    * Update project status
    * 
    * @param id - Project ID
-   * @param statusData - Status update data
-   * @param options - Service options
-   * @returns Promise with updated project
+   * @param statusData - Status update details
+   * @param options - Operation options with auth context
+   * @returns Updated project response
+   * @throws {ErrorDetails} When status update fails
    */
-  updateStatus(id: number, statusData: ProjectStatusUpdateDto, options?: ServiceOptions): Promise<ProjectResponseDto>;
+  updateStatus(
+    id: number, 
+    statusData: ProjectStatusUpdateDto, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ProjectResponseDto>;
   
   /**
-   * Add note to project
+   * Add a note to a project
    * 
    * @param id - Project ID
    * @param note - Note text
-   * @param userId - User ID
-   * @param userName - User name
-   * @param options - Service options
-   * @returns Promise with created note
+   * @param userId - User adding the note
+   * @param userName - Name of user adding the note
+   * @param options - Operation options with auth context
+   * @returns Created project note
+   * @throws {ErrorDetails} When note addition fails
    */
-  addNote(id: number, note: string, userId: number, userName: string, options?: ServiceOptions): Promise<ProjectNoteDto>;
+  addNote(
+    id: number, 
+    note: string, 
+    userId: number, 
+    userName: string, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ProjectNoteDto>;
   
   /**
-   * Get project notes
+   * Retrieve project notes
    * 
    * @param id - Project ID
-   * @param options - Service options
-   * @returns Promise with notes
+   * @param options - Operation options with optional auth context
+   * @returns Project notes
    */
-  getNotes(id: number, options?: ServiceOptions): Promise<ProjectNoteDto[]>;
+  getNotes(
+    id: number, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ProjectNoteDto[]>;
   
   /**
-   * Get project statistics
+   * Get comprehensive project statistics
    * 
    * @param filters - Optional filter parameters
-   * @param options - Service options
-   * @returns Promise with statistics
+   * @param options - Operation options with auth context
+   * @returns Project statistics
    */
-  getProjectStatistics(filters?: Partial<ProjectFilterParams>, options?: ServiceOptions): Promise<ProjectStatisticsDto>;
+  getProjectStatistics(
+    filters?: Partial<ProjectFilterParams>, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<ProjectStatisticsDto>;
   
   /**
-   * Export projects to file
+   * Export project data
    * 
-   * @param format - Export format (csv or excel)
-   * @param filters - Filter parameters
-   * @param options - Service options
-   * @returns Promise with export data
+   * @param format - Export format
+   * @param filters - Optional filter parameters
+   * @param options - Operation options with auth context
+   * @returns Exported data buffer and filename
    */
-  exportData(format: 'csv' | 'excel', filters?: ProjectFilterParams, options?: ServiceOptions): Promise<{ buffer: Buffer; filename: string }>;
+  exportData(
+    format: 'csv' | 'excel', 
+    filters?: ProjectFilterParams, 
+    options?: OperationOptions & { authContext?: AuthContext }
+  ): Promise<{ buffer: Buffer; filename: string }>;
 }

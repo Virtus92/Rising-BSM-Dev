@@ -1,3 +1,5 @@
+import { PaginatedResult, FilterCriteria, OperationOptions, SortOptions } from '@/types/core/shared';
+
 /**
  * IBaseRepository
  * 
@@ -6,8 +8,9 @@
  * 
  * @template T - Entity type
  * @template ID - Primary key type (default: number)
+ * @template FilterType - Type for filter criteria
  */
-export interface IBaseRepository<T, ID = number> {
+export interface IBaseRepository<T, ID = number, FilterType = Record<string, any>> {
     /**
      * Bulk update multiple entities
      * 
@@ -39,7 +42,7 @@ export interface IBaseRepository<T, ID = number> {
      * @param options - Query options like pagination, sorting, etc.
      * @returns Promise containing array of entities and pagination metadata
      */
-    findAll(options?: QueryOptions): Promise<PaginatedResult<T>>;
+    findAll(options?: OperationOptions): Promise<PaginatedResult<T>>;
     
     /**
      * Find an entity by its ID
@@ -48,7 +51,7 @@ export interface IBaseRepository<T, ID = number> {
      * @param options - Additional query options
      * @returns Promise containing the found entity or null if not found
      */
-    findById(id: ID, options?: QueryOptions): Promise<T | null>;
+    findById(id: ID, options?: OperationOptions): Promise<T | null>;
     
     /**
      * Find entities based on specific criteria
@@ -57,7 +60,7 @@ export interface IBaseRepository<T, ID = number> {
      * @param options - Additional query options
      * @returns Promise containing array of matching entities
      */
-    findByCriteria(criteria: FilterCriteria, options?: QueryOptions): Promise<T[]>;
+    findByCriteria(criteria: FilterCriteria<FilterType>, options?: OperationOptions): Promise<T[]>;
     
     /**
      * Find a single entity based on specific criteria
@@ -66,7 +69,7 @@ export interface IBaseRepository<T, ID = number> {
      * @param options - Additional query options
      * @returns Promise containing the found entity or null if not found
      */
-    findOneByCriteria(criteria: FilterCriteria, options?: QueryOptions): Promise<T | null>;
+    findOneByCriteria(criteria: FilterCriteria<FilterType>, options?: OperationOptions): Promise<T | null>;
     
     /**
      * Create a new entity
@@ -99,7 +102,7 @@ export interface IBaseRepository<T, ID = number> {
      * @param criteria - Filter criteria
      * @returns Promise containing the count
      */
-    count(criteria?: FilterCriteria): Promise<number>;
+    count(criteria?: FilterCriteria<FilterType>): Promise<number>;
     
     /**
      * Executes operations within a transaction
@@ -108,101 +111,4 @@ export interface IBaseRepository<T, ID = number> {
      * @returns Promise containing the result of the transaction
      */
     transaction<R>(callback: (repository: IBaseRepository<T, ID>) => Promise<R>): Promise<R>;
-  }
-  
-  /**
-   * Query options for repository operations
-   */
-  export interface QueryOptions {
-    /**
-     * Page number (1-indexed)
-     */
-    page?: number;
-    
-    /**
-     * Number of items per page
-     */
-    limit?: number;
-    
-    /**
-     * Fields to select/include
-     */
-    select?: string[];
-    
-    /**
-     * Related entities to include
-     */
-    relations?: string[];
-    
-    /**
-     * Sorting options
-     */
-    sort?: SortOptions;
-    
-    /**
-     * Whether to include soft-deleted items
-     */
-    withDeleted?: boolean;
-    
-    /**
-     * Additional operation-specific options
-     */
-    [key: string]: any;
-  }
-  
-  /**
-   * Sorting options
-   */
-  export interface SortOptions {
-    /**
-     * Field to sort by
-     */
-    field: string;
-    
-    /**
-     * Sort direction
-     */
-    direction: 'ASC' | 'DESC';
-  }
-
-  
-  
-  /**
-   * Pagination result
-   */
-  export interface PaginatedResult<T> {
-    /**
-     * Array of items
-     */
-    data: T[];
-    
-    /**
-     * Pagination metadata
-     */
-    pagination: {
-      /**
-       * Current page
-       */
-      page: number;
-      
-      /**
-       * Items per page
-       */
-      limit: number;
-      
-      /**
-       * Total number of items
-       */
-      total: number;
-      
-      /**
-       * Total number of pages
-       */
-      totalPages: number;
-    };
-  }
-  
-  /**
-   * Filter criteria type for queries
-   */
-  export type FilterCriteria = Record<string, any>;
+}

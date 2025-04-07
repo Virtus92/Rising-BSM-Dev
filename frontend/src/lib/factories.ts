@@ -2,30 +2,30 @@
  * Service and Repository Factories
  * 
  * Diese Datei bietet ein optimiertes Factory-System für Service- und Repository-Instanzen
- * mit Dependency Injection und wiederverwendet zentrale Dienste aus dem Bootstrap-System.
+ * mit Dependency Injection für die Next.js Anwendung.
  */
 import { prisma } from './db';
 import { getLogger, getErrorHandler, getValidationService } from './core/bootstrap';
 
 // Repositories
-import { UserRepository } from '../repositories/UserRepository';
-import { CustomerRepository } from '../repositories/CustomerRepository';
-import { ProjectRepository } from '../repositories/ProjectRepository';
-import { ServiceRepository } from '../repositories/ServiceRepository';
-import { AppointmentRepository } from '../repositories/AppointmentRepository';
-import { NotificationRepository } from '../repositories/NotificationRepository';
-import { RequestRepository } from '../repositories/RequestRepository';
-import { RefreshTokenRepository } from '../repositories/RefreshTokenRepository';
+import { UserRepository } from './repositories/UserRepository';
+import { CustomerRepository } from './repositories/CustomerRepository';
+import { ProjectRepository } from './repositories/ProjectRepository';
+import { ServiceRepository } from './repositories/ServiceRepository';
+import { AppointmentRepository } from './repositories/AppointmentRepository';
+import { NotificationRepository } from './repositories/NotificationRepository';
+import { RequestRepository } from './repositories/RequestRepository';
+import { RefreshTokenRepository } from './repositories/RefreshTokenRepository';
 
 // Services
-import { UserService } from '../services/UserService';
-import { AuthService } from '../services/AuthService';
-import { CustomerService } from '../services/CustomerService';
-import { ProjectService } from '../services/ProjectService';
-import { ServiceService } from '../services/ServiceService';
-import { AppointmentService } from '../services/AppointmentService';
-import { NotificationService } from '../services/NotificationService';
-import { RequestService } from '../services/RequestService';
+import { UserService } from './services/UserService';
+import { AuthService } from './services/AuthService';
+import { CustomerService } from './services/CustomerService';
+import { ProjectService } from './services/ProjectService';
+import { ServiceService } from './services/ServiceService';
+import { AppointmentService } from './services/AppointmentService';
+import { NotificationService } from './services/NotificationService';
+import { RequestService } from './services/RequestService';
 
 // Singleton-Instanzen für Repositories
 let userRepository: UserRepository;

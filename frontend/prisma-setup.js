@@ -1,6 +1,17 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const dotenv = require('dotenv');
+
+// Lade Umgebungsvariablen aus dem Root-Verzeichnis
+const rootEnvPath = path.resolve(__dirname, '../.env');
+if (fs.existsSync(rootEnvPath)) {
+  console.log(`Loading environment variables from root .env file`);
+  dotenv.config({ path: rootEnvPath });
+} else {
+  console.log(`No root .env file found, using process environment variables`);
+  dotenv.config();
+}
 
 // Colors for console output
 const colors = {

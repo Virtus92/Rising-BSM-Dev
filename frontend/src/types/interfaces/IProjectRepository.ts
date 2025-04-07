@@ -1,70 +1,114 @@
-import { Project } from '../entities/Project.js';
-import { IBaseRepository } from './IBaseRepository.js';
-import { ProjectFilterParams } from '../dtos/ProjectDtos.js';
+import { IBaseRepository } from './IBaseRepository';
+import { Project } from '../entities/Project';
+import { ProjectFilterParams } from '../dtos/ProjectDtos';
+import { 
+  PaginatedResult, 
+  OperationOptions,
+  FilterCriteria,
+  ErrorDetails 
+} from '@/types/core/shared';
 
-/**
- * Interface for project repository
- * Extends the base repository with project-specific methods
- */
-export interface IProjectRepository extends IBaseRepository<Project, number> {
+export interface IProjectRepository extends IBaseRepository<Project, number, ProjectFilterParams> {
   /**
-   * Find projects by filter parameters
+   * Find projects with advanced filtering
    * 
-   * @param filters - Filter parameters
-   * @returns Promise with projects and pagination info
+   * @param filters - Complex project filter parameters
+   * @param options - Query options
+   * @returns Paginated project results
    */
-  findProjects(filters: ProjectFilterParams): Promise<{ data: Project[]; pagination: any }>;
+  findProjects(
+    filters: ProjectFilterParams, 
+    options?: OperationOptions
+  ): Promise<PaginatedResult<Project>>;
   
   /**
-   * Find projects for a customer
+   * Find projects for a specific customer
    * 
    * @param customerId - Customer ID
-   * @returns Promise with projects
+   * @param options - Query options
+   * @returns Project entities
    */
-  findByCustomer(customerId: number): Promise<Project[]>;
+  findByCustomer(
+    customerId: number, 
+    options?: OperationOptions
+  ): Promise<Project[]>;
   
   /**
-   * Find projects for a service
+   * Find projects for a specific service
    * 
    * @param serviceId - Service ID
-   * @returns Promise with projects
+   * @param options - Query options
+   * @returns Project entities
    */
-  findByService(serviceId: number): Promise<Project[]>;
+  findByService(
+    serviceId: number, 
+    options?: OperationOptions
+  ): Promise<Project[]>;
   
   /**
    * Find active projects
    * 
-   * @param limit - Maximum number of projects to return
-   * @returns Promise with projects
+   * @param limit - Maximum number of active projects to return
+   * @param options - Query options
+   * @returns Active project entities
    */
-  findActive(limit?: number): Promise<Project[]>;
+  findActive(
+    limit?: number, 
+    options?: OperationOptions
+  ): Promise<Project[]>;
   
   /**
-   * Get project with detailed relations
+   * Retrieve project with detailed relations
    * 
    * @param id - Project ID
-   * @returns Promise with project including all related data
+   * @param options - Query options
+   * @returns Project entity with all related data or null
    */
-  findByIdWithDetails(id: number): Promise<Project | null>;
+  findByIdWithDetails(
+    id: number, 
+    options?: OperationOptions
+  ): Promise<Project | null>;
   
   /**
    * Add a note to a project
    * 
    * @param projectId - Project ID
-   * @param userId - User ID
-   * @param userName - User name
+   * @param userId - User adding the note
+   * @param userName - Name of user adding the note
    * @param text - Note text
-   * @returns Promise with created note
+   * @returns Created note
+   * @throws {ErrorDetails} When note addition fails
    */
-  addNote(projectId: number, userId: number, userName: string, text: string): Promise<any>;
+  addNote(
+    projectId: number, 
+    userId: number, 
+    userName: string, 
+    text: string
+  ): Promise<{
+    id: number;
+    projectId: number;
+    userId: number;
+    userName: string;
+    text: string;
+    createdAt: Date;
+  }>;
   
   /**
-   * Get all notes for a project
+   * Retrieve project notes
    * 
    * @param projectId - Project ID
-   * @returns Promise with notes
+   * @returns Project notes
    */
-  getNotes(projectId: number): Promise<any[]>;
+  getNotes(
+    projectId: number
+  ): Promise<Array<{
+    id: number;
+    projectId: number;
+    userId: number;
+    userName: string;
+    text: string;
+    createdAt: Date;
+  }>>;
   
   /**
    * Log activity for a project
@@ -74,15 +118,43 @@ export interface IProjectRepository extends IBaseRepository<Project, number> {
    * @param userName - User name
    * @param action - Activity type
    * @param details - Activity details
-   * @returns Promise with created activity log
+   * @returns Created activity log
    */
-  logActivity(projectId: number, userId: number, userName: string, action: string, details?: string): Promise<any>;
+  logActivity(
+    projectId: number, 
+    userId: number, 
+    userName: string, 
+    action: string, 
+    details?: string
+  ): Promise<{
+    id: number;
+    projectId: number;
+    userId: number;
+    userName: string;
+    action: string;
+    details?: string;
+    createdAt: Date;
+  }>;
   
   /**
    * Get project statistics
    * 
    * @param filters - Optional filter parameters
-   * @returns Promise with statistics
+   * @returns Project statistics
    */
-  getStatistics(filters?: Partial<ProjectFilterParams>): Promise<any>;
+  getStatistics(
+    filters?: Partial<ProjectFilterParams>
+  ): Promise<{
+    totalProjects: number;
+    activeProjects: number;
+    completedProjects: number;
+    averageProjectValue: number;
+    projectsByStatus: Record<string, number>;
+    topCustomers: Array<{
+      customerId: number;
+      customerName: string;
+      projectCount: number;
+      totalValue: number;
+    }>;
+  }>;
 }
