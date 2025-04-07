@@ -1,31 +1,132 @@
 import { 
-    IErrorHandler, 
-    AppError, 
-    ValidationError, 
-    NotFoundError, 
-    UnauthorizedError, 
-    ForbiddenError,
-    ErrorResponse 
-  } from '../../types/interfaces/IErrorHandler.js';
-  import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
-  
+  IErrorHandler, 
+  AppError, 
+  ValidationError, 
+  NotFoundError, 
+  UnauthorizedError, 
+  ForbiddenError,
+  ErrorResponse,
+  BadRequestError,
+  ConflictError
+} from '../../types/interfaces/IErrorHandler.js';
+import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
+
+/**
+ * ErrorHandler
+ * 
+ * Implementation of IErrorHandler that provides standardized error handling.
+ * Transforms various error types into consistent API responses.
+ */
+export class ErrorHandler implements IErrorHandler {
   /**
-   * ErrorHandler
+   * Creates a new ErrorHandler instance
    * 
-   * Implementation of IErrorHandler that provides standardized error handling.
-   * Transforms various error types into consistent API responses.
+   * @param logger - Logging service
+   * @param showStackTraces - Whether to include stack traces in error responses (defaults to false in production)
    */
-  export class ErrorHandler implements IErrorHandler {
-    /**
-     * Creates a new ErrorHandler instance
-     * 
-     * @param logger - Logging service
-     * @param showStackTraces - Whether to include stack traces in error responses (defaults to false in production)
-     */
-    constructor(
-      private readonly logger: ILoggingService,
-      private readonly showStackTraces: boolean = process.env.NODE_ENV !== 'production'
-    ) {}
+  constructor(
+    private readonly logger: ILoggingService,
+    private readonly showStackTraces: boolean = process.env.NODE_ENV !== 'production'
+  ) {}
+
+  /**
+   * Create a conflict error for resource conflicts
+   * 
+   * @param message - Error message
+   * @returns ConflictError instance
+   */
+  createConflictError(message: string): ConflictError {
+    return new ConflictError(message);
+  }
+
+  /**
+   * Create a bad request error for invalid input
+   * 
+   * @param message - Error message
+   * @returns BadRequestError instance
+   */
+  createBadRequestError(message: string): BadRequestError {
+    return new BadRequestError(message);
+  }
+
+  /**
+   * Handle database-specific errors and convert to appropriate AppError types
+   * 
+   * @param error - Database error
+   * @returns Mapped AppError
+   */
+  handleDatabaseError(error: any): AppError {
+    // Check for common database error patterns
+    const errorMessage = error.message || 'Database error occurred';
+    
+    // Duplicate key/unique constraint violation
+    if (
+      error.code === '23505' || // PostgreSQL unique violation
+      error.errno === 1062 ||   // MySQL duplicate entry
+      errorMessage.includes('duplicate key') ||
+      errorMessage.includes('unique constraint')
+    ) {
+      return this.createConflictError('Resource already exists');
+    }
+    
+    // Foreign key constraint failure
+    if (
+      error.code === '23503' || // PostgreSQL foreign key violation
+      error.errno === 1452 ||   // MySQL foreign key constraint fails
+      errorMessage.includes('foreign key constraint')
+    ) {
+      return this.createBadRequestError('Referenced resource does not exist');
+    }
+    
+    // Default to internal server error
+    this.logger.error('Unhandled database error', error);
+    return this.createError(
+      'A database error occurred',
+      500,
+      'database_error',
+      this.showStackTraces ? error : undefined
+    );
+  }
+
+  /**
+   * Map any error to an appropriate AppError
+   * 
+   * @param error - Any error object
+   * @returns Mapped AppError
+   */
+  mapError(error: any): AppError {
+    // Already an AppError - return as is
+    if (error instanceof AppError) {
+      return error;
+    }
+    
+    // Handle database errors
+    if (
+      error.code?.startsWith('23') || // PostgreSQL error codes
+      error.errno || // MySQL error numbers
+      error.name === 'SequelizeError' ||
+      error.name === 'MongoError'
+    ) {
+      return this.handleDatabaseError(error);
+    }
+    
+    // Handle HTTP-like errors with status codes
+    if (error.statusCode || error.status) {
+      const statusCode = error.statusCode || error.status;
+      const message = error.message || 'An error occurred';
+      const errorCode = error.code || `error_${statusCode}`;
+      
+      return this.createError(message, statusCode, errorCode, error.details);
+    }
+    
+    // Default case: wrap in a generic AppError
+    return this.createError(
+      error.message || 'An unexpected error occurred',
+      500,
+      'internal_error',
+      this.showStackTraces ? error : undefined
+    );
+  }
   
     /**
      * Handle an error and generate an appropriate response

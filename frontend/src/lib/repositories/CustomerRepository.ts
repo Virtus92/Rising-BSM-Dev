@@ -17,6 +17,7 @@ export class CustomerRepository extends BaseRepository<ICustomer, number> {
    * @param errorHandler - Error handler
    */
   constructor(
+    
     logger: ILoggingService,
     errorHandler: IErrorHandler
   ) {

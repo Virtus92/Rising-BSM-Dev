@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { toast as sonnerToast, Toast } from 'sonner';
+import { toast as sonnerToast } from 'sonner';
 
 type ToastVariant = 'default' | 'success' | 'error' | 'warning' | 'info';
 
@@ -70,7 +70,6 @@ export function useToast() {
       position: position as any,
       ...sonnerVariant,
       id,
-      important,
       onDismiss,
       action: action ? {
         label: action.label,

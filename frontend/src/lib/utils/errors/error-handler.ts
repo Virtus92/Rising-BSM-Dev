@@ -26,7 +26,68 @@ export class ErrorHandler implements IErrorHandler {
     private readonly logger: ILoggingService,
     private readonly showStackTraces: boolean = process.env.NODE_ENV !== 'production'
   ) {}
+  /**
+   * Create a bad request error
+   * 
+   * @param message - Error message
+   * @returns BadRequestError
+   */
+  createBadRequestError(message: string): BadRequestError {
+    const error = new BadRequestError(message);
+    
+    // Log bad request error creation
+    this.logger.debug('Created bad request error', {
+      message: error.message
+    });
+    
+    return error;
+  }
 
+  /**
+   * Handle any error by logging and formatting it
+   * 
+   * @param error - Any error to handle
+   * @param req - Optional request object for context
+   * @param res - Optional response object
+   * @returns Formatted error response
+   */
+  handleError(error: any, req?: any): ErrorResponse {
+    // Map the error to an AppError type
+    const appError = this.mapError(error);
+    
+    // Log the error with context
+    const logContext = {
+      statusCode: appError.statusCode,
+      path: req?.path || 'unknown',
+      method: req?.method || 'unknown',
+      ...(this.showStackTraces && appError.stack ? { stack: appError.stack } : {})
+    };
+    
+    this.logger.error(appError.message, logContext);
+    
+    // Format and return the error response
+    return this.formatError(appError);
+  }
+
+  /**
+   * Format an error into a consistent response structure
+   * 
+   * @param error - Error to format
+   * @returns Structured error response
+   */
+  formatError(error: any): ErrorResponse {
+    const appError = error instanceof AppError ? error : this.mapError(error);
+    
+    return {
+      success: false,
+      errors: [{
+        message: appError.message,
+        statusCode: appError.statusCode,
+        ...(appError instanceof ValidationError ? { validationErrors: appError.errors } : {}),
+        ...(this.showStackTraces && appError.stack ? { stack: appError.stack } : {})
+      }]
+    };
+  }
   /**
    * Create a general error
    * 
@@ -41,8 +102,7 @@ export class ErrorHandler implements IErrorHandler {
     this.logger.debug('Created application error', {
       type: error.constructor.name,
       message: error.message,
-      statusCode: error.statusCode,
-      code: error.code
+      statusCode: error.statusCode
     });
     
     return error;

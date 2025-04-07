@@ -153,36 +153,31 @@ export const apiResponse = {
     // Fehler durch ErrorHandler aufbereiten lassen
     const errorResponse = errorHandler.formatError(error);
     
-    // Status-Code aus der Fehlerantwort extrahieren
-    const statusCode = errorResponse.statusCode || 500;
+    // Fehlerinformationen extrahieren
+    const firstError = errorResponse.errors && errorResponse.errors[0];
+    const statusCode = firstError?.statusCode || 500;
+    const message = firstError?.message || 'Ein unerwarteter Fehler ist aufgetreten';
+    const validationErrors = firstError?.validationErrors || [];
     
-    // Anhand der Fehlerart die richtige Antwort generieren
+    // Typbasierte Antwort generieren
     if (error instanceof ValidationError) {
-      return this.validationError(errorResponse.message, errorResponse.errors || []);
+      return this.validationError(message, validationErrors);
     }
     
     if (error instanceof NotFoundError) {
-      return this.notFound(errorResponse.message);
+      return this.notFound(message);
     }
     
     if (error instanceof UnauthorizedError) {
-      return this.unauthorized(errorResponse.message);
+      return this.unauthorized(message);
     }
     
     if (error instanceof ForbiddenError) {
-      return this.forbidden(errorResponse.message);
-    }
-    
-    if (error instanceof AppError) {
-      return this.error(errorResponse.message, statusCode, errorResponse.errors || []);
+      return this.forbidden(message);
     }
     
     // Allgemeiner Fehler
-    return this.error(
-      errorResponse.message || 'Ein unerwarteter Fehler ist aufgetreten',
-      statusCode,
-      errorResponse.errors || []
-    );
+    return this.error(message, statusCode, validationErrors.length ? validationErrors : []);
   },
   
   /**
@@ -200,7 +195,7 @@ export const apiResponse = {
       const result = await requestHandler();
       return this.success(result, options?.successMessage);
     } catch (error) {
-      return this.handleError(error);
+      return this.handleError(error) as NextResponse<ApiResponse<T>>;
     }
   }
 };

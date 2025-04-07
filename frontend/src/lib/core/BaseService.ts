@@ -1,5 +1,16 @@
-import { IBaseService, ServiceOptions, PaginatedResult, FilterCriteria } from '../../types/interfaces/IBaseService.js';
+import { IBaseService } from '../../types/interfaces/IBaseService.js';
+import { PaginatedResult, FilterCriteria, OperationOptions, ErrorDetails } from '@/types/core/shared';
 import { IBaseRepository } from '../../types/interfaces/IBaseRepository.js';
+
+/**
+ * Service options for controlling operation behavior
+ */
+interface ServiceOptions extends OperationOptions {
+  context?: {
+    userId?: number;
+    [key: string]: any;
+  };
+}
 import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
 import { IValidationService } from '../../types/interfaces/IValidationService.js';
 import { IErrorHandler, AppError } from '../../types/interfaces/IErrorHandler.js';

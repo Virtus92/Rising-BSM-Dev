@@ -138,14 +138,12 @@ export class BadRequestError extends AppError {
  */
 export interface ErrorResponse {
   success: boolean;
-  message: string;
-  statusCode: number;
-  errorCode: string;
-  errors?: string[];
-  details?: any;
-  stack?: string;
-  timestamp: string;
-  path?: string;
+  errors: Array<{
+    message: string;
+    statusCode: number;
+    validationErrors?: string[];
+    stack?: string;
+  }>;
 }
 
 /**
