@@ -1,4 +1,4 @@
-import { ILoggingService, LogLevel, LogFormat, LoggingOptions } from '../interfaces/ILoggingService';
+import { ILoggingService, LogLevel, LogFormat, LoggingOptions } from '../../types/interfaces/ILoggingService';
 
 /**
  * LoggingService

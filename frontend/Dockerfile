@@ -1,5 +1,5 @@
 # Build Stage
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -18,27 +18,14 @@ COPY prisma ./prisma/
 # Generate Prisma client
 RUN npx prisma generate
 
-# Copy OpenAPI files and scripts first
-COPY openapi ./openapi/
-COPY scripts ./scripts/
-
-# Create dist directory for bundled OpenAPI
-RUN mkdir -p dist
-
-# Install Redocly CLI for OpenAPI bundling if not already in package.json
-RUN npm list @redocly/cli || npm install --no-save @redocly/cli
-
-# Bundle OpenAPI files
-RUN node scripts/bundle-openapi.js
-
 # Copy rest of the application code
 COPY . .
 
 # Build Next.js app
-RUN npm run build:docker
+RUN npm run build
 
 # Production Stage
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
@@ -79,4 +66,4 @@ USER nextjs
 
 # Set up entry point to handle migrations and start app
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["npm", "run", "start:docker"]
+CMD ["npm", "run", "start"]

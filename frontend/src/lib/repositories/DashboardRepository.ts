@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
-import { ILoggingService } from '../interfaces/ILoggingService.js';
-import { IErrorHandler } from '../interfaces/IErrorHandler.js';
-import { IDashboardRepository } from '../interfaces/IDashboardRepository.js';
+import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
+import { IErrorHandler } from '../../types/interfaces/IErrorHandler.js';
+import { IDashboardRepository } from '../../types/interfaces/IDashboardRepository.js';
 import { BaseRepository } from '../core/BaseRepository.js';
 
 /**

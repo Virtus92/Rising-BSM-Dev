@@ -16,7 +16,7 @@ import {
   getNotificationLink
 } from '../dtos/NotificationDtos.js';
 import { NotFoundError, ForbiddenError } from '../lib/interfaces/IErrorHandler.js';
-import { ServiceOptions } from '../interfaces/IBaseService.js';
+import { ServiceOptions } from '../../types/interfaces/IBaseService.js';
 import { NotificationEventManager, NotificationEventType } from '../events/NotificationEventManager.js';
 
 /**

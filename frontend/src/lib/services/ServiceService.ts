@@ -15,7 +15,7 @@ import {
 import { ILoggingService } from '../lib/interfaces/ILoggingService.js';
 import { IErrorHandler } from '../lib/interfaces/IErrorHandler.js';
 import { IValidationService } from '../lib/interfaces/IValidationService.js';
-import { PaginatedResult, ServiceOptions } from '../interfaces/IBaseService.js';
+import { PaginatedResult, ServiceOptions } from '../../types/interfaces/IBaseService.js';
 
 /**
  * Implementation of IServiceService for service operations.

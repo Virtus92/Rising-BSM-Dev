@@ -1,8 +1,8 @@
 import type { PrismaClient, Prisma } from '@prisma/client'
 type ContactRequestData = Omit<CreateRequestDto, 'requestId'> & { status: string };
-import { IRequestRepository } from '../interfaces/IRequestRepository.js';
-import { ILoggingService } from '../interfaces/ILoggingService.js';
-import { IErrorHandler } from '../interfaces/IErrorHandler.js';
+import { IRequestRepository } from '../../types/interfaces/IRequestRepository.js';
+import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
+import { IErrorHandler } from '../../types/interfaces/IErrorHandler.js';
 import { ContactRequest } from '../entities/ContactRequest.js';
 import { BaseRepository } from '../core/BaseRepository.js';
 import { 
@@ -13,7 +13,7 @@ import {
   RequestResponseDto,
   RequestPaginationMeta
 } from '../dtos/RequestDtos.js';
-import { FilterCriteria, QueryOptions } from '../interfaces/IBaseRepository.js';
+import { FilterCriteria, QueryOptions } from '../../types/interfaces/IBaseRepository.js';
 
 /**
  * Repository for handling ContactRequest data persistence

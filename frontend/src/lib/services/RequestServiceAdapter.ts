@@ -1,5 +1,5 @@
 import { ContactRequest } from '../entities/ContactRequest.js';
-import { IBaseService, ServiceOptions } from '../interfaces/IBaseService.js';
+import { IBaseService, ServiceOptions } from '../../types/interfaces/IBaseService.js';
 import { IRequestService } from '../lib/interfaces/IRequestService.js';
 import { 
   CreateRequestDto, 

@@ -1,10 +1,10 @@
 import { BaseRepository } from '../core/BaseRepository.js';
-import { IProjectRepository } from '../interfaces/IProjectRepository.js';
+import { IProjectRepository } from '../../types/interfaces/IProjectRepository.js';
 import { Project, ProjectStatus } from '../entities/Project.js';
 import { ProjectFilterParams } from '../dtos/ProjectDtos.js';
-import { QueryOptions } from '../interfaces/IBaseRepository.js';
-import { ILoggingService } from '../interfaces/ILoggingService.js';
-import { IErrorHandler } from '../interfaces/IErrorHandler.js';
+import { QueryOptions } from '../../types/interfaces/IBaseRepository.js';
+import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
+import { IErrorHandler } from '../../types/interfaces/IErrorHandler.js';
 import { PrismaClient } from '@prisma/client';
 import { DateTimeHelper } from '../utils/datetime-helper.js';
 

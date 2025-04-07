@@ -1,8 +1,8 @@
-import { IBaseService, ServiceOptions, PaginatedResult, FilterCriteria } from '../interfaces/IBaseService.js';
-import { IBaseRepository } from '../interfaces/IBaseRepository.js';
-import { ILoggingService } from '../interfaces/ILoggingService.js';
-import { IValidationService } from '../interfaces/IValidationService.js';
-import { IErrorHandler, AppError } from '../interfaces/IErrorHandler.js';
+import { IBaseService, ServiceOptions, PaginatedResult, FilterCriteria } from '../../types/interfaces/IBaseService.js';
+import { IBaseRepository } from '../../types/interfaces/IBaseRepository.js';
+import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
+import { IValidationService } from '../../types/interfaces/IValidationService.js';
+import { IErrorHandler, AppError } from '../../types/interfaces/IErrorHandler.js';
 
 /**
  * BaseService

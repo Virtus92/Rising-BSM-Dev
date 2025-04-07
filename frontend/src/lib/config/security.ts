@@ -1,5 +1,5 @@
-import { env } from './index.js';
-import { ILoggingService, LogLevel } from '../interfaces/ILoggingService.js';
+import { env } from './env';  // Geändert auf neue typsichere Implementierung
+import { ILoggingService, LogLevel } from '../../types/interfaces/ILoggingService.js';
 
 /**
  * Validates security-critical environment variables
@@ -7,11 +7,11 @@ import { ILoggingService, LogLevel } from '../interfaces/ILoggingService.js';
  * @param logger - Logging service
  */
 export function validateSecurityConfig(logger: ILoggingService): void {
-  const IS_PRODUCTION = env<string>('NODE_ENV', 'development') === 'production';
+  const IS_PRODUCTION = env.app.environment === 'production';
   
   // Validate JWT secrets
-  const JWT_SECRET = env<string>('JWT_SECRET', '');
-  const JWT_REFRESH_SECRET = env<string>('JWT_REFRESH_SECRET', '');
+  const JWT_SECRET = env.auth.jwtSecret;
+  const JWT_REFRESH_SECRET = env.auth.jwtRefreshSecret;
   
   if (IS_PRODUCTION) {
     const insecureSecrets = [

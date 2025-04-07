@@ -20,7 +20,7 @@ import {
   appointmentStatusUpdateValidationSchema,
   appointmentNoteValidationSchema
 } from '../dtos/AppointmentDtos.js';
-import { PaginatedResult, ServiceOptions } from '../interfaces/IBaseService.js';
+import { PaginatedResult, ServiceOptions } from '../../types/interfaces/IBaseService.js';
 import { DateTimeHelper } from '../utils/datetime-helper.js';
 
 /**

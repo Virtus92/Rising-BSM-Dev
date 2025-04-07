@@ -1,8 +1,8 @@
 import { BaseRepository } from '../core/BaseRepository.js';
-import { IRefreshTokenRepository } from '../interfaces/IRefreshTokenRepository.js';
+import { IRefreshTokenRepository } from '../../types/interfaces/IRefreshTokenRepository.js';
 import { RefreshToken } from '../entities/RefreshToken.js';
-import { ILoggingService } from '../interfaces/ILoggingService.js';
-import { IErrorHandler } from '../interfaces/IErrorHandler.js';
+import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
+import { IErrorHandler } from '../../types/interfaces/IErrorHandler.js';
 import { PrismaClient } from '@prisma/client';
 import { QueryOptions, FilterCriteria } from 'src/interfaces/IBaseRepository.js';
 

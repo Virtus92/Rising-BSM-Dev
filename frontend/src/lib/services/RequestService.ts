@@ -24,7 +24,7 @@ interface EnhancedRequestResponseDto extends RequestResponseDto {
   notes?: any[];
   processor?: any;
 }
-import { ServiceOptions, FilterCriteria } from '../interfaces/IBaseService.js';
+import { ServiceOptions, FilterCriteria } from '../../types/interfaces/IBaseService.js';
 import { NotificationEventManager, NotificationEventType } from '../events/NotificationEventManager.js';
 import { ExportUtils } from '../utils/export-utils.js';
 import { ValidationUtils } from '../utils/validation-utils.js';

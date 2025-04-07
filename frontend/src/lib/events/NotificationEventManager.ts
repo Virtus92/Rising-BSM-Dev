@@ -1,4 +1,4 @@
-import { ILoggingService } from '../interfaces/ILoggingService.js';
+import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
 
 /**
  * NotificationEventManager

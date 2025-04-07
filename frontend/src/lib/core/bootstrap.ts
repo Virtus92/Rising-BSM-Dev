@@ -7,10 +7,10 @@
 
 import { PrismaClient } from '@prisma/client';
 import { LoggingService } from './LoggingService';
-import { LogLevel, LogFormat } from '../../types/interfaces/ILoggingService';
-import { createLogger } from '../utils/logging/logger-service';
-import { ErrorHandler } from '../utils/errors/error-handler';
-import { ValidationService } from '../utils/validation/validation-service';
+import { LogLevel, LogFormat } from '@/types/interfaces/ILoggingService';
+import { createLogger } from '@/lib/utils/logging/logger-service';
+import { ErrorHandler } from '@/lib/utils/errors/error-handler';
+import { ValidationService } from './ValidationService';
 import { prisma } from '../db'; // Die zentrale Prisma-Instanz aus db.ts
 
 // Initialisierungsstatus

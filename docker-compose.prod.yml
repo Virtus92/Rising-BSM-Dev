@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: rising_bsm_prod
+      POSTGRES_DB: rising_bsm
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
     ports:
@@ -21,11 +21,11 @@ services:
       retries: 5
 
   # Frontend service (production mode)
-  frontend:
+  app:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: rising-bsm-frontend-prod
+    container_name: rising-bsm-app-prod
     env_file:
       - ./.env.production
     environment:

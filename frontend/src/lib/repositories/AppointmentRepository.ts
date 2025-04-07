@@ -1,10 +1,10 @@
 import { BaseRepository } from '../core/BaseRepository.js';
-import { IAppointmentRepository } from '../interfaces/IAppointmentRepository.js';
+import { IAppointmentRepository } from '../../types/interfaces/IAppointmentRepository.js';
 import { Appointment, AppointmentStatus } from '../entities/Appointment.js';
 import { AppointmentFilterParams } from '../dtos/AppointmentDtos.js';
-import { QueryOptions, FilterCriteria } from '../interfaces/IBaseRepository.js';
-import { ILoggingService } from '../interfaces/ILoggingService.js';
-import { IErrorHandler } from '../interfaces/IErrorHandler.js';
+import { QueryOptions, FilterCriteria } from '../../types/interfaces/IBaseRepository.js';
+import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
+import { IErrorHandler } from '../../types/interfaces/IErrorHandler.js';
 // Korrigierter Import für PrismaClient
 import { PrismaClient } from '@prisma/client';
 import { DateTimeHelper } from '../utils/datetime-helper.js';

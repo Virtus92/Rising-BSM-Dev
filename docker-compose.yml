@@ -26,13 +26,11 @@ services:
       dockerfile: Dockerfile.dev
     container_name: rising-bsm-app
     env_file:
-      - ./.env
+      - ./frontend/.env
     environment:
       - NODE_ENV=development
       - SEED_DATABASE=true
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/rising_bsm?schema=public
-      - TS_NODE_COMPILER_OPTIONS='{"module":"CommonJS","moduleResolution":"node"}'
-      - TS_NODE_TRANSPILE_ONLY=true
     ports:
       - "3000:3000"
     depends_on:
@@ -44,8 +42,6 @@ services:
       - /app/.next
     networks:
       - rising-bsm-network
-    command: >
-      sh -c "npm run prisma:generate && npm run db:migrate && npm run dev"
 
 networks:
   rising-bsm-network:

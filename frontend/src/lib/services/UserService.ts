@@ -1,6 +1,6 @@
 import { BaseService } from '../core/BaseService.js';
-import { IUserService } from '../interfaces/IUserService.js';
-import { IUserRepository } from '../interfaces/IUserRepository.js';
+import { IUserService } from '../../types/interfaces/IUserService.js';
+import { IUserRepository } from '../../types/interfaces/IUserRepository.js';
 import { ILoggingService } from '../lib/interfaces/ILoggingService.js';
 import { IValidationService } from '../lib/interfaces/IValidationService.js';
 import { IErrorHandler } from '../lib/interfaces/IErrorHandler.js';
@@ -17,7 +17,7 @@ import {
   updateUserValidationSchema,
   changePasswordValidationSchema
 } from '../dtos/UserDtos.js';
-import { ServiceOptions } from '../interfaces/IBaseService.js';
+import { ServiceOptions } from '../../types/interfaces/IBaseService.js';
 import { CryptoHelper } from '../utils/crypto-helper.js';
 
 /**

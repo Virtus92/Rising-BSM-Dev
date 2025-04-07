@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import config from '../config/index.js';
+import { env } from '../config/env';  // Geändert auf neue typsichere Implementierung
 
 /**
  * CryptoHelper
@@ -44,9 +44,9 @@ export class CryptoHelper {
     options: { 
       expiresIn: string, 
       secret?: string 
-    } = { expiresIn: config.JWT_EXPIRES_IN }
+    } = { expiresIn: env.auth.jwtExpiresIn }
   ): string {
-    const secret = options.secret || config.JWT_SECRET;
+    const secret = options.secret || env.auth.jwtSecret;
     return jwt.sign(payload, secret, { expiresIn: options.expiresIn } as jwt.SignOptions);
   }
 
@@ -58,7 +58,7 @@ export class CryptoHelper {
    * @returns Decoded token payload
    * @throws Error if token is invalid
    */
-  static verifyJwtToken(token: string, secret: string = config.JWT_SECRET): any {
+  static verifyJwtToken(token: string, secret: string = env.auth.jwtSecret): any {
     return jwt.verify(token, secret);
   }
 

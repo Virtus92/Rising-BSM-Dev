@@ -2,6 +2,9 @@
  * Einheitliche API-Antwortfunktionen für Next.js
  */
 import { NextResponse } from 'next/server';
+import { AppError, ValidationError, NotFoundError, UnauthorizedError, ForbiddenError } from '@/types/interfaces/IErrorHandler';
+import { IErrorHandler } from '@/types/interfaces/IErrorHandler';
+import { getErrorHandler } from '@/lib/core/bootstrap';
 
 /**
  * Standardisierte API-Antwortstruktur
@@ -139,6 +142,66 @@ export const apiResponse = {
       pagination,
       timestamp: new Date().toISOString(),
     }, { status: 200 });
+  },
+  
+  /**
+   * Einheitliches Fehlerhandling für API-Endpunkte
+   */
+  handleError(error: unknown, req?: any): NextResponse<ApiResponse<null>> {
+    const errorHandler = getErrorHandler();
+    
+    // Fehler durch ErrorHandler aufbereiten lassen
+    const errorResponse = errorHandler.formatError(error);
+    
+    // Status-Code aus der Fehlerantwort extrahieren
+    const statusCode = errorResponse.statusCode || 500;
+    
+    // Anhand der Fehlerart die richtige Antwort generieren
+    if (error instanceof ValidationError) {
+      return this.validationError(errorResponse.message, errorResponse.errors || []);
+    }
+    
+    if (error instanceof NotFoundError) {
+      return this.notFound(errorResponse.message);
+    }
+    
+    if (error instanceof UnauthorizedError) {
+      return this.unauthorized(errorResponse.message);
+    }
+    
+    if (error instanceof ForbiddenError) {
+      return this.forbidden(errorResponse.message);
+    }
+    
+    if (error instanceof AppError) {
+      return this.error(errorResponse.message, statusCode, errorResponse.errors || []);
+    }
+    
+    // Allgemeiner Fehler
+    return this.error(
+      errorResponse.message || 'Ein unerwarteter Fehler ist aufgetreten',
+      statusCode,
+      errorResponse.errors || []
+    );
+  },
+  
+  /**
+   * Standardantwort für API-Handler mit Try-Catch
+   */
+  async tryRequest<T>(
+    requestHandler: () => Promise<T>,
+    options?: {
+      successMessage?: string;
+      errorMessage?: string;
+      statusCode?: number;
+    }
+  ): Promise<NextResponse<ApiResponse<T>>> {
+    try {
+      const result = await requestHandler();
+      return this.success(result, options?.successMessage);
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 };
 

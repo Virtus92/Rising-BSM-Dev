@@ -1,19 +1,20 @@
 {
-    "name": "rising-bsm-backend",
+    "name": "rising-bsm",
     "version": "1.0.0",
-    "description": "Business Service Management Backend",
-    "main": "dist/server.js",
+    "description": "Business Service Management App with NextJS",
+    "private": true,
     "type": "module",
     "scripts": {
-        "build": "tsc",
-        "start": "node dist/server.js",
-        "dev": "nodemon --exec ts-node --esm server.ts",
-        "test": "jest",
-        "test:coverage": "jest --coverage",
-        "lint": "eslint . --ext .ts",
-        "migrate": "prisma migrate dev",
-        "seed": "ts-node prisma/seed.ts",
-        "dia": "node backend/tools/swagger-diagnostic.cjs"
+        "build": "cd frontend && npm run build",
+        "start": "cd frontend && npm run start",
+        "dev": "cd frontend && npm run dev",
+        "test": "cd frontend && npm run test",
+        "test:ci": "cd frontend && npm run test:ci",
+        "lint": "cd frontend && npm run lint",
+        "db:migrate": "cd frontend && npm run db:migrate",
+        "db:seed": "cd frontend && npm run db:seed",
+        "db:reset": "cd frontend && npm run db:reset",
+        "prisma:studio": "cd frontend && npm run db:studio"
     },
     "dependencies": {
         "@prisma/client": "^5.4.2",

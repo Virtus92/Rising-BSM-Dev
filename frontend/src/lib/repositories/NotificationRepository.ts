@@ -1,10 +1,10 @@
 import { BaseRepository } from '../core/BaseRepository.js';
-import { INotificationRepository } from '../interfaces/INotificationRepository.js';
+import { INotificationRepository } from '../../types/interfaces/INotificationRepository.js';
 import { Notification } from '../entities/Notification.js';
 import { NotificationFilterDto } from '../dtos/NotificationDtos.js';
-import { QueryOptions } from '../interfaces/IBaseRepository.js';
-import { ILoggingService } from '../interfaces/ILoggingService.js';
-import { IErrorHandler } from '../interfaces/IErrorHandler.js';
+import { QueryOptions } from '../../types/interfaces/IBaseRepository.js';
+import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
+import { IErrorHandler } from '../../types/interfaces/IErrorHandler.js';
 import { PrismaClient } from '@prisma/client';
 import Item from 'mock-fs/lib/item.js';
 

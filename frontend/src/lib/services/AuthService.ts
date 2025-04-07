@@ -1,5 +1,5 @@
 import { IAuthService } from '../lib/interfaces/IAuthService.js';
-import { IUserRepository } from '../interfaces/IUserRepository.js';
+import { IUserRepository } from '../../types/interfaces/IUserRepository.js';
 import { IRefreshTokenRepository } from '../lib/interfaces/IRefreshTokenRepository.js';
 import { ILoggingService } from '../lib/interfaces/ILoggingService.js';
 import { IValidationService } from '../lib/interfaces/IValidationService.js';
@@ -12,7 +12,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto
 } from '../dtos/AuthDtos.js';
-import { ServiceOptions } from '../interfaces/IBaseService.js';
+import { ServiceOptions } from '../../types/interfaces/IBaseService.js';
 import { RefreshToken } from '../entities/RefreshToken.js';
 import { User, UserStatus } from '../entities/User.js';
 import { CryptoHelper } from '../utils/crypto-helper.js';

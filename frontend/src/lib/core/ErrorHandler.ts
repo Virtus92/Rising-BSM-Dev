@@ -6,8 +6,8 @@ import {
     UnauthorizedError, 
     ForbiddenError,
     ErrorResponse 
-  } from '../interfaces/IErrorHandler.js';
-  import { ILoggingService } from '../interfaces/ILoggingService.js';
+  } from '../../types/interfaces/IErrorHandler.js';
+  import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
   
   /**
    * ErrorHandler

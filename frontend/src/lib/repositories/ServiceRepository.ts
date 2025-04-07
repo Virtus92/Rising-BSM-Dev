@@ -1,10 +1,10 @@
 import { BaseRepository } from '../core/BaseRepository.js';
-import { IServiceRepository } from '../interfaces/IServiceRepository.js';
+import { IServiceRepository } from '../../types/interfaces/IServiceRepository.js';
 import { Service } from '../entities/Service.js';
 import { ServiceFilterParams } from '../dtos/ServiceDtos.js';
-import { FilterCriteria, QueryOptions } from '../interfaces/IBaseRepository.js';
-import { ILoggingService } from '../interfaces/ILoggingService.js';
-import { IErrorHandler } from '../interfaces/IErrorHandler.js';
+import { FilterCriteria, QueryOptions } from '../../types/interfaces/IBaseRepository.js';
+import { ILoggingService } from '../../types/interfaces/ILoggingService.js';
+import { IErrorHandler } from '../../types/interfaces/IErrorHandler.js';
 import { PrismaClient } from '@prisma/client';
 
 /**

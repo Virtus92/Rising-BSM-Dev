@@ -1,55 +1,20 @@
 /** @type {import('next').NextConfig} */
-const path = require('path');
-const fs = require('fs');
-const dotenv = require('dotenv');
-
-// Lade Umgebungsvariablen aus dem Root-Verzeichnis
-const rootEnvPath = path.resolve(__dirname, '../.env');
-if (fs.existsSync(rootEnvPath)) {
-  console.log('Lade Umgebungsvariablen aus dem Root-Verzeichnis (./.env)');
-  dotenv.config({ path: rootEnvPath });
-} else {
-  console.log('Keine .env im Root-Verzeichnis gefunden, verwende Prozessumgebungsvariablen');
-  dotenv.config();
-}
-
 const nextConfig = {
+  // Wichtige Umgebungsvariablen auf Client-Seite verfügbar machen
   env: {
-    // API-URLs
+    // API-URLs und Basis-Konfiguration
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api',
-    BACKEND_API_URL: process.env.BACKEND_API_URL || 'http://localhost:3000/api',
-    
-    // Auth-Konfiguration
-    JWT_SECRET: process.env.JWT_SECRET || 'your-default-super-secret-key-change-in-production',
-    JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '15m',
-    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'your-refresh-default-key-change-in-production',
-    JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-    
-    // Datenbank-URL (übernommen von Prisma)
-    DATABASE_URL: process.env.DATABASE_URL,
-    
-    // Logging
-    LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+    NEXT_PUBLIC_FRONTEND_URL: process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000',
   },
   
-  // App Router ist jetzt Standard in Next.js 13+
-  // Experimentelles Flag nicht mehr nötig
-  
-  // ESLint während des Builds deaktivieren, da wir Probleme separat beheben
+  // ESLint während des Builds deaktivieren
   eslint: {
     ignoreDuringBuilds: true,
-  },
-  
-  // Experimentelle Funktionen für die Unterstützung von Edge-Middleware
-  experimental: {
-    // Ermöglicht instrumentierte Builds für besseres Monitoring
-    instrumentationHook: true,
   },
   
   // Image-Optimierung konfigurieren
   images: {
     domains: ['localhost'],
-    // Weitere sichere Domains hier hinzufügen
   },
 };
 

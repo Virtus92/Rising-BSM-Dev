@@ -1,13 +1,14 @@
-import { IErrorHandler } from '@/types/interfaces/IErrorHandler';
 import { 
+  IErrorHandler, 
   AppError, 
   ValidationError, 
   NotFoundError, 
   UnauthorizedError, 
   ForbiddenError, 
   ConflictError, 
-  BadRequestError 
-} from './app-errors';
+  BadRequestError,
+  ErrorResponse 
+} from '@/types/interfaces/IErrorHandler';
 import { ILoggingService } from '@/types/interfaces/ILoggingService';
 
 /**

@@ -19,7 +19,7 @@ import {
   projectStatusUpdateValidationSchema,
   projectNoteValidationSchema
 } from '../dtos/ProjectDtos.js';
-import { ServiceOptions, PaginatedResult } from '../interfaces/IBaseService.js';
+import { ServiceOptions, PaginatedResult } from '../../types/interfaces/IBaseService.js';
 import { DateTimeHelper } from '../utils/datetime-helper.js';
 
 /**
