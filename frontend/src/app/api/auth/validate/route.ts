@@ -29,20 +29,38 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
     );
   }
   
-  // Für die Entwicklungsphase simulieren wir eine erfolgreiche Token-Validierung
-  // In der Produktion würden wir den AuthService verwenden
+  // Verwende AuthService für die Token-Validierung
+  const authService = getAuthService();
   
-  // Simuliere eine gültige/ungültige Token-Prüfung
-  const isValid = token.length > 10; // Einfache Simulation
-  
-  if (!isValid) {
-    return NextResponse.json(
+  try {
+    const isValid = await authService.verifyToken(token);
+    
+    if (!isValid) {
+      const response = NextResponse.json(
       {
         success: false,
         message: 'Invalid or expired token',
         timestamp: new Date().toISOString()
       },
       { status: 400 }
+      );
+      
+      // Delete all authentication cookies
+      response.cookies.delete('auth_token');
+      response.cookies.delete('refresh_token');
+      response.cookies.delete('auth_token_backup');
+      response.cookies.delete('refresh_token_backup');
+      
+      return response;
+    }
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'Error validating token',
+        timestamp: new Date().toISOString()
+      },
+      { status: 500 }
     );
   }
   

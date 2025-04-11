@@ -1,198 +1,163 @@
 'use client';
 
 import { getLogger } from '../common/logging';
+import { jwtDecode } from 'jwt-decode';
 
+// Blacklisted token storage - maps token signature to expiration time
 interface BlacklistedToken {
-  token: string;    // Either full token or token ID (jti)
-  expiry: number;   // Expiration time in milliseconds
-  reason: string;   // Reason for blacklisting (logout, security, etc.)
+  signature: string;
+  expires: number; // Unix timestamp
 }
 
 /**
- * Token blacklist for managing revoked JWT tokens
- * Acts as a centralized registry of revoked tokens that are still valid by their expiration time
+ * TokenBlacklist class for managing invalidated tokens
+ * Uses memory storage with automatic cleanup of expired entries
  */
-export class TokenBlacklist {
-  private static instance: TokenBlacklist;
-  private blacklist: Map<string, BlacklistedToken> = new Map();
-  private logger = getLogger();
-  private cleanupInterval: NodeJS.Timeout | null = null;
+class TokenBlacklist {
+  // Blacklist storage - maps user ID to array of blacklisted token signatures
+  private blacklistedByUser: Map<string, Set<string>> = new Map();
   
-  private constructor() {
-    // Start cleanup task
-    this.startCleanupTask();
-  }
+  // All blacklisted tokens with expiration
+  private blacklistedTokens: BlacklistedToken[] = [];
   
-  /**
-   * Get singleton instance
-   */
-  public static getInstance(): TokenBlacklist {
-    if (!TokenBlacklist.instance) {
-      TokenBlacklist.instance = new TokenBlacklist();
-    }
-    return TokenBlacklist.instance;
-  }
-  
-  /**
-   * Start automatic cleanup task to remove expired tokens
-   */
-  private startCleanupTask() {
-    if (typeof setInterval !== 'undefined' && !this.cleanupInterval) {
-      // Run cleanup every 15 minutes
-      this.cleanupInterval = setInterval(() => this.cleanup(), 15 * 60 * 1000);
-      this.logger.info('Token blacklist cleanup task started');
-    }
-  }
-  
-  /**
-   * Stop the cleanup task (usually when shutting down)
-   */
-  public stopCleanupTask() {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-      this.logger.info('Token blacklist cleanup task stopped');
-    }
-  }
-  
-  /**
-   * Clean up expired tokens from the blacklist
-   */
-  public cleanup() {
-    const now = Date.now();
-    let removedCount = 0;
-    
-    for (const [token, data] of this.blacklist.entries()) {
-      if (data.expiry < now) {
-        this.blacklist.delete(token);
-        removedCount++;
-      }
-    }
-    
-    if (removedCount > 0) {
-      this.logger.debug(`Removed ${removedCount} expired tokens from blacklist`);
-    }
-    
-    return removedCount;
-  }
+  // Last cleanup time
+  private lastCleanup: number = Date.now();
   
   /**
    * Add a token to the blacklist
-   * 
-   * @param token The JWT token or token ID to blacklist
-   * @param expiry Expiration time in milliseconds since epoch
-   * @param reason Reason for blacklisting
+   * @param token JWT token to blacklist
    */
-  public add(token: string, expiry: number, reason: string = 'logout'): void {
-    // Use token fingerprint (first 32 chars of hash) to avoid storing the entire token
-    const fingerprint = this.getTokenFingerprint(token);
+  blacklistToken(token: string): void {
+    try {
+      // Extract parts of the token
+      const [header, payload, signature] = token.split('.');
+      
+      if (!header || !payload || !signature) {
+        console.warn('Invalid token format for blacklisting');
+        return;
+      }
+      
+      // Decode payload to get expiration and user ID
+      const decoded = jwtDecode<{ sub?: string | number, exp?: number }>(token);
+      
+      if (!decoded || !decoded.exp) {
+        console.warn('Token missing expiration, cannot blacklist properly');
+        return;
+      }
+      
+      // Add to blacklisted tokens
+      this.blacklistedTokens.push({
+        signature,
+        expires: decoded.exp * 1000 // Convert to milliseconds
+      });
+      
+      // Also track by user ID if available
+      if (decoded.sub) {
+        const userId = decoded.sub.toString();
+        
+        if (!this.blacklistedByUser.has(userId)) {
+          this.blacklistedByUser.set(userId, new Set());
+        }
+        
+        this.blacklistedByUser.get(userId)?.add(signature);
+      }
+      
+      // Periodically clean up expired tokens
+      this.cleanupIfNeeded();
+    } catch (error) {
+      console.error('Error blacklisting token:', error);
+    }
+  }
+  
+  /**
+   * Blacklist all tokens for a specific user
+   * @param userId User ID to blacklist tokens for
+   */
+  blacklistUser(userId: string | number): void {
+    const userIdStr = userId.toString();
     
-    this.blacklist.set(fingerprint, {
-      token: fingerprint,
-      expiry,
-      reason
-    });
+    // Create empty set if needed
+    if (!this.blacklistedByUser.has(userIdStr)) {
+      this.blacklistedByUser.set(userIdStr, new Set());
+    }
     
-    this.logger.debug(`Token added to blacklist: ${fingerprint.substring(0, 8)}...`, { 
-      reason, 
-      expiry: new Date(expiry).toISOString() 
-    });
+    // Mark the user as fully blacklisted by adding a special marker
+    this.blacklistedByUser.get(userIdStr)?.add('__ALL_TOKENS__');
   }
   
   /**
    * Check if a token is blacklisted
-   * 
-   * @param token The JWT token to check
-   * @returns True if the token is blacklisted
+   * @param token JWT token to check
+   * @returns true if blacklisted, false otherwise
    */
-  public isBlacklisted(token: string): boolean {
-    // Get token fingerprint
-    const fingerprint = this.getTokenFingerprint(token);
-    
-    // Check if token is in blacklist
-    const blacklistedToken = this.blacklist.get(fingerprint);
-    
-    // If not found, token is not blacklisted
-    if (!blacklistedToken) {
-      return false;
-    }
-    
-    // If found but expired, remove it from blacklist and return false
-    const now = Date.now();
-    if (blacklistedToken.expiry < now) {
-      this.blacklist.delete(fingerprint);
-      return false;
-    }
-    
-    // Token is blacklisted and still valid
-    return true;
-  }
-  
-  /**
-   * Remove a token from the blacklist
-   * 
-   * @param token The JWT token to remove
-   * @returns True if token was found and removed
-   */
-  public remove(token: string): boolean {
-    const fingerprint = this.getTokenFingerprint(token);
-    return this.blacklist.delete(fingerprint);
-  }
-  
-  /**
-   * Get the size of the blacklist
-   */
-  public size(): number {
-    return this.blacklist.size;
-  }
-  
-  /**
-   * Create a fingerprint of the token for storage
-   * Uses a hashing algorithm to create a consistent identifier without storing the full token
-   * 
-   * @param token JWT token
-   * @returns Token fingerprint
-   */
-  private getTokenFingerprint(token: string): string {
-    // In a Node.js environment, we'd use crypto
-    // For browsers and Edge Runtime, use a simple hashing algorithm
-    
-    if (typeof crypto !== 'undefined' && crypto.subtle) {
+  isBlacklisted(token: string): boolean {
+    try {
+      // Extract parts of the token
+      const [header, payload, signature] = token.split('.');
+      
+      if (!header || !payload || !signature) {
+        return false;
+      }
+      
+      // Check if token is directly blacklisted
+      const isDirectlyBlacklisted = this.blacklistedTokens.some(
+        entry => entry.signature === signature
+      );
+      
+      if (isDirectlyBlacklisted) {
+        return true;
+      }
+      
+      // Check if user is blacklisted
       try {
-        // Browser environment with crypto support
-        // Convert token to hash using SHA-256
-        const encoder = new TextEncoder();
-        const data = encoder.encode(token);
+        const decoded = jwtDecode<{ sub?: string | number }>(token);
         
-        // Use non-async version for simplicity
-        // In production, you'd use the async version with await
-        let hash = 0;
-        for (let i = 0; i < token.length; i++) {
-          const char = token.charCodeAt(i);
-          hash = ((hash << 5) - hash) + char;
-          hash = hash & hash; // Convert to 32bit integer
+        if (!decoded || !decoded.sub) {
+          return false;
         }
         
-        // Return the hash as a hexadecimal string
-        return hash.toString(16).padStart(8, '0');
+        const userId = decoded.sub.toString();
+        const userBlacklist = this.blacklistedByUser.get(userId);
+        
+        // If user has any blacklisted tokens, check if all tokens are blacklisted
+        if (userBlacklist && userBlacklist.has('__ALL_TOKENS__')) {
+          return true;
+        }
+        
+        // Or check if this specific token is blacklisted
+        return userBlacklist ? userBlacklist.has(signature) : false;
       } catch (e) {
-        this.logger.warn('Error creating token fingerprint with crypto', { error: e });
+        console.error('Error decoding token for blacklist check:', e);
+        return false;
       }
+    } catch (error) {
+      console.error('Error checking token blacklist:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Clean up expired blacklisted tokens
+   */
+  private cleanupIfNeeded(): void {
+    const now = Date.now();
+    
+    // Only clean up once per hour
+    if (now - this.lastCleanup < 3600000) {
+      return;
     }
     
-    // Fallback to a simple deterministic hash function
-    let hash = 0;
-    for (let i = 0; i < token.length; i++) {
-      const char = token.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
+    this.lastCleanup = now;
     
-    // Return the hash as a hexadecimal string
-    return hash.toString(16).padStart(8, '0');
+    // Remove expired tokens
+    this.blacklistedTokens = this.blacklistedTokens.filter(
+      entry => entry.expires > now
+    );
+    
+    console.log(`Cleaned up token blacklist, remaining entries: ${this.blacklistedTokens.length}`);
   }
 }
 
-// Export singleton instance
-export const tokenBlacklist = TokenBlacklist.getInstance();
+// Export as singleton
+export const tokenBlacklist = new TokenBlacklist();
 export default tokenBlacklist;

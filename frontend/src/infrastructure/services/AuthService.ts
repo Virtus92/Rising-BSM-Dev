@@ -96,6 +96,7 @@ export class AuthService implements IAuthService {
       const { isValid, errors } = this.validator.validate(loginDto, schema);
       
       if (!isValid) {
+        // Wir werfen einen Fehler mit den Validierungsfehlern
         throw this.errorHandler.createValidationError('Invalid login data', errors);
       }
       
@@ -793,8 +794,8 @@ export class AuthService implements IAuthService {
         role: registerDto.role || UserRole.USER,
         status: UserStatus.ACTIVE,
         phone: registerDto.phone,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
       
       // Aktivität protokollieren

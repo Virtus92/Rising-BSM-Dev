@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
 import { 

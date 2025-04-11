@@ -210,6 +210,26 @@ export class TokenManager {
     }, 150); // Short debounce delay
   }
 
+  static getAccessToken(): string | null {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('auth_token_backup');
+    }
+    return null;
+  }
+  
+  static clearTokens(): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_token_backup');
+      localStorage.removeItem('refresh_token_backup');
+    }
+    
+    if (typeof document !== 'undefined') {
+      document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    }
+  }
+
   /**
    * Notify about logout (tokens are cleared by the server)
    */

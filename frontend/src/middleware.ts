@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as jose from 'jose';  // Using jose for Edge-compatible JWT validation
-import { tokenBlacklist } from './infrastructure/auth/TokenBlacklist';
-import { securityConfig } from './infrastructure/common/config/SecurityConfig';
+import { tokenBlacklist } from '@/infrastructure/auth/TokenBlacklist';
+import { securityConfig } from '@/infrastructure/common/config/SecurityConfig';
+import { TokenManager } from '@/infrastructure/auth/TokenManager';
+
+// Cache for user verification results to reduce API calls
+// Format: { userId: { timestamp: number, isValid: boolean } }
+const USER_VERIFICATION_CACHE: Record<string, { timestamp: number, isValid: boolean }> = {};
+const CACHE_TTL = 60 * 1000; // 1 minute cache TTL
 
 /**
  * Improved JWT verification for Edge Runtime
@@ -39,7 +45,15 @@ async function isTokenValid(token: string): Promise<boolean> {
           return false;
         }
         
-        console.log('Token validation passed with all required claims');
+        // Verify that the user referenced in the token still exists and is active
+        const userId = payload.sub;
+        const isUserValid = await verifyUserExists(userId.toString());
+        if (!isUserValid) {
+          console.log(`User ${userId} not found or inactive`);
+          return false;
+        }
+        
+        console.log('Token validation passed with all required claims and valid user');
         return true;
       } catch (claimError) {
         // If it fails due to missing claims, try a more permissive verification
@@ -64,8 +78,20 @@ async function isTokenValid(token: string): Promise<boolean> {
           return false;
         }
         
+        // Verify that the user referenced in the token still exists and is active
+        if (payload.sub) {
+          const isUserValid = await verifyUserExists(payload.sub.toString());
+          if (!isUserValid) {
+            console.log(`User ${payload.sub} not found or inactive`);
+            return false;
+          }
+        } else {
+          console.log('Legacy token missing user ID (sub claim)');
+          return false;
+        }
+        
         // Basic validation passed for legacy token
-        console.log('Legacy token validation passed (no issuer/audience)');
+        console.log('Legacy token validation passed (no issuer/audience) with valid user');
         return true;
       }
     } catch (verifyError) {
@@ -79,47 +105,46 @@ async function isTokenValid(token: string): Promise<boolean> {
 }
 
 /**
- * Fallback JWT structure validation for backward compatibility
- * Only used if cryptographic validation is not possible
- * NOT SECURE - only checks token structure and expiration
+ * Verify that the user referenced in the token exists and is active
+ * Uses an API endpoint to check user existence
  */
-function isTokenStructureValid(token: string): boolean {
+async function verifyUserExists(userId: string): Promise<boolean> {
   try {
-    // First check if the token is blacklisted
-    if (tokenBlacklist.isBlacklisted(token)) {
-      console.log('Token is blacklisted');
-      return false;
+    // Check cache first to reduce API calls
+    const cacheEntry = USER_VERIFICATION_CACHE[userId];
+    if (cacheEntry && Date.now() - cacheEntry.timestamp < CACHE_TTL) {
+      console.log(`Using cached verification for user ${userId}: ${cacheEntry.isValid}`);
+      return cacheEntry.isValid;
     }
     
-    // Parse the token without verifying signature
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      console.log('Invalid token structure');
-      return false;
-    }
+    console.log(`Verifying user ${userId} via API call`);
     
-    // Base64 decode and parse the payload
-    const payload = JSON.parse(
-      Buffer.from(parts[1], 'base64').toString()
-    );
+    // Call the verify-user API endpoint
+    const response = await fetch(new URL('/api/auth/verify-user', 
+                                       process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Auth-Skip': 'true' // Special header to prevent middleware recursion
+      },
+      body: JSON.stringify({ userId })
+    });
     
-    // Check for expiration
-    const exp = payload.exp;
-    if (!exp) {
-      console.log('Token missing expiration');
-      return false;
-    }
+    // Parse response
+    const isValid = response.ok && (await response.json()).success === true;
     
-    // Check if token is expired
-    const now = Math.floor(Date.now() / 1000);
-    if (exp < now) {
-      console.log(`Token expired at ${new Date(exp * 1000).toISOString()}`);
-      return false;
-    }
+    // Store result in cache
+    USER_VERIFICATION_CACHE[userId] = {
+      timestamp: Date.now(),
+      isValid
+    };
     
-    return true;
+    console.log(`User ${userId} verification result: ${isValid}`);
+    return isValid;
   } catch (error) {
-    console.log('Token basic validation error:', error);
+    console.error(`Error verifying user ${userId}:`, error);
+    
+    // In production, fail closed (assume invalid) on errors
     return false;
   }
 }
@@ -135,6 +160,12 @@ export async function middleware(request: NextRequest) {
   // USE CONSISTENT TOKEN NAMES
   const token = request.cookies.get('auth_token')?.value;
   const { pathname } = request.nextUrl;
+
+  // Special bypass for the verify-user endpoint when called from middleware
+  if (pathname === '/api/auth/verify-user' && request.headers.get('X-Auth-Skip') === 'true') {
+    console.log('Skipping auth check for verify-user API call from middleware');
+    return NextResponse.next();
+  }
 
   // Debug log the token (for development only)
   console.log(`Middleware checking path: ${pathname}`);
@@ -160,6 +191,7 @@ export async function middleware(request: NextRequest) {
     '/auth/reset-password',
     '/',
     '/api/auth/',  // All auth API endpoints
+    '/api/auth/verify-user', // Explicitly add the verify-user endpoint
     '/api/requests/public',
     // Add any other public API endpoints here
   ];
@@ -225,13 +257,8 @@ export async function middleware(request: NextRequest) {
       try {
         isValid = await isTokenValid(token);
       } catch (e) {
-        console.log('Full token validation failed, falling back to basic check:', e);
-        // Fall back to basic structure validation if full validation fails
-        isValid = isTokenStructureValid(token);
-        
-        if (isValid) {
-          console.warn('WARNING: Using fallback token validation which is less secure');
-        }
+        console.log('Token validation failed:', e);
+        throw new Error('Token validation failed - no fallback to less secure validation');
       }
       
       if (isValid) {

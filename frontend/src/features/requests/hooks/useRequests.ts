@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
 import { RequestService } from '@/infrastructure/clients/RequestService';

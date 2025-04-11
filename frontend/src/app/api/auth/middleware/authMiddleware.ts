@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { getLogger } from '@/infrastructure/common/logging';
 import { securityConfig } from '@/infrastructure/common/config/SecurityConfig';
 import { tokenBlacklist } from '@/infrastructure/auth/TokenBlacklist';
+import { db } from '@/infrastructure/db';
 
 export interface AuthOptions {
   requiredRoles?: string[];
@@ -30,13 +31,26 @@ export async function getServerSession(req?: NextRequest, options: AuthOptions =
     // Initialize security config
     securityConfig.initialize();
     
-    // Get auth token from cookies - use consistent naming
-    const cookieStore = cookies();
-    const authToken = cookieStore.get('auth_token')?.value;
+    // FIRST check X-Auth-Token header from middleware
+    let authToken = null;
     
+    if (req) {
+      // Check for token passed from middleware
+      authToken = req.headers.get('X-Auth-Token');
+      if (authToken) {
+        logger.debug('Found auth token in X-Auth-Token header from middleware');
+      }
+    }
+    
+    // If no token in X-Auth-Token, THEN check cookies (as fallback)
     if (!authToken) {
-      logger.warn('No auth token found in cookies');
-      return null;
+      const cookieStore = cookies();
+      authToken = cookieStore.get('auth_token')?.value;
+      
+      if (!authToken) {
+        logger.warn('No auth token found in X-Auth-Token header or cookies');
+        return null;
+      }
     }
     
     // Check if token is blacklisted
@@ -56,6 +70,39 @@ export async function getServerSession(req?: NextRequest, options: AuthOptions =
       if (!decoded || !decoded.sub) {
         logger.warn('Invalid token payload');
         return null;
+      }
+      
+      // Check if user exists and is active in database
+      try {
+        // Verify user exists and is active
+        const user = await db.user.findUnique({
+          where: { id: Number(decoded.sub) },
+          select: { 
+            id: true, 
+            status: true,
+            role: true
+          }
+        });
+        
+        if (!user) {
+          logger.warn(`User not found in database for ID: ${decoded.sub}`);
+          // Blacklist this token since the user doesn't exist
+          tokenBlacklist.blacklistUser(decoded.sub);
+          return null;
+        }
+        
+        if (user.status !== 'active') {
+          logger.warn(`User account is not active: ${decoded.sub}, status: ${user.status}`);
+          // Blacklist tokens for inactive users
+          tokenBlacklist.blacklistUser(decoded.sub);
+          return null;
+        }
+        
+        // Use the role from the database rather than the token for better security
+        decoded.role = user.role;
+      } catch (dbError) {
+        logger.error('Database error checking user existence:', { error: dbError });
+        // On database errors, proceed with token data but log the error
       }
       
       // Check for required roles if specified
