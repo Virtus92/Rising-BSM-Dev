@@ -1,6 +1,7 @@
 import { IBaseRepository, PaginationResult } from './IBaseRepository';
 import { Customer } from '../entities/Customer';
-import { CustomerFilterParams } from '../dtos/CustomerDtos';
+import { CustomerFilterParamsDto } from '../dtos/CustomerDtos';
+import { CommonStatus, CustomerType } from '../enums/CommonEnums';
 
 /**
  * Repository-Interface für Kunden
@@ -41,18 +42,65 @@ export interface ICustomerRepository extends IBaseRepository<Customer> {
   findByIdWithRelations(id: number): Promise<Customer | null>;
   
   /**
-   * Erstellt einen Kundeneintrag im Protokoll
+   * Findet Kunden mit erweiterten Filteroptionen
    * 
-   * @param data - Protokolldaten
-   * @returns Erstellter Protokolleintrag
+   * @param filters - Filterparameter
+   * @returns Gefundene Kunden mit Paginierung
    */
-  createCustomerLog(data: { customerId: number; userId?: number; action: string; details?: string; }): Promise<any>;
+  findCustomers(filters: CustomerFilterParamsDto): Promise<PaginationResult<Customer>>;
   
   /**
-   * Ruft das Protokoll eines Kunden ab
+   * Aktualisiert den Status eines Kunden
    * 
-   * @param customerId - Kunden-ID
-   * @returns Kundenprotokoll
+   * @param id - Kunden-ID
+   * @param status - Neuer Status
+   * @param updatedBy - ID des Benutzers, der die Änderung durchführt
+   * @returns Aktualisierter Kunde
    */
-  getCustomerLogs(customerId: number): Promise<any[]>;
+  updateStatus(id: number, status: CommonStatus, updatedBy?: number): Promise<Customer>;
+  
+  /**
+   * Führt einen Soft Delete eines Kunden durch
+   * 
+   * @param id - Kunden-ID
+   * @param updatedBy - ID des Benutzers, der die Löschung durchführt
+   * @returns Erfolg der Operation
+   */
+  softDelete(id: number, updatedBy?: number): Promise<boolean>;
+  
+  /**
+   * Aktualisiert die Newsletter-Einstellung eines Kunden
+   * 
+   * @param id - Kunden-ID
+   * @param subscribe - Newsletter abonnieren
+   * @param updatedBy - ID des Benutzers, der die Änderung durchführt
+   * @returns Aktualisierter Kunde
+   */
+  updateNewsletterSubscription(id: number, subscribe: boolean, updatedBy?: number): Promise<Customer>;
+  
+  /**
+   * Findet Kunden nach Typ
+   * 
+   * @param type - Kundentyp
+   * @param limit - Maximale Anzahl der Ergebnisse
+   * @returns Gefundene Kunden
+   */
+  findByType(type: CustomerType, limit?: number): Promise<Customer[]>;
+  
+  /**
+   * Findet Kunden nach Status
+   * 
+   * @param status - Kundenstatus
+   * @param limit - Maximale Anzahl der Ergebnisse
+   * @returns Gefundene Kunden
+   */
+  findByStatus(status: CommonStatus, limit?: number): Promise<Customer[]>;
+  
+  /**
+   * Findet kürzlich erstellte oder aktualisierte Kunden
+   * 
+   * @param limit - Maximale Anzahl der Ergebnisse
+   * @returns Gefundene Kunden
+   */
+  findRecent(limit?: number): Promise<Customer[]>;
 }

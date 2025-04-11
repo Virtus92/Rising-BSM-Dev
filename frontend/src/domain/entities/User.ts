@@ -1,6 +1,9 @@
 import { BaseEntity } from './BaseEntity';
 import { UserRole, UserStatus } from '../enums/UserEnums';
 
+// Re-export der Enums für einfachen Zugriff
+export { UserRole, UserStatus } from '../enums/UserEnums';
+
 /**
  * Benutzer-Entität
  * 
@@ -180,6 +183,14 @@ export class User extends BaseEntity {
   }
   
   /**
+   * Validiert das E-Mail-Format
+   */
+  isValidEmail(): boolean {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(this.email);
+  }
+  
+  /**
    * Aktualisiert den Benutzerstatus
    * 
    * @param status - Neuer Status
@@ -254,9 +265,23 @@ export class User extends BaseEntity {
       phone: this.phone,
       status: this.status,
       profilePicture: this.profilePicture,
-      lastLoginAt: this.lastLoginAt
+      lastLoginAt: this.lastLoginAt,
+      password: this.password,
+      resetToken: this.resetToken,
+      resetTokenExpiry: this.resetTokenExpiry
     };
     
     return { ...baseObject, ...safeData };
   }
 }
+
+// Type-alias für einfachere Verwendung der User-Klasse im Code
+export type UserType = {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+};

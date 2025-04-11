@@ -6,13 +6,23 @@ import {
   RefreshTokenResponseDto,
   ForgotPasswordDto,
   ResetPasswordDto,
-  LogoutDto
+  LogoutDto,
+  RegisterDto
 } from '../dtos/AuthDtos';
 
 /**
  * Service-Interface für Authentifizierung
  */
 export interface IAuthService {
+  /**
+   * Registriert einen neuen Benutzer
+   * 
+   * @param registerDto - Registrierungsdaten
+   * @param options - Service-Optionen
+   * @returns Registrierungsergebnis
+   */
+  register(registerDto: RegisterDto, options?: ServiceOptions): Promise<{ success: boolean; message?: string; data?: any }>;
+  
   /**
    * Führt den Login eines Benutzers durch
    * 
@@ -44,9 +54,10 @@ export interface IAuthService {
    * Validiert ein Token für das Zurücksetzen des Passworts
    * 
    * @param token - Token
+   * @param options - Service-Optionen
    * @returns Gültigkeit des Tokens
    */
-  validateResetToken(token: string): Promise<boolean>;
+  validateResetToken(token: string, options?: ServiceOptions): Promise<boolean>;
   
   /**
    * Setzt ein Passwort zurück
@@ -61,17 +72,28 @@ export interface IAuthService {
    * Führt den Logout eines Benutzers durch
    * 
    * @param userId - Benutzer-ID
-   * @param refreshToken - Refresh-Token (optional)
+   * @param logoutDto - Logout-Daten
    * @param options - Service-Optionen
    * @returns Logout-Ergebnis
    */
-  logout(userId: number, refreshToken?: string, options?: ServiceOptions): Promise<{ success: boolean; tokenCount: number }>;
+  logout(userId: number, logoutDto?: LogoutDto, options?: ServiceOptions): Promise<{ success: boolean; tokenCount: number }>;
   
   /**
-   * Generiert ein Token für das Zurücksetzen des Passworts (nur für Tests)
+   * Überprüft, ob ein Benutzer authentifiziert ist
    * 
-   * @param email - E-Mail-Adresse
-   * @returns Token und Ablaufzeitpunkt
+   * @param token - Access-Token
+   * @param options - Service-Optionen
+   * @returns Authentifizierungsstatus
    */
-  getResetTokenForTesting(email: string): Promise<{ token: string; expiry: Date }>;
+  verifyToken(token: string, options?: ServiceOptions): Promise<{ valid: boolean; userId?: number; }>;
+  
+  /**
+   * Überprüft, ob ein Benutzer die angegebene Rolle hat
+   * 
+   * @param userId - Benutzer-ID
+   * @param role - Zu überprüfende Rolle
+   * @param options - Service-Optionen
+   * @returns Ob der Benutzer die Rolle hat
+   */
+  hasRole(userId: number, role: string, options?: ServiceOptions): Promise<boolean>;
 }

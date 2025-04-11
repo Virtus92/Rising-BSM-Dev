@@ -4,13 +4,13 @@ services:
     image: postgres:13
     container_name: rising-bsm-db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: rising_bsm
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_DATABASE:-rising_bsm}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     networks:
       - rising-bsm-network
     healthcheck:
@@ -30,9 +30,9 @@ services:
     environment:
       - NODE_ENV=development
       - SEED_DATABASE=true
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/rising_bsm?schema=public
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:${DB_PORT:-5432}/${DB_DATABASE:-rising_bsm}?schema=public
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
       db:
         condition: service_healthy

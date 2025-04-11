@@ -1,155 +1,140 @@
-// Serverinitialisierung zuerst importieren
-import '@/lib/server/init';
-
 import { NextRequest, NextResponse } from 'next/server';
-import { createApiHandler } from '@/lib/server/core/api-handler';
-import { IDashboardService } from '@/lib/server/interfaces/IDashboardService';
-import { withAuth } from '@/lib/server/core/auth';
-import { ILoggingService } from '@/lib/server/interfaces/ILoggingService';
+import { PrismaClient } from '@prisma/client';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
 
-// Dienste, die für diese Route aufgelöst werden sollen
-const SERVICES_TO_RESOLVE = ['DashboardService', 'LoggingService'];
+const prisma = new PrismaClient();
 
 /**
  * GET /api/dashboard
- * Holt alle Daten für das Dashboard in einem Aufruf
+ * 
+ * Ruft Dashboard-Daten ab, einschließlich Statistiken zu Kunden, Terminen, Anfragen usw.
  */
-export const GET = withAuth(
-  async (req: NextRequest, user, services) => {
-    const { logger, DashboardService } = services as {
-      logger: ILoggingService;
-      DashboardService: IDashboardService;
+export const GET = apiRouteHandler(async (request: NextRequest) => {
+  try {
+    // Authentifizierung wird durch den apiRouteHandler geprüft
+
+    // Statistiken sammeln
+    const stats = {
+      // Kundenzahlen
+      customers: {
+        total: await prisma.customer.count({
+          where: { status: 'active' }
+        }),
+        new: await prisma.customer.count({
+          where: {
+            status: 'active',
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // Letzte 30 Tage
+          }
+        })
+      },
+
+      // Termine
+      appointments: {
+        total: await prisma.appointment.count(),
+        upcoming: await prisma.appointment.count({
+          where: {
+            appointmentDate: { gte: new Date() },
+            status: { in: ['planned', 'confirmed'] }
+          }
+        }),
+        today: await prisma.appointment.count({
+          where: {
+            appointmentDate: {
+              gte: new Date(new Date().setHours(0, 0, 0, 0)),
+              lt: new Date(new Date().setHours(23, 59, 59, 999))
+            }
+          }
+        })
+      },
+
+      // Anfragen
+      requests: {
+        total: await prisma.contactRequest.count(),
+        new: await prisma.contactRequest.count({
+          where: { status: 'new' }
+        }),
+        inProgress: await prisma.contactRequest.count({
+          where: { status: 'in_progress' }
+        }),
+        completed: await prisma.contactRequest.count({
+          where: { status: 'completed' }
+        })
+      }
     };
-    
-    logger.debug('Dashboard-Daten-Anfrage empfangen');
-    
-    try {
-      // Alle Dashboard-Daten parallel laden für bessere Performance
-      const [
-        metrics,
-        recentProjects,
-        upcomingAppointments,
-        projectStats,
-        appointmentStats,
-        customerStats,
-        recentActivities
-      ] = await Promise.all([
-        DashboardService.getMetrics(),
-        DashboardService.getRecentProjects(5),
-        DashboardService.getUpcomingAppointments(5),
-        DashboardService.getProjectStatsByStatus(),
-        DashboardService.getAppointmentStatsByStatus(),
-        DashboardService.getCustomerStatsByStatus(),
-        DashboardService.getRecentActivities(10)
-      ]);
-      
-      // Verarbeite Termine, um sicherzustellen, dass Kundendaten als Strings vorhanden sind
-      const processedAppointments = upcomingAppointments.map((appointment: any) => {
-        // Wenn customer ein Objekt ist, extrahiere den Namen
-        if (appointment.customer && typeof appointment.customer === 'object') {
-          appointment.customerName = appointment.customer.name || 'Kein Name';
-          // Setze customer als String (nur zur Sicherheit)
-          appointment.customer = appointment.customerName;
-        } else if (!appointment.customerName && typeof appointment.customer === 'string') {
-          appointment.customerName = appointment.customer;
-        } else if (!appointment.customer && !appointment.customerName) {
-          appointment.customerName = 'Kein Kunde zugewiesen';
-          appointment.customer = 'Kein Kunde zugewiesen';
-        }
-        
-        return appointment;
-      });
-      
-      // Chart-Daten aus den Statistiken erstellen
-      const projectStatusChart = {
-        labels: (projectStats as any[]).map(stat => stat.status),
-        data: (projectStats as any[]).map(stat => Number(stat.count))
-      };
-      
-      const appointmentStatusChart = {
-        labels: (appointmentStats as any[]).map(stat => stat.status),
-        data: (appointmentStats as any[]).map(stat => Number(stat.count))
-      };
-      
-      const customerStatusChart = {
-        labels: (customerStats as any[]).map(stat => stat.status),
-        data: (customerStats as any[]).map(stat => Number(stat.count))
-      };
-      
-      // Leeres Chart für Revenue, wenn keine Daten vorhanden sind
-      const revenueChart = {
-        labels: [],
-        data: []
-      };
-      
-      // TODO: Revenue-Daten abrufen
-      logger.warn('Revenue Chart benötigt Implementierung vom Backend!');
-      
-      // Dashboard-Daten zusammenstellen
-      const dashboardData = {
-        stats: {
-          // Metriken in dem Format umstrukturieren, das das Frontend erwartet
-          totalCustomers: { count: metrics.customers.total, trend: metrics.customers.new || 0 },
-          activeProjects: { count: metrics.projects.active, trend: 0 },
-          newRequests: { count: metrics.projects.active - metrics.projects.completed, trend: 0 },
-          
-          // Originale Metriken beibehalten für vollständige Daten
-          customers: metrics.customers,
-          projects: metrics.projects,
-          appointments: metrics.appointments,
-          services: metrics.services,
-          notifications: metrics.notifications
+
+    // Aktuelle Termine (kommende 7 Tage)
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    const upcomingAppointments = await prisma.appointment.findMany({
+      where: {
+        appointmentDate: {
+          gte: new Date(),
+          lt: nextWeek
         },
-        
-        // Chart-Daten
-        charts: {
-        revenue: revenueChart,
-        projectStatus: projectStatusChart,
-        appointmentStatus: appointmentStatusChart,
-        customerStatus: customerStatusChart,
-        services: projectStatusChart // Als Ersatz verwenden wir die Projektstatistiken
-        },
-        
-        // Einfacher Zugriff auf Revenue-Chart (für bestehende Integration)
-        revenue: revenueChart,
-        
-        // Listen-Daten
-        recentProjects,
-        upcomingAppointments: processedAppointments,
-        recentActivity: recentActivities,
-        
-        // Zusätzliche leere Arrays für Kompatibilität
-        notifications: []
-      };
-      
-      logger.info('Dashboard-Daten erfolgreich geladen', {
-        projectCount: recentProjects.length,
-        appointmentCount: processedAppointments.length,
-        activityCount: recentActivities.length
-      });
-      
-      return NextResponse.json({
-        success: true,
-        data: dashboardData,
-        meta: {
-          timestamp: new Date().toISOString()
+        status: { in: ['planned', 'confirmed'] }
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true
+          }
         }
-      });
-    } catch (error: any) {
-      logger.error('Fehler beim Laden der Dashboard-Daten', error);
-      
-      const statusCode = error.statusCode || 500;
-      return NextResponse.json(
-        {
-          success: false,
-          error: error.message || 'Interner Serverfehler beim Laden der Dashboard-Daten',
-          meta: {
-            timestamp: new Date().toISOString()
+      },
+      orderBy: {
+        appointmentDate: 'asc'
+      },
+      take: 5
+    });
+
+    // Neue Kontaktanfragen
+    const recentRequests = await prisma.contactRequest.findMany({
+      where: {
+        status: { in: ['new', 'in_progress'] }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 5
+    });
+
+    // Letzte Kundenaktivitäten
+    const recentCustomerActivities = await prisma.customerLog.findMany({
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true
           }
         },
-        { status: statusCode }
-      );
-    }
-  },
-  SERVICES_TO_RESOLVE
-);
+        user: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 10
+    });
+
+    return formatSuccess({
+        stats,
+        upcomingAppointments,
+        recentRequests,
+        recentCustomerActivities
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+    return formatError(
+      error instanceof Error ? error.message : 'Server-Fehler beim Abrufen der Dashboard-Daten',
+      500
+    );
+  }
+});

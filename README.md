@@ -1,225 +1,173 @@
-# Rising BSM - Business Service Management
+# RISING-BSM
 
-## Projektübersicht
+## Business Service Management System
 
-Rising BSM ist eine modulare Business Service Management Anwendung für die Verwaltung von Kunden, Projekten, Dienstleistungen und Terminen. Die Anwendung bietet umfassende Features zur Kundenbetreuung, Projektverwaltung, Terminplanung und Rechnungsstellung.
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Status](https://img.shields.io/badge/status-entwicklung-orange)
 
-## Architektur
+RISING-BSM ist ein umfassendes Business Service Management System, das für die Verwaltung von Facility Management Services entwickelt wurde. Es ermöglicht die effiziente Verwaltung von Kundenanfragen, Terminen, Kundendaten und Mitarbeitern in einer einzigen Anwendung.
 
-Die Anwendung ist mit Next.js und Typescript implementiert und nutzt einen Domain-Driven-Design (DDD) Ansatz. Die Architektur besteht aus folgenden Hauptkomponenten:
+## 📋 Inhaltsverzeichnis
 
-### Frontend
+- [Übersicht](#übersicht)
+- [Projektstruktur](#projektstruktur)
+- [Technologie-Stack](#technologie-stack)
+- [Installation](#installation)
+- [Entwicklung](#entwicklung)
+- [Produktivumgebung](#produktivumgebung)
+- [Architektur](#architektur)
+- [API-Dokumentation](#api-dokumentation)
 
-- **Next.js App Router**: Für das Routing und die Seitenstruktur
-- **React**: Für die UI-Komponenten
-- **Tailwind CSS**: Für das Styling
+## 🔍 Übersicht
 
-### Backend
+RISING-BSM ist eine All-in-One-Lösung für Facility Management Unternehmen. Die Anwendung umfasst:
 
-- **Next.js API Routes**: Für die API-Implementierung
-- **Prisma ORM**: Für den Datenbankzugriff
-- **PostgreSQL**: Als primäre Datenbank
+- **Öffentliche Website** zur Präsentation des Unternehmens und Services
+- **Kontaktanfragen-Management** für eingehende Kundenanfragen
+- **Kunden-Management** zur Verwaltung von Kundendaten und -beziehungen
+- **Termin-Management** zur Planung und Überwachung von Kundenterminen
+- **Dashboard** mit Kennzahlen und Statistiken
+- **Benutzerverwaltung** mit verschiedenen Berechtigungsstufen
 
-### Architekturlayer
+## 🏗️ Projektstruktur
 
-Die Backend-Implementierung folgt einer mehrschichtigen Architektur:
-
-1. **Entitäten** (`/src/types/entities`): TypeScript Interfaces, die die Domänenmodelle definieren
-2. **DTOs** (`/src/types/dtos`): Data Transfer Objects für Ein- und Ausgaben
-3. **Repositories** (`/src/lib/repositories`): Datenzugriffsschicht für Datenbankoperationen
-4. **Services** (`/src/lib/services`): Geschäftslogik und Domänenoperationen
-5. **API-Routen** (`/src/app/api`): API-Endpunkte und Controller
-
-## Datestruktur
+Das Projekt ist in einem monorepo-ähnlichen Aufbau organisiert:
 
 ```
-/frontend
-├── prisma/              # Prisma Schema und Migrations
-├── public/              # Statische Assets
-└── src/
-    ├── app/             # Next.js App Router
-    │   ├── api/         # API-Routen
-    │   └── ...          # Frontend-Seiten
-    ├── components/      # React-Komponenten
-    ├── contexts/        # React-Kontexte
-    ├── lib/             # Backend-Implementierung
-    │   ├── core/        # Basis-Abstraktionen (BaseRepository, BaseService)
-    │   ├── repositories/# Repository-Implementierungen
-    │   ├── services/    # Service-Implementierungen
-    │   └── utils/       # Hilfsfunktionen
-    ├── providers/       # React-Provider
-    └── types/           # TypeScript-Definitionen
-        ├── dtos/        # Data Transfer Objects
-        ├── entities/    # Domänenmodelle
-        ├── enums/       # Enumerationen
-        └── interfaces/  # Interfaces
+Rising-BSM/
+├── frontend/           # Next.js Frontend + API (Backend-for-Frontend Pattern)
+│   ├── src/
+│   │   ├── app/        # Next.js App Router
+│   │   ├── domain/     # Domänenlogik, Entitäten, DTOs
+│   │   ├── features/   # Feature-Module
+│   │   ├── infrastructure/ # Infrastrukturcode, Repositories, Services
+│   │   └── shared/     # Gemeinsame Komponenten und Utilities
+│   ├── prisma/         # Prisma ORM Schema & Migrationen
+│   └── public/         # Statische Assets
+└── docker-compose.yml  # Docker-Compose für Entwicklung und Produktion
 ```
 
-## Kernkonzepte
+## 🔧 Technologie-Stack
 
-### Repository-Pattern
+### Frontend & API
+- **Next.js**: React-Framework mit serverseitigen Komponenten und API-Routen
+- **TypeScript**: Typsicheres JavaScript
+- **Tailwind CSS**: Utility-first CSS-Framework
+- **React Query**: State Management für asynchrone Daten
+- **Zod**: Schema-Validierung
+- **React Hook Form**: Formularverarbeitung
 
-Repositories sind für den Datenzugriff verantwortlich und kapseln die Datenbankoperationen. Sie bieten eine einheitliche Schnittstelle für den Zugriff auf die Domänenmodelle.
+### Backend & Datenbank
+- **Next.js API Routes**: Backend-for-Frontend API
+- **Prisma ORM**: Datenbankabstraktion und Migration
+- **PostgreSQL**: Relationale Datenbank
+- **JWT**: Authentifizierung und Autorisierung
+- **bcrypt**: Sicheres Passwort-Hashing
 
-```typescript
-// Beispiel: UserRepository
-export class UserRepository extends BaseRepository<IUser, number> {
-  async findByEmail(email: string): Promise<IUser | null> {
-    // Implementierung...
-  }
-}
-```
+### Infrastruktur
+- **Docker**: Containerisierung
+- **Docker Compose**: Container-Orchestrierung
 
-### Service-Pattern
-
-Services kapseln die Geschäftslogik und orchestrieren die Repository-Operationen. Sie sind für die Validierung, Autorisierung und andere Business Rules verantwortlich.
-
-```typescript
-// Beispiel: UserService
-export class UserService extends BaseService<IUser, CreateUserDto, UpdateUserDto, UserResponseDto> {
-  async authenticate(email: string, password: string): Promise<UserResponseDto | null> {
-    // Implementierung...
-  }
-}
-```
-
-### Factory-Pattern
-
-Factories werden verwendet, um Services und Repositories mit ihren Abhängigkeiten zu instanziieren und bieten eine einheitliche Schnittstelle für den Zugriff.
-
-```typescript
-// Beispiel: getUserService
-export function getUserService() {
-  return new UserService(
-    getUserRepository(),
-    createLogger('UserService'),
-    validationService,
-    errorHandler
-  );
-}
-```
-
-### Einheitliche API-Antworten
-
-Alle API-Endpunkte verwenden ein einheitliches Antwortformat, um Konsistenz zu gewährleisten.
-
-```typescript
-// Beispiel: Erfolgreiches Abrufen eines Benutzers
-return apiResponse.success(user, 'User retrieved successfully');
-
-// Beispiel: Fehlerbehandlung
-return apiResponse.notFound(`User with ID ${id} not found`);
-```
-
-## Entwicklungsumgebung
+## 🚀 Installation
 
 ### Voraussetzungen
-
-- Node.js >= 18
+- Node.js (Version 18 oder höher)
 - Docker und Docker Compose
-- npm oder yarn
+- Git
 
-### Installation
+### Setup
 
-1. Repository klonen
-   ```
-   git clone https://github.com/your-username/rising-bsm.git
-   cd rising-bsm
-   ```
-
-2. Abhängigkeiten installieren
-   ```
-   cd frontend
-   npm install
+1. Repository klonen:
+   ```bash
+   git clone <repository-url>
+   cd Rising-BSM
    ```
 
-3. Umgebungsvariablen einrichten
-   ```
-   cp .env.example .env
-   ```
-   Dann .env-Datei bearbeiten und die entsprechenden Werte setzen.
-
-4. Entwicklungsumgebung mit Docker starten
-   ```
-   docker-compose up -d
+2. Umgebungsvariablen einrichten:
+   ```bash
+   # Im frontend-Verzeichnis
+   cp .env.local.example .env.local
+   # Dann die Umgebungsvariablen anpassen
    ```
 
-5. Datenbank migrieren und Prisma Client generieren
-   ```
-   npm run prisma:generate
-   npm run db:migrate
-   ```
-
-6. Entwicklungsserver starten
-   ```
-   npm run dev
+3. Mit Docker starten:
+   ```bash
+   docker-compose up
    ```
 
-### Verfügbare Scripts
+4. Die Anwendung ist nun unter http://localhost:3000 erreichbar.
 
-- **npm run dev**: Startet den Entwicklungsserver
-- **npm run build**: Erstellt eine Produktions-Build
-- **npm run start**: Startet die Anwendung im Produktionsmodus
-- **npm run lint**: Führt ESLint aus
-- **npm run prisma:generate**: Generiert den Prisma Client
-- **npm run db:migrate**: Führt Datenbankmigrationen aus
-- **npm run db:seed**: Füllt die Datenbank mit Testdaten
+## 💻 Entwicklung
 
-## Deployment
-
-### Docker
-
-Die Anwendung kann mit Docker Compose in Produktion bereitgestellt werden:
-
+### Lokale Entwicklung
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+# Ins frontend-Verzeichnis wechseln
+cd frontend
+
+# Abhängigkeiten installieren
+npm install
+
+# Prisma Client generieren
+npm run prisma:generate
+
+# Datenbank migrieren 
+npm run db:migrate
+
+# Entwicklungsserver starten
+npm run dev
 ```
 
-### Manuelles Deployment
+### Nützliche Skripte
+- `npm run dev`: Startet den Entwicklungsserver
+- `npm run build`: Baut die Anwendung für die Produktion
+- `npm run start`: Startet die gebaute Anwendung
+- `npm run lint`: Führt ESLint aus
+- `npm run test`: Führt Tests aus
+- `npm run db:migrate`: Führt Datenbankmigrationen aus
+- `npm run db:seed`: Befüllt die Datenbank mit Testdaten
+- `npm run db:studio`: Startet Prisma Studio für die Datenbankansicht
 
-1. Produktions-Build erstellen
-   ```
+## 🌍 Produktivumgebung
+
+### Deployment
+
+1. Produktions-Build erstellen:
+   ```bash
+   cd frontend
    npm run build
    ```
 
-2. Abhängigkeiten für Produktion installieren
-   ```
-   npm ci --production
-   ```
-
-3. Prisma Client generieren
-   ```
-   npm run prisma:generate
+2. Mit Docker Compose für Produktion starten:
+   ```bash
+   docker-compose -f docker-compose.prod.yml up -d
    ```
 
-4. Anwendung im Produktionsmodus starten
-   ```
-   npm run start
-   ```
+## 🏛️ Architektur
 
-## Best Practices
+Die Anwendung folgt einer Domain-Driven Design (DDD) Architektur mit klarer Trennung von:
 
-### API-Entwicklung
+- **Domain**: Geschäftslogik, Entitäten, Repositories und Services Interfaces
+- **Infrastructure**: Konkrete Implementierungen von Repositories und Services
+- **Features**: Feature-Module für die UI-Komponenten und -Logik
+- **Shared**: Gemeinsam genutzte Komponenten und Utilities
 
-- Verwende die standardisierten API-Response-Funktionen
-- Implementiere Fehlerbehandlung in jedem API-Endpunkt
-- Validiere alle Eingaben
-- Dokumentiere API-Endpunkte mit JSDoc-Kommentaren
+### Architektonische Prinzipien:
+- **Dependency Inversion**: Verwendung von Interfaces für lose Kopplung
+- **Repository Pattern**: Abstraktion der Datenpersistenz
+- **Service Layer**: Geschäftslogik in Services gekapselt
+- **Clean Architecture**: Klare Trennung von Domäne, Anwendung und Infrastruktur
 
-### Repository/Service-Entwicklung
+## 📚 API-Dokumentation
 
-- Verwende BaseRepository und BaseService als Basis
-- Halte die Services und Repositories klein und fokussiert
-- Implementiere Business-Logik in Services, nicht in Repositories
-- Repositories sollten nur Datenbankoperationen durchführen
+Die API-Dokumentation ist im OpenAPI-Format verfügbar:
 
-### Typsicherheit
+- **Entwicklung**: http://localhost:3000/api-docs
 
-- Definiere alle Entitäten als TypeScript-Interfaces
-- Verwende DTOs für Ein- und Ausgabe
-- Nutze Enums für Status- und Typwerte
-- Vermeide `any` und verwende stattdessen spezifische Typen
+### Hauptendpunkte:
 
-## Kontakt
-
-Bei Fragen oder Problemen wenden Sie sich bitte an den Projektinhaber.
+- `/api/auth/*`: Authentifizierung (Login, Register, Refresh)
+- `/api/users/*`: Benutzerverwaltung
+- `/api/customers/*`: Kundenverwaltung
+- `/api/requests/*`: Anfragenverwaltung
+- `/api/appointments/*`: Terminverwaltung
+- `/api/dashboard/*`: Dashboard-Daten

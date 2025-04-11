@@ -1,41 +1,27 @@
 import { ILoggingService, LogLevel, LogFormat, LoggingOptions } from './ILoggingService';
 
 /**
- * Implementierung des Logging-Services
+ * LoggingService
+ * 
+ * Implementation von ILoggingService mit Logging-Funktionalität.
+ * Kann an verschiedene Logging-Bibliotheken angepasst werden (Winston, Pino, etc.).
  */
 export class LoggingService implements ILoggingService {
-  /**
-   * Aktuelles Log-Level
-   */
   private level: LogLevel;
-  
-  /**
-   * Aktuelles Log-Format
-   */
   private format: LogFormat;
-  
-  /**
-   * Globaler Kontext für alle Logs
-   */
   private context: Record<string, any> = {};
-  
-  /**
-   * Timer für Performance-Messung
-   */
   private timers: Map<string, number> = new Map();
   
-  /**
-   * Prioritäten der Log-Level
-   */
+  // Prioritäten für die Log-Level
   private readonly LOG_LEVEL_PRIORITIES: Record<LogLevel, number> = {
     [LogLevel.ERROR]: 3,
     [LogLevel.WARN]: 2,
     [LogLevel.INFO]: 1,
     [LogLevel.DEBUG]: 0
   };
-  
+
   /**
-   * Konstruktor
+   * Erstellt eine neue LoggingService-Instanz
    * 
    * @param options - Logging-Optionen
    */
@@ -50,49 +36,49 @@ export class LoggingService implements ILoggingService {
     // Initialisiere transportspezifische Einstellungen
     this.initializeTransports(options);
   }
-  
+
   /**
-   * Protokolliert eine informative Nachricht
+   * Protokolliert eine Info-Nachricht
    * 
-   * @param message - Nachricht
-   * @param meta - Metadaten
+   * @param message - Log-Nachricht
+   * @param meta - Optionale Metadaten
    */
   public info(message: string, meta?: Record<string, any>): void {
     if (this.isLevelEnabled(LogLevel.INFO)) {
       this.log(LogLevel.INFO, message, meta);
     }
   }
-  
+
   /**
    * Protokolliert eine Debug-Nachricht
    * 
-   * @param message - Nachricht
-   * @param meta - Metadaten
+   * @param message - Log-Nachricht
+   * @param meta - Optionale Metadaten
    */
   public debug(message: string, meta?: Record<string, any>): void {
     if (this.isLevelEnabled(LogLevel.DEBUG)) {
       this.log(LogLevel.DEBUG, message, meta);
     }
   }
-  
+
   /**
-   * Protokolliert eine Warnung
+   * Protokolliert eine Warn-Nachricht
    * 
-   * @param message - Nachricht
-   * @param meta - Metadaten
+   * @param message - Log-Nachricht
+   * @param meta - Optionale Metadaten
    */
   public warn(message: string, meta?: Record<string, any>): void {
     if (this.isLevelEnabled(LogLevel.WARN)) {
       this.log(LogLevel.WARN, message, meta);
     }
   }
-  
+
   /**
-   * Protokolliert einen Fehler
+   * Protokolliert eine Fehlermeldung
    * 
-   * @param message - Nachricht
+   * @param message - Log-Nachricht
    * @param error - Fehler oder Metadaten
-   * @param meta - Metadaten
+   * @param meta - Optionale Metadaten
    */
   public error(message: string, error?: Error | string | Record<string, any>, meta?: Record<string, any>): void {
     if (this.isLevelEnabled(LogLevel.ERROR)) {
@@ -121,7 +107,7 @@ export class LoggingService implements ILoggingService {
       this.log(LogLevel.ERROR, message, { ...metaData, error: errorData });
     }
   }
-  
+
   /**
    * Protokolliert eine HTTP-Anfrage
    * 
@@ -151,7 +137,7 @@ export class LoggingService implements ILoggingService {
       }
     }
   }
-  
+
   /**
    * Erstellt einen Child-Logger mit zusätzlichem Kontext
    * 
@@ -171,7 +157,7 @@ export class LoggingService implements ILoggingService {
     
     return childLogger;
   }
-  
+
   /**
    * Startet einen Timer
    * 
@@ -181,7 +167,7 @@ export class LoggingService implements ILoggingService {
     this.timers.set(label, Date.now());
     return label;
   }
-  
+
   /**
    * Beendet einen Timer und protokolliert die Dauer
    * 
@@ -204,7 +190,7 @@ export class LoggingService implements ILoggingService {
       this.warn(`Timer ${timerId} not found`, { timerId });
     }
   }
-  
+
   /**
    * Prüft, ob ein Log-Level aktiviert ist
    * 
@@ -213,7 +199,7 @@ export class LoggingService implements ILoggingService {
   public isLevelEnabled(level: LogLevel): boolean {
     return this.LOG_LEVEL_PRIORITIES[level] >= this.LOG_LEVEL_PRIORITIES[this.level];
   }
-  
+
   /**
    * Initialisiert die Logging-Transports
    * 
@@ -223,7 +209,7 @@ export class LoggingService implements ILoggingService {
     // Standardimplementierung richtet einfach die Konsole ein
     // In einer echten Implementierung würden hier Transports basierend auf Optionen konfiguriert
   }
-  
+
   /**
    * Interne Logging-Methode
    * 
@@ -269,7 +255,7 @@ export class LoggingService implements ILoggingService {
         break;
     }
   }
-  
+
   /**
    * Gibt den ANSI-Farbcode für ein Log-Level zurück
    * 
@@ -289,7 +275,7 @@ export class LoggingService implements ILoggingService {
         return '\x1b[0m'; // Reset
     }
   }
-  
+
   /**
    * Formatiert einen Fehler für das Logging
    * 
@@ -311,3 +297,6 @@ export class LoggingService implements ILoggingService {
     };
   }
 }
+
+// Export der Enum-Typen für die Verwendung in bootstrap.ts
+export { LogLevel, LogFormat };

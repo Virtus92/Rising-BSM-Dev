@@ -8,6 +8,8 @@ import {
 } from './IValidationService';
 import { ILoggingService } from '../logging/ILoggingService';
 import { IErrorHandler, ValidationError } from '../error/ErrorHandler';
+import { ValidationResult as DomainValidationResult, ValidationErrorType } from '@/domain/enums/ValidationResults';
+import { createErrorValidation, createSuccessValidation, ValidationResultDto, ValidationErrorDto } from '@/domain/dtos/ValidationDto';
 
 /**
  * Implementierung des Validierungsdienstes
@@ -101,7 +103,7 @@ export class ValidationService implements IValidationService {
    * @param options - Validierungsoptionen
    * @returns Validierungsergebnis
    */
-  validate<T>(data: any, schema: ValidationSchema, options?: ValidationOptions): ValidationResult<T> {
+  validate<T = any>(data: any, schema: ValidationSchema, options?: ValidationOptions): ValidationResult<T> {
     // Standardoptionen
     const opts = {
       throwOnError: false,
@@ -267,8 +269,13 @@ export class ValidationService implements IValidationService {
    * @param schema - Validierungsschema
    * @returns Validierungsergebnis
    */
-  validateOrThrow<T>(data: any, schema: ValidationSchema): ValidationResult<T> {
-    return this.validate<T>(data, schema, { throwOnError: true });
+  validateOrThrow<T extends Record<string, any> | undefined = any>(data: any, schema: ValidationSchema): ValidationResultDto {
+    const result = this.validate<T>(data, schema, { throwOnError: true });
+    
+    return {
+      result: DomainValidationResult.SUCCESS,
+      data: result.validatedData
+    };
   }
   
   /**

@@ -7,8 +7,9 @@ import {
   UserDetailResponseDto,
   ChangePasswordDto,
   UpdateUserStatusDto,
-  UserFilterParams
+  UserFilterParamsDto
 } from '../dtos/UserDtos';
+import { ActivityLogDto } from '../dtos/ActivityLogDto';
 import { PaginationResult } from '../repositories/IBaseRepository';
 
 /**
@@ -19,17 +20,19 @@ export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUs
    * Findet einen Benutzer anhand seiner E-Mail-Adresse
    * 
    * @param email - E-Mail-Adresse
+   * @param options - Service-Optionen
    * @returns Gefundener Benutzer oder null
    */
-  findByEmail(email: string): Promise<UserResponseDto | null>;
+  findByEmail(email: string, options?: ServiceOptions): Promise<UserResponseDto | null>;
   
   /**
    * Findet einen Benutzer anhand seines Namens
    * 
    * @param name - Name
+   * @param options - Service-Optionen
    * @returns Gefundener Benutzer oder null
    */
-  findByName(name: string): Promise<UserResponseDto | null>;
+  findByName(name: string, options?: ServiceOptions): Promise<UserResponseDto | null>;
   
   /**
    * Ruft detaillierte Benutzerinformationen ab
@@ -44,9 +47,10 @@ export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUs
    * Findet Benutzer mit erweiterten Filteroptionen
    * 
    * @param filters - Filterparameter
+   * @param options - Service-Optionen
    * @returns Gefundene Benutzer mit Paginierung
    */
-  findUsers(filters: UserFilterParams): Promise<PaginationResult<UserResponseDto>>;
+  findUsers(filters: UserFilterParamsDto, options?: ServiceOptions): Promise<PaginationResult<UserResponseDto>>;
   
   /**
    * Ändert das Passwort eines Benutzers
@@ -80,9 +84,20 @@ export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUs
   /**
    * Ruft Benutzerstatistiken ab
    * 
+   * @param options - Service-Optionen
    * @returns Benutzerstatistiken
    */
-  getUserStatistics(): Promise<any>;
+  getUserStatistics(options?: ServiceOptions): Promise<any>;
+  
+  /**
+   * Ruft die Aktivitäten eines Benutzers ab
+   * 
+   * @param userId - Benutzer-ID
+   * @param limit - Maximale Anzahl der Ergebnisse
+   * @param options - Service-Optionen
+   * @returns Benutzeraktivitäten
+   */
+  getUserActivity(userId: number, limit?: number, options?: ServiceOptions): Promise<ActivityLogDto[]>;
   
   /**
    * Führt einen Soft Delete eines Benutzers durch
@@ -107,7 +122,8 @@ export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUs
    * 
    * @param email - E-Mail-Adresse
    * @param password - Passwort
+   * @param options - Service-Optionen
    * @returns Authentifizierter Benutzer oder null
    */
-  authenticate(email: string, password: string): Promise<UserResponseDto | null>;
+  authenticate(email: string, password: string, options?: ServiceOptions): Promise<UserResponseDto | null>;
 }

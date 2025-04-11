@@ -160,30 +160,25 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
   async transaction<R>(callback: () => Promise<R>): Promise<R> {
     try {
       // Verwende Prismas Transaktions-API
-      return await this.prisma.$transaction(async (tx) => {
-        // Speichere Transaktions-Client
-        this.prismaTransaction = tx;
-        
-        try {
-          // Führe Operation aus
-          const result = await callback();
-          
-          // Lösche Transaktions-Client
-          this.prismaTransaction = null;
-          
-          return result;
-        } catch (error) {
-          // Lösche Transaktions-Client
-          this.prismaTransaction = null;
-          
-          // Wirf Fehler erneut, um Rollback auszulösen
-          throw error;
+      return await this.prisma.$transaction(
+        async (tx) => {
+          try {
+            // Speichere Transaktions-Client
+            this.prismaTransaction = tx;
+            
+            // Führe Operation aus
+            return await callback();
+          } finally {
+            // Lösche Transaktions-Client (wird immer ausgeführt)
+            this.prismaTransaction = null;
+          }
+        },
+        {
+          // Transaktionsoptionen
+          maxWait: 5000, // 5s maximale Wartezeit
+          timeout: 10000, // 10s maximale Transaktionszeit
         }
-      }, {
-        // Transaktionsoptionen
-        maxWait: 5000, // 5s maximale Wartezeit
-        timeout: 10000, // 10s maximale Transaktionszeit
-      });
+      );
     } catch (error) {
       this.logger.error('Transaction error', { error });
       throw this.handleError(error);

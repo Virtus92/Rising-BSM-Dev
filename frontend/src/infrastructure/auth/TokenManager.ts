@@ -1,0 +1,548 @@
+/**
+ * Token Management-Service for client-side authentication
+ * This class handles token validation and integration with HTTP-only cookies set by the server
+ */
+import { jwtDecode } from 'jwt-decode';
+import { TokenPayloadDto } from '@/domain/dtos/AuthDtos';
+import { getLogger } from '@/infrastructure/common/logging';
+
+/**
+ * Service for managing auth tokens in the browser
+ * Works with HTTP-only cookies set by the server
+ */
+export class TokenManager {
+  /**
+   * Initializes the TokenManager and checks authentication status
+   * 
+   * @param autoRefresh - Whether to automatically refresh expired tokens
+   * @returns Promise that returns true if a valid token is present
+   */
+  static async initialize(autoRefresh: boolean = true): Promise<boolean> {
+    const logger = getLogger();
+    logger.debug('Initializing TokenManager');
+    
+    // First synchronize tokens between localStorage and cookies to recover from issues
+    this.synchronizeTokens();
+    
+    // Since we work with HTTP-only cookies, we need to make an API call
+    // to check if we're authenticated
+    if (autoRefresh) {
+      logger.debug('Attempting to verify authentication');
+      try {
+        // Check authentication by calling /api/users/me
+        const response = await fetch('/api/users/me', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        // If we get a 200 response, we're authenticated
+        if (response.ok) {
+          logger.debug('User is authenticated');
+          return true;
+        }
+        
+        // For 401 or other errors, try a token refresh
+        logger.debug('User not authenticated with current token, attempting refresh');
+        return await this.refreshAccessToken();
+      } catch (error) {
+        logger.error('Error checking authentication:', { error });
+        return false;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Synchronizes tokens between localStorage backups and cookies
+   * This helps recover from scenarios where cookies aren't properly set
+   */
+  static synchronizeTokens(): void {
+    // Only run in client-side
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+    
+    const logger = getLogger();
+    logger.debug('Synchronizing tokens between localStorage and cookies');
+    
+    try {
+      // Check for backup tokens in localStorage
+      const authTokenBackup = localStorage.getItem('auth_token_backup');
+      const refreshTokenBackup = localStorage.getItem('refresh_token_backup');
+      
+      // Get current cookies
+      const cookies = document.cookie.split(';').map(c => c.trim());
+      const hasAuthCookie = cookies.some(c => c.startsWith('auth_token='));
+      const hasRefreshCookie = cookies.some(c => c.startsWith('refresh_token='));
+      
+      // If we have backup but no cookie, set temporary client-side cookies
+      // This will help until the next API call refreshes them properly
+      if (authTokenBackup && !hasAuthCookie) {
+        logger.debug('Setting auth_token cookie from backup');
+        document.cookie = `auth_token=${authTokenBackup};path=/;max-age=3600`;
+      }
+      
+      if (refreshTokenBackup && !hasRefreshCookie) {
+        logger.debug('Setting refresh_token cookie from backup');
+        document.cookie = `refresh_token=${refreshTokenBackup};path=/;max-age=86400`;
+      }
+      
+      // If auth_token in localStorage is undefined but we have a backup,
+      // update it to maintain compatibility with any legacy code
+      if (authTokenBackup && localStorage.getItem('auth_token') === 'undefined') {
+        logger.debug('Fixing undefined auth_token in localStorage');
+        localStorage.setItem('auth_token', authTokenBackup);
+      }
+    } catch (error) {
+      logger.error('Error synchronizing tokens:', { error });
+    }
+  }
+  
+  /**
+   * Notifies the application about authentication state changes
+   * Note: Actual tokens are managed by HTTP-only cookies set by the server
+   * 
+   * @param isAuthenticated - Whether the user is authenticated
+   */
+  // Debounce flag to prevent multiple auth change notifications in a short period
+  private static isNotifying: boolean = false;
+  private static notificationTimeout: any = null;
+  
+  // Set a minimum interval between auth notifications to avoid cascade effects
+  private static lastEventTime = 0;
+  private static readonly MIN_EVENT_INTERVAL = 300;
+  private static readonly AUTH_COOLDOWN = 2000; // 2 second cooldown after auth changes
+
+  public static getLastAuthChangeTime(): number {
+    return this.lastAuthChange;
+  }
+  private static notificationDebounceTimer: any = null;
+  private static pendingNotifications: Array<{isAuthenticated: boolean, timestamp: number}> = [];
+  public static lastAuthChange = 0;
+  
+  /**
+   * Notifies the application about authentication state changes
+   * Uses debouncing and queuing to ensure all state changes are processed
+   *
+   * @param isAuthenticated - Whether the user is authenticated
+   */
+  static notifyAuthChange(isAuthenticated: boolean): void {
+    const logger = getLogger();
+    const now = Date.now();
+    
+    // Synchronize tokens on auth change to ensure consistency
+    this.synchronizeTokens();
+    
+    // Add to pending notifications queue
+    this.pendingNotifications.push({isAuthenticated, timestamp: now});
+    logger.debug('Added auth change to queue', {
+      isAuthenticated,
+      queueLength: this.pendingNotifications.length
+    });
+
+    // Skip if in cooldown period or too soon after previous event
+    if (now - this.lastAuthChange < this.AUTH_COOLDOWN ||
+        now - this.lastEventTime < this.MIN_EVENT_INTERVAL) {
+      logger.debug('Auth change notification throttled');
+      return;
+    }
+    
+    // Clear any pending timers
+    if (this.notificationTimeout) {
+      clearTimeout(this.notificationTimeout);
+    }
+    if (this.notificationDebounceTimer) {
+      clearTimeout(this.notificationDebounceTimer);
+    }
+    
+    // Process the queue after debounce delay
+    this.notificationDebounceTimer = setTimeout(() => {
+      // Get the most recent notification from queue
+      const latestNotification = this.pendingNotifications.reduce((latest, current) =>
+        current.timestamp > latest.timestamp ? current : latest
+      );
+      
+      // Clear queue
+      this.pendingNotifications = [];
+      
+      // Skip if already notifying
+      if (this.isNotifying) {
+        logger.debug('Auth change notification delayed - already notifying');
+        this.notificationTimeout = setTimeout(() => {
+          this.isNotifying = false;
+          this.notifyAuthChange(latestNotification.isAuthenticated);
+        }, 300);
+        return;
+      }
+      
+      // Update timestamp
+      this.lastEventTime = Date.now();
+      
+      // Set notifying flag
+      this.isNotifying = true;
+      logger.debug('Processing auth state change', {
+        isAuthenticated: latestNotification.isAuthenticated
+      });
+      
+      // Dispatch event
+      if (typeof window !== 'undefined') {
+        try {
+          const event = new CustomEvent('auth_status_changed', {
+            detail: { isAuthenticated: latestNotification.isAuthenticated }
+          });
+          window.dispatchEvent(event);
+          logger.debug('Auth state change event dispatched');
+        } catch (e) {
+          logger.error('Failed to dispatch auth event:', { error: e });
+        } finally {
+          setTimeout(() => {
+            this.isNotifying = false;
+          }, 500);
+        }
+      } else {
+        this.isNotifying = false;
+      }
+    }, 150); // Short debounce delay
+  }
+
+  /**
+   * Notify about logout (tokens are cleared by the server)
+   */
+  static notifyLogout(): void {
+    // Dispatch event to inform components about logout
+    this.notifyAuthChange(false);
+    
+    // Clear any localStorage backups on logout
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_token_backup');
+      localStorage.removeItem('refresh_token_backup');
+    }
+  }
+
+  /**
+   * Extracts user information from a JWT token
+   * This method is useful when a token is extracted from cookies
+   * 
+   * @param token - JWT token
+   * @returns User information or null for invalid token
+   */
+  static getUserFromToken(token: string): { id: number; name: string; email: string; role: string } | null {
+    try {
+      const decoded = jwtDecode<TokenPayloadDto>(token);
+      
+      if (!decoded) {
+        return null;
+      }
+      
+      // UserId can be in sub as string or number
+      let userId: number;
+      if (typeof decoded.sub === 'number') {
+        userId = decoded.sub;
+      } else if (typeof decoded.sub === 'string') {
+        userId = parseInt(decoded.sub, 10);
+      } else {
+        return null;
+      }
+      
+      if (isNaN(userId)) {
+        return null;
+      }
+      
+      return {
+        id: userId,
+        name: decoded.name,
+        email: decoded.email,
+        role: decoded.role,
+      };
+    } catch (error) {
+      getLogger().error('Token decoding failed:', { error });
+      return null;
+    }
+  }
+
+  /**
+   * Extracts the expiration date from a JWT token
+   * 
+   * @param token - JWT token
+   * @returns Date object with expiration date or null for invalid token
+   */
+  static getTokenExpiration(token: string): Date | null {
+    try {
+      const decoded = jwtDecode<TokenPayloadDto>(token);
+      
+      if (!decoded || !decoded.exp) {
+        return null;
+      }
+      
+      // Token expiration time in seconds to Date
+      return new Date(decoded.exp * 1000);
+    } catch (error) {
+      getLogger().error('Token expiration extraction failed:', { error });
+      return null;
+    }
+  }
+
+  /**
+   * Checks if a JWT token is expired
+   * 
+   * @param token - JWT token
+   * @param bufferSeconds - Buffer time in seconds to detect early expiration (default: 30s)
+   * @returns True if expired, otherwise false
+   */
+  static isTokenExpired(token: string, bufferSeconds: number = 30): boolean {
+    try {
+      const expiration = this.getTokenExpiration(token);
+      
+      if (!expiration) {
+        return true;
+      }
+      
+      // Consider buffer time to detect early expiration
+      const currentTime = new Date();
+      const bufferTime = new Date(currentTime.getTime() + bufferSeconds * 1000);
+      
+      return bufferTime >= expiration;
+    } catch (error) {
+      getLogger().error('Token validation failed:', { error });
+      return true;
+    }
+  }
+
+  /**
+   * Calculates the remaining validity period of a token in milliseconds
+   * 
+   * @param token - JWT token
+   * @returns Remaining time in milliseconds or 0 if expired
+   */
+  static getTokenRemainingTime(token: string): number {
+    try {
+      const expiration = this.getTokenExpiration(token);
+      
+      if (!expiration) {
+        return 0;
+      }
+      
+      const currentTime = new Date();
+      const remainingTime = expiration.getTime() - currentTime.getTime();
+      
+      return Math.max(0, remainingTime);
+    } catch (error) {
+      getLogger().error('Calculation of remaining token time failed:', { error });
+      return 0;
+    }
+  }
+
+  /**
+   * Refreshes the access token by making an API call to the refresh endpoint
+   * Tokens are handled by HTTP-only cookies set by the server
+   * 
+   * @returns Promise<boolean> True if refresh was successful
+   */
+  static async refreshAccessToken(): Promise<boolean> {
+    const logger = getLogger();
+    
+    try {
+      logger.debug('Starting token refresh');
+      
+      // Synchronize tokens to ensure we have the best chance of having valid cookies
+      this.synchronizeTokens();
+      
+      // Add a timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      
+      // Check browser cookies for refresh_token
+      if (typeof document !== 'undefined') {
+        const hasCookie = document.cookie.split(';').some(cookie => {
+          const trimmedCookie = cookie.trim();
+          return trimmedCookie.startsWith('refresh_token=');
+        });
+        
+        if (!hasCookie) {
+          // Check if we have a backup in localStorage we can use to create a cookie
+          const refreshTokenBackup = localStorage.getItem('refresh_token_backup');
+          if (refreshTokenBackup) {
+            logger.debug('Creating refresh_token cookie from backup');
+            document.cookie = `refresh_token=${refreshTokenBackup};path=/;max-age=86400`;
+          } else {
+            logger.warn('No refresh token cookie or backup found, skipping refresh');
+            return false;
+          }
+        }
+      }
+      
+      // Add a retry mechanism for token refresh
+      const maxRetries = 2;
+      let currentRetry = 0;
+      
+      while (currentRetry <= maxRetries) {
+        try {
+          // Direct API call to avoid circular dependencies with cache busting
+          const refreshUrl = `/api/auth/refresh?_=${timestamp}`;
+          
+          const response = await fetch(refreshUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+              'X-Requested-With': 'XMLHttpRequest', // Helps identify AJAX requests
+              'X-Retry-Count': currentRetry.toString()
+            },
+            credentials: 'include' // Important for cookie handling
+          });
+          
+          if (response.ok) {
+            try {
+              const data = await response.json();
+              
+              if (data && data.success) {
+                logger.debug('Token refresh successful');
+                
+                // If the response includes token data, save backups
+                if (data.data && data.data.accessToken) {
+                  logger.debug('Saving token backup from refresh response');
+                  localStorage.setItem('auth_token_backup', data.data.accessToken);
+                  
+                  if (data.data.refreshToken) {
+                    localStorage.setItem('refresh_token_backup', data.data.refreshToken);
+                  }
+                }
+                
+                // Dispatch event for successful refresh
+                this.notifyAuthChange(true);
+                return true;
+              }
+              
+              logger.warn('Token refresh response not successful:', { data });
+              // If this is the last retry, break out
+              if (currentRetry === maxRetries) break;
+              
+              // Otherwise continue to next retry
+              currentRetry++;
+              const delay = Math.pow(2, currentRetry) * 300; // Exponential backoff
+              await new Promise(resolve => setTimeout(resolve, delay));
+              continue;
+            } catch (parseError) {
+              logger.error('Failed to parse token refresh response:', { parseError });
+              
+              // Even with parsing error, if status was OK, consider it successful
+              if (response.status >= 200 && response.status < 300) {
+                logger.debug('Token refresh succeeded despite parsing error');
+                
+                // Update auth state with delay
+                setTimeout(() => {
+                  this.notifyAuthChange(true);
+                }, 50);
+                
+                return true;
+              }
+              
+              // If this is the last retry, break out
+              if (currentRetry === maxRetries) break;
+              
+              // Otherwise continue to next retry
+              currentRetry++;
+              const delay = Math.pow(2, currentRetry) * 300;
+              await new Promise(resolve => setTimeout(resolve, delay));
+              continue;
+            }
+          } else {
+            logger.warn(`Token refresh failed: ${response.status} (attempt ${currentRetry + 1}/${maxRetries + 1})`);
+            
+            // Log response details for debugging
+            try {
+              const errorText = await response.text();
+              logger.warn('Token refresh error details:', { 
+                status: response.status, 
+                attempt: currentRetry + 1,
+                text: errorText.slice(0, 200) // Log first 200 chars to avoid huge logs
+              });
+            } catch (e) {
+              logger.warn('Could not read error response');
+            }
+            
+            // If the server returns 401 or 403, notify about auth change on last attempt
+            if ((response.status === 401 || response.status === 403) && currentRetry === maxRetries) {
+              this.notifyAuthChange(false);
+            }
+            
+            // If this is the last retry, break out
+            if (currentRetry === maxRetries) break;
+            
+            // Otherwise continue to next retry
+            currentRetry++;
+            const delay = Math.pow(2, currentRetry) * 300;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        } catch (error) {
+          logger.error(`Token refresh attempt ${currentRetry + 1} error:`, { error });
+          
+          // If this is the last retry, break out
+          if (currentRetry === maxRetries) break;
+          
+          // Otherwise continue to next retry
+          currentRetry++;
+          const delay = Math.pow(2, currentRetry) * 300;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+      
+      // If we get here, all retries failed
+      return false;
+    } catch (error) {
+      logger.error('Token refresh outer error:', { error });
+      return false;
+    }
+  }
+
+  /**
+   * Checks if a user has a specific role or one of multiple roles
+   * 
+   * @param userRole - Current user role
+   * @param requiredRole - Required role(s)
+   * @returns True if the user has the required role, otherwise false
+   */
+  static hasRole(userRole: string, requiredRole: string | string[]): boolean {
+    if (!userRole) {
+      return false;
+    }
+    
+    // Role weights (higher number = more rights)
+    const roleWeights: Record<string, number> = {
+      'admin': 100,
+      'manager': 75,
+      'mitarbeiter': 50,
+      'benutzer': 25,
+      'gast': 10
+    };
+    
+    // Function to check if a role has enough rights
+    const hasEnoughRights = (userRoleWeight: number, requiredRoleWeight: number) => {
+      return userRoleWeight >= requiredRoleWeight;
+    };
+    
+    // Weight of the user role
+    const userRoleWeight = roleWeights[userRole.toLowerCase()] || 0;
+    
+    // Check for multiple required roles (OR connection)
+    if (Array.isArray(requiredRole)) {
+      return requiredRole.some(role => {
+        const requiredRoleWeight = roleWeights[role.toLowerCase()] || 0;
+        return hasEnoughRights(userRoleWeight, requiredRoleWeight);
+      });
+    }
+    
+    // Check for a single required role
+    const requiredRoleWeight = roleWeights[requiredRole.toLowerCase()] || 0;
+    return hasEnoughRights(userRoleWeight, requiredRoleWeight);
+  }
+}

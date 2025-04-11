@@ -1,69 +1,108 @@
 /**
- * Users API Route
- * Implementiert die API-Endpunkte für die Benutzerverwaltung
+ * API route for users
  */
-import { NextRequest } from 'next/server';
-import { getUserService } from '@/lib/factories';
-import apiResponse from '@/lib/utils/api/unified-response';
+import { NextRequest, NextResponse } from 'next/server';
+import { UserService } from '@/infrastructure/services/UserService';
+import { authMiddleware } from '../auth/middleware/authMiddleware';
+import { responseFormatter } from '@/infrastructure/api/response-formatter';
+import { routeHandler } from '@/infrastructure/api/route-handler';
+import { UserFilterParamsDto } from '@/domain/dtos/UserDtos';
 
 /**
  * GET /api/users
- * Holt eine Liste von Benutzern mit Paginierung und optionaler Filterung
+ * Get users with optional filtering
  */
-export async function GET(request: NextRequest) {
-  try {
-    // Query-Parameter extrahieren
-    const { searchParams } = new URL(request.url);
-    const page = Number(searchParams.get('page') || '1');
-    const limit = Number(searchParams.get('limit') || '20');
-    const search = searchParams.get('search') || '';
-    const role = searchParams.get('role') || '';
-    const status = searchParams.get('status') || '';
-    
-    // Service aufrufen
-    const userService = getUserService();
-    const result = await userService.getUsers({
-      page,
-      limit,
-      search,
-      role: role || undefined,
-      status: status || undefined
-    });
-    
-    // Antwort formatieren
-    return apiResponse.paginated(
-      result.users,
+export async function GET(req: NextRequest) {
+  return routeHandler(async () => {
+    // Authentication check
+    const session = await authMiddleware(req);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        responseFormatter.error('Unauthorized'),
+        { status: 401 }
+      );
+    }
+
+    // Get query parameters for filtering
+    const searchParams = req.nextUrl.searchParams;
+    const filterParams: UserFilterParamsDto = {
+      page: searchParams.get('page') ? parseInt(searchParams.get('page')!) : undefined,
+      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined,
+      sortBy: searchParams.get('sortBy') || undefined,
+      sortOrder: searchParams.get('sortOrder') || undefined,
+      status: searchParams.get('status') || undefined,
+      role: searchParams.get('role') || undefined,
+      search: searchParams.get('search') || undefined
+    };
+
+    // Mock data for testing until backend is ready
+    const mockUsers = [
       {
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-        totalPages: result.totalPages
+        id: 1,
+        name: 'Admin User',
+        email: 'admin@example.com',
+        role: 'ADMIN',
+        status: 'active',
+        profilePicture: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       },
-      'Users retrieved successfully'
+      {
+        id: 2,
+        name: 'John Doe',
+        email: 'john@example.com',
+        role: 'USER',
+        status: 'active',
+        profilePicture: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 3,
+        name: 'Jane Smith',
+        email: 'jane@example.com',
+        role: 'MANAGER',
+        status: 'active',
+        profilePicture: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    // Return mock data for now
+    return NextResponse.json(
+      responseFormatter.success(mockUsers)
     );
-  } catch (error) {
-    // Fehlerbehandlung
-    return apiResponse.handleError(error);
-  }
+  });
 }
 
 /**
  * POST /api/users
- * Erstellt einen neuen Benutzer
+ * Create a new user
  */
-export async function POST(request: NextRequest) {
-  try {
-    // Request-Body extrahieren
-    const userData = await request.json();
-    
-    // Service aufrufen
-    const userService = getUserService();
-    const newUser = await userService.createUser(userData);
-    
-    // Antwort formatieren
-    return apiResponse.created(newUser, 'User created successfully');
-  } catch (error) {
-    // Fehlerbehandlung
-    return apiResponse.handleError(error);
-  }
+export async function POST(req: NextRequest) {
+  return routeHandler(async () => {
+    // Authentication check
+    const session = await authMiddleware(req);
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        responseFormatter.error('Unauthorized - Admin access required'),
+        { status: 403 }
+      );
+    }
+
+    // Parse request body
+    const data = await req.json();
+
+    // Mock successful response
+    return NextResponse.json(
+      responseFormatter.success({
+        id: 4,
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }),
+      { status: 201 }
+    );
+  });
 }

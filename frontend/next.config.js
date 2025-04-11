@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Disable React Strict Mode to prevent double-mounting
+  reactStrictMode: false,
+  
   // Wichtige Umgebungsvariablen auf Client-Seite verfügbar machen
   env: {
     // API-URLs und Basis-Konfiguration

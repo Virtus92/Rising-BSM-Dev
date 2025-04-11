@@ -1,90 +1,104 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { container } from '@/lib/server/di-container';
-import { ICustomerService } from '@/lib/server/interfaces/ICustomerService';
-import { withAuth, withRoles } from '@/lib/server/core/auth';
+/**
+ * Customers API-Route
+ * 
+ * Verarbeitet Anfragen zur Kundenverwaltung
+ */
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError, formatValidationError } from '@/infrastructure/api/response-formatter';
+import { getCustomerService } from '@/infrastructure/common/factories';
+import { CreateCustomerDto, CustomerFilterParamsDto } from '@/domain/dtos/CustomerDtos';
 
 /**
  * GET /api/customers
- * Gibt alle Kunden zurück
+ * 
+ * Ruft eine Liste von Kunden ab, optional gefiltert und paginiert
  */
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = apiRouteHandler(async (req: NextRequest) => {
   try {
-    const customerService = container.resolve<ICustomerService>('CustomerService');
-    
-    // Query-Parameter extrahieren
+    // Filterdaten aus Query-Parametern extrahieren
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get('status');
-    const type = searchParams.get('type');
-    const search = searchParams.get('search');
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
-    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : undefined;
-    
-    const filters = {
-      status: status || undefined,
-      type: type || undefined,
-      search: search || undefined,
-      limit,
-      offset
+    const filters: CustomerFilterParamsDto = {
+      search: searchParams.get('search') || undefined,
+      status: searchParams.get('status') as any || undefined,
+      type: searchParams.get('type') as any || undefined,
+      city: searchParams.get('city') || undefined,
+      postalCode: searchParams.get('postalCode') || undefined,
+      newsletter: searchParams.has('newsletter') 
+        ? searchParams.get('newsletter') === 'true'
+        : undefined,
+      page: searchParams.has('page') 
+        ? parseInt(searchParams.get('page') as string)
+        : 1,
+      limit: searchParams.has('limit') 
+        ? parseInt(searchParams.get('limit') as string)
+        : 10,
+      sortBy: searchParams.get('sortBy') || undefined,
+      sortDirection: (searchParams.get('sortDirection') as 'asc' | 'desc') || undefined
     };
+
+    // Kundenservice abrufen
+    const customerService = getCustomerService();
     
-    const result = await customerService.findAll(filters);
-    
-    return NextResponse.json({
-      success: true,
-      data: result.customers,
-      meta: {
-        total: result.total,
-        timestamp: new Date().toISOString()
-      }
-    });
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
+    // Paginierte Kundenliste abrufen
+    const result = await customerService.getAll({
+      relations: ['appointments'],
+      context: {
+        userId: req.auth?.userId
       },
-      { status: statusCode }
+      ...filters
+    });
+
+    // Erfolgsantwort
+    return formatSuccess(result, 'Kunden erfolgreich abgerufen');
+    
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    return formatError(
+      error instanceof Error ? error.message : 'Fehler beim Abrufen der Kunden',
+      500
     );
   }
 });
 
 /**
  * POST /api/customers
+ * 
  * Erstellt einen neuen Kunden
  */
-export const POST = withRoles(['admin', 'manager'], async (req: NextRequest, user) => {
+export const POST = apiRouteHandler(async (req: NextRequest) => {
   try {
-    const customerService = container.resolve<ICustomerService>('CustomerService');
+    // Request-Body als JSON parsen
+    const data = await req.json() as CreateCustomerDto;
     
-    const data = await req.json();
+    // Kundenservice abrufen
+    const customerService = getCustomerService();
     
-    const customer = await customerService.create(data, user.id, user.name || `User ${user.id}`);
+    // Versuch, den Kunden zu erstellen
+    const result = await customerService.create(data, {
+      context: {
+        userId: req.auth?.userId,
+        ipAddress: req.headers.get('x-forwarded-for') || req.ip
+      }
+    });
     
-    return NextResponse.json(
-      {
-        success: true,
-        data: customer,
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: 201 }
-    );
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
+    // Erfolgsantwort
+    return formatSuccess(result, 'Kunde erfolgreich erstellt', 201);
+    
+  } catch (error) {
+    console.error('Error creating customer:', error);
+    
+    // Behandlung von Validierungsfehlern
+    if (error instanceof Error && 'validationErrors' in error) {
+      return formatValidationError(
+        (error as any).validationErrors,
+        'Validierungsfehler beim Erstellen des Kunden'
+      );
+    }
+    
+    return formatError(
+      error instanceof Error ? error.message : 'Fehler beim Erstellen des Kunden',
+      500
     );
   }
 });

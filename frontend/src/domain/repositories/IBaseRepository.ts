@@ -170,17 +170,6 @@ export interface IBaseRepository<T, ID = number> {
   bulkUpdate(ids: ID[], data: Partial<T>): Promise<number>;
   
   /**
-   * Protokolliert eine Aktivität
-   * 
-   * @param userId - Benutzer-ID
-   * @param actionType - Aktionstyp
-   * @param details - Details
-   * @param ipAddress - IP-Adresse
-   * @returns Erfolg der Operation
-   */
-  logActivity(userId: number, actionType: string, details?: string, ipAddress?: string): Promise<any>;
-  
-  /**
    * Führt eine Transaktion aus
    * 
    * @param callback - Callback-Funktion

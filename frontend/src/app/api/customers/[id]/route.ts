@@ -1,149 +1,160 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { container } from '@/lib/server/di-container';
-import { ICustomerService } from '@/lib/server/interfaces/ICustomerService';
-import { withAuth, withRoles } from '@/lib/server/core/auth';
+/**
+ * Customer API-Route für einzelne Kunden
+ * 
+ * Verarbeitet Anfragen für einzelne Kunden (GET, PUT, DELETE)
+ */
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/infrastructure/api/response-formatter';
+import { getCustomerService } from '@/infrastructure/common/factories';
+import { UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 
 /**
  * GET /api/customers/[id]
- * Holt einen bestimmten Kunden anhand seiner ID
+ * 
+ * Ruft einen einzelnen Kunden anhand seiner ID ab
  */
-export const GET = withAuth(async (req: NextRequest, user) => {
+export const GET = apiRouteHandler(async (req: NextRequest, params?: { [key: string]: string }) => {
   try {
-    const customerService = container.resolve<ICustomerService>('CustomerService');
-    
-    // ID aus dem URL-Pfad extrahieren
-    const id = parseInt(req.url.split('/').pop() || '0');
-    
-    if (isNaN(id) || id <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Ungültige Kunden-ID',
-          meta: {
-            timestamp: new Date().toISOString()
-          }
-        },
-        { status: 400 }
-      );
+    if (!params) {
+      return formatError('Keine Kunden-ID angegeben', 400);
     }
     
-    const customer = await customerService.findById(id);
+    const id = parseInt(params.id);
     
-    return NextResponse.json({
-      success: true,
-      data: customer,
-      meta: {
-        timestamp: new Date().toISOString()
+    if (isNaN(id)) {
+      return formatError('Ungültige Kunden-ID', 400);
+    }
+    
+    // Kundenservice abrufen
+    const customerService = getCustomerService();
+    
+    // Kunde mit angegebener ID abrufen
+    const customer = await customerService.getById(id, {
+      relations: ['appointments'],
+      context: {
+        userId: req.auth?.userId
       }
     });
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
+    
+    if (!customer) {
+      return formatNotFound('Kunde nicht gefunden');
+    }
+    
+    // Erfolgsantwort
+    return formatSuccess(customer, 'Kunde erfolgreich abgerufen');
+    
+  } catch (error) {
+    console.error('Error fetching customer:', error);
+    return formatError(
+      error instanceof Error ? error.message : 'Fehler beim Abrufen des Kunden',
+      500
     );
   }
 });
 
 /**
  * PUT /api/customers/[id]
- * Aktualisiert einen bestimmten Kunden anhand seiner ID (Nur für Admin und Manager)
+ * 
+ * Aktualisiert einen Kunden anhand seiner ID
  */
-export const PUT = withRoles(['admin', 'manager'], async (req: NextRequest, user) => {
+export const PUT = apiRouteHandler(async (req: NextRequest, params?: { [key: string]: string }) => {
   try {
-    const customerService = container.resolve<ICustomerService>('CustomerService');
+    if (!params) {
+      return formatError('Keine Kunden-ID angegeben', 400);
+    }
     
-    // ID aus dem URL-Pfad extrahieren
-    const id = parseInt(req.url.split('/').pop() || '0');
+    const id = parseInt(params.id);
     
-    if (isNaN(id) || id <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Ungültige Kunden-ID',
-          meta: {
-            timestamp: new Date().toISOString()
-          }
-        },
-        { status: 400 }
+    if (isNaN(id)) {
+      return formatError('Ungültige Kunden-ID', 400);
+    }
+    
+    // Request-Body als JSON parsen
+    const data = await req.json() as UpdateCustomerDto;
+    
+    // Kundenservice abrufen
+    const customerService = getCustomerService();
+    
+    // Prüfen, ob der Kunde existiert
+    const existingCustomer = await customerService.getById(id);
+    
+    if (!existingCustomer) {
+      return formatNotFound('Kunde nicht gefunden');
+    }
+    
+    // Kunde aktualisieren
+    const updatedCustomer = await customerService.update(id, data, {
+      context: {
+        userId: req.auth?.userId,
+        ipAddress: req.headers.get('x-forwarded-for') || req.ip
+      }
+    });
+    
+    // Erfolgsantwort
+    return formatSuccess(updatedCustomer, 'Kunde erfolgreich aktualisiert');
+    
+  } catch (error) {
+    console.error('Error updating customer:', error);
+    
+    // Behandlung von Validierungsfehlern
+    if (error instanceof Error && 'validationErrors' in error) {
+      return formatValidationError(
+        (error as any).validationErrors,
+        'Validierungsfehler beim Aktualisieren des Kunden'
       );
     }
     
-    const data = await req.json();
-    
-    const customer = await customerService.update(id, data, user.id, user.name || `User ${user.id}`);
-    
-    return NextResponse.json({
-      success: true,
-      data: customer,
-      meta: {
-        timestamp: new Date().toISOString()
-      }
-    });
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
+    return formatError(
+      error instanceof Error ? error.message : 'Fehler beim Aktualisieren des Kunden',
+      500
     );
   }
 });
 
 /**
  * DELETE /api/customers/[id]
- * Löscht einen bestimmten Kunden anhand seiner ID (Nur für Admin)
+ * 
+ * Löscht einen Kunden anhand seiner ID
  */
-export const DELETE = withRoles(['admin'], async (req: NextRequest, user) => {
+export const DELETE = apiRouteHandler(async (req: NextRequest, params?: { [key: string]: string }) => {
   try {
-    const customerService = container.resolve<ICustomerService>('CustomerService');
-    
-    // ID aus dem URL-Pfad extrahieren
-    const id = parseInt(req.url.split('/').pop() || '0');
-    
-    if (isNaN(id) || id <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Ungültige Kunden-ID',
-          meta: {
-            timestamp: new Date().toISOString()
-          }
-        },
-        { status: 400 }
-      );
+    if (!params) {
+      return formatError('Keine Kunden-ID angegeben', 400);
     }
     
-    const result = await customerService.delete(id, user.id, user.name || `User ${user.id}`);
+    const id = parseInt(params.id);
     
-    return NextResponse.json({
-      success: result,
-      meta: {
-        timestamp: new Date().toISOString()
+    if (isNaN(id)) {
+      return formatError('Ungültige Kunden-ID', 400);
+    }
+    
+    // Kundenservice abrufen
+    const customerService = getCustomerService();
+    
+    // Prüfen, ob der Kunde existiert
+    const existingCustomer = await customerService.getById(id);
+    
+    if (!existingCustomer) {
+      return formatNotFound('Kunde nicht gefunden');
+    }
+    
+    // Kunde löschen
+    const deleted = await customerService.delete(id, {
+      context: {
+        userId: req.auth?.userId,
+        ipAddress: req.headers.get('x-forwarded-for') || req.ip
       }
     });
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
+    
+    // Erfolgsantwort
+    return formatSuccess({ deleted }, 'Kunde erfolgreich gelöscht');
+    
+  } catch (error) {
+    console.error('Error deleting customer:', error);
+    return formatError(
+      error instanceof Error ? error.message : 'Fehler beim Löschen des Kunden',
+      500
     );
   }
 });

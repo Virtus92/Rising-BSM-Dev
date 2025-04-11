@@ -1,54 +1,5 @@
 import { IBaseRepository } from './IBaseRepository';
-
-/**
- * Refresh-Token Entität
- */
-export interface RefreshToken {
-  /**
-   * Token-String
-   */
-  token: string;
-  
-  /**
-   * Benutzer-ID
-   */
-  userId: number;
-  
-  /**
-   * Ablaufzeitpunkt
-   */
-  expiresAt: Date;
-  
-  /**
-   * Erstellungszeitpunkt
-   */
-  createdAt: Date;
-  
-  /**
-   * IP-Adresse der Erstellung
-   */
-  createdByIp?: string;
-  
-  /**
-   * Widerrufszeitpunkt
-   */
-  revokedAt?: Date;
-  
-  /**
-   * IP-Adresse des Widerrufs
-   */
-  revokedByIp?: string;
-  
-  /**
-   * Ob das Token widerrufen wurde
-   */
-  isRevoked: boolean;
-  
-  /**
-   * Token, das dieses Token ersetzt hat
-   */
-  replacedByToken?: string;
-}
+import { RefreshToken } from '../entities/RefreshToken';
 
 /**
  * Repository-Interface für Refresh-Tokens
@@ -66,9 +17,28 @@ export interface IRefreshTokenRepository extends IBaseRepository<RefreshToken, s
    * Findet alle Tokens eines Benutzers
    * 
    * @param userId - Benutzer-ID
+   * @param activeOnly - Nur aktive Tokens
    * @returns Gefundene Tokens
    */
-  findByUserId(userId: number): Promise<RefreshToken[]>;
+  findByUserId(userId: number, activeOnly?: boolean): Promise<RefreshToken[]>;
+  
+  /**
+   * Widerruft ein Token
+   * 
+   * @param token - Token-String
+   * @param ipAddress - IP-Adresse des Widerrufs
+   * @param replacedByToken - Token, das dieses Token ersetzt
+   * @returns Widerrufenes Token
+   */
+  revokeToken(token: string, ipAddress?: string, replacedByToken?: string): Promise<RefreshToken>;
+  
+  /**
+   * Widerruft alle Tokens eines Benutzers
+   * 
+   * @param userId - Benutzer-ID
+   * @returns Anzahl der widerrufenen Tokens
+   */
+  revokeAllUserTokens(userId: number): Promise<number>;
   
   /**
    * Löscht alle Tokens eines Benutzers
@@ -84,4 +54,14 @@ export interface IRefreshTokenRepository extends IBaseRepository<RefreshToken, s
    * @returns Anzahl der gelöschten Tokens
    */
   deleteExpiredTokens(): Promise<number>;
+  
+  /**
+   * Erstellt ein neues Token mit automatischer Widerrufung des alten Tokens
+   * 
+   * @param token - Neues Token
+   * @param oldToken - Altes Token (optional)
+   * @param ipAddress - IP-Adresse
+   * @returns Erstelltes Token
+   */
+  createWithRotation(token: RefreshToken, oldToken?: string, ipAddress?: string): Promise<RefreshToken>;
 }

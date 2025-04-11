@@ -4,13 +4,13 @@ services:
     image: postgres:13
     container_name: rising-bsm-db-prod
     environment:
-      POSTGRES_USER: postgres
+      POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: rising_bsm
+      POSTGRES_DB: ${DB_DATABASE:-rising_bsm}
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     networks:
       - rising-bsm-network-prod
     restart: always
@@ -27,11 +27,13 @@ services:
       dockerfile: Dockerfile
     container_name: rising-bsm-app-prod
     env_file:
-      - ./.env.production
+      - ./frontend/.env.production
     environment:
       - NODE_ENV=production
+      # Override DATABASE_URL to ensure it uses the Docker network service name
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:${DB_PORT:-5432}/${DB_DATABASE:-rising_bsm}?schema=public
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
       db:
         condition: service_healthy

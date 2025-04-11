@@ -30,17 +30,14 @@ model User {
   resetTokenExpiry  DateTime?
   settings          UserSettings?
   activities        UserActivity[]
-  projects          Project[]
   appointments      Appointment[]
   refreshTokens     RefreshToken[]
-  serviceLogs       ServiceLog[]
   customerLogs      CustomerLog[]
-  requestLogs       RequestLog[]
-  projectNotes      ProjectNote[]
-  requestNotes      RequestNote[]
   appointmentNotes  AppointmentNote[]
   appointmentLogs   AppointmentLog[]
-
+  contactRequests   ContactRequest[]
+  requestNotes      RequestNote[]
+  requestLogs       RequestLog[]
 
   @@index([email])
   @@index([name])
@@ -64,6 +61,7 @@ model UserActivity {
   userId    Int
   timestamp DateTime? @default(now()) @db.Timestamp(6)
   activity  String    @db.VarChar(255)
+  details   String?   @db.Text
   ipAddress String?   @db.VarChar(255)
   user      User      @relation(fields: [userId], references: [id])
 }
@@ -100,31 +98,30 @@ model SystemSettings {
 }
 
 //==============================================================================
-// CRM: CUSTOMERS, PROJECTS & SERVICES
+// CRM: CUSTOMERS
 //==============================================================================
 
 model Customer {
-  id           Int            @id @default(autoincrement())
-  name         String         @db.VarChar(100)
-  company      String?        @db.VarChar(100)
-  email        String?        @db.VarChar(100)
-  phone        String?        @db.VarChar(30)
-  address      String?        @db.Text
-  postalCode   String?        @db.VarChar(10)
-  city         String?        @db.VarChar(100)
-  country      String         @default("Austria") @db.VarChar(100)
-  notes        String?        @db.Text
-  newsletter   Boolean        @default(false)
-  status       String         @default("active") @db.VarChar(20)
-  type         String         @default("private") @db.VarChar(20)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  createdBy    Int? 
-  updatedBy    Int?
-  projects     Project[]
-  appointments Appointment[]
-  invoices     Invoice[]
-  logs         CustomerLog[]
+  id             Int              @id @default(autoincrement())
+  name           String           @db.VarChar(100)
+  company        String?          @db.VarChar(100)
+  email          String?          @db.VarChar(100)
+  phone          String?          @db.VarChar(30)
+  address        String?          @db.Text
+  postalCode     String?          @db.VarChar(10)
+  city           String?          @db.VarChar(100)
+  country        String           @default("Deutschland") @db.VarChar(100)
+  notes          String?          @db.Text
+  newsletter     Boolean          @default(false)
+  status         String           @default("active") @db.VarChar(20)
+  type           String           @default("private") @db.VarChar(20)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  createdBy      Int?
+  updatedBy      Int?
+  appointments   Appointment[]
+  logs           CustomerLog[]
+  contactRequests ContactRequest[]
 
   @@index([email])
   @@index([status])
@@ -142,75 +139,6 @@ model CustomerLog {
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 }
 
-model Service {
-  id           Int               @id @default(autoincrement())
-  name         String            @db.VarChar(100)
-  description  String?           @db.Text
-  basePrice    Decimal           @db.Decimal
-  vatRate      Decimal           @default(20.00) @db.Decimal
-  active       Boolean           @default(true)
-  unit         String?           @db.VarChar(20)
-  createdAt    DateTime          @default(now()) @db.Timestamp(6)
-  updatedAt    DateTime          @updatedAt @db.Timestamp(6)
-  projects     Project[]
-  invoiceItems InvoiceItem[]
-  logs         ServiceLog[]
-}
-
-model ServiceLog {
-  id          Int      @id @default(autoincrement())
-  serviceId   Int
-  userId      Int?
-  userName    String?  @db.VarChar(255)
-  action      String   @db.VarChar(255)
-  details     String?  @db.Text
-  createdAt   DateTime @default(now()) @db.Timestamp(6)
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-}
-
-model Project {
-  id          Int            @id @default(autoincrement())
-  title       String         @db.VarChar(200)
-  customerId  Int?
-  serviceId   Int?
-  startDate   DateTime?      @db.Date
-  endDate     DateTime?      @db.Date
-  amount      Decimal?       @db.Decimal
-  description String?        @db.Text
-  status      String         @default("new") @db.VarChar(20)
-  createdBy   Int?
-  createdAt   DateTime       @default(now()) @db.Timestamp(6)
-  updatedAt   DateTime       @updatedAt @db.Timestamp(6)
-  customer    Customer?      @relation(fields: [customerId], references: [id])
-  service     Service?       @relation(fields: [serviceId], references: [id])
-  creator     User?          @relation(fields: [createdBy], references: [id])
-  invoices    Invoice[]
-  appointments Appointment[]
-  notes       ProjectNote[]
-}
-
-model ProjectNote {
-  id        Int      @id @default(autoincrement())
-  projectId Int?
-  userId    Int?
-  userName  String   @db.Text
-  text      String   @db.Text
-  createdAt DateTime @default(now()) @db.Timestamp(6)
-  project   Project? @relation(fields: [projectId], references: [id])
-  user      User?    @relation(fields: [userId], references: [id])
-}
-
-model ProjectLog {
-  id        Int      @id @default(autoincrement())
-  projectId Int
-  userId    Int
-  userName  String
-  action    String
-  details   String?
-  createdAt DateTime @default(now())
-}
-
 //==============================================================================
 // SCHEDULING: APPOINTMENTS & CALENDAR
 //==============================================================================
@@ -219,7 +147,6 @@ model Appointment {
   id              Int               @id @default(autoincrement())
   title           String            @db.VarChar(200)
   customerId      Int?
-  projectId       Int?
   appointmentDate DateTime          @db.Timestamp(6)
   duration        Int?
   location        String?           @db.VarChar(200)
@@ -229,9 +156,10 @@ model Appointment {
   createdAt       DateTime          @default(now()) @db.Timestamp(6)
   updatedAt       DateTime          @updatedAt @db.Timestamp(6)
   customer        Customer?         @relation(fields: [customerId], references: [id])
-  project         Project?          @relation(fields: [projectId], references: [id])
   creator         User?             @relation(fields: [createdBy], references: [id])
   notes           AppointmentNote[]
+  logs            AppointmentLog[]
+  contactRequests ContactRequest[]
 
   @@index([customerId])
   @@index([appointmentDate])
@@ -250,55 +178,19 @@ model AppointmentNote {
 }
 
 model AppointmentLog {
-  id            Int      @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   appointmentId Int
   userId        Int
-  userName      String   @db.Text
-  action        String   @db.Text
-  details       String?  @db.Text
-  createdAt     DateTime @default(now()) @db.Timestamp(6)
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userName      String      @db.Text
+  action        String      @db.Text
+  details       String?     @db.Text
+  createdAt     DateTime    @default(now()) @db.Timestamp(6)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 }
 
 //==============================================================================
-// FINANCE: INVOICES & PAYMENTS
-//==============================================================================
-
-model Invoice {
-  id              Int           @id @default(autoincrement())
-  invoiceNumber   String        @db.VarChar(50)
-  projectId       Int?
-  customerId      Int?
-  amount          Decimal       @db.Decimal
-  vatAmount       Decimal       @db.Decimal
-  totalAmount     Decimal       @db.Decimal
-  invoiceDate     DateTime      @db.Date
-  dueDate         DateTime      @db.Date
-  paidAt          DateTime?     @db.Timestamp(6)
-  status          String        @default("open") @db.VarChar(20)
-  createdAt       DateTime      @default(now()) @db.Timestamp(6)
-  updatedAt       DateTime      @updatedAt @db.Timestamp(6)
-  items           InvoiceItem[]
-  project         Project?      @relation(fields: [projectId], references: [id])
-  customer        Customer?     @relation(fields: [customerId], references: [id])
-
-  @@index([invoiceDate], name: "idx_invoice_date")
-}
-
-model InvoiceItem {
-  id         Int      @id @default(autoincrement())
-  invoiceId  Int
-  serviceId  Int
-  quantity   Int
-  unitPrice  Decimal  @db.Decimal
-  createdAt  DateTime @default(now()) @db.Timestamp(6)
-  updatedAt  DateTime @updatedAt @db.Timestamp(6)
-  invoice    Invoice  @relation(fields: [invoiceId], references: [id])
-  service    Service  @relation(fields: [serviceId], references: [id])
-}
-
-//==============================================================================
-// CONTACT & NOTIFICATIONS
+// CONTACT & REQUESTS
 //==============================================================================
 
 model ContactRequest {
@@ -310,10 +202,20 @@ model ContactRequest {
   message     String        @db.Text
   status      String        @default("new") @db.VarChar(20)
   processorId Int?
+  customerId  Int?
+  appointmentId Int?
   ipAddress   String?       @db.VarChar(255)
   createdAt   DateTime      @default(now()) @db.Timestamp(6)
   updatedAt   DateTime      @updatedAt @db.Timestamp(6)
   notes       RequestNote[]
+  logs        RequestLog[]
+  customer    Customer?     @relation(fields: [customerId], references: [id])
+  appointment Appointment?  @relation(fields: [appointmentId], references: [id])
+  processor   User?         @relation(fields: [processorId], references: [id])
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model RequestNote {
@@ -323,7 +225,7 @@ model RequestNote {
   userName  String        @db.VarChar(100)
   text      String        @db.Text
   createdAt DateTime      @default(now()) @db.Timestamp(6)
-  request   ContactRequest @relation(fields: [requestId], references: [id])
+  request   ContactRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   user      User          @relation(fields: [userId], references: [id])
 }
 
@@ -336,7 +238,12 @@ model RequestLog {
   details   String?  @db.Text
   createdAt DateTime @default(now()) @db.Timestamp(6)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  request   ContactRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 }
+
+//==============================================================================
+// NOTIFICATIONS
+//==============================================================================
 
 model Notification {
   id            Int       @id @default(autoincrement())

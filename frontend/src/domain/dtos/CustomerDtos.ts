@@ -1,5 +1,28 @@
-import { CustomerType } from '../enums/CommonEnums';
-import { CustomerStatus } from '../entities/Customer';
+import { BaseResponseDto, BaseFilterParamsDto } from './BaseDto';
+import { Customer } from '../entities/Customer';
+import { CommonStatus, CustomerType } from '../enums/CommonEnums';
+import { ActivityLogDto } from './ActivityLogDto';
+
+/**
+ * Haupt-DTO für Kunden
+ */
+export interface CustomerDto {
+  id: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  name: string;
+  company?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
+  country: string;
+  notes?: string;
+  newsletter: boolean;
+  status: CommonStatus;
+  type: CustomerType;
+}
 
 /**
  * DTO für die Erstellung eines Kunden
@@ -59,6 +82,21 @@ export interface CreateCustomerDto {
    * Kundentyp
    */
   type?: CustomerType;
+
+  /**
+   * Firmenname
+   */
+  companyName?: string;
+  
+  /**
+   * Postleitzahl (alias für postalCode)
+   */
+  zipCode?: string;
+  
+  /**
+   * Umsatzsteuer-ID
+   */
+  vatNumber?: string;
 }
 
 /**
@@ -118,23 +156,33 @@ export interface UpdateCustomerDto {
   /**
    * Kundenstatus
    */
-  status?: CustomerStatus;
+  status?: CommonStatus;
   
   /**
    * Kundentyp
    */
   type?: CustomerType;
+
+  /**
+   * Firmenname
+   */
+  companyName?: string;
+  
+  /**
+   * Postleitzahl (alias für postalCode)
+   */
+  zipCode?: string;
+  
+  /**
+   * Umsatzsteuer-ID
+   */
+  vatNumber?: string;
 }
 
 /**
  * DTO für die Rückgabe eines Kunden
  */
-export interface CustomerResponseDto {
-  /**
-   * Kunden-ID
-   */
-  id: number;
-  
+export interface CustomerResponseDto extends BaseResponseDto {
   /**
    * Kundenname
    */
@@ -188,38 +236,43 @@ export interface CustomerResponseDto {
   /**
    * Kundenstatus
    */
-  status: string;
+  status: CommonStatus;
   
   /**
    * Kundentyp
    */
-  type: string;
+  type: CustomerType;
   
   /**
    * Vollständige Adresse
    */
   fullAddress?: string;
+
+  /**
+   * Firmenname
+   */
+  companyName?: string;
   
   /**
-   * Erstellungsdatum
+   * Postleitzahl (alias für postalCode)
    */
-  createdAt: string;
+  zipCode?: string;
   
   /**
-   * Aktualisierungsdatum
+   * Umsatzsteuer-ID
    */
-  updatedAt: string;
+  vatNumber?: string;
+
+  /**
+   * Status-Label für die Anzeige
+   */
+  statusLabel?: string;
 }
 
 /**
  * DTO für detaillierte Kundeninformationen
  */
 export interface CustomerDetailResponseDto extends CustomerResponseDto {
-  /**
-   * Zugehörige Projekte
-   */
-  projects?: any[];
-  
   /**
    * Zugehörige Termine
    */
@@ -228,54 +281,53 @@ export interface CustomerDetailResponseDto extends CustomerResponseDto {
   /**
    * Aktivitätsprotokoll
    */
-  logs?: CustomerLogDto[];
+  activityLogs?: ActivityLogDto[];
+  
+  /**
+   * Kontaktanfragen
+   */
+  contactRequests?: any[];
 }
 
 /**
- * DTO für Kundenaktivitäten
+ * Konvertiert ein Kundenobjekt in ein DTO
+ * 
+ * @param customer - Kundenobjekt
+ * @returns CustomerDto
  */
-export interface CustomerLogDto {
-  /**
-   * Protokoll-ID
-   */
-  id: number;
-  
+export function mapCustomerToDto(customer: Customer): CustomerDto {
+  return {
+    id: customer.id,
+    name: customer.name,
+    company: customer.company,
+    email: customer.email,
+    phone: customer.phone,
+    address: customer.address,
+    postalCode: customer.postalCode,
+    city: customer.city,
+    country: customer.country,
+    notes: customer.notes,
+    newsletter: customer.newsletter,
+    status: customer.status,
+    type: customer.type,
+    createdAt: customer.createdAt,
+    updatedAt: customer.updatedAt
+  };
+}
+
+/**
+ * DTO für Kundenprotokolle
+ */
+export interface CustomerLogDto extends ActivityLogDto {
   /**
    * Kunden-ID
    */
   customerId: number;
   
   /**
-   * Benutzer-ID
+   * Kundenname
    */
-  userId?: number;
-  
-  /**
-   * Benutzername
-   */
-  userName: string;
-  
-  /**
-   * Aktivitätstyp
-   */
-  action: string;
-  
-  /**
-   * Details
-   */
-  details?: string;
-  
-  /**
-   * Erstellungsdatum
-   */
-  createdAt: string;
-  
-  /**
-   * Benutzer
-   */
-  user?: {
-    name: string;
-  };
+  customerName: string;
 }
 
 /**
@@ -285,7 +337,7 @@ export interface UpdateCustomerStatusDto {
   /**
    * Neuer Status
    */
-  status: CustomerStatus;
+  status: CommonStatus;
   
   /**
    * Grund für die Statusänderung
@@ -296,16 +348,11 @@ export interface UpdateCustomerStatusDto {
 /**
  * Filterparameter für Kundenabfragen
  */
-export interface CustomerFilterParams {
-  /**
-   * Suchtext
-   */
-  search?: string;
-  
+export interface CustomerFilterParamsDto extends BaseFilterParamsDto {
   /**
    * Kundenstatus
    */
-  status?: CustomerStatus;
+  status?: CommonStatus;
   
   /**
    * Kundentyp
@@ -326,34 +373,4 @@ export interface CustomerFilterParams {
    * Newsletter-Anmeldung
    */
   newsletter?: boolean;
-  
-  /**
-   * Startdatum für die Filterung
-   */
-  startDate?: Date;
-  
-  /**
-   * Enddatum für die Filterung
-   */
-  endDate?: Date;
-  
-  /**
-   * Seitennummer
-   */
-  page?: number;
-  
-  /**
-   * Einträge pro Seite
-   */
-  limit?: number;
-  
-  /**
-   * Sortierfeld
-   */
-  sortBy?: string;
-  
-  /**
-   * Sortierrichtung
-   */
-  sortDirection?: 'asc' | 'desc';
 }

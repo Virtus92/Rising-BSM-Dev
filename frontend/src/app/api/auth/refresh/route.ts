@@ -1,102 +1,207 @@
 /**
- * Refresh Token API-Route
- * 
- * Diese Route ermöglicht die Erneuerung des Access Tokens mit einem gültigen Refresh Token.
+ * Token Refresh API Route
+ * Refreshes access tokens using a valid refresh token from HTTP-only cookie
  */
-import { NextRequest } from 'next/server';
-import { successResponse } from '@/lib/utils/api/response';
-import { ApiError, BadRequestError, UnauthorizedError } from '@/lib/utils/api/error';
-import { getLogger } from '@/lib/core/bootstrap';
+import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
+import { cookies } from 'next/headers';
+import { formatResponse } from '@/infrastructure/api/response-formatter';
+import { getLogger } from '@/infrastructure/common/logging';
+import { getPrismaClient } from '@/infrastructure/common/database/prisma';
+import { securityConfig } from '@/infrastructure/common/config/SecurityConfig';
+import { tokenBlacklist } from '@/infrastructure/auth/TokenBlacklist';
+import { withRateLimit } from '@/infrastructure/api/middleware/rate-limit';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
- * POST /api/auth/refresh
- * Erneuert das Access Token mit einem Refresh Token
+ * Handles token refresh requests with improved security
  */
-export async function POST(request: NextRequest) {
+async function refreshHandler(req: NextRequest) {
   const logger = getLogger();
+  const prisma = getPrismaClient();
   
   try {
-    const { refreshToken } = await request.json();
+    // Get refresh token from cookies
+    const cookieStore = cookies();
+    const refreshToken = cookieStore.get('refresh_token')?.value;
     
-    // Eingabe validieren
     if (!refreshToken) {
-      throw new BadRequestError('Refresh Token ist erforderlich');
+      logger.warn('Token refresh failed: No refresh token in cookies');
+      // Clear any invalid tokens to prevent further issues
+      const response = NextResponse.json(
+        formatResponse.error('No refresh token available', 401),
+        { status: 401 }
+      );
+      
+      response.cookies.delete('auth_token');
+      response.cookies.delete('refresh_token');
+      
+      return response;
     }
-    
-    // JWT-Secret aus Umgebungsvariablen oder Standard
-    const jwtSecret = process.env.JWT_SECRET || 'your-default-super-secret-key-change-in-production';
-    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'your-refresh-default-key-change-in-production';
-    
-    // Refresh Token verifizieren
-    let decodedRefreshToken;
-    try {
-      decodedRefreshToken = jwt.verify(refreshToken, jwtRefreshSecret);
-    } catch (error) {
-      throw new UnauthorizedError('Ungültiges Refresh Token');
-    }
-    
-    // Neues Access Token erstellen
-    const userId = typeof decodedRefreshToken === 'object' ? decodedRefreshToken.userId : null;
-    
-    if (!userId) {
-      throw new UnauthorizedError('Ungültiges Refresh Token');
-    }
-    
-    // In einer realen Anwendung würden wir hier den Benutzer aus der Datenbank laden
-    // Für die Demo verwenden wir fest codierte Benutzer
-    
-    // Demo-Benutzer für Admin und normalen Benutzer
-    const demoUsers = [
-      {
-        id: 1,
-        name: 'Admin',
-        email: 'admin@example.com',
-        role: 'admin'
+
+    // Find the refresh token in the database
+    const storedToken = await prisma.refreshToken.findFirst({
+      where: {
+        token: refreshToken,
+        expiresAt: {
+          gt: new Date()
+        },
+        isRevoked: false // Make sure token hasn't been revoked
       },
-      {
-        id: 2,
-        name: 'Benutzer',
-        email: 'user@example.com',
-        role: 'employee'
+      include: {
+        user: true
       }
-    ];
+    });
     
-    // Benutzer finden
-    const user = demoUsers.find(u => u.id === userId);
-    
-    if (!user) {
-      throw new UnauthorizedError('Ungültiges Refresh Token');
+    if (!storedToken) {
+      logger.warn('Refresh token not found or expired');
+      
+      // Clear invalid tokens
+      const response = NextResponse.json(
+        formatResponse.error('Invalid or expired refresh token', 401),
+        { status: 401 }
+      );
+      
+      response.cookies.delete('auth_token');
+      response.cookies.delete('refresh_token');
+      
+      return response;
     }
     
-    // Neues Access Token erstellen
+    const user = storedToken.user;
+    
+    // Check if user is active
+    if (user.status !== 'active') {
+      logger.warn('Token refresh failed: Inactive user', { userId: user.id });
+      
+      // Clear tokens
+      const response = NextResponse.json(
+        formatResponse.error('User account is not active', 403),
+        { status: 403 }
+      );
+      
+      response.cookies.delete('auth_token');
+      response.cookies.delete('refresh_token');
+      
+      return response;
+    }
+    
+    // Validate security configuration
+    if (!securityConfig.isJwtSecretConfigured()) {
+      logger.error('JWT_SECRET not properly configured');
+      return NextResponse.json(
+        formatResponse.error('Authentication service unavailable', 500),
+        { status: 500 }
+      );
+    }
+    
+    // Get security configuration
+    const jwtSecret = securityConfig.getJwtSecret();
+    const jwtOptions = securityConfig.getJwtOptions();
+    
+    // Generate a new token ID
+    const tokenId = uuidv4();
+    
+    // Get token lifetimes
+    const accessTokenLifetime = securityConfig.getAccessTokenLifetime();
+    const refreshTokenLifetime = securityConfig.getRefreshTokenLifetime();
+    
+    // Generate new access token
     const accessToken = jwt.sign(
-      {
-        userId: user.id,
-        name: user.name,
+      { 
+        sub: user.id, 
         email: user.email,
-        role: user.role
+        name: user.name,
+        role: user.role,
+        iss: jwtOptions.issuer,
+        aud: jwtOptions.audience,
+        jti: tokenId
       },
       jwtSecret,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
+      { 
+        ...jwtOptions,
+        expiresIn: `${Math.floor(accessTokenLifetime / 60)}m`
+      }
     );
     
-    // Neues Refresh Token erstellen
-    const newRefreshToken = jwt.sign(
-      { userId: user.id },
-      jwtRefreshSecret,
-      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
-    );
+    // Generate new refresh token
+    const newRefreshToken = require('crypto').randomBytes(40).toString('hex');
     
-    logger.info(`Token erneuert für Benutzer ID: ${user.id}`);
+    // Store new refresh token in database
+    await prisma.refreshToken.create({
+      data: {
+        token: newRefreshToken,
+        tokenId: tokenId, // Store the JWT ID
+        userId: user.id,
+        expiresAt: new Date(Date.now() + refreshTokenLifetime * 1000),
+        createdByIp: req.headers.get('x-forwarded-for') || 'unknown'
+      }
+    });
     
-    return successResponse({
-      accessToken,
-      refreshToken: newRefreshToken,
-      user
-    }, 'Token erfolgreich erneuert');
+    // Revoke old refresh token
+    await prisma.refreshToken.update({
+      where: { token: refreshToken },
+      data: { 
+        isRevoked: true,
+        revokedAt: new Date(),
+        revokedByIp: req.headers.get('x-forwarded-for') || 'unknown',
+        replacedByToken: newRefreshToken
+      }
+    });
+    
+    // If the old token had a tokenId reference, add that to the blacklist
+    if (storedToken.tokenId) {
+      const oldJwtExpiry = storedToken.expiresAt.getTime();
+      tokenBlacklist.add(storedToken.tokenId, oldJwtExpiry, 'token-rotation');
+    }
+    
+    logger.info('Token refreshed successfully', { userId: user.id });
+    
+    // Create response with tokens as cookies
+    const response = NextResponse.json({
+      success: true,
+      message: 'Token refreshed successfully',
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        }
+      }
+    });
+    
+    // Set HTTP-only cookies with standardized names
+    response.cookies.set({
+      name: 'auth_token',
+      value: accessToken,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: accessTokenLifetime
+    });
+    
+    response.cookies.set({
+      name: 'refresh_token',
+      value: newRefreshToken,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax', // Less restrictive to support refresh flows
+      path: '/',
+      maxAge: refreshTokenLifetime
+    });
+    
+    return response;
   } catch (error) {
-    logger.error('Fehler bei Token-Erneuerung:', error);
-    return ApiError.handleError(error);
+    logger.error('Token refresh error:', { error });
+    
+    return NextResponse.json(
+      formatResponse.error(error instanceof Error ? error.message : 'Failed to refresh token', 500),
+      { status: 500 }
+    );
   }
 }
+
+// Export with rate limiting
+export const POST = withRateLimit(refreshHandler);

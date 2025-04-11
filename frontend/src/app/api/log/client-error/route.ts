@@ -1,51 +1,51 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandling } from '@/lib/server/core/globalErrorHandler';
-import { container } from '@/lib/server/di-container';
-import { ILoggingService } from '@/lib/server/interfaces/ILoggingService';
+/**
+ * Client Error Logging API-Route
+ * 
+ * Diese Route ermöglicht das Protokollieren von Client-seitigen Fehlern
+ */
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess } from '@/infrastructure/api/response-formatter';
+import { getLogger } from '@/infrastructure/common/logging';
 
 /**
  * POST /api/log/client-error
- * Protokolliert Client-seitige Fehler
+ * 
+ * Protokolliert einen Client-seitigen Fehler
  */
-async function handleClientError(req: NextRequest) {
-  const logger = container.resolve<ILoggingService>('LoggingService');
-  
-  try {
-    const errorData = await req.json();
+export const POST = apiRouteHandler(
+  async (request: NextRequest) => {
+    const logger = getLogger();
+    const errorData = await request.json();
     
-    // Extrahiere relevante Informationen
-    const {
-      message,
-      name,
-      stack,
+    // Extrahiere Fehlerinformationen
+    const { 
+      message, 
+      stack, 
+      url, 
+      userAgent, 
+      timestamp = new Date().toISOString(),
       componentStack,
-      url,
-      userAgent
+      additionalInfo
     } = errorData;
     
     // Protokolliere den Fehler
-    logger.error('Client-Fehler', new Error(message), {
-      errorType: name,
+    logger.error('Client Error', {
+      message,
       stack,
-      componentStack,
       url,
       userAgent,
-      timestamp: new Date().toISOString()
+      timestamp,
+      componentStack,
+      additionalInfo,
+      ip: request.headers.get('x-forwarded-for') || request.ip || 'unknown'
     });
     
-    return NextResponse.json(
-      { success: true },
-      { status: 200 }
-    );
-  } catch (error) {
-    logger.error('Fehler beim Protokollieren eines Client-Fehlers', 
-                error instanceof Error ? error : new Error(String(error)));
-    
-    return NextResponse.json(
-      { success: false, error: 'Fehler beim Protokollieren' },
-      { status: 500 }
-    );
+    // Bestätige die Protokollierung
+    return formatSuccess({ logged: true });
+  },
+  {
+    // Keine Authentifizierung für Fehlerprotokolle erforderlich
+    requiresAuth: false
   }
-}
-
-export const POST = withErrorHandling(handleClientError, container.resolve<ILoggingService>('LoggingService'));
+);

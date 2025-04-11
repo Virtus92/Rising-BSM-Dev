@@ -1,188 +1,95 @@
-/**
- * DTO für Benutzeranmeldung
- */
+import { UserRole } from '../enums/UserEnums';
+
 export interface LoginDto {
-  /**
-   * E-Mail-Adresse
-   */
   email: string;
-  
-  /**
-   * Passwort
-   */
   password: string;
-  
-  /**
-   * "Angemeldet bleiben"-Option
-   */
   remember?: boolean;
 }
 
-/**
- * DTO für Token-Payload
- */
-export interface TokenPayloadDto {
-  /**
-   * Benutzer-ID
-   */
-  sub: string;
-  
-  /**
-   * E-Mail-Adresse
-   */
-  email: string;
-  
-  /**
-   * Benutzername
-   */
+export interface RegisterDto {
   name: string;
-  
-  /**
-   * Benutzerrolle
-   */
-  role: string;
-  
-  /**
-   * Erstellungszeitpunkt
-   */
-  iat: number;
-  
-  /**
-   * Ablaufzeitpunkt
-   */
-  exp: number;
+  email: string;
+  password: string;
+  role?: UserRole;
+  phone?: string;
+  terms?: boolean;
 }
 
-/**
- * DTO für Authentifizierungsantwort
- */
+export interface RegisterFormData {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  terms: boolean;
+}
+
+export interface ResetPasswordDto {
+  email: string;
+  token?: string;
+  password?: string;
+  confirmPassword?: string;
+}
+
+export interface ForgotPasswordRequestDto {
+  email: string;
+}
+
+export interface ResetPasswordRequestDto {
+  token: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordRequestDto {
+  oldPassword: string;
+  newPassword: string;
+}
+
 export interface AuthResponseDto {
-  /**
-   * Benutzer-ID
-   */
-  id: number;
-  
-  /**
-   * Access Token
-   */
-  accessToken: string;
-  
-  /**
-   * Refresh Token
-   */
-  refreshToken: string;
-  
-  /**
-   * Ablaufzeit in Sekunden
-   */
-  expiresIn: number;
-  
-  /**
-   * Erstellungszeitpunkt
-   */
-  createdAt: string;
-  
-  /**
-   * Aktualisierungszeitpunkt
-   */
-  updatedAt: string;
-  
-  /**
-   * Benutzerdaten
-   */
   user: {
     id: number;
     name: string;
     email: string;
-    role: string;
+    role: UserRole;
     status: string;
     profilePicture?: string;
     createdAt: string;
     updatedAt: string;
   };
-}
-
-/**
- * DTO für Token-Aktualisierung
- */
-export interface RefreshTokenDto {
-  /**
-   * Refresh Token
-   */
-  refreshToken: string;
-}
-
-/**
- * DTO für Token-Aktualisierungsantwort
- */
-export interface RefreshTokenResponseDto {
-  /**
-   * Benutzer-ID
-   */
   id: number;
-  
-  /**
-   * Neues Access Token
-   */
   accessToken: string;
-  
-  /**
-   * Neues Refresh Token (falls Rotation aktiviert)
-   */
   refreshToken: string;
-  
-  /**
-   * Ablaufzeit in Sekunden
-   */
   expiresIn: number;
-  
-  /**
-   * Erstellungszeitpunkt
-   */
   createdAt: string;
-  
-  /**
-   * Aktualisierungszeitpunkt
-   */
   updatedAt: string;
 }
 
-/**
- * DTO für "Passwort vergessen"
- */
+export interface RefreshTokenDto {
+  refreshToken: string;
+}
+
+export interface RefreshTokenResponseDto {
+  id: number;
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ForgotPasswordDto {
-  /**
-   * E-Mail-Adresse
-   */
   email: string;
 }
 
-/**
- * DTO für Passwort-Zurücksetzen
- */
-export interface ResetPasswordDto {
-  /**
-   * Token für Passwort-Zurücksetzen
-   */
-  token: string;
-  
-  /**
-   * Neues Passwort
-   */
-  password: string;
-  
-  /**
-   * Passwortbestätigung
-   */
-  confirmPassword: string;
+export interface LogoutDto {
+  refreshToken: string;
+  allDevices?: boolean;
 }
 
-/**
- * DTO für Abmeldung
- */
-export interface LogoutDto {
-  /**
-   * Refresh Token
-   */
-  refreshToken?: string;
+export interface TokenPayloadDto {
+  sub: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  iat: number;
+  exp: number;
 }

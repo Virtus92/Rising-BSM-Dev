@@ -1,84 +1,78 @@
+/**
+ * API route for notifications
+ */
 import { NextRequest, NextResponse } from 'next/server';
-import { container } from '@/lib/server/di-container';
-import { INotificationService } from '@/lib/server/interfaces/INotificationService';
-import { withAuth } from '@/lib/server/core/auth';
+import { NotificationService } from '@/infrastructure/services/NotificationService';
+import { authMiddleware } from '../auth/middleware/authMiddleware';
+import { responseFormatter } from '@/infrastructure/api/response-formatter';
+import { routeHandler } from '@/infrastructure/api/route-handler';
+import { NotificationFilterParamsDto } from '@/domain/dtos/NotificationDtos';
 
 /**
  * GET /api/notifications
- * Holt alle Benachrichtigungen für den authentifizierten Benutzer
+ * Get notifications for the current user
  */
-export const GET = withAuth(async (req: NextRequest, user) => {
-  try {
-    const notificationService = container.resolve<INotificationService>('NotificationService');
-    
-    // Query-Parameter extrahieren
-    const { searchParams } = new URL(req.url);
-    const readParam = searchParams.get('read');
-    const read = readParam ? readParam === 'true' : undefined;
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
-    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : undefined;
-    
-    const options = {
-      read,
-      limit,
-      offset
+export async function GET(req: NextRequest) {
+  return routeHandler(async () => {
+    // Authentication check
+    const session = await authMiddleware(req);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        responseFormatter.error('Unauthorized'),
+        { status: 401 }
+      );
+    }
+
+    // Get query parameters
+    const searchParams = req.nextUrl.searchParams;
+    const filterParams: NotificationFilterParamsDto = {
+      userId: session.user.id,
+      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined,
+      page: searchParams.get('page') ? parseInt(searchParams.get('page')!) : undefined,
+      unreadOnly: searchParams.get('unreadOnly') === 'true'
     };
-    
-    const result = await notificationService.findByUser(user.id, options);
-    
-    return NextResponse.json({
-      success: true,
-      data: result.notifications,
-      meta: {
-        total: result.total,
-        timestamp: new Date().toISOString()
-      }
-    });
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
+
+    // Get notifications for the user
+    const notificationService = new NotificationService();
+    const notifications = await notificationService.getNotifications(filterParams);
+
+    // Format the date for each notification for easier display
+    const formattedNotifications = notifications.map(notification => ({
+      ...notification,
+      formattedDate: new Date(notification.createdAt).toLocaleString()
+    }));
+
     return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
+      responseFormatter.success(formattedNotifications)
     );
-  }
-});
+  });
+}
 
 /**
- * DELETE /api/notifications
- * Löscht alle Benachrichtigungen des aktuellen Benutzers
+ * POST /api/notifications
+ * Create a new notification (admin only)
  */
-export const DELETE = withAuth(async (req: NextRequest, user) => {
-  try {
-    const notificationService = container.resolve<INotificationService>('NotificationService');
+export async function POST(req: NextRequest) {
+  return routeHandler(async () => {
+    // Authentication check
+    const session = await authMiddleware(req);
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        responseFormatter.error('Unauthorized - Admin access required'),
+        { status: 403 }
+      );
+    }
+
+    // Parse request body
+    const data = await req.json();
     
-    const count = await notificationService.deleteAll(user.id);
-    
-    return NextResponse.json({
-      success: true,
-      data: {
-        count
-      },
-      meta: {
-        timestamp: new Date().toISOString()
-      }
-    });
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
+    // Create notification
+    const notificationService = new NotificationService();
+    const newNotification = await notificationService.createNotification(data);
+
     return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
+      responseFormatter.success(newNotification),
+      { status: 201 }
     );
-  }
-});
+  });
+}

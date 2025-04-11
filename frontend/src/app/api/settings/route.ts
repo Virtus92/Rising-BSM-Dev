@@ -4,31 +4,15 @@
  * Diese Route bietet Zugriff auf Systemeinstellungen.
  */
 import { NextRequest } from 'next/server';
-import { createGetHandler, createPutHandler } from '@/lib/utils/api/route-handler';
-import { getLogger } from '@/lib/core/bootstrap';
-
-/**
- * Validierungsschema für Einstellungen
- */
-const settingsSchema = {
-  companyName: { type: 'string', required: true },
-  companyLogo: { type: 'string' },
-  companyEmail: { type: 'string', format: 'email' },
-  companyPhone: { type: 'string' },
-  companyAddress: { type: 'string' },
-  companyWebsite: { type: 'string', format: 'uri' },
-  dateFormat: { type: 'string', required: true },
-  timeFormat: { type: 'string', required: true },
-  currency: { type: 'string', required: true },
-  language: { type: 'string', required: true },
-  theme: { type: 'string', enum: ['light', 'dark', 'system'], required: true }
-};
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess } from '@/infrastructure/api/response-formatter';
+import { getLogger } from '@/infrastructure/common/logging';
 
 /**
  * GET /api/settings
  * Gibt die Systemeinstellungen zurück
  */
-export const GET = createGetHandler(
+export const GET = apiRouteHandler(
   async (request: NextRequest) => {
     const logger = getLogger();
     logger.info('Hole Systemeinstellungen');
@@ -36,7 +20,7 @@ export const GET = createGetHandler(
     // In der fertigen Implementierung würden wir hier die Einstellungen aus der Datenbank holen
     // Für jetzt geben wir Standardeinstellungen zurück
     
-    return {
+    return formatSuccess({
       companyName: 'Rising BSM',
       companyLogo: '/images/logo.png',
       companyEmail: 'info@rising-bsm.com',
@@ -48,13 +32,11 @@ export const GET = createGetHandler(
       currency: 'EUR',
       language: 'de',
       theme: 'system'
-    };
+    });
   },
   {
     // Optional: erfordere Authentifizierung für die Einstellungen
-    // requireAuth: true,
-    // Optional: erlaube nur bestimmte Rollen
-    // allowedRoles: ['admin'],
+    requiresAuth: false,
   }
 );
 
@@ -62,24 +44,56 @@ export const GET = createGetHandler(
  * PUT /api/settings
  * Aktualisiert die Systemeinstellungen
  */
-export const PUT = createPutHandler(
-  async (request: NextRequest, context: any) => {
+export const PUT = apiRouteHandler(
+  async (request: NextRequest) => {
     const logger = getLogger();
-    const data = context.body; // Bereits validierte Daten aus dem Context
+    const data = await request.json();
+    
+    // Validiere die Daten
+    // Hier würden wir normalerweise getValidationService().validate() verwenden
     
     logger.info('Aktualisiere Systemeinstellungen', data);
     
     // In der fertigen Implementierung würden wir hier die Einstellungen in der Datenbank aktualisieren
     // Für jetzt simulieren wir eine erfolgreiche Aktualisierung
     
-    return data;
+    return formatSuccess(data);
   },
   {
-    // Validierungsschema für die Einstellungen
-    schema: settingsSchema,
     // Authentifizierung für das Aktualisieren von Einstellungen erfordern
-    requireAuth: true,
+    requiresAuth: true,
     // Nur Administratoren dürfen Einstellungen aktualisieren
-    allowedRoles: ['admin']
+    requiresRole: ['admin']
+  }
+);
+
+/**
+ * POST /api/settings/reset
+ * Setzt die Systemeinstellungen auf die Standardwerte zurück
+ */
+export const POST = apiRouteHandler(
+  async (request: NextRequest) => {
+    const logger = getLogger();
+    logger.info('Setze Systemeinstellungen zurück');
+    
+    // In der fertigen Implementierung würden wir hier die Einstellungen in der Datenbank zurücksetzen
+    // Für jetzt simulieren wir eine erfolgreiche Zurücksetzung
+    
+    const defaultSettings = {
+      companyName: 'Rising BSM',
+      dateFormat: 'dd.MM.yyyy',
+      timeFormat: 'HH:mm',
+      currency: 'EUR',
+      language: 'de',
+      theme: 'system'
+    };
+    
+    return formatSuccess(defaultSettings);
+  },
+  {
+    // Authentifizierung für das Zurücksetzen von Einstellungen erfordern
+    requiresAuth: true,
+    // Nur Administratoren dürfen Einstellungen zurücksetzen
+    requiresRole: ['admin']
   }
 );

@@ -5,7 +5,9 @@ import {
 import { IBaseRepository, PaginationResult } from '@/domain/repositories/IBaseRepository';
 import { ILoggingService } from '@/infrastructure/common/logging/ILoggingService';
 import { IValidationService } from '@/infrastructure/common/validation/IValidationService';
-import { IErrorHandler, AppError } from '@/infrastructure/common/error/ErrorHandler';
+import { IErrorHandler, AppError, ValidationError } from '@/infrastructure/common/error/ErrorHandler';
+import { ValidationResult, ValidationErrorType } from '@/domain/enums/ValidationResults';
+import { ValidationResultDto } from '@/domain/dtos/ValidationDto';
 
 /**
  * Basis-Service-Klasse
@@ -19,7 +21,7 @@ import { IErrorHandler, AppError } from '@/infrastructure/common/error/ErrorHand
  * @template R - Typ für Response DTO
  * @template ID - Typ des Primärschlüssels
  */
-export abstract class BaseService<T, C, U, R, ID = number> implements IBaseService<T, C, U, R, ID> {
+export abstract class BaseService<T, C extends Record<string, any>, U extends Record<string, any>, R, ID = number> implements IBaseService<T, C, U, R, ID> {
   /**
    * Konstruktor
    * 
@@ -103,7 +105,15 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
   async create(data: C, options?: ServiceOptions): Promise<R> {
     try {
       // Validiere Eingabedaten
-      await this.validate(data);
+      const validationResult = await this.validate(data);
+      
+      // Prüfe auf Validierungsfehler
+      if (validationResult.result === ValidationResult.ERROR) {
+        throw this.errorHandler.createValidationError(
+          'Validation failed',
+          validationResult.errors?.map(e => e.message) || []
+        );
+      }
       
       // Füge Auditinformationen hinzu, falls Kontext vorhanden
       const auditedData = this.addAuditInfo(data, options?.context, 'create');
@@ -148,7 +158,15 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
       }
       
       // Validiere Eingabedaten mit userID für E-Mail-Validierung
-      await this.validate(data, true, id as any);
+      const validationResult = await this.validate(data, true, id as any);
+      
+      // Prüfe auf Validierungsfehler
+      if (validationResult.result === ValidationResult.ERROR) {
+        throw this.errorHandler.createValidationError(
+          'Validation failed',
+          validationResult.errors?.map(e => e.message) || []
+        );
+      }
       
       // Füge Auditinformationen hinzu, falls Kontext vorhanden
       const auditedData = this.addAuditInfo(data, options?.context, 'update');
@@ -237,8 +255,9 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
    * @param data - Zu validierende Daten
    * @param isUpdate - Ob es sich um eine Aktualisierung handelt
    * @param entityId - ID der Entität (bei Aktualisierungen)
+   * @returns Validierungsergebnis
    */
-  async validate(data: C | U, isUpdate: boolean = false, entityId?: number): Promise<void> {
+  async validate(data: C | U, isUpdate: boolean = false, entityId?: number): Promise<ValidationResultDto> {
     try {
       // Hole Validierungsschema basierend auf der Operation
       const schema = isUpdate ? this.getUpdateValidationSchema() : this.getCreateValidationSchema();
@@ -256,16 +275,44 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
       
       // Führe zusätzliche Validierungen aus, falls erforderlich
       await this.validateBusinessRules(data, isUpdate, entityId);
+      
+      // Rückgabe eines erfolgreichen Validierungsergebnisses
+      return {
+        result: ValidationResult.SUCCESS,
+        data: data
+      };
     } catch (error) {
       if (error instanceof AppError) {
-        throw error;
+        // Erstelle Validierungsfehler im Domain-Format
+        const errorDtos = error instanceof ValidationError ? 
+          error.errors?.map(e => ({
+            type: ValidationErrorType.FORMAT,
+            field: e.split(':')[0]?.trim() || 'unknown',
+            message: e
+          })) : 
+          [{
+            type: ValidationErrorType.OTHER,
+            field: 'general',
+            message: error.message
+          }];
+
+        return {
+          result: ValidationResult.ERROR,
+          errors: errorDtos
+        };
       }
       
       this.logger.error(`Error in ${this.constructor.name}.validate`, { error, data, isUpdate });
-      throw this.errorHandler.createValidationError(
-        'Validation error',
-        [error instanceof Error ? error.message : String(error)]
-      );
+      
+      // Erstelle allgemeinen Validierungsfehler
+      return {
+        result: ValidationResult.ERROR,
+        errors: [{
+          type: ValidationErrorType.OTHER,
+          field: 'general',
+          message: error instanceof Error ? error.message : String(error)
+        }]
+      };
     }
   }
 
@@ -275,7 +322,7 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
    * @param callback - Callback-Funktion
    * @returns Ergebnis der Transaktion
    */
-  async transaction<Result>(callback: (service: IBaseService<T, C, U, R, ID>) => Promise<Result>): Promise<Result> {
+  async transaction<r>(callback: (service: IBaseService<T, C, U, R, ID>) => Promise<r>): Promise<r> {
     try {
       // Verwende Repository, um Transaktion zu verwalten
       return await this.repository.transaction(async () => {
@@ -299,7 +346,15 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
   async bulkUpdate(ids: ID[], data: U, options?: ServiceOptions): Promise<number> {
     try {
       // Validiere Daten
-      await this.validate(data, true);
+      const validationResult = await this.validate(data, true);
+      
+      // Prüfe auf Validierungsfehler
+      if (validationResult.result === ValidationResult.ERROR) {
+        throw this.errorHandler.createValidationError(
+          'Validation failed',
+          validationResult.errors?.map(e => e.message) || []
+        );
+      }
       
       // Füge Auditinformationen hinzu, falls Kontext vorhanden
       const auditedData = this.addAuditInfo(data, options?.context, 'update');
@@ -318,12 +373,65 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
   }
 
   /**
+   * Führt eine erweiterte Suche durch
+   * 
+   * @param searchText - Suchtext
+   * @param options - Service-Optionen
+   * @returns Gefundene Entitäten
+   */
+  async search(searchText: string, options?: ServiceOptions): Promise<R[]> {
+    // Standardimplementierung verwendet findByCriteria mit Name und andere häufig gesuchte Felder
+    // Sollte in Unterklassen überschrieben werden für spezifische Suchlogik
+    try {
+      const criteria: Record<string, any> = {};
+      
+      if (searchText && searchText.trim() !== '') {
+        // Füge grundlegende Suchkriterien hinzu (sollte in Unterklassen angepasst werden)
+        criteria.name = searchText; // Annahme: Die meisten Entitäten haben ein "name" Feld
+      }
+      
+      return await this.findByCriteria(criteria, options);
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.search`, { error, searchText });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Prüft, ob eine Entität existiert
+   * 
+   * @param id - ID der Entität
+   * @param options - Service-Optionen
+   * @returns Ob die Entität existiert
+   */
+  async exists(id: ID, options?: ServiceOptions): Promise<boolean> {
+    try {
+      // Prüfe über Repository, ob Entität existiert
+      const entity = await this.repository.findById(id, this.mapToRepositoryOptions(options));
+      return !!entity;
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.exists`, { error, id });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Mappt eine Entität auf eine Response DTO
    * 
    * @param entity - Zu mappende Entität
    * @returns Response DTO
    */
   abstract toDTO(entity: T): R;
+
+  /**
+   * Konvertiert eine DTO in eine Entität
+   * 
+   * @param dto - DTO
+   * @returns Entität
+   */
+  fromDTO(dto: C | U): Partial<T> {
+    return this.toEntity(dto);
+  }
 
   /**
    * Mappt eine DTO auf eine Entität
@@ -499,9 +607,12 @@ export abstract class BaseService<T, C, U, R, ID = number> implements IBaseServi
     // Extrahiere gemeinsame Eigenschaften
     const { relations, withDeleted } = options;
     
+    // Type assertion for pagination options that might be passed from older code
+    const serviceOptions = options as any;
+    
     return {
-      page: options.page,
-      limit: options.limit,
+      page: serviceOptions.page,
+      limit: serviceOptions.limit,
       relations,
       withDeleted
     };

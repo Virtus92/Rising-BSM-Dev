@@ -1,103 +1,126 @@
 /**
- * User API Route Handler (für spezifische Benutzer-ID)
+ * API route for specific user operations
  */
-import { NextRequest } from 'next/server';
-import { getUserService } from '@/lib/factories';
-import apiResponse from '@/lib/utils/api/unified-response';
-
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
+import { NextRequest, NextResponse } from 'next/server';
+import { authMiddleware } from '../../auth/middleware/authMiddleware';
+import { responseFormatter } from '@/infrastructure/api/response-formatter';
+import { routeHandler } from '@/infrastructure/api/route-handler';
 
 /**
  * GET /api/users/[id]
- * Holt einen einzelnen Benutzer
+ * Get a specific user by ID
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  try {
-    const { id } = params;
-    
-    const userService = getUserService();
-    const user = await userService.getUserById(id);
-    
-    if (!user) {
-      return apiResponse.notFound(`User with ID ${id} not found`);
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return routeHandler(async () => {
+    // Authentication check
+    const session = await authMiddleware(req);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        responseFormatter.error('Unauthorized'),
+        { status: 401 }
+      );
     }
-    
-    return apiResponse.success(user, 'User retrieved successfully');
-  } catch (error) {
-    return apiResponse.handleError(error);
-  }
+
+    const id = parseInt(params.id);
+    if (isNaN(id)) {
+      return NextResponse.json(
+        responseFormatter.error('Invalid user ID'),
+        { status: 400 }
+      );
+    }
+
+    // Mock user data
+    const mockUser = {
+      id: id,
+      name: id === 1 ? 'Admin User' : id === 2 ? 'John Doe' : 'Jane Smith',
+      email: id === 1 ? 'admin@example.com' : id === 2 ? 'john@example.com' : 'jane@example.com',
+      role: id === 1 ? 'ADMIN' : id === 3 ? 'MANAGER' : 'USER',
+      status: 'active',
+      profilePicture: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    return NextResponse.json(
+      responseFormatter.success(mockUser)
+    );
+  });
 }
 
 /**
  * PUT /api/users/[id]
- * Aktualisiert einen Benutzer
+ * Update a user
  */
-export async function PUT(request: NextRequest, { params }: RouteParams) {
-  try {
-    const { id } = params;
-    const userData = await request.json();
-    
-    const userService = getUserService();
-    const updatedUser = await userService.updateUser(id, userData);
-    
-    return apiResponse.success(updatedUser, 'User updated successfully');
-  } catch (error) {
-    return apiResponse.handleError(error);
-  }
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return routeHandler(async () => {
+    // Authentication check
+    const session = await authMiddleware(req);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        responseFormatter.error('Unauthorized'),
+        { status: 401 }
+      );
+    }
+
+    const id = parseInt(params.id);
+    if (isNaN(id)) {
+      return NextResponse.json(
+        responseFormatter.error('Invalid user ID'),
+        { status: 400 }
+      );
+    }
+
+    // Parse request body
+    const data = await req.json();
+
+    // Mock updated user
+    const updatedUser = {
+      id: id,
+      ...data,
+      updatedAt: new Date().toISOString()
+    };
+
+    return NextResponse.json(
+      responseFormatter.success(updatedUser)
+    );
+  });
 }
 
 /**
  * DELETE /api/users/[id]
- * Löscht einen Benutzer
+ * Delete a user
  */
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  try {
-    const { id } = params;
-    
-    const userService = getUserService();
-    await userService.deleteUser(id);
-    
-    return apiResponse.noContent();
-  } catch (error) {
-    return apiResponse.handleError(error);
-  }
-}
-
-/**
- * PATCH /api/users/[id]
- * Teilweise Aktualisierung eines Benutzers (z.B. Status)
- */
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
-  try {
-    const { id } = params;
-    const updates = await request.json();
-    
-    // Extrahieren der Benutzerinformationen aus den Headers
-    const userId = request.headers.get('x-user-id');
-    const userService = getUserService();
-    
-    // Überprüfen, ob es eine Statusaktualisierung ist
-    if (updates.status) {
-      const updatedUser = await userService.updateUserStatus(
-        Number(id),
-        updates.status,
-        {
-          userId: userId ? Number(userId) : undefined,
-          ipAddress: request.headers.get('x-forwarded-for') || request.ip
-        }
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return routeHandler(async () => {
+    // Authentication check
+    const session = await authMiddleware(req);
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        responseFormatter.error('Unauthorized - Admin access required'),
+        { status: 403 }
       );
-      
-      return apiResponse.success(updatedUser, 'User status updated successfully');
     }
-    
-    // Ansonsten normale Teilaktualisierung durchführen
-    const updatedUser = await userService.updateUser(id, updates);
-    return apiResponse.success(updatedUser, 'User updated successfully');
-  } catch (error) {
-    return apiResponse.handleError(error);
-  }
+
+    const id = parseInt(params.id);
+    if (isNaN(id)) {
+      return NextResponse.json(
+        responseFormatter.error('Invalid user ID'),
+        { status: 400 }
+      );
+    }
+
+    // Mock successful deletion
+    return NextResponse.json(
+      responseFormatter.success({ success: true })
+    );
+  });
 }

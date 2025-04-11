@@ -5,10 +5,27 @@ import {
   UnauthorizedError, 
   ForbiddenError, 
   ConflictError, 
-  BadRequestError, 
-  ErrorResponse 
+  BadRequestError
 } from './ErrorTypes';
 import { ILoggingService } from '../logging/ILoggingService';
+import { ApiRequestError } from '@/infrastructure/clients/ApiClient';
+
+// Re-export der Fehlertypen für einfachen Zugriff
+export { AppError, ValidationError, NotFoundError, UnauthorizedError, ForbiddenError, ConflictError, BadRequestError } from './ErrorTypes';
+// Direkte Definition von ErrorResponse um Importprobleme zu lösen
+export interface ErrorResponse {
+  success: boolean;
+  message: string;
+  statusCode?: number;
+  errorCode?: string;
+  errors?: Array<{
+    message: string;
+    statusCode?: number;
+    validationErrors?: string[];
+    stack?: string;
+  }>;
+  timestamp?: string;
+}
 
 /**
  * Interface für den ErrorHandler
@@ -266,6 +283,31 @@ export class ErrorHandler implements IErrorHandler {
     // Bereits ein AppError
     if (error instanceof AppError) {
       return error;
+    }
+    
+    // ApiRequestError aus ApiClient in entsprechenden AppError umwandeln
+    if (error instanceof ApiRequestError) {
+      switch (error.statusCode) {
+        case 400:
+          return this.createBadRequestError(error.message);
+        case 401:
+          return this.createUnauthorizedError(error.message);
+        case 403:
+          return this.createForbiddenError(error.message);
+        case 404:
+          return this.createNotFoundError(error.message);
+        case 409:
+          return this.createConflictError(error.message);
+        case 422:
+          return this.createValidationError(error.message, error.errors);
+        default:
+          return this.createError(
+            error.message,
+            error.statusCode || 500,
+            'api_error',
+            this.showStackTraces ? { errors: error.errors } : undefined
+          );
+      }
     }
     
     // Nativer Error

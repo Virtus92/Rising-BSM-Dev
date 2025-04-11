@@ -8,14 +8,16 @@ export enum CommonStatus {
 }
 
 /**
- * Projektstatus
+ * Kundenstatus
+ * 
+ * @deprecated Verwende stattdessen CommonStatus
  */
-export enum ProjectStatus {
-  NEW = "new",
-  IN_PROGRESS = "in_progress",
-  ON_HOLD = "on_hold",
-  COMPLETED = "completed",
-  CANCELLED = "cancelled"
+// This enum is kept for backward compatibility only
+// All new code should use CommonStatus instead
+export enum CustomerStatus {
+  ACTIVE = CommonStatus.ACTIVE,
+  INACTIVE = CommonStatus.INACTIVE,
+  DELETED = CommonStatus.DELETED
 }
 
 /**
@@ -38,12 +40,45 @@ export enum CustomerType {
 }
 
 /**
- * Rechnungsstatus
+ * Anfragestatus
  */
-export enum InvoiceStatus {
-  DRAFT = "draft",
-  OPEN = "open",
-  PAID = "paid",
-  CANCELLED = "cancelled",
-  OVERDUE = "overdue"
+export enum RequestStatus {
+  NEW = "new",
+  IN_PROGRESS = "in_progress",
+  COMPLETED = "completed",
+  CANCELLED = "cancelled"
+}
+
+/**
+ * Benachrichtigungstyp
+ */
+export enum NotificationType {
+  INFO = 'info',
+  WARNING = 'warning',
+  ERROR = 'error',
+  SUCCESS = 'success',
+  SYSTEM = 'system',
+  TASK = 'task',
+  APPOINTMENT = 'appointment',
+  PROJECT = 'project',
+  MESSAGE = 'message',
+  ALERT = 'alert'
+}
+
+/**
+ * Aktionstypen für Protokolleinträge
+ */
+export enum LogActionType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  VIEW = 'view',
+  LOGIN = 'login',
+  LOGOUT = 'logout',
+  RESET_PASSWORD = 'reset_password',
+  CHANGE_PASSWORD = 'change_password',
+  CHANGE_STATUS = 'change_status',
+  ASSIGN = 'assign',
+  LINK = 'link',
+  CONVERT = 'convert'
 }

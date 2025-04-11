@@ -1,3 +1,5 @@
+import { ValidationResultDto } from '@/domain/dtos/ValidationDto';
+
 /**
  * Validierungsregel
  */
@@ -149,12 +151,13 @@ export interface IValidationService {
   
   /**
    * Validiert Daten anhand eines Schemas und wirft bei Fehlern einen Fehler
+   * Integriert mit Domain ValidationResultDto
    * 
    * @param data - Zu validierende Daten
    * @param schema - Validierungsschema
-   * @returns Validierungsergebnis
+   * @returns Domain-Validierungsergebnis
    */
-  validateOrThrow<T = any>(data: any, schema: ValidationSchema): ValidationResult<T>;
+  validateOrThrow<T = any>(data: any, schema: ValidationSchema): ValidationResultDto;
   
   /**
    * Validiert ein bestimmtes Feld

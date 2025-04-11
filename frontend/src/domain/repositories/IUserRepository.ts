@@ -1,6 +1,7 @@
 import { IBaseRepository, PaginationResult } from './IBaseRepository';
 import { User } from '../entities/User';
-import { UserFilterParams } from '../dtos/UserDtos';
+import { ActivityLog } from '../entities/ActivityLog';
+import { UserFilterParamsDto } from '../dtos/UserDtos';
 
 /**
  * Repository-Interface für Benutzer
@@ -28,7 +29,7 @@ export interface IUserRepository extends IBaseRepository<User> {
    * @param filters - Filterparameter
    * @returns Gefundene Benutzer mit Paginierung
    */
-  findUsers(filters: UserFilterParams): Promise<PaginationResult<User>>;
+  findUsers(filters: UserFilterParamsDto): Promise<PaginationResult<User>>;
   
   /**
    * Sucht Benutzer anhand eines Suchbegriffs
@@ -55,7 +56,7 @@ export interface IUserRepository extends IBaseRepository<User> {
    * @param limit - Maximale Anzahl der Ergebnisse
    * @returns Benutzeraktivitäten
    */
-  getUserActivity(userId: number, limit?: number): Promise<any[]>;
+  getUserActivity(userId: number, limit?: number): Promise<ActivityLog[]>;
   
   /**
    * Löscht einen Benutzer dauerhaft (Hard Delete)
@@ -64,4 +65,55 @@ export interface IUserRepository extends IBaseRepository<User> {
    * @returns Erfolg der Operation
    */
   hardDelete(userId: number): Promise<boolean>;
+  
+  /**
+   * Setzt einen Token zum Zurücksetzen des Passworts
+   * 
+   * @param userId - Benutzer-ID
+   * @param token - Reset-Token
+   * @param expiry - Ablaufzeitpunkt
+   * @returns Aktualisierter Benutzer
+   */
+  setResetToken(userId: number, token: string, expiry: Date): Promise<User>;
+  
+  /**
+   * Prüft, ob ein Reset-Token gültig ist
+   * 
+   * @param token - Reset-Token
+   * @returns Benutzer-ID, wenn gültig, sonst null
+   */
+  validateResetToken(token: string): Promise<number | null>;
+  
+  /**
+   * Aktualisiert den letzten Anmeldezeitpunkt
+   * 
+   * @param userId - Benutzer-ID
+   * @returns Aktualisierter Benutzer
+   */
+  updateLastLogin(userId: number): Promise<User>;
+  
+  /**
+   * Aktualisiert das Profilbild eines Benutzers
+   * 
+   * @param userId - Benutzer-ID
+   * @param profilePictureUrl - URL des Profilbilds
+   * @returns Aktualisierter Benutzer
+   */
+  updateProfilePicture(userId: number, profilePictureUrl: string): Promise<User>;
+  
+  /**
+   * Loggt Benutzeraktivitäten
+   * 
+   * @param userId - Benutzer-ID
+   * @param action - Aktionstyp
+   * @param details - Details zur Aktion
+   * @param ipAddress - IP-Adresse
+   * @returns Promise mit Ergebnis der Aktivitätsprotokollierung
+   */
+  logActivity(
+    userId: number,
+    action: string,
+    details?: string,
+    ipAddress?: string
+  ): Promise<any>;
 }

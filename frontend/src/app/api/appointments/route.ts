@@ -1,97 +1,103 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { container } from '@/lib/server/di-container';
-import { IAppointmentService } from '@/lib/server/interfaces/IAppointmentService';
-import { withAuth } from '@/lib/server/core/auth';
+/**
+ * Appointments API-Route
+ * 
+ * Verarbeitet Anfragen zur Terminverwaltung
+ */
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError, formatValidationError } from '@/infrastructure/api/response-formatter';
+import { getAppointmentService } from '@/infrastructure/common/factories';
+import { CreateAppointmentDto } from '@/domain/dtos/AppointmentDtos';
 
 /**
  * GET /api/appointments
- * Gibt alle Termine zurück
+ * 
+ * Ruft eine Liste von Terminen ab, optional gefiltert und paginiert
  */
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = apiRouteHandler(async (req: NextRequest) => {
   try {
-    const appointmentService = container.resolve<IAppointmentService>('AppointmentService');
-    
-    // Query-Parameter extrahieren
+    // Filterdaten aus Query-Parametern extrahieren
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get('status');
-    const customerId = searchParams.get('customerId') ? parseInt(searchParams.get('customerId')!) : undefined;
-    const projectId = searchParams.get('projectId') ? parseInt(searchParams.get('projectId')!) : undefined;
-    const startDateFrom = searchParams.get('startDateFrom') ? new Date(searchParams.get('startDateFrom')!) : undefined;
-    const startDateTo = searchParams.get('startDateTo') ? new Date(searchParams.get('startDateTo')!) : undefined;
-    const search = searchParams.get('search');
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
-    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : undefined;
-    
     const filters = {
-      status: status || undefined,
-      customerId,
-      projectId,
-      startDateFrom,
-      startDateTo,
-      search: search || undefined,
-      limit,
-      offset
+      status: searchParams.get('status') || undefined,
+      date: searchParams.get('date') || undefined,
+      customerId: searchParams.has('customerId') 
+        ? parseInt(searchParams.get('customerId') as string) 
+        : undefined,
+      projectId: searchParams.has('projectId') 
+        ? parseInt(searchParams.get('projectId') as string) 
+        : undefined,
+      page: searchParams.has('page') 
+        ? parseInt(searchParams.get('page') as string) 
+        : 1,
+      limit: searchParams.has('limit') 
+        ? parseInt(searchParams.get('limit') as string) 
+        : 10
     };
+
+    // Terminservice abrufen
+    const appointmentService = getAppointmentService();
     
-    const result = await appointmentService.findAll(filters);
-    
-    return NextResponse.json({
-      success: true,
-      data: result.appointments,
-      meta: {
-        total: result.total,
-        timestamp: new Date().toISOString()
+    // Paginierte Terminliste abrufen
+    const result = await appointmentService.getAll({
+      relations: ['customer'],
+      context: {
+        userId: req.auth?.userId,
+        page: filters.page,
+        limit: filters.limit
       }
     });
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
+
+    // Erfolgsantwort
+    return formatSuccess(result, 'Termine erfolgreich abgerufen');
+    
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    return formatError(
+      error instanceof Error ? error.message : 'Fehler beim Abrufen der Termine',
+      500
     );
   }
 });
 
 /**
  * POST /api/appointments
+ * 
  * Erstellt einen neuen Termin
  */
-export const POST = withAuth(async (req: NextRequest, user) => {
+export const POST = apiRouteHandler(async (req: NextRequest) => {
   try {
-    const appointmentService = container.resolve<IAppointmentService>('AppointmentService');
+    // Request-Body als JSON parsen
+    const data = await req.json() as CreateAppointmentDto;
     
-    const data = await req.json();
+    // Terminservice abrufen
+    const appointmentService = getAppointmentService();
     
-    const appointment = await appointmentService.create(data, user.id, user.name || `User ${user.id}`);
+    // Versuch, den Termin zu erstellen
+    const result = await appointmentService.create(data, {
+      context: {
+        userId: req.auth?.userId,
+        ipAddress: req.headers.get('x-forwarded-for') || req.ip
+      }
+    });
     
-    return NextResponse.json(
-      {
-        success: true,
-        data: appointment,
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: 201 }
-    );
-  } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Interner Serverfehler',
-        errors: error.errors,
-        meta: {
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
+    // Erfolgsantwort
+    return formatSuccess(result, 'Termin erfolgreich erstellt', 201);
+    
+  } catch (error) {
+    console.error('Error creating appointment:', error);
+    
+    // Behandlung von Validierungsfehlern
+    if (error instanceof Error && 'validationErrors' in error) {
+      return formatValidationError(
+        (error as any).validationErrors,
+        'Validierungsfehler beim Erstellen des Termins'
+      );
+    }
+    
+    return formatError(
+      error instanceof Error ? error.message : 'Fehler beim Erstellen des Termins',
+      500
     );
   }
 });

@@ -1,14 +1,8 @@
 import { BaseEntity } from './BaseEntity';
-import { CustomerType } from '../enums/CommonEnums';
+import { CommonStatus, CustomerType } from '../enums/CommonEnums';
 
-/**
- * Kundenstatus
- */
-export enum CustomerStatus {
-  ACTIVE = "active",
-  INACTIVE = "inactive", 
-  DELETED = "deleted"
-}
+// Re-export der verwendeten Enums für einfachen Zugriff
+export { CommonStatus, CustomerType } from '../enums/CommonEnums';
 
 /**
  * Kunden-Entität
@@ -69,7 +63,7 @@ export class Customer extends BaseEntity {
   /**
    * Kundenstatus
    */
-  status: CustomerStatus;
+  status: CommonStatus;
   
   /**
    * Kundentyp
@@ -94,7 +88,7 @@ export class Customer extends BaseEntity {
     this.country = data.country || 'Deutschland';
     this.notes = data.notes;
     this.newsletter = data.newsletter || false;
-    this.status = data.status || CustomerStatus.ACTIVE;
+    this.status = data.status || CommonStatus.ACTIVE;
     this.type = data.type || CustomerType.PRIVATE;
   }
   
@@ -125,7 +119,7 @@ export class Customer extends BaseEntity {
    * Prüft, ob der Kunde aktiv ist
    */
   isActive(): boolean {
-    return this.status === CustomerStatus.ACTIVE;
+    return this.status === CommonStatus.ACTIVE;
   }
   
   /**
@@ -141,7 +135,7 @@ export class Customer extends BaseEntity {
    * @param status - Neuer Status
    * @param updatedBy - ID des Benutzers, der die Änderung durchführt
    */
-  updateStatus(status: CustomerStatus, updatedBy?: number): Customer {
+  updateStatus(status: CommonStatus, updatedBy?: number): Customer {
     this.status = status;
     this.updateAuditData(updatedBy);
     return this;
@@ -153,7 +147,7 @@ export class Customer extends BaseEntity {
    * @param updatedBy - ID des Benutzers, der die Deaktivierung durchführt
    */
   deactivate(updatedBy?: number): Customer {
-    return this.updateStatus(CustomerStatus.INACTIVE, updatedBy);
+    return this.updateStatus(CommonStatus.INACTIVE, updatedBy);
   }
   
   /**
@@ -162,7 +156,7 @@ export class Customer extends BaseEntity {
    * @param updatedBy - ID des Benutzers, der die Aktivierung durchführt
    */
   activate(updatedBy?: number): Customer {
-    return this.updateStatus(CustomerStatus.ACTIVE, updatedBy);
+    return this.updateStatus(CommonStatus.ACTIVE, updatedBy);
   }
   
   /**
@@ -171,7 +165,7 @@ export class Customer extends BaseEntity {
    * @param updatedBy - ID des Benutzers, der die Löschung durchführt
    */
   softDelete(updatedBy?: number): Customer {
-    return this.updateStatus(CustomerStatus.DELETED, updatedBy);
+    return this.updateStatus(CommonStatus.DELETED, updatedBy);
   }
   
   /**
@@ -201,6 +195,27 @@ export class Customer extends BaseEntity {
   }
   
   /**
+   * Aktualisiert die Newsletter-Einstellung
+   * 
+   * @param subscribe - Newsletter abonnieren
+   * @param updatedBy - ID des Benutzers, der die Änderung durchführt
+   */
+  updateNewsletterSubscription(subscribe: boolean, updatedBy?: number): Customer {
+    this.newsletter = subscribe;
+    this.updateAuditData(updatedBy);
+    return this;
+  }
+  
+  /**
+   * Validiert das E-Mail-Format (falls eine E-Mail vorhanden ist)
+   */
+  isValidEmail(): boolean {
+    if (!this.email) return true; // keine E-Mail ist valide für Kunden
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(this.email);
+  }
+  
+  /**
    * Konvertiert die Entität in ein einfaches Objekt
    */
   override toObject(): Record<string, any> {
@@ -219,7 +234,8 @@ export class Customer extends BaseEntity {
       notes: this.notes,
       newsletter: this.newsletter,
       status: this.status,
-      type: this.type
+      type: this.type,
+      fullAddress: this.getFullAddress()
     };
   }
 }

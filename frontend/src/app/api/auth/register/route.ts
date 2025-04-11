@@ -1,85 +1,148 @@
 /**
- * Register API Route Handler
+ * Register API Route
+ * Handles user registrations directly using the database
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthService, getUserService } from '@/services/factory';
-import { createdResponse } from '@/lib/utils/api/response';
-import { ApiError, BadRequestError, ConflictError } from '@/lib/utils/api/error';
+import bcryptjs from 'bcryptjs';
+import { formatResponse } from '@/infrastructure/api/response-formatter';
+import { getLogger } from '@/infrastructure/common/logging';
+import { getPrismaClient } from '@/infrastructure/common/database/prisma';
+import { UserRole } from '@/domain/enums/UserEnums';
 
 /**
  * POST /api/auth/register
- * Neuen Benutzer registrieren
+ * Processes registration requests and creates new user accounts
  */
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
+  const logger = getLogger();
+  const prisma = getPrismaClient();
+  
   try {
-    const userData = await request.json();
-    const { email, password, firstName, lastName } = userData;
+    // Parse request body
+    const data = await req.json();
     
-    // Grundlegende Validierung
-    if (!email || !password) {
-      throw new BadRequestError('E-Mail und Passwort sind erforderlich');
+    // Basic validation
+    if (!data.name || !data.email || !data.password || !data.confirmPassword) {
+      return NextResponse.json(
+        formatResponse.validationError(
+          ['All fields are required'],
+          'Validation failed'
+        ),
+        { status: 400 }
+      );
     }
     
-    // E-Mail-Format validieren
+    if (data.password !== data.confirmPassword) {
+      return NextResponse.json(
+        formatResponse.validationError(
+          ['Passwords do not match'],
+          'Validation failed'
+        ),
+        { status: 400 }
+      );
+    }
+    
+    // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      throw new BadRequestError('Ungültiges E-Mail-Format');
+    if (!emailRegex.test(data.email)) {
+      return NextResponse.json(
+        formatResponse.validationError(
+          ['Invalid email format'],
+          'Validation failed'
+        ),
+        { status: 400 }
+      );
     }
     
-    // Prüfen, ob ein Benutzer mit dieser E-Mail bereits existiert
-    const userService = getUserService();
-    const existingUser = await userService.getUserByEmail(email);
+    // Password strength validation
+    if (data.password.length < 8) {
+      return NextResponse.json(
+        formatResponse.validationError(
+          ['Password must be at least 8 characters long'],
+          'Validation failed'
+        ),
+        { status: 400 }
+      );
+    }
+    
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email }
+    });
     
     if (existingUser) {
-      throw new ConflictError('Ein Benutzer mit dieser E-Mail existiert bereits');
+      return NextResponse.json(
+        formatResponse.validationError(
+          ['Email address is already in use'],
+          'Validation failed'
+        ),
+        { status: 400 }
+      );
     }
     
-    // Benutzer erstellen
-    const authService = getAuthService();
-    const newUser = await authService.register({
-      email,
-      password,
-      firstName: firstName || '',
-      lastName: lastName || '',
-      role: 'user'  // Standard-Rolle
-    });
+    // Hash the password
+    const salt = await bcryptjs.genSalt(10);
+    const hashedPassword = await bcryptjs.hash(data.password, salt);
     
-    // Optional: Auto-Login nach Registrierung
-    const { accessToken, refreshToken } = await authService.login(email, password);
+    // Get IP address for audit logs
+    const ipAddress = req.headers.get('x-forwarded-for') || 'unknown';
     
-    // Cookies setzen
-    const response = NextResponse.json({
-      success: true,
-      message: 'Registrierung erfolgreich',
+    // Create the user
+    const newUser = await prisma.user.create({
       data: {
-        user: newUser,
-        accessToken
+        name: data.name,
+        email: data.email,
+        password: hashedPassword,
+        role: UserRole.USER, // Default role for new users
+        status: 'ACTIVE', // By default, users are active
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
-    }, { status: 201 });
-    
-    // HTTP-Only-Cookie für Refresh-Token setzen
-    response.cookies.set({
-      name: 'refreshToken',
-      value: refreshToken,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 // 7 Tage
     });
     
-    // Normales Cookie für Access-Token setzen (für JS-Zugriff)
-    response.cookies.set({
-      name: 'token',
-      value: accessToken,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 15 * 60 // 15 Minuten
+    // Log the registration
+    await prisma.userActivity.create({
+      data: {
+        activity: 'USER_REGISTERED',
+        userId: newUser.id,
+        details: JSON.stringify({ ipAddress }),
+        timestamp: new Date()
+      }
     });
     
-    return response;
+    // Remove password from response
+    const { password, ...userWithoutPassword } = newUser;
+    
+    logger.info('User registered successfully', { userId: newUser.id, email: data.email });
+    
+    // Success response
+    return NextResponse.json(
+      formatResponse.success(
+        userWithoutPassword,
+        'Registration successful. You can now log in.'
+      ),
+      { status: 201 }
+    );
   } catch (error) {
-    return ApiError.handleError(error);
+    logger.error('Registration error:',  { error });
+    
+    // Error handling for duplicate email addresses
+    if (error instanceof Error && error.message.includes('unique constraint')) {
+      return NextResponse.json(
+        formatResponse.validationError(
+          ['Email address is already in use'],
+          'Validation failed'
+        ),
+        { status: 400 }
+      );
+    }
+    
+    return NextResponse.json(
+      formatResponse.error(error instanceof Error ? error.message : 'An error occurred during registration', 500),
+      { status: 500 }
+    );
+  } finally {
+    // No need to disconnect when using the singleton pattern
+    // The connection pool is managed by the prisma client
   }
 }

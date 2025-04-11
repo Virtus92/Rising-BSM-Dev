@@ -1,11 +1,14 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaRepository } from './PrismaRepository';
 import { IUserRepository } from '@/domain/repositories/IUserRepository';
-import { User } from '@/domain/entities/User';
-import { UserFilterParams } from '@/domain/dtos/UserDtos';
+import { User, UserRole, UserStatus } from '@/domain/entities/User';
+import { UserFilterParamsDto } from '@/domain/dtos/UserDtos';
+import { ActivityLog } from '@/domain/entities/ActivityLog';
 import { ILoggingService } from '@/infrastructure/common/logging/ILoggingService';
 import { IErrorHandler } from '@/infrastructure/common/error/ErrorHandler';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
+import { EntityType } from '@/domain/enums/EntityTypes';
+import { LogActionType } from '@/domain/enums/CommonEnums';
 
 /**
  * Implementierung des UserRepository
@@ -84,17 +87,42 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
    * @param filters - Filterparameter
    * @returns Promise mit Benutzern und Paginierung
    */
-  async findUsers(filters: UserFilterParams): Promise<PaginationResult<User>> {
+  async findUsers(filters: UserFilterParamsDto): Promise<PaginationResult<User>> {
     try {
       // Baue WHERE-Bedingungen
-      const where = this.buildUserFilters(filters);
+      const where: any = {};
       
-      // Extrahiere Paginierungsparameter
+      // Füge Suchkriterium hinzu
+      if (filters.search) {
+        where.OR = [
+          { name: { contains: filters.search, mode: 'insensitive' } },
+          { email: { contains: filters.search, mode: 'insensitive' } }
+        ];
+      }
+      
+      // Füge weitere Filter hinzu
+      if (filters.role) where.role = filters.role;
+      if (filters.status) where.status = filters.status;
+      
+      // Füge Datumsbereich hinzu
+      if (filters.startDate || filters.endDate) {
+        where.createdAt = {};
+        
+        if (filters.startDate) {
+          where.createdAt.gte = filters.startDate;
+        }
+        
+        if (filters.endDate) {
+          where.createdAt.lte = filters.endDate;
+        }
+      }
+      
+      // Berechne Paginierung
       const page = filters.page || 1;
       const limit = filters.limit || 10;
       const skip = (page - 1) * limit;
       
-      // Baue ORDER BY
+      // Bestimme Sortierung
       const orderBy: any = {};
       if (filters.sortBy) {
         orderBy[filters.sortBy] = filters.sortDirection || 'desc';
@@ -102,21 +130,23 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
         orderBy.createdAt = 'desc';
       }
       
-      // Führe Count-Abfrage aus
-      const total = await this.prisma.user.count({ where });
-      
-      // Führe Hauptabfrage aus
-      const users = await this.prisma.user.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy
-      });
+      // Führe Abfragen aus
+      const [total, users] = await Promise.all([
+        // Count-Abfrage für Gesamtanzahl
+        this.prisma.user.count({ where }),
+        // Daten-Abfrage mit Paginierung
+        this.prisma.user.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy
+        })
+      ]);
       
       // Mappe auf Domänenentitäten
       const data = users.map(user => this.mapToDomainEntity(user));
       
-      // Berechne Paginierungsmetadaten
+      // Berechne Paginierungsinformationen
       const totalPages = Math.ceil(total / limit);
       
       return {
@@ -152,7 +182,9 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
           OR: [
             { name: { contains: search, mode: 'insensitive' } },
             { email: { contains: search, mode: 'insensitive' } }
-          ]
+          ],
+          // Ignoriere gelöschte Benutzer
+          NOT: { status: UserStatus.DELETED }
         },
         take: limit,
         orderBy: { name: 'asc' }
@@ -175,17 +207,26 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
    */
   async updatePassword(userId: number, hashedPassword: string): Promise<User> {
     try {
-      // Aktualisiere Passwort
-      const user = await this.prisma.user.update({
+      // Aktualisiere Passwort und lösche Reset-Token
+      const updatedUser = await this.prisma.user.update({
         where: { id: userId },
         data: { 
           password: hashedPassword,
+          resetToken: null,
+          resetTokenExpiry: null,
           updatedAt: new Date()
         }
       });
       
-      // Mappe auf Domänenentität
-      return this.mapToDomainEntity(user);
+      // Protokolliere die Passwortänderung
+      await this.logActivity(
+        userId,
+        LogActionType.CHANGE_PASSWORD,
+        'Password changed',
+        undefined
+      );
+      
+      return this.mapToDomainEntity(updatedUser);
     } catch (error) {
       this.logger.error('Error in UserRepository.updatePassword', { error, userId });
       throw this.handleError(error);
@@ -199,7 +240,7 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
    * @param limit - Maximale Anzahl der Ergebnisse
    * @returns Promise mit Benutzeraktivitäten
    */
-  async getUserActivity(userId: number, limit: number = 10): Promise<any[]> {
+  async getUserActivity(userId: number, limit: number = 10): Promise<ActivityLog[]> {
     try {
       const activities = await this.prisma.userActivity.findMany({
         where: { userId },
@@ -207,7 +248,17 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
         take: limit
       });
       
-      return activities;
+      // Mappe auf Domain-Entitäten
+      return activities.map(activity => new ActivityLog({
+        id: activity.id,
+        entityType: EntityType.USER,
+        entityId: userId,
+        userId: activity.userId,
+        action: activity.activity,
+        details: activity.details ? JSON.parse(activity.details) : {},
+        createdAt: activity.timestamp || new Date(),
+        updatedAt: activity.timestamp || new Date()
+      }));
     } catch (error) {
       this.logger.error('Error in UserRepository.getUserActivity', { error, userId });
       throw this.handleError(error);
@@ -224,19 +275,153 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
     try {
       this.logger.debug(`Hard deleting user with ID: ${userId}`);
       
-      // Lösche zuerst die Aktivitäten des Benutzers, um Fremdschlüssel-Einschränkungen zu vermeiden
-      await this.prisma.userActivity.deleteMany({
-        where: { userId }
-      });
-      
-      // Lösche den Benutzer
-      await this.prisma.user.delete({
-        where: { id: userId }
+      // Führe eine Transaktion aus, um Datenintegrität zu gewährleisten
+      await this.prisma.$transaction(async (tx) => {
+        // Lösche zuerst die abhängigen Entitäten
+        await tx.userActivity.deleteMany({
+          where: { userId }
+        });
+        
+        await tx.refreshToken.deleteMany({
+          where: { userId }
+        });
+        
+        // Lösche UserSettings, falls vorhanden
+        await tx.userSettings.deleteMany({
+          where: { userId }
+        });
+        
+        // Lösche den Benutzer selbst
+        await tx.user.delete({
+          where: { id: userId }
+        });
       });
       
       return true;
     } catch (error) {
       this.logger.error('Error in UserRepository.hardDelete', { error, userId });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Setzt ein Token zum Zurücksetzen des Passworts
+   * 
+   * @param userId - Benutzer-ID
+   * @param token - Reset-Token
+   * @param expiry - Ablaufzeitpunkt
+   * @returns Promise mit aktualisiertem Benutzer
+   */
+  async setResetToken(userId: number, token: string, expiry: Date): Promise<User> {
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          resetToken: token,
+          resetTokenExpiry: expiry,
+          updatedAt: new Date()
+        }
+      });
+      
+      // Protokolliere die Token-Generierung
+      await this.logActivity(
+        userId,
+        LogActionType.RESET_PASSWORD,
+        'Password reset token generated',
+        undefined
+      );
+      
+      return this.mapToDomainEntity(updatedUser);
+    } catch (error) {
+      this.logger.error('Error in UserRepository.setResetToken', { error, userId });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Prüft, ob ein Reset-Token gültig ist
+   * 
+   * @param token - Reset-Token
+   * @returns Benutzer-ID, wenn gültig, sonst null
+   */
+  async validateResetToken(token: string): Promise<number | null> {
+    try {
+      // Suche einen Benutzer mit diesem Token und gültiger Ablaufzeit
+      const user = await this.prisma.user.findFirst({
+        where: {
+          resetToken: token,
+          resetTokenExpiry: {
+            gt: new Date() // Token muss in der Zukunft ablaufen
+          }
+        }
+      });
+      
+      return user ? user.id : null;
+    } catch (error) {
+      this.logger.error('Error in UserRepository.validateResetToken', { error, token });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Aktualisiert den letzten Anmeldezeitpunkt
+   * 
+   * @param userId - Benutzer-ID
+   * @returns Aktualisierter Benutzer
+   */
+  async updateLastLogin(userId: number): Promise<User> {
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          lastLoginAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+      
+      // Protokolliere die Anmeldung
+      await this.logActivity(
+        userId,
+        LogActionType.LOGIN,
+        'User logged in',
+        undefined
+      );
+      
+      return this.mapToDomainEntity(updatedUser);
+    } catch (error) {
+      this.logger.error('Error in UserRepository.updateLastLogin', { error, userId });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Aktualisiert das Profilbild eines Benutzers
+   * 
+   * @param userId - Benutzer-ID
+   * @param profilePictureUrl - URL des Profilbilds
+   * @returns Aktualisierter Benutzer
+   */
+  async updateProfilePicture(userId: number, profilePictureUrl: string): Promise<User> {
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          profilePicture: profilePictureUrl,
+          updatedAt: new Date()
+        }
+      });
+      
+      // Protokolliere die Aktualisierung
+      await this.logActivity(
+        userId,
+        LogActionType.UPDATE,
+        'Profile picture updated',
+        undefined
+      );
+      
+      return this.mapToDomainEntity(updatedUser);
+    } catch (error) {
+      this.logger.error('Error in UserRepository.updateProfilePicture', { error, userId });
       throw this.handleError(error);
     }
   }
@@ -332,49 +517,6 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
     result.updatedAt = new Date();
     
     return result;
-  }
-
-  /**
-   * Erstellt Benutzerfilter für die Suche
-   * 
-   * @param filters - Filterparameter
-   * @returns ORM-spezifische WHERE-Bedingungen
-   */
-  protected buildUserFilters(filters: UserFilterParams): any {
-    const where: any = {};
-    
-    // Suchfilter
-    if (filters.search) {
-      where.OR = [
-        { name: { contains: filters.search, mode: 'insensitive' } },
-        { email: { contains: filters.search, mode: 'insensitive' } }
-      ];
-    }
-    
-    // Rollenfilter
-    if (filters.role) {
-      where.role = filters.role;
-    }
-    
-    // Statusfilter
-    if (filters.status) {
-      where.status = filters.status;
-    }
-    
-    // Datumsbereichsfilter
-    if (filters.startDate || filters.endDate) {
-      where.createdAt = {};
-      
-      if (filters.startDate) {
-        where.createdAt.gte = filters.startDate;
-      }
-      
-      if (filters.endDate) {
-        where.createdAt.lte = filters.endDate;
-      }
-    }
-    
-    return where;
   }
 
   /**
