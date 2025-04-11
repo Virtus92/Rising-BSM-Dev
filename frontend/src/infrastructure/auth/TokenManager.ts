@@ -270,6 +270,11 @@ export class TokenManager {
         return null;
       }
       
+      // Explicitly check for required fields
+      if (!decoded.name || !decoded.email || !decoded.role) {
+        return null;
+      }
+      
       if (isNaN(userId)) {
         return null;
       }
@@ -376,8 +381,15 @@ export class TokenManager {
       // Add a timestamp to prevent caching
       const timestamp = new Date().getTime();
       
-      // Check browser cookies for refresh_token
+      // Enhanced cookie checking with better debugging
       if (typeof document !== 'undefined') {
+        // Log all cookies for debugging (without values for security)
+        const allCookies = document.cookie.split(';').map(c => c.trim());
+        logger.debug('Available cookies during refresh', { 
+          cookieCount: allCookies.length,
+          cookieNames: allCookies.map(c => c.split('=')[0]) 
+        });
+        
         const hasCookie = document.cookie.split(';').some(cookie => {
           const trimmedCookie = cookie.trim();
           return trimmedCookie.startsWith('refresh_token=');
@@ -388,7 +400,17 @@ export class TokenManager {
           const refreshTokenBackup = localStorage.getItem('refresh_token_backup');
           if (refreshTokenBackup) {
             logger.debug('Creating refresh_token cookie from backup');
-            document.cookie = `refresh_token=${refreshTokenBackup};path=/;max-age=86400`;
+            
+            // Ensure proper cookie format with attributes
+            const secure = process.env.NODE_ENV === 'production' ? 'Secure;' : '';
+            document.cookie = `refresh_token=${refreshTokenBackup};Path=/;${secure}Max-Age=86400;SameSite=Lax`;
+            
+            // Verify cookie was successfully set
+            setTimeout(() => {
+              const cookieSet = document.cookie.split(';').some(c => 
+                c.trim().startsWith('refresh_token='));
+              logger.debug('Refresh token cookie creation result', { success: cookieSet });
+            }, 0);
           } else {
             logger.warn('No refresh token cookie or backup found, skipping refresh');
             return false;
@@ -405,6 +427,19 @@ export class TokenManager {
           // Direct API call to avoid circular dependencies with cache busting
           const refreshUrl = `/api/auth/refresh?_=${timestamp}`;
           
+          // Log cookies before making the API call
+          if (typeof document !== 'undefined') {
+            const cookieNames = document.cookie.split(';')
+              .map(c => c.trim().split('=')[0])
+              .filter(Boolean);
+            logger.debug('Cookies available before refresh request', { 
+              count: cookieNames.length,
+              names: cookieNames
+            });
+          }
+          
+          logger.debug(`Making token refresh request (attempt ${currentRetry + 1}/${maxRetries + 1})`);
+          
           const response = await fetch(refreshUrl, {
             method: 'POST',
             headers: {
@@ -417,6 +452,13 @@ export class TokenManager {
             },
             credentials: 'include' // Important for cookie handling
           });
+          
+          // Log response headers for debugging
+          const responseHeaders: Record<string, string> = {};
+          response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+          });
+          logger.debug('Refresh response headers', { responseHeaders });
           
           if (response.ok) {
             try {

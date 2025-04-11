@@ -4,9 +4,9 @@
 import { ApiClient } from '@/infrastructure/clients/ApiClient';
 import { 
   AppointmentDto, 
-  AppointmentFilterParamsDto, 
-  CreateAppointmentDto, 
-  UpdateAppointmentDto 
+  AppointmentFilterParamsDto,
+  CreateAppointmentDto,
+  UpdateAppointmentDto
 } from '@/domain/dtos/AppointmentDtos';
 
 export class AppointmentService {
@@ -21,6 +21,17 @@ export class AppointmentService {
       queryParams = '?' + new URLSearchParams(filters as any).toString();
     }
     return ApiClient.get(`${this.basePath}${queryParams}`);
+  }
+
+  /**
+   * Get upcoming appointments
+   */
+  static async getUpcomingAppointments(limit?: number) {
+    let url = `${this.basePath}/upcoming`;
+    if (limit) {
+      url += `?limit=${limit}`;
+    }
+    return ApiClient.get(url);
   }
 
   /**
@@ -52,23 +63,30 @@ export class AppointmentService {
   }
 
   /**
-   * Get upcoming appointments
-   */
-  static async getUpcomingAppointments() {
-    return ApiClient.get(`${this.basePath}/upcoming`);
-  }
-
-  /**
-   * Get monthly statistics
-   */
-  static async getMonthlyStats() {
-    return ApiClient.get(`${this.basePath}/stats/monthly`);
-  }
-
-  /**
    * Get appointment count
    */
   static async count() {
     return ApiClient.get(`${this.basePath}/count`);
+  }
+  
+  /**
+   * Get monthly appointment statistics
+   */
+  static async getMonthlyStats() {
+    return ApiClient.get(`${this.basePath}/stats/monthly`);
+  }
+  
+  /**
+   * Get weekly appointment statistics
+   */
+  static async getWeeklyStats() {
+    return ApiClient.get(`${this.basePath}/stats/weekly`);
+  }
+  
+  /**
+   * Get yearly appointment statistics
+   */
+  static async getYearlyStats() {
+    return ApiClient.get(`${this.basePath}/stats/yearly`);
   }
 }

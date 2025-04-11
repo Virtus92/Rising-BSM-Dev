@@ -36,165 +36,231 @@ import { IActivityLogService } from '@/domain/services/IActivityLogService';
 import { INotificationService } from '@/domain/services/INotificationService';
 import { IRefreshTokenService } from '@/domain/services/IRefreshTokenService';
 
-// Singleton-Instanzen für Services
-let authService: AuthService;
-let userService: UserService;
-let customerService: CustomerService;
-let appointmentService: AppointmentService;
-let requestService: RequestService;
-let activityLogService: ActivityLogService;
-let notificationService: NotificationService;
-let refreshTokenService: RefreshTokenService;
+/**
+ * ServiceFactory Klasse für einheitliche Erstellung von Services
+ */
+export class ServiceFactory {
+  private static instance: ServiceFactory;
+
+  // Singleton-Instanzen für Services
+  private authService?: AuthService;
+  private userService?: UserService;
+  private customerService?: CustomerService;
+  private appointmentService?: AppointmentService;
+  private requestService?: RequestService;
+  private activityLogService?: ActivityLogService;
+  private notificationService?: NotificationService;
+  private refreshTokenService?: RefreshTokenService;
+
+  /**
+   * Private Konstruktor für Singleton-Pattern
+   */
+  private constructor() {}
+
+  /**
+   * Gibt die Singleton-Instanz der ServiceFactory zurück
+   */
+  public static getInstance(): ServiceFactory {
+    if (!ServiceFactory.instance) {
+      ServiceFactory.instance = new ServiceFactory();
+    }
+    return ServiceFactory.instance;
+  }
+
+  /**
+   * Erstellt eine Instanz des AuthService
+   */
+  public createAuthService(): IAuthService {
+    if (!this.authService) {
+      // Verwende die JWT-Konfiguration aus dem ConfigService
+      const jwtConfig = configService.getJwtConfig();
+      
+      this.authService = new AuthService(
+        getUserRepository(),
+        getRefreshTokenRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler(),
+        jwtConfig
+      );
+    }
+    return this.authService;
+  }
+
+  /**
+   * Erstellt eine Instanz des UserService
+   */
+  public createUserService(): IUserService {
+    if (!this.userService) {
+      // Create a properly initialized UserService instance
+      const staticUserService = new UserService(
+        getUserRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
+      
+      // For now, use type assertion to bridge the interface gap
+      // This is a temporary solution until the service is fully implemented
+      this.userService = staticUserService as any as UserService;
+    }
+    return this.userService as unknown as IUserService;
+  }
+
+  /**
+   * Erstellt eine Instanz des CustomerService
+   */
+  public createCustomerService(): ICustomerService {
+    if (!this.customerService) {
+      // Create a properly initialized CustomerService instance
+      const staticCustomerService = new CustomerService(
+        getCustomerRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
+      
+      // For now, use type assertion to bridge the interface gap
+      // This is a temporary solution until the service is fully implemented
+      this.customerService = staticCustomerService as any as CustomerService;
+    }
+    return this.customerService as unknown as ICustomerService;
+  }
+
+  /**
+   * Erstellt eine Instanz des AppointmentService
+   */
+  public createAppointmentService(): IAppointmentService {
+    if (!this.appointmentService) {
+      // Vollständige Implementierung des AppointmentService
+      this.appointmentService = new AppointmentService(
+        getAppointmentRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
+    }
+    return this.appointmentService as unknown as IAppointmentService;
+  }
+
+  /**
+   * Erstellt eine Instanz des RequestService
+   */
+  public createRequestService(): IRequestService {
+    if (!this.requestService) {
+      // Vollständige Implementierung des RequestService
+      this.requestService = new RequestService(
+        getRequestRepository(),
+        getCustomerRepository(),
+        getAppointmentRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
+    }
+    return this.requestService as unknown as IRequestService;
+  }
+
+  /**
+   * Erstellt eine Instanz des ActivityLogService
+   */
+  public createActivityLogService(): IActivityLogService {
+    if (!this.activityLogService) {
+      this.activityLogService = new ActivityLogService(
+        getActivityLogRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
+    }
+    return this.activityLogService;
+  }
+
+  /**
+   * Erstellt eine Instanz des NotificationService
+   */
+  public createNotificationService(): INotificationService {
+    if (!this.notificationService) {
+      this.notificationService = new NotificationService(
+        getNotificationRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
+    }
+    return this.notificationService;
+  }
+
+  /**
+   * Erstellt eine Instanz des RefreshTokenService
+   */
+  public createRefreshTokenService(): IRefreshTokenService {
+    if (!this.refreshTokenService) {
+      this.refreshTokenService = new RefreshTokenService(
+        getRefreshTokenRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
+    }
+    return this.refreshTokenService;
+  }
+
+  /**
+   * Setzt alle Service-Instanzen zurück
+   */
+  public resetServices(): void {
+    this.authService = undefined;
+    this.userService = undefined;
+    this.customerService = undefined;
+    this.appointmentService = undefined;
+    this.requestService = undefined;
+    this.activityLogService = undefined;
+    this.notificationService = undefined;
+    this.refreshTokenService = undefined;
+  }
+}
 
 /**
- * Gibt eine Singleton-Instanz des AuthService zurück
+ * Gibt eine Singleton-Instanz der ServiceFactory zurück
  */
+export function getServiceFactory(): ServiceFactory {
+  return ServiceFactory.getInstance();
+}
+
+// Export individual service factory functions for backward compatibility
 export function getAuthService(): IAuthService {
-  if (!authService) {
-    // Verwende die JWT-Konfiguration aus dem ConfigService
-    const jwtConfig = configService.getJwtConfig();
-    
-    authService = new AuthService(
-      getUserRepository(),
-      getRefreshTokenRepository(),
-      getLogger(),
-      getValidationService(),
-      getErrorHandler(),
-      jwtConfig
-    );
-  }
-  return authService;
+  return getServiceFactory().createAuthService();
 }
 
-/**
- * Gibt eine Singleton-Instanz des UserService zurück
- */
 export function getUserService(): IUserService {
-  if (!userService) {
-    // Create a properly initialized UserService instance
-    const staticUserService = new UserService(
-      getUserRepository(),
-      getLogger(),
-      getValidationService(),
-      getErrorHandler()
-    );
-    
-    // For now, use type assertion to bridge the interface gap
-    // This is a temporary solution until the service is fully implemented
-    userService = staticUserService as any as UserService;
-  }
-  return userService as unknown as IUserService;
+  return getServiceFactory().createUserService();
 }
 
-/**
- * Gibt eine Singleton-Instanz des CustomerService zurück
- */
 export function getCustomerService(): ICustomerService {
-  if (!customerService) {
-    // Create a properly initialized CustomerService instance
-    const staticCustomerService = new CustomerService(
-      getCustomerRepository(),
-      getLogger(),
-      getValidationService(),
-      getErrorHandler()
-    );
-    
-    // For now, use type assertion to bridge the interface gap
-    // This is a temporary solution until the service is fully implemented
-    customerService = staticCustomerService as any as CustomerService;
-  }
-  return customerService as unknown as ICustomerService;
+  return getServiceFactory().createCustomerService();
 }
 
-/**
- * Gibt eine Singleton-Instanz des AppointmentService zurück
- */
 export function getAppointmentService(): IAppointmentService {
-  if (!appointmentService) {
-    // Vollständige Implementierung des AppointmentService
-    appointmentService = new AppointmentService(
-      getAppointmentRepository(),
-      getLogger(),
-      getValidationService(),
-      getErrorHandler()
-    );
-  }
-  return appointmentService as unknown as IAppointmentService;
+  return getServiceFactory().createAppointmentService();
 }
 
-/**
- * Gibt eine Singleton-Instanz des RequestService zurück
- */
 export function getRequestService(): IRequestService {
-  if (!requestService) {
-    // Vollständige Implementierung des RequestService
-    requestService = new RequestService(
-      getRequestRepository(),
-      getCustomerRepository(),
-      getAppointmentRepository(),
-      getLogger(),
-      getValidationService(),
-      getErrorHandler()
-    );
-  }
-  return requestService as unknown as IRequestService;
+  return getServiceFactory().createRequestService();
 }
 
-/**
- * Gibt eine Singleton-Instanz des ActivityLogService zurück
- */
 export function getActivityLogService(): IActivityLogService {
-  if (!activityLogService) {
-    activityLogService = new ActivityLogService(
-      getActivityLogRepository(),
-      getLogger(),
-      getValidationService(),
-      getErrorHandler()
-    );
-  }
-  return activityLogService;
+  return getServiceFactory().createActivityLogService();
 }
 
-/**
- * Gibt eine Singleton-Instanz des NotificationService zurück
- */
 export function getNotificationService(): INotificationService {
-  if (!notificationService) {
-    notificationService = new NotificationService(
-      getNotificationRepository(),
-      getLogger(),
-      getValidationService(),
-      getErrorHandler()
-    );
-  }
-  return notificationService;
+  return getServiceFactory().createNotificationService();
 }
 
-/**
- * Gibt eine Singleton-Instanz des RefreshTokenService zurück
- */
 export function getRefreshTokenService(): IRefreshTokenService {
-  if (!refreshTokenService) {
-    refreshTokenService = new RefreshTokenService(
-      getRefreshTokenRepository(),
-      getLogger(),
-      getValidationService(),
-      getErrorHandler()
-    );
-  }
-  return refreshTokenService;
+  return getServiceFactory().createRefreshTokenService();
 }
 
-/**
- * Setzt alle Service-Instanzen zurück
- */
 export function resetServices(): void {
-  authService = undefined as any;
-  userService = undefined as any;
-  customerService = undefined as any;
-  appointmentService = undefined as any;
-  requestService = undefined as any;
-  activityLogService = undefined as any;
-  notificationService = undefined as any;
-  refreshTokenService = undefined as any;
+  getServiceFactory().resetServices();
 }

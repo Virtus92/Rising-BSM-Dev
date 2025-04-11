@@ -24,7 +24,7 @@ export class UserService {
       if (filters.page) params.append('page', filters.page.toString());
       if (filters.limit) params.append('limit', filters.limit.toString());
       if (filters.sortBy) params.append('sortBy', filters.sortBy);
-      if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+      if (filters.sortDirection) params.append('sortOrder', filters.sortDirection);
       if (filters.status) params.append('status', filters.status);
       if (filters.role) params.append('role', filters.role);
       
@@ -113,5 +113,33 @@ export class UserService {
    */
   static async getUserStatistics() {
     return ApiClient.get(`${this.basePath}/statistics`);
+  }
+  
+  /**
+   * Get statistics for dashboard
+   */
+  static async getStatistics() {
+    return ApiClient.get(`${this.basePath}/dashboard/user`);
+  }
+  
+  /**
+   * Get monthly statistics
+   */
+  static async getMonthlyStats() {
+    return ApiClient.get(`${this.basePath}/stats/monthly`);
+  }
+  
+  /**
+   * Get weekly statistics
+   */
+  static async getWeeklyStats() {
+    return ApiClient.get(`${this.basePath}/stats/weekly`);
+  }
+  
+  /**
+   * Get yearly statistics
+   */
+  static async getYearlyStats() {
+    return ApiClient.get(`${this.basePath}/stats/yearly`);
   }
 }

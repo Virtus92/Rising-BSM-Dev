@@ -3,6 +3,7 @@ import { ContactRequest } from '@/domain/entities/ContactRequest';
 import { IRequestService } from '@/domain/services/IRequestService';
 import { IRequestRepository } from '@/domain/repositories/IRequestRepository';
 import { ICustomerRepository } from '@/domain/repositories/ICustomerRepository';
+import { IUserRepository } from '@/domain/repositories/IUserRepository';
 import { IAppointmentRepository } from '@/domain/repositories/IAppointmentRepository';
 import { ILoggingService } from '@/infrastructure/common/logging/ILoggingService';
 import { IValidationService } from '@/infrastructure/common/validation/IValidationService';
@@ -13,8 +14,10 @@ import {
   RequestResponseDto,
   RequestDetailResponseDto,
   RequestStatusUpdateDto,
-  ConvertToCustomerDto
+  ConvertToCustomerDto,
+  RequestNoteDto
 } from '@/domain/dtos/RequestDtos';
+import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
 import { mapRequestToDto } from '@/domain/dtos/RequestDtos';
 import { ServiceOptions } from '@/domain/services/IBaseService';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
@@ -22,6 +25,7 @@ import { Customer } from '@/domain/entities/Customer';
 import { CustomerType } from '@/domain/enums/CommonEnums';
 import { Appointment } from '@/domain/entities/Appointment';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
+import { AppointmentService } from './AppointmentService';
 
 /**
  * Service für Kontaktanfragen
@@ -48,6 +52,7 @@ export class RequestService extends BaseService<
   constructor(
     protected requestRepository: IRequestRepository,
     protected customerRepository: ICustomerRepository,
+    protected userRepository: IUserRepository,
     protected appointmentRepository: IAppointmentRepository,
     logger: ILoggingService,
     validator: IValidationService,
@@ -105,7 +110,7 @@ export class RequestService extends BaseService<
   async findRequestById(
     id: number,
     options?: ServiceOptions
-  ): Promise<RequestDetailResponseDto | null> {
+  ): Promise<RequestDetailResponseDto> {
     try {
       const repoOptions = this.mapToRepositoryOptions({
         ...options,
@@ -114,11 +119,11 @@ export class RequestService extends BaseService<
 
       const request = await this.requestRepository.findById(id, repoOptions);
       if (!request) {
-        return null;
+        throw this.errorHandler.createNotFoundError(`Request with ID ${id} not found`);
       }
 
       // Lade Notizen zur Anfrage
-      const notes = await this.requestRepository.findNotes(id);
+      const notes = await this.requestRepository.getNotes(id);
 
       // Lade Kundeninformationen, falls verknüpft
       let customer = undefined;
@@ -229,10 +234,9 @@ export class RequestService extends BaseService<
 
       // Füge optional eine Notiz hinzu
       if (data.note && options?.context?.userId) {
-        await this.addNote(id, {
-          text: data.note,
-          userId: options.context.userId
-        }, options);
+        const user = await this.userRepository.findById(options.context.userId);
+        const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'System';
+        await this.addNote(id, options.context.userId, userName, data.note, options);
       }
 
       return this.toDTO(updatedRequest);
@@ -265,19 +269,21 @@ export class RequestService extends BaseService<
    * @returns Erstellte Notiz
    */
   async addNote(
-    requestId: number,
-    data: { text: string; userId: number },
+    id: number,
+    userId: number,
+    userName: string,
+    text: string,
     options?: ServiceOptions
-  ): Promise<any> {
+  ): Promise<RequestNoteDto> {
     try {
       // Prüfe, ob die Anfrage existiert
-      const request = await this.requestRepository.findById(requestId);
+      const request = await this.requestRepository.findById(id);
       if (!request) {
-        throw this.errorHandler.createNotFoundError(`Request with ID ${requestId} not found`);
+        throw this.errorHandler.createNotFoundError(`Request with ID ${id} not found`);
       }
 
       // Validiere die Eingabedaten
-      if (!data.text || !data.text.trim()) {
+      if (!text || !text.trim()) {
         throw this.errorHandler.createValidationError(
           'Invalid note data',
           ['Note text is required']
@@ -285,7 +291,7 @@ export class RequestService extends BaseService<
       }
 
       // Füge die Notiz hinzu
-      const note = await this.requestRepository.addNote(requestId, data.userId, data.text);
+      const note = await this.requestRepository.addNote(id, userId, userName, text);
 
       return {
         id: note.id,
@@ -297,7 +303,7 @@ export class RequestService extends BaseService<
         updatedAt: note.updatedAt.toISOString()
       };
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.addNote`, { error, requestId, data });
+      this.logger.error(`Error in ${this.constructor.name}.addNote`, { error, id, userId, text });
       throw this.handleError(error);
     }
   }
@@ -312,7 +318,8 @@ export class RequestService extends BaseService<
    */
   async assignRequest(
     id: number,
-    processorId: number,
+    userId: number,
+    note?: string,
     options?: ServiceOptions
   ): Promise<RequestResponseDto> {
     try {
@@ -323,7 +330,7 @@ export class RequestService extends BaseService<
       }
 
       // Weise die Anfrage zu
-      request.processorId = processorId;
+      request.processorId = userId;
       
       // Wenn die Anfrage noch neu ist, setze sie auf "in Bearbeitung"
       if (request.status === RequestStatus.NEW) {
@@ -337,15 +344,15 @@ export class RequestService extends BaseService<
 
       // Füge eine Notiz hinzu
       if (options?.context?.userId) {
-        await this.addNote(id, {
-          text: `Request assigned to processor ID ${processorId}`,
-          userId: options.context.userId
-        }, options);
+        const user = await this.userRepository.findById(options.context.userId);
+        const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'System';
+        const noteText = note || `Request assigned to processor ID ${userId}`;
+        await this.addNote(id, options.context.userId, userName, noteText, options);
       }
 
       return this.toDTO(updatedRequest);
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.assignRequest`, { error, id, processorId });
+      this.logger.error(`Error in ${this.constructor.name}.assignRequest`, { error, id, userId });
       throw this.handleError(error);
     }
   }
@@ -417,12 +424,11 @@ export class RequestService extends BaseService<
 
       // Füge eine Notiz hinzu
       if (options?.context?.userId) {
-        await this.addNote(data.requestId, {
-          text: `Request converted to customer ID ${customer.id}${
+        const user = await this.userRepository.findById(options.context.userId);
+        const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'System';
+        await this.addNote(data.requestId, options.context.userId, userName, `Request converted to customer ID ${customer.id}${
             appointment ? ` and appointment ID ${appointment.id} created` : ''
-          }`,
-          userId: options.context.userId
-        }, options);
+          }`, options);
       }
 
       return {
@@ -453,6 +459,7 @@ export class RequestService extends BaseService<
   async linkToCustomer(
     requestId: number,
     customerId: number,
+    note?: string,
     options?: ServiceOptions
   ): Promise<RequestResponseDto> {
     try {
@@ -477,10 +484,10 @@ export class RequestService extends BaseService<
 
       // Füge eine Notiz hinzu
       if (options?.context?.userId) {
-        await this.addNote(requestId, {
-          text: `Request linked to customer ID ${customerId}`,
-          userId: options.context.userId
-        }, options);
+        const user = await this.userRepository.findById(options.context.userId);
+        const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'System';
+        const noteText = note || `Request linked to customer ID ${customerId}`;
+        await this.addNote(requestId, options.context.userId, userName, noteText, options);
       }
 
       return this.toDTO(updatedRequest);
@@ -500,9 +507,10 @@ export class RequestService extends BaseService<
    */
   async createAppointmentForRequest(
     requestId: number,
-    appointmentData: any,
+    appointmentData: Partial<Appointment>,
+    note?: string,
     options?: ServiceOptions
-  ): Promise<any> {
+  ): Promise<AppointmentResponseDto> {
     try {
       // Prüfe, ob die Anfrage existiert
       const request = await this.requestRepository.findById(requestId);
@@ -535,20 +543,35 @@ export class RequestService extends BaseService<
 
       // Füge eine Notiz hinzu
       if (options?.context?.userId) {
-        await this.addNote(requestId, {
-          text: `Appointment ID ${appointment.id} created for request`,
-          userId: options.context.userId
-        }, options);
+        const user = await this.userRepository.findById(options.context.userId);
+        const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'System';
+        const noteText = note || `Appointment ID ${appointment.id} created for request`;
+        await this.addNote(requestId, options.context.userId, userName, noteText, options);
       }
 
+      // Format date and time for display
+      const dateObj = appointment.appointmentDate;
+      const dateFormatted = dateObj.toLocaleDateString();
+      const timeFormatted = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const appointmentTime = `${dateObj.getHours().toString().padStart(2, '0')}:${dateObj.getMinutes().toString().padStart(2, '0')}`;
+      
       return {
         id: appointment.id,
         title: appointment.title,
         appointmentDate: appointment.appointmentDate.toISOString(),
-        duration: appointment.duration,
+        dateFormatted: dateFormatted,
+        appointmentTime: appointmentTime,
+        timeFormatted: timeFormatted,
+        duration: appointment.duration ?? 60, // Default to 60 minutes if undefined
         location: appointment.location,
         description: appointment.description,
-        status: appointment.status
+        status: appointment.status,
+        statusLabel: this.getAppointmentStatusLabel(appointment.status),
+        statusClass: this.getAppointmentStatusClass(appointment.status),
+        createdAt: appointment.createdAt.toISOString(),
+        updatedAt: appointment.updatedAt.toISOString(),
+        customerId: appointment.customerId,
+        customerName: request.name
       };
     } catch (error) {
       this.logger.error(`Error in ${this.constructor.name}.createAppointmentForRequest`, { error, requestId, appointmentData });
@@ -563,8 +586,17 @@ export class RequestService extends BaseService<
    * @returns Anfragenstatistiken
    */
   async getRequestStats(
+    period?: string,
     options?: ServiceOptions
-  ): Promise<any> {
+  ): Promise<{
+    totalRequests: number;
+    newRequests: number;
+    inProgressRequests: number;
+    completedRequests: number;
+    cancelledRequests: number;
+    requestsWithCustomer: number;
+    conversionRate: number;
+  }> {
     try {
       // Zähle Anfragen nach Status
       const totalRequests = await this.requestRepository.count();
@@ -714,6 +746,48 @@ export class RequestService extends BaseService<
       case RequestStatus.COMPLETED:
         return 'bg-green-100 text-green-800';
       case RequestStatus.CANCELLED:
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  }
+  
+  /**
+   * Gibt ein Label für einen Terminstatus zurück
+   * 
+   * @param status - Terminstatus
+   * @returns Label
+   */
+  private getAppointmentStatusLabel(status: AppointmentStatus): string {
+    switch (status) {
+      case AppointmentStatus.PLANNED:
+        return 'Geplant';
+      case AppointmentStatus.CONFIRMED:
+        return 'Bestätigt';
+      case AppointmentStatus.COMPLETED:
+        return 'Abgeschlossen';
+      case AppointmentStatus.CANCELLED:
+        return 'Abgesagt';
+      default:
+        return 'Unbekannt';
+    }
+  }
+
+  /**
+   * Gibt eine CSS-Klasse für einen Terminstatus zurück
+   * 
+   * @param status - Terminstatus
+   * @returns CSS-Klasse
+   */
+  private getAppointmentStatusClass(status: AppointmentStatus): string {
+    switch (status) {
+      case AppointmentStatus.PLANNED:
+        return 'bg-blue-100 text-blue-800';
+      case AppointmentStatus.CONFIRMED:
+        return 'bg-green-100 text-green-800';
+      case AppointmentStatus.COMPLETED:
+        return 'bg-purple-100 text-purple-800';
+      case AppointmentStatus.CANCELLED:
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';

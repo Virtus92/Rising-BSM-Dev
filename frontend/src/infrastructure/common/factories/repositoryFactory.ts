@@ -121,8 +121,8 @@ export function getRequestRepository(): IRequestRepository {
  */
 export function getNotificationRepository(): INotificationRepository {
   if (!notificationRepository) {
+    // Create properly initialized NotificationRepository
     notificationRepository = new NotificationRepository(
-      getPrismaClient(),
       getLogger(),
       getErrorHandler()
     );

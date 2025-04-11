@@ -123,18 +123,22 @@ export class AppointmentService extends BaseService<
   /**
    * Findet Termine für einen Datumsbereich
    * 
-   * @param startDate - Startdatum
-   * @param endDate - Enddatum
+   * @param startDate - Startdatum (YYYY-MM-DD)
+   * @param endDate - Enddatum (YYYY-MM-DD)
    * @param options - Service-Optionen
    * @returns Gefundene Termine
    */
   async findByDateRange(
-    startDate: Date,
-    endDate: Date,
+    startDate: string,
+    endDate: string,
     options?: ServiceOptions
   ): Promise<AppointmentResponseDto[]> {
     try {
-      const appointments = await this.repository.findByDateRange(startDate, endDate);
+      // Convert string dates to Date objects for the repository
+      const startDateObj = new Date(startDate);
+      const endDateObj = new Date(endDate);
+      
+      const appointments = await this.repository.findByDateRange(startDateObj, endDateObj);
       return appointments.map(appointment => this.toDTO(appointment));
     } catch (error) {
       this.logger.error(`Error in ${this.constructor.name}.findByDateRange`, { error, startDate, endDate });
@@ -180,10 +184,7 @@ export class AppointmentService extends BaseService<
 
       // Füge optional eine Notiz hinzu
       if (data.note && options?.context?.userId) {
-        await this.addNote(id, {
-          text: data.note,
-          userId: options.context.userId
-        }, options);
+        await this.addNote(id, data.note, options);
       }
 
       return this.toDTO(updatedAppointment);
@@ -196,37 +197,46 @@ export class AppointmentService extends BaseService<
   /**
    * Fügt eine Notiz zu einem Termin hinzu
    * 
-   * @param appointmentId - Termin-ID
-   * @param data - Notiz-Daten
+   * @param id - Termin-ID
+   * @param note - Notiztext
    * @param options - Service-Optionen
    * @returns Erfolg der Operation
    */
   async addNote(
-    appointmentId: number,
-    data: { text: string; userId: number },
+    id: number,
+    note: string,
     options?: ServiceOptions
   ): Promise<boolean> {
     try {
       // Prüfe, ob der Termin existiert
-      const appointment = await this.repository.findById(appointmentId);
+      const appointment = await this.repository.findById(id);
       if (!appointment) {
-        throw this.errorHandler.createNotFoundError(`Appointment with ID ${appointmentId} not found`);
+        throw this.errorHandler.createNotFoundError(`Appointment with ID ${id} not found`);
       }
 
       // Validiere die Eingabedaten
-      if (!data.text || !data.text.trim()) {
+      if (!note || !note.trim()) {
         throw this.errorHandler.createValidationError(
           'Invalid note data',
           ['Note text is required']
         );
       }
 
+      // Get userId from options context
+      const userId = options?.context?.userId;
+      if (!userId) {
+        throw this.errorHandler.createValidationError(
+          'Invalid user',
+          ['User ID is required to add a note']
+        );
+      }
+
       // Füge die Notiz hinzu
-      await this.repository.addNote(appointmentId, data.userId, data.text);
+      await this.repository.addNote(id, userId, note);
 
       return true;
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.addNote`, { error, appointmentId, data });
+      this.logger.error(`Error in ${this.constructor.name}.addNote`, { error, id, note });
       throw this.handleError(error);
     }
   }
@@ -264,9 +274,15 @@ export class AppointmentService extends BaseService<
     // Formatiere Datum und Zeit
     const dateObj = new Date(entity.appointmentDate);
     
+    // Ensure appointmentDate is a string
+    const appointmentDateStr = typeof entity.appointmentDate === 'string' 
+      ? entity.appointmentDate 
+      : entity.appointmentDate.toISOString();
+    
     // Erweitere mit zusätzlichen Informationen
     return {
       ...baseDto,
+      appointmentDate: appointmentDateStr, // Ensure appointmentDate is always a string
       dateFormatted: dateObj.toLocaleDateString(),
       timeFormatted: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       statusLabel: this.getStatusLabel(entity.status),

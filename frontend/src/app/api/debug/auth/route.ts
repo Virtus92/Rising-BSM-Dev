@@ -1,45 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatResponse } from '@/infrastructure/api/response-formatter';
 
 /**
- * DEBUG ENDPOINT: Gibt Informationen zum Authentifizierungsstatus zurück
+ * DEBUG ENDPOINT: Returns authentication status information.
  * 
- * ACHTUNG: Nur für Entwicklungszwecke. In Produktion deaktivieren.
+ * WARNING: This endpoint should be disabled in production.
  */
-export async function GET(request: NextRequest) {
-  // In Produktion keine sensiblen Informationen preisgeben
+export const GET = apiRouteHandler(async (request: NextRequest) => {
+  // Always disable in production for security
   if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ message: 'This endpoint is disabled in production' }, { status: 404 });
+    return formatResponse.error('This endpoint is disabled in production', 404);
   }
 
-  // Cookie-Liste holen (ohne Werte für Sicherheit)
-  const cookiesList = cookies();
-  const cookieNames = cookiesList.getAll().map(cookie => cookie.name);
-  
-  // Auth-relevante Cookies hervorheben
-  const authCookies = cookieNames.filter(name => 
-    name.includes('auth') || 
-    name.includes('token') || 
-    name.includes('session')
-  );
-  
-  // Header-Informationen sammeln
-  const headersList = Object.fromEntries(
-    [...request.headers.entries()].filter(([key]) => 
-      // Nur nicht-sensible Headers anzeigen
-      !key.includes('secret') && 
-      !key.includes('auth') && 
-      !key.includes('cookie')
-    )
-  );
-
-  // Response mit Debug-Informationen
-  return NextResponse.json({
-    authenticated: authCookies.length > 0,
-    cookieNames,
-    authCookies,
-    headers: headersList,
-    userAgent: request.headers.get('user-agent'),
+  // This endpoint should require authentication to prevent information disclosure
+  return formatResponse.success({
+    message: 'Authentication successful',
+    environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString()
   });
-}
+}, {
+  // Make this endpoint require authentication
+  requiresAuth: true,
+  // Optionally restrict to admin role
+  requiresRole: ['admin']
+});

@@ -38,6 +38,16 @@ export abstract class BaseService<T, C extends Record<string, any>, U extends Re
   ) {
     this.logger.debug(`Created ${this.constructor.name}`);
   }
+  
+  /**
+   * Gets the repository instance
+   * This allows direct repository access when needed for specific operations
+   * 
+   * @returns The repository instance
+   */
+  public getRepository(): IBaseRepository<T, ID> {
+    return this.repository;
+  }
 
   /**
    * Ruft alle Entitäten ab

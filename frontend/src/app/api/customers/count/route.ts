@@ -1,45 +1,40 @@
-import { NextResponse } from 'next/server';
-import { auth } from '../../auth/middleware/authMiddleware';
-import { getPrismaClient } from '@/infrastructure/common/database/prisma';
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
 import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * GET /api/customers/count
  * Returns the total count of customers in the system
  */
-export async function GET(request: Request) {
+export const GET = apiRouteHandler(async (request: NextRequest) => {
   const logger = getLogger();
+  const serviceFactory = getServiceFactory();
   
   try {
-    // Verify authentication
-    const authResult = await auth(request);
-    if (!authResult.success) {
-      return NextResponse.json(
-        { success: false, message: authResult.message },
-        { status: authResult.status }
-      );
-    }
-
-    // Get prisma client
-    const prisma = getPrismaClient();
-
-    // Count customers
-    const count = await prisma.customer.count();
-
-    return NextResponse.json({
-      success: true,
-      data: count,
-      message: 'Customer count retrieved successfully'
-    });
+    // Get customer service
+    const customerService = serviceFactory.createCustomerService();
+    
+    // Context for service calls
+    const context = { userId: request.auth?.userId };
+    
+    // Get count directly from repository
+    const count = await customerService.getRepository().count();
+    
+    return formatSuccess({ count }, 'Customer count retrieved successfully');
   } catch (error) {
-    logger.error('[API] Error counting customers:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Failed to retrieve customer count', 
-        error: error instanceof Error ? error.message : String(error) 
-      },
-      { status: 500 }
+    logger.error('Error counting customers:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    return formatError(
+      error instanceof Error ? error.message : 'Failed to retrieve customer count',
+      500
     );
   }
-}
+}, {
+  // Secure this endpoint
+  requiresAuth: true
+});

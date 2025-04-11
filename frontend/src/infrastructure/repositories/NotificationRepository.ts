@@ -1,154 +1,95 @@
-import { PrismaClient, Prisma } from '@prisma/client';
-import { PrismaRepository } from './PrismaRepository';
+import { BaseRepository } from './BaseRepository';
 import { INotificationRepository } from '@/domain/repositories/INotificationRepository';
 import { Notification } from '@/domain/entities/Notification';
 import { NotificationFilterParamsDto } from '@/domain/dtos/NotificationDtos';
+import { PaginationResult, QueryOptions } from '@/domain/repositories/IBaseRepository';
+import { NotificationType } from '@/domain/enums/CommonEnums';
 import { ILoggingService } from '@/infrastructure/common/logging/ILoggingService';
 import { IErrorHandler } from '@/infrastructure/common/error/ErrorHandler';
-import { PaginationResult } from '@/domain/repositories/IBaseRepository';
-import { NotificationType } from '@/domain/enums/CommonEnums';
 
 /**
- * Implementation des NotificationRepository
- * 
- * Verwendet Prisma als ORM.
+ * Implementation of the notification repository
  */
-export class NotificationRepository extends PrismaRepository<Notification, number> implements INotificationRepository {
+export class NotificationRepository extends BaseRepository<Notification> implements INotificationRepository {
   /**
-   * Konstruktor
+   * Constructor
    * 
-   * @param prisma - Prisma-Client
-   * @param logger - Logging-Dienst
-   * @param errorHandler - Fehlerbehandlungsdienst
+   * @param logger - Logging service
+   * @param errorHandler - Error handling service
    */
-  constructor(
-    prisma: PrismaClient,
-    logger: ILoggingService,
-    errorHandler: IErrorHandler
-  ) {
-    // 'notification' ist der Name des Modells in Prisma
-    super(prisma, 'notification', logger, errorHandler);
-    
-    this.logger.debug('Initialized NotificationRepository');
+  constructor(logger: ILoggingService, errorHandler: IErrorHandler) {
+    super('notifications', logger, errorHandler);
   }
 
   /**
-   * Findet Benachrichtigungen für einen Benutzer
+   * Find notifications for a specific user
    * 
-   * @param userId - Benutzer-ID
-   * @param unreadOnly - Nur ungelesene Benachrichtigungen
-   * @param limit - Maximale Anzahl der Ergebnisse
-   * @returns Benachrichtigungen
+   * @param userId - The user ID
+   * @param unreadOnly - Whether to return only unread notifications
+   * @param limit - Maximum number of notifications to return
+   * @returns Array of notifications
    */
-  async findByUser(userId: number, unreadOnly: boolean = false, limit: number = 10): Promise<Notification[]> {
+  async findByUser(userId: number, unreadOnly: boolean = false, limit?: number): Promise<Notification[]> {
     try {
-      const where: any = { userId };
-      
+      // Build query criteria
+      const criteria: Record<string, any> = { userId };
       if (unreadOnly) {
-        where.read = false;
+        criteria.isRead = false;
       }
       
-      const notifications = await this.prisma.notification.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: limit
-      });
+      // Build options with sorting and limit
+      const options: QueryOptions = {
+        sort: { field: 'createdAt', direction: 'desc' }
+      };
       
-      return notifications.map(notification => this.mapToDomainEntity(notification));
+      if (limit && limit > 0) {
+        options.limit = limit;
+      }
+      
+      // Execute query
+      return await this.findByCriteria(criteria, options);
     } catch (error) {
-      this.logger.error('Error in NotificationRepository.findByUser', { error, userId, unreadOnly });
+      this.logger.error('Error in NotificationRepository.findByUser', { error, userId, unreadOnly, limit });
       throw this.handleError(error);
     }
   }
 
   /**
-   * Findet Benachrichtigungen mit erweiterten Filteroptionen
+   * Find notifications with filters and pagination
    * 
-   * @param filters - Filterparameter
-   * @returns Gefundene Benachrichtigungen mit Paginierung
+   * @param filters - Filter parameters
+   * @returns Paginated notifications
    */
   async findNotifications(filters: NotificationFilterParamsDto): Promise<PaginationResult<Notification>> {
     try {
-      // Baue WHERE-Bedingungen
-      const where: any = {};
+      // Build criteria from filters
+      const criteria: Record<string, any> = {};
       
-      // Füge Benutzer-ID hinzu, falls vorhanden
       if (filters.userId) {
-        where.userId = filters.userId;
+        criteria.userId = filters.userId;
       }
       
-      // Nur ungelesene Benachrichtigungen
-      if (filters.unreadOnly) {
-        where.read = false;
-      }
-      
-      // Benachrichtigungstyp
       if (filters.type) {
-        where.type = filters.type;
+        criteria.type = filters.type;
       }
       
-      // Füge Suchkriterium hinzu
-      if (filters.search) {
-        where.OR = [
-          { title: { contains: filters.search, mode: 'insensitive' } },
-          { message: { contains: filters.search, mode: 'insensitive' } }
-        ];
+      if (filters.unreadOnly) {
+        criteria.isRead = false;
       }
       
-      // Füge Datumsbereich hinzu
-      if (filters.startDate || filters.endDate) {
-        where.createdAt = {};
-        
-        if (filters.startDate) {
-          where.createdAt.gte = filters.startDate;
-        }
-        
-        if (filters.endDate) {
-          where.createdAt.lte = filters.endDate;
-        }
-      }
-      
-      // Berechne Paginierung
-      const page = filters.page || 1;
-      const limit = filters.limit || 10;
-      const skip = (page - 1) * limit;
-      
-      // Bestimme Sortierung
-      const orderBy: any = {};
-      if (filters.sortBy) {
-        orderBy[filters.sortBy] = filters.sortDirection || 'desc';
-      } else {
-        orderBy.createdAt = 'desc';
-      }
-      
-      // Führe Abfragen aus
-      const [total, notifications] = await Promise.all([
-        // Count-Abfrage für Gesamtanzahl
-        this.prisma.notification.count({ where }),
-        // Daten-Abfrage mit Paginierung
-        this.prisma.notification.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy
-        })
-      ]);
-      
-      // Mappe auf Domänenentitäten
-      const data = notifications.map(notification => this.mapToDomainEntity(notification));
-      
-      // Berechne Paginierungsinformationen
-      const totalPages = Math.ceil(total / limit);
-      
-      return {
-        data,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages
-        }
+      // Create options for pagination and sorting
+      const options: QueryOptions = {
+        page: filters.page || 1,
+        limit: filters.limit || 10,
+        sort: { field: 'createdAt', direction: 'desc' }
       };
+      
+      // Use findAll with criteria and options
+      const queryOptions = this.buildQueryOptions(options);
+      queryOptions.where = criteria;
+      
+      // Execute query
+      return await this.findAll(options);
     } catch (error) {
       this.logger.error('Error in NotificationRepository.findNotifications', { error, filters });
       throw this.handleError(error);
@@ -156,22 +97,24 @@ export class NotificationRepository extends PrismaRepository<Notification, numbe
   }
 
   /**
-   * Markiert eine Benachrichtigung als gelesen
+   * Mark a notification as read
    * 
-   * @param id - Benachrichtigungs-ID
-   * @returns Aktualisierte Benachrichtigung
+   * @param id - The notification ID
+   * @returns The updated notification
    */
   async markAsRead(id: number): Promise<Notification> {
     try {
-      const updatedNotification = await this.prisma.notification.update({
-        where: { id },
-        data: { 
-          read: true,
-          updatedAt: new Date()
-        }
-      });
+      const notification = await this.findById(id);
       
-      return this.mapToDomainEntity(updatedNotification);
+      if (!notification) {
+        throw new Error(`Notification with ID ${id} not found`);
+      }
+      
+      // Mark as read using the entity method
+      notification.markAsRead();
+      
+      // Update in database
+      return await this.update(id, notification);
     } catch (error) {
       this.logger.error('Error in NotificationRepository.markAsRead', { error, id });
       throw this.handleError(error);
@@ -179,25 +122,29 @@ export class NotificationRepository extends PrismaRepository<Notification, numbe
   }
 
   /**
-   * Markiert alle Benachrichtigungen eines Benutzers als gelesen
+   * Mark all notifications as read for a user
    * 
-   * @param userId - Benutzer-ID
-   * @returns Anzahl der aktualisierten Benachrichtigungen
+   * @param userId - The user ID
+   * @returns The number of notifications marked as read
    */
   async markAllAsRead(userId: number): Promise<number> {
     try {
-      const updateResult = await this.prisma.notification.updateMany({
-        where: { 
-          userId,
-          read: false
-        },
-        data: { 
-          read: true,
-          updatedAt: new Date()
-        }
+      // Find all unread notifications for the user
+      const unreadNotifications = await this.findByCriteria({
+        userId,
+        isRead: false
       });
       
-      return updateResult.count;
+      // Mark each notification as read
+      const updatePromises = unreadNotifications.map(notification => {
+        notification.markAsRead();
+        return this.update(notification.id, notification);
+      });
+      
+      // Wait for all updates to complete
+      await Promise.all(updatePromises);
+      
+      return unreadNotifications.length;
     } catch (error) {
       this.logger.error('Error in NotificationRepository.markAllAsRead', { error, userId });
       throw this.handleError(error);
@@ -205,18 +152,25 @@ export class NotificationRepository extends PrismaRepository<Notification, numbe
   }
 
   /**
-   * Löscht alle Benachrichtigungen eines Benutzers
+   * Delete all notifications for a user
    * 
-   * @param userId - Benutzer-ID
-   * @returns Anzahl der gelöschten Benachrichtigungen
+   * @param userId - The user ID
+   * @returns The number of notifications deleted
    */
   async deleteAllForUser(userId: number): Promise<number> {
     try {
-      const deleteResult = await this.prisma.notification.deleteMany({
-        where: { userId }
-      });
+      // Find all notifications for the user
+      const notifications = await this.findByCriteria({ userId });
       
-      return deleteResult.count;
+      // Delete each notification
+      const deletePromises = notifications.map(notification => 
+        this.delete(notification.id)
+      );
+      
+      // Wait for all deletions to complete
+      await Promise.all(deletePromises);
+      
+      return notifications.length;
     } catch (error) {
       this.logger.error('Error in NotificationRepository.deleteAllForUser', { error, userId });
       throw this.handleError(error);
@@ -224,42 +178,16 @@ export class NotificationRepository extends PrismaRepository<Notification, numbe
   }
 
   /**
-   * Löscht alte Benachrichtigungen
+   * Count unread notifications for a user
    * 
-   * @param olderThan - Datum, vor dem Benachrichtigungen gelöscht werden sollen
-   * @returns Anzahl der gelöschten Benachrichtigungen
-   */
-  async deleteOldNotifications(olderThan: Date): Promise<number> {
-    try {
-      const deleteResult = await this.prisma.notification.deleteMany({
-        where: { 
-          createdAt: {
-            lt: olderThan
-          },
-          read: true // Lösche nur gelesene Benachrichtigungen
-        }
-      });
-      
-      return deleteResult.count;
-    } catch (error) {
-      this.logger.error('Error in NotificationRepository.deleteOldNotifications', { error, olderThan });
-      throw this.handleError(error);
-    }
-  }
-
-  /**
-   * Zählt ungelesene Benachrichtigungen für einen Benutzer
-   * 
-   * @param userId - Benutzer-ID
-   * @returns Anzahl ungelesener Benachrichtigungen
+   * @param userId - The user ID
+   * @returns The number of unread notifications
    */
   async countUnread(userId: number): Promise<number> {
     try {
-      return await this.prisma.notification.count({
-        where: { 
-          userId,
-          read: false
-        }
+      return await this.count({
+        userId,
+        isRead: false
       });
     } catch (error) {
       this.logger.error('Error in NotificationRepository.countUnread', { error, userId });
@@ -268,45 +196,34 @@ export class NotificationRepository extends PrismaRepository<Notification, numbe
   }
 
   /**
-   * Erstellt Benachrichtigungen für mehrere Benutzer
+   * Create notifications for multiple users
    * 
-   * @param userIds - Benutzer-IDs
-   * @param data - Benachrichtigungsdaten
-   * @returns Erstellte Benachrichtigungen
+   * @param userIds - Array of user IDs
+   * @param baseNotification - Base notification data
+   * @returns Array of created notifications
    */
   async createForMultipleUsers(
     userIds: number[], 
-    data: Partial<Notification>
+    baseNotification: Partial<Notification>
   ): Promise<Notification[]> {
     try {
-      if (!userIds.length) {
-        return [];
+      const createdNotifications: Notification[] = [];
+      
+      // Create a notification for each user
+      for (const userId of userIds) {
+        // Create a new notification entity
+        const notificationData = {
+          ...baseNotification,
+          userId,
+          isRead: false
+        };
+        
+        // Create notification in database
+        const notification = await this.create(notificationData);
+        createdNotifications.push(notification);
       }
       
-      // Erstelle ein Array von Benachrichtigungsdaten für jeden Benutzer
-      const notifications = userIds.map(userId => ({
-        userId,
-        title: data.title || '',
-        message: data.message || '',
-        type: data.type || NotificationType.INFO,
-        read: false,
-        customerId: data.customerId,
-        appointmentId: data.appointmentId,
-        contactRequestId: data.contactRequestId,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }));
-      
-      // Erstelle die Benachrichtigungen in einer Transaktion
-      const createdNotifications = await this.prisma.$transaction(
-        notifications.map(notificationData => 
-          this.prisma.notification.create({
-            data: notificationData
-          })
-        )
-      );
-      
-      return createdNotifications.map(notification => this.mapToDomainEntity(notification));
+      return createdNotifications;
     } catch (error) {
       this.logger.error('Error in NotificationRepository.createForMultipleUsers', { error, userIds });
       throw this.handleError(error);
@@ -314,139 +231,253 @@ export class NotificationRepository extends PrismaRepository<Notification, numbe
   }
 
   /**
-   * Mappt eine ORM-Entität auf eine Domänenentität
+   * Delete old notifications
    * 
-   * @param ormEntity - ORM-Entität
-   * @returns Domänenentität
+   * @param olderThan - Date threshold
+   * @returns Number of deleted notifications
+   */
+  async deleteOldNotifications(olderThan: Date): Promise<number> {
+    try {
+      // Find notifications older than the specified date
+      const oldNotifications = await this.executeQuery('findMany', {
+        where: {
+          createdAt: {
+            lt: olderThan
+          }
+        }
+      });
+      
+      // Delete each notification
+      const deletePromises: Promise<Notification>[] = oldNotifications.map((notification: Notification) => 
+        this.delete(notification.id)
+      );
+      
+      // Wait for all deletions to complete
+      await Promise.all(deletePromises);
+      
+      return oldNotifications.length;
+    } catch (error) {
+      this.logger.error('Error in NotificationRepository.deleteOldNotifications', { error, olderThan });
+      throw this.handleError(error);
+    }
+  }
+  
+  // Required implementations for abstract methods from BaseRepository
+  
+  /**
+   * Begin a database transaction
+   */
+  protected async beginTransaction(): Promise<void> {
+    // Implementation of transaction start
+    await this.executeQuery('beginTransaction');
+  }
+
+  /**
+   * Commit a database transaction
+   */
+  protected async commitTransaction(): Promise<void> {
+    // Implementation of transaction commit
+    await this.executeQuery('commitTransaction');
+  }
+
+  /**
+   * Rollback a database transaction
+   */
+  protected async rollbackTransaction(): Promise<void> {
+    // Implementation of transaction rollback
+    await this.executeQuery('rollbackTransaction');
+  }
+
+  /**
+   * Execute a database query
+   * 
+   * @param operation - Operation name
+   * @param args - Query arguments
+   * @returns Query result
+   */
+  protected async executeQuery(operation: string, ...args: any[]): Promise<any> {
+    // Implementation of query execution
+    try {
+      // Access Prisma client through model name
+      const prisma = (global as any).prisma;
+      if (!prisma) {
+        throw new Error('Prisma client not available');
+      }
+      
+      // Dynamically call the operation on the model
+      const model = prisma[this.model];
+      if (!model || typeof model[operation] !== 'function') {
+        throw new Error(`Operation ${operation} not available on model ${this.model}`);
+      }
+      
+      return await model[operation](...args);
+    } catch (error) {
+      this.logger.error(`Error executing query ${operation} on ${this.model}`, { error, args });
+      throw error;
+    }
+  }
+
+  /**
+   * Build ORM-specific query options
+   * 
+   * @param options - Query options
+   * @returns ORM-specific options
+   */
+  protected buildQueryOptions(options?: QueryOptions): any {
+    const queryOptions: any = {};
+    
+    if (!options) {
+      return queryOptions;
+    }
+    
+    // Pagination
+    if (options.page && options.limit) {
+      queryOptions.skip = (options.page - 1) * options.limit;
+      queryOptions.take = options.limit;
+    } else if (options.limit) {
+      queryOptions.take = options.limit;
+    }
+    
+    // Field selection
+    if (options.select && options.select.length > 0) {
+      queryOptions.select = options.select.reduce((acc, field) => {
+        acc[field] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+    }
+    
+    // Relations
+    if (options.relations && options.relations.length > 0) {
+      queryOptions.include = options.relations.reduce((acc, relation) => {
+        acc[relation] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+    }
+    
+    // Sorting
+    if (options.sort) {
+      queryOptions.orderBy = {
+        [options.sort.field]: options.sort.direction
+      };
+    }
+    
+    return queryOptions;
+  }
+
+  /**
+   * Process criteria for the ORM
+   * 
+   * @param criteria - Filter criteria
+   * @returns ORM-specific criteria
+   */
+  protected processCriteria(criteria: Record<string, any>): any {
+    // Convert criteria to Prisma format
+    return { where: criteria };
+  }
+
+  /**
+   * Map ORM entity to domain entity
+   * 
+   * @param ormEntity - ORM entity
+   * @returns Domain entity
    */
   protected mapToDomainEntity(ormEntity: any): Notification {
     if (!ormEntity) {
       return null as any;
     }
     
-    return new Notification({
+    // Create a new Notification instance
+    const notification = new Notification({
       id: ormEntity.id,
       userId: ormEntity.userId,
-      type: ormEntity.type,
       title: ormEntity.title,
       message: ormEntity.message,
-      isRead: ormEntity.read,
+      type: ormEntity.type,
+      isRead: ormEntity.isRead,
       customerId: ormEntity.customerId,
       appointmentId: ormEntity.appointmentId,
       contactRequestId: ormEntity.contactRequestId,
-      createdAt: ormEntity.createdAt,
-      updatedAt: ormEntity.updatedAt,
+      link: ormEntity.link,
+      createdAt: new Date(ormEntity.createdAt),
+      updatedAt: new Date(ormEntity.updatedAt),
       createdBy: ormEntity.createdBy,
       updatedBy: ormEntity.updatedBy
     });
+    
+    return notification;
   }
 
   /**
-   * Mappt eine Domänenentität auf eine ORM-Entität
+   * Map domain entity to ORM entity
    * 
-   * @param domainEntity - Domänenentität
-   * @returns ORM-Entität
+   * @param domainEntity - Domain entity
+   * @returns ORM entity
    */
   protected mapToORMEntity(domainEntity: Partial<Notification>): any {
-    // Entferne undefined-Eigenschaften
-    const result: Record<string, any> = {};
-    
-    Object.entries(domainEntity).forEach(([key, value]) => {
-      if (value !== undefined) {
-        result[key] = value;
-      }
-    });
-    
-    // Setze Zeitstempel für Erstellungen/Aktualisierungen
-    if (!result.createdAt && !result.id) {
-      result.createdAt = new Date();
+    if (!domainEntity) {
+      return null;
     }
     
-    result.updatedAt = new Date();
+    // Create a data object for Prisma
+    const data: Record<string, any> = {};
     
-    return result;
+    // Map properties
+    if (domainEntity.userId !== undefined) data.userId = domainEntity.userId;
+    if (domainEntity.title !== undefined) data.title = domainEntity.title;
+    if (domainEntity.message !== undefined) data.message = domainEntity.message;
+    if (domainEntity.type !== undefined) data.type = domainEntity.type;
+    if (domainEntity.isRead !== undefined) data.isRead = domainEntity.isRead;
+    if (domainEntity.customerId !== undefined) data.customerId = domainEntity.customerId;
+    if (domainEntity.appointmentId !== undefined) data.appointmentId = domainEntity.appointmentId;
+    if (domainEntity.contactRequestId !== undefined) data.contactRequestId = domainEntity.contactRequestId;
+    if (domainEntity.link !== undefined) data.link = domainEntity.link;
+    if (domainEntity.createdAt !== undefined) data.createdAt = domainEntity.createdAt;
+    if (domainEntity.updatedAt !== undefined) data.updatedAt = domainEntity.updatedAt;
+    if (domainEntity.createdBy !== undefined) data.createdBy = domainEntity.createdBy;
+    if (domainEntity.updatedBy !== undefined) data.updatedBy = domainEntity.updatedBy;
+    
+    return data;
   }
 
   /**
-   * Implementierung der Aktivitätsprotokollierung
+   * Check if an error is a database error
    * 
-   * Nicht relevant für Benachrichtigungen, daher eine leere Implementierung.
+   * @param error - Error to check
+   * @returns Whether the error is a database error
    */
-  protected async logActivityImplementation(
-    userId: number, 
-    actionType: string, 
-    details?: string,
-    ipAddress?: string
-  ): Promise<any> {
-    // Für Benachrichtigungen nicht notwendig
-    return null;
+  protected isDatabaseError(error: any): boolean {
+    return (
+      error &&
+      typeof error === 'object' &&
+      (error.code !== undefined || error.name === 'PrismaClientKnownRequestError')
+    );
   }
 
   /**
-   * Verarbeitet Kriterien für das ORM
+   * Check if an error violates a unique constraint
    * 
-   * @param criteria - Filterkriterien
-   * @returns ORM-spezifische Kriterien
+   * @param error - Error to check
+   * @returns Whether the error violates a unique constraint
    */
-  protected processCriteria(criteria: Record<string, any>): any {
-    const where: any = {};
-    
-    // Verarbeite jedes Kriterium
-    for (const [key, value] of Object.entries(criteria)) {
-      // Behandle komplexe Kriterien
-      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-        // Objekt mit Operatoren wie {eq, gt, lt, etc.}
-        const operators: Record<string, any> = {};
-        
-        for (const [op, opValue] of Object.entries(value)) {
-          switch (op) {
-            case 'eq':
-              operators.equals = opValue;
-              break;
-            case 'neq':
-              operators.not = opValue;
-              break;
-            case 'gt':
-              operators.gt = opValue;
-              break;
-            case 'gte':
-              operators.gte = opValue;
-              break;
-            case 'lt':
-              operators.lt = opValue;
-              break;
-            case 'lte':
-              operators.lte = opValue;
-              break;
-            case 'contains':
-              operators.contains = opValue;
-              operators.mode = 'insensitive';
-              break;
-            case 'startsWith':
-              operators.startsWith = opValue;
-              break;
-            case 'endsWith':
-              operators.endsWith = opValue;
-              break;
-            case 'in':
-              operators.in = opValue;
-              break;
-            case 'notIn':
-              operators.notIn = opValue;
-              break;
-            default:
-              // Unbekannter Operator, übergebe ihn einfach
-              operators[op] = opValue;
-          }
-        }
-        
-        where[key] = operators;
-      } else {
-        // Einfache Gleichheit
-        where[key] = value;
-      }
-    }
-    
-    return where;
+  protected isUniqueConstraintError(error: any): boolean {
+    return (
+      this.isDatabaseError(error) &&
+      (error.code === 'P2002' || // Prisma unique constraint error
+       (typeof error.message === 'string' && error.message.includes('unique constraint')))
+    );
+  }
+
+  /**
+   * Check if an error violates a foreign key constraint
+   * 
+   * @param error - Error to check
+   * @returns Whether the error violates a foreign key constraint
+   */
+  protected isForeignKeyConstraintError(error: any): boolean {
+    return (
+      this.isDatabaseError(error) &&
+      (error.code === 'P2003' || // Prisma foreign key constraint error
+       (typeof error.message === 'string' && error.message.includes('foreign key constraint')))
+    );
   }
 }

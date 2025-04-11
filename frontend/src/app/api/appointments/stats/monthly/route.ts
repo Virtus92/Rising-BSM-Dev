@@ -1,100 +1,91 @@
-import { NextResponse } from 'next/server';
-import { auth } from '../../../auth/middleware/authMiddleware';
-import { getPrismaClient } from '@/infrastructure/common/database/prisma';
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
 import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * GET /api/appointments/stats/monthly
  * Returns monthly appointment statistics for the past 12 months
  */
-export async function GET(request: Request) {
+export const GET = apiRouteHandler(async (request: NextRequest) => {
   const logger = getLogger();
+  const serviceFactory = getServiceFactory();
   
   try {
-    // Verify authentication
-    const authResult = await auth(request);
-    if (!authResult.success) {
-      return NextResponse.json(
-        { success: false, message: authResult.message },
-        { status: authResult.status }
-      );
-    }
-
-    // Get prisma client
-    const prisma = getPrismaClient();
-
     // Get URL parameters
     const url = new URL(request.url);
     const months = parseInt(url.searchParams.get('months') || '12', 10);
     
-    // Calculate start date (X months ago)
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - months);
+    // Get appointment service
+    const appointmentService = serviceFactory.createAppointmentService();
     
-    // Format dates to beginning/end of month
-    startDate.setDate(1);
-    startDate.setHours(0, 0, 0, 0);
+    // Create context with user ID
+    const context = { userId: request.auth?.userId };
     
-    // Generate monthly ranges
-    const monthRanges = [];
-    const currentDate = new Date(startDate);
+    // Get monthly stats from repository directly to avoid method errors
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setMonth(today.getMonth() - months);
     
-    while (currentDate <= endDate) {
-      const month = currentDate.getMonth();
-      const year = currentDate.getFullYear();
-      
-      const monthStart = new Date(year, month, 1);
-      const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
-      
-      monthRanges.push({
-        start: new Date(monthStart),
-        end: new Date(monthEnd),
-        month: monthStart.toLocaleString('default', { month: 'short' }),
-        year: year
+    // Get appointments in the date range
+    const appointments = await appointmentService.getRepository().findByDateRange(startDate, today);
+    
+    // Process data to calculate monthly stats
+    const monthlyMap = new Map();
+    
+    // Initialize months
+    for (let i = 0; i < months; i++) {
+      const monthDate = new Date(today);
+      monthDate.setMonth(today.getMonth() - i);
+      const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+      monthlyMap.set(monthKey, {
+        month: monthKey,
+        label: monthDate.toLocaleString('default', { month: 'long' }),
+        year: monthDate.getFullYear(),
+        count: 0,
+        completed: 0,
+        cancelled: 0
       });
-      
-      // Move to next month
-      currentDate.setMonth(currentDate.getMonth() + 1);
     }
     
-    // Query appointments for each month using the correct field appointmentDate
-    const monthlyStats = await Promise.all(
-      monthRanges.map(async (range) => {
-        const count = await prisma.appointment.count({
-          where: {
-            appointmentDate: {
-              gte: range.start,
-              lte: range.end
-            }
-          }
-        });
+    // Count appointments by month
+    for (const appointment of appointments) {
+      const date = new Date(appointment.appointmentDate);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (monthlyMap.has(monthKey)) {
+        const stats = monthlyMap.get(monthKey);
+        stats.count++;
         
-        return {
-          month: `${range.month} ${range.year}`,
-          count: count,
-          period: {
-            start: range.start.toISOString(),
-            end: range.end.toISOString()
-          }
-        };
-      })
+        if (appointment.status === 'COMPLETED') {
+          stats.completed++;
+        } else if (appointment.status === 'CANCELLED') {
+          stats.cancelled++;
+        }
+      }
+    }
+    
+    // Convert to array and sort by month
+    const monthlyStats = Array.from(monthlyMap.values());
+    monthlyStats.sort((a, b) => a.month.localeCompare(b.month));
+    
+    return formatSuccess(
+      monthlyStats, 
+      'Monthly appointment statistics retrieved successfully'
     );
-
-    return NextResponse.json({
-      success: true,
-      data: monthlyStats,
-      message: 'Monthly appointment statistics retrieved successfully'
-    });
   } catch (error) {
-    logger.error('[API] Error generating monthly appointment stats:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Failed to retrieve monthly appointment statistics', 
-        error: error instanceof Error ? error.message : String(error) 
-      },
-      { status: 500 }
+    logger.error('Error generating monthly appointment stats:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    return formatError(
+      error instanceof Error ? error.message : 'Failed to retrieve monthly appointment statistics',
+      500
     );
   }
-}
+}, {
+  // Secure this endpoint
+  requiresAuth: true
+});

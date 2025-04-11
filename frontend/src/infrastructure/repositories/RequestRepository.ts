@@ -148,6 +148,57 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
   }
 
   /**
+   * Ruft alle Notizen zu einer Kontaktanfrage ab
+   * 
+   * @param id - ID der Anfrage
+   * @returns Liste der Notizen
+   */
+  async getNotes(id: number): Promise<RequestNote[]> {
+    try {
+      const requestNotes = await this.prisma.requestNote.findMany({
+        where: { requestId: id },
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      return requestNotes.map(note => new RequestNote({
+        id: note.id,
+        requestId: note.requestId,
+        userId: note.userId,
+        userName: note.userName,
+        text: note.text,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt || note.createdAt
+      }));
+    } catch (error) {
+      this.logger.error('Error getting notes for request', { error, id });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Löscht eine Notiz von einer Kontaktanfrage
+   * 
+   * @param requestId - ID der Anfrage
+   * @param noteId - ID der Notiz
+   * @returns Erfolgsstatus
+   */
+  async deleteNote(requestId: number, noteId: number): Promise<boolean> {
+    try {
+      await this.prisma.requestNote.delete({
+        where: { 
+          id: noteId,
+          requestId: requestId
+        }
+      });
+      
+      return true;
+    } catch (error) {
+      this.logger.error('Error deleting note from request', { error, requestId, noteId });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Weist eine Kontaktanfrage einem Benutzer zu
    * 
    * @param id - ID der Anfrage

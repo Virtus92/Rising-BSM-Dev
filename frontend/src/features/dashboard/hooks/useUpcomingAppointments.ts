@@ -14,8 +14,13 @@ export const useUpcomingAppointments = () => {
       try {
         setIsLoading(true);
         const response = await AppointmentService.getUpcomingAppointments();
-        if (response.success && response.data) {
-          setAppointments(response.data);
+        if (response.success) {
+          // Ensure data is an array
+          const appointmentData = Array.isArray(response.data) ? response.data :
+                                response.data && Array.isArray(response.data.appointments) ? response.data.appointments :
+                                [];
+                                
+          setAppointments(appointmentData);
         } else {
           setError(response.message || 'Failed to fetch upcoming appointments');
         }

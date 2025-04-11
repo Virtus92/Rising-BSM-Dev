@@ -1,13 +1,9 @@
-/**
- * Appointment API-Route für einzelne Termine
- * 
- * Verarbeitet Anfragen für einzelne Termine (GET, PUT, DELETE)
- */
 import { NextRequest } from 'next/server';
 import { apiRouteHandler } from '@/infrastructure/api/route-handler';
 import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/infrastructure/api/response-formatter';
 import { getAppointmentService } from '@/infrastructure/common/factories';
 import { UpdateAppointmentDto, StatusUpdateDto } from '@/domain/dtos/AppointmentDtos';
+import { getLogger } from '@/infrastructure/common/logging';
 
 /**
  * GET /api/appointments/[id]
@@ -45,9 +41,15 @@ export const GET = apiRouteHandler(async (req: NextRequest, params?: { [key: str
     return formatSuccess(appointment, 'Termin erfolgreich abgerufen');
     
   } catch (error) {
-    console.error('Error fetching appointment:', error);
+    const logger = getLogger();
+    logger.error('Error fetching appointment:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      appointmentId: params?.id
+    });
+    
     return formatError(
-      error instanceof Error ? error.message : 'Fehler beim Abrufen des Termins',
+      error instanceof Error ? error.message : 'Error retrieving appointment',
       500
     );
   }
@@ -95,18 +97,23 @@ export const PUT = apiRouteHandler(async (req: NextRequest, params?: { [key: str
     return formatSuccess(updatedAppointment, 'Termin erfolgreich aktualisiert');
     
   } catch (error) {
-    console.error('Error updating appointment:', error);
+    const logger = getLogger();
+    logger.error('Error updating appointment:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      appointmentId: params?.id
+    });
     
-    // Behandlung von Validierungsfehlern
+    // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
       return formatValidationError(
         (error as any).validationErrors,
-        'Validierungsfehler beim Aktualisieren des Termins'
+        'Appointment validation failed'
       );
     }
     
     return formatError(
-      error instanceof Error ? error.message : 'Fehler beim Aktualisieren des Termins',
+      error instanceof Error ? error.message : 'Error updating appointment',
       500
     );
   }
@@ -151,9 +158,15 @@ export const DELETE = apiRouteHandler(async (req: NextRequest, params?: { [key: 
     return formatSuccess({ deleted }, 'Termin erfolgreich gelöscht');
     
   } catch (error) {
-    console.error('Error deleting appointment:', error);
+    const logger = getLogger();
+    logger.error('Error deleting appointment:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      appointmentId: params?.id
+    });
+    
     return formatError(
-      error instanceof Error ? error.message : 'Fehler beim Löschen des Termins',
+      error instanceof Error ? error.message : 'Error deleting appointment',
       500
     );
   }

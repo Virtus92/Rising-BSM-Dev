@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { AppointmentList } from '@/features/appointments/components/AppointmentList';
 import { Button } from '@/shared/components/ui/button';
@@ -14,7 +16,9 @@ export default function AppointmentsPage() {
         </Button>
       </div>
       
-      <AppointmentList />
+      <div>
+        <AppointmentList />
+      </div>
     </div>
   );
 }

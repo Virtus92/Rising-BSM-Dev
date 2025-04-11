@@ -38,6 +38,17 @@ export const CustomerList = () => {
     );
   }
 
+  // Check if customers is an array and has items
+  const customersArray = Array.isArray(customers) ? customers : [];
+  
+  if (customersArray.length === 0) {
+    return (
+      <div className="text-center p-4">
+        No customers found. Add a new customer to get started.
+      </div>
+    );
+  }
+
   return (
     <Table>
       <TableHeader>
@@ -50,7 +61,7 @@ export const CustomerList = () => {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {customers.map((customer) => (
+        {customersArray.map((customer) => (
           <TableRow key={customer.id}>
             <TableCell>{customer.name}</TableCell>
             <TableCell>{customer.email}</TableCell>

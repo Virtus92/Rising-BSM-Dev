@@ -15,7 +15,7 @@ export interface IRequestRepository extends IBaseRepository<ContactRequest> {
    * @param filters - Filterparameter
    * @returns Gefundene Anfragen mit Paginierung
    */
-  findRequests(filters: RequestFilterParamsDto): Promise<PaginationResult<ContactRequest>>;
+  findRequests(criteria: Record<string, any>, options?: any): Promise<PaginationResult<ContactRequest>>;
   /**
    * Aktualisiert den Status einer Kontaktanfrage
    * 
@@ -35,6 +35,25 @@ export interface IRequestRepository extends IBaseRepository<ContactRequest> {
    * @returns Erstellte Notiz
    */
   addNote(id: number, userId: number, userName: string, text: string): Promise<RequestNote>;
+
+  /**
+   * Ruft alle Notizen zu einer Kontaktanfrage ab
+   * 
+   * @param id - ID der Anfrage
+   * @returns Liste der Notizen
+   */
+  getNotes(id: number): Promise<RequestNote[]>;
+
+  /**
+   * Löscht eine Notiz von einer Kontaktanfrage
+   * 
+   * @param id - ID der Anfrage
+   * @param noteId - ID der Notiz
+   * @returns Erfolgsstatus
+   */
+  deleteNote(id: number, noteId: number): Promise<boolean>;
+
+  
   
   /**
    * Weist eine Kontaktanfrage einem Benutzer zu

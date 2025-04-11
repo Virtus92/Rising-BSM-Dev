@@ -265,16 +265,48 @@ export async function middleware(request: NextRequest) {
         // Log successful validation
         console.log(`Token validation passed for ${pathname}`);
         
-        // Token is valid, we can proceed
-        // Add user info to request headers for API routes
-        if (pathname.startsWith('/api/') && !isPublicPath) {
-          const response = NextResponse.next();
+        // Token is valid, create response
+        const response = NextResponse.next();
+        
+        // CRITICAL FIX: Always add X-Auth-Token for API routes
+        // This ensures the token is available to API handlers
+        if (pathname.startsWith('/api/')) {
+          console.log(`Adding X-Auth-Token header for API route: ${pathname}`);
+          
+          // Set the token in multiple headers to increase chances of it being available
+          // to the API route handlers
           response.headers.set('X-Auth-Token', token);
-          return response;
+          
+          // Also ensure the auth_token cookie is properly set with correct attributes
+          // This is the most reliable way to pass the token between middleware and API routes
+          if (!request.cookies.has('auth_token') || request.cookies.get('auth_token')?.value !== token) {
+            // Get expiration time from the token
+            let expiresIn = 24 * 60 * 60; // Default 24 hours
+            try {
+              const decoded = jose.decodeJwt(token);
+              if (decoded.exp) {
+                // Calculate seconds until expiration
+                expiresIn = Math.max(0, decoded.exp - Math.floor(Date.now() / 1000));
+              }
+            } catch (e) {
+              console.log('Error decoding token expiration, using default:', e);
+            }
+            
+            // Set the auth_token cookie on the response
+            // This will ensure it's available to API routes
+            response.cookies.set({
+              name: 'auth_token',
+              value: token,
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'strict',
+              path: '/',
+              maxAge: expiresIn
+            });
+          }
         }
         
-        // For normal pages, just proceed
-        return NextResponse.next();
+        return response;
       } else {
         // Token is invalid or expired - handle appropriately
         console.log(`Token appears invalid in middleware for ${pathname}`);

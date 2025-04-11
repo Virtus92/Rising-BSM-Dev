@@ -86,6 +86,23 @@ export interface IErrorHandler {
   createBadRequestError(message: string): BadRequestError;
   
   /**
+   * Erstellt einen Datenbankfehler
+   * 
+   * @param message - Fehlermeldung
+   * @param code - Datenbankfehlercode
+   * @param details - Fehlerdetails
+   */
+  createDatabaseError(message: string, code?: string, details?: any): AppError;
+  
+
+  /**
+   * Behandelt einen Datenbankfehler
+   * 
+   * @param error - Datenbankfehler
+   */
+  handleDatabaseError(error: any): AppError;
+  
+  /**
    * Wandelt einen Fehler in einen AppError um
    * 
    * @param error - Fehler
@@ -108,12 +125,14 @@ export interface IErrorHandler {
   formatError(error: any): ErrorResponse;
   
   /**
-   * Behandelt einen Datenbankfehler
+   * Erstellt einen Datenbank-Fehler
    * 
-   * @param error - Datenbankfehler
+   * @param message - Fehlermeldung
+   * @param code - Datenbankfehlercode
+   * @param details - Fehlerdetails
    */
-  handleDatabaseError(error: any): AppError;
-}
+  createDatabaseError(message: string, code?: string, details?: any): AppError;
+  }
 
 /**
  * Implementierung des ErrorHandlers
@@ -131,6 +150,15 @@ export class ErrorHandler implements IErrorHandler {
   ) {}
   
   /**
+   * Erstellt einen Bad Request Fehler
+   * 
+   * @param message - Fehlermeldung
+   */
+  createBadRequestError(message: string): BadRequestError {
+    return new BadRequestError(message);
+  }
+  
+  /**
    * Erstellt einen allgemeinen Fehler
    * 
    * @param message - Fehlermeldung
@@ -141,8 +169,8 @@ export class ErrorHandler implements IErrorHandler {
   createError(message: string, statusCode: number = 500, code: string = 'server_error', details?: any): AppError {
     const error = new AppError(message, statusCode, code, details);
     
-    // Protokolliere die Fehlererstellung
-    this.logger.debug('Created application error', {
+    // Protokolliere die Fehlererstellung - using info instead of debug to avoid issues
+    this.logger.info('Created application error', {
       type: error.constructor.name,
       message: error.message,
       statusCode: error.statusCode
@@ -160,8 +188,8 @@ export class ErrorHandler implements IErrorHandler {
   createValidationError(message: string, errors: string[] = []): ValidationError {
     const error = new ValidationError(message, errors);
     
-    // Protokolliere die Fehlererstellung
-    this.logger.debug('Created validation error', {
+    // Protokolliere die Fehlererstellung - using info instead of debug to avoid issues
+    this.logger.info('Created validation error', {
       message: error.message,
       errors: error.errors
     });
@@ -207,19 +235,14 @@ export class ErrorHandler implements IErrorHandler {
   }
   
   /**
-   * Erstellt einen ungültigen Anfragefehler
+   * Erstellt einen Datenbank-Fehler
    * 
    * @param message - Fehlermeldung
+   * @param code - Datenbankfehlercode
+   * @param details - Fehlerdetails
    */
-  createBadRequestError(message: string): BadRequestError {
-    const error = new BadRequestError(message);
-    
-    // Protokolliere die Fehlererstellung
-    this.logger.debug('Created bad request error', {
-      message: error.message
-    });
-    
-    return error;
+  createDatabaseError(message: string, code: string = 'database_error', details?: any): AppError {
+    return this.createError(message, 500, code, details);
   }
   
   /**

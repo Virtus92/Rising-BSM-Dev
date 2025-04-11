@@ -29,6 +29,16 @@ export class UserService implements IUserService {
   ) {
     this.logger.debug('Initialized UserService');
   }
+  
+  /**
+   * Gets the repository instance
+   * This allows direct repository access when needed for specific operations
+   * 
+   * @returns The repository instance
+   */
+  public getRepository(): IUserRepository {
+    return this.userRepository;
+  }
 
   /**
    * Finds a user by email
@@ -412,8 +422,8 @@ export class UserService implements IUserService {
       role: entity.role,
       status: entity.status,
       profilePicture: entity.profilePicture,
-      createdAt: entity.createdAt as any instanceof Date ? entity.createdAt.toString() : entity.createdAt,
-      updatedAt: entity.updatedAt as any instanceof Date ? entity.updatedAt.toString() : entity.updatedAt
+      createdAt: entity.createdAt instanceof Date ? entity.createdAt.toISOString() : entity.createdAt,
+      updatedAt: entity.updatedAt instanceof Date ? entity.updatedAt.toISOString() : entity.updatedAt
     };
   }
 

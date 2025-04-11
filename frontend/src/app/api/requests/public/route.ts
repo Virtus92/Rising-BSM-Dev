@@ -1,100 +1,87 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError, formatValidationError } from '@/infrastructure/api/response-formatter';
+import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * POST /api/requests/public
  * 
  * Erstellt eine neue öffentliche Kontaktanfrage (ohne Authentifizierung).
  */
-export async function POST(request: NextRequest) {
+export const POST = apiRouteHandler(async (request: NextRequest) => {
+  const logger = getLogger();
+  const serviceFactory = getServiceFactory();
+  
   try {
     // Daten aus Request-Body auslesen
     const body = await request.json();
     const { name, email, phone, service, message } = body;
     
-    // Validierung
+    // Basic validation
     if (!name || !email || !service || !message) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: 'Unvollständige Daten', 
-          errors: ['Bitte füllen Sie alle Pflichtfelder aus'] 
-        },
-        { status: 400 }
-      );
+      return formatError('Incomplete data - Please fill all required fields', 400);
     }
     
-    // E-Mail-Format validieren
+    // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: 'Ungültige E-Mail-Adresse', 
-          errors: ['Die angegebene E-Mail-Adresse hat ein ungültiges Format'] 
-        },
-        { status: 400 }
-      );
+      return formatError('The provided email address has an invalid format', 400);
     }
     
-    // IP-Adresse des Clients ermitteln (falls verfügbar)
+    // Get client IP address
     const ipAddress = request.headers.get('x-forwarded-for') || 
-                     request.headers.get('x-real-ip') || 
-                     '127.0.0.1';
+                      request.headers.get('x-real-ip') || 
+                      '127.0.0.1';
     
-    // Anti-Spam-Maßnahme: Überprüfe, ob in den letzten 5 Minuten bereits eine Anfrage von dieser IP kam
-    const recentRequest = await prisma.contactRequest.findFirst({
-      where: {
-        ipAddress: ipAddress.split(',')[0],
-        createdAt: {
-          gte: new Date(Date.now() - 5 * 60 * 1000) // 5 Minuten
-        }
-      }
+    // Get request service
+    const requestService = serviceFactory.createRequestService();
+    
+    // Prepare request data
+    const requestData = {
+      name,
+      email,
+      phone,
+      service,
+      message,
+      status: 'NEW',
+      source: 'website',
+      priority: 'MEDIUM'
+    };
+    
+    // Create context with IP address
+    const context = {
+      ipAddress: ipAddress.split(',')[0]
+    };
+    
+    // Create the request
+    const newRequest = await requestService.create(requestData, { context });
+    
+    // Success response
+    return formatSuccess({
+      id: newRequest.id,
+      createdAt: newRequest.createdAt
+    }, 'Thank you for your request! We will contact you shortly.', 201);
+  } catch (error) {
+    logger.error('Error creating public request:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
     
-    if (recentRequest) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: 'Zu viele Anfragen', 
-          errors: ['Bitte warten Sie einige Minuten, bevor Sie eine weitere Anfrage senden'] 
-        },
-        { status: 429 }
+    // Handle validation errors
+    if (error instanceof Error && 'validationErrors' in error) {
+      return formatValidationError(
+        (error as any).validationErrors,
+        'The request could not be processed due to validation errors'
       );
     }
     
-    // Neue Anfrage erstellen
-    const newRequest = await prisma.contactRequest.create({
-      data: {
-        name,
-        email,
-        phone,
-        service,
-        message,
-        status: 'new',
-        ipAddress: ipAddress.split(',')[0] // Erste IP-Adresse bei mehreren
-      }
-    });
-    
-    // Erfolgsantwort
-    return NextResponse.json({
-      success: true,
-      message: 'Vielen Dank für Ihre Anfrage! Wir werden uns in Kürze bei Ihnen melden.',
-      data: {
-        id: newRequest.id,
-        createdAt: newRequest.createdAt
-      }
-    });
-  } catch (error) {
-    console.error('Error creating public request:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Entschuldigung, beim Verarbeiten Ihrer Anfrage ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut.'
-      },
-      { status: 500 }
+    return formatError(
+      'Sorry, there was an error processing your request. Please try again later.',
+      500
     );
   }
-}
+}, {
+  // Public endpoint - no auth required
+  requiresAuth: false
+});

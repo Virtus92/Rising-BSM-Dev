@@ -38,6 +38,16 @@ export class CustomerService implements ICustomerService {
   ) {
     this.logger.debug('Initialized CustomerService');
   }
+  
+  /**
+   * Gets the repository instance
+   * This allows direct repository access when needed for specific operations
+   * 
+   * @returns The repository instance
+   */
+  public getRepository(): ICustomerRepository {
+    return this.customerRepository;
+  }
 
   /**
    * Finds a customer by email

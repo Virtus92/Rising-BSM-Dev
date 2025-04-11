@@ -68,6 +68,20 @@ export class RequestService {
   }
 
   /**
+   * Get weekly statistics
+   */
+  static async getWeeklyStats() {
+    return ApiClient.get(`${this.basePath}/stats/weekly`);
+  }
+
+  /**
+   * Get yearly statistics
+   */
+  static async getYearlyStats() {
+    return ApiClient.get(`${this.basePath}/stats/yearly`);
+  }
+
+  /**
    * Get request count
    */
   static async count() {

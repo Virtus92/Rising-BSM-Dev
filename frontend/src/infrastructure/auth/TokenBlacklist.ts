@@ -1,5 +1,3 @@
-'use client';
-
 import { getLogger } from '../common/logging';
 import { jwtDecode } from 'jwt-decode';
 
@@ -37,8 +35,23 @@ class TokenBlacklist {
         return;
       }
       
-      // Decode payload to get expiration and user ID
-      const decoded = jwtDecode<{ sub?: string | number, exp?: number }>(token);
+      // Safely decode JWT payload without dependency on external library
+      let decoded: { sub?: string | number, exp?: number } = {};
+      
+      try {
+        // First try using jwtDecode if available (client-side)
+        if (typeof jwtDecode === 'function') {
+          decoded = jwtDecode<{ sub?: string | number, exp?: number }>(token);
+        } else {
+          // Manual decoding as fallback (server-side)
+          const base64Payload = payload.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = Buffer.from(base64Payload, 'base64').toString('utf8');
+          decoded = JSON.parse(jsonPayload);
+        }
+      } catch (decodeError) {
+        console.error('Error decoding token:', decodeError);
+        return;
+      }
       
       if (!decoded || !decoded.exp) {
         console.warn('Token missing expiration, cannot blacklist properly');
@@ -110,7 +123,24 @@ class TokenBlacklist {
       
       // Check if user is blacklisted
       try {
-        const decoded = jwtDecode<{ sub?: string | number }>(token);
+        // Safely decode JWT payload without dependency on external library
+        // This works in both client and server environments
+        let decoded: { sub?: string | number } = {};
+        
+        try {
+          // First try using jwtDecode if available (client-side)
+          if (typeof jwtDecode === 'function') {
+            decoded = jwtDecode<{ sub?: string | number }>(token);
+          } else {
+            // Manual decoding as fallback (server-side)
+            const base64Payload = payload.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = Buffer.from(base64Payload, 'base64').toString('utf8');
+            decoded = JSON.parse(jsonPayload);
+          }
+        } catch (decodeError) {
+          console.error('Error decoding token:', decodeError);
+          return false;
+        }
         
         if (!decoded || !decoded.sub) {
           return false;
@@ -127,7 +157,7 @@ class TokenBlacklist {
         // Or check if this specific token is blacklisted
         return userBlacklist ? userBlacklist.has(signature) : false;
       } catch (e) {
-        console.error('Error decoding token for blacklist check:', e);
+        console.error('Error processing token for blacklist check:', e);
         return false;
       }
     } catch (error) {

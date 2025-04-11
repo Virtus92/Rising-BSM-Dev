@@ -1,42 +1,37 @@
-/**
- * API route for user count
- */
-import { NextRequest, NextResponse } from 'next/server';
-import { authMiddleware } from '../../auth/middleware/authMiddleware';
-import { formatResponse } from '@/infrastructure/api/response-formatter';
-import { routeHandler } from '@/infrastructure/api/route-handler';
-import { getPrismaClient } from '@/infrastructure/common/database/prisma';
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
+import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * GET /api/users/count
  * Get user count
  */
-export async function GET(req: NextRequest) {
-  return routeHandler(async () => {
-    // Authentication check
-    const session = await authMiddleware(req);
-    if (!session || !session.user) {
-      return NextResponse.json(
-        formatResponse.error('Unauthorized'),
-        { status: 401 }
-      );
-    }
-
-    try {
-      const prisma = getPrismaClient();
-      
-      // Get actual count from database
-      const count = await prisma.user.count();
-      
-      return NextResponse.json(
-        formatResponse.success({ count })
-      );
-    } catch (error) {
-      // Fallback to mock data if database access fails
-      console.error('Error accessing user count:', error);
-      return NextResponse.json(
-        formatResponse.success({ count: 3 })
-      );
-    }
-  });
-}
+export const GET = apiRouteHandler(async (request: NextRequest) => {
+  const logger = getLogger();
+  
+  try {
+    // Get the user service from service factory
+    const serviceFactory = getServiceFactory();
+    const userService = serviceFactory.createUserService();
+    
+    // Get user count from the repository
+    const count = await userService.getRepository().count();
+    
+    return formatSuccess({ count }, 'User count retrieved successfully');
+  } catch (error) {
+    logger.error('Error retrieving user count:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    return formatError(
+      error instanceof Error ? error.message : 'Failed to retrieve user count',
+      500
+    );
+  }
+}, {
+  // Secure this endpoint
+  requiresAuth: true
+});

@@ -35,8 +35,22 @@ export const RequestList = () => {
 
   if (error) {
     return (
-      <div className="text-red-500 text-center p-4">
-        {error}
+      <div className="text-red-500 text-center p-4 border border-red-200 rounded-md bg-red-50">
+        <p className="font-semibold mb-2">Error loading requests</p>
+        <p>{error}</p>
+        <p className="text-sm mt-2">Please check your connection and try again later.</p>
+      </div>
+    );
+  }
+  
+  // Check if requests is an array and has items
+  const requestsArray = Array.isArray(requests) ? requests : [];
+  
+  if (requestsArray.length === 0) {
+    return (
+      <div className="text-center p-8 text-muted-foreground border border-dashed rounded-md">
+        <p className="mb-2">No requests found.</p>
+        <p className="text-sm">Requests are created when customers contact you through the contact form.</p>
       </div>
     );
   }
@@ -54,7 +68,7 @@ export const RequestList = () => {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {requests.map((request) => (
+        {requestsArray.map((request) => (
         <TableRow key={request.id}>
         <TableCell>{request.id}</TableCell>
         <TableCell>{request.name}</TableCell>

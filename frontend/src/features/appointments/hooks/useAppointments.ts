@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { AppointmentService } from '@/infrastructure/clients/AppointmentService';
 import { AppointmentDto } from '@/domain/dtos/AppointmentDtos';
@@ -12,7 +14,21 @@ export const useAppointments = () => {
       setIsLoading(true);
       const response = await AppointmentService.getAppointments();
       if (response.success && response.data) {
-        setAppointments(response.data);
+        // Ensure response.data is an array before setting state
+        if (Array.isArray(response.data)) {
+          setAppointments(response.data);
+        } else if (response.data && typeof response.data === 'object') {
+          // Handle the case where data might be an object with an array property
+          const possibleArrayData = Object.values(response.data).find(item => Array.isArray(item));
+          if (Array.isArray(possibleArrayData)) {
+            setAppointments(possibleArrayData);
+          } else {
+            // If data is an object but not in the expected format, create an array from it
+            setAppointments([response.data as AppointmentDto]);
+          }
+        } else {
+          setError('Unexpected data format received');
+        }
       } else {
         setError(response.message || 'Failed to fetch appointments');
       }

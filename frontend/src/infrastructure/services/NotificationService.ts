@@ -367,6 +367,8 @@ export class NotificationService extends BaseService<
       userId: entity.userId || 0,
       title: entity.title,
       message: entity.message || '',
+      // Add content property derived from message or a default value
+      content: entity.message || '',
       type: entity.type,
       isRead: entity.isRead,
       customerId: entity.customerId,

@@ -1,45 +1,40 @@
-import { NextResponse } from 'next/server';
-import { auth } from '../../auth/middleware/authMiddleware';
-import { getPrismaClient } from '@/infrastructure/common/database/prisma';
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
 import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * GET /api/requests/count
  * Returns the total count of contact requests in the system
  */
-export async function GET(request: Request) {
+export const GET = apiRouteHandler(async (request: NextRequest) => {
   const logger = getLogger();
+  const serviceFactory = getServiceFactory();
   
   try {
-    // Verify authentication
-    const authResult = await auth(request);
-    if (!authResult.success) {
-      return NextResponse.json(
-        { success: false, message: authResult.message },
-        { status: authResult.status }
-      );
-    }
-
-    // Get prisma client
-    const prisma = getPrismaClient();
-
-    // Count contact requests
-    const count = await prisma.contactRequest.count();
-
-    return NextResponse.json({
-      success: true,
-      data: count,
-      message: 'Request count retrieved successfully'
-    });
+    // Get request service
+    const requestService = serviceFactory.createRequestService();
+    
+    // Context for service calls
+    const context = { userId: request.auth?.userId };
+    
+    // Get count directly from repository
+    const count = await requestService.getRepository().count();
+    
+    return formatSuccess({ count }, 'Request count retrieved successfully');
   } catch (error) {
-    logger.error('[API] Error counting requests:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Failed to retrieve request count', 
-        error: error instanceof Error ? error.message : String(error) 
-      },
-      { status: 500 }
+    logger.error('Error counting requests:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    return formatError(
+      error instanceof Error ? error.message : 'Failed to retrieve request count',
+      500
     );
   }
-}
+}, {
+  // Secure this endpoint
+  requiresAuth: true
+});

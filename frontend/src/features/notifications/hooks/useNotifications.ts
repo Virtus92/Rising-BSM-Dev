@@ -40,9 +40,12 @@ export function useNotifications({
       const response = await NotificationClient.getNotifications(options);
       
       if (response.success && response.data) {
-        setNotifications(response.data);
+        // Make sure we always have an array
+        const notificationData = Array.isArray(response.data) ? response.data : [];
+        setNotifications(notificationData);
+        
         // Ungelesene Benachrichtigungen zählen
-        const unreadCount = response.data.filter(n => !n.isRead).length;
+        const unreadCount = notificationData.filter(n => !n.isRead).length;
         setUnreadCount(unreadCount);
       } else {
         setError(response.message || 'Fehler beim Laden der Benachrichtigungen');

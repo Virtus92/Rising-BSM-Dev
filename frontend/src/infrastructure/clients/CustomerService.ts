@@ -9,6 +9,11 @@ import {
   UpdateCustomerDto 
 } from '@/domain/dtos/CustomerDtos';
 
+interface StatsResponse {
+  period: string;
+  customers: number;
+}
+
 export class CustomerService {
   private static readonly basePath = "/customers";
 
@@ -56,5 +61,26 @@ export class CustomerService {
    */
   static async count() {
     return ApiClient.get(`${this.basePath}/count`);
+  }
+  
+  /**
+   * Get monthly customer statistics
+   */
+  static async getMonthlyStats() {
+    return ApiClient.get(`${this.basePath}/stats/monthly`);
+  }
+  
+  /**
+   * Get weekly customer statistics
+   */
+  static async getWeeklyStats() {
+    return ApiClient.get(`${this.basePath}/stats/weekly`);
+  }
+  
+  /**
+   * Get yearly customer statistics
+   */
+  static async getYearlyStats() {
+    return ApiClient.get(`${this.basePath}/stats/yearly`);
   }
 }

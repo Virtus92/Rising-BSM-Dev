@@ -1,22 +1,26 @@
 /**
  * Customers API-Route
  * 
- * Verarbeitet Anfragen zur Kundenverwaltung
+ * Handles customer management requests
  */
 import { NextRequest } from 'next/server';
 import { apiRouteHandler } from '@/infrastructure/api/route-handler';
 import { formatSuccess, formatError, formatValidationError } from '@/infrastructure/api/response-formatter';
-import { getCustomerService } from '@/infrastructure/common/factories';
 import { CreateCustomerDto, CustomerFilterParamsDto } from '@/domain/dtos/CustomerDtos';
+import { getServiceFactory } from '@/infrastructure/common/factories';
+import { getLogger } from '@/infrastructure/common/logging';
 
 /**
  * GET /api/customers
  * 
- * Ruft eine Liste von Kunden ab, optional gefiltert und paginiert
+ * Retrieves a list of customers, optionally filtered and paginated
  */
 export const GET = apiRouteHandler(async (req: NextRequest) => {
+  const logger = getLogger();
+  const serviceFactory = getServiceFactory();
+  
   try {
-    // Filterdaten aus Query-Parametern extrahieren
+    // Extract filter parameters from query
     const { searchParams } = new URL(req.url);
     const filters: CustomerFilterParamsDto = {
       search: searchParams.get('search') || undefined,
@@ -37,68 +41,158 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
       sortDirection: (searchParams.get('sortDirection') as 'asc' | 'desc') || undefined
     };
 
-    // Kundenservice abrufen
-    const customerService = getCustomerService();
+    // Get the customer service
+    const customerService = serviceFactory.createCustomerService();
     
-    // Paginierte Kundenliste abrufen
-    const result = await customerService.getAll({
-      relations: ['appointments'],
-      context: {
-        userId: req.auth?.userId
-      },
-      ...filters
+    // Context for service calls
+    const context = { userId: req.auth?.userId };
+    
+    // Get repository directly for more stable access
+    const repository = customerService.getRepository();
+    
+    // Build criteria
+    const criteria: Record<string, any> = {};
+    
+    if (filters.status) {
+      criteria.status = filters.status;
+    }
+    
+    if (filters.type) {
+      criteria.type = filters.type;
+    }
+    
+    if (filters.city) {
+      criteria.city = filters.city;
+    }
+    
+    if (filters.postalCode) {
+      criteria.postalCode = filters.postalCode;
+    }
+    
+    if (filters.newsletter !== undefined) {
+      criteria.newsletter = filters.newsletter;
+    }
+    
+    // Get total count
+    const total = await repository.count(criteria);
+    
+    // Get customers with pagination
+    const page = filters.page || 1;
+    const limit = filters.limit || 10;
+    
+    // Get data from repository directly
+    const customers = await repository.findByCriteria(criteria, {
+      page,
+      limit,
+      sort: {
+        field: filters.sortBy || 'createdAt',
+        direction: (filters.sortDirection || 'desc') as 'asc' | 'desc'
+      }
     });
+    
+    // Map to DTOs
+    const customerDtos = customers.map(customer => ({
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      company: customer.company,
+      type: customer.type,
+      status: customer.status,
+      address: customer.address,
+      city: customer.city,
+      postalCode: customer.postalCode,
+      country: customer.country,
+      newsletter: customer.newsletter,
+      createdAt: customer.createdAt instanceof Date ? customer.createdAt.toISOString() : customer.createdAt,
+      updatedAt: customer.updatedAt instanceof Date ? customer.updatedAt.toISOString() : customer.updatedAt
+    }));
+    
+    // Create result with pagination
+    const result = {
+      data: customerDtos,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
 
-    // Erfolgsantwort
-    return formatSuccess(result, 'Kunden erfolgreich abgerufen');
+    // Success response
+    return formatSuccess(
+      result,
+      'Customers retrieved successfully'
+    );
     
   } catch (error) {
-    console.error('Error fetching customers:', error);
+    logger.error('Error fetching customers:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
     return formatError(
-      error instanceof Error ? error.message : 'Fehler beim Abrufen der Kunden',
+      error instanceof Error ? error.message : 'Error retrieving customers',
       500
     );
   }
+}, {
+  // Secure this endpoint
+  requiresAuth: true
 });
 
 /**
  * POST /api/customers
  * 
- * Erstellt einen neuen Kunden
+ * Creates a new customer
  */
 export const POST = apiRouteHandler(async (req: NextRequest) => {
+  const logger = getLogger();
+  const serviceFactory = getServiceFactory();
+  
   try {
-    // Request-Body als JSON parsen
+    // Parse the request body
     const data = await req.json() as CreateCustomerDto;
     
-    // Kundenservice abrufen
-    const customerService = getCustomerService();
+    // Get the customer service
+    const customerService = serviceFactory.createCustomerService();
     
-    // Versuch, den Kunden zu erstellen
-    const result = await customerService.create(data, {
-      context: {
-        userId: req.auth?.userId,
-        ipAddress: req.headers.get('x-forwarded-for') || req.ip
-      }
+    // Context for service calls
+    const context = { 
+      userId: req.auth?.userId,
+      ipAddress: req.headers.get('x-forwarded-for') || 'unknown' 
+    };
+    
+    // Create the customer
+    const result = await customerService.create(data, { context });
+    
+    // Success response
+    return formatSuccess(result, 'Customer created successfully', 201);
+  } catch (error) {
+    logger.error('Error creating customer:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
     
-    // Erfolgsantwort
-    return formatSuccess(result, 'Kunde erfolgreich erstellt', 201);
-    
-  } catch (error) {
-    console.error('Error creating customer:', error);
-    
-    // Behandlung von Validierungsfehlern
+    // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
       return formatValidationError(
         (error as any).validationErrors,
-        'Validierungsfehler beim Erstellen des Kunden'
+        'Customer validation failed'
       );
     }
     
+    // Special case for duplicate email
+    if (error instanceof Error && error.message.includes('email already exists')) {
+      return formatError('A customer with this email already exists', 400);
+    }
+    
     return formatError(
-      error instanceof Error ? error.message : 'Fehler beim Erstellen des Kunden',
+      error instanceof Error ? error.message : 'Error creating customer',
       500
     );
   }
+}, {
+  // Secure this endpoint
+  requiresAuth: true
 });

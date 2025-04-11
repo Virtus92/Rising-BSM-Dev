@@ -1,6 +1,42 @@
 /**
  * Utility functions for API interactions
  */
+import { ApiResponse } from '@/infrastructure/clients/ApiClient';
+
+/**
+ * Process an API response, extracting the data and handling errors
+ * @param responsePromise Promise returning an API response
+ * @param options Options for processing
+ * @returns Extracted data from API response
+ */
+export async function processApiResponse<T>(
+  responsePromise: Promise<ApiResponse<T>>,
+  options: { context?: string } = {}
+): Promise<T> {
+  try {
+    const response = await responsePromise;
+    
+    // Response should be an object with data property
+    if (response && typeof response === 'object') {
+      // Access .data field of the response if it exists
+      if ('data' in response && response.data !== undefined) {
+        return response.data as T;
+      }
+      
+      // If response doesn't have data property but looks like data itself, return it
+      if (!('success' in response) && !('error' in response)) {
+        return response as unknown as T;
+      }
+    }
+    
+    // Handle missing or empty data
+    console.warn(`API response missing data in ${options.context || 'unknown context'}`, response);
+    return {} as T;
+  } catch (error) {
+    console.error(`Error processing API response in ${options.context || 'unknown context'}:`, error);
+    throw error;
+  }
+}
 
 /**
  * Safe fetch utility that handles errors and returns fallback data when needed
@@ -21,9 +57,22 @@ export async function safeFetch<T>(
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
         ...options?.headers,
       }
     };
+    
+    // Add auth token from localStorage as a backup if available
+    if (typeof localStorage !== 'undefined') {
+      const authToken = localStorage.getItem('auth_token_backup');
+      if (authToken) {
+        fetchOptions.headers = {
+          ...fetchOptions.headers,
+          'Authorization': `Bearer ${authToken}`
+        };
+      }
+    }
     
     // Use a timeout to prevent hanging requests
     const controller = new AbortController();
@@ -52,6 +101,18 @@ export async function safeFetch<T>(
       } else {
         return {} as T;
       }
+    }
+    
+    // Handle 401/403 errors - user might need to relogin
+    if (response.status === 401 || response.status === 403) {
+      console.error(`Authentication error (${response.status}): ${url}`);
+      // You might want to redirect to login or refresh token here
+      // For now, just return fallback data
+      if (fallbackData !== undefined) {
+        return fallbackData;
+      }
+      
+      throw new Error(`Authentication error: ${response.status}`);
     }
     
     // Handle other errors

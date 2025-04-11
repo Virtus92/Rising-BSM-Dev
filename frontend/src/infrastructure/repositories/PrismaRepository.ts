@@ -3,6 +3,7 @@ import { BaseRepository } from './BaseRepository';
 import { ILoggingService } from '@/infrastructure/common/logging/ILoggingService';
 import { IErrorHandler } from '@/infrastructure/common/error/ErrorHandler';
 import { QueryOptions } from '@/domain/repositories/IBaseRepository';
+import { configService } from '@/infrastructure/services/ConfigService';
 
 /**
  * Prisma-Basis-Repository
@@ -34,6 +35,7 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
     errorHandler: IErrorHandler
   ) {
     super(prisma[modelName as keyof PrismaClient], logger, errorHandler);
+    this.logger.debug(`Initialized PrismaRepository for model: ${modelName}`);
   }
 
   /**
@@ -81,6 +83,10 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
    * @returns Promise mit Abfrageergebnis
    */
   protected async executeQuery(operation: string, ...args: any[]): Promise<any> {
+    // Startzeit protokollieren, wenn im Debug-Modus
+    const isDebug = configService.getLoggingConfig().level === 'debug';
+    const startTime = isDebug ? Date.now() : 0;
+    
     try {
       // Hole das passende Modell
       const model = this.prismaTransaction || this.prisma[this.modelName as keyof PrismaClient];
@@ -89,64 +95,102 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
         throw new Error(`Model ${this.modelName} not found on Prisma client`);
       }
       
+      // Ausführung der Abfrage
+      let result;
+      
       switch (operation) {
         case 'findAll':
-          return await (model as any).findMany(args[0]);
+          result = await (model as any).findMany(args[0]);
+          break;
           
         case 'findById':
-          return await (model as any).findUnique({
+          result = await (model as any).findUnique({
             where: { id: args[0] },
             ...(args[1] || {})
           });
+          break;
           
         case 'findByCriteria':
-          return await (model as any).findMany({
+          result = await (model as any).findMany({
             where: args[0],
             ...(args[1] || {})
           });
+          break;
           
         case 'findOneByCriteria':
-          return await (model as any).findFirst({
+          result = await (model as any).findFirst({
             where: args[0],
             ...(args[1] || {})
           });
+          break;
           
         case 'create':
-          return await (model as any).create({
+          result = await (model as any).create({
             data: args[0]
           });
+          break;
           
         case 'update':
-          return await (model as any).update({
+          result = await (model as any).update({
             where: { id: args[0] },
             data: args[1]
           });
+          break;
           
         case 'delete':
-          return await (model as any).delete({
+          result = await (model as any).delete({
             where: { id: args[0] }
           });
+          break;
           
         case 'count':
-          return await (model as any).count({
+          result = await (model as any).count({
             where: args[0]
           });
+          break;
           
         case 'bulkUpdate':
-          return await (model as any).updateMany({
+          result = await (model as any).updateMany({
             where: { id: { in: args[0] } },
             data: args[1]
           });
+          break;
           
         case 'logActivity':
           // Spezielle Implementierung für Aktivitätsprotokollierung
-          return await this.logActivityImplementation(args[0], args[1], args[2], args[3]);
+          result = await this.logActivityImplementation(args[0], args[1], args[2], args[3]);
+          break;
           
         default:
           throw new Error(`Unknown operation: ${operation}`);
       }
+      
+      // Protokolliere Ausführungszeit im Debug-Modus
+      if (isDebug) {
+        const duration = Date.now() - startTime;
+        this.logger.debug(`Query execution time for ${operation} on ${this.modelName}: ${duration}ms`);
+        
+        // Warne bei langsamen Abfragen
+        if (duration > 1000) {
+          this.logger.warn(`Slow query detected: ${operation} on ${this.modelName} took ${duration}ms`, {
+            operation,
+            model: this.modelName,
+            duration,
+            args: JSON.stringify(args)
+          });
+        }
+      }
+      
+      return result;
     } catch (error) {
-      this.logger.error(`Error executing query: ${operation}`, { error, args });
+      // Protokolliere Fehler mit Details
+      this.logger.error(`Error executing query: ${operation} on ${this.modelName}`, { 
+        error, 
+        operation, 
+        model: this.modelName,
+        args: JSON.stringify(args)
+      });
+      
       throw error;
     }
   }
@@ -159,6 +203,8 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
    */
   async transaction<R>(callback: () => Promise<R>): Promise<R> {
     try {
+      const timeout = configService.isDevelopment() ? 30000 : 10000;
+      
       // Verwende Prismas Transaktions-API
       return await this.prisma.$transaction(
         async (tx) => {
@@ -166,22 +212,28 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
             // Speichere Transaktions-Client
             this.prismaTransaction = tx;
             
+            // Protokolliere Transaktionsbeginn
+            this.logger.debug(`Starting transaction for ${this.modelName}`);
+            
             // Führe Operation aus
             return await callback();
           } finally {
             // Lösche Transaktions-Client (wird immer ausgeführt)
             this.prismaTransaction = null;
+            
+            // Protokolliere Transaktionsende
+            this.logger.debug(`Transaction for ${this.modelName} completed`);
           }
         },
         {
           // Transaktionsoptionen
           maxWait: 5000, // 5s maximale Wartezeit
-          timeout: 10000, // 10s maximale Transaktionszeit
+          timeout: timeout, // Timeout für die Transaktion
         }
       );
     } catch (error) {
-      this.logger.error('Transaction error', { error });
-      throw this.handleError(error);
+      this.logger.error(`Transaction error in ${this.modelName}`, { error });
+      throw this.handleDatabaseError(error);
     }
   }
 
@@ -251,6 +303,71 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
   }
 
   /**
+   * Behandelt einen Datenbankfehler
+   * 
+   * @param error - Der aufgetretene Fehler
+   * @returns Der transformierte Fehler
+   */
+  protected handleDatabaseError(error: any): Error {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      // Bekannte Prisma-Fehler mit detaillierten Fehlermeldungen
+      switch (error.code) {
+        case 'P2002': // Unique constraint violated
+          const field = error.meta?.target as string[] || ['field'];
+          return this.errorHandler.createConflictError(
+            `Unique constraint violation on field(s): ${field.join(', ')}`
+          );
+          
+        case 'P2003': // Foreign key constraint failed
+          const fkField = error.meta?.field_name || 'field';
+          return this.errorHandler.createConflictError(
+            `Foreign key constraint violation on field: ${fkField}`
+          );
+          
+        case 'P2025': // Record not found
+          return this.errorHandler.createNotFoundError(
+            error.meta?.cause ? String(error.meta.cause) : 'Record not found'
+          );
+          
+        case 'P2014': // Required relation violation
+          return this.errorHandler.createValidationError(
+            'Required relation violation',
+            [error.message]
+          );
+          
+        case 'P2021': // Table does not exist
+          return this.errorHandler.handleDatabaseError(error);
+          
+        case 'P2010': // Raw query error
+          return this.errorHandler.handleDatabaseError(error);
+          
+        default:
+          return this.errorHandler.handleDatabaseError(error);
+      }
+    } else if (error instanceof Prisma.PrismaClientValidationError) {
+      // Validierungsfehler
+      return this.errorHandler.createValidationError(
+        'Database validation error', 
+        [error.message.split('\n').pop() || error.message]
+      );
+    } else if (error instanceof Prisma.PrismaClientRustPanicError) {
+      // Schwerwiegender Fehler im Prisma-Engine
+      this.logger.error('Critical Prisma Engine error occurred', { error });
+      return this.errorHandler.handleDatabaseError(error);
+    } else if (error instanceof Prisma.PrismaClientInitializationError) {
+      // Fehler bei der Initialisierung
+      this.logger.error('Prisma initialization error', { error });
+      return this.errorHandler.handleDatabaseError(error);
+    } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+      // Unbekannter Anfragefehler
+      return this.errorHandler.handleDatabaseError(error);
+    }
+    
+    // Generischer Datenbankfehler
+    return this.errorHandler.handleDatabaseError(error);
+  }
+
+  /**
    * Implementierung der Aktivitätsprotokollierung
    * 
    * Muss von den abgeleiteten Klassen implementiert werden, die Aktivitäten protokollieren müssen.
@@ -267,4 +384,13 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
     details?: string, 
     ipAddress?: string
   ): Promise<any>;
+  
+  /**
+   * Gibt den Anzeigenamen des Repositories zurück
+   * 
+   * @returns Anzeigename für Logging
+   */
+  protected getDisplayName(): string {
+    return `${this.modelName}Repository`;
+  }
 }

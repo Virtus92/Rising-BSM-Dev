@@ -1,226 +1,145 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { getServerSession, authOptions } from '@/app/api/auth/middleware/authMiddleware';
-
-const prisma = new PrismaClient();
+/**
+ * API route for requests
+ */
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError, formatValidationError } from '@/infrastructure/api/response-formatter';
+import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * GET /api/requests
- * 
- * Ruft eine Liste von Kontaktanfragen ab.
+ * Get requests with optional filtering
  */
-export async function GET(request: NextRequest) {
+export const GET = apiRouteHandler(async (req: NextRequest) => {
+  const logger = getLogger();
+  const serviceFactory = getServiceFactory();
+  
   try {
-    // Authentifizierung prüfen
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
-
-    // URL-Parameter abrufen
-    const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search') || '';
-    const status = searchParams.get('status');
-    const service = searchParams.get('service');
-    const processorId = searchParams.get('processorId') ? parseInt(searchParams.get('processorId')!) : undefined;
-    const unassigned = searchParams.get('unassigned') === 'true';
-    const notConverted = searchParams.get('notConverted') === 'true';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    // Get query parameters for filtering
+    const { searchParams } = new URL(req.url);
+    const page = searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1;
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 10;
+    const status = searchParams.get('status') || undefined;
+    const search = searchParams.get('search') || undefined;
     const sortBy = searchParams.get('sortBy') || 'createdAt';
-    const sortDirection = searchParams.get('sortDirection') || 'desc';
-
-    // Filterkriterien erstellen
-    const where: any = {};
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { message: { contains: search, mode: 'insensitive' } }
-      ];
-    }
-
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
+    
+    // Get request service
+    const requestService = serviceFactory.createRequestService();
+    
+    // Get repository
+    const repository = requestService.getRepository();
+    
+    // Build criteria
+    const criteria: Record<string, any> = {};
+    
     if (status) {
-      where.status = status;
+      criteria.status = status;
     }
-
-    if (service) {
-      where.service = service;
-    }
-
-    if (processorId) {
-      where.processorId = processorId;
-    }
-
-    if (unassigned) {
-      where.processorId = null;
-    }
-
-    if (notConverted) {
-      where.customerId = null;
-    }
-
-    // Gesamtanzahl der Anfragen zählen
-    const total = await prisma.contactRequest.count({ where });
-
-    // Anfragen abfragen
-    const requests = await prisma.contactRequest.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        service: true,
-        message: true,
-        status: true,
-        processorId: true,
-        customerId: true,
-        appointmentId: true,
-        ipAddress: true,
-        createdAt: true,
-        updatedAt: true,
-        processor: {
-          select: {
-            name: true
-          }
-        },
-        customer: {
-          select: {
-            name: true
-          }
-        },
-        appointment: {
-          select: {
-            title: true
-          }
-        }
-      },
-      orderBy: {
-        [sortBy]: sortDirection
-      },
-      skip: (page - 1) * limit,
-      take: limit
-    });
-
-    // Daten formatieren
-    const formattedRequests = requests.map(request => {
-      const { processor, customer, appointment, ...rest } = request;
-      
-      // Status-Label und CSS-Klasse bestimmen
-      let statusLabel, statusClass;
-      switch (rest.status) {
-        case 'new':
-          statusLabel = 'Neu';
-          statusClass = 'text-blue-500';
-          break;
-        case 'in_progress':
-          statusLabel = 'In Bearbeitung';
-          statusClass = 'text-yellow-500';
-          break;
-        case 'completed':
-          statusLabel = 'Abgeschlossen';
-          statusClass = 'text-green-500';
-          break;
-        case 'cancelled':
-          statusLabel = 'Abgebrochen';
-          statusClass = 'text-red-500';
-          break;
-        default:
-          statusLabel = 'Unbekannt';
-          statusClass = 'text-gray-500';
+    
+    // Get total count
+    const total = await repository.count(criteria);
+    
+    // Get requests with pagination
+    const requests = await repository.findByCriteria(criteria, {
+      page,
+      limit,
+      sort: {
+        field: sortBy,
+        direction: sortOrder.toLowerCase() as 'asc' | 'desc'
       }
-      
-      return {
-        ...rest,
-        statusLabel,
-        statusClass,
-        processorName: processor?.name || null,
-        customerName: customer?.name || null,
-        appointmentTitle: appointment?.title || null
-      };
     });
-
-    // Erfolgsantwort
-    return NextResponse.json({
-      success: true,
-      data: formattedRequests,
+    
+    // Map to DTOs
+    const requestDtos = requests.map(request => ({
+      id: request.id,
+      name: request.name,
+      email: request.email,
+      phone: request.phone,
+      service: request.service,
+      message: request.message,
+      status: request.status,
+      processorId: request.processorId,
+      customerId: request.customerId,
+      appointmentId: request.appointmentId,
+      createdAt: request.createdAt instanceof Date ? request.createdAt.toISOString() : request.createdAt,
+      updatedAt: request.updatedAt instanceof Date ? request.updatedAt.toISOString() : request.updatedAt
+    }));
+    
+    // Return paginated results
+    return formatSuccess({
+      data: requestDtos,
       pagination: {
+        total,
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit) || 1
+        totalPages: Math.ceil(total / limit)
       }
-    });
+    }, 'Requests retrieved successfully');
+    
   } catch (error) {
-    console.error('Error fetching requests:', error);
-    return NextResponse.json(
-      { success: false, message: 'Server-Fehler', error: String(error) },
-      { status: 500 }
+    logger.error('Error fetching requests:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    return formatError(
+      error instanceof Error ? error.message : 'Failed to fetch requests',
+      500
     );
   }
-}
+}, {
+  // Secure this endpoint
+  requiresAuth: true
+});
 
 /**
  * POST /api/requests
- * 
- * Erstellt eine neue Kontaktanfrage.
+ * Create a new request
  */
-export async function POST(request: NextRequest) {
+export const POST = apiRouteHandler(async (req: NextRequest) => {
+  const logger = getLogger();
+  const serviceFactory = getServiceFactory();
+  
   try {
-    // Authentifizierung prüfen (optional, da auch für das öffentliche Formular)
-    const session = await getServerSession(authOptions);
+    // Parse request body
+    const data = await req.json();
     
-    // Daten aus Request-Body auslesen
-    const body = await request.json();
-    const { name, email, phone, service, message } = body;
+    // Create context info
+    const context = {
+      userId: req.auth?.userId,
+      ipAddress: req.headers.get('x-forwarded-for') || 'unknown'
+    };
     
-    // Validierung
-    if (!name || !email || !service || !message) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: 'Unvollständige Daten', 
-          errors: ['Bitte füllen Sie alle Pflichtfelder aus'] 
-        },
-        { status: 400 }
+    // Get request service
+    const requestService = serviceFactory.createRequestService();
+    
+    // Create the request with proper validation
+    const newRequest = await requestService.create(data, { context });
+    
+    return formatSuccess(newRequest, 'Request created successfully', 201);
+    
+  } catch (error) {
+    logger.error('Error creating request:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    // Handle validation errors
+    if (error instanceof Error && 'validationErrors' in error) {
+      return formatValidationError(
+        (error as any).validationErrors,
+        'Request validation failed'
       );
     }
     
-    // IP-Adresse des Clients ermitteln (falls verfügbar)
-    const ipAddress = request.headers.get('x-forwarded-for') || 
-                     request.headers.get('x-real-ip') || 
-                     '127.0.0.1';
-    
-    // Neue Anfrage erstellen
-    const newRequest = await prisma.contactRequest.create({
-      data: {
-        name,
-        email,
-        phone,
-        service,
-        message,
-        status: 'new',
-        ipAddress: ipAddress.split(',')[0], // Erste IP-Adresse bei mehreren
-        processorId: session?.user?.id ? parseInt(session.user.id) : null
-      }
-    });
-    
-    // Erfolgsantwort
-    return NextResponse.json({
-      success: true,
-      message: 'Kontaktanfrage erfolgreich erstellt',
-      data: newRequest
-    });
-  } catch (error) {
-    console.error('Error creating request:', error);
-    return NextResponse.json(
-      { success: false, message: 'Server-Fehler', error: String(error) },
-      { status: 500 }
+    return formatError(
+      error instanceof Error ? error.message : 'Failed to create request',
+      500
     );
   }
-}
+}, {
+  // This endpoint is public for contact form submissions
+  requiresAuth: false
+});

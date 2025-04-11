@@ -11,32 +11,33 @@ import {
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { useSettings } from '@/shared/contexts/SettingsContext';
 import { useToast } from '@/shared/hooks/useToast';
+import { Button } from '@/shared/components/ui/button';
 import { NotificationClient } from '@/infrastructure/api/NotificationClient';
 import { NotificationType } from '@/domain/enums/CommonEnums';
 import { NotificationResponseDto } from '@/domain/dtos/NotificationDtos';
 import { getLogger } from '@/infrastructure/common/logging';
 
 /**
- * Props für die NotificationItem-Komponente
+ * Props for the NotificationItem component
  */
 interface NotificationItemProps {
   /**
-   * Die Benachrichtigung, die angezeigt werden soll
+   * The notification to display
    */
   notification: NotificationResponseDto;
   
   /**
-   * Callback für das Markieren als gelesen
+   * Callback for marking as read
    */
   onMarkAsRead: (id: number) => void;
   
   /**
-   * Funktion für die Bestimmung der URL basierend auf der Benachrichtigung
+   * Function to determine the URL based on the notification
    */
   getNotificationUrl: (notification: NotificationResponseDto) => string;
   
   /**
-   * Funktion für die Bestimmung des Icons basierend auf dem Benachrichtigungstyp
+   * Function to determine the icon based on the notification type
    */
   getNotificationIcon: (type: NotificationType | string) => JSX.Element;
 };
@@ -56,9 +57,7 @@ const NotificationItem = memo(({
           onMarkAsRead(notification.id);
         }
       }}
-      className={`px-4 py-2 hover:bg-gray-50 dark:hover:bg-slate-700 block ${
-        !notification.isRead ? 'bg-blue-50 dark:bg-blue-900/10' : ''
-      }`}
+      className={`px-4 py-2 hover:bg-accent block ${!notification.isRead ? 'bg-muted' : ''}`}
     >
       <div className="flex items-start">
         <div className="mr-2 mt-0.5">
@@ -66,19 +65,19 @@ const NotificationItem = memo(({
         </div>
         <div className="flex-1">
           <div className="flex justify-between items-start">
-            <p className={`text-sm ${!notification.isRead ? 'font-semibold' : ''} text-gray-800 dark:text-gray-200`}>
+            <p className={`text-sm ${!notification.isRead ? 'font-semibold' : ''}`}>
               {notification.title}
             </p>
             {!notification.isRead && (
-              <span className="h-2 w-2 bg-blue-500 rounded-full ml-2 mt-1.5" aria-hidden="true"></span>
+              <span className="h-2 w-2 bg-primary rounded-full ml-2 mt-1.5" aria-hidden="true"></span>
             )}
           </div>
           {notification.message && (
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
               {notification.message}
             </p>
           )}
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             {new Date(notification.createdAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}
           </p>
         </div>
@@ -90,11 +89,21 @@ const NotificationItem = memo(({
 NotificationItem.displayName = 'NotificationItem';
 
 /**
- * Hauptkomponente für den Dashboard-Header
- * 
- * Zeigt die Navigation, Benutzerprofil, Benachrichtigungen und Theme-Toggle an
+ * Props for the DashboardHeader component
  */
-const DashboardHeader = () => {
+interface DashboardHeaderProps {
+  /**
+   * Function to toggle the sidebar on mobile devices
+   */
+  setSidebarOpen: (isOpen: boolean) => void;
+};
+
+/**
+ * Main component for the dashboard header
+ * 
+ * Displays navigation, user profile, notifications, and theme toggle
+ */
+const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
   const { user, logout } = useAuth();
   const { settings } = useSettings();
   const router = useRouter();
@@ -102,7 +111,6 @@ const DashboardHeader = () => {
   
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationResponseDto[]>([]);
@@ -120,9 +128,11 @@ const DashboardHeader = () => {
       const response = await NotificationClient.getNotifications();
       
       if (response.success && response.data) {
-        setNotifications(response.data || []);
+        // Ensure data is an array
+        const notificationArray = Array.isArray(response.data) ? response.data : [];
+        setNotifications(notificationArray);
         // Count unread notifications
-        const unread = response.data.filter(n => !n.isRead).length;
+        const unread = notificationArray.filter(n => !n.isRead).length;
         setUnreadCount(unread);
       } else {
         setNotificationError(response.message || 'Fehler beim Laden der Benachrichtigungen');
@@ -148,12 +158,17 @@ const DashboardHeader = () => {
     const intervalId = setInterval(async () => {
       if (user) {
         try {
+          // Use a more robust approach to handle potential server errors
           const response = await NotificationClient.getNotifications({ unreadOnly: true });
           if (response.success && response.data) {
-            setUnreadCount(response.data.length);
+            // Ensure data is an array
+            const notificationArray = Array.isArray(response.data) ? response.data : [];
+            setUnreadCount(notificationArray.length);
           }
         } catch (error) {
-          console.error('Fehler beim Aktualisieren des Benachrichtigungszählers:', error);
+          // Log error but don't disrupt the UI
+          console.error('Error updating notification counter:', error);
+          // Don't change the unread count on error - keep the previous value
         }
       }
     }, 60000); // Every minute
@@ -386,24 +401,23 @@ const DashboardHeader = () => {
   }, [isProfileOpen, isNotificationsOpen]);
   
   return (
-    <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 shadow-sm h-16 sticky top-0 z-30">
+    <header className="bg-background border-b shadow-sm h-16 sticky top-0 z-40">
       <div className="flex items-center justify-between h-full px-4">
         {/* Left side - Logo and Mobile Menu */}
         <div className="flex items-center">
-          <button 
-            className="block md:hidden mr-3"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label={isMobileMenuOpen ? "Menü schließen" : "Menü öffnen"}
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden mr-2"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
           >
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6 text-gray-600 dark:text-gray-300" aria-hidden="true" />
-            ) : (
-              <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" aria-hidden="true" />
-            )}
-          </button>
+            <Menu className="h-5 w-5" />
+          </Button>
           
           <Link href="/dashboard" className="flex items-center">
-            <span className="text-xl font-bold text-green-600 dark:text-green-500">
+            <span className="text-xl font-bold text-primary">
               {settings?.companyName || 'Rising BSM'}
             </span>
           </Link>
@@ -416,16 +430,17 @@ const DashboardHeader = () => {
             <input
               type="text"
               placeholder="Suchen..."
-              className="py-1.5 pl-9 pr-2 rounded-md bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent w-40 lg:w-60"
+              className="py-1.5 pl-9 pr-2 rounded-md bg-background border text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent w-40 lg:w-60"
               aria-label="Suche"
             />
-            <Search className="h-4 w-4 text-gray-500 dark:text-gray-400 absolute left-3" aria-hidden="true" />
+            <Search className="h-4 w-4 text-muted-foreground absolute left-3" aria-hidden="true" />
           </div>
           
           {/* Notifications */}
           <div className="relative" id="notifications-dropdown">
-            <button 
-              className="text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-500 p-1.5 rounded-full relative"
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={toggleNotifications}
               aria-label={`Benachrichtigungen ${unreadCount > 0 ? `(${unreadCount} ungelesen)` : ''}`}
               aria-haspopup="true"
@@ -437,27 +452,29 @@ const DashboardHeader = () => {
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
-            </button>
+            </Button>
             
             {isNotificationsOpen && (
               <div 
-                className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md shadow-lg py-1 z-50"
+                className="absolute right-0 mt-2 w-80 bg-card border rounded-md shadow-lg py-1 z-50"
                 role="menu"
                 aria-orientation="vertical"
                 aria-labelledby="notifications-menu"
               >
-                <div className="px-4 py-2 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Benachrichtigungen</h3>
+                <div className="px-4 py-2 border-b flex justify-between items-center">
+                  <h3 className="text-sm font-semibold">Benachrichtigungen</h3>
                   
                   {notifications.length > 0 && unreadCount > 0 && (
-                    <button 
+                    <Button 
+                      variant="ghost"
+                      size="sm"
                       onClick={handleMarkAllAsRead}
-                      className="text-xs text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 font-medium flex items-center"
+                      className="text-xs h-7 px-2"
                       aria-label="Alle als gelesen markieren"
                     >
                       <Check className="h-3 w-3 mr-1" aria-hidden="true" />
                       Alle lesen
-                    </button>
+                    </Button>
                   )}
                 </div>
                 
@@ -465,21 +482,23 @@ const DashboardHeader = () => {
                   {loading ? (
                     <div className="px-4 py-4">
                       <div className="animate-pulse flex flex-col space-y-2">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mt-2"></div>
-                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                        <div className="h-4 bg-muted rounded w-3/4"></div>
+                        <div className="h-3 bg-muted rounded w-1/2"></div>
+                        <div className="h-4 bg-muted rounded w-full mt-2"></div>
+                        <div className="h-3 bg-muted rounded w-2/3"></div>
                       </div>
                     </div>
                   ) : notificationError ? (
                     <div className="px-4 py-4 text-center">
-                      <p className="text-sm text-red-500 dark:text-red-400">{notificationError}</p>
-                      <button 
+                      <p className="text-sm text-red-500">{notificationError}</p>
+                      <Button 
+                        variant="ghost"
+                        size="sm"
                         onClick={loadNotifications}
-                        className="mt-2 text-xs text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 font-medium"
+                        className="mt-2 text-xs"
                       >
                         Erneut versuchen
-                      </button>
+                      </Button>
                     </div>
                   ) : notifications.length > 0 ? (
                     <div role="list">
@@ -495,16 +514,16 @@ const DashboardHeader = () => {
                     </div>
                   ) : (
                     <div className="px-4 py-6 text-center">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Keine Benachrichtigungen</p>
+                      <p className="text-sm text-muted-foreground">Keine Benachrichtigungen</p>
                     </div>
                   )}
                 </div>
                 
                 {notifications.length > 0 && (
-                  <div className="px-4 py-2 border-t border-gray-200 dark:border-slate-700">
+                  <div className="px-4 py-2 border-t">
                     <Link
                       href="/dashboard/notifications"
-                      className="text-sm text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 font-medium flex items-center justify-between"
+                      className="text-sm font-medium flex items-center justify-between"
                     >
                       <span>Alle Benachrichtigungen anzeigen</span>
                       <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -516,8 +535,9 @@ const DashboardHeader = () => {
           </div>
           
           {/* Theme Toggle */}
-          <button 
-            className="text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-500 p-1.5 rounded-full"
+          <Button 
+            variant="ghost"
+            size="icon"
             onClick={toggleTheme}
             aria-label={theme === 'light' ? 'Zum dunklen Design wechseln' : 'Zum hellen Design wechseln'}
           >
@@ -526,73 +546,76 @@ const DashboardHeader = () => {
             ) : (
               <Sun className="h-5 w-5" aria-hidden="true" />
             )}
-          </button>
+          </Button>
           
           {/* Profile */}
           <div className="relative" id="profile-dropdown">
-            <button 
-              className="flex items-center text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-500"
+            <Button 
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full p-0"
               onClick={toggleProfile}
               aria-label="Profilmenü öffnen"
               aria-haspopup="true"
               aria-expanded={isProfileOpen}
             >
-              <div className="h-8 w-8 rounded-full bg-green-500 text-white flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                 <span className="text-sm font-medium" aria-hidden="true">{userInitials}</span>
               </div>
-            </button>
+            </Button>
             
             {isProfileOpen && (
               <div 
-                className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md shadow-lg py-1 z-50"
+                className="absolute right-0 mt-2 w-56 bg-card border rounded-md shadow-lg py-1 z-50"
                 role="menu"
                 aria-orientation="vertical"
                 aria-labelledby="profile-menu"
               >
-                <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                <div className="px-4 py-3 border-b">
+                  <p className="text-sm font-semibold">
                     {user?.name || 'Benutzer'}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  <p className="text-xs text-muted-foreground truncate">
                     {user?.email || 'user@example.com'}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Mitarbeiter'}
                   </p>
                 </div>
                 
-                <ul role="none">
+                <ul role="none" className="py-1">
                   <li role="none">
                     <Link 
-                      href="/dashboard/profile" 
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700"
+                      href="/dashboard/me" 
+                      className="flex items-center px-4 py-2 text-sm hover:bg-accent"
                       role="menuitem"
                       onClick={() => setIsProfileOpen(false)}
                     >
-                      <User className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+                      <User className="h-4 w-4 mr-2 text-muted-foreground" aria-hidden="true" />
                       Profil
                     </Link>
                   </li>
                   <li role="none">
                     <Link 
                       href="/dashboard/settings" 
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700"
+                      className="flex items-center px-4 py-2 text-sm hover:bg-accent"
                       role="menuitem"
                       onClick={() => setIsProfileOpen(false)}
                     >
-                      <Settings className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+                      <Settings className="h-4 w-4 mr-2 text-muted-foreground" aria-hidden="true" />
                       Einstellungen
                     </Link>
                   </li>
-                  <li role="none">
-                    <button 
+                  <li role="none" className="border-t mt-1 pt-1">
+                    <Button 
+                      variant="ghost"
+                      className="flex items-center w-full px-4 py-2 text-sm justify-start font-normal hover:bg-accent rounded-none"
                       onClick={handleLogout}
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 w-full text-left"
                       role="menuitem"
                     >
-                      <LogOut className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+                      <LogOut className="h-4 w-4 mr-2 text-muted-foreground" aria-hidden="true" />
                       Abmelden
-                    </button>
+                    </Button>
                   </li>
                 </ul>
               </div>

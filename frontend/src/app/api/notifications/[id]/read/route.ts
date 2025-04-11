@@ -1,61 +1,67 @@
 /**
  * API route for marking a specific notification as read
  */
-import { NextRequest, NextResponse } from 'next/server';
-import { NotificationService } from '@/infrastructure/services/NotificationService';
-import { authMiddleware } from '../../../auth/middleware/authMiddleware';
-import { responseFormatter } from '@/infrastructure/api/response-formatter';
-import { routeHandler } from '@/infrastructure/api/route-handler';
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError, formatNotFound } from '@/infrastructure/api/response-formatter';
+import { getLogger } from '@/infrastructure/common/logging';
+import { getNotificationService } from '@/infrastructure/common/factories';
 
 /**
  * PUT /api/notifications/[id]/read
  * Mark a notification as read
  */
-export async function PUT(
-  req: NextRequest,
+export const PUT = apiRouteHandler(async (
+  request: NextRequest,
   { params }: { params: { id: string } }
-) {
-  return routeHandler(async () => {
-    // Authentication check
-    const session = await authMiddleware(req);
-    if (!session || !session.user) {
-      return NextResponse.json(
-        responseFormatter.error('Unauthorized'),
-        { status: 401 }
-      );
-    }
-
+) => {
+  const logger = getLogger();
+  
+  try {
+    // Get notification service
+    const notificationService = getNotificationService();
+    
+    // Parse notification ID
     const id = parseInt(params.id);
     if (isNaN(id)) {
-      return NextResponse.json(
-        responseFormatter.error('Invalid notification ID'),
-        { status: 400 }
-      );
+      return formatError('Invalid notification ID', 400);
     }
-
-    const notificationService = new NotificationService();
     
-    // Check if notification belongs to the current user
-    const notification = await notificationService.getNotificationById(id);
+    // Context for service calls
+    const context = { 
+      userId: request.auth?.userId,
+      userRole: request.auth?.role 
+    };
+    
+    // Check if notification exists
+    const notification = await notificationService.getById(id, { context });
     if (!notification) {
-      return NextResponse.json(
-        responseFormatter.error('Notification not found'),
-        { status: 404 }
-      );
+      return formatNotFound('Notification not found');
     }
     
-    if (notification.userId !== session.user.id && session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        responseFormatter.error('Access denied'),
-        { status: 403 }
-      );
+    // Check ownership or admin access
+    if (notification.userId !== context.userId && context.userRole !== 'ADMIN') {
+      return formatError('Access denied - You do not have permission to mark this notification as read', 403);
     }
-
-    // Mark as read
-    const updatedNotification = await notificationService.markAsRead(id);
-
-    return NextResponse.json(
-      responseFormatter.success(updatedNotification)
+    
+    // Mark notification as read
+    const updatedNotification = await notificationService.markAsRead(id, { context });
+    
+    return formatSuccess(updatedNotification, 'Notification marked as read');
+  } catch (error) {
+    logger.error('Error marking notification as read:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      notificationId: params.id,
+      userId: request.auth?.userId
+    });
+    
+    return formatError(
+      error instanceof Error ? error.message : 'Failed to mark notification as read',
+      500
     );
-  });
-}
+  }
+}, {
+  // Secure this endpoint
+  requiresAuth: true
+});

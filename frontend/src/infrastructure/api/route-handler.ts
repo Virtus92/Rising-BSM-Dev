@@ -3,6 +3,7 @@ import { formatResponse } from './response-formatter';
 import { getLogger } from '../common/logging';
 import { getErrorHandler } from '../common/bootstrap';
 import jwt from 'jsonwebtoken';
+import { securityConfig } from '../common/config/SecurityConfig';
 
 /**
  * API-Route-Handler-Typ
@@ -51,21 +52,78 @@ export function apiRouteHandler(
       
       // Authentifizierung prüfen, falls erforderlich
       if (options.requiresAuth) {
-        const authHeader = req.headers.get('authorization');
+        // Check multiple token sources
+        let token = null;
+        let tokenSource = 'none';
         
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        // 1. Check cookies
+        const cookieHeader = req.headers.get('cookie');
+        if (cookieHeader) {
+          const cookies = cookieHeader.split(';').map(cookie => cookie.trim());
+          // Check multiple possible cookie names
+          const authCookie = cookies.find(cookie => 
+              cookie.startsWith('auth_token=') ||
+              cookie.startsWith('token=') ||
+              cookie.startsWith('authorization=') ||
+              cookie.startsWith('auth='));
+          
+          if (authCookie) {
+            token = authCookie.split('=')[1];
+            // Handle URL-encoded values
+            if (token?.startsWith('%22') && token?.endsWith('%22')) {
+              token = decodeURIComponent(token);
+            }
+            // Remove surrounding quotes if present
+            if (token?.startsWith('"') && token?.endsWith('"')) {
+              token = token.slice(1, -1);
+            }
+            tokenSource = 'cookie';
+          }
+        }
+        
+        // 2. If no token in cookies, check authorization header
+        if (!token) {
+          const authHeader = req.headers.get('authorization');
+          if (authHeader?.startsWith('Bearer ')) {
+            token = authHeader.substring(7);
+            tokenSource = 'authorization';
+          }
+        }
+        
+        // 3. Check X-Auth-Token header
+        if (!token) {
+          const xAuthToken = req.headers.get('x-auth-token');
+          if (xAuthToken) {
+            token = xAuthToken;
+            tokenSource = 'x-auth-token';
+          }
+        }
+        
+        // 4. Check session-related headers
+        if (!token) {
+          const sessionToken = req.headers.get('session-token') || req.headers.get('session');
+          if (sessionToken) {
+            token = sessionToken;
+            tokenSource = 'session-token';
+          }
+        }
+        
+        // If no token found in any location
+        if (!token) {
+          logger.warn('No token found for protected route', { path: req.nextUrl.pathname });
           return formatResponse.error(
             errorHandler.createUnauthorizedError('Authentication required'),
             401
           );
         }
         
-        // Token aus dem Authorization-Header extrahieren
-        const token = authHeader.replace('Bearer ', '');
-        
         try {
+          // Get JWT secret from security config or environment
+          const jwtSecret = securityConfig.getJwtSecret() || 
+                          process.env.JWT_SECRET || 
+                          'default-secret-change-me';
+          
           // JWT-Token validieren und dekodieren
-          const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-me';
           const decoded = jwt.verify(token, jwtSecret) as any;
           
           if (!decoded || !decoded.sub) {
@@ -74,6 +132,13 @@ export function apiRouteHandler(
               401
             );
           }
+          
+          // For development only: Log token information
+          logger.debug('Token validation successful', { 
+            sub: decoded.sub,
+            tokenSource,
+            exp: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : 'none'
+          });
           
           // Authentifizierungsdaten an die Request anhängen
           (req as any).auth = {
@@ -96,7 +161,11 @@ export function apiRouteHandler(
             }
           }
         } catch (tokenError) {
-          logger.error('Token validation error', { error: tokenError });
+          logger.error('Token validation error', { 
+            error: tokenError instanceof Error ? tokenError.message : String(tokenError),
+            tokenSource,
+            path: req.nextUrl.pathname
+          });
           return formatResponse.error(
             errorHandler.createUnauthorizedError('Invalid token'),
             401
@@ -118,9 +187,35 @@ export function apiRouteHandler(
       
       return response;
     } catch (error) {
-      // Protokolliere Fehler
+      // Protokolliere Fehler mit verbesserter Fehlerserializierung
+      let errorDetails = {};
+      
+      try {
+        if (error instanceof Error) {
+          errorDetails = {
+            message: error.message,
+            name: error.name,
+            stack: error.stack,
+            code: (error as any).code
+          };
+        } else if (error !== null && typeof error === 'object') {
+          errorDetails = Object.getOwnPropertyNames(error).reduce((acc, key) => {
+            try {
+              acc[key] = (error as any)[key];
+            } catch (e) {
+              acc[key] = 'Error accessing property';
+            }
+            return acc;
+          }, {} as Record<string, any>);
+        } else {
+          errorDetails = { rawError: String(error) };
+        }
+      } catch (loggingError) {
+        errorDetails = { serializationError: String(loggingError), originalError: String(error) };
+      }
+      
       logger.error(`API Error: ${req.method} ${req.nextUrl.pathname}`, {
-        error,
+        errorDetails,
         method: req.method,
         url: req.url,
         responseTime: `${Date.now() - startTime}ms`
@@ -143,7 +238,34 @@ export async function routeHandler(handler: () => Promise<NextResponse>): Promis
   try {
     return await handler();
   } catch (error) {
-    logger.error('API route error:', { error });
+    // Improved error logging with better serialization
+    let errorDetails = {};
+    
+    try {
+      if (error instanceof Error) {
+        errorDetails = {
+          message: error.message,
+          name: error.name,
+          stack: error.stack,
+          code: (error as any).code
+        };
+      } else if (error !== null && typeof error === 'object') {
+        errorDetails = Object.getOwnPropertyNames(error).reduce((acc, key) => {
+          try {
+            acc[key] = (error as any)[key];
+          } catch (e) {
+            acc[key] = 'Error accessing property';
+          }
+          return acc;
+        }, {} as Record<string, any>);
+      } else {
+        errorDetails = { rawError: String(error) };
+      }
+    } catch (loggingError) {
+      errorDetails = { serializationError: String(loggingError), originalError: String(error) };
+    }
+    
+    logger.error('API route error:', { errorDetails });
     
     return NextResponse.json(
       {

@@ -7,8 +7,7 @@ import {
   AppointmentResponseDto,
   StatusUpdateDto
 } from '@/domain/dtos/AppointmentDtos';
-import ApiClient from '@/infrastructure/clients/ApiClient';
-import type { ApiResponse } from '@/infrastructure/clients/ApiClient';
+import ApiClient, { ApiResponse, ApiRequestError } from '@/infrastructure/clients/ApiClient';
 
 // API-URL für Termine
 const APPOINTMENTS_API_URL = '/api/appointments';
@@ -45,12 +44,10 @@ export class AppointmentClient {
       
       return await ApiClient.get(url);
     } catch (error) {
-      console.error('Error fetching appointments:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: []
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : 'Failed to fetch appointments',
+        500
+      );
     }
   }
   
@@ -64,12 +61,10 @@ export class AppointmentClient {
     try {
       return await ApiClient.get(`${APPOINTMENTS_API_URL}/${id}`);
     } catch (error) {
-      console.error(`Error fetching appointment with ID ${id}:`, error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to fetch appointment with ID ${id}`,
+        500
+      );
     }
   }
   
@@ -83,12 +78,10 @@ export class AppointmentClient {
     try {
       return await ApiClient.post(APPOINTMENTS_API_URL, data);
     } catch (error) {
-      console.error('Error creating appointment:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : 'Failed to create appointment',
+        500
+      );
     }
   }
   
@@ -103,12 +96,10 @@ export class AppointmentClient {
     try {
       return await ApiClient.put(`${APPOINTMENTS_API_URL}/${id}`, data);
     } catch (error) {
-      console.error(`Error updating appointment with ID ${id}:`, error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to update appointment with ID ${id}`,
+        500
+      );
     }
   }
   
@@ -122,12 +113,10 @@ export class AppointmentClient {
     try {
       return await ApiClient.delete(`${APPOINTMENTS_API_URL}/${id}`);
     } catch (error) {
-      console.error(`Error deleting appointment with ID ${id}:`, error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to delete appointment with ID ${id}`,
+        500
+      );
     }
   }
   
@@ -142,12 +131,10 @@ export class AppointmentClient {
     try {
       return await ApiClient.put(`${APPOINTMENTS_API_URL}/${id}/status`, statusData);
     } catch (error) {
-      console.error(`Error updating status for appointment with ID ${id}:`, error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to update status for appointment with ID ${id}`,
+        500
+      );
     }
   }
   
@@ -162,12 +149,10 @@ export class AppointmentClient {
     try {
       return await ApiClient.post(`${APPOINTMENTS_API_URL}/${id}/notes`, { note });
     } catch (error) {
-      console.error(`Error adding note to appointment with ID ${id}:`, error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to add note to appointment with ID ${id}`,
+        500
+      );
     }
   }
   
@@ -181,12 +166,10 @@ export class AppointmentClient {
     try {
       return await ApiClient.get(`${APPOINTMENTS_API_URL}/by-customer/${customerId}`);
     } catch (error) {
-      console.error(`Error fetching appointments for customer with ID ${customerId}:`, error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to fetch appointments for customer with ID ${customerId}`,
+        500
+      );
     }
   }
   
@@ -200,12 +183,10 @@ export class AppointmentClient {
     try {
       return await ApiClient.get(`${APPOINTMENTS_API_URL}/by-project/${projectId}`);
     } catch (error) {
-      console.error(`Error fetching appointments for project with ID ${projectId}:`, error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to fetch appointments for project with ID ${projectId}`,
+        500
+      );
     }
   }
   
@@ -220,12 +201,10 @@ export class AppointmentClient {
     try {
       return await ApiClient.get(`${APPOINTMENTS_API_URL}/by-date-range?startDate=${startDate}&endDate=${endDate}`);
     } catch (error) {
-      console.error(`Error fetching appointments for date range ${startDate} to ${endDate}:`, error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to fetch appointments for date range ${startDate} to ${endDate}`,
+        500
+      );
     }
   }
   
@@ -240,12 +219,10 @@ export class AppointmentClient {
       const queryParams = limit ? `?limit=${limit}` : '';
       return await ApiClient.get(`${APPOINTMENTS_API_URL}/upcoming${queryParams}`);
     } catch (error) {
-      console.error('Error fetching upcoming appointments:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
-      };
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : 'Failed to fetch upcoming appointments',
+        500
+      );
     }
   }
 }
