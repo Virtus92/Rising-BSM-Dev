@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres.qkhermeufcstwtlyttpo:postgres@aws-0-eu-central-1.pooler.supabase.com:5432/postgres"
 }
 
 //==============================================================================
@@ -20,7 +20,8 @@ model User {
   role              String             @default("employee") @db.VarChar(20)
   phone             String?            @db.VarChar(30)
   status            String             @default("active") @db.Text
-  profilePicture    String?            @db.VarChar(255)
+  profilePicture    String?            @db.VarChar(255) // Legacy field, keeping for backward compatibility
+  profilePictureId  Int?               // Reference to the File model
   createdAt         DateTime           @default(now()) @db.Timestamp(6)
   updatedAt         DateTime           @updatedAt @db.Timestamp(6)
   createdBy         Int?                             
@@ -39,9 +40,11 @@ model User {
   requestNotes      RequestNote[]
   requestLogs       RequestLog[]
   permissions       UserPermission[]
+  profilePictureFile File?             @relation("ProfilePicture", fields: [profilePictureId], references: [id])
 
   @@index([email])
   @@index([name])
+  @@index([profilePictureId])
 }
 
 model UserSettings {
@@ -272,7 +275,7 @@ model RequestLog {
   userName  String   @db.VarChar(255)
   action    String   @db.VarChar(255)
   details   String?  @db.Text
-  createdAt DateTime @default(now()) @db.Timestamp(6)
+  createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   request   ContactRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 }
@@ -295,4 +298,28 @@ model Notification {
   updatedAt     DateTime  @updatedAt
   createdBy     Int?
   updatedBy     Int?
+}
+
+//==============================================================================
+// FILE STORAGE
+//==============================================================================
+
+model File {
+  id            Int       @id @default(autoincrement())
+  filename      String    @db.VarChar(255)
+  originalName  String    @db.VarChar(255)
+  mimeType      String    @db.VarChar(100)
+  path          String    @db.VarChar(255)
+  size          Int
+  type          String    @default("general") @db.VarChar(50)
+  uploadedAt    DateTime  @default(now())
+  uploadedBy    Int?
+  description   String?   @db.Text
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
+  userProfiles  User[]    @relation("ProfilePicture")
+
+  @@index([type])
+  @@index([uploadedBy])
+  @@index([path])
 }

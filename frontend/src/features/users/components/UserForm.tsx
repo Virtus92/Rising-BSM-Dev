@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { UserRole, UserStatus } from '@/domain/enums/UserEnums';
 import { UserDto } from '@/domain/dtos/UserDtos';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { useFileUpload } from '@/shared/hooks/useFileUpload';
 
 export interface UserFormData {
   name: string;
@@ -28,6 +29,7 @@ export interface UserFormData {
   status?: UserStatus;
   phone?: string;
   profilePicture?: string;
+  profilePictureId?: number;
 }
 
 export interface UserFormProps {
@@ -63,15 +65,36 @@ export const UserForm: React.FC<UserFormProps> = ({
     role: initialData?.role as UserRole || UserRole.USER,
     status: initialData?.status as UserStatus || UserStatus.ACTIVE,
     phone: initialData?.phone || '',
-    profilePicture: initialData?.profilePicture || ''
+    profilePicture: initialData?.profilePicture || '',
+    profilePictureId: initialData?.profilePictureId
   });
 
   const [internalError, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('basic');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(initialData?.profilePicture || null);
-  const [isUploading, setIsUploading] = useState(false);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
+
+  // Use the file upload hook
+  const { upload, isUploading } = useFileUpload({
+    onSuccess: (result) => {
+      if (result.filePath) {
+        setPreviewImage(result.filePath);
+        setFormData(prev => ({ 
+          ...prev, 
+          profilePicture: result.filePath,
+          profilePictureId: result.fileId as number
+        }));
+        setError(null);
+      }
+    },
+    onError: (error) => {
+      setError(error.message);
+    },
+    showToasts: true,
+    allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    maxSize: 2 * 1024 * 1024 // 2MB
+  });
 
   // Clean up object URL when component unmounts or when a new image is selected
   useEffect(() => {
@@ -105,69 +128,22 @@ export const UserForm: React.FC<UserFormProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      // Show error for invalid file type
-      setError('Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      return;
-    }
-
-    // Validate file size (max 2MB)
-    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
-    if (file.size > maxSize) {
-      setError('Image size is too large. Maximum size is 2MB.');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      return;
-    }
-
-    // Revoke previous object URL to prevent memory leaks
-    if (objectUrl) {
-      URL.revokeObjectURL(objectUrl);
-      setObjectUrl(null);
-    }
-
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setPreviewImage(result);
-    };
-    reader.readAsDataURL(file);
-
-    // In a real implementation, we would upload to a cloud storage
-    // and get a permanent URL. Here, we'll use the data URL for the form value.
-    setIsUploading(true);
+    // File validation is handled by the useFileUpload hook
     try {
-      // In a production environment, this would be replaced with actual file upload
-      // to a storage service like AWS S3, and we would store the returned URL
-      // For now, we'll use a data URL with proper validation
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const fileReader = new FileReader();
-        fileReader.onload = () => resolve(fileReader.result as string);
-        fileReader.onerror = reject;
-        fileReader.readAsDataURL(file);
+      // Upload the file to the server using our file upload API
+      await upload(file, 'profilePictures', {
+        userId: initialData?.id?.toString() || 'new'
       });
       
-      // Set the data URL as the profile picture value
-      // In production, this would be a URL to the uploaded file
-      setFormData(prev => ({ 
-        ...prev, 
-        profilePicture: dataUrl
-      }));
-      
-      // Clear any previous errors
-      setError(null);
+      // The onSuccess callback in useFileUpload will update the form data
+      // with the file path and file ID returned from the server
     } catch (error) {
-      console.error('Error processing file:', error instanceof Error ? error.message : String(error));
-      setError('Failed to process the image. Please try again.');
+      console.error('Error uploading file:', error);
+      // Error handling is done in the useFileUpload hook via onError callback
     } finally {
-      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -179,7 +155,11 @@ export const UserForm: React.FC<UserFormProps> = ({
     }
     
     setPreviewImage(null);
-    setFormData(prev => ({ ...prev, profilePicture: '' }));
+    setFormData(prev => ({ 
+      ...prev, 
+      profilePicture: '',
+      profilePictureId: undefined
+    }));
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }

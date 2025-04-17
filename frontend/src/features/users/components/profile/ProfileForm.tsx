@@ -29,22 +29,29 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     name: string;
     email: string;
     phone: string;
-    profilePicture: string;
+    profilePicture?: string;
+    profilePictureId?: number;
   }>({
     name: '',
     email: '',
     phone: '',
-    profilePicture: ''
+    profilePicture: '',
+    profilePictureId: undefined
   });
 
   // Use the file upload hook
   const { upload, isUploading, error: uploadError } = useFileUpload({
     onSuccess: (result) => {
-      if (result.filePath) {
-        setFormData(prev => ({ ...prev, profilePicture: result.filePath || '' }));
+      if (result.fileId && result.filePath) {
+        setFormData(prev => ({ 
+          ...prev, 
+          profilePictureId: result.fileId as number,
+          profilePicture: result.filePath
+        }));
+        
         // If not in editing mode, directly save the profile picture
         if (!isEditing) {
-          handleProfilePictureUpdate(result.filePath);
+          handleProfilePictureUpdate(result.fileId as number, result.filePath);
         }
       }
     },
@@ -67,7 +74,8 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
-        profilePicture: user.profilePicture || ''
+        profilePicture: user.profilePicture || '',
+        profilePictureId: user.profilePictureId
       });
     }
   }, [user]);
@@ -88,28 +96,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     
     const file = e.target.files[0];
     
-    // Validate file size and type before uploading
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-    
-    if (file.size > MAX_FILE_SIZE) {
-      toast({
-        title: "Fehler",
-        description: "Die Datei ist zu groß. Maximale Größe: 5MB.",
-        variant: "error"
-      });
-      return;
-    }
-    
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      toast({
-        title: "Fehler",
-        description: "Ungültiges Dateiformat. Erlaubte Formate: JPG, PNG, WEBP.",
-        variant: "error"
-      });
-      return;
-    }
-    
+    // File validation is handled by the useFileUpload hook
     setIsUploadingImage(true);
     upload(file, 'profilePictures', { userId: user?.id?.toString() || '' })
       .catch(error => {
@@ -133,13 +120,15 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
   };
 
   // Handle profile picture update specifically
-  const handleProfilePictureUpdate = async (profilePicturePath: string) => {
+  const handleProfilePictureUpdate = async (fileId: number, filePath: string) => {
     if (!user) return;
     
     try {
       setIsSaving(true);
       const response = await UserService.updateUser(user.id, {
-        profilePicture: profilePicturePath
+        profilePictureId: fileId,
+        // Keep the profilePicture path for backward compatibility
+        profilePicture: filePath
       });
 
       if (response.success) {
@@ -176,12 +165,23 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     try {
       setIsSaving(true);
       
-      const response = await UserService.updateUser(user.id, {
+      // Prepare update data
+      const updateData = {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        profilePicture: formData.profilePicture
-      });
+      };
+      
+      // Only include profile picture fields if they've changed
+      if (formData.profilePictureId !== user.profilePictureId) {
+        Object.assign(updateData, {
+          profilePictureId: formData.profilePictureId,
+          // Keep profilePicture for backward compatibility 
+          profilePicture: formData.profilePicture
+        });
+      }
+      
+      const response = await UserService.updateUser(user.id, updateData);
 
       if (response.success) {
         toast({

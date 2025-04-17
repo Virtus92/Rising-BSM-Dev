@@ -3,10 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "start:docker": "npx prisma generate && npx prisma migrate deploy && next start",
+    "dev": "npx prisma generate && npx prisma migrate dev && next dev",
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",

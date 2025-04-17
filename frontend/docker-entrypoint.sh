@@ -17,6 +17,7 @@ echo -e "${YELLOW}Initiating database migrations...${NC}"
 echo -e "${YELLOW}Waiting for database connection...${NC}"
 sleep 3
 
+npx prisma migrate resolve --applied "20231003123456_initial_migration" || true
 # Simpler Direkt-Ansatz: Versuche npx prisma db pull - wenn es einen Fehler gibt, brauchen wir eine Migration
 echo -e "${YELLOW}Checking database schema...${NC}"
 if ! npx prisma db pull --print > /dev/null 2>&1; then

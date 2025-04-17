@@ -13,7 +13,6 @@ COPY package*.json ./
 RUN npm install
 # Ensure ts-node and required seeding packages are available globally
 RUN npm install -g ts-node typescript
-RUN npm install -g dotenv @faker-js/faker bcryptjs
 
 # Copy prisma schema, migrations, and seed files
 COPY prisma ./prisma/

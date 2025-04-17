@@ -58,22 +58,34 @@ export function validateUserCreation(data: any): { isValid: boolean; errors: str
 export function validateUserUpdate(data: any): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  // Optional fields validation
-  if (data.name !== undefined && (typeof data.name !== 'string' || data.name.trim().length < 2)) {
-    errors.push('Name must be at least 2 characters');
+  // For profile updates, the data object should exist
+  if (!data || typeof data !== 'object') {
+    errors.push('Invalid update data provided');
+    return { isValid: false, errors };
+  }
+
+  // Optional fields validation - only validate if they're defined
+  if (data.name !== undefined && data.name !== null) {
+    if (typeof data.name !== 'string' || data.name.trim().length < 2) {
+      errors.push('Name must be at least 2 characters');
+    }
   }
   
-  if (data.email !== undefined && (typeof data.email !== 'string' || !isValidEmail(data.email))) {
-    errors.push('Email format is invalid');
+  if (data.email !== undefined && data.email !== null) {
+    if (typeof data.email !== 'string' || !isValidEmail(data.email)) {
+      errors.push('Email format is invalid');
+    }
   }
   
   // Only validate password if it's actually provided (not empty string)
-  if (data.password !== undefined && data.password !== '' && (typeof data.password !== 'string' || !isPasswordValid(data.password))) {
-    errors.push('Password must be at least 8 characters and include uppercase, lowercase, number, and special character');
+  if (data.password !== undefined && data.password !== null && data.password !== '') {
+    if (typeof data.password !== 'string' || !isPasswordValid(data.password)) {
+      errors.push('Password must be at least 8 characters and include uppercase, lowercase, number, and special character');
+    }
   }
   
   // Role validation
-  if (data.role !== undefined) {
+  if (data.role !== undefined && data.role !== null) {
     const validRoles = Object.values(UserRole);
     if (!validRoles.includes(data.role)) {
       errors.push(`Role must be one of: ${validRoles.join(', ')}`);
@@ -81,18 +93,23 @@ export function validateUserUpdate(data: any): { isValid: boolean; errors: strin
   }
   
   // Status validation
-  if (data.status !== undefined) {
+  if (data.status !== undefined && data.status !== null) {
     const validStatuses = Object.values(UserStatus);
     if (!validStatuses.includes(data.status)) {
       errors.push(`Status must be one of: ${validStatuses.join(', ')}`);
     }
   }
   
-  // Phone validation (if provided and not empty)
-  if (data.phone !== undefined && data.phone !== '' && typeof data.phone === 'string' && !isValidPhone(data.phone)) {
-    errors.push('Phone number format is invalid');
+  // Phone validation - accept any string, including empty
+  if (data.phone !== undefined && data.phone !== null && data.phone !== '') {
+    if (typeof data.phone !== 'string' || !isValidPhone(data.phone)) {
+      errors.push('Phone number format is invalid');
+    }
   }
   
+  // Profile picture - don't validate, accept any string
+  
+  // If there are no validation errors, it's valid
   return {
     isValid: errors.length === 0,
     errors
