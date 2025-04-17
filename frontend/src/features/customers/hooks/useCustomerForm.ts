@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { CustomerResponseDto, CreateCustomerDto, UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { useToast } from '@/shared/hooks/useToast';
 import { formatPhoneNumber, isValidPhone } from '@/infrastructure/common/validation/userValidation';
+import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
 
 type FormErrors = {
   name?: string;
@@ -9,7 +10,7 @@ type FormErrors = {
   phone?: string;
   address?: string;
   city?: string;
-  zipCode?: string;
+  postalCode?: string; // Changed from zipCode to postalCode
   country?: string;
   [key: string]: string | undefined;
 };
@@ -31,11 +32,16 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
   const [phone, setPhone] = useState(initialData.phone ? formatPhoneNumber(initialData.phone) : '');
   const [address, setAddress] = useState(initialData.address || '');
   const [city, setCity] = useState(initialData.city || '');
-  const [zipCode, setZipCode] = useState(initialData.zipCode || '');
+  const [postalCode, setPostalCode] = useState(initialData.postalCode || ''); // Changed from zipCode to postalCode
   const [country, setCountry] = useState(initialData.country || '');
-  const [companyName, setCompanyName] = useState(initialData.companyName || '');
+  const [company, setCompany] = useState(initialData.company || ''); // Changed from companyName to company
   const [vatNumber, setVatNumber] = useState(initialData.vatNumber || '');
   const [notes, setNotes] = useState(initialData.notes || '');
+  
+  // Adding the missing fields
+  const [customerType, setCustomerType] = useState(initialData.type || CustomerType.PRIVATE);
+  const [status, setStatus] = useState(initialData.status || CommonStatus.ACTIVE);
+  const [newsletter, setNewsletter] = useState(initialData.newsletter || false);
   
   // Formularstatus
   const [errors, setErrors] = useState<FormErrors>({});
@@ -76,16 +82,20 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
       phone: phone ? formatPhoneNumber(phone) : undefined,
       address: address || undefined,
       city: city || undefined,
-      zipCode: zipCode || undefined,
+      postalCode: postalCode || undefined,
       country: country || undefined,
-      companyName: companyName || undefined,
+      company: company || undefined,
       vatNumber: vatNumber || undefined,
-      notes: notes || undefined
+      notes: notes || undefined,
+      // Add the missing fields to the form data
+      type: customerType,
+      status: status,
+      newsletter: newsletter
     };
   }, [
     name, email, phone, address, 
-    city, zipCode, country, companyName, 
-    vatNumber, notes
+    city, postalCode, country, company,
+    vatNumber, notes, customerType, status, newsletter
   ]);
   
   // Formular absenden
@@ -139,28 +149,39 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
     setPhone(initialData.phone ? formatPhoneNumber(initialData.phone) : '');
     setAddress(initialData.address || '');
     setCity(initialData.city || '');
-    setZipCode(initialData.zipCode || '');
+    setPostalCode(initialData.postalCode || '');
     setCountry(initialData.country || '');
-    setCompanyName(initialData.companyName || '');
+    setCompany(initialData.company || '');
     setVatNumber(initialData.vatNumber || '');
     setNotes(initialData.notes || '');
+    
+    // Reset the new fields
+    setCustomerType(initialData.type || CustomerType.PRIVATE);
+    setStatus(initialData.status || CommonStatus.ACTIVE);
+    setNewsletter(initialData.newsletter || false);
+    
     setErrors({});
     setSuccess(false);
   }, [initialData]);
   
   // Einzelnes Feld aktualisieren und Fehler löschen
-  const updateField = useCallback((field: string, value: string) => {
-    const setters: Record<string, (value: string) => void> = {
+  const updateField = useCallback((field: string, value: any) => {
+    const setters: Record<string, (value: any) => void> = {
       name: setName,
       email: setEmail,
       phone: (value) => setPhone(value),
       address: setAddress,
       city: setCity,
-      zipCode: setZipCode,
+      postalCode: setPostalCode, // Changed from zipCode to postalCode
       country: setCountry,
-      companyName: setCompanyName,
+      company: setCompany, // Changed from companyName to company
       vatNumber: setVatNumber,
-      notes: setNotes
+      notes: setNotes,
+      // Add the new fields
+      customerType: setCustomerType,
+      type: setCustomerType, // Support both 'type' and 'customerType'
+      status: setStatus,
+      newsletter: setNewsletter
     };
     
     const setter = setters[field];
@@ -190,16 +211,24 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
     setAddress,
     city,
     setCity,
-    zipCode,
-    setZipCode,
+    postalCode,
+    setPostalCode, // Changed from zipCode to postalCode
     country,
     setCountry,
-    companyName,
-    setCompanyName,
+    company,
+    setCompany, // Changed from companyName to company
     vatNumber,
     setVatNumber,
     notes,
     setNotes,
+    
+    // Add the new fields to the return object
+    customerType,
+    setCustomerType,
+    status,
+    setStatus,
+    newsletter,
+    setNewsletter,
     
     // Formularzustand
     errors,

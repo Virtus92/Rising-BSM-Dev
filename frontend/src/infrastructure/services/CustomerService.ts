@@ -18,11 +18,14 @@ import { IValidationService } from '@/infrastructure/common/validation/IValidati
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 import { ServiceOptions } from '@/domain/services/IBaseService';
 import { QueryOptions } from '@/domain/repositories/IBaseRepository';
+import { PrismaClient } from '@prisma/client';
 
 /**
  * Service for managing customers
  */
 export class CustomerService implements ICustomerService {
+  private prisma: PrismaClient;
+  
   /**
    * Constructor
    * 
@@ -38,8 +41,12 @@ export class CustomerService implements ICustomerService {
     public readonly errorHandler: IErrorHandler
   ) {
     this.logger.debug('Initialized CustomerService');
+    this.prisma = new PrismaClient();
   }
   
+  // Private variable to store notes in memory (temporary solution until database implementation)
+  private customerNotes: Map<number, CustomerLogDto[]> = new Map();
+
   /**
    * Gets the repository instance
    * This allows direct repository access when needed for specific operations
@@ -226,8 +233,47 @@ export class CustomerService implements ICustomerService {
    */
   async getCustomerLogs(customerId: number, options?: ServiceOptions): Promise<CustomerLogDto[]> {
     try {
-      // For now, return an empty array - would be implemented in a complete version
-      return [];
+      // Get filter for action if provided
+      const filter: { customerId: number; action?: string } = { customerId };
+      if (options?.filters?.action) {
+        filter.action = options.filters.action as string;
+      }
+      
+      // Get logs from database using Prisma
+      const logs = await this.prisma.customerLog.findMany({
+        where: filter,
+        orderBy: { createdAt: 'desc' },
+        include: { 
+          user: true,
+          customer: true
+        }
+      });
+      
+      this.logger.debug('Retrieved customer logs', { 
+        customerId, 
+        count: logs.length, 
+        filter: options?.filters 
+      });
+      
+      // Map logs to DTOs
+      return logs.map(log => ({
+        id: log.id,
+        customerId: log.customerId,
+        customerName: log.customer?.name || 'Unknown Customer',
+        entityType: EntityType.CUSTOMER, 
+        entityId: log.customerId,
+        userId: log.userId || 0,
+        userName: log.userName,
+        action: log.action,
+        details: log.details ? (
+          typeof log.details === 'string' ? 
+            // If it's a string, try to parse as JSON or wrap in an object
+            { text: log.details } : 
+            log.details as Record<string, any>
+        ) : {},
+        createdAt: log.createdAt.toISOString(),
+        updatedAt: log.createdAt.toISOString() // CustomerLog doesn't have updatedAt
+      }));
     } catch (error) {
       this.logger.error('Error in CustomerService.getCustomerLogs', { error, customerId });
       throw error;
@@ -250,21 +296,53 @@ export class CustomerService implements ICustomerService {
     options?: ServiceOptions
   ): Promise<CustomerLogDto> {
     try {
-      // Try to get customer to get name
+      // Try to get customer to validate existence
       const customer = await this.customerRepository.findById(customerId);
-      const customerName = customer ? customer.name : 'Unknown';
+      if (!customer) {
+        throw this.errorHandler.createNotFoundError(`Customer with id ${customerId} not found`);
+      }
       
-      // Minimal implementation - would be more complete in production
+      const userName = options?.context?.userName || 'System';
+      const userId = options?.context?.userId;
+      
+      // Convert string details to object format that matches CustomerLogDto requirements
+      const detailsObject = details ? { text: details } : {};
+      
+      // Create log entry in database using Prisma
+      const log = await this.prisma.customerLog.create({
+        data: {
+          customerId,
+          userId, 
+          userName,
+          action,
+          details: details, // Prisma schema expects a string here
+          createdAt: new Date(),
+        },
+        include: { 
+          user: true,
+          customer: true
+        }
+      });
+      
+      this.logger.debug('Created customer log', { 
+        logId: log.id,
+        customerId, 
+        action 
+      });
+      
+      // Return as DTO with properly formatted fields
       return {
-        id: 0,
-        customerId,
-        customerName,
-        entityType: EntityType.CUSTOMER, // Required field for CustomerLogDto
-        entityId: customerId,   // Required field for CustomerLogDto
-        action,
-        details: details ? { text: details } : { text: '' },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        id: log.id,
+        customerId: log.customerId,
+        customerName: log.customer?.name || 'Unknown Customer',
+        entityType: EntityType.CUSTOMER,
+        entityId: log.customerId,
+        userId: log.userId || 0,
+        userName: log.userName,
+        action: log.action,
+        details: detailsObject, // Use the object format for the DTO
+        createdAt: log.createdAt.toISOString(),
+        updatedAt: log.createdAt.toISOString() // CustomerLog doesn't have updatedAt
       };
     } catch (error) {
       this.logger.error('Error in CustomerService.createCustomerLog', { error, customerId, action });
@@ -352,7 +430,52 @@ export class CustomerService implements ICustomerService {
    */
   async create(data: CreateCustomerDto, options?: ServiceOptions): Promise<CustomerResponseDto> {
     try {
-      const customer = await this.customerRepository.create(data);
+      this.logger.debug('Creating customer with data', { data });
+      
+      // Normalize data to match database schema
+      const normalizedData: any = { ...data };
+      
+      // Handle field name mappings for zipCode/postalCode
+      if (normalizedData.zipCode !== undefined) {
+        normalizedData.postalCode = normalizedData.zipCode;
+        delete normalizedData.zipCode;
+      }
+      
+      // Handle field name mappings for companyName/company
+      if (normalizedData.companyName !== undefined) {
+        normalizedData.company = normalizedData.companyName;
+        delete normalizedData.companyName;
+      }
+      
+      // Ensure VAT number is properly processed - log it for debugging
+      if (normalizedData.vatNumber !== undefined) {
+        console.log('Processing VAT number:', normalizedData.vatNumber);
+        
+        // If backend expects a different field name for VAT number, uncomment and adapt this:
+        // normalizedData.vat_number = normalizedData.vatNumber;
+        // delete normalizedData.vatNumber;
+      } else {
+        console.log('No VAT number provided in create request');
+      }
+      
+      // Set timestamps if not provided
+      if (!normalizedData.createdAt) {
+        normalizedData.createdAt = new Date();
+      }
+      
+      if (!normalizedData.updatedAt) {
+        normalizedData.updatedAt = new Date();
+      }
+      
+      // Set userId from context if available
+      if (options?.context?.userId && !normalizedData.createdBy) {
+        normalizedData.createdBy = options.context.userId;
+        normalizedData.updatedBy = options.context.userId;
+      }
+      
+      this.logger.debug('Creating customer with normalized data', { normalizedData });
+      
+      const customer = await this.customerRepository.create(normalizedData);
       return this.mapToResponseDto(customer);
     } catch (error) {
       this.logger.error('Error in CustomerService.create', { error, data });
@@ -370,7 +493,43 @@ export class CustomerService implements ICustomerService {
    */
   async update(id: number, data: UpdateCustomerDto, options?: ServiceOptions): Promise<CustomerResponseDto> {
     try {
-      const customer = await this.customerRepository.update(id, data);
+      // Normalize data to match database schema
+      const normalizedData: any = { ...data };
+      
+      // Handle field name mappings for zipCode/postalCode
+      if (normalizedData.zipCode !== undefined) {
+        normalizedData.postalCode = normalizedData.zipCode;
+        delete normalizedData.zipCode;
+      }
+      
+      // Handle field name mappings for companyName/company
+      if (normalizedData.companyName !== undefined) {
+        normalizedData.company = normalizedData.companyName;
+        delete normalizedData.companyName;
+      }
+      
+      // Ensure VAT number is properly processed during updates
+      if (normalizedData.vatNumber !== undefined) {
+        console.log('Processing VAT number in update:', normalizedData.vatNumber);
+        
+        // If backend expects a different field name for VAT number, uncomment and adapt this:
+        // normalizedData.vat_number = normalizedData.vatNumber;
+        // delete normalizedData.vatNumber;
+      } else {
+        console.log('No VAT number provided in update request');
+      }
+      
+      // Set updatedAt timestamp if not provided
+      normalizedData.updatedAt = new Date();
+      
+      // Set userId from context if available
+      if (options?.context?.userId) {
+        normalizedData.updatedBy = options.context.userId;
+      }
+      
+      this.logger.debug('Updating customer with normalized data', { id, normalizedData });
+      
+      const customer = await this.customerRepository.update(id, normalizedData);
       return this.mapToResponseDto(customer);
     } catch (error) {
       this.logger.error('Error in CustomerService.update', { error, id, data });
@@ -519,7 +678,10 @@ export class CustomerService implements ICustomerService {
       newsletter: entity.newsletter,
       status: entity.status,
       createdAt: entity.createdAt.toISOString(),
-      updatedAt: entity.updatedAt.toISOString()
+      updatedAt: entity.updatedAt.toISOString(),
+      // Add frontend-specific field aliases for consistency
+      zipCode: entity.postalCode,
+      companyName: entity.company
     };
   }
 

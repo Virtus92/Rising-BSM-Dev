@@ -58,11 +58,6 @@ export interface CreateCustomerDto {
   address?: string;
   
   /**
-   * Land
-   */
-  country?: string;
-  
-  /**
    * Stadt
    */
   city?: string;
@@ -88,19 +83,18 @@ export interface CreateCustomerDto {
   type?: CustomerType;
 
   /**
-   * Firmenname
+   * Postleitzahl
    */
-  companyName?: string;
-  
-  /**
-   * Postleitzahl (alias für postalCode)
-   */
-  zipCode?: string;
+  postalCode?: string;
   
   /**
    * Umsatzsteuer-ID
    */
   vatNumber?: string;
+  
+  /* Support for frontend aliases */
+  zipCode?: string; 
+  companyName?: string;
 }
 
 /**
@@ -166,21 +160,15 @@ export interface UpdateCustomerDto {
    * Kundentyp
    */
   type?: CustomerType;
-
-  /**
-   * Firmenname
-   */
-  companyName?: string;
-  
-  /**
-   * Postleitzahl (alias für postalCode)
-   */
-  zipCode?: string;
   
   /**
    * Umsatzsteuer-ID
    */
   vatNumber?: string;
+  
+  /* Support for frontend aliases */
+  zipCode?: string;
+  companyName?: string;
 }
 
 /**

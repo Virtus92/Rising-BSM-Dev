@@ -550,11 +550,15 @@ export class UserService implements IUserService {
         throw this.errorHandler.createNotFoundError('User not found');
       }
 
-      // Update the user
-      const user = await this.userRepository.update(id, data);
+      // Clean data before sending to repository to prevent Prisma errors
+      // Remove fields that shouldn't be directly passed to the database
+      const { confirmPassword, password, ...cleanedData } = data as any;
+      
+      // Update the user with cleaned data
+      const user = await this.userRepository.update(id, cleanedData);
       
       // If the role changed, we need to invalidate permissions cache
-      if (data.role && data.role !== originalUser.role) {
+      if (cleanedData.role && cleanedData.role !== originalUser.role) {
         try {
           // Invalidate permissions cache for this user
           // Import dynamically to avoid circular dependencies

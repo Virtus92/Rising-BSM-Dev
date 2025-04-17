@@ -2,27 +2,55 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Save, ArrowLeft, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/card';
+import { Save, ArrowLeft, Loader2, User, Mail, Phone, Building, FileText, MapPin, Globe, Tag, AlertCircle, Mail as Newsletter } from 'lucide-react';
 import { CustomerResponseDto, CreateCustomerDto, UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { useCustomerForm } from '@/features/customers/hooks/useCustomerForm';
 import { useToast } from '@/shared/hooks/useToast';
+import { Button } from '@/shared/components/ui/button';
+import { Label } from '@/shared/components/ui/label';
+import { Input } from '@/shared/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { EntityColors } from '@/shared/utils/entity-colors';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Switch } from '@/shared/components/ui/switch';
+import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
 
-interface CustomerFormProps {
+export interface CustomerFormProps {
   initialData?: Partial<CustomerResponseDto>;
   onSubmit: (data: CreateCustomerDto | UpdateCustomerDto) => Promise<CustomerResponseDto | null>;
   mode: 'create' | 'edit';
+  isLoading?: boolean;
+  error?: string | null;
+  success?: boolean;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
   onCancel?: () => void;
 }
 
 /**
  * Formular zum Erstellen und Bearbeiten von Kunden
  */
-export default function CustomerForm({ initialData = {}, onSubmit, mode, onCancel }: CustomerFormProps) {
+export default function CustomerForm({ 
+  initialData = {}, 
+  onSubmit, 
+  mode, 
+  isLoading = false,
+  error = null,
+  success = false,
+  title = mode === 'create' ? 'Neuen Kunden erstellen' : 'Kundendaten bearbeiten',
+  description,
+  submitLabel = mode === 'create' ? 'Kunde erstellen' : 'Speichern',
+  onCancel 
+}: CustomerFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [hasChanges, setHasChanges] = useState(false);
   const [showConfirmLeave, setShowConfirmLeave] = useState(false);
+  const [activeTab, setActiveTab] = useState('basic');
+  const [internalSuccess, setInternalSuccess] = useState(false); // Add internal success state
 
   const {
     name, setName,
@@ -30,24 +58,33 @@ export default function CustomerForm({ initialData = {}, onSubmit, mode, onCance
     phone, setPhone,
     address, setAddress,
     city, setCity,
-    zipCode, setZipCode,
+    postalCode, setPostalCode,
     country, setCountry,
-    companyName, setCompanyName,
+    company, setCompany,
     vatNumber, setVatNumber,
     notes, setNotes,
-    errors,
-    submitting,
-    handleSubmit,
+    customerType, setCustomerType,
+    status, setStatus,
+    newsletter, setNewsletter,
+    errors: formErrors,
+    submitting: formSubmitting,
+    handleSubmit: formSubmit,
     updateField
   } = useCustomerForm({
     initialData,
     onSubmit: async (data) => {
       try {
+        // Log the data being submitted for debugging purposes
+        console.log('Submitting customer data:', data);
+        
         const result = await onSubmit(data);
         if (result) {
           const successMessage = mode === 'create' 
             ? 'Kunde wurde erfolgreich erstellt' 
             : 'Kunde wurde erfolgreich aktualisiert';
+            
+          // Set internal success state
+          setInternalSuccess(true);
             
           toast({
             title: 'Erfolg',
@@ -55,11 +92,14 @@ export default function CustomerForm({ initialData = {}, onSubmit, mode, onCance
             variant: 'success'
           });
           
-          // Nach dem Speichern zur Detailseite oder Liste navigieren
-          if (mode === 'create') {
-            router.push(`/dashboard/customers/${result.id}`);
-          } else {
-            router.push(`/dashboard/customers/${initialData.id}`);
+          // Only navigate if we're not in a modal
+          if (!onCancel) {
+            // Nach dem Speichern zur Detailseite oder Liste navigieren
+            if (mode === 'create') {
+              router.push(`/dashboard/customers/${result.id}`);
+            } else {
+              router.push(`/dashboard/customers/${initialData.id}`);
+            }
           }
           
           return result;
@@ -68,6 +108,10 @@ export default function CustomerForm({ initialData = {}, onSubmit, mode, onCance
         return null;
       } catch (error) {
         console.error('Form submission error:', error);
+        
+        // Make sure to set success to false when an error occurs
+        setInternalSuccess(false);
+        
         toast({
           title: 'Fehler',
           description: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
@@ -78,6 +122,13 @@ export default function CustomerForm({ initialData = {}, onSubmit, mode, onCance
       }
     }
   });
+  
+  // Use provided loading/error states or fallback to form states
+  const submitting = isLoading || formSubmitting;
+  const errors = error ? { general: error, ...formErrors } : formErrors;
+  
+  // Use either parent success prop or internal success state
+  const showSuccess = success || internalSuccess;
 
   // Funktion zum Überprüfen, ob Änderungen vorgenommen wurden
   const checkForChanges = useCallback(() => {
@@ -86,21 +137,25 @@ export default function CustomerForm({ initialData = {}, onSubmit, mode, onCance
     const hasPhoneChanged = phone !== (initialData.phone || '');
     const hasAddressChanged = address !== (initialData.address || '');
     const hasCityChanged = city !== (initialData.city || '');
-    const hasZipCodeChanged = zipCode !== (initialData.zipCode || '');
+    const hasPostalCodeChanged = postalCode !== (initialData.postalCode || '');
     const hasCountryChanged = country !== (initialData.country || '');
-    const hasCompanyNameChanged = companyName !== (initialData.companyName || '');
+    const hasCompanyChanged = company !== (initialData.company || '');
     const hasVatNumberChanged = vatNumber !== (initialData.vatNumber || '');
     const hasNotesChanged = notes !== (initialData.notes || '');
+    const hasTypeChanged = customerType !== (initialData.type || CustomerType.PRIVATE);
+    const hasStatusChanged = status !== (initialData.status || CommonStatus.ACTIVE);
+    const hasNewsletterChanged = newsletter !== (initialData.newsletter || false);
     
     const changes = hasNameChanged || hasEmailChanged || hasPhoneChanged || 
-      hasAddressChanged || hasCityChanged || hasZipCodeChanged || 
-      hasCountryChanged || hasCompanyNameChanged || hasVatNumberChanged || 
-      hasNotesChanged;
+      hasAddressChanged || hasCityChanged || hasPostalCodeChanged || 
+      hasCountryChanged || hasCompanyChanged || hasVatNumberChanged || 
+      hasNotesChanged || hasTypeChanged || hasStatusChanged || 
+      hasNewsletterChanged;
     
     setHasChanges(changes);
   }, [
-    name, email, phone, address, city, zipCode, country, 
-    companyName, vatNumber, notes, initialData
+    name, email, phone, address, city, postalCode, country,
+    company, vatNumber, notes, customerType, status, newsletter, initialData
   ]);
 
   // Die checkForChanges-Funktion bei jeder Änderung aufrufen
@@ -111,7 +166,7 @@ export default function CustomerForm({ initialData = {}, onSubmit, mode, onCance
 
   // Funktion zum Abbrechen und Zurückgehen
   const handleCancel = () => {
-    if (hasChanges) {
+    if (hasChanges && !onCancel) {
       setShowConfirmLeave(true);
     } else {
       if (onCancel) {
@@ -126,305 +181,279 @@ export default function CustomerForm({ initialData = {}, onSubmit, mode, onCance
     }
   };
 
-  // Funktion zur Bestätigung des Verlassens trotz Änderungen
-  const confirmLeave = () => {
-    setShowConfirmLeave(false);
-    if (onCancel) {
-      onCancel();
-    } else {
-      if (mode === 'edit' && initialData.id) {
-        router.push(`/dashboard/customers/${initialData.id}`);
-      } else {
-        router.push('/dashboard/customers');
-      }
-    }
-  };
-
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
-      {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <button 
-            onClick={handleCancel}
-            className="mr-2 p-1 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {mode === 'create' ? 'Neuen Kunden erstellen' : 'Kundendaten bearbeiten'}
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
-              Speichern...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              Speichern
-            </>
+    <Card className="w-full border shadow-sm hover:shadow-md transition-all">
+      <form onSubmit={(e) => { e.preventDefault(); formSubmit(); }}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5 text-blue-600" />
+            {title}
+          </CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </CardHeader>
+        
+        <CardContent>
+          {errors.general && (
+            <div className="bg-red-50 p-3 rounded-md text-red-800 text-sm mb-4">
+              {errors.general}
+            </div>
           )}
-        </button>
-      </div>
+          
+          {showSuccess && (
+            <div className="bg-green-50 p-3 rounded-md text-green-800 text-sm mb-4">
+              Operation completed successfully!
+            </div>
+          )}
 
-      {/* Formular */}
-      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Allgemeine Informationen</h3>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-2 md:w-[400px] mb-4">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="address">Address & Details</TabsTrigger>
+            </TabsList>
             
-            {/* Name */}
-            <div className="mb-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                value={name}
-                onChange={(e) => handleFieldChange('name', e.target.value)}
-                className={`w-full px-3 py-2 border ${
-                  errors.name ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                } rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white`}
-                placeholder="Vollständiger Name"
-                required
-              />
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
-              )}
-            </div>
-            
-            {/* Firma */}
-            <div className="mb-4">
-              <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Firma
-              </label>
-              <input
-                id="companyName"
-                name="companyName"
-                type="text"
-                value={companyName}
-                onChange={(e) => handleFieldChange('companyName', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white"
-                placeholder="Firmenname (optional)"
-              />
-            </div>
-            
-            {/* UID/USt-ID */}
-            <div className="mb-4">
-              <label htmlFor="vatNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                UID/USt-ID
-              </label>
-              <input
-                id="vatNumber"
-                name="vatNumber"
-                type="text"
-                value={vatNumber}
-                onChange={(e) => handleFieldChange('vatNumber', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white"
-                placeholder="UID oder USt-ID (optional)"
-              />
-            </div>
-            
-            {/* E-Mail */}
-            <div className="mb-4">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                E-Mail
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={email}
-                onChange={(e) => handleFieldChange('email', e.target.value)}
-                className={`w-full px-3 py-2 border ${
-                  errors.email ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                } rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white`}
-                placeholder="email@beispiel.com"
-              />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
-              )}
-            </div>
-            
-            {/* Telefon */}
-            <div className="mb-4">
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Telefon
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => handleFieldChange('phone', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white"
-                placeholder="+43 123 456789"
-              />
-            </div>
-          </div>
+            <TabsContent value="basic" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-blue-600" />
+                    Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={name}
+                    onChange={(e) => handleFieldChange('name', e.target.value)}
+                    placeholder="Full name"
+                    required
+                    className={errors.name ? "border-red-500" : ""}
+                  />
+                  {errors.name && (
+                    <p className="text-sm text-red-600">{errors.name}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 text-blue-600" />
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => handleFieldChange('email', e.target.value)}
+                    placeholder="example@domain.com"
+                    className={errors.email ? "border-red-500" : ""}
+                  />
+                  {errors.email && (
+                    <p className="text-sm text-red-600">{errors.email}</p>
+                  )}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-blue-600" />
+                    Phone
+                  </Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => handleFieldChange('phone', e.target.value)}
+                    placeholder="+43 123 456789"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="company" className="flex items-center gap-1.5">
+                    <Building className="h-3.5 w-3.5 text-blue-600" />
+                    Company
+                  </Label>
+                  <Input
+                    id="company"
+                    name="company"
+                    value={company}
+                    onChange={(e) => handleFieldChange('company', e.target.value)}
+                    placeholder="Company name (optional)"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="vatNumber" className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-blue-600" />
+                  VAT Number
+                </Label>
+                <Input
+                  id="vatNumber"
+                  name="vatNumber"
+                  value={vatNumber}
+                  onChange={(e) => handleFieldChange('vatNumber', e.target.value)}
+                  placeholder="VAT or tax ID (optional)"
+                />
+              </div>
 
-          <div>
-            <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Adressinformationen</h3>
-            
-            {/* Adresse */}
-            <div className="mb-4">
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Adresse
-              </label>
-              <input
-                id="address"
-                name="address"
-                type="text"
-                value={address}
-                onChange={(e) => handleFieldChange('address', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white"
-                placeholder="Straße und Hausnummer"
-              />
-            </div>
-            
-            {/* PLZ */}
-            <div className="mb-4">
-              <label htmlFor="zipCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Postleitzahl
-              </label>
-              <input
-                id="zipCode"
-                name="zipCode"
-                type="text"
-                value={zipCode}
-                onChange={(e) => handleFieldChange('zipCode', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white"
-                placeholder="1234"
-              />
-            </div>
-            
-            {/* Stadt */}
-            <div className="mb-4">
-              <label htmlFor="city" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Stadt
-              </label>
-              <input
-                id="city"
-                name="city"
-                type="text"
-                value={city}
-                onChange={(e) => handleFieldChange('city', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white"
-                placeholder="Stadt"
-              />
-            </div>
-            
-            {/* Land */}
-            <div className="mb-4">
-              <label htmlFor="country" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Land
-              </label>
-              <input
-                id="country"
-                name="country"
-                type="text"
-                value={country}
-                onChange={(e) => handleFieldChange('country', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white"
-                placeholder="Österreich"
-              />
-            </div>
-          </div>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="customerType" className="flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5 text-blue-600" />
+                  Customer Type
+                </Label>
+                <Select
+                  value={customerType}
+                  onValueChange={(value) => handleFieldChange('type', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select customer type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={CustomerType.PRIVATE}>Private</SelectItem>
+                    <SelectItem value={CustomerType.BUSINESS}>Business</SelectItem>
+                    <SelectItem value={CustomerType.INDIVIDUAL}>Individual</SelectItem>
+                    <SelectItem value={CustomerType.GOVERNMENT}>Government</SelectItem>
+                    <SelectItem value={CustomerType.NON_PROFIT}>Non-Profit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-        {/* Notizen */}
-        <div className="mt-6">
-          <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Notizen</h3>
-          <textarea
-            id="notes"
-            name="notes"
-            rows={4}
-            value={notes}
-            onChange={(e) => handleFieldChange('notes', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white"
-            placeholder="Zusätzliche Informationen oder Notizen zu diesem Kunden..."
-          ></textarea>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="status" className="flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 text-blue-600" />
+                  Status
+                </Label>
+                <Select
+                  value={status}
+                  onValueChange={(value) => handleFieldChange('status', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={CommonStatus.ACTIVE}>Active</SelectItem>
+                    <SelectItem value={CommonStatus.INACTIVE}>Inactive</SelectItem>
+                    <SelectItem value={CommonStatus.DELETED}>Deleted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-        {/* Buttons */}
-        <div className="mt-8 flex justify-end space-x-3">
-          <button
-            type="button"
+              <div className="space-y-2">
+                <Label htmlFor="newsletter" className="flex items-center gap-1.5">
+                  <Newsletter className="h-3.5 w-3.5 text-blue-600" />
+                  Newsletter
+                </Label>
+                <Switch
+                  id="newsletter"
+                  name="newsletter"
+                  checked={newsletter}
+                  onCheckedChange={(checked) => updateField('newsletter', checked)}
+                />
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="address" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="address" className="flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                  Address
+                </Label>
+                <Input
+                  id="address"
+                  name="address"
+                  value={address}
+                  onChange={(e) => handleFieldChange('address', e.target.value)}
+                  placeholder="Street address"
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="postalCode" className="flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                    Postal Code
+                  </Label>
+                  <Input
+                    id="postalCode"
+                    name="postalCode"
+                    value={postalCode}
+                    onChange={(e) => handleFieldChange('postalCode', e.target.value)}
+                    placeholder="1234"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="city" className="flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                    City
+                  </Label>
+                  <Input
+                    id="city"
+                    name="city"
+                    value={city}
+                    onChange={(e) => handleFieldChange('city', e.target.value)}
+                    placeholder="City"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="country" className="flex items-center gap-1.5">
+                    <Globe className="h-3.5 w-3.5 text-blue-600" />
+                    Country
+                  </Label>
+                  <Input
+                    id="country"
+                    name="country"
+                    value={country}
+                    onChange={(e) => handleFieldChange('country', e.target.value)}
+                    placeholder="Country"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2 mt-4">
+                <Label htmlFor="notes" className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-blue-600" />
+                  Notes
+                </Label>
+                <Textarea
+                  id="notes"
+                  name="notes"
+                  rows={4}
+                  value={notes}
+                  onChange={(e) => handleFieldChange('notes', e.target.value)}
+                  placeholder="Additional information or notes about this customer..."
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+        
+        <CardFooter className="flex justify-between">
+          <Button 
+            type="button" 
+            variant="outline" 
             onClick={handleCancel}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            disabled={submitting}
+            className={EntityColors.customers?.text || ""}
           >
-            Abbrechen
-          </button>
-          <button
+            Cancel
+          </Button>
+          <Button 
             type="submit"
             disabled={submitting}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={EntityColors.customers?.primary || "bg-blue-600 hover:bg-blue-700"}
           >
             {submitting ? (
               <>
-                <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4 inline" />
-                Speichern...
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
               </>
-            ) : (
-              'Speichern'
-            )}
-          </button>
-        </div>
+            ) : submitLabel}
+          </Button>
+        </CardFooter>
       </form>
-
-      {/* Bestätigungsdialog */}
-      {showConfirmLeave && (
-        <div className="fixed z-50 inset-0 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
-            </div>
-            
-            <div className="inline-block align-bottom bg-white dark:bg-slate-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white dark:bg-slate-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                      Ungespeicherte Änderungen
-                    </h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Sie haben ungespeicherte Änderungen. Sind Sie sicher, dass Sie die Seite verlassen möchten? Alle nicht gespeicherten Änderungen gehen verloren.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 dark:bg-slate-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={confirmLeave}
-                >
-                  Verlassen
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => setShowConfirmLeave(false)}
-                >
-                  Zurück zum Formular
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </Card>
   );
 }

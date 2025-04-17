@@ -7,7 +7,7 @@ import {
   UpdateUserStatusDto
 } from '@/domain/dtos/UserDtos';
 import { ActivityLogDto } from '@/domain/dtos/ActivityLogDto';
-import { ApiResponse } from './ApiClient';
+import { ApiResponse, apiClient } from './ApiClient';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 
 /**
@@ -142,7 +142,25 @@ export class UserService {
    * Change password
    */
   static async changePassword(data: { oldPassword: string; newPassword: string; confirmPassword: string }): Promise<ApiResponse<void>> {
-    return UserClient.changePassword(data);
+    // Map oldPassword to currentPassword as expected by the API
+    const payload = {
+      currentPassword: data.oldPassword,
+      newPassword: data.newPassword,
+      confirmPassword: data.confirmPassword
+    };
+    
+    try {
+      // Use the auth/change-password endpoint directly
+      const response = await apiClient.post('/auth/change-password', payload);
+      return response;
+    } catch (error) {
+      console.error('Error changing password:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to change password',
+        data: null
+      };
+    }
   }
 
   /**

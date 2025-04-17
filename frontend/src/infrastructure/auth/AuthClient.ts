@@ -243,8 +243,15 @@ export class AuthClient {
           localStorage.removeItem('refresh_token_backup');
         }
         
+        // Fix the path to prevent double /api/ prefix
+        // ApiClient already adds the /api prefix, so we need to remove it from our path
         // The server will clear the auth cookies
-        const response = await ApiClient.post(`${this.basePath}/logout`);
+        const logoutPath = this.basePath.startsWith('/api') 
+          ? this.basePath.substring(4) + '/logout' 
+          : this.basePath + '/logout';
+        
+        console.log(`AuthClient: Using logout path: ${logoutPath}`);
+        const response = await ApiClient.post(logoutPath);
         
         // Notify about logout with slight delay
         setTimeout(() => {

@@ -271,7 +271,13 @@ export class UserClient {
    * @returns API response
    */
   static async changePassword(data: { oldPassword: string; newPassword: string; confirmPassword: string }): Promise<ApiResponse<void>> {
-    return await UserClient.apiRequest<void>('post', `${USERS_API_URL}/change-password`, data);
+    // Map oldPassword to currentPassword as expected by the API
+    const payload = {
+      currentPassword: data.oldPassword,
+      newPassword: data.newPassword,
+      confirmPassword: data.confirmPassword
+    };
+    return await UserClient.apiRequest<void>('post', '/auth/change-password', payload);
   }
 
   /**

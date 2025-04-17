@@ -146,6 +146,7 @@ model Customer {
   postalCode     String?          @db.VarChar(10)
   city           String?          @db.VarChar(100)
   country        String           @default("Deutschland") @db.VarChar(100)
+  vatNumber      String?          @db.VarChar(50)
   notes          String?          @db.Text
   newsletter     Boolean          @default(false)
   status         String           @default("active") @db.VarChar(20)
@@ -240,7 +241,7 @@ model ContactRequest {
   customerId  Int?
   appointmentId Int?
   ipAddress   String?       @db.VarChar(255)
-  createdAt   DateTime      @default(now()) @db.Timestamp(6)
+  createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt @db.Timestamp(6)
   notes       RequestNote[]
   logs        RequestLog[]

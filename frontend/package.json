@@ -12,6 +12,7 @@
     "test:watch": "jest --watch",
     "test:ci": "jest --ci --coverage",
     "db:migrate": "npx prisma migrate deploy",
+    "db:migrate:dev": "NODE_ENV=development npx prisma migrate dev",
     "db:seed": "node scripts/seed.js",
     "db:studio": "npx prisma studio",
     "prisma:generate": "npx prisma generate",

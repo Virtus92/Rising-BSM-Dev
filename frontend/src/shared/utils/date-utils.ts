@@ -1,22 +1,25 @@
 /**
- * Formatiert ein Datum in einen ISO-String
- * Stellt sicher, dass Datumswerte einheitlich formatiert werden
+ * Formatiert ein Datum in ein lesbares Format
  * 
  * @param date - Datum oder String
+ * @param options - Formatierungsoptionen
  * @returns Formatiertes Datum als String
  */
-export function formatDate(date: Date | string | null | undefined): string {
-  if (!date) return '';
+export function formatDate(date: Date | string | null | undefined, options: Intl.DateTimeFormatOptions = {}): string {
+  if (!date) return 'Nicht verfügbar';
   
-  if (date instanceof Date) {
-    return date.toISOString();
-  }
+  const defaultOptions: Intl.DateTimeFormatOptions = {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    ...options
+  };
   
-  // Wenn es ein String ist, überprüfen ob es ein gültiges Datum ist
   try {
-    return new Date(date).toISOString();
+    const dateObj = date instanceof Date ? date : new Date(date);
+    return dateObj.toLocaleDateString('de-DE', defaultOptions);
   } catch (e) {
-    return String(date);
+    return 'Ungültiges Datum';
   }
 }
 

@@ -19,7 +19,9 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
   const logger = getLogger();
   
   // Parse den Anfragekörper
-  const { currentPassword, newPassword, newPasswordConfirm } = await req.json();
+  const { currentPassword, newPassword, confirmPassword } = await req.json();
+  // For backward compatibility
+  const newPasswordConfirm = confirmPassword;
   
   // Validiere die Eingaben
   if (!currentPassword) {
@@ -44,7 +46,7 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
     );
   }
   
-  if (newPassword !== newPasswordConfirm) {
+  if (newPassword !== confirmPassword) {
     return NextResponse.json(
       {
         success: false,
@@ -77,7 +79,7 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
     const result = await userService.changePassword(userId, {
       currentPassword,
       newPassword,
-      confirmPassword: newPasswordConfirm
+      confirmPassword
     }, {
       context: {
         userId,

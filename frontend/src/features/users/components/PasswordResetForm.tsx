@@ -38,15 +38,7 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
     setPasswordType(prev => prev === 'password' ? 'text' : 'password');
   };
 
-  const generatePassword = () => {
-    // Generate a strong random password
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+=-';
-    let password = '';
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
-  };
+  // We'll use the secure password generator from the server instead of generating locally
 
   const handleResetPassword = async () => {
     setError(null);
@@ -54,12 +46,12 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
     setIsLoading(true);
     
     try {
-      const newPassword = generatePassword();
-      const response = await UserService.adminResetPassword(userId, newPassword);
+      // Let the server generate a secure password
+      const response = await UserService.resetUserPassword(userId);
       
-      if (response.success) {
+      if (response.success && response.data?.password) {
         setSuccess(true);
-        setGeneratedPassword(newPassword);
+        setGeneratedPassword(response.data.password);
         toast({
           title: "Password Reset Successful",
           description: "The user's password has been reset successfully.",

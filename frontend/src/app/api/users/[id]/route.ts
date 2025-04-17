@@ -102,7 +102,7 @@ export const PUT = apiRouteHandler(async (
     const data = await req.json();
     
     // Validate input data
-    const { validateUserUpdate } = await import('@/infrastructure/common/validation/userValidation');
+    const { validateUserUpdate } = require('@/infrastructure/common/validation/userValidation');
     const validationResult = validateUserUpdate(data);
     
     if (!validationResult.isValid) {

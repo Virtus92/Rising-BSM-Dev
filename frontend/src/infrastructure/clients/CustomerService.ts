@@ -108,4 +108,44 @@ export class CustomerService {
   static async getYearlyStats() {
     return ApiClient.get(`${this.basePath}/stats/yearly`);
   }
+
+  /**
+   * Add a note to a customer
+   */
+  static async addCustomerNote(id: number, note: string) {
+    try {
+      console.log(`Adding note to customer ${id}:`, note);
+      const response = await ApiClient.post(`${this.basePath}/${id}/notes`, { note });
+      console.log('Add note response:', response);
+      return response;
+    } catch (error) {
+      console.error('Error in CustomerService.addCustomerNote:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error adding customer note'
+      };
+    }
+  }
+
+  /**
+   * Get notes for a customer
+   */
+  static async getCustomerNotes(id: number, forceFresh = false) {
+    try {
+      // Add cache busting parameter if needed
+      const cacheBuster = forceFresh ? `?_t=${Date.now()}` : '';
+      console.log(`Fetching notes for customer ${id}${forceFresh ? ' with cache busting' : ''}`);
+      const response = await ApiClient.get(`${this.basePath}/${id}/notes${cacheBuster}`);
+      console.log('Get notes response:', response);
+      return response;
+    } catch (error) {
+      console.error('Error in CustomerService.getCustomerNotes:', error);
+      return {
+        success: false,
+        data: [],
+        message: error instanceof Error ? error.message : 'Error fetching customer notes'
+      };
+    }
+  }
 }

@@ -41,6 +41,18 @@ export class Customer extends BaseEntity {
   postalCode?: string;
   
   /**
+   * Alias for postalCode - used on the frontend
+   * @deprecated Use postalCode instead
+   */
+  get zipCode(): string | undefined {
+    return this.postalCode;
+  }
+  
+  set zipCode(value: string | undefined) {
+    this.postalCode = value;
+  }
+  
+  /**
    * Stadt
    */
   city?: string;
