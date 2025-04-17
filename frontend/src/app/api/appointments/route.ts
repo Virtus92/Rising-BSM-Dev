@@ -1,103 +1,164 @@
 /**
  * Appointments API-Route
  * 
- * Verarbeitet Anfragen zur Terminverwaltung
+ * Handles appointment management requests
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError, formatValidationError } from '@/infrastructure/api/response-formatter';
-import { getAppointmentService } from '@/infrastructure/common/factories';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
+import { getServiceFactory } from '@/infrastructure/common/factories';
+import { getLogger } from '@/infrastructure/common/logging';
 import { CreateAppointmentDto } from '@/domain/dtos/AppointmentDtos';
+import { apiPermissions } from '@/app/api/helpers/apiPermissions';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
 
 /**
  * GET /api/appointments
  * 
- * Ruft eine Liste von Terminen ab, optional gefiltert und paginiert
+ * Retrieves a list of appointments, optionally filtered and paginated
+ * Requires APPOINTMENTS_VIEW permission
  */
 export const GET = apiRouteHandler(async (req: NextRequest) => {
+  const logger = getLogger();
+  const serviceFactory = getServiceFactory();
+  
   try {
-    // Filterdaten aus Query-Parametern extrahieren
+    // Check permission
+    if (!await apiPermissions.hasPermission(
+      req.auth?.userId as number, 
+      SystemPermission.APPOINTMENTS_VIEW
+    )) {
+      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_VIEW}`);
+      return formatResponse.error(
+        `You don't have permission to perform this action (requires ${SystemPermission.APPOINTMENTS_VIEW})`, 
+        403
+      );
+    }
+    
+    // Extract filter parameters from query
     const { searchParams } = new URL(req.url);
+    
+    // Check for permitted sort fields to prevent errors
+    const requestedSortBy = searchParams.get('sortBy') || 'appointmentDate';
+    const permittedSortFields = ['appointmentDate', 'title', 'status', 'createdAt', 'updatedAt', 'customerName', 'customer.name'];
+    const sortBy = permittedSortFields.includes(requestedSortBy) ? requestedSortBy : 'appointmentDate';
+    
     const filters = {
       status: searchParams.get('status') || undefined,
-      date: searchParams.get('date') || undefined,
+      startDate: searchParams.get('startDate') || undefined,
+      endDate: searchParams.get('endDate') || undefined,
       customerId: searchParams.has('customerId') 
         ? parseInt(searchParams.get('customerId') as string) 
-        : undefined,
-      projectId: searchParams.has('projectId') 
-        ? parseInt(searchParams.get('projectId') as string) 
         : undefined,
       page: searchParams.has('page') 
         ? parseInt(searchParams.get('page') as string) 
         : 1,
       limit: searchParams.has('limit') 
         ? parseInt(searchParams.get('limit') as string) 
-        : 10
+        : 10,
+      sortBy: sortBy,
+      sortDirection: (searchParams.get('sortDirection') as 'asc' | 'desc') || 'asc'
     };
-
-    // Terminservice abrufen
-    const appointmentService = getAppointmentService();
     
-    // Paginierte Terminliste abrufen
-    const result = await appointmentService.getAll({
-      relations: ['customer'],
-      context: {
-        userId: req.auth?.userId,
-        page: filters.page,
-        limit: filters.limit
-      }
+    // Get appointment service
+    const appointmentService = serviceFactory.createAppointmentService();
+    
+    // Include relations from query params if specified
+    const relationsParam = searchParams.get('relations');
+    const relations = relationsParam ? relationsParam.split(',') : ['customer'];
+    
+    // Get appointments through service with proper filters
+    const result = await appointmentService.findAll({
+      context: { userId: req.auth?.userId },
+      page: filters.page,
+      limit: filters.limit,
+      filters: {
+        status: filters.status,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        customerId: filters.customerId
+      },
+      sort: {
+        field: filters.sortBy,
+        direction: filters.sortDirection
+      },
+      // Always include requested relations
+      relations: relations
     });
-
-    // Erfolgsantwort
-    return formatSuccess(result, 'Termine erfolgreich abgerufen');
     
+    return formatResponse.success(result, 'Appointments retrieved successfully');
   } catch (error) {
-    console.error('Error fetching appointments:', error);
-    return formatError(
-      error instanceof Error ? error.message : 'Fehler beim Abrufen der Termine',
+    logger.error('Error fetching appointments:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    return formatResponse.error(
+      error instanceof Error ? error.message : 'Error retrieving appointments',
       500
     );
   }
+}, {
+  requiresAuth: true
 });
 
 /**
  * POST /api/appointments
  * 
- * Erstellt einen neuen Termin
+ * Creates a new appointment
+ * Requires APPOINTMENTS_CREATE permission
  */
 export const POST = apiRouteHandler(async (req: NextRequest) => {
+  const logger = getLogger();
+  const serviceFactory = getServiceFactory();
+  
   try {
-    // Request-Body als JSON parsen
-    const data = await req.json() as CreateAppointmentDto;
-    
-    // Terminservice abrufen
-    const appointmentService = getAppointmentService();
-    
-    // Versuch, den Termin zu erstellen
-    const result = await appointmentService.create(data, {
-      context: {
-        userId: req.auth?.userId,
-        ipAddress: req.headers.get('x-forwarded-for') || req.ip
-      }
-    });
-    
-    // Erfolgsantwort
-    return formatSuccess(result, 'Termin erfolgreich erstellt', 201);
-    
-  } catch (error) {
-    console.error('Error creating appointment:', error);
-    
-    // Behandlung von Validierungsfehlern
-    if (error instanceof Error && 'validationErrors' in error) {
-      return formatValidationError(
-        (error as any).validationErrors,
-        'Validierungsfehler beim Erstellen des Termins'
+    // Check permission
+    if (!await apiPermissions.hasPermission(
+      req.auth?.userId as number, 
+      SystemPermission.APPOINTMENTS_CREATE
+    )) {
+      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_CREATE}`);
+      return formatResponse.error(
+        `You don't have permission to perform this action (requires ${SystemPermission.APPOINTMENTS_CREATE})`, 
+        403
       );
     }
     
-    return formatError(
-      error instanceof Error ? error.message : 'Fehler beim Erstellen des Termins',
+    // Parse request body
+    const data = await req.json() as CreateAppointmentDto;
+    
+    // Get appointment service
+    const appointmentService = serviceFactory.createAppointmentService();
+    
+    // Create appointment with all needed context
+    const result = await appointmentService.create(data, {
+      context: {
+        userId: req.auth?.userId,
+        ipAddress: req.headers.get('x-forwarded-for') || 'unknown'
+      },
+      // Always include customer relation for complete data
+      relations: ['customer']
+    });
+    
+    return formatResponse.success(result, 'Appointment created successfully', 201);
+  } catch (error) {
+    logger.error('Error creating appointment:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    // Handle validation errors
+    if (error instanceof Error && 'validationErrors' in error) {
+      return formatResponse.validationError(
+        (error as any).validationErrors
+      );
+    }
+    
+    return formatResponse.error(
+      error instanceof Error ? error.message : 'Error creating appointment',
       500
     );
   }
+}, {
+  requiresAuth: true
 });

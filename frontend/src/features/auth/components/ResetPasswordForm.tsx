@@ -36,9 +36,13 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   useEffect(() => {
     const checkToken = async () => {
       try {
-        const isValid = await validateResetToken(token);
+        // Sanitize token first to prevent HTML errors
+        const sanitizedToken = token.replace(/</g, '').replace(/>/g, '');
+        
+        const isValid = await validateResetToken(sanitizedToken);
         setIsTokenValid(isValid);
       } catch (err) {
+        console.error('Error validating token:', err);
         setIsTokenValid(false);
       } finally {
         setIsValidating(false);

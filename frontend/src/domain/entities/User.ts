@@ -46,6 +46,11 @@ export class User extends BaseEntity {
   profilePicture?: string;
   
   /**
+   * Benutzerberechtigungen
+   */
+  permissions?: string[];
+  
+  /**
    * Letzter Anmeldezeitpunkt
    */
   lastLoginAt?: Date;
@@ -71,10 +76,13 @@ export class User extends BaseEntity {
     this.name = data.name || '';
     this.email = data.email || '';
     this.password = data.password;
-    this.role = data.role || UserRole.USER;
+    // Ensure role is always a valid UserRole enum value
+    this.role = this.validateRole(data.role);
     this.phone = data.phone;
-    this.status = data.status || UserStatus.ACTIVE;
+    // Ensure status is always a valid UserStatus enum value
+    this.status = this.validateStatus(data.status);
     this.profilePicture = data.profilePicture;
+    this.permissions = data.permissions || [];
     this.lastLoginAt = data.lastLoginAt ? new Date(data.lastLoginAt) : undefined;
     this.resetToken = data.resetToken;
     this.resetTokenExpiry = data.resetTokenExpiry ? new Date(data.resetTokenExpiry) : undefined;
@@ -114,6 +122,13 @@ export class User extends BaseEntity {
    */
   isAdmin(): boolean {
     return this.role === UserRole.ADMIN;
+  }
+  
+  /**
+   * Prüft, ob der Benutzer Manager-Rechte oder höher hat
+   */
+  isManagerOrAbove(): boolean {
+    return this.role === UserRole.ADMIN || this.role === UserRole.MANAGER;
   }
   
   /**
@@ -183,6 +198,36 @@ export class User extends BaseEntity {
   }
   
   /**
+   * Validates the role against the UserRole enum
+   * If invalid, defaults to UserRole.USER
+   * 
+   * @param role - Role value to validate
+   * @returns Valid UserRole value
+   */
+  private validateRole(role?: UserRole | string): UserRole {
+    if (!role) return UserRole.USER;
+    
+    // Check if the role is a valid UserRole enum value
+    const isValidRole = Object.values(UserRole).includes(role as UserRole);
+    return isValidRole ? (role as UserRole) : UserRole.USER;
+  }
+  
+  /**
+   * Validates the status against the UserStatus enum
+   * If invalid, defaults to UserStatus.ACTIVE
+   * 
+   * @param status - Status value to validate
+   * @returns Valid UserStatus value
+   */
+  private validateStatus(status?: UserStatus | string): UserStatus {
+    if (!status) return UserStatus.ACTIVE;
+    
+    // Check if the status is a valid UserStatus enum value
+    const isValidStatus = Object.values(UserStatus).includes(status as UserStatus);
+    return isValidStatus ? (status as UserStatus) : UserStatus.ACTIVE;
+  }
+  
+  /**
    * Validiert das E-Mail-Format
    */
   isValidEmail(): boolean {
@@ -244,6 +289,7 @@ export class User extends BaseEntity {
     if (data.status !== undefined) this.status = data.status;
     if (data.profilePicture !== undefined) this.profilePicture = data.profilePicture;
     if (data.password !== undefined) this.password = data.password;
+    if (data.permissions !== undefined) this.permissions = data.permissions;
     
     // Auditdaten aktualisieren
     this.updateAuditData(updatedBy);
@@ -265,6 +311,7 @@ export class User extends BaseEntity {
       phone: this.phone,
       status: this.status,
       profilePicture: this.profilePicture,
+      permissions: this.permissions,
       lastLoginAt: this.lastLoginAt,
       password: this.password,
       resetToken: this.resetToken,
@@ -276,12 +323,20 @@ export class User extends BaseEntity {
 }
 
 // Type-alias für einfachere Verwendung der User-Klasse im Code
+/**
+ * Type alias for User entity for simpler usage in the codebase
+ * Contains the essential properties for most display and processing needs
+ */
 export type UserType = {
   id: number;
   name: string;
   email: string;
   role: UserRole;
   status: UserStatus;
+  phone?: string;
+  profilePicture?: string;
+  permissions?: string[];
   createdAt: string | Date;
   updatedAt: string | Date;
+  lastLoginAt?: string | Date;
 };

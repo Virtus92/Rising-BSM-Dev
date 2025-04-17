@@ -75,8 +75,7 @@ export async function POST(req: NextRequest) {
           data: {
             isRevoked: true,
             revokedAt: new Date(),
-            revokedByIp: req.headers.get('x-forwarded-for') || 'unknown',
-            revokedReason: 'logout'
+            revokedByIp: req.headers.get('x-forwarded-for') || 'unknown'
           }
         });
         

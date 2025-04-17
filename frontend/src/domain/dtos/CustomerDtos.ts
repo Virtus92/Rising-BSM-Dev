@@ -22,6 +22,10 @@ export interface CustomerDto {
   newsletter: boolean;
   status: CommonStatus;
   type: CustomerType;
+  // Added properties to match usage in components
+  statusLabel?: string;
+  typeLabel?: string;
+  vatNumber?: string;
 }
 
 /**
@@ -54,9 +58,9 @@ export interface CreateCustomerDto {
   address?: string;
   
   /**
-   * Postleitzahl
+   * Land
    */
-  postalCode?: string;
+  country?: string;
   
   /**
    * Stadt
@@ -267,6 +271,11 @@ export interface CustomerResponseDto extends BaseResponseDto {
    * Status-Label für die Anzeige
    */
   statusLabel?: string;
+  
+  /**
+   * Type-Label für die Anzeige
+   */
+  typeLabel?: string;
 }
 
 /**
@@ -363,6 +372,11 @@ export interface CustomerFilterParamsDto extends BaseFilterParamsDto {
    * Stadt
    */
   city?: string;
+  
+  /**
+   * Land
+   */
+  country?: string;
   
   /**
    * Postleitzahl

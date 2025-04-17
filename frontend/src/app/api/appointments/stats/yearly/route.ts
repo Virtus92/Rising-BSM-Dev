@@ -3,78 +3,73 @@ import { apiRouteHandler } from '@/infrastructure/api/route-handler';
 import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
 import { getLogger } from '@/infrastructure/common/logging';
 import { getServiceFactory } from '@/infrastructure/common/factories';
+import { generateYearlyStats } from '@/shared/utils/statistics-utils';
+import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
+import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 
 /**
  * GET /api/appointments/stats/yearly
+ * 
  * Returns yearly appointment statistics
  */
 export const GET = apiRouteHandler(async (request: NextRequest) => {
   const logger = getLogger();
-  const serviceFactory = getServiceFactory();
   
   try {
     // Get URL parameters
     const url = new URL(request.url);
-    const years = parseInt(url.searchParams.get('years') || '3', 10); // Default to 3 years
+    const years = parseInt(url.searchParams.get('years') || '3', 10);
     
-    // Get appointment service
+    const serviceFactory = getServiceFactory();
     const appointmentService = serviceFactory.createAppointmentService();
     
-    // Create context with user ID
-    const context = { userId: request.auth?.userId };
-    
-    // Get repository for direct data access
-    const repository = appointmentService.getRepository();
-    
-    // Calculate date ranges for the years
-    const today = new Date();
-    const endDate = new Date(today);
-    const startDate = new Date(today);
-    startDate.setFullYear(today.getFullYear() - years);
-    
-    // Initialize yearly stats
-    const yearlyStats = [];
-    
-    // Get all appointments in the date range
-    const appointments = await repository.findByDateRange(startDate, endDate);
-    
-    // Group appointments by year
-    const appointmentsByYear = new Map<number, any[]>();
-    
-    for (const appointment of appointments) {
-      const date = new Date(appointment.appointmentDate);
-      const year = date.getFullYear();
-      
-      if (!appointmentsByYear.has(year)) {
-        appointmentsByYear.set(year, []);
+    // Get all appointments
+    const appointmentsResponse = await appointmentService.findAll({
+      limit: 1000, // High limit to get all appointments
+      context: {
+        userId: request.auth?.userId
       }
-      
-      appointmentsByYear.get(year)?.push(appointment);
+    });
+    
+    let appointments: AppointmentResponseDto[] = [];
+    if (appointmentsResponse && appointmentsResponse.data) {
+      appointments = appointmentsResponse.data;
     }
     
-    // Create stats for each year
-    for (let y = today.getFullYear() - years + 1; y <= today.getFullYear(); y++) {
-      const yearAppointments = appointmentsByYear.get(y) || [];
+    // Generate yearly stats using our utility function
+    const yearlyStats = generateYearlyStats(
+      appointments,
+      (appointment: AppointmentResponseDto) => appointment.appointmentDate,
+      years
+    );
+    
+    // Enrich with additional data needed for the UI
+    const enrichedStats = yearlyStats.map(stat => {
+      // Filter appointments for this period
+      const periodAppointments = appointments.filter(apt => {
+        const appointmentDate = new Date(apt.appointmentDate);
+        return appointmentDate >= new Date(stat.startDate) && 
+               appointmentDate <= new Date(stat.endDate);
+      });
       
       // Count by status
-      const completed = yearAppointments.filter(a => a.status === 'COMPLETED').length;
-      const cancelled = yearAppointments.filter(a => a.status === 'CANCELLED').length;
+      const completed = periodAppointments.filter(a => a.status === AppointmentStatus.COMPLETED).length;
+      const cancelled = periodAppointments.filter(a => a.status === AppointmentStatus.CANCELLED).length;
+      const planned = periodAppointments.filter(a => a.status === AppointmentStatus.PLANNED).length;
+      const confirmed = periodAppointments.filter(a => a.status === AppointmentStatus.CONFIRMED).length;
       
-      // Add to yearly stats
-      yearlyStats.push({
-        year: y,
-        count: yearAppointments.length,
+      return {
+        ...stat,
+        appointments: stat.count,
         completed,
         cancelled,
-        // Calculate completion rate
-        completionRate: yearAppointments.length > 0 
-          ? completed / yearAppointments.length 
-          : 0
-      });
-    }
+        planned,
+        confirmed
+      };
+    });
     
     return formatSuccess(
-      yearlyStats, 
+      enrichedStats, 
       'Yearly appointment statistics retrieved successfully'
     );
   } catch (error) {

@@ -21,6 +21,58 @@ export function formatDate(date: Date | string | null | undefined): string {
 }
 
 /**
+ * Formats a date as a relative time string (e.g. "2 hours ago", "just now")
+ * 
+ * @param date - Date to format
+ * @returns Formatted relative time string
+ */
+export function formatRelativeTime(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  
+  const parsedDate = date instanceof Date ? date : new Date(date);
+  if (isNaN(parsedDate.getTime())) return '';
+  
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - parsedDate.getTime()) / 1000);
+  
+  // Weniger als 1 Minute
+  if (diffInSeconds < 60) {
+    return 'just now';
+  }
+  
+  // Weniger als 1 Stunde
+  if (diffInSeconds < 3600) {
+    const minutes = Math.floor(diffInSeconds / 60);
+    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+  }
+  
+  // Weniger als 1 Tag
+  if (diffInSeconds < 86400) {
+    const hours = Math.floor(diffInSeconds / 3600);
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  }
+  
+  // Weniger als 1 Woche
+  if (diffInSeconds < 604800) {
+    const days = Math.floor(diffInSeconds / 86400);
+    return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+  }
+  
+  // Weniger als 1 Monat
+  if (diffInSeconds < 2592000) {
+    const weeks = Math.floor(diffInSeconds / 604800);
+    return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+  }
+  
+  // Standard-Datumsformat für ältere Daten
+  return parsedDate.toLocaleDateString('de-DE', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+}
+
+/**
  * Prüft, ob ein Wert ein Datum ist
  * 
  * @param value - Zu prüfender Wert

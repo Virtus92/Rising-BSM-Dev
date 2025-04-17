@@ -24,7 +24,7 @@ export interface IAppointmentService extends IBaseService<
    * @param options - Service-Optionen
    * @returns Termin mit Details
    */
-  getAppointmentDetails(id: number, options?: ServiceOptions): Promise<AppointmentDetailResponseDto | null>;
+  getAppointmentDetails(id: number | string, options?: ServiceOptions): Promise<AppointmentDetailResponseDto | null>;
   
   /**
    * Findet Termine für einen Kunden

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useToast } from '@/shared/hooks/useToast';
 import { useSettings } from '@/shared/contexts/SettingsContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -14,6 +15,7 @@ import { Loader2, RefreshCcw, AlertCircle, Sun, Moon, Monitor, Check, X } from '
 
 export default function SettingsPage() {
   const { settings, isLoading, error, updateSetting, resetToDefaults, reloadSettings } = useSettings();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);

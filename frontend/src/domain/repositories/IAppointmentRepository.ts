@@ -64,7 +64,7 @@ export interface IAppointmentRepository extends IBaseRepository<Appointment> {
    * @param id - Termin-ID
    * @returns Termin mit Beziehungen
    */
-  findByIdWithRelations(id: number): Promise<Appointment | null>;
+  findByIdWithRelations(id: number | string): Promise<Appointment | null>;
   
   /**
    * Erstellt eine Notiz zu einem Termin

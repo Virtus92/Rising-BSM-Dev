@@ -89,13 +89,13 @@ export const RequestFilterPanel: React.FC<RequestFilterPanelProps> = ({
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={filters.status || ''}
-                  onValueChange={(value) => onFilterChange({ status: value ? (value as RequestStatus) : undefined })}
+                  onValueChange={(value) => onFilterChange({ status: value ? (value === "all" ? undefined : value as RequestStatus) : undefined })}
                 >
                   <SelectTrigger id="status">
                     <SelectValue placeholder="Alle Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Alle Status</SelectItem>
+                    <SelectItem value="all">Alle Status</SelectItem>
                     <SelectItem value={RequestStatus.NEW}>Neu</SelectItem>
                     <SelectItem value={RequestStatus.IN_PROGRESS}>In Bearbeitung</SelectItem>
                     <SelectItem value={RequestStatus.COMPLETED}>Abgeschlossen</SelectItem>
@@ -109,13 +109,13 @@ export const RequestFilterPanel: React.FC<RequestFilterPanelProps> = ({
                 <Label htmlFor="service">Service</Label>
                 <Select
                   value={filters.service || ''}
-                  onValueChange={(value) => onFilterChange({ service: value || undefined })}
+                  onValueChange={(value) => onFilterChange({ service: value === "all" ? undefined : value || undefined })}
                 >
                   <SelectTrigger id="service">
                     <SelectValue placeholder="Alle Services" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Alle Services</SelectItem>
+                    <SelectItem value="all">Alle Services</SelectItem>
                     <SelectItem value="Website-Entwicklung">Website-Entwicklung</SelectItem>
                     <SelectItem value="SEO-Optimierung">SEO-Optimierung</SelectItem>
                     <SelectItem value="Online-Marketing">Online-Marketing</SelectItem>

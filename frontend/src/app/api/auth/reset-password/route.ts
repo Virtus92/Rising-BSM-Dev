@@ -5,8 +5,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess } from '@/infrastructure/api/response-formatter';
+import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
 import { getAuthService } from '@/infrastructure/common/factories';
+import { getLogger } from '@/infrastructure/common/logging';
 
 /**
  * POST /api/auth/reset-password
@@ -14,6 +15,7 @@ import { getAuthService } from '@/infrastructure/common/factories';
  * Setzt das Passwort mit einem gültigen Reset-Token zurück.
  */
 export const POST = apiRouteHandler(async (req: NextRequest) => {
+  const logger = getLogger();
   // Parse den Anfragekörper
   const { token, password, confirmPassword } = await req.json();
   
@@ -51,12 +53,50 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
     );
   }
   
-  // Für die Entwicklungsphase simulieren wir ein erfolgreiches Passwort-Reset
-  // In der Produktion würden wir den AuthService verwenden
-  
-  // Formatiere die Antwort
-  return NextResponse.json(
-    formatSuccess({}, 'Password has been reset successfully'),
-    { status: 200 }
-  );
+  try {
+    // Use the AuthService to reset the password
+    const authService = getAuthService();
+    
+    // First validate the token
+    const isValidToken = await authService.validateResetToken(token);
+    if (!isValidToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Invalid or expired token',
+          timestamp: new Date().toISOString()
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Reset the password
+    const result = await authService.resetPassword({
+      token,
+      password,
+      confirmPassword,
+      email: '' // The email will be determined from the token by the service
+    });
+    
+    logger.info('Password reset successfully');
+    
+    // Return success response
+    return NextResponse.json(
+      formatSuccess({}, 'Password has been reset successfully'),
+      { status: 200 }
+    );
+  } catch (error) {
+    logger.error('Error resetting password', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    return NextResponse.json(
+      formatError(
+        error instanceof Error ? error.message : 'Failed to reset password',
+        error instanceof Error && error.message.includes('token') ? 400 : 500
+      ),
+      { status: error instanceof Error && error.message.includes('token') ? 400 : 500 }
+    );
+  }
 }, { requiresAuth: false });

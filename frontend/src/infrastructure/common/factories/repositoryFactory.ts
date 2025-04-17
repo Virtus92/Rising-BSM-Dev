@@ -13,6 +13,7 @@ import { ActivityLogRepository } from '@/infrastructure/repositories/ActivityLog
 import { AppointmentRepository } from '@/infrastructure/repositories/AppointmentRepository';
 import { RequestRepository } from '@/infrastructure/repositories/RequestRepository';
 import { NotificationRepository } from '@/infrastructure/repositories/NotificationRepository';
+import { PermissionRepository } from '@/infrastructure/repositories/PermissionRepository';
 
 // Interfaces
 import { IUserRepository } from '@/domain/repositories/IUserRepository';
@@ -22,6 +23,7 @@ import { IActivityLogRepository } from '@/domain/repositories/IActivityLogReposi
 import { IAppointmentRepository } from '@/domain/repositories/IAppointmentRepository';
 import { IRequestRepository } from '@/domain/repositories/IRequestRepository';
 import { INotificationRepository } from '@/domain/repositories/INotificationRepository';
+import { IPermissionRepository } from '@/domain/repositories/IPermissionRepository';
 
 // Singleton-Instanzen für Repositories
 let userRepository: UserRepository;
@@ -31,6 +33,7 @@ let activityLogRepository: ActivityLogRepository;
 let appointmentRepository: AppointmentRepository;
 let requestRepository: RequestRepository;
 let notificationRepository: NotificationRepository;
+let permissionRepository: PermissionRepository;
 
 /**
  * Gibt eine Singleton-Instanz des UserRepository zurück
@@ -121,13 +124,28 @@ export function getRequestRepository(): IRequestRepository {
  */
 export function getNotificationRepository(): INotificationRepository {
   if (!notificationRepository) {
-    // Create properly initialized NotificationRepository
+    // Create properly initialized NotificationRepository with prisma client
     notificationRepository = new NotificationRepository(
+      getPrismaClient(),
       getLogger(),
       getErrorHandler()
     );
   }
   return notificationRepository;
+}
+
+/**
+ * Returns a singleton instance of the PermissionRepository
+ */
+export function getPermissionRepository(): IPermissionRepository {
+  if (!permissionRepository) {
+    permissionRepository = new PermissionRepository(
+      getPrismaClient(),
+      getLogger(),
+      getErrorHandler()
+    );
+  }
+  return permissionRepository;
 }
 
 /**
@@ -141,4 +159,5 @@ export function resetRepositories(): void {
   appointmentRepository = undefined as any;
   requestRepository = undefined as any;
   notificationRepository = undefined as any;
+  permissionRepository = undefined as any;
 }

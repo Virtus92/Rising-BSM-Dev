@@ -20,6 +20,8 @@ import { resetRepositories } from './factories/repositoryFactory';
 import { resetServices as resetServiceInstances } from './factories/serviceFactory';
 import { configService } from '@/infrastructure/services/ConfigService';
 import { createApiErrorInterceptor } from '@/infrastructure/common/error/ApiErrorInterceptor';
+import { User } from 'lucide-react';
+import { UserStatus } from '@/domain';
 
 // Singleton instances
 let errorHandler: IErrorHandler;
@@ -79,21 +81,27 @@ export async function bootstrap(): Promise<void> {
     });
     logger.debug('API error interceptor initialized');
     
-    // Initialize API client only if not already initializing or initialized
+    // Initialize API client only in client context
     const apiConfig = configService.getApiConfig();
-    await ApiClient.initialize({
-      baseUrl: apiConfig.baseUrl,
-      autoRefreshToken: true,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Client-Version': '1.0.0'
-      }
-    });
-    logger.debug('API client initialized with baseUrl', { baseUrl: apiConfig.baseUrl });
+    if (typeof window !== 'undefined') {
+      // We're in a client context, safe to initialize ApiClient
+      await ApiClient.initialize({
+        baseUrl: apiConfig.baseUrl,
+        autoRefreshToken: true,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Version': '1.0.0'
+        }
+      });
+      logger.debug('API client initialized with baseUrl', { baseUrl: apiConfig.baseUrl });
 
-    // Initialize token manager
-    await TokenManager.initialize();
-    logger.debug('Token manager initialized');
+      // Initialize token manager (also client-only)
+      await TokenManager.initialize();
+      logger.debug('Token manager initialized');
+    } else {
+      // Server context - skip client-only initialization
+      logger.debug('Skipping client-only API and token manager initialization in server context');
+    }
     
     // Lazy-load factories to avoid circular dependencies
     const { getPrismaClient } = await import('./factories/databaseFactory');
@@ -104,7 +112,8 @@ export async function bootstrap(): Promise<void> {
       getRequestRepository,
       getActivityLogRepository,
       getNotificationRepository,
-      getRefreshTokenRepository 
+      getRefreshTokenRepository,
+      getPermissionRepository
     } = await import('./factories/repositoryFactory');
     
     const { 
@@ -115,7 +124,8 @@ export async function bootstrap(): Promise<void> {
       getRequestService,
       getActivityLogService,
       getNotificationService,
-      getRefreshTokenService 
+      getRefreshTokenService,
+      getPermissionService 
     } = await import('./factories/serviceFactory');
     
     // Initialize Prisma
@@ -130,18 +140,52 @@ export async function bootstrap(): Promise<void> {
     getActivityLogRepository();
     getNotificationRepository();
     getRefreshTokenRepository();
+    const permissionRepo = getPermissionRepository();
     logger.debug('Repositories initialized');
+    
+    // Seed permissions if needed
+    try {
+      logger.info('Seeding permissions...');
+      await permissionRepo.seedDefaultPermissions();
+      logger.info('Permission seeding completed');
+    } catch (error) {
+      logger.error('Error seeding permissions', { error });
+      // Don't block startup for permission seeding
+    }
     
     // Initialize services
     getAuthService();
-    getUserService();
+    const userService = getUserService();
     getCustomerService();
     getAppointmentService();
     getRequestService();
     getActivityLogService();
     getNotificationService();
     getRefreshTokenService();
+    const permissionService = getPermissionService();
     logger.debug('Services initialized');
+    
+    // Initialize permission cache for existing users
+    try {
+      logger.info('Pre-warming permission cache...');
+      // Get a limited number of active users to pre-warm the cache
+      const activeUsers = await userService.findUsers({
+        status: UserStatus.ACTIVE,
+        limit: 20,
+        page: 1
+      });
+      
+      if (activeUsers.data?.length) {
+        // Initialize permission cache for these users
+        for (const user of activeUsers.data) {
+          await permissionService.getUserPermissions(user.id);
+        }
+        logger.info(`Pre-warmed permission cache for ${activeUsers.data.length} active users`);
+      }
+    } catch (error) {
+      logger.error('Error pre-warming permission cache', { error });
+      // Don't block startup for cache warming
+    }
     
     logger.info('Application bootstrap completed successfully');
   } catch (error) {

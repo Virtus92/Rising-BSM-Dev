@@ -3,89 +3,76 @@ import { apiRouteHandler } from '@/infrastructure/api/route-handler';
 import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
 import { getLogger } from '@/infrastructure/common/logging';
 import { getServiceFactory } from '@/infrastructure/common/factories';
+import { generateYearlyStats } from '@/shared/utils/statistics-utils';
+import { RequestResponseDto } from '@/domain/dtos/RequestDtos';
+import { RequestStatus } from '@/domain/enums/CommonEnums';
 
 /**
  * GET /api/requests/stats/yearly
- * Returns yearly request statistics
+ * 
+ * Returns yearly contact request statistics
  */
 export const GET = apiRouteHandler(async (request: NextRequest) => {
   const logger = getLogger();
-  const serviceFactory = getServiceFactory();
   
   try {
     // Get URL parameters
     const url = new URL(request.url);
-    const years = parseInt(url.searchParams.get('years') || '3', 10); // Default to 3 years
+    const years = parseInt(url.searchParams.get('years') || '3', 10);
     
-    // Get request service
+    const serviceFactory = getServiceFactory();
     const requestService = serviceFactory.createRequestService();
     
-    // Create context with user ID
-    const context = { userId: request.auth?.userId };
-    
-    // Get repository for direct data access
-    const repository = requestService.getRepository();
-    
-    // Calculate date ranges for the years
-    const today = new Date();
-    const endDate = new Date(today);
-    const startDate = new Date(today);
-    startDate.setFullYear(today.getFullYear() - years);
-    
-    // Initialize yearly stats
-    const yearlyStats = [];
-    
-    // Get all requests in the date range
-    const requests = await repository.findByCriteria({
-      createdAt: {
-        gte: startDate,
-        lte: endDate
+    // Get all requests
+    const requestsResponse = await requestService.findAll({
+      limit: 1000, // High limit to get all requests
+      context: {
+        userId: request.auth?.userId
       }
     });
     
-    // Group requests by year
-    const requestsByYear = new Map<number, any[]>();
-    
-    for (const request of requests) {
-      const date = new Date(request.createdAt);
-      const year = date.getFullYear();
-      
-      if (!requestsByYear.has(year)) {
-        requestsByYear.set(year, []);
-      }
-      
-      requestsByYear.get(year)?.push(request);
+    let requests: RequestResponseDto[] = [];
+    if (requestsResponse && requestsResponse.data) {
+      requests = requestsResponse.data;
     }
     
-    // Create stats for each year
-    for (let y = today.getFullYear() - years + 1; y <= today.getFullYear(); y++) {
-      const yearRequests = requestsByYear.get(y) || [];
+    // Generate yearly stats using our utility function
+    const yearlyStats = generateYearlyStats(
+      requests,
+      (request: RequestResponseDto) => request.createdAt,
+      years
+    );
+    
+    // Enrich with additional data needed for the UI
+    const enrichedStats = yearlyStats.map(stat => {
+      // Filter requests for this period
+      const periodRequests = requests.filter(req => {
+        const createdDate = new Date(req.createdAt);
+        return createdDate >= new Date(stat.startDate) && 
+               createdDate <= new Date(stat.endDate);
+      });
       
       // Count by status
-      const newRequests = yearRequests.filter(r => r.status === 'NEW').length;
-      const inProgress = yearRequests.filter(r => r.status === 'IN_PROGRESS').length;
-      const completed = yearRequests.filter(r => r.status === 'COMPLETED').length;
-      const cancelled = yearRequests.filter(r => r.status === 'CANCELLED').length;
-      const convertedToCustomer = yearRequests.filter(r => r.convertedToCustomer).length;
+      const newRequests = periodRequests.filter(r => r.status === RequestStatus.NEW).length;
+      const inProgress = periodRequests.filter(r => r.status === RequestStatus.IN_PROGRESS).length;
+      const completed = periodRequests.filter(r => r.status === RequestStatus.COMPLETED).length;
+      const cancelled = periodRequests.filter(r => r.status === RequestStatus.CANCELLED).length;
+      const convertedToCustomer = periodRequests.filter(r => r.customerId !== null && r.customerId !== undefined).length;
       
-      // Add to yearly stats
-      yearlyStats.push({
-        year: y,
-        total: yearRequests.length,
+      return {
+        ...stat,
+        requests: stat.count,
         new: newRequests,
         inProgress,
         completed,
         cancelled,
         convertedToCustomer,
-        // Calculate conversion rate
-        conversionRate: yearRequests.length > 0
-          ? convertedToCustomer / yearRequests.length
-          : 0
-      });
-    }
+        conversionRate: stat.count > 0 ? Math.round((convertedToCustomer / stat.count) * 100) : 0
+      };
+    });
     
     return formatSuccess(
-      yearlyStats, 
+      enrichedStats, 
       'Yearly request statistics retrieved successfully'
     );
   } catch (error) {

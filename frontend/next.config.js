@@ -19,6 +19,15 @@ const nextConfig = {
   images: {
     domains: ['localhost'],
   },
+
+  // Add a Webpack rule to ignore .html files
+  webpack: (config) => {
+    config.module.rules.push({
+      test: /\.html$/,
+      use: 'ignore-loader',
+    });
+    return config;
+  },
 };
 
 module.exports = nextConfig;

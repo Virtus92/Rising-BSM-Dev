@@ -252,7 +252,7 @@ export class TokenManager {
    * @param token - JWT token
    * @returns User information or null for invalid token
    */
-  static getUserFromToken(token: string): { id: number; name: string; email: string; role: string } | null {
+  static getUserFromToken(token: string): { id: number; name: string; email: string; role: string; iss?: string; aud?: string } | null {
     try {
       const decoded = jwtDecode<TokenPayloadDto>(token);
       
@@ -284,6 +284,9 @@ export class TokenManager {
         name: decoded.name,
         email: decoded.email,
         role: decoded.role,
+        // Include standard JWT claims if present
+        iss: decoded.iss,
+        aud: decoded.aud
       };
     } catch (error) {
       getLogger().error('Token decoding failed:', { error });
@@ -363,20 +366,42 @@ export class TokenManager {
     }
   }
 
+  // Flag to track refresh attempts and prevent infinite loops
+  private static isRefreshing = false;
+  private static refreshCallbacks: Array<(success: boolean) => void> = [];
+  private static lastRefreshAttempt = 0;
+  private static failedRefreshCount = 0;
+
   /**
-   * Refreshes the access token by making an API call to the refresh endpoint
-   * Tokens are handled by HTTP-only cookies set by the server
-   * 
-   * @returns Promise<boolean> True if refresh was successful
+   * Refresh the access token
    */
   static async refreshAccessToken(): Promise<boolean> {
     const logger = getLogger();
     
     try {
-      logger.debug('Starting token refresh');
+      // Prevent multiple refresh attempts at the same time
+      if (this.isRefreshing) {
+        logger.debug('Already refreshing token, waiting for completion...');
+        
+        // Wait for the existing refresh operation to complete
+        return await new Promise((resolve) => {
+          this.refreshCallbacks.push((success: boolean) => resolve(success));
+        });
+      }
       
-      // Synchronize tokens to ensure we have the best chance of having valid cookies
-      this.synchronizeTokens();
+      // Set refreshing flag to prevent multiple simultaneous requests
+      this.isRefreshing = true;
+      
+      // Check if the refresh token request was made recently (prevent rapid retries)
+      const now = Date.now();
+      if (this.lastRefreshAttempt && (now - this.lastRefreshAttempt) < 5000) { // 5 seconds
+        logger.debug('Token refresh attempted too recently, skipping');
+        this.isRefreshing = false;
+        return false;
+      }
+      
+      this.lastRefreshAttempt = now;
+      logger.debug('Attempting to refresh token');
       
       // Add a timestamp to prevent caching
       const timestamp = new Date().getTime();
@@ -533,6 +558,22 @@ export class TokenManager {
             // If the server returns 401 or 403, notify about auth change on last attempt
             if ((response.status === 401 || response.status === 403) && currentRetry === maxRetries) {
               this.notifyAuthChange(false);
+              
+              // Redirect to login page if token refresh fails completely
+              if (this.failedRefreshCount >= 2 && typeof window !== 'undefined') {
+                logger.debug('Too many failed token refresh attempts, redirecting to login');
+                
+                // Add a slight delay to avoid immediate redirect
+                setTimeout(() => {
+                  // Clear failed count after redirecting
+                  this.failedRefreshCount = 0;
+                  
+                  // Redirect with current path as return URL
+                  window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
+                }, 500);
+              } else {
+                this.failedRefreshCount++;
+              }
             }
             
             // If this is the last retry, break out
@@ -559,12 +600,92 @@ export class TokenManager {
       }
       
       // If we get here, all retries failed
+      this.isRefreshing = false;
+      this.refreshCallbacks.forEach(callback => callback(false));
+      this.refreshCallbacks = [];
+      
+      // Increment failed refresh count for potential redirect on subsequent attempts
+      this.failedRefreshCount++;
+      logger.debug(`Token refresh failed after all attempts. Failed count: ${this.failedRefreshCount}`);
+      
+      // If we've failed too many times, redirect to login
+      if (this.failedRefreshCount >= 3 && typeof window !== 'undefined') {
+        logger.warn('Too many consecutive refresh failures, redirecting to login');
+        
+        // Clear the count
+        this.failedRefreshCount = 0;
+        
+        // Redirect after a small delay
+        setTimeout(() => {
+          window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
+        }, 300);
+      }
+      
       return false;
     } catch (error) {
       logger.error('Token refresh outer error:', { error });
+      
+      // Clear flags and notify callbacks
+      this.isRefreshing = false;
+      this.refreshCallbacks.forEach(callback => callback(false));
+      this.refreshCallbacks = [];
+      
+      // Increment failed count
+      this.failedRefreshCount++;
+      
+      // After multiple consecutive failures, redirect to login
+      if (this.failedRefreshCount >= 3 && typeof window !== 'undefined') {
+        logger.warn('Too many token refresh errors, redirecting to login');
+        
+        // Clear the count
+        this.failedRefreshCount = 0;
+        
+        // Redirect with a delay
+        setTimeout(() => {
+          window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
+        }, 300);
+      }
+      
       return false;
     }
   }
+
+    /**
+   * Validates the current access token
+   * 
+   * @returns Whether the token is valid
+   */
+    static async validateToken(): Promise<boolean> {
+      try {
+        // Get the current access token
+        const token = TokenManager.getAccessToken();
+        
+        if (!token) {
+          return false;
+        }
+        
+        // Call the validate endpoint to check if token is valid
+        const response = await fetch('/api/auth/validate', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          return false;
+        }
+        
+        const data = await response.json();
+        return data.success === true;
+      } catch (error) {
+        console.error('Error validating token:', 
+          error instanceof Error ? error.message : String(error));
+        return false;
+      }
+    }
 
   /**
    * Checks if a user has a specific role or one of multiple roles

@@ -1,104 +1,126 @@
 /**
- * Basis-DTO für Abfrageparameter
+ * Base Data Transfer Object for query parameters
  */
 export interface BaseFilterParamsDto {
   /**
-   * Suchtext
+   * Search text for filtering
    */
   search?: string;
   
   /**
-   * Seitennummer
+   * Page number for pagination (1-based)
    */
   page?: number;
   
   /**
-   * Einträge pro Seite
+   * Number of items per page
    */
   limit?: number;
   
   /**
-   * Sortierfeld
+   * Field to sort by
    */
   sortBy?: string;
   
   /**
-   * Sortierrichtung
+   * Sort direction
    */
   sortDirection?: 'asc' | 'desc';
   
   /**
-   * Startdatum für die Filterung
+   * Start date for filtering date ranges
    */
   startDate?: Date;
   
   /**
-   * Enddatum für die Filterung
+   * End date for filtering date ranges
    */
   endDate?: Date;
+  
+  /**
+   * Related entities to include in the response
+   * 
+   * @example ['customer', 'notes']
+   */
+  relations?: string[];
+  
+  /**
+   * Whether to include deleted items (soft-delete)
+   */
+  includeDeleted?: boolean;
 }
 
 /**
- * Basis-DTO für Antworten
+ * Base DTO for entity responses
  */
 export interface BaseResponseDto {
   /**
-   * Entitäts-ID
+   * Entity ID
    */
   id: number;
   
   /**
-   * Erstellungszeitpunkt
+   * Creation timestamp
    */
   createdAt: string;
   
   /**
-   * Aktualisierungszeitpunkt
+   * Last update timestamp
    */
   updatedAt: string;
   
   /**
-   * ID des erstellenden Benutzers
+   * ID of the user who created this entity
    */
   createdBy?: number;
   
   /**
-   * ID des aktualisierenden Benutzers
+   * ID of the user who last updated this entity
    */
   updatedBy?: number;
 }
 
 /**
- * Basis-DTO für Paginierungsergebnisse
+ * Base DTO for pagination information
+ */
+export interface PaginationMetaDto {
+  /**
+   * Current page number (1-based)
+   */
+  page: number;
+  
+  /**
+   * Number of items per page
+   */
+  limit: number;
+  
+  /**
+   * Total number of items across all pages
+   */
+  total: number;
+  
+  /**
+   * Total number of pages
+   */
+  totalPages: number;
+}
+
+/**
+ * Base DTO for paginated results
  */
 export interface PaginationResultDto<T> {
   /**
-   * Daten
+   * Data items for the current page
    */
   data: T[];
   
   /**
-   * Paginierungsinformationen
+   * Pagination metadata
    */
-  pagination: {
-    /**
-     * Aktuelle Seite
-     */
-    page: number;
-    
-    /**
-     * Einträge pro Seite
-     */
-    limit: number;
-    
-    /**
-     * Gesamtanzahl der Einträge
-     */
-    total: number;
-    
-    /**
-     * Gesamtanzahl der Seiten
-     */
-    totalPages: number;
-  };
+  pagination: PaginationMetaDto;
+  
+  /**
+   * Optional metadata about the results
+   */
+  meta?: Record<string, any>;
 }

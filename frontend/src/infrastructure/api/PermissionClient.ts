@@ -1,0 +1,236 @@
+/**
+ * API-Client for Permission Management
+ */
+import { 
+  CreatePermissionDto, 
+  UpdatePermissionDto, 
+  PermissionResponseDto,
+  UserPermissionsResponseDto,
+  UpdateUserPermissionsDto
+} from '@/domain/dtos/PermissionDtos';
+import { ApiClient, ApiResponse, apiClient } from '@/infrastructure/clients/ApiClient';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+
+// API-URL for permissions
+const PERMISSIONS_API_URL = '/permissions';
+const USER_PERMISSIONS_API_URL = '/users/permissions';
+
+/**
+ * Client for permission API requests
+ */
+export class PermissionClient {
+  /**
+   * Singleton instance of the API client
+   */
+  private static apiClient = apiClient;
+
+  /**
+   * Maximum number of retries for API calls
+   */
+  private static MAX_RETRIES = 2;
+
+  /**
+   * Base timeout for API calls in milliseconds
+   */
+  private static BASE_TIMEOUT = 5000;
+
+  /**
+   * Helper method to handle API requests with retry logic
+   * 
+   * @param method - Request method (get, post, etc.)
+   * @param url - API endpoint URL
+   * @param data - Optional data for POST/PUT requests
+   * @returns API response
+   */
+  private static async apiRequest<T>(
+    method: 'get' | 'post' | 'put' | 'delete' | 'patch',
+    url: string, 
+    data?: any,
+    customParams?: { maxRetries?: number }
+  ): Promise<ApiResponse<T>> {
+    const maxRetries = customParams?.maxRetries ?? PermissionClient.MAX_RETRIES;
+    let attempts = 0;
+
+    // Implement retry logic for transient errors
+    while (attempts <= maxRetries) {
+      try {
+        // Use the appropriate method from the API client
+        if (method === 'get') {
+          return await PermissionClient.apiClient.get(url);
+        } else if (method === 'post') {
+          return await PermissionClient.apiClient.post(url, data);
+        } else if (method === 'put') {
+          return await PermissionClient.apiClient.put(url, data);
+        } else if (method === 'delete') {
+          return await PermissionClient.apiClient.delete(url);
+        } else if (method === 'patch') {
+          return await PermissionClient.apiClient.patch(url, data);
+        }
+
+        // If we get here, method was invalid (shouldn't happen due to TypeScript)
+        throw new Error(`Invalid API method: ${method}`);
+      } catch (error: any) {
+        attempts++;
+        
+        // Only retry for network or server errors (not validation or auth errors)
+        const isTransientError = (
+          !error.statusCode || // Network error
+          error.statusCode >= 500 || // Server error
+          error.statusCode === 429 // Rate limiting
+        );
+        
+        if (!isTransientError || attempts > maxRetries) {
+          // Don't retry client errors or if we've reached max retries
+          if (error.message) {
+            console.error(`API error (${method.toUpperCase()} ${url}):`, error.message);
+            return {
+              success: false,
+              message: error.message,
+              data: null,
+              statusCode: error.statusCode || 500
+            };
+          }
+          break;
+        }
+        
+        // Exponential backoff: wait longer between each retry
+        const delayMs = Math.pow(2, attempts) * 100;
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    
+    // If we get here, all retries failed or we had a non-retryable error
+    console.error(`All retries failed for ${method.toUpperCase()} ${url}`);
+    return {
+      success: false,
+      message: `Failed to ${method} data after multiple attempts`,
+      data: null,
+      statusCode: 500
+    };
+  }
+
+  /**
+   * Creates query parameters from an object
+   */
+  private static createQueryParams(params: Record<string, any> = {}): string {
+    const queryParams = new URLSearchParams();
+    
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value));
+      }
+    });
+    
+    const queryString = queryParams.toString();
+    return queryString ? `?${queryString}` : '';
+  }
+
+  /**
+   * Gets all permissions with optional filtering
+   * 
+   * @param params - Optional filter parameters
+   * @returns API response
+   */
+  static async getPermissions(params: Record<string, any> = {}): Promise<ApiResponse<PaginationResult<PermissionResponseDto>>> {
+    const queryString = PermissionClient.createQueryParams(params);
+    const url = `${PERMISSIONS_API_URL}${queryString}`;
+    
+    return await PermissionClient.apiRequest<PaginationResult<PermissionResponseDto>>('get', url);
+  }
+  
+  /**
+   * Gets a permission by ID
+   * 
+   * @param id - Permission ID
+   * @returns API response
+   */
+  static async getPermissionById(id: number | string): Promise<ApiResponse<PermissionResponseDto>> {
+    return await PermissionClient.apiRequest<PermissionResponseDto>('get', `${PERMISSIONS_API_URL}/${id}`);
+  }
+  
+  /**
+   * Gets a permission by code
+   * 
+   * @param code - Permission code
+   * @returns API response
+   */
+  static async getPermissionByCode(code: string): Promise<ApiResponse<PermissionResponseDto>> {
+    return await PermissionClient.apiRequest<PermissionResponseDto>('get', `${PERMISSIONS_API_URL}/by-code/${code}`);
+  }
+  
+  /**
+   * Creates a new permission
+   * 
+   * @param data - Permission data
+   * @returns API response
+   */
+  static async createPermission(data: CreatePermissionDto): Promise<ApiResponse<PermissionResponseDto>> {
+    return await PermissionClient.apiRequest<PermissionResponseDto>('post', PERMISSIONS_API_URL, data);
+  }
+  
+  /**
+   * Updates a permission
+   * 
+   * @param id - Permission ID
+   * @param data - Permission update data
+   * @returns API response
+   */
+  static async updatePermission(id: number | string, data: UpdatePermissionDto): Promise<ApiResponse<PermissionResponseDto>> {
+    return await PermissionClient.apiRequest<PermissionResponseDto>('put', `${PERMISSIONS_API_URL}/${id}`, data);
+  }
+  
+  /**
+   * Deletes a permission
+   * 
+   * @param id - Permission ID
+   * @returns API response
+   */
+  static async deletePermission(id: number | string): Promise<ApiResponse<void>> {
+    return await PermissionClient.apiRequest<void>('delete', `${PERMISSIONS_API_URL}/${id}`);
+  }
+  
+  /**
+   * Gets permissions for a user
+   * 
+   * @param userId - User ID
+   * @returns API response
+   */
+  static async getUserPermissions(userId: number | string): Promise<ApiResponse<UserPermissionsResponseDto>> {
+    return await PermissionClient.apiRequest<UserPermissionsResponseDto>('get', `${USER_PERMISSIONS_API_URL}?userId=${userId}`);
+  }
+  
+  /**
+   * Updates permissions for a user
+   * 
+   * @param data - Update data
+   * @returns API response
+   */
+  static async updateUserPermissions(data: UpdateUserPermissionsDto): Promise<ApiResponse<boolean>> {
+    return await PermissionClient.apiRequest<boolean>('post', USER_PERMISSIONS_API_URL, data);
+  }
+  
+  /**
+   * Gets default permissions for a role
+   * 
+   * @param role - User role
+   * @returns API response
+   */
+  static async getDefaultPermissionsForRole(role: string): Promise<ApiResponse<string[]>> {
+    return await PermissionClient.apiRequest<string[]>('get', `${PERMISSIONS_API_URL}/role-defaults/${role}`);
+  }
+  
+  /**
+   * Checks if a user has a specific permission
+   * 
+   * @param userId - User ID
+   * @param permission - Permission to check
+   * @returns API response indicating whether user has the permission
+   */
+  static async hasPermission(userId: number | string, permission: SystemPermission | string): Promise<ApiResponse<boolean>> {
+    return await PermissionClient.apiRequest<boolean>(
+      'get',
+      `${USER_PERMISSIONS_API_URL}/check?userId=${userId}&permission=${encodeURIComponent(permission)}`
+    );
+  }
+}

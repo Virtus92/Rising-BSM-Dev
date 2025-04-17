@@ -8,6 +8,7 @@ import { IAppointmentRepository } from '@/domain/repositories/IAppointmentReposi
 import { ILoggingService } from '@/infrastructure/common/logging/ILoggingService';
 import { IValidationService } from '@/infrastructure/common/validation/IValidationService';
 import { IErrorHandler } from '@/infrastructure/common/error/ErrorHandler';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 import {
   CreateRequestDto,
   UpdateRequestDto,
@@ -20,12 +21,15 @@ import {
 import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
 import { mapRequestToDto } from '@/domain/dtos/RequestDtos';
 import { ServiceOptions } from '@/domain/services/IBaseService';
-import { RequestStatus } from '@/domain/enums/CommonEnums';
+import { RequestStatus, AppointmentStatus, CustomerType } from '@/domain/enums/CommonEnums';
 import { Customer } from '@/domain/entities/Customer';
-import { CustomerType } from '@/domain/enums/CommonEnums';
 import { Appointment } from '@/domain/entities/Appointment';
-import { AppointmentStatus } from '@/domain/enums/CommonEnums';
-import { AppointmentService } from './AppointmentService';
+import { 
+  getRequestStatusLabel, 
+  getRequestStatusClass,
+  getAppointmentStatusLabel,
+  getAppointmentStatusClass 
+} from '@/domain/utils/statusUtils';
 
 /**
  * Service für Kontaktanfragen
@@ -62,6 +66,106 @@ export class RequestService extends BaseService<
   }
 
   /**
+   * Find all requests with pagination and filtering
+   * 
+   * @param options Service options including pagination and filters
+   * @returns Paginated results
+   */
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<RequestResponseDto>> {
+    try {
+      // Convert service options to repository options
+      const repoOptions = this.mapToRepositoryOptions(options);
+      
+      // Add filter criteria if provided in options
+      if (options?.filters) {
+        repoOptions.criteria = {};
+        
+        if (options.filters.status) {
+          repoOptions.criteria.status = options.filters.status;
+        }
+        
+        if (options.filters.type) {
+          repoOptions.criteria.type = options.filters.type;
+        }
+        
+        if (options.filters.assignedTo) {
+          repoOptions.criteria.processorId = options.filters.assignedTo;
+        }
+        
+        if (options.filters.startDate && options.filters.endDate) {
+          repoOptions.criteria.createdAtRange = {
+            start: options.filters.startDate,
+            end: options.filters.endDate
+          };
+        } else if (options.filters.startDate) {
+          repoOptions.criteria.createdAtAfter = options.filters.startDate;
+        } else if (options.filters.endDate) {
+          repoOptions.criteria.createdAtBefore = options.filters.endDate;
+        }
+      }
+      
+      // Get requests from repository
+      const result = await this.repository.findAll(repoOptions);
+      
+      // Map entities to DTOs
+      return {
+        data: result.data.map(request => this.toDTO(request)),
+        pagination: result.pagination
+      };
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.findAll`, { 
+        error: error instanceof Error ? error.message : String(error),
+        options 
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Count requests with optional filtering
+   */
+  async count(options?: { 
+    context?: any, 
+    filters?: Record<string, any> 
+  }): Promise<number> {
+    try {
+      const criteria: Record<string, any> = {};
+      
+      if (options?.filters?.status) {
+        criteria.status = options.filters.status;
+      }
+      
+      if (options?.filters?.type) {
+        criteria.type = options.filters.type;
+      }
+      
+      if (options?.filters?.assignedTo) {
+        criteria.processorId = options.filters.assignedTo;
+      }
+      
+      if (options?.filters?.startDate && options?.filters?.endDate) {
+        criteria.createdAtRange = {
+          start: options.filters.startDate,
+          end: options.filters.endDate
+        };
+      } else if (options?.filters?.startDate) {
+        criteria.createdAtAfter = options.filters.startDate;
+      } else if (options?.filters?.endDate) {
+        criteria.createdAtBefore = options.filters.endDate;
+      }
+      
+      this.logger.info('Counting requests with criteria', { criteria });
+      return await this.repository.count(criteria);
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.count`, { 
+        error: error instanceof Error ? error.message : String(error),
+        filters: options?.filters 
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Erstellt eine neue Anfrage
    * 
    * @param data - Anfragedaten
@@ -95,7 +199,10 @@ export class RequestService extends BaseService<
         pagination: result.pagination
       };
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.findRequests`, { error, criteria });
+      this.logger.error(`Error in ${this.constructor.name}.findRequests`, { 
+        error: error instanceof Error ? error.message : String(error),
+        criteria 
+      });
       throw this.handleError(error);
     }
   }
@@ -175,7 +282,10 @@ export class RequestService extends BaseService<
         activityLogs: []
       };
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.findRequestById`, { error, id });
+      this.logger.error(`Error in ${this.constructor.name}.findRequestById`, { 
+        error: error instanceof Error ? error.message : String(error),
+        id 
+      });
       throw this.handleError(error);
     }
   }
@@ -241,7 +351,11 @@ export class RequestService extends BaseService<
 
       return this.toDTO(updatedRequest);
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.updateRequestStatus`, { error, id, data });
+      this.logger.error(`Error in ${this.constructor.name}.updateRequestStatus`, { 
+        error: error instanceof Error ? error.message : String(error),
+        id, 
+        data 
+      });
       throw this.handleError(error);
     }
   }
@@ -303,7 +417,12 @@ export class RequestService extends BaseService<
         updatedAt: note.updatedAt.toISOString()
       };
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.addNote`, { error, id, userId, text });
+      this.logger.error(`Error in ${this.constructor.name}.addNote`, { 
+        error: error instanceof Error ? error.message : String(error),
+        id, 
+        userId, 
+        text 
+      });
       throw this.handleError(error);
     }
   }
@@ -352,7 +471,11 @@ export class RequestService extends BaseService<
 
       return this.toDTO(updatedRequest);
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.assignRequest`, { error, id, userId });
+      this.logger.error(`Error in ${this.constructor.name}.assignRequest`, { 
+        error: error instanceof Error ? error.message : String(error),
+        id, 
+        userId 
+      });
       throw this.handleError(error);
     }
   }
@@ -443,7 +566,10 @@ export class RequestService extends BaseService<
         request: this.toDTO(updatedRequest)
       };
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.convertToCustomer`, { error, data });
+      this.logger.error(`Error in ${this.constructor.name}.convertToCustomer`, { 
+        error: error instanceof Error ? error.message : String(error),
+        data 
+      });
       throw this.handleError(error);
     }
   }
@@ -492,7 +618,11 @@ export class RequestService extends BaseService<
 
       return this.toDTO(updatedRequest);
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.linkToCustomer`, { error, requestId, customerId });
+      this.logger.error(`Error in ${this.constructor.name}.linkToCustomer`, { 
+        error: error instanceof Error ? error.message : String(error),
+        requestId, 
+        customerId 
+      });
       throw this.handleError(error);
     }
   }
@@ -566,15 +696,19 @@ export class RequestService extends BaseService<
         location: appointment.location,
         description: appointment.description,
         status: appointment.status,
-        statusLabel: this.getAppointmentStatusLabel(appointment.status),
-        statusClass: this.getAppointmentStatusClass(appointment.status),
+        statusLabel: getAppointmentStatusLabel(appointment.status),
+        statusClass: getAppointmentStatusClass(appointment.status),
         createdAt: appointment.createdAt.toISOString(),
         updatedAt: appointment.updatedAt.toISOString(),
         customerId: appointment.customerId,
         customerName: request.name
       };
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.createAppointmentForRequest`, { error, requestId, appointmentData });
+      this.logger.error(`Error in ${this.constructor.name}.createAppointmentForRequest`, { 
+        error: error instanceof Error ? error.message : String(error),
+        requestId, 
+        appointmentData 
+      });
       throw this.handleError(error);
     }
   }
@@ -622,7 +756,9 @@ export class RequestService extends BaseService<
         conversionRate: Math.round(conversionRate * 100) / 100 // Auf 2 Dezimalstellen runden
       };
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.getRequestStats`, { error });
+      this.logger.error(`Error in ${this.constructor.name}.getRequestStats`, {
+        error: error instanceof Error ? error.message : String(error)
+      });
       throw this.handleError(error);
     }
   }
@@ -640,8 +776,8 @@ export class RequestService extends BaseService<
     // Erweitere mit zusätzlichen Informationen
     return {
       ...baseDto,
-      statusLabel: this.getStatusLabel(entity.status),
-      statusClass: this.getStatusClass(entity.status),
+      statusLabel: getRequestStatusLabel(entity.status),
+      statusClass: getRequestStatusClass(entity.status),
       processorName: entity.processorId ? `User ID ${entity.processorId}` : undefined,
       customerName: entity.customerId ? `Customer ID ${entity.customerId}` : undefined,
       appointmentTitle: entity.appointmentId ? `Appointment ID ${entity.appointmentId}` : undefined
@@ -700,7 +836,7 @@ export class RequestService extends BaseService<
     return {
       name: { type: 'string', minLength: 2, maxLength: 100, required: false },
       email: { type: 'string', format: 'email', required: false },
-      phone: { type: 'string', pattern: '^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$', required: false },
+      phone: { type: 'string', pattern: '^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}}', required: false },
       service: { type: 'string', minLength: 2, maxLength: 100, required: false },
       message: { type: 'string', minLength: 10, maxLength: 1000, required: false },
       status: { type: 'string', enum: Object.values(RequestStatus), required: false },
@@ -708,89 +844,5 @@ export class RequestService extends BaseService<
       customerId: { type: 'number', required: false },
       appointmentId: { type: 'number', required: false }
     };
-  }
-
-  /**
-   * Gibt ein Label für einen Status zurück
-   * 
-   * @param status - Status
-   * @returns Label
-   */
-  private getStatusLabel(status: RequestStatus): string {
-    switch (status) {
-      case RequestStatus.NEW:
-        return 'Neu';
-      case RequestStatus.IN_PROGRESS:
-        return 'In Bearbeitung';
-      case RequestStatus.COMPLETED:
-        return 'Abgeschlossen';
-      case RequestStatus.CANCELLED:
-        return 'Abgebrochen';
-      default:
-        return 'Unbekannt';
-    }
-  }
-
-  /**
-   * Gibt eine CSS-Klasse für einen Status zurück
-   * 
-   * @param status - Status
-   * @returns CSS-Klasse
-   */
-  private getStatusClass(status: RequestStatus): string {
-    switch (status) {
-      case RequestStatus.NEW:
-        return 'bg-blue-100 text-blue-800';
-      case RequestStatus.IN_PROGRESS:
-        return 'bg-yellow-100 text-yellow-800';
-      case RequestStatus.COMPLETED:
-        return 'bg-green-100 text-green-800';
-      case RequestStatus.CANCELLED:
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  }
-  
-  /**
-   * Gibt ein Label für einen Terminstatus zurück
-   * 
-   * @param status - Terminstatus
-   * @returns Label
-   */
-  private getAppointmentStatusLabel(status: AppointmentStatus): string {
-    switch (status) {
-      case AppointmentStatus.PLANNED:
-        return 'Geplant';
-      case AppointmentStatus.CONFIRMED:
-        return 'Bestätigt';
-      case AppointmentStatus.COMPLETED:
-        return 'Abgeschlossen';
-      case AppointmentStatus.CANCELLED:
-        return 'Abgesagt';
-      default:
-        return 'Unbekannt';
-    }
-  }
-
-  /**
-   * Gibt eine CSS-Klasse für einen Terminstatus zurück
-   * 
-   * @param status - Terminstatus
-   * @returns CSS-Klasse
-   */
-  private getAppointmentStatusClass(status: AppointmentStatus): string {
-    switch (status) {
-      case AppointmentStatus.PLANNED:
-        return 'bg-blue-100 text-blue-800';
-      case AppointmentStatus.CONFIRMED:
-        return 'bg-green-100 text-green-800';
-      case AppointmentStatus.COMPLETED:
-        return 'bg-purple-100 text-purple-800';
-      case AppointmentStatus.CANCELLED:
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
   }
 }

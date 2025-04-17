@@ -15,7 +15,8 @@ npx prisma migrate deploy
 # Seed database if required
 if [ "$NODE_ENV" = "development" ] || [ "$SEED_DATABASE" = "true" ]; then
   echo -e "${YELLOW}Seeding database...${NC}"
-  npx prisma db seed
+  # Use our custom seed script
+  node scripts/seed.js
 fi
 
 # Start the application

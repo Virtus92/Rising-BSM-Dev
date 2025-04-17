@@ -620,11 +620,22 @@ export abstract class BaseService<T, C extends Record<string, any>, U extends Re
     // Type assertion for pagination options that might be passed from older code
     const serviceOptions = options as any;
     
+    // Add sort options if they exist
+    const sortOptions = options.sort ? {
+      sort: {
+        field: options.sort.field,
+        direction: options.sort.direction || 'asc'
+      }
+    } : {};
+    
+    this.logger.debug(`Mapping service options to repository options with sort:`, sortOptions);
+    
     return {
       page: serviceOptions.page,
       limit: serviceOptions.limit,
       relations,
-      withDeleted
+      withDeleted,
+      ...sortOptions
     };
   }
 

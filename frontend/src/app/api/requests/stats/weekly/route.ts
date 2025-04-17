@@ -3,6 +3,9 @@ import { apiRouteHandler } from '@/infrastructure/api/route-handler';
 import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
 import { getLogger } from '@/infrastructure/common/logging';
 import { getServiceFactory } from '@/infrastructure/common/factories';
+import { generateWeeklyStats } from '@/shared/utils/statistics-utils';
+import { RequestResponseDto } from '@/domain/dtos/RequestDtos';
+import { RequestStatus } from '@/domain/enums/CommonEnums';
 
 /**
  * GET /api/requests/stats/weekly
@@ -11,116 +14,71 @@ import { getServiceFactory } from '@/infrastructure/common/factories';
  */
 export const GET = apiRouteHandler(async (request: NextRequest) => {
   const logger = getLogger();
-  const serviceFactory = getServiceFactory();
   
   try {
     // Extract query parameters for customization
     const url = new URL(request.url);
     const weeksParam = url.searchParams.get('weeks');
-    const targetWeeks = weeksParam ? parseInt(weeksParam, 10) : 12; // Default to 12 weeks if not specified
+    const targetWeeks = weeksParam ? parseInt(weeksParam, 10) : 12; // Default to 12 weeks
     
-    // Get the request service
+    const serviceFactory = getServiceFactory();
     const requestService = serviceFactory.createRequestService();
     
-    // Context for service calls
-    const context = { userId: request.auth?.userId };
-    
-    // Get repository for direct data access
-    const repository = requestService.getRepository();
-    
-    // Calculate date ranges
-    const today = new Date();
-    const endDate = new Date(today);
-    
-    // Calculate start date (targetWeeks weeks ago)
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - (targetWeeks * 7));
-    
-    // Get requests in the date range
-    const requests = await repository.findByCriteria({
-      createdAt: {
-        gte: startDate,
-        lte: endDate
+    // Get all requests
+    const requestsResponse = await requestService.findAll({
+      limit: 1000, // High limit to get all requests
+      context: {
+        userId: request.auth?.userId
       }
     });
     
-    // Prepare the week map for organizing requests
-    const weekMap = new Map<string, any[]>();
-    
-    // Helper function to get the week number and year
-    const getWeekNumber = (date: Date): { week: number, year: number } => {
-      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-      const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-      return { week: weekNo, year: d.getUTCFullYear() };
-    };
-    
-    // Initialize week data for the target weeks
-    for (let i = 0; i < targetWeeks; i++) {
-      const weekDate = new Date(today);
-      weekDate.setDate(today.getDate() - (i * 7));
-      const { week, year } = getWeekNumber(weekDate);
-      const weekKey = `${year}-W${week.toString().padStart(2, '0')}`;
-      
-      if (!weekMap.has(weekKey)) {
-        weekMap.set(weekKey, []);
-      }
+    let requests: RequestResponseDto[] = [];
+    if (requestsResponse && requestsResponse.data) {
+      requests = requestsResponse.data;
     }
     
-    // Group requests by week
-    for (const request of requests) {
-      const date = new Date(request.createdAt);
-      const { week, year } = getWeekNumber(date);
-      const weekKey = `${year}-W${week.toString().padStart(2, '0')}`;
-      
-      if (!weekMap.has(weekKey)) {
-        weekMap.set(weekKey, []);
-      }
-      
-      weekMap.get(weekKey)?.push(request);
-    }
+    // Generate weekly stats using our utility function
+    const weeklyStats = generateWeeklyStats(
+      requests,
+      (req: RequestResponseDto) => req.createdAt,
+      targetWeeks
+    );
     
-    // Create weekly stats array sorted by date (newest first)
-    const weeklyStats = Array.from(weekMap.entries()).map(([weekKey, requests]) => {
-      // Count requests by status
-      const newRequests = requests.filter(r => r.status === 'NEW').length;
-      const inProgress = requests.filter(r => r.status === 'IN_PROGRESS').length;
-      const completed = requests.filter(r => r.status === 'COMPLETED').length;
-      const cancelled = requests.filter(r => r.status === 'CANCELLED').length;
-      const convertedToCustomer = requests.filter(r => r.convertedToCustomer).length;
+    // Enrich with additional data needed for the UI
+    const enrichedStats = weeklyStats.map(stat => {
+      // Filter requests for this period
+      const periodRequests = requests.filter(req => {
+        const createdDate = new Date(req.createdAt);
+        return createdDate >= new Date(stat.startDate) && 
+               createdDate <= new Date(stat.endDate);
+      });
       
-      // Parse weekKey (e.g., "2024-W15")
-      const [yearStr, weekStr] = weekKey.split('-W');
-      const year = parseInt(yearStr, 10);
-      const week = parseInt(weekStr, 10);
+      // Count by status
+      const newRequests = periodRequests.filter(r => r.status === RequestStatus.NEW).length;
+      const inProgress = periodRequests.filter(r => r.status === RequestStatus.IN_PROGRESS).length;
+      const completed = periodRequests.filter(r => r.status === RequestStatus.COMPLETED).length;
+      const cancelled = periodRequests.filter(r => r.status === RequestStatus.CANCELLED).length;
+      const convertedToCustomer = periodRequests.filter(r => r.customerId !== null && r.customerId !== undefined).length;
+      
+      // Extract week number from period string (e.g., "Week 15")
+      const week = parseInt(stat.period.replace('Week ', ''), 10);
       
       return {
-        weekKey,
-        year,
+        ...stat,
+        weekKey: `${stat.year}-W${week.toString().padStart(2, '0')}`,
         week,
-        total: requests.length,
+        label: stat.period,
+        total: stat.count,
         new: newRequests,
         inProgress,
         completed,
         cancelled,
         convertedToCustomer,
-        // Generate a label like "Week 15"
-        label: `Week ${week}`,
-        // Calculate conversion rate
-        conversionRate: requests.length > 0
-          ? convertedToCustomer / requests.length
-          : 0
+        conversionRate: stat.count > 0 ? (convertedToCustomer / stat.count) : 0
       };
-    }).sort((a, b) => {
-      // Sort by year and week (newest first)
-      if (a.year !== b.year) {
-        return b.year - a.year;
-      }
-      return b.week - a.week;
     });
     
-    return formatSuccess(weeklyStats, 'Weekly request statistics retrieved successfully');
+    return formatSuccess(enrichedStats, 'Weekly request statistics retrieved successfully');
   } catch (error) {
     logger.error('Error fetching weekly request statistics:', { 
       error: error instanceof Error ? error.message : String(error),

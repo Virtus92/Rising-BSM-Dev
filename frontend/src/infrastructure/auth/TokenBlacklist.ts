@@ -103,6 +103,33 @@ class TokenBlacklist {
    * @param token JWT token to check
    * @returns true if blacklisted, false otherwise
    */
+  /**
+   * Add a token to the blacklist with a specific expiration and reason
+   * @param tokenOrId Token string or JWT token ID
+   * @param expiresAt Expiration timestamp in milliseconds
+   * @param reason Reason for blacklisting the token
+   */
+  add(tokenOrId: string, expiresAt: number, reason?: string): void {
+    try {
+      // If it looks like a JWT, blacklist the token itself
+      if (tokenOrId.includes('.')) {
+        this.blacklistToken(tokenOrId);
+        return;
+      }
+      
+      // Otherwise, assume it's a token ID and add it to the blacklist
+      this.blacklistedTokens.push({
+        signature: tokenOrId, // Use the token ID as the signature
+        expires: expiresAt
+      });
+      
+      // Clean up expired tokens periodically
+      this.cleanupIfNeeded();
+    } catch (error) {
+      console.error('Error adding token to blacklist:', error);
+    }
+  }
+
   isBlacklisted(token: string): boolean {
     try {
       // Extract parts of the token

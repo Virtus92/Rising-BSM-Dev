@@ -41,10 +41,3 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
     </div>
   );
 }
-
-export function generateMetadata({ params }: RequestDetailPageProps) {
-  return {
-    title: `Anfrage #${params.id} | Rising BSM Dashboard`,
-    description: 'Details zu einer Kontaktanfrage',
-  };
-}

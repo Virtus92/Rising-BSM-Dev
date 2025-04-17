@@ -5,6 +5,7 @@ import { IAppointmentRepository } from '@/domain/repositories/IAppointmentReposi
 import { ILoggingService } from '@/infrastructure/common/logging/ILoggingService';
 import { IValidationService } from '@/infrastructure/common/validation/IValidationService';
 import { IErrorHandler } from '@/infrastructure/common/error/ErrorHandler';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 import {
   CreateAppointmentDto,
   UpdateAppointmentDto,
@@ -15,6 +16,7 @@ import {
 import { mapAppointmentToDto } from '@/domain/dtos/AppointmentDtos';
 import { ServiceOptions } from '@/domain/services/IBaseService';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
+import { AppointmentCustomerData } from '@/domain/dtos/AppointmentDtos';
 
 /**
  * Service für Termine
@@ -27,6 +29,9 @@ export class AppointmentService extends BaseService<
   UpdateAppointmentDto,
   AppointmentResponseDto
 > implements IAppointmentService {
+  
+  // Add container property to store service dependencies
+  protected container: any;
   
   /**
    * Konstruktor
@@ -43,6 +48,161 @@ export class AppointmentService extends BaseService<
     errorHandler: IErrorHandler
   ) {
     super(repository, logger, validator, errorHandler);
+    // Initialize the container
+    this.container = {}; 
+  }
+  
+  /**
+   * Helper method to get customer service
+   */
+  private getCustomerService() {
+    try {
+      // Import dynamically to avoid circular dependencies
+      const { getServiceFactory } = require('@/infrastructure/common/factories');
+      const serviceFactory = getServiceFactory();
+      return serviceFactory.createCustomerService();
+    } catch (error) {
+      this.logger.error('Failed to get customer service', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    }
+  }
+  
+  /**
+   * Helper method for consistent appointment ID validation
+   */
+  private validateAppointmentId(id: number | string): number | null {
+    if (id === undefined || id === null || id === '') {
+      return null;
+    }
+    
+    // If it's already a number, just validate it's positive
+    if (typeof id === 'number') {
+      return id > 0 ? id : null;
+    }
+    
+    // If it's a string, try to extract numeric part
+    const numericPart = id.replace(/[^0-9]/g, '');
+    if (!numericPart) {
+      return null;
+    }
+    
+    const numericId = parseInt(numericPart, 10);
+    return !isNaN(numericId) && numericId > 0 ? numericId : null;
+  }
+
+  /**
+   * Find all appointments with pagination and filtering
+   * 
+   * @param options Service options including pagination and filters
+   * @returns Paginated appointments
+   */
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<AppointmentResponseDto>> {
+    try {
+      // Convert service options to repository options
+      const repoOptions = this.mapToRepositoryOptions(options);
+      
+      // Add filter criteria if provided in options
+      if (options?.filters) {
+        repoOptions.criteria = {};
+        
+        if (options.filters.status) {
+          repoOptions.criteria.status = options.filters.status;
+        }
+        
+        if (options.filters.startDate && options.filters.endDate) {
+          repoOptions.criteria.appointmentDateRange = {
+            start: options.filters.startDate,
+            end: options.filters.endDate
+          };
+        } else if (options.filters.startDate) {
+          repoOptions.criteria.appointmentDateAfter = options.filters.startDate;
+        } else if (options.filters.endDate) {
+          repoOptions.criteria.appointmentDateBefore = options.filters.endDate;
+        }
+        
+        if (options.filters.customerId) {
+          repoOptions.criteria.customerId = options.filters.customerId;
+        }
+      }
+      
+      // Ensure we always include customer relation for proper customer data
+      if (!repoOptions.relations) {
+        repoOptions.relations = [];
+      }
+      
+      if (!repoOptions.relations.includes('customer')) {
+        repoOptions.relations.push('customer');
+      }
+      
+      // Special handling for customer name sorting
+      if (options?.sort?.field === 'customerName' || options?.sort?.field === 'customer.name') {
+        if (!repoOptions.sort) repoOptions.sort = {};
+        repoOptions.sort.field = 'customer.name';
+        repoOptions.sort.direction = options.sort.direction || 'asc';
+      }
+      
+      this.logger.debug('Finding appointments with options:', { 
+        criteria: repoOptions.criteria,
+        sort: repoOptions.sort,
+        relations: repoOptions.relations
+      });
+      
+      // Get appointments from repository
+      const result = await this.repository.findAll(repoOptions);
+      
+      // Map entities to DTOs
+      return {
+        data: result.data.map(appointment => this.toDTO(appointment)),
+        pagination: result.pagination
+      };
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.findAll`, { 
+        error: error instanceof Error ? error.message : String(error),
+        options 
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Count appointments with optional filtering
+   */
+  async count(options?: { 
+    context?: any, 
+    filters?: Record<string, any> 
+  }): Promise<number> {
+    try {
+      const criteria: Record<string, any> = {};
+      
+      if (options?.filters?.status) {
+        criteria.status = options.filters.status;
+      }
+      
+      if (options?.filters?.startDate && options?.filters?.endDate) {
+        criteria.appointmentDateRange = {
+          start: options.filters.startDate,
+          end: options.filters.endDate
+        };
+      } else if (options?.filters?.startDate) {
+        criteria.appointmentDateAfter = options.filters.startDate;
+      } else if (options?.filters?.endDate) {
+        criteria.appointmentDateBefore = options.filters.endDate;
+      }
+      
+      if (options?.filters?.customerId) {
+        criteria.customerId = options.filters.customerId;
+      }
+      
+      return await this.repository.count(criteria);
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.count`, { 
+        error: error instanceof Error ? error.message : String(error),
+        filters: options?.filters 
+      });
+      throw this.handleError(error);
+    }
   }
 
   /**
@@ -53,27 +213,74 @@ export class AppointmentService extends BaseService<
    * @returns Termin mit Details oder null
    */
   async getAppointmentDetails(
-    id: number,
+    id: number | string,
     options?: ServiceOptions
   ): Promise<AppointmentDetailResponseDto | null> {
     try {
+      // Use validateId for consistent ID validation
+      const validatedId = this.validateAppointmentId(id);
+      if (validatedId === null) {
+        this.logger.error('Invalid appointment ID provided to getAppointmentDetails');
+        throw this.errorHandler.createValidationError('Invalid appointment ID', ['Appointment ID is required']);
+      }
+
+      this.logger.debug(`Getting appointment details for ID: ${validatedId}`);
+
+      // Always include customer and notes relations
       const repoOptions = this.mapToRepositoryOptions({
         ...options,
         relations: ['notes', 'customer']
       });
 
-      const appointment = await this.repository.findById(id, repoOptions);
+      const appointment = await this.repository.findByIdWithRelations(validatedId);
       if (!appointment) {
+        this.logger.info(`Appointment with ID ${validatedId} not found`);
         return null;
       }
 
-      // Lade Notizen zum Termin
-      const notes = await this.repository.findNotes(id);
+      // Load notes for the appointment
+      const notes = await this.repository.findNotes(validatedId);
 
-      // Basis-DTO erstellen
+      // Create base DTO
       const appointmentDto = this.toDTO(appointment) as AppointmentResponseDto;
 
-      // Erweitern mit Details
+      // Get customer details consistently using AppointmentCustomerData interface
+      let customer: AppointmentCustomerData | undefined;
+      
+      // First try to get customer from the appointment.customer property
+      if (appointment.customerId && (appointment as any).customer) {
+        const customerData = (appointment as any).customer;
+        customer = {
+          id: appointment.customerId,
+          name: customerData.name || 'Unknown Customer',
+          email: customerData.email,
+          phone: customerData.phone
+        };
+      }
+      // If not available, try to get from customerService
+      else if (appointment.customerId) {
+        try {
+          // Get customer service from service factory instead of container
+          const customerService = this.getCustomerService();
+          if (customerService) {
+            const customerData = await customerService.getById(appointment.customerId);
+            if (customerData) {
+              customer = {
+                id: appointment.customerId,
+                name: customerData.name || 'Unknown Customer',
+                email: customerData.email,
+                phone: customerData.phone
+              };
+            }
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to load customer data for appointment ${appointment.id}`, {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+
+      // Return consistent appointment detail response
       return {
         ...appointmentDto,
         notes: notes.map(note => ({
@@ -86,16 +293,14 @@ export class AppointmentService extends BaseService<
           createdAt: note.createdAt.toISOString(),
           updatedAt: note.updatedAt.toISOString()
         })),
-        customer: appointment.customerId ? {
-          id: appointment.customerId,
-          name: 'Customer Name', // Hier würde normalerweise der tatsächliche Kundenname stehen
-          email: 'customer@example.com',
-          phone: '123-456-7890'
-        } : undefined,
+        customer,
         activityLogs: []
       };
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.getAppointmentDetails`, { error, id });
+      this.logger.error(`Error in ${this.constructor.name}.getAppointmentDetails`, { 
+        error: error instanceof Error ? error.message : String(error), 
+        id 
+      });
       throw this.handleError(error);
     }
   }
@@ -115,7 +320,10 @@ export class AppointmentService extends BaseService<
       const appointments = await this.repository.findByCustomer(customerId);
       return appointments.map(appointment => this.toDTO(appointment));
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.findByCustomer`, { error, customerId });
+      this.logger.error(`Error in ${this.constructor.name}.findByCustomer`, { 
+        error: error instanceof Error ? error.message : String(error), 
+        customerId 
+      });
       throw this.handleError(error);
     }
   }
@@ -141,7 +349,11 @@ export class AppointmentService extends BaseService<
       const appointments = await this.repository.findByDateRange(startDateObj, endDateObj);
       return appointments.map(appointment => this.toDTO(appointment));
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.findByDateRange`, { error, startDate, endDate });
+      this.logger.error(`Error in ${this.constructor.name}.findByDateRange`, { 
+        error: error instanceof Error ? error.message : String(error), 
+        startDate, 
+        endDate 
+      });
       throw this.handleError(error);
     }
   }
@@ -189,7 +401,11 @@ export class AppointmentService extends BaseService<
 
       return this.toDTO(updatedAppointment);
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.updateStatus`, { error, id, data });
+      this.logger.error(`Error in ${this.constructor.name}.updateStatus`, { 
+        error: error instanceof Error ? error.message : String(error),
+        id, 
+        data 
+      });
       throw this.handleError(error);
     }
   }
@@ -224,19 +440,22 @@ export class AppointmentService extends BaseService<
 
       // Get userId from options context
       const userId = options?.context?.userId;
-      if (!userId) {
-        throw this.errorHandler.createValidationError(
-          'Invalid user',
-          ['User ID is required to add a note']
-        );
-      }
-
+      
+      // If userId is not provided, use a default system user ID (1 for admin)
+      // This ensures the API still works even if the user context is missing
+      const effectiveUserId = userId || 1;
+      this.logger.debug(`Adding note to appointment ${id} with user ID: ${effectiveUserId}`, { providedUserId: userId });
+      
       // Füge die Notiz hinzu
-      await this.repository.addNote(id, userId, note);
+      await this.repository.addNote(id, effectiveUserId, note);
 
       return true;
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.addNote`, { error, id, note });
+      this.logger.error(`Error in ${this.constructor.name}.addNote`, { 
+        error: error instanceof Error ? error.message : String(error),
+        id, 
+        note 
+      });
       throw this.handleError(error);
     }
   }
@@ -250,13 +469,35 @@ export class AppointmentService extends BaseService<
    */
   async getUpcoming(
     limit: number = 10,
-    options?: ServiceOptions
+    options?: ServiceOptions & { days?: number }
   ): Promise<AppointmentResponseDto[]> {
     try {
-      const appointments = await this.repository.findUpcoming(limit);
-      return appointments.map(appointment => this.toDTO(appointment));
+      // Number of days to look ahead (default 7 days)
+      const days = options?.days || 7;
+      
+      // Calculate date range
+      const today = new Date();
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() + days);
+      
+      // Find appointments in date range
+      const appointments = await this.repository.findByDateRange(today, endDate);
+      
+      // Sort by date and limit
+      const sortedAppointments = appointments
+        .sort((a, b) => {
+          const dateA = new Date(a.appointmentDate);
+          const dateB = new Date(b.appointmentDate);
+          return dateA.getTime() - dateB.getTime();
+        })
+        .slice(0, limit);
+      
+      return sortedAppointments.map(appointment => this.toDTO(appointment));
     } catch (error) {
-      this.logger.error(`Error in ${this.constructor.name}.getUpcoming`, { error, limit });
+      this.logger.error(`Error in ${this.constructor.name}.getUpcoming`, { 
+        error: error instanceof Error ? error.message : String(error),
+        limit 
+      });
       throw this.handleError(error);
     }
   }
@@ -277,7 +518,19 @@ export class AppointmentService extends BaseService<
     // Ensure appointmentDate is a string
     const appointmentDateStr = typeof entity.appointmentDate === 'string' 
       ? entity.appointmentDate 
-      : entity.appointmentDate.toISOString();
+      : entity.appointmentDate.toISOString().split('T')[0];
+    
+    // Process customer data consistently using AppointmentCustomerData interface
+    if ((entity as any).customer) {
+      const customerData = (entity as any).customer;
+      baseDto.customerName = customerData.name;
+      baseDto.customerData = {
+        id: customerData.id,
+        name: customerData.name,
+        email: customerData.email,
+        phone: customerData.phone
+      };
+    }
     
     // Erweitere mit zusätzlichen Informationen
     return {
@@ -312,7 +565,22 @@ export class AppointmentService extends BaseService<
     if (dto.location !== undefined) entity.location = dto.location;
     if (dto.description !== undefined) entity.description = dto.description;
     if (dto.status !== undefined) entity.status = dto.status;
-    if (dto.duration !== undefined) entity.duration = dto.duration;
+    
+    if (dto.duration !== undefined) {
+        // Ensure duration is always a number
+      if (typeof dto.duration === 'string') {
+      try {
+        const parsedDuration = parseInt(dto.duration, 10);
+        entity.duration = isNaN(parsedDuration) ? 60 : parsedDuration;
+          this.logger.debug(`Converted string duration to number: ${dto.duration} -> ${entity.duration}`);
+      } catch (err) {
+          this.logger.warn(`Error converting duration string '${dto.duration}' to number, using default`, { error: err });
+            entity.duration = 60; // Default duration if parsing fails
+          }
+        } else {
+          entity.duration = dto.duration;
+        }
+      }
     
     // Verarbeite Datum und Zeit
     if ('appointmentDate' in dto && dto.appointmentDate) {

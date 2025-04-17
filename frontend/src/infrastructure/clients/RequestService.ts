@@ -1,15 +1,17 @@
 /**
  * Client for request service API
  */
-import { ApiClient } from '@/infrastructure/clients/ApiClient';
+import { ApiClient, ApiResponse } from '@/infrastructure/clients/ApiClient';
 import { 
   RequestResponseDto, 
+  RequestDetailResponseDto,
   RequestFilterParamsDto, 
   CreateRequestDto, 
   UpdateRequestDto,
   RequestStatusUpdateDto,
   ConvertToCustomerDto
 } from '@/domain/dtos/RequestDtos';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 
 export class RequestService {
   private static readonly basePath = "/requests";
@@ -17,25 +19,76 @@ export class RequestService {
   /**
    * Get all requests with optional filtering
    */
-  static async getAll(filters?: RequestFilterParamsDto) {
-    let queryParams = '';
-    if (filters) {
-      queryParams = '?' + new URLSearchParams(filters as any).toString();
+  static async getAll(filters?: RequestFilterParamsDto): Promise<ApiResponse<PaginationResult<RequestResponseDto>>> {
+    try {
+      let queryParams = '';
+      if (filters) {
+        const urlParams = new URLSearchParams();
+        
+        // Add all defined filters to query params
+        if (filters.page) urlParams.append('page', String(filters.page));
+        if (filters.limit) urlParams.append('limit', String(filters.limit));
+        if (filters.status) urlParams.append('status', filters.status);
+        if (filters.service) urlParams.append('service', filters.service);
+        if (filters.search) urlParams.append('search', filters.search);
+        if (filters.processorId) urlParams.append('processorId', String(filters.processorId));
+        if (filters.unassigned) urlParams.append('unassigned', String(filters.unassigned));
+        if (filters.notConverted) urlParams.append('notConverted', String(filters.notConverted));
+        if (filters.sortBy) urlParams.append('sortBy', filters.sortBy);
+        if (filters.sortDirection) urlParams.append('sortDirection', filters.sortDirection);
+        
+        // Add date filters with proper ISO string format
+        if (filters.startDate) {
+          try {
+            urlParams.append('startDate', filters.startDate.toISOString());
+          } catch (e) {
+            console.error('Invalid startDate format:', filters.startDate);
+          }
+        }
+        if (filters.endDate) {
+          try {
+            urlParams.append('endDate', filters.endDate.toISOString());
+          } catch (e) {
+            console.error('Invalid endDate format:', filters.endDate);
+          }
+        }
+        
+        const paramString = urlParams.toString();
+        if (paramString) {
+          queryParams = '?' + paramString;
+        }
+      }
+      
+      return await ApiClient.get(`${this.basePath}${queryParams}`);
+    } catch (error) {
+      console.error('Error in RequestService.getAll:', error);
+      return {
+        success: false,
+        data: {
+          data: [],
+          pagination: {
+            page: filters?.page || 1,
+            limit: filters?.limit || 10,
+            total: 0,
+            totalPages: 0
+          }
+        },
+        message: error instanceof Error ? error.message : 'Error fetching requests'
+      };
     }
-    return ApiClient.get(`${this.basePath}${queryParams}`);
   }
 
   /**
    * Get a specific request by ID
    */
-  static async getById(id: number) {
+  static async getById(id: number): Promise<ApiResponse<RequestDetailResponseDto>> {
     return ApiClient.get(`${this.basePath}/${id}`);
   }
 
   /**
    * Create a new request
    */
-  static async create(data: CreateRequestDto) {
+  static async create(data: CreateRequestDto): Promise<ApiResponse<RequestResponseDto>> {
     return ApiClient.post(this.basePath, data);
   }
 
@@ -120,8 +173,8 @@ export class RequestService {
   /**
    * Add a note to a request
    */
-  static async addNote(requestId: number, content: string) {
-    return ApiClient.post(`${this.basePath}/${requestId}/notes`, { content });
+  static async addNote(requestId: number, text: string) {
+    return ApiClient.post(`${this.basePath}/${requestId}/notes`, { text });
   }
 
   /**

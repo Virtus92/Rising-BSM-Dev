@@ -11,7 +11,7 @@ import {
  * Client für den Zugriff auf Kontaktanfragen-API
  */
 export class RequestClient {
-  private readonly baseUrl = '/api/requests';
+  private readonly baseUrl = '/requests';
   
   /**
    * Konstruktor

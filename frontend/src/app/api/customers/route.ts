@@ -4,11 +4,12 @@
  * Handles customer management requests
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError, formatValidationError } from '@/infrastructure/api/response-formatter';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
 import { CreateCustomerDto, CustomerFilterParamsDto } from '@/domain/dtos/CustomerDtos';
 import { getServiceFactory } from '@/infrastructure/common/factories';
 import { getLogger } from '@/infrastructure/common/logging';
+import { apiPermissions } from '@/app/api/helpers/apiPermissions';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
 
 /**
  * GET /api/customers
@@ -20,6 +21,18 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
   const serviceFactory = getServiceFactory();
   
   try {
+    // Check permission using the same pattern as appointment routes
+    if (!await apiPermissions.hasPermission(
+      req.auth?.userId as number, 
+      SystemPermission.CUSTOMERS_VIEW
+    )) {
+      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_VIEW}`);
+      return formatResponse.error(
+        `You don't have permission to view customers`, 
+        403
+      );
+    }
+    
     // Extract filter parameters from query
     const { searchParams } = new URL(req.url);
     const filters: CustomerFilterParamsDto = {
@@ -37,8 +50,8 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
       limit: searchParams.has('limit') 
         ? parseInt(searchParams.get('limit') as string)
         : 10,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortDirection: (searchParams.get('sortDirection') as 'asc' | 'desc') || undefined
+      sortBy: searchParams.get('sortBy') || 'createdAt',
+      sortDirection: (searchParams.get('sortDirection') as 'asc' | 'desc') || 'desc'
     };
 
     // Get the customer service
@@ -47,80 +60,40 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
     // Context for service calls
     const context = { userId: req.auth?.userId };
     
-    // Get repository directly for more stable access
-    const repository = customerService.getRepository();
+    // Log detailed debugging information about the request
+    logger.debug('Fetching customers with filters:', { 
+      filters, 
+      userId: req.auth?.userId,
+      url: req.url
+    });
     
-    // Build criteria
-    const criteria: Record<string, any> = {};
-    
-    if (filters.status) {
-      criteria.status = filters.status;
-    }
-    
-    if (filters.type) {
-      criteria.type = filters.type;
-    }
-    
-    if (filters.city) {
-      criteria.city = filters.city;
-    }
-    
-    if (filters.postalCode) {
-      criteria.postalCode = filters.postalCode;
-    }
-    
-    if (filters.newsletter !== undefined) {
-      criteria.newsletter = filters.newsletter;
-    }
-    
-    // Get total count
-    const total = await repository.count(criteria);
-    
-    // Get customers with pagination
-    const page = filters.page || 1;
-    const limit = filters.limit || 10;
-    
-    // Get data from repository directly
-    const customers = await repository.findByCriteria(criteria, {
-      page,
-      limit,
+    // Use the service for getting data
+    const result = await customerService.getAll({
+      context,
+      page: filters.page,
+      limit: filters.limit,
+      filters: {
+        status: filters.status,
+        type: filters.type,
+        city: filters.city,
+        postalCode: filters.postalCode,
+        newsletter: filters.newsletter,
+        search: filters.search
+      },
       sort: {
         field: filters.sortBy || 'createdAt',
         direction: (filters.sortDirection || 'desc') as 'asc' | 'desc'
       }
     });
-    
-    // Map to DTOs
-    const customerDtos = customers.map(customer => ({
-      id: customer.id,
-      name: customer.name,
-      email: customer.email,
-      phone: customer.phone,
-      company: customer.company,
-      type: customer.type,
-      status: customer.status,
-      address: customer.address,
-      city: customer.city,
-      postalCode: customer.postalCode,
-      country: customer.country,
-      newsletter: customer.newsletter,
-      createdAt: customer.createdAt instanceof Date ? customer.createdAt.toISOString() : customer.createdAt,
-      updatedAt: customer.updatedAt instanceof Date ? customer.updatedAt.toISOString() : customer.updatedAt
-    }));
-    
-    // Create result with pagination
-    const result = {
-      data: customerDtos,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
-    };
+
+    // Log successful retrieval
+    logger.debug('Successfully retrieved customers', { 
+      count: result.data?.length || 0,
+      total: result.pagination?.total || 0
+    });
 
     // Success response
-    return formatSuccess(
+    return formatResponse.success(
       result,
       'Customers retrieved successfully'
     );
@@ -128,10 +101,11 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
   } catch (error) {
     logger.error('Error fetching customers:', {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.auth?.userId
     });
     
-    return formatError(
+    return formatResponse.error(
       error instanceof Error ? error.message : 'Error retrieving customers',
       500
     );
@@ -151,6 +125,18 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
   const serviceFactory = getServiceFactory();
   
   try {
+    // Check permission using the same pattern as appointment routes
+    if (!await apiPermissions.hasPermission(
+      req.auth?.userId as number, 
+      SystemPermission.CUSTOMERS_CREATE
+    )) {
+      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_CREATE}`);
+      return formatResponse.error(
+        `You don't have permission to create customers`, 
+        403
+      );
+    }
+    
     // Parse the request body
     const data = await req.json() as CreateCustomerDto;
     
@@ -167,27 +153,27 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
     const result = await customerService.create(data, { context });
     
     // Success response
-    return formatSuccess(result, 'Customer created successfully', 201);
+    return formatResponse.success(result, 'Customer created successfully', 201);
   } catch (error) {
     logger.error('Error creating customer:', {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.auth?.userId
     });
     
     // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
-      return formatValidationError(
-        (error as any).validationErrors,
-        'Customer validation failed'
+      return formatResponse.validationError(
+        (error as any).validationErrors
       );
     }
     
     // Special case for duplicate email
     if (error instanceof Error && error.message.includes('email already exists')) {
-      return formatError('A customer with this email already exists', 400);
+      return formatResponse.error('A customer with this email already exists', 400);
     }
     
-    return formatError(
+    return formatResponse.error(
       error instanceof Error ? error.message : 'Error creating customer',
       500
     );

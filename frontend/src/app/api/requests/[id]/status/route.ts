@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { getServerSession, authOptions } from '@/app/api/auth/middleware/authMiddleware';
-
-const prisma = new PrismaClient();
+import { NextRequest } from 'next/server';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
+import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { apiPermissions } from '../../../helpers/apiPermissions';
+import { RequestStatusUpdateDto } from '@/domain/dtos/RequestDtos';
 
 type RequestParams = {
   params: {
@@ -15,113 +17,39 @@ type RequestParams = {
  * 
  * Aktualisiert den Status einer Kontaktanfrage.
  */
-export async function PATCH(request: NextRequest, { params }: RequestParams) {
-  try {
-    // Authentifizierung prüfen
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
+export const PATCH = apiRouteHandler(
+  apiPermissions.withPermission(
+    async (req: NextRequest, { params }: RequestParams) => {
+      const logger = getLogger();
+      const serviceFactory = getServiceFactory();
 
-    const requestId = parseInt(params.id);
-    if (isNaN(requestId)) {
-      return NextResponse.json(
-        { success: false, message: 'Ungültige Anfrage-ID' },
-        { status: 400 }
-      );
-    }
-
-    // Überprüfen, ob die Anfrage existiert
-    const existingRequest = await prisma.contactRequest.findUnique({
-      where: { id: requestId }
-    });
-
-    if (!existingRequest) {
-      return NextResponse.json(
-        { success: false, message: 'Kontaktanfrage nicht gefunden' },
-        { status: 404 }
-      );
-    }
-
-    // Daten aus dem Request-Body auslesen
-    const body = await request.json();
-    const { status, note } = body;
-
-    // Status validieren
-    const validStatuses = ['new', 'in_progress', 'completed', 'cancelled'];
-    if (!status || !validStatuses.includes(status)) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: 'Ungültiger Status', 
-          errors: [
-            `Status muss einer der folgenden sein: ${validStatuses.join(', ')}`
-          ]
-        },
-        { status: 400 }
-      );
-    }
-
-    // Status aktualisieren
-    const updatedRequest = await prisma.contactRequest.update({
-      where: { id: requestId },
-      data: { status }
-    });
-
-    // Wenn eine Notiz vorhanden ist, füge einen Log-Eintrag hinzu
-    if (note) {
-      await prisma.requestLog.create({
-        data: {
-          requestId,
-          userId: parseInt(session.user.id),
-          userName: session.user.name || 'Unbekannt',
-          action: `Status geändert auf ${status}`,
-          details: note
-        }
-      });
-    }
-
-    // Status-Label und CSS-Klasse bestimmen
-    let statusLabel, statusClass;
-    switch (status) {
-      case 'new':
-        statusLabel = 'Neu';
-        statusClass = 'text-blue-500';
-        break;
-      case 'in_progress':
-        statusLabel = 'In Bearbeitung';
-        statusClass = 'text-yellow-500';
-        break;
-      case 'completed':
-        statusLabel = 'Abgeschlossen';
-        statusClass = 'text-green-500';
-        break;
-      case 'cancelled':
-        statusLabel = 'Abgebrochen';
-        statusClass = 'text-red-500';
-        break;
-      default:
-        statusLabel = 'Unbekannt';
-        statusClass = 'text-gray-500';
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Status erfolgreich aktualisiert',
-      data: {
-        ...updatedRequest,
-        statusLabel,
-        statusClass
+      const requestId = parseInt(params.id);
+      if (isNaN(requestId)) {
+        return formatResponse.error('Invalid request ID', 400);
       }
-    });
-  } catch (error) {
-    console.error('Error updating request status:', error);
-    return NextResponse.json(
-      { success: false, message: 'Server-Fehler', error: String(error) },
-      { status: 500 }
-    );
-  }
-}
+      
+      // Parse request body
+      const body = await req.json();
+      const statusUpdateData: RequestStatusUpdateDto = {
+        status: body.status,
+        note: body.note
+      };
+      
+      // Create context for service calls
+      const context = {
+        userId: req.auth?.userId,
+        userRole: req.auth?.role
+      };
+      
+      // Get request service
+      const requestService = serviceFactory.createRequestService();
+      
+      // Update request status
+      const updatedRequest = await requestService.updateRequestStatus(requestId, statusUpdateData, { context });
+      
+      return formatResponse.success(updatedRequest, 'Request status updated successfully');
+    },
+    SystemPermission.REQUESTS_EDIT
+  ),
+  { requiresAuth: true }
+);

@@ -1,51 +1,77 @@
 /**
- * Client Error Logging API-Route
- * 
- * Diese Route ermöglicht das Protokollieren von Client-seitigen Fehlern
+ * API route for logging client-side errors
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess } from '@/infrastructure/api/response-formatter';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
 import { getLogger } from '@/infrastructure/common/logging';
+
+interface ClientErrorPayload {
+  message: string;
+  stack?: string;
+  source?: string;
+  url?: string;
+  timestamp?: string;
+  user?: {
+    id?: number;
+    email?: string;
+  };
+}
 
 /**
  * POST /api/log/client-error
- * 
- * Protokolliert einen Client-seitigen Fehler
+ * Log a client-side error
  */
-export const POST = apiRouteHandler(
-  async (request: NextRequest) => {
-    const logger = getLogger();
-    const errorData = await request.json();
+export const POST = apiRouteHandler(async (req: NextRequest) => {
+  const logger = getLogger();
+
+  try {
+    // Parse request body
+    const data = await req.json() as ClientErrorPayload;
     
-    // Extrahiere Fehlerinformationen
-    const { 
-      message, 
-      stack, 
-      url, 
-      userAgent, 
-      timestamp = new Date().toISOString(),
-      componentStack,
-      additionalInfo
-    } = errorData;
+    // Validate required fields
+    if (!data.message) {
+      return formatResponse.error('Error message is required', 400);
+    }
+
+    // Add user ID from authentication if available
+    const userId = req.auth?.userId;
+    if (userId) {
+      data.user = {
+        ...data.user,
+        id: userId
+      };
+    }
     
-    // Protokolliere den Fehler
-    logger.error('Client Error', {
-      message,
-      stack,
-      url,
-      userAgent,
-      timestamp,
-      componentStack,
-      additionalInfo,
-      ip: request.headers.get('x-forwarded-for') || request.ip || 'unknown'
+    // Add timestamp if not provided
+    if (!data.timestamp) {
+      data.timestamp = new Date().toISOString();
+    }
+    
+    // Log the error to server logs
+    logger.error('Client error:', {
+      message: data.message,
+      stack: data.stack,
+      source: data.source || 'client',
+      url: data.url,
+      timestamp: data.timestamp,
+      user: data.user,
+      ip: req.headers.get('x-forwarded-for') || 'unknown'
     });
     
-    // Bestätige die Protokollierung
-    return formatSuccess({ logged: true });
-  },
-  {
-    // Keine Authentifizierung für Fehlerprotokolle erforderlich
-    requiresAuth: false
+    // In a production environment, you might want to store this in a database
+    // or send it to an error tracking service
+    
+    return formatResponse.success(null, 'Error logged successfully');
+  } catch (error) {
+    logger.error('Error handling client error logging:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    // Return success anyway, we don't want to cause errors in error handling
+    return formatResponse.success(null, 'Error processed');
   }
-);
+}, {
+  // Don't require authentication for error logging
+  requiresAuth: false
+});

@@ -33,6 +33,35 @@ export interface ServiceOptions {
    * Gelöschte Einträge einbeziehen
    */
   withDeleted?: boolean;
+
+  /**
+   * Pagination page
+   */
+  page?: number;
+
+  /**
+   * Items per page
+   */
+  limit?: number;
+
+  /**
+   * Filter parameters
+   */
+  filters?: Record<string, any>;
+
+  /**
+   * Sort parameters
+   */
+  sort?: {
+    field: string;
+    direction: 'asc' | 'desc';
+    order?: string; // For compatibility with some APIs
+  };
+  
+  /**
+   * Number of days to include in date range queries
+   */
+  days?: number;
 }
 
 /**
@@ -83,6 +112,14 @@ export class ServiceError extends Error {
  * @template ID - Typ des Primärschlüssels
  */
 export interface IBaseService<T, C, U, R, ID = number> {
+  /**
+   * Count entities with optional filtering
+   * 
+   * @param options - Service options with filters
+   * @returns Number of entities matching criteria
+   */
+  count(options?: { context?: any; filters?: Record<string, any> }): Promise<number>;
+
   /**
    * Ruft alle Entitäten ab
    * 
@@ -161,7 +198,7 @@ export interface IBaseService<T, C, U, R, ID = number> {
    * @returns Ergebnis der Transaktion
    * @throws ServiceError - Bei Fehlern
    */
-  transaction<Result>(callback: (service: IBaseService<T, C, U, R, ID>) => Promise<Result>): Promise<Result>;
+  transaction<r>(callback: (service: IBaseService<T, C, U, R, ID>) => Promise<r>): Promise<r>;
   
   /**
    * Führt einen Massenupdate durch
@@ -208,4 +245,17 @@ export interface IBaseService<T, C, U, R, ID = number> {
    * @returns Ob die Entität existiert
    */
   exists(id: ID, options?: ServiceOptions): Promise<boolean>;
+
+  /**
+   * Get access to the repository
+   * @returns The repository instance
+   */
+  getRepository(): any;
+
+  /**
+   * Find all entries with pagination and filtering
+   * @param options Service options including pagination and filters
+   * @returns Paginated results
+   */
+  findAll(options?: ServiceOptions): Promise<PaginationResult<R>>;
 }

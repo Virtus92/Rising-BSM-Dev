@@ -13,7 +13,8 @@ import {
   getActivityLogRepository,
   getAppointmentRepository,
   getRequestRepository,
-  getNotificationRepository
+  getNotificationRepository,
+  getPermissionRepository
 } from './repositoryFactory';
 
 // Services
@@ -25,6 +26,7 @@ import { RequestService } from '@/infrastructure/services/RequestService';
 import { ActivityLogService } from '@/infrastructure/services/ActivityLogService';
 import { NotificationService } from '@/infrastructure/services/NotificationService';
 import { RefreshTokenService } from '@/infrastructure/services/RefreshTokenService';
+import { PermissionService } from '@/infrastructure/services/PermissionService';
 
 // Interfaces
 import { IAuthService } from '@/domain/services/IAuthService';
@@ -35,6 +37,7 @@ import { IRequestService } from '@/domain/services/IRequestService';
 import { IActivityLogService } from '@/domain/services/IActivityLogService';
 import { INotificationService } from '@/domain/services/INotificationService';
 import { IRefreshTokenService } from '@/domain/services/IRefreshTokenService';
+import { IPermissionService } from '@/domain/services/IPermissionService';
 
 /**
  * ServiceFactory Klasse für einheitliche Erstellung von Services
@@ -51,6 +54,7 @@ export class ServiceFactory {
   private activityLogService?: ActivityLogService;
   private notificationService?: NotificationService;
   private refreshTokenService?: RefreshTokenService;
+  private permissionService?: PermissionService;
 
   /**
    * Private Konstruktor für Singleton-Pattern
@@ -152,6 +156,7 @@ export class ServiceFactory {
       this.requestService = new RequestService(
         getRequestRepository(),
         getCustomerRepository(),
+        getUserRepository(),
         getAppointmentRepository(),
         getLogger(),
         getValidationService(),
@@ -207,6 +212,21 @@ export class ServiceFactory {
   }
 
   /**
+   * Creates a Permission Service instance
+   */
+  public createPermissionService(): IPermissionService {
+    if (!this.permissionService) {
+      this.permissionService = new PermissionService(
+        getPermissionRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
+    }
+    return this.permissionService;
+  }
+
+  /**
    * Setzt alle Service-Instanzen zurück
    */
   public resetServices(): void {
@@ -218,6 +238,7 @@ export class ServiceFactory {
     this.activityLogService = undefined;
     this.notificationService = undefined;
     this.refreshTokenService = undefined;
+    this.permissionService = undefined;
   }
 }
 
@@ -259,6 +280,10 @@ export function getNotificationService(): INotificationService {
 
 export function getRefreshTokenService(): IRefreshTokenService {
   return getServiceFactory().createRefreshTokenService();
+}
+
+export function getPermissionService(): IPermissionService {
+  return getServiceFactory().createPermissionService();
 }
 
 export function resetServices(): void {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useRequest } from '../hooks/useRequest';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -60,6 +61,7 @@ import {
   Loader2,
   ArrowLeft,
   UserCheck,
+  Edit,
 } from 'lucide-react';
 import { formatDate } from '@/features/notifications/components/utils/date-utils';
 import { RequestStatusUpdateDto } from '@/domain/dtos/RequestDtos';
@@ -78,6 +80,7 @@ interface RequestDetailProps {
  * Komponente zur Anzeige einer Kontaktanfrage im Detail
  */
 export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
+  const router = useRouter();
   const {
     request,
     isLoading,
@@ -246,6 +249,13 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
           </div>
         </CardContent>
         <CardFooter className="flex flex-wrap gap-2 pt-2">
+          {/* Edit Button */}
+          <Link href={`/dashboard/requests/${request.id}/edit`}>
+            <Button variant="outline">
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Request
+            </Button>
+          </Link>
           {/* Status-Dialog */}
           <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
             <DialogTrigger asChild>
@@ -406,7 +416,12 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
               <AlertDialogFooter>
                 <AlertDialogCancel>Abbrechen</AlertDialogCancel>
                 <AlertDialogAction
-                  onClick={() => deleteRequest()}
+                  onClick={async () => {
+                    const success = await deleteRequest();
+                    if (success) {
+                      router.push('/dashboard/requests');
+                    }
+                  }}
                   disabled={isDeleting}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >

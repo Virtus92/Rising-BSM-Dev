@@ -305,7 +305,7 @@ export class AuthClient {
    * Validate reset token
    */
   static async validateResetToken(token: string) {
-    return ApiClient.post(`${this.basePath}/validate`, { token });
+    return ApiClient.post(`${this.basePath}/validate-token`, { token });
   }
 
   /**

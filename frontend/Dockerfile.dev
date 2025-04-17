@@ -1,4 +1,4 @@
-FROM node:23-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -11,6 +11,9 @@ COPY package*.json ./
 
 # Install all dependencies including dev dependencies
 RUN npm install
+# Ensure ts-node and required seeding packages are available globally
+RUN npm install -g ts-node typescript
+RUN npm install -g dotenv @faker-js/faker bcryptjs
 
 # Copy prisma schema, migrations, and seed files
 COPY prisma ./prisma/
@@ -24,6 +27,9 @@ RUN chmod +x /app/docker-entrypoint.sh
 
 # Copy the rest of the application
 COPY . .
+
+# Ensure our seed script is executable
+RUN chmod +x /app/scripts/seed.js
 
 # Environment variables
 ENV PORT=3000

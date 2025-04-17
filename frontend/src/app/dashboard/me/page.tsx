@@ -12,6 +12,7 @@ import { useToast } from '@/shared/hooks/useToast';
 import { useFileUpload } from '@/shared/hooks/useFileUpload';
 import { UserRole, UserStatus } from '@/domain/enums/UserEnums';
 import { UserService } from '@/infrastructure/clients/UserService';
+import { AuthService } from '@/infrastructure/services/AuthService';
 
 export default function UserProfilePage() {
   const { user, isLoading, refreshAuth } = useAuth();
@@ -21,7 +22,12 @@ export default function UserProfilePage() {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    email: string;
+    phone: string;
+    profilePicture: string;
+  }>({
     name: '',
     email: '',
     phone: '',
@@ -41,7 +47,7 @@ export default function UserProfilePage() {
   const { upload, isUploading, error: uploadError } = useFileUpload({
     onSuccess: (result) => {
       if (result.filePath) {
-        setFormData(prev => ({ ...prev, profilePicture: result.filePath }));
+        setFormData(prev => ({ ...prev, profilePicture: result.filePath || '' }));
         // If not in editing mode, directly save the profile picture
         if (!isEditing) {
           handleProfilePictureUpdate(result.filePath);
@@ -289,8 +295,9 @@ export default function UserProfilePage() {
       setChangingPasswordError(null);
       
       const response = await UserService.changePassword({
-        currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword
+        oldPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+        confirmPassword: passwordData.confirmPassword
       });
       
       if (response.success) {

@@ -51,13 +51,17 @@ export class ApiClient {
   } = {}): Promise<void> {
     // If already initialized with the same base URL, return immediately
     if (GLOBAL_API_INITIALIZED && GLOBAL_API_BASE_URL === (config.baseUrl || GLOBAL_API_BASE_URL)) {
-      console.log('ApiClient already initialized, reusing existing instance');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('ApiClient already initialized, reusing existing instance');
+      }
       return Promise.resolve();
     }
     
     // Return existing promise if initialization is in progress
     if (GLOBAL_INIT_PROMISE) {
-      console.log('ApiClient initialization already in progress, waiting...');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('ApiClient initialization already in progress, waiting...');
+      }
       return GLOBAL_INIT_PROMISE;
     }
     
@@ -93,10 +97,10 @@ export class ApiClient {
         }
         resolve(); // Still resolve to prevent hanging promises
       } finally {
-        // Clear the promise after completion
+        // Clear the promise after completion - use a longer timeout to ensure all components have a chance to react
         setTimeout(() => {
           GLOBAL_INIT_PROMISE = null;
-        }, 100);
+        }, 500);
       }
     });
     
@@ -180,11 +184,18 @@ export class ApiClient {
     }
 
     try {
+      // Process the parameters to remove undefined values to prevent URL issues
+      const cleanParams = options.params ? Object.fromEntries(
+        Object.entries(options.params)
+          .filter(([_, value]) => value !== undefined && value !== null)
+      ) : undefined;
+
       // Create URL with query parameters
-      const url = options.params 
-        ? this.createUrl(endpoint, options.params)
+      const url = cleanParams 
+        ? this.createUrl(endpoint, cleanParams)
         : `${GLOBAL_API_BASE_URL}${endpoint}`;
       
+      // Only log in development mode
       if (process.env.NODE_ENV === 'development') {
         console.log(`API GET: ${url}`);
       }
@@ -194,16 +205,62 @@ export class ApiClient {
         method: 'GET',
         headers: { ...GLOBAL_API_HEADERS, ...(options.headers || {}) },
         credentials: 'include', // Include cookies
+        // Add cache control to prevent browser caching
+        cache: 'no-cache',
       };
 
-      const response = await fetch(url, requestOptions);
+      // Detect notification endpoint for special handling and lists for better retry strategy
+      const isNotificationEndpoint = endpoint.includes('/notifications');
+      const isListEndpoint = endpoint.includes('?page=') || 
+                             endpoint.includes('limit=') || 
+                             endpoint.includes('pagination');
+      
+      // Configure retries based on endpoint type
+      // - No retries for notifications
+      // - Limited retries for list endpoints to prevent resource exhaustion
+      // - Standard retries for other endpoints
+      const maxRetries = isNotificationEndpoint ? 0 : (isListEndpoint ? 1 : 2);
+      const retryDelay = isListEndpoint ? 1000 : 300; // Longer delay for list endpoints
 
-      return this.handleResponse<T>(response);
+      // Use retry logic with configurable retries
+      return await this.retry<ApiResponse<T>>(async () => {
+        // Add request timeout for better error handling
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        
+        try {
+          const response = await fetch(url, {
+            ...requestOptions,
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          return this.handleResponse<T>(response);
+        } catch (error) {
+          clearTimeout(timeoutId);
+          throw error;
+        }
+      }, maxRetries, retryDelay);
     } catch (error) {
+      // Special handling for notification endpoint errors
+      if (endpoint.includes('/notifications')) {
+        console.warn('Notification endpoint error, preventing retry:', error);
+        return {
+          success: false,
+          data: null,
+          message: 'Failed to fetch notifications',
+          statusCode: 500
+        };
+      }
+      
+      // Check if this is a list endpoint that's failing repeatedly
+      if (endpoint.includes('?page=') || endpoint.includes('limit=')) {
+        console.warn('List endpoint error, limiting retries:', endpoint);
+      }
+      
       return this.handleError<T>(error);
     }
   }
-  
+
   /**
    * Make a POST request
    * @param endpoint API endpoint
@@ -375,9 +432,37 @@ export class ApiClient {
           };
         } else {
           // Handle 401 (Unauthorized) - Session expired
-          // Don't automatically redirect to prevent redirect loops
           if (response.status === 401) {
             console.warn('API request returned 401 Unauthorized');
+            
+            // Try to refresh the token and retry the request if it's not already a refresh request
+            if (!response.url.includes('/api/auth/refresh') && typeof window !== 'undefined') {
+              try {
+                // Import TokenManager dynamically to avoid circular dependencies
+                const { TokenManager } = await import('@/infrastructure/auth/TokenManager');
+                const refreshSuccess = await TokenManager.refreshAccessToken();
+                
+                if (refreshSuccess) {
+                  // Retry the original request after token refresh
+                  console.log('Token refreshed successfully, retrying original request');
+                  const retryResponse = await fetch(response.url, {
+                    method: response.type,
+                    headers: response.headers,
+                    credentials: 'include',
+                    body: response.bodyUsed ? undefined : await response.clone().text()
+                  });
+                  
+                  return this.handleResponse<T>(retryResponse);
+                }
+              } catch (refreshError) {
+                console.error('Failed to refresh token during 401 response', refreshError);
+              }
+            }
+            
+            // If refresh fails or we're already in a refresh request, redirect to login
+            if (typeof window !== 'undefined') {
+              window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
+            }
           }
           
           // Error with JSON details
@@ -403,7 +488,29 @@ export class ApiClient {
         } else {
           // Handle 401 (Unauthorized) - Session expired
           if (response.status === 401 && typeof window !== 'undefined') {
-            // Redirect to login page
+            // Try to refresh the token first
+            try {
+              // Import TokenManager dynamically to avoid circular dependencies
+              const { TokenManager } = await import('@/infrastructure/auth/TokenManager');
+              const refreshSuccess = await TokenManager.refreshAccessToken();
+              
+              if (refreshSuccess) {
+                // Retry the original request after token refresh
+                console.log('Token refreshed successfully, retrying original request');
+                const retryResponse = await fetch(response.url, {
+                  method: response.type,
+                  headers: response.headers,
+                  credentials: 'include',
+                  body: response.bodyUsed ? undefined : await response.clone().text()
+                });
+                
+                return this.handleResponse<T>(retryResponse);
+              }
+            } catch (refreshError) {
+              console.error('Failed to refresh token during 401 response', refreshError);
+            }
+            
+            // If refresh fails, redirect to login page
             window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
           }
           
@@ -474,14 +581,34 @@ export class ApiClient {
     try {
       return await fn();
     } catch (error) {
+      // Don't retry if we're out of retries
       if (retries <= 0) {
         throw error;
       }
       
+      // Check for abort errors (e.g. timeouts) and network errors
+      const isAbortError = error instanceof DOMException && error.name === 'AbortError';
+      const isNetworkError = error instanceof TypeError && error.message === 'Failed to fetch';
+      
+      // Don't retry for programmatic aborts (timeouts) or certain kinds of client errors
+      if (isAbortError) {
+        console.warn('Request timed out, not retrying');
+        throw new Error('Request timed out. Please try again later.');
+      }
+      
+      // For network errors, check if navigator is online before retrying
+      if (isNetworkError && typeof navigator !== 'undefined' && !navigator.onLine) {
+        console.warn('Network offline, not retrying');
+        throw new Error('Network connection unavailable. Please check your internet connection.');
+      }
+      
+      // Log retry attempt
+      console.warn(`Retrying request (${retries} attempts left) after ${delay}ms delay`);
+      
       // Wait for delay milliseconds
       await new Promise(resolve => setTimeout(resolve, delay));
       
-      // Retry with one fewer retry and slightly longer delay
+      // Retry with one fewer retry and longer delay
       return this.retry(fn, retries - 1, delay * 1.5);
     }
   }

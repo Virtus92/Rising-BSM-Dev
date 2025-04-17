@@ -1,17 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { RequestService } from '@/infrastructure/clients/RequestService';
-import { AppointmentService } from '@/infrastructure/clients/AppointmentService';
-import { CustomerService } from '@/infrastructure/clients/CustomerService';
-import { UserService } from '@/infrastructure/clients/UserService';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { ApiResponse } from '@/infrastructure/clients/ApiClient';
+import { useToast } from '@/shared/hooks/useToast';
 
 export type TimeFrame = 'weekly' | 'monthly' | 'yearly';
-
-interface BaseStats {
-  period: string; // Can be week, month, or year depending on the time frame
-  value: number;
-}
 
 interface StatsData {
   [key: string]: number;
@@ -26,18 +19,26 @@ interface ChartDataItem {
   key: string;
 }
 
+interface DatasetStatus {
+  requests: boolean;
+  appointments: boolean;
+  customers: boolean;
+  users: boolean;
+}
+
 export interface DashboardChartState {
   mergedData: ChartDataItem[];
   timeFrame: TimeFrame;
   isLoading: boolean;
   error: string | null;
+  datasetStatus: DatasetStatus;
   changeTimeFrame: (timeFrame: TimeFrame) => void;
   refreshData: () => Promise<void>;
 }
 
 /**
  * Enhanced hook for dashboard charts that supports multiple time frames
- * and includes all statistics types
+ * and directly uses the dedicated stats API endpoints
  */
 export const useDashboardCharts = (): DashboardChartState => {
   const [statsData, setStatsData] = useState<{
@@ -51,182 +52,288 @@ export const useDashboardCharts = (): DashboardChartState => {
     customers: {},
     users: {}
   });
+  
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('monthly');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [datasetStatus, setDatasetStatus] = useState<DatasetStatus>({
+    requests: false,
+    appointments: false,
+    customers: false,
+    users: false
+  });
 
-  // Function to fetch statistics based on the selected time frame
-  const fetchStatistics = async (selectedTimeFrame: TimeFrame) => {
+  const { toast } = useToast();
+  
+  // Track mounted state to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+  // Track if fetch is in progress to prevent duplicate fetches
+  const isFetchingRef = useRef(false);
+  // Track last fetch time to throttle refreshes
+  const lastFetchTimeRef = useRef(0);
+
+  // Function to fetch stats from a specific API endpoint
+  const fetchStatsFromApi = useCallback(async (
+    entityType: 'users' | 'customers' | 'appointments' | 'requests',
+    timeFrameValue: TimeFrame
+  ): Promise<{ success: boolean; data: StatsData }> => {
     try {
-      setIsLoading(true);
-      setError(null);
+      console.log(`Fetching ${timeFrameValue} stats for ${entityType}`);
       
-      // Determine which API endpoint to call based on timeFrame
-      const getStatsMethod = selectedTimeFrame === 'weekly' 
-        ? 'getWeeklyStats' 
-        : selectedTimeFrame === 'yearly' 
-          ? 'getYearlyStats' 
-          : 'getMonthlyStats';
+      // Construct the API URL based on entity type and time frame
+      const apiUrl = `/api/${entityType}/stats/${timeFrameValue}`;
       
-      // Fallback plan if API methods don't exist
-      let requestStatsPromise, appointmentStatsPromise, customerStatsPromise, userStatsPromise;
-
-      // Default to monthly if method doesn't exist
-      if (typeof RequestService[getStatsMethod] === 'function') {
-        requestStatsPromise = RequestService[getStatsMethod]();
-      } else {
-        console.warn(`RequestService.${getStatsMethod} not available, falling back to monthly stats`);
-        requestStatsPromise = RequestService.getMonthlyStats();
-      }
-        
-      if (typeof AppointmentService[getStatsMethod] === 'function') {
-        appointmentStatsPromise = AppointmentService[getStatsMethod]();
-      } else {
-        console.warn(`AppointmentService.${getStatsMethod} not available, falling back to monthly stats`);
-        appointmentStatsPromise = AppointmentService.getMonthlyStats();
-      }
-
-      // Not all services may have all timeframe methods implemented
-      if (typeof CustomerService.getMonthlyStats === 'function') {
-        customerStatsPromise = CustomerService.getMonthlyStats();
-      } else {
-        console.warn('CustomerService.getMonthlyStats not available');
-        customerStatsPromise = Promise.resolve({ success: true, data: [] });
-      }
-        
-      if (typeof UserService.getStatistics === 'function') {
-        userStatsPromise = UserService.getStatistics();
-      } else {
-        console.warn('UserService.getStatistics not available');
-        userStatsPromise = Promise.resolve({ success: true, data: [] });
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        console.error(`Failed to fetch ${entityType} ${timeFrameValue} stats. Status: ${response.status}`);
+        return { success: false, data: {} };
       }
       
-      // Execute all API calls in parallel
-      const [requestStatsResponse, appointmentStatsResponse, customerStatsResponse, userStatsResponse] = 
-        await Promise.allSettled([
-          requestStatsPromise,
-          appointmentStatsPromise,
-          customerStatsPromise,
-          userStatsPromise
-        ]);
+      const data = await response.json();
+      
+      if (!data.success || !data.data) {
+        console.error(`API returned unsuccessful response for ${entityType} ${timeFrameValue} stats:`, data.message);
+        return { success: false, data: {} };
+      }
+      
+      const result: StatsData = {};
+      const statsArray = data.data;
+      
+      if (Array.isArray(statsArray)) {
+        statsArray.forEach(item => {
+          let period: string;
+          let value: number;
+          
+          // Extract period based on time frame
+          if (timeFrameValue === 'weekly') {
+            period = item.week || `Week ${item.weekNumber}` || item.period;
+          } else if (timeFrameValue === 'monthly') {
+            period = item.month || item.period;
+          } else {
+            period = item.year?.toString() || item.period;
+          }
+          
+          // Extract the value
+          value = item[entityType.slice(0, -1) + 's'] || // Try pluralized form (e.g., "users")
+                 item[entityType.slice(0, -1)] ||       // Try singular form (e.g., "user")
+                 item.count ||
+                 item.total ||
+                 item.value ||
+                 0;
+          
+          result[period] = value;
+        });
+      }
+      
+      return { success: true, data: result };
+    } catch (error) {
+      console.error(`Error fetching ${entityType} ${timeFrameValue} stats:`, error);
+      return { success: false, data: {} };
+    }
+  }, []);
 
+  // Function to fetch all stats for the selected time frame
+  const fetchStatistics = useCallback(async (
+    selectedTimeFrame: TimeFrame, 
+    showErrors = false
+  ): Promise<void> => {
+    // Prevent duplicate fetches
+    if (isFetchingRef.current) {
+      console.log('Already fetching data, skipping this request');
+      return;
+    }
+    
+    // Throttle refreshes
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current < 5000) {
+      console.log('Too many refresh attempts, throttling');
+      return;
+    }
+    
+    try {
+      console.log(`Fetching statistics for ${selectedTimeFrame} timeframe`);
+      isFetchingRef.current = true;
+      
+      if (isMountedRef.current) {
+        setIsLoading(true);
+        setError(null);
+        setDatasetStatus({
+          requests: false,
+          appointments: false,
+          customers: false,
+          users: false
+        });
+      }
+      
+      // Create an object to collect the new data
       const newStatsData = {
         requests: {},
         appointments: {},
         customers: {},
         users: {}
       };
-
-      // Process request stats
-      if (requestStatsResponse.status === 'fulfilled' && requestStatsResponse.value?.success) {
-        const data = requestStatsResponse.value.data || [];
-        if (Array.isArray(data)) {
-          data.forEach(item => {
-            const period = item.period || item.month || item.week || item.year || 'Unknown';
-            newStatsData.requests[period] = typeof item.requests === 'number' ? item.requests : 
-                                          typeof item.count === 'number' ? item.count : 0;
-          });
-        } else {
-          console.error('Request stats data is not an array', data);
-        }
+      
+      // Fetch stats for each category in parallel
+      const results = await Promise.allSettled([
+        fetchStatsFromApi('requests', selectedTimeFrame),
+        fetchStatsFromApi('appointments', selectedTimeFrame),
+        fetchStatsFromApi('customers', selectedTimeFrame),
+        fetchStatsFromApi('users', selectedTimeFrame)
+      ]);
+      
+      // Track which datasets succeeded and failed
+      const failedDatasets: string[] = [];
+      let successfulDatasets = 0;
+      
+      // Process results and update the newStatsData
+      if (results[0].status === 'fulfilled' && results[0].value.success) {
+        newStatsData.requests = results[0].value.data;
+        successfulDatasets++;
       } else {
-        console.error('Failed to fetch request stats:', 
-          requestStatsResponse.status === 'rejected' 
-            ? requestStatsResponse.reason 
-            : requestStatsResponse.value?.message);
+        failedDatasets.push('requests');
       }
       
-      // Process appointment stats
-      if (appointmentStatsResponse.status === 'fulfilled' && appointmentStatsResponse.value?.success) {
-        const data = appointmentStatsResponse.value.data || [];
-        if (Array.isArray(data)) {
-          data.forEach(item => {
-            const period = item.period || item.month || item.week || item.year || 'Unknown';
-            newStatsData.appointments[period] = typeof item.appointments === 'number' ? item.appointments :
-                                               typeof item.count === 'number' ? item.count : 0;
-          });
-        } else {
-          console.error('Appointment stats data is not an array', data);
-        }
+      if (results[1].status === 'fulfilled' && results[1].value.success) {
+        newStatsData.appointments = results[1].value.data;
+        successfulDatasets++;
       } else {
-        console.error('Failed to fetch appointment stats:', 
-          appointmentStatsResponse.status === 'rejected' 
-            ? appointmentStatsResponse.reason 
-            : appointmentStatsResponse.value?.message);
+        failedDatasets.push('appointments');
       }
       
-      // Process customer stats
-      if (customerStatsResponse.status === 'fulfilled' && customerStatsResponse.value?.success) {
-        const data = customerStatsResponse.value.data || [];
-        if (Array.isArray(data)) {
-          data.forEach(item => {
-            const period = item.period || item.month || item.week || item.year || 'Unknown';
-            newStatsData.customers[period] = typeof item.customers === 'number' ? item.customers :
-                                             typeof item.count === 'number' ? item.count : 0;
-          });
-        } else {
-          console.error('Customer stats data is not an array', data);
-        }
+      if (results[2].status === 'fulfilled' && results[2].value.success) {
+        newStatsData.customers = results[2].value.data;
+        successfulDatasets++;
       } else {
-        console.error('Failed to fetch customer stats:', 
-          customerStatsResponse.status === 'rejected' 
-            ? customerStatsResponse.reason 
-            : customerStatsResponse.value?.message);
+        failedDatasets.push('customers');
       }
       
-      // Process user stats
-      if (userStatsResponse.status === 'fulfilled' && userStatsResponse.value?.success) {
-        const data = userStatsResponse.value.data || [];
-        if (Array.isArray(data)) {
-          data.forEach(item => {
-            const period = item.period || item.month || item.week || item.year || 'Unknown';
-            newStatsData.users[period] = typeof item.users === 'number' ? item.users :
-                                         typeof item.count === 'number' ? item.count : 0;
-          });
-        } else {
-          console.error('User stats data is not an array', data);
-        }
+      if (results[3].status === 'fulfilled' && results[3].value.success) {
+        newStatsData.users = results[3].value.data;
+        successfulDatasets++;
       } else {
-        console.error('Failed to fetch user stats:', 
-          userStatsResponse.status === 'rejected' 
-            ? userStatsResponse.reason 
-            : userStatsResponse.value?.message);
+        failedDatasets.push('users');
       }
-
-      setStatsData(newStatsData);
       
-      // Set error only if all responses failed
-      const allFailed = [requestStatsResponse, appointmentStatsResponse, customerStatsResponse, userStatsResponse]
-        .every(response => 
-          response.status === 'rejected' || 
-          (response.status === 'fulfilled' && !response.value?.success)
+      // Update last successful fetch time
+      lastFetchTimeRef.current = Date.now();
+      
+      // Only update state if the component is still mounted
+      if (isMountedRef.current) {
+        // Always update the statsData with whatever we got
+        setStatsData(newStatsData);
+        
+        // Update datasetStatus based on which datasets succeeded
+        setDatasetStatus({
+          requests: !failedDatasets.includes('requests'),
+          appointments: !failedDatasets.includes('appointments'),
+          customers: !failedDatasets.includes('customers'),
+          users: !failedDatasets.includes('users')
+        });
+        
+        // Check if we have any data to display
+        const anyDataReceived = Object.values(newStatsData).some(
+          categoryData => Object.keys(categoryData).length > 0
         );
         
-      if (allFailed) {
-        setError('Failed to load chart data. Please try again later.');
+        console.log(`Data received: ${anyDataReceived}, Successful datasets: ${successfulDatasets}`);
+        
+        // Set appropriate error message based on results
+        if (failedDatasets.length === 4) {
+          setError('Failed to load all chart data. Please try again later.');
+          
+          if (showErrors) {
+            toast({
+              title: 'Chart data failed to load',
+              description: 'All datasets could not be retrieved. Please try again later.',
+              variant: 'error'
+            });
+          }
+        } else if (failedDatasets.length > 0) {
+          setError(`Some data could not be loaded: ${failedDatasets.join(', ')}.`);
+          
+          if (showErrors && failedDatasets.length > 0) {
+            toast({
+              title: 'Partial data loaded',
+              description: `Some datasets could not be retrieved: ${failedDatasets.join(', ')}.`,
+              variant: 'warning'
+            });
+          }
+        } else if (!anyDataReceived) {
+          setError('No data available for the selected time period.');
+          
+          if (showErrors) {
+            toast({
+              title: 'No data available',
+              description: 'No data is available for the selected time period.',
+              variant: 'warning'
+            });
+          }
+        } else {
+          // Clear error if we have data
+          setError(null);
+        }
       }
     } catch (error) {
-      console.error(`Failed to fetch ${selectedTimeFrame} stats`, error);
-      setError(`Failed to load ${selectedTimeFrame} chart data. Please try again later.`);
+      console.error(`Failed to fetch ${selectedTimeFrame} stats:`, error);
+      
+      if (isMountedRef.current) {
+        setError(`Failed to load ${selectedTimeFrame} chart data. Please try again later.`);
+        
+        if (showErrors) {
+          toast({
+            title: 'Error loading chart data',
+            description: 'An unexpected error occurred when loading chart data.',
+            variant: 'error'
+          });
+        }
+      }
     } finally {
-      setIsLoading(false);
+      // Always ensure we reset loading state and fetching flag
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
+      
+      isFetchingRef.current = false;
+      console.log('Fetch statistics completed');
     }
-  };
+  }, [fetchStatsFromApi, toast]);
 
   // Fetch data when the component mounts or the time frame changes
   useEffect(() => {
+    console.log(`Time frame changed to ${timeFrame}, fetching new data`);
     fetchStatistics(timeFrame);
-  }, [timeFrame]);
+    
+    // Clean up function to prevent updates after unmount
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [timeFrame, fetchStatistics]);
 
   // Change time frame function
-  const changeTimeFrame = (newTimeFrame: TimeFrame) => {
+  const changeTimeFrame = useCallback((newTimeFrame: TimeFrame) => {
+    console.log(`Changing time frame from ${timeFrame} to ${newTimeFrame}`);
     setTimeFrame(newTimeFrame);
-  };
+  }, [timeFrame]);
 
-  // Refresh data function
-  const refreshData = async () => {
-    await fetchStatistics(timeFrame);
-  };
+  // Refresh data function with visible feedback
+  const refreshData = useCallback(async () => {
+    console.log('Manual refresh requested');
+    try {
+      await fetchStatistics(timeFrame, true);
+      
+      if (isMountedRef.current) {
+        toast({
+          title: 'Chart data refreshed',
+          description: 'Dashboard charts have been updated with the latest data.',
+          variant: 'success'
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing chart data:', error);
+      // Error handling is already in fetchStatistics
+    }
+  }, [timeFrame, fetchStatistics, toast]);
 
   // Memoize the merged data to avoid recalculating on every render
   const mergedData = useMemo(() => {
@@ -237,6 +344,11 @@ export const useDashboardCharts = (): DashboardChartState => {
        ...Object.keys(statsData.customers),
        ...Object.keys(statsData.users)]
     );
+    
+    // If we have no periods at all, create a dummy period
+    if (periodsSet.size === 0) {
+      periodsSet.add('No Data');
+    }
     
     // Sort periods based on time frame
     const sortedPeriods = Array.from(periodsSet).sort((a, b) => {
@@ -253,11 +365,16 @@ export const useDashboardCharts = (): DashboardChartState => {
       
       // For weekly data (format: 'Week X')
       if (timeFrame === 'weekly') {
-        const aWeek = parseInt(a.replace('Week ', ''), 10);
-        const bWeek = parseInt(b.replace('Week ', ''), 10);
+        const aMatch = a.match(/Week\s+(\d+)/i);
+        const bMatch = b.match(/Week\s+(\d+)/i);
         
-        if (!isNaN(aWeek) && !isNaN(bWeek)) {
-          return aWeek - bWeek;
+        if (aMatch && bMatch) {
+          const aWeek = parseInt(aMatch[1], 10);
+          const bWeek = parseInt(bMatch[1], 10);
+          
+          if (!isNaN(aWeek) && !isNaN(bWeek)) {
+            return aWeek - bWeek;
+          }
         }
       }
       
@@ -291,6 +408,7 @@ export const useDashboardCharts = (): DashboardChartState => {
     timeFrame,
     isLoading,
     error,
+    datasetStatus,
     changeTimeFrame,
     refreshData
   };

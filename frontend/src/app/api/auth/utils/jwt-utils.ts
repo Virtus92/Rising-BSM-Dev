@@ -44,12 +44,28 @@ export function decodeToken<T = any>(token: string): T | null {
  * Verify a JWT token in a server-compatible way
  * @param token JWT token to verify
  * @param secret Secret key for verification (optional, uses default if not provided)
+ * @param options JWT verification options
  * @returns Verified token payload or null if invalid
  */
-export function verifyToken<T = any>(token: string, secret?: string): T | null {
+export function verifyToken<T = any>(token: string, secret?: string, options?: jwt.VerifyOptions): T | null {
   try {
     const jwtSecret = secret || getJwtSecret();
-    return jwt.verify(token, jwtSecret) as T;
+    const defaultOptions: jwt.VerifyOptions = {
+      issuer: 'rising-bsm',
+      audience: process.env.JWT_AUDIENCE || 'rising-bsm-app'
+    };
+    
+    try {
+      // First try with standard JWT claims
+      return jwt.verify(token, jwtSecret, { ...defaultOptions, ...options }) as T;
+    } catch (claimError) {
+      // If it fails due to missing claims, try legacy verification
+      getLogger().debug('Standard claim validation failed, trying legacy verification:', { 
+        error: claimError instanceof Error ? claimError.message : String(claimError) 
+      });
+      
+      return jwt.verify(token, jwtSecret) as T;
+    }
   } catch (error) {
     getLogger().error('Error verifying JWT:', { error });
     return null;

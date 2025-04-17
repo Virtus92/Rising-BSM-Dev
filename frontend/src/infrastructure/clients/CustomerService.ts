@@ -21,11 +21,36 @@ export class CustomerService {
    * Get all customers with optional filtering
    */
   static async getCustomers(filters?: CustomerFilterParamsDto) {
-    let queryParams = '';
-    if (filters) {
-      queryParams = '?' + new URLSearchParams(filters as any).toString();
+    try {
+      let queryParams = '';
+      if (filters) {
+        // Create a clean params object without undefined/null values
+        const cleanFilters = Object.fromEntries(
+          Object.entries(filters).filter(([_, value]) => 
+            value !== undefined && value !== null && value !== ''
+          )
+        );
+        
+        queryParams = '?' + new URLSearchParams(cleanFilters as any).toString();
+      }
+      
+      return await ApiClient.get(`${this.basePath}${queryParams}`);
+    } catch (error) {
+      console.error('Error in CustomerService.getCustomers:', error);
+      return {
+        success: false,
+        data: { 
+          data: [], 
+          pagination: {
+            page: filters?.page || 1,
+            limit: filters?.limit || 10,
+            total: 0,
+            totalPages: 0
+          }
+        },
+        message: error instanceof Error ? error.message : 'Error fetching customers'
+      };
     }
-    return ApiClient.get(`${this.basePath}${queryParams}`);
   }
 
   /**

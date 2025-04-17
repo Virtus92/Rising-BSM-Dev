@@ -60,39 +60,51 @@ async function isTokenValid(token: string): Promise<boolean> {
         // This is for backward compatibility with existing tokens
         console.log('Claim validation failed, trying legacy verification:', claimError);
         
-        const { payload } = await jose.jwtVerify(token, secretKey, {
-          // No issuer or audience requirements for backward compatibility
-        });
-        
-        // Check for expiration
-        const exp = payload.exp;
-        if (!exp) {
-          console.log('Token missing expiration');
-          return false;
-        }
-        
-        // Check if token is expired
-        const now = Math.floor(Date.now() / 1000);
-        if (exp < now) {
-          console.log(`Token expired at ${new Date(exp * 1000).toISOString()}`);
-          return false;
-        }
-        
-        // Verify that the user referenced in the token still exists and is active
-        if (payload.sub) {
-          const isUserValid = await verifyUserExists(payload.sub.toString());
-          if (!isUserValid) {
-            console.log(`User ${payload.sub} not found or inactive`);
+        // Only try legacy verification if the error is specifically about missing claims
+        // and not some other verification error
+        if (claimError instanceof Error && 
+            (claimError.name === 'JWTClaimValidationFailed' || 
+             claimError.message.includes('claim validation'))) {
+          
+          const { payload } = await jose.jwtVerify(token, secretKey, {
+            // No issuer or audience requirements for backward compatibility
+          });
+          
+          // Check for expiration
+          const exp = payload.exp;
+          if (!exp) {
+            console.log('Token missing expiration');
             return false;
           }
+          
+          // Check if token is expired
+          const now = Math.floor(Date.now() / 1000);
+          if (exp < now) {
+            console.log(`Token expired at ${new Date(exp * 1000).toISOString()}`);
+            return false;
+          }
+          
+          // Verify that the user referenced in the token still exists and is active
+          if (payload.sub) {
+            const isUserValid = await verifyUserExists(payload.sub.toString());
+            if (!isUserValid) {
+              console.log(`User ${payload.sub} not found or inactive`);
+              return false;
+            }
+          } else {
+            console.log('Legacy token missing user ID (sub claim)');
+            return false;
+          }
+          
+          // Basic validation passed for legacy token
+          console.log('Legacy token validation passed (no issuer/audience) with valid user');
+          return true;
         } else {
-          console.log('Legacy token missing user ID (sub claim)');
+          // If it's not a claim validation error, it's likely a more serious issue like
+          // an invalid signature, so we don't fall back to less secure validation
+          console.log('Token validation failed with non-claim error:', claimError);
           return false;
         }
-        
-        // Basic validation passed for legacy token
-        console.log('Legacy token validation passed (no issuer/audience) with valid user');
-        return true;
       }
     } catch (verifyError) {
       console.log('Token signature verification failed:', verifyError);
@@ -265,20 +277,47 @@ export async function middleware(request: NextRequest) {
         // Log successful validation
         console.log(`Token validation passed for ${pathname}`);
         
+        // Extract user data from the token
+        let userData = null;
+        try {
+          const decoded = jose.decodeJwt(token);
+          userData = {
+            userId: Number(decoded.sub),
+            name: decoded.name as string || '',
+            email: decoded.email as string || '',
+            role: decoded.role as string || ''
+          };
+        } catch (e) {
+          console.log('Error decoding token data:', e);
+        }
+        
         // Token is valid, create response
         const response = NextResponse.next();
         
-        // CRITICAL FIX: Always add X-Auth-Token for API routes
-        // This ensures the token is available to API handlers
+        // CRITICAL FIX: Always add auth info for API routes
         if (pathname.startsWith('/api/')) {
-          console.log(`Adding X-Auth-Token header for API route: ${pathname}`);
+          console.log(`Adding authentication headers for API route: ${pathname}`);
           
-          // Set the token in multiple headers to increase chances of it being available
-          // to the API route handlers
+          // Add the JWT token itself
           response.headers.set('X-Auth-Token', token);
           
-          // Also ensure the auth_token cookie is properly set with correct attributes
-          // This is the most reliable way to pass the token between middleware and API routes
+          // Also add decoded user data for API routes to access
+          if (userData) {
+            response.headers.set('X-Auth-User-Id', userData.userId.toString());
+            if (userData.role) response.headers.set('X-Auth-User-Role', userData.role);
+            
+            // Add a more complete set of data in a single header
+            const authDataJson = JSON.stringify({
+              userId: userData.userId,
+              role: userData.role || '',
+              name: userData.name || '',
+              email: userData.email || ''
+            });
+            
+            response.headers.set('X-Auth-Data', Buffer.from(authDataJson).toString('base64'));
+          }
+          
+          // Ensure the auth_token cookie is properly set
           if (!request.cookies.has('auth_token') || request.cookies.get('auth_token')?.value !== token) {
             // Get expiration time from the token
             let expiresIn = 24 * 60 * 60; // Default 24 hours
@@ -293,7 +332,6 @@ export async function middleware(request: NextRequest) {
             }
             
             // Set the auth_token cookie on the response
-            // This will ensure it's available to API routes
             response.cookies.set({
               name: 'auth_token',
               value: token,
@@ -308,17 +346,14 @@ export async function middleware(request: NextRequest) {
         
         return response;
       } else {
-        // Token is invalid or expired - handle appropriately
         console.log(`Token appears invalid in middleware for ${pathname}`);
         
         // For protected page routes: redirect to login
         if (!isPublicPath && !pathname.startsWith('/api/')) {
-          // Clean the returnUrl to prevent loops
           const cleanPath = pathname.replace(/\/api\/api\//, '/api/');
           const url = new URL('/auth/login', request.url);
           url.searchParams.set('returnUrl', encodeURI(cleanPath));
           
-          // Clear the invalid token
           const response = NextResponse.redirect(url);
           response.cookies.delete('auth_token');
           response.cookies.delete('refresh_token');
@@ -339,7 +374,6 @@ export async function middleware(request: NextRequest) {
         }
       }
     } catch (error) {
-      // Token validation error
       console.log(`Token validation error in middleware for ${pathname}:`, error);
       
       // For protected page routes: redirect to login
@@ -347,7 +381,6 @@ export async function middleware(request: NextRequest) {
         const url = new URL('/auth/login', request.url);
         url.searchParams.set('returnUrl', encodeURI(pathname));
         
-        // Clear the invalid token
         const response = NextResponse.redirect(url);
         response.cookies.delete('auth_token');
         response.cookies.delete('refresh_token');
@@ -369,7 +402,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Default behavior for routes that don't match any condition
   console.log(`Default middleware behavior for ${pathname}`);
   return NextResponse.next();
 }

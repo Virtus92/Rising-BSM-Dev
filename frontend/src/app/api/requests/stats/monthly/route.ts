@@ -1,100 +1,92 @@
-import { NextResponse } from 'next/server';
-import { auth } from '../../../auth/middleware/authMiddleware';
-import { getPrismaClient } from '@/infrastructure/common/database/prisma';
+import { NextRequest } from 'next/server';
+import { apiRouteHandler } from '@/infrastructure/api/route-handler';
+import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
 import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
+import { generateMonthlyStats } from '@/shared/utils/statistics-utils';
+import { RequestResponseDto } from '@/domain/dtos/RequestDtos';
+import { RequestStatus } from '@/domain/enums/CommonEnums';
 
 /**
  * GET /api/requests/stats/monthly
- * Returns monthly contact request statistics for the past 12 months
+ * 
+ * Returns monthly request statistics for the past 12 months
  */
-export async function GET(request: Request) {
+export const GET = apiRouteHandler(async (request: NextRequest) => {
   const logger = getLogger();
   
   try {
-    // Verify authentication
-    const authResult = await auth(request);
-    if (!authResult.success) {
-      return NextResponse.json(
-        { success: false, message: authResult.message },
-        { status: authResult.status }
-      );
-    }
-
-    // Get prisma client
-    const prisma = getPrismaClient();
-
     // Get URL parameters
     const url = new URL(request.url);
-    const months = parseInt(url.searchParams.get('months') || '12', 10);
+    const lookbackMonths = parseInt(url.searchParams.get('months') || '12', 10);
     
-    // Calculate start date (X months ago)
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - months);
+    const serviceFactory = getServiceFactory();
+    const requestService = serviceFactory.createRequestService();
     
-    // Format dates to beginning/end of month
-    startDate.setDate(1);
-    startDate.setHours(0, 0, 0, 0);
+    // Get all requests
+    const requestsResponse = await requestService.findAll({
+      limit: 1000, // High limit to get all requests
+      context: {
+        userId: request.auth?.userId
+      }
+    });
     
-    // Generate monthly ranges
-    const monthRanges = [];
-    const currentDate = new Date(startDate);
-    
-    while (currentDate <= endDate) {
-      const month = currentDate.getMonth();
-      const year = currentDate.getFullYear();
-      
-      const monthStart = new Date(year, month, 1);
-      const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
-      
-      monthRanges.push({
-        start: new Date(monthStart),
-        end: new Date(monthEnd),
-        month: monthStart.toLocaleString('default', { month: 'short' }),
-        year: year
-      });
-      
-      // Move to next month
-      currentDate.setMonth(currentDate.getMonth() + 1);
+    let requests: RequestResponseDto[] = [];
+    if (requestsResponse && requestsResponse.data) {
+      requests = requestsResponse.data;
     }
     
-    // Query requests for each month
-    const monthlyStats = await Promise.all(
-      monthRanges.map(async (range) => {
-        const count = await prisma.contactRequest.count({
-          where: {
-            createdAt: {
-              gte: range.start,
-              lte: range.end
-            }
-          }
-        });
-        
-        return {
-          month: `${range.month} ${range.year}`,
-          count: count,
-          period: {
-            start: range.start.toISOString(),
-            end: range.end.toISOString()
-          }
-        };
-      })
+    // Generate monthly stats using our utility function
+    const monthlyStats = generateMonthlyStats(
+      requests,
+      (req: RequestResponseDto) => req.createdAt,
+      lookbackMonths
     );
-
-    return NextResponse.json({
-      success: true,
-      data: monthlyStats,
-      message: 'Monthly request statistics retrieved successfully'
+    
+    // Enrich with additional data needed for the UI
+    const enrichedStats = monthlyStats.map(stat => {
+      // Filter requests for this period
+      const periodRequests = requests.filter(req => {
+        const creationDate = new Date(req.createdAt);
+        return creationDate >= new Date(stat.startDate) && 
+               creationDate <= new Date(stat.endDate);
+      });
+      
+      // Count by status
+      const newRequests = periodRequests.filter(r => r.status === RequestStatus.NEW).length;
+      const inProgress = periodRequests.filter(r => r.status === RequestStatus.IN_PROGRESS).length;
+      const completed = periodRequests.filter(r => r.status === RequestStatus.COMPLETED).length;
+      const cancelled = periodRequests.filter(r => r.status === RequestStatus.CANCELLED).length;
+      const converted = periodRequests.filter(r => r.customerId !== null && r.customerId !== undefined).length;
+      
+      return {
+        ...stat,
+        month: stat.period.split(' ')[0], // Extract month name
+        requests: stat.count,
+        newRequests,
+        inProgress,
+        completed,
+        cancelled,
+        converted
+      };
     });
+    
+    return formatSuccess(
+      enrichedStats, 
+      'Monthly request statistics retrieved successfully'
+    );
   } catch (error) {
-    logger.error('[API] Error generating monthly request stats:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Failed to retrieve monthly request statistics', 
-        error: error instanceof Error ? error.message : String(error) 
-      },
-      { status: 500 }
+    logger.error('Error generating monthly request stats:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    return formatError(
+      error instanceof Error ? error.message : 'Failed to retrieve monthly request statistics',
+      500
     );
   }
-}
+}, {
+  // Secure this endpoint
+  requiresAuth: true
+});

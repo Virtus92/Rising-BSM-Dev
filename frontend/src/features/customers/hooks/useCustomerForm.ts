@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { CustomerResponseDto, CreateCustomerDto, UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { useToast } from '@/shared/hooks/useToast';
+import { formatPhoneNumber, isValidPhone } from '@/infrastructure/common/validation/userValidation';
 
 type FormErrors = {
   name?: string;
@@ -27,7 +28,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
   // Formularfelder
   const [name, setName] = useState(initialData.name || '');
   const [email, setEmail] = useState(initialData.email || '');
-  const [phone, setPhone] = useState(initialData.phone || '');
+  const [phone, setPhone] = useState(initialData.phone ? formatPhoneNumber(initialData.phone) : '');
   const [address, setAddress] = useState(initialData.address || '');
   const [city, setCity] = useState(initialData.city || '');
   const [zipCode, setZipCode] = useState(initialData.zipCode || '');
@@ -57,17 +58,22 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
       newErrors.email = 'Ungültiges E-Mail-Format';
     }
     
+    // Validiere Telefonnummer (falls vorhanden)
+    if (phone && !isValidPhone(phone)) {
+      newErrors.phone = 'Ungültiges Telefonnummer-Format';
+    }
+    
     // Setze Fehler und gib Validierungsstatus zurück
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [name, email]);
+  }, [name, email, phone]);
   
   // Erstelle das Formularobjekt
   const getFormData = useCallback((): CreateCustomerDto | UpdateCustomerDto => {
     return {
       name,
       email: email || undefined,
-      phone: phone || undefined,
+      phone: phone ? formatPhoneNumber(phone) : undefined,
       address: address || undefined,
       city: city || undefined,
       zipCode: zipCode || undefined,
@@ -130,7 +136,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
   const resetForm = useCallback(() => {
     setName(initialData.name || '');
     setEmail(initialData.email || '');
-    setPhone(initialData.phone || '');
+    setPhone(initialData.phone ? formatPhoneNumber(initialData.phone) : '');
     setAddress(initialData.address || '');
     setCity(initialData.city || '');
     setZipCode(initialData.zipCode || '');
@@ -147,7 +153,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
     const setters: Record<string, (value: string) => void> = {
       name: setName,
       email: setEmail,
-      phone: setPhone,
+      phone: (value) => setPhone(value),
       address: setAddress,
       city: setCity,
       zipCode: setZipCode,

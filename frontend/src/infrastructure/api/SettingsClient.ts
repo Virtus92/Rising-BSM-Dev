@@ -4,7 +4,7 @@
 import { ApiClient, ApiResponse, apiClient } from '@/infrastructure/clients/ApiClient';
 
 // API-URL für Einstellungen
-const SETTINGS_API_URL = '/api/settings';
+const SETTINGS_API_URL = '/settings';
 
 /**
  * Systemeinstellungen-Interface

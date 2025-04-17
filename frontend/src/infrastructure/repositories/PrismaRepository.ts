@@ -2,8 +2,13 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 import { ILoggingService } from '@/infrastructure/common/logging/ILoggingService';
 import { IErrorHandler } from '@/infrastructure/common/error/ErrorHandler';
-import { QueryOptions } from '@/domain/repositories/IBaseRepository';
+import { QueryOptions as BaseQueryOptions, PaginationResult } from '@/domain/repositories/IBaseRepository';
 import { configService } from '@/infrastructure/services/ConfigService';
+
+// Extend QueryOptions to include criteria
+export interface QueryOptions extends BaseQueryOptions {
+  criteria?: any;
+}
 
 /**
  * Prisma-Basis-Repository
@@ -36,6 +41,69 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
   ) {
     super(prisma[modelName as keyof PrismaClient], logger, errorHandler);
     this.logger.debug(`Initialized PrismaRepository for model: ${modelName}`);
+  }
+
+  /**
+   * Find all items with pagination
+   * 
+   * @param options - Query options 
+   * @returns Paginated results
+   */
+  async findAll<U = T>(options?: QueryOptions): Promise<PaginationResult<U>> {
+    try {
+      const queryOptions = this.buildQueryOptions(options);
+      
+      // Process criteria if provided
+      let where = {};
+      if (options?.criteria) {
+        where = this.processCriteria ? this.processCriteria(options.criteria) : options.criteria;
+      }
+      
+      // Build query parameters
+      const params: any = {
+        where,
+        ...queryOptions
+      };
+      
+      // Special handling for customer sorting if needed
+      if (options?.sort?.field === 'customerName' || options?.sort?.field === 'customer.name') {
+        params.orderBy = {
+          customer: { name: options.sort.direction.toLowerCase() }
+        };
+        
+        // Make sure customer relation is included
+        if (!params.include) params.include = {};
+        params.include.customer = true;
+      }
+      
+      // Execute paginated query
+      const [total, items] = await Promise.all([
+        this.executeQuery('count', where),
+        this.executeQuery('findByCriteria', where, params)
+      ]);
+      
+      // Calculate pagination metadata
+      const limit = options?.limit || 10;
+      const page = options?.page || 1;
+      const totalPages = Math.ceil(total / limit);
+      
+      return {
+        data: items as U[],
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages
+        }
+      };
+    } catch (error) {
+      this.logger.error(`Error in ${this.getDisplayName()}.findAll:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        options
+      });
+      throw this.handleError(error);
+    }
   }
 
   /**
@@ -76,6 +144,25 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
   }
 
   /**
+   * Normalisiert eine ID für Prisma-Abfragen
+   * Konvertiert String-IDs in numerische IDs, falls nötig
+   * 
+   * @param id - Die zu normalisierende ID
+   * @returns Die normalisierte ID
+   */
+  protected normalizeId(id: any): any {
+    try {
+      // Simply return the ID as-is without any conversion or validation
+      // Let the database layer handle the validation
+      // This maximizes compatibility with different ID formats
+      return id;
+    } catch (error) {
+      this.logger.warn('Error in normalizeId:', { id, error: String(error) });
+      return id;
+    }
+  }
+
+  /**
    * Führt eine Datenbankabfrage aus
    * 
    * @param operation - Operationsname
@@ -104,10 +191,36 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
           break;
           
         case 'findById':
-          result = await (model as any).findUnique({
-            where: { id: args[0] },
-            ...(args[1] || {})
-          });
+          // Don't do any ID normalization or validation at all - just try to find the record
+          try {
+            // First try a direct lookup by id
+            result = await (model as any).findUnique({
+              where: { id: args[0] },
+              ...(args[1] || {})
+            });
+            
+            // If that fails, try converting string to number and vice versa
+            if (!result && typeof args[0] === 'string' && /^\d+$/.test(args[0])) {
+              // Try as number if it's a numeric string
+              result = await (model as any).findUnique({
+                where: { id: parseInt(args[0]) },
+                ...(args[1] || {})
+              });
+            } else if (!result && typeof args[0] === 'number') {
+              // Try as string if it's a number
+              result = await (model as any).findUnique({
+                where: { id: String(args[0]) },
+                ...(args[1] || {})
+              });
+            }
+          } catch (findError) {
+            // Log the error but don't crash - return null instead
+            this.logger.warn(`Error finding record by ID ${args[0]}`, { 
+              error: findError,
+              modelName: this.modelName 
+            });
+            result = null;
+          }
           break;
           
         case 'findByCriteria':
@@ -131,15 +244,21 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
           break;
           
         case 'update':
+          // Normalisiere die ID für Prisma
+          const updateId = this.normalizeId(args[0]);
+          
           result = await (model as any).update({
-            where: { id: args[0] },
+            where: { id: updateId },
             data: args[1]
           });
           break;
           
         case 'delete':
+          // Normalisiere die ID für Prisma
+          const deleteId = this.normalizeId(args[0]);
+          
           result = await (model as any).delete({
-            where: { id: args[0] }
+            where: { id: deleteId }
           });
           break;
           
@@ -150,8 +269,13 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
           break;
           
         case 'bulkUpdate':
+          // Normalisiere alle IDs im Array
+          const bulkUpdateIds = Array.isArray(args[0]) 
+            ? args[0].map(id => this.normalizeId(id)) 
+            : args[0];
+            
           result = await (model as any).updateMany({
-            where: { id: { in: args[0] } },
+            where: { id: { in: bulkUpdateIds } },
             data: args[1]
           });
           break;
@@ -274,9 +398,26 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
     
     // Füge Sortierung hinzu
     if (options.sort) {
-      result.orderBy = {
-        [options.sort.field]: options.sort.direction.toLowerCase()
-      };
+      // Fix for the "sortBy" field issue - don't use "sortBy" as a field name
+      // Special handling for metadata field names that aren't real database fields
+      if (options.sort.field === 'sortBy') {
+        // Use a default field based on the model
+        const defaultSortField = this.getDefaultSortField();
+        result.orderBy = {
+          [defaultSortField]: options.sort.direction.toLowerCase()
+        };
+        this.logger.debug(`Used default sort field ${defaultSortField} for sortBy`);
+      } else {
+        // Use the specified field
+        result.orderBy = {
+          [options.sort.field]: options.sort.direction.toLowerCase()
+        };
+        this.logger.debug(`Added sorting options: ${options.sort.field} ${options.sort.direction}`);
+      }
+    } else if (this.modelName === 'appointment') {
+      // Default sorting for appointments
+      result.orderBy = { appointmentDate: 'asc' };
+      this.logger.debug('Added default sorting for appointments by appointmentDate asc');
     }
     
     return result;
@@ -392,5 +533,27 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
    */
   protected getDisplayName(): string {
     return `${this.modelName}Repository`;
+  }
+  
+  /**
+   * Returns the default sort field for this model
+   * Used when a generic 'sortBy' is requested
+   * 
+   * @returns The default field to sort by
+   */
+  protected getDefaultSortField(): string {
+    // Use model-specific default sort fields
+    switch (this.modelName) {
+      case 'user':
+        return 'name';
+      case 'customer':
+        return 'name';
+      case 'appointment':
+        return 'appointmentDate';
+      case 'request':
+        return 'createdAt';
+      default:
+        return 'createdAt';
+    }
   }
 }

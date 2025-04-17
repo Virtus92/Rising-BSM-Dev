@@ -118,7 +118,7 @@ export default function NotificationItem({
             {!compact && (
               <div className={`mt-2 ${expanded ? 'block' : 'hidden'}`}>
                 <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                  {notification.content}
+                  {notification.content || notification.message || ''}
                 </p>
                 
                 {notification.link && (

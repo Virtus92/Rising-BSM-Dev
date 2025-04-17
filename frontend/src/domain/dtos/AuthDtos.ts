@@ -4,6 +4,9 @@ export interface LoginDto {
   email: string;
   password: string;
   remember?: boolean;
+  ipAddress?: string;
+  userAgent?: string;
+  rememberMe?: boolean;
 }
 
 export interface RegisterDto {
@@ -59,6 +62,8 @@ export interface AuthResponseDto {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+  accessExpiration?: number;
+  refreshExpiration?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,4 +97,6 @@ export interface TokenPayloadDto {
   role: UserRole;
   iat: number;
   exp: number;
+  iss?: string; // Issuer
+  aud?: string; // Audience
 }

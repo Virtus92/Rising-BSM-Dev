@@ -2,109 +2,70 @@
  * API route for specific notification operations
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { NotificationService } from '@/infrastructure/services/NotificationService';
+import { getServiceFactory } from '@/infrastructure/common/factories';
 import { authMiddleware } from '../../auth/middleware/authMiddleware';
-import { responseFormatter } from '@/infrastructure/api/response-formatter';
-import { routeHandler } from '@/infrastructure/api/route-handler';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
 
 /**
  * GET /api/notifications/[id]
  * Get specific notification by id
  */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  return routeHandler(async () => {
-    // Authentication check
-    const session = await authMiddleware(req);
-    if (!session || !session.user) {
-      return NextResponse.json(
-        responseFormatter.error('Unauthorized'),
-        { status: 401 }
-      );
-    }
-
+export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+  try {
     const id = parseInt(params.id);
     if (isNaN(id)) {
-      return NextResponse.json(
-        responseFormatter.error('Invalid notification ID'),
-        { status: 400 }
-      );
+      return formatResponse.error('Invalid notification ID', 400);
     }
 
-    const notificationService = new NotificationService();
-    const notification = await notificationService.getNotificationById(id);
+    const serviceFactory = getServiceFactory();
+    const notificationService = serviceFactory.createNotificationService();
+    const notification = await notificationService.getById(id);
 
     if (!notification) {
-      return NextResponse.json(
-        responseFormatter.error('Notification not found'),
-        { status: 404 }
-      );
+      return formatResponse.error('Notification not found', 404);
     }
 
     // Check if notification belongs to the current user
-    if (notification.userId !== session.user.id && session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        responseFormatter.error('Access denied'),
-        { status: 403 }
-      );
+    if (notification.userId !== req.auth?.userId && req.auth?.role !== 'ADMIN') {
+      return formatResponse.error('Access denied', 403);
     }
 
-    return NextResponse.json(
-      responseFormatter.success(notification)
-    );
-  });
-}
+    return formatResponse.success(notification);
+  } catch (error) {
+    console.error('Error fetching notification:', error);
+    return formatResponse.error('Error fetching notification', 500);
+  }
+}, {
+  requiresAuth: true
+});
 
-/**
- * DELETE /api/notifications/[id]
- * Delete a notification
- */
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  return routeHandler(async () => {
-    // Authentication check
-    const session = await authMiddleware(req);
-    if (!session || !session.user) {
-      return NextResponse.json(
-        responseFormatter.error('Unauthorized'),
-        { status: 401 }
-      );
-    }
-
+export const DELETE = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+  try {
     const id = parseInt(params.id);
     if (isNaN(id)) {
-      return NextResponse.json(
-        responseFormatter.error('Invalid notification ID'),
-        { status: 400 }
-      );
+      return formatResponse.error('Invalid notification ID', 400);
     }
 
-    const notificationService = new NotificationService();
+    const serviceFactory = getServiceFactory();
+    const notificationService = serviceFactory.createNotificationService();
     
     // Check if notification belongs to the current user
-    const notification = await notificationService.getNotificationById(id);
+    const notification = await notificationService.getById(id);
     if (!notification) {
-      return NextResponse.json(
-        responseFormatter.error('Notification not found'),
-        { status: 404 }
-      );
+      return formatResponse.error('Notification not found', 404);
     }
     
-    if (notification.userId !== session.user.id && session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        responseFormatter.error('Access denied'),
-        { status: 403 }
-      );
+    if (notification.userId !== req.auth?.userId && req.auth?.role !== 'ADMIN') {
+      return formatResponse.error('Access denied', 403);
     }
 
-    await notificationService.deleteNotification(id);
+    await notificationService.delete(id);
 
-    return NextResponse.json(
-      responseFormatter.success({ success: true })
-    );
-  });
-}
+    return formatResponse.success({ success: true }, 'Notification deleted successfully');
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    return formatResponse.error('Error deleting notification', 500);
+  }
+}, {
+  requiresAuth: true
+});

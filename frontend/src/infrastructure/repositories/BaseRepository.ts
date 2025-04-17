@@ -39,6 +39,14 @@ export abstract class BaseRepository<T, ID = number> implements IBaseRepository<
     try {
       const queryOptions = this.buildQueryOptions(options);
       
+      // Make sure we have proper sorting for appointments
+      if (this.getDisplayName()?.toLowerCase().includes('appointment')) {
+        if (!queryOptions.orderBy) {
+          queryOptions.orderBy = { appointmentDate: 'asc' };
+          this.logger.debug('Adding default appointment date sorting for appointments');
+        }
+      }
+      
       // Zähle die Gesamtanzahl
       const total = await this.count();
       
@@ -381,4 +389,13 @@ export abstract class BaseRepository<T, ID = number> implements IBaseRepository<
    * @returns Ob der Fehler eine Fremdschlüssel-Einschränkung verletzt
    */
   protected abstract isForeignKeyConstraintError(error: any): boolean;
+  
+  /**
+   * Gibt den Anzeigenamen des Repositories zurück
+   * 
+   * @returns Anzeigename für Logging
+   */
+  protected getDisplayName(): string {
+    return this.constructor.name;
+  }
 }

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { initializeApi } from '@/infrastructure/api/ApiInitializer';
 
 /**
  * This component initializes the dashboard by ensuring the authentication state is properly set
@@ -9,22 +10,24 @@ import { useRouter } from 'next/navigation';
  */
 export default function DashboardInitializer() {
   const router = useRouter();
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     async function initializeDashboard() {
-      console.log('DashboardInitializer: Starting initialization');
-
       try {
+        // Initialize API client first
+        await initializeApi();
+        
         // Import TokenManager for token synchronization
         const { TokenManager } = await import('@/infrastructure/auth/TokenManager');
         
         // Synchronize tokens between localStorage and cookies
-        TokenManager.synchronizeTokens();
+        await TokenManager.synchronizeTokens();
         
         // Check if we have any auth tokens
         let hasToken = false;
         
-        // Check cookies
+        // Check cookies in a more consistent way
         const cookies = document.cookie.split(';').map(c => c.trim());
         hasToken = cookies.some(c => 
           c.startsWith('auth_token=') || 
@@ -36,7 +39,6 @@ export default function DashboardInitializer() {
         if (!hasToken) {
           const tokenBackup = localStorage.getItem('auth_token_backup');
           if (tokenBackup) {
-            console.log('DashboardInitializer: Using token backup');
             hasToken = true;
             
             // Set cookies from backup
@@ -50,20 +52,35 @@ export default function DashboardInitializer() {
           }
         }
         
+        // Call the bootstrap API endpoint for server-side checks
+        const bootstrapResponse = await fetch('/api/bootstrap', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // Include credentials to send cookies
+          credentials: 'include'
+        });
+
+        if (!bootstrapResponse.ok) {
+          throw new Error(`Bootstrap failed with status: ${bootstrapResponse.status}`);
+        }
+
+        const bootstrapData = await bootstrapResponse.json();
+        if (!bootstrapData.success) {
+          throw new Error(bootstrapData.message || 'Unknown bootstrap error');
+        }
+        
         // If we have tokens, verify authentication
         if (hasToken) {
-          console.log('DashboardInitializer: Found tokens, verifying authentication');
-          
           // Use a direct authentication check
           const authOk = await verifyAuthentication();
           
           if (!authOk) {
-            console.error('DashboardInitializer: Authentication verification failed');
             // If authentication failed, try to refresh the token
             const refreshed = await TokenManager.refreshAccessToken();
             
             if (!refreshed) {
-              console.error('DashboardInitializer: Token refresh failed, redirecting to login');
               router.push('/auth/login?session=expired');
               return;
             }
@@ -71,20 +88,21 @@ export default function DashboardInitializer() {
             // After refresh, verify again
             const authAfterRefresh = await verifyAuthentication();
             if (!authAfterRefresh) {
-              console.error('DashboardInitializer: Authentication still failed after refresh');
               router.push('/auth/login?session=expired');
               return;
             }
           }
-          
-          console.log('DashboardInitializer: Authentication verified');
         } else {
-          console.error('DashboardInitializer: No tokens found, redirecting to login');
           router.push('/auth/login?auth=missing');
         }
       } catch (error) {
-        console.error('DashboardInitializer: Error during initialization', error);
-        // Don't redirect on error - let the app's normal auth flow handle it
+        console.error('DashboardInitializer: Error during initialization', 
+          error instanceof Error ? error.message : String(error));
+        
+        // On bootstrap error, redirect to login to reset the auth state
+        router.push('/auth/login?error=init');
+      } finally {
+        setIsInitializing(false);
       }
     }
     
@@ -106,18 +124,18 @@ export default function DashboardInitializer() {
       });
       
       if (!response.ok) {
-        console.warn('DashboardInitializer: Authentication check failed', response.status);
         return false;
       }
       
       const data = await response.json();
       return data.success === true && !!data.data;
     } catch (error) {
-      console.error('DashboardInitializer: Error checking authentication', error);
+      console.error('DashboardInitializer: Error checking authentication', 
+        error instanceof Error ? error.message : String(error));
       return false;
     }
   }
 
-  // This component doesn't render anything
+  // This component doesn't render anything visible
   return null;
 }

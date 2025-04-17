@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { getServerSession, authOptions } from '@/app/api/auth/middleware/authMiddleware';
-
-const prisma = new PrismaClient();
+import { NextRequest } from 'next/server';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
+import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { apiPermissions } from '../../../helpers/apiPermissions';
 
 type RequestParams = {
   params: {
@@ -15,136 +16,101 @@ type RequestParams = {
  * 
  * Fügt eine Notiz zu einer Kontaktanfrage hinzu.
  */
-export async function POST(request: NextRequest, { params }: RequestParams) {
-  try {
-    // Authentifizierung prüfen
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
+export const POST = apiRouteHandler(
+  apiPermissions.withPermission(
+    async (req: NextRequest, { params }: RequestParams) => {
+      const logger = getLogger();
+      const serviceFactory = getServiceFactory();
 
-    const requestId = parseInt(params.id);
-    if (isNaN(requestId)) {
-      return NextResponse.json(
-        { success: false, message: 'Ungültige Anfrage-ID' },
-        { status: 400 }
-      );
-    }
-
-    // Überprüfen, ob die Anfrage existiert
-    const existingRequest = await prisma.contactRequest.findUnique({
-      where: { id: requestId }
-    });
-
-    if (!existingRequest) {
-      return NextResponse.json(
-        { success: false, message: 'Kontaktanfrage nicht gefunden' },
-        { status: 404 }
-      );
-    }
-
-    // Daten aus dem Request-Body auslesen
-    const body = await request.json();
-    const { text } = body;
-
-    if (!text || text.trim() === '') {
-      return NextResponse.json(
-        { success: false, message: 'Notiztext ist erforderlich' },
-        { status: 400 }
-      );
-    }
-
-    // Notiz erstellen
-    const newNote = await prisma.requestNote.create({
-      data: {
+      const requestId = parseInt(params.id);
+      if (isNaN(requestId)) {
+        return formatResponse.error('Invalid request ID', 400);
+      }
+      
+      // Parse request body
+      const body = await req.json();
+      const { text, content } = body;
+      const noteText = text || content; // Support both field names
+      
+      if (!noteText || noteText.trim() === '') {
+        return formatResponse.error('Note text is required', 400);
+      }
+      
+      // Create context for service calls
+      const context = {
+        userId: req.auth?.userId,
+        userRole: req.auth?.role
+      };
+      
+      // Get request service
+      const requestService = serviceFactory.createRequestService();
+      
+      // Add note to request
+      const newNote = await requestService.addNote(
         requestId,
-        userId: parseInt(session.user.id),
-        userName: session.user.name || 'Unbekannt',
-        text
-      }
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: 'Notiz erfolgreich hinzugefügt',
-      data: {
-        ...newNote,
-        createdAt: newNote.createdAt.toISOString()
-      }
-    });
-  } catch (error) {
-    console.error('Error adding note to request:', error);
-    return NextResponse.json(
-      { success: false, message: 'Server-Fehler', error: String(error) },
-      { status: 500 }
-    );
-  }
-}
+        req.auth?.userId || 0,
+        req.auth?.name || 'Unknown User',
+        noteText,
+        { context }
+      );
+      
+      return formatResponse.success(newNote, 'Note added successfully');
+    },
+    SystemPermission.REQUESTS_EDIT
+  ),
+  { requiresAuth: true }
+);
 
 /**
  * GET /api/requests/[id]/notes
  * 
  * Ruft alle Notizen einer Kontaktanfrage ab.
  */
-export async function GET(request: NextRequest, { params }: RequestParams) {
-  try {
-    // Authentifizierung prüfen
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
-
-    const requestId = parseInt(params.id);
-    if (isNaN(requestId)) {
-      return NextResponse.json(
-        { success: false, message: 'Ungültige Anfrage-ID' },
-        { status: 400 }
-      );
-    }
-
-    // Überprüfen, ob die Anfrage existiert
-    const existingRequest = await prisma.contactRequest.findUnique({
-      where: { id: requestId }
-    });
-
-    if (!existingRequest) {
-      return NextResponse.json(
-        { success: false, message: 'Kontaktanfrage nicht gefunden' },
-        { status: 404 }
-      );
-    }
-
-    // Notizen abrufen
-    const notes = await prisma.requestNote.findMany({
-      where: { requestId },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    // Formatierte Antwort
-    const formattedNotes = notes.map(note => ({
-      id: note.id,
-      requestId: note.requestId,
-      userId: note.userId,
-      userName: note.userName,
-      text: note.text,
-      createdAt: note.createdAt.toISOString()
-    }));
-
-    return NextResponse.json({
-      success: true,
-      data: formattedNotes
-    });
-  } catch (error) {
-    console.error('Error fetching request notes:', error);
-    return NextResponse.json(
-      { success: false, message: 'Server-Fehler', error: String(error) },
-      { status: 500 }
-    );
-  }
-}
+export const GET = apiRouteHandler(
+  apiPermissions.withPermission(
+    async (req: NextRequest, { params }: RequestParams) => {
+      const logger = getLogger();
+      const serviceFactory = getServiceFactory();
+      
+      const requestId = parseInt(params.id);
+      if (isNaN(requestId)) {
+        return formatResponse.error('Invalid request ID', 400);
+      }
+      
+      // Create context for service calls
+      const context = {
+        userId: req.auth?.userId,
+        userRole: req.auth?.role
+      };
+      
+      // Get request service and directly use it for notes
+      const requestService = serviceFactory.createRequestService();
+      
+      // Check if request exists
+      const requestEntity = await requestService.findRequestById(requestId, { context });
+      if (!requestEntity) {
+        return formatResponse.error('Request not found', 404);
+      }
+      
+      // Get notes via the detailed response that includes notes
+      const detailedRequest = await requestService.findRequestById(requestId, { context });
+      const notes = detailedRequest.notes || [];
+      
+      // Format notes for response
+      const formattedNotes = notes.map(note => ({
+        id: note.id,
+        requestId: note.requestId,
+        userId: note.userId,
+        userName: note.userName,
+        text: note.text,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt || note.createdAt,
+        formattedDate: new Date(note.createdAt).toLocaleString()
+      }));
+      
+      return formatResponse.success(formattedNotes, 'Notes retrieved successfully');
+    },
+    SystemPermission.REQUESTS_VIEW
+  ),
+  { requiresAuth: true }
+);

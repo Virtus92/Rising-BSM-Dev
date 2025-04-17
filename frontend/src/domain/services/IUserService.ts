@@ -126,4 +126,14 @@ export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUs
    * @returns Authentifizierter Benutzer oder null
    */
   authenticate(email: string, password: string, options?: ServiceOptions): Promise<UserResponseDto | null>;
+  
+  /**
+   * Updates the password for a user directly (admin operation)
+   * 
+   * @param userId - User ID
+   * @param password - New password (will be hashed)
+   * @param options - Service options
+   * @returns Updated user
+   */
+  updatePassword(userId: number, password: string, options?: ServiceOptions): Promise<UserResponseDto>;
 }

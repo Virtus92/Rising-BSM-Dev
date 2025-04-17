@@ -1,118 +1,231 @@
+/**
+ * Dashboard API Route
+ * Provides dashboard data and statistics
+ */
 import { NextRequest } from 'next/server';
 import { apiRouteHandler } from '@/infrastructure/api/route-handler';
 import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
 import { getLogger } from '@/infrastructure/common/logging';
-import {
-  getCustomerService,
-  getAppointmentService,
-  getRequestService,
-  getActivityLogService
-} from '@/infrastructure/common/factories';
+import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * GET /api/dashboard
  * 
- * Retrieves dashboard data including statistics on customers, appointments, requests, etc.
+ * Retrieves dashboard data including:
+ * - Statistics on users, customers, appointments, and requests
+ * - Recent activities
+ * - Upcoming appointments
+ * - Recent requests
+ * 
+ * This endpoint aggregates data from multiple services for the dashboard UI.
  */
 export const GET = apiRouteHandler(async (request: NextRequest) => {
   const logger = getLogger();
+  const serviceFactory = getServiceFactory();
   
   try {
-    // Authentication is handled by the apiRouteHandler
-    const userId = request.auth?.userId;
-    
-    if (!userId) {
-      return formatError('Authentication required', 401);
-    }
-    
     // Get service instances
-    const customerService = getCustomerService();
-    const appointmentService = getAppointmentService();
-    const requestService = getRequestService();
-    const activityLogService = getActivityLogService();
+    const customerService = serviceFactory.createCustomerService();
+    const appointmentService = serviceFactory.createAppointmentService();
+    const requestService = serviceFactory.createRequestService();
+    const userService = serviceFactory.createUserService();
+    const activityLogService = serviceFactory.createActivityLogService();
     
     // Context for service calls
-    const context = { userId };
+    const context = { userId: request.auth?.userId };
     
-    // Collect statistics
-    const stats = {
+    // Run all queries in parallel for better performance
+    const [
+      totalCustomers,
+      newCustomers,
+      totalAppointments,
+      upcomingAppointments,
+      todayAppointments,
+      totalRequests,
+      newRequests,
+      inProgressRequests,
+      completedRequests,
+      totalUsers,
+      activeUsers,
+      recentAppointmentsList,
+      recentRequestsList,
+      recentActivities
+    ] = await Promise.all([
       // Customer statistics
-      customers: {
-        total: await customerService.count({ context, filters: { status: 'active' } }),
-        new: await customerService.count({
-          context,
-          filters: {
-            status: 'active',
-            createdAfter: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
-          }
-        })
-      },
-
+      customerService.count({ 
+        context, 
+        filters: { status: 'active' } 
+      }).catch(err => {
+        logger.warn('Error fetching total customers count', { error: err.message });
+        return 0;
+      }),
+      
+      customerService.count({
+        context,
+        filters: {
+          status: 'active',
+          createdAfter: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
+        }
+      }).catch(err => {
+        logger.warn('Error fetching new customers count', { error: err.message });
+        return 0;
+      }),
+      
       // Appointment statistics
-      appointments: {
-        total: await appointmentService.count({ context }),
-        upcoming: await appointmentService.count({
-          context,
-          filters: {
-            dateAfter: new Date(),
-            status: ['planned', 'confirmed']
-          }
-        }),
-        today: await appointmentService.count({
-          context, 
-          filters: {
-            dateFrom: new Date(new Date().setHours(0, 0, 0, 0)),
-            dateTo: new Date(new Date().setHours(23, 59, 59, 999))
-          }
-        })
+      appointmentService.count({ context }).catch(err => {
+        logger.warn('Error fetching total appointments count', { error: err.message });
+        return 0;
+      }),
+      
+      appointmentService.count({
+        context,
+        filters: {
+          dateAfter: new Date(),
+          status: ['planned', 'confirmed']
+        }
+      }).catch(err => {
+        logger.warn('Error fetching upcoming appointments count', { error: err.message });
+        return 0;
+      }),
+      
+      appointmentService.count({
+        context, 
+        filters: {
+          dateFrom: new Date(new Date().setHours(0, 0, 0, 0)),
+          dateTo: new Date(new Date().setHours(23, 59, 59, 999))
+        }
+      }).catch(err => {
+        logger.warn('Error fetching today appointments count', { error: err.message });
+        return 0;
+      }),
+      
+      // Request statistics
+      requestService.count({ context }).catch(err => {
+        logger.warn('Error fetching total requests count', { error: err.message });
+        return 0;
+      }),
+      
+      requestService.count({ 
+        context, 
+        filters: { status: 'new' } 
+      }).catch(err => {
+        logger.warn('Error fetching new requests count', { error: err.message });
+        return 0;
+      }),
+      
+      requestService.count({ 
+        context, 
+        filters: { status: 'in_progress' } 
+      }).catch(err => {
+        logger.warn('Error fetching in-progress requests count', { error: err.message });
+        return 0;
+      }),
+      
+      requestService.count({ 
+        context, 
+        filters: { status: 'completed' } 
+      }).catch(err => {
+        logger.warn('Error fetching completed requests count', { error: err.message });
+        return 0;
+      }),
+      
+      // User statistics
+      userService.count({ context }).catch(err => {
+        logger.warn('Error fetching total users count', { error: err.message });
+        return 0;
+      }),
+      
+      userService.count({ 
+        context, 
+        filters: { status: 'active' } 
+      }).catch(err => {
+        logger.warn('Error fetching active users count', { error: err.message });
+        return 0;
+      }),
+      
+      // Upcoming appointments list (next 7 days, limited to 5)
+      appointmentService.getUpcoming(5, { context }).catch(err => {
+        logger.warn('Error fetching upcoming appointments list', { error: err.message });
+        return [];
+      }),
+      
+      // Recent requests (newest 5)
+      requestService.findAll({
+        context,
+        filters: { status: ['new', 'in_progress'] },
+        page: 1,
+        limit: 5,
+        sort: { field: 'createdAt', direction: 'desc' }
+      }).catch(err => {
+        logger.warn('Error fetching recent requests', { error: err.message });
+        return { data: [], pagination: { page: 1, limit: 5, total: 0, totalPages: 0 } };
+      }),
+      
+      // Recent activity logs
+      activityLogService.findAll({
+        context,
+        page: 1,
+        limit: 10,
+        sort: { field: 'createdAt', direction: 'desc' }
+      }).catch(err => {
+        logger.warn('Error fetching recent activities', { error: err.message });
+        return { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } };
+      })
+    ]);
+
+    // Organize all data for the response
+    const dashboardData = {
+      stats: {
+        // Customer statistics
+        customers: {
+          total: totalCustomers,
+          new: newCustomers
+        },
+
+        // Appointment statistics
+        appointments: {
+          total: totalAppointments,
+          upcoming: upcomingAppointments,
+          today: todayAppointments
+        },
+
+        // Request statistics
+        requests: {
+          total: totalRequests,
+          new: newRequests,
+          inProgress: inProgressRequests,
+          completed: completedRequests
+        },
+        
+        // User statistics
+        users: {
+          total: totalUsers,
+          active: activeUsers
+        }
       },
 
-      // Request statistics
-      requests: {
-        total: await requestService.count({ context }),
-        new: await requestService.count({ context, filters: { status: 'new' } }),
-        inProgress: await requestService.count({ context, filters: { status: 'in_progress' } }),
-        completed: await requestService.count({ context, filters: { status: 'completed' } })
-      }
+      // Lists for dashboard widgets
+      upcomingAppointments: recentAppointmentsList,
+      recentRequests: recentRequestsList.data || [],
+      recentActivities: recentActivities.data || []
     };
 
-    // Get upcoming appointments (next 7 days)
-    const upcomingAppointments = await appointmentService.getUpcoming(5, { context });
-
-    // Get recent requests
-    const recentRequests = await requestService.findAll({
-      context,
-      filters: { status: ['new', 'in_progress'] },
-      pagination: { page: 1, limit: 5 },
-      sort: { field: 'createdAt', order: 'desc' }
-    });
-
-    // Get recent activity logs
-    const recentCustomerActivities = await activityLogService.findAll({
-      context,
-      filters: { entityType: 'customer' },
-      pagination: { page: 1, limit: 10 },
-      sort: { field: 'createdAt', order: 'desc' }
-    });
-
-    return formatSuccess({
-      stats,
-      upcomingAppointments,
-      recentRequests: recentRequests.data,
-      recentCustomerActivities: recentCustomerActivities.data
-    }, 'Dashboard data retrieved successfully');
+    // Return formatted success response
+    return formatSuccess(dashboardData, 'Dashboard data retrieved successfully');
   } catch (error) {
+    // Log error details
     logger.error('Error fetching dashboard data:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined
     });
     
+    // Return formatted error response
     return formatError(
       error instanceof Error ? error.message : 'Server error while retrieving dashboard data',
       500
     );
   }
 }, {
-  // Secure this endpoint
+  // Secure this endpoint - only authenticated users can access it
   requiresAuth: true
 });

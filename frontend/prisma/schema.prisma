@@ -38,6 +38,7 @@ model User {
   contactRequests   ContactRequest[]
   requestNotes      RequestNote[]
   requestLogs       RequestLog[]
+  permissions       UserPermission[]
 
   @@index([email])
   @@index([name])
@@ -70,6 +71,40 @@ model UserSession {
   sid    String   @id @db.VarChar
   sess   Json
   expire DateTime @db.Timestamp(6)
+}
+
+//==============================================================================
+// ROLES & PERMISSIONS
+//==============================================================================
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  code        String           @unique @db.VarChar(100)
+  name        String           @db.VarChar(100)
+  description String           @db.Text
+  category    String           @db.VarChar(50)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  createdBy   Int?
+  updatedBy   Int?
+  users       UserPermission[]
+
+  @@index([code])
+  @@index([category])
+}
+
+model UserPermission {
+  id           Int        @id @default(autoincrement())
+  userId       Int
+  permissionId Int
+  grantedAt    DateTime   @default(now())
+  grantedBy    Int?
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
 }
 
 model RefreshToken {

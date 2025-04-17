@@ -1,9 +1,7 @@
 import * as React from "react";
+
 import { cn } from "@/shared/utils/cn";
 
-/**
- * Card-Komponente für Container mit Schatten und Stil
- */
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -19,9 +17,6 @@ const Card = React.forwardRef<
 ));
 Card.displayName = "Card";
 
-/**
- * CardHeader-Komponente für den oberen Teil einer Karte
- */
 const CardHeader = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -34,9 +29,6 @@ const CardHeader = React.forwardRef<
 ));
 CardHeader.displayName = "CardHeader";
 
-/**
- * CardTitle-Komponente für den Titel einer Karte
- */
 const CardTitle = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLHeadingElement>
@@ -44,7 +36,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      "text-2xl font-semibold leading-none tracking-tight",
+      "text-lg font-semibold leading-none tracking-tight",
       className
     )}
     {...props}
@@ -52,9 +44,6 @@ const CardTitle = React.forwardRef<
 ));
 CardTitle.displayName = "CardTitle";
 
-/**
- * CardDescription-Komponente für die Beschreibung einer Karte
- */
 const CardDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
@@ -67,9 +56,6 @@ const CardDescription = React.forwardRef<
 ));
 CardDescription.displayName = "CardDescription";
 
-/**
- * CardContent-Komponente für den Inhaltsbereich einer Karte
- */
 const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -78,9 +64,6 @@ const CardContent = React.forwardRef<
 ));
 CardContent.displayName = "CardContent";
 
-/**
- * CardFooter-Komponente für den unteren Teil einer Karte
- */
 const CardFooter = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>

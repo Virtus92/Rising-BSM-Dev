@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import DashboardLayout from '@/shared/layouts/dashboard/DashboardLayout';
 import DashboardInitializer from './DashboardInitializer';
-import { DashboardErrorBoundary } from './DashboardErrorBoundary';
+import ErrorBoundary from '@/shared/components/error/ErrorBoundary';
 
 export default function AppDashboardLayout({ 
   children 
@@ -27,13 +27,13 @@ export default function AppDashboardLayout({
   }, []);
   
   return (
-      <>
-        <DashboardInitializer />
-        <DashboardErrorBoundary>
-          <DashboardLayout>
-            {children}
-          </DashboardLayout>
-        </DashboardErrorBoundary>
-      </>
+    <>
+      <DashboardInitializer />
+      <ErrorBoundary>
+        <DashboardLayout>
+          {children}
+        </DashboardLayout>
+      </ErrorBoundary>
+    </>
   );
 }

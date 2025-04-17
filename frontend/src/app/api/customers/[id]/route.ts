@@ -4,41 +4,74 @@ import { formatSuccess, formatError, formatNotFound, formatValidationError } fro
 import { getServiceFactory } from '@/infrastructure/common/factories';
 import { UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { getLogger } from '@/infrastructure/common/logging';
+import { apiPermissions } from '@/app/api/helpers/apiPermissions';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { validateId } from '@/shared/utils/validation-utils';
 
 /**
  * GET /api/customers/[id]
  * 
  * Retrieves a single customer by ID
  */
-export const GET = apiRouteHandler(async (req: NextRequest, params?: { [key: string]: string }) => {
+export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   
   try {
-    if (!params) {
+    // Check permission using consistent pattern
+    if (!await apiPermissions.hasPermission(
+      req.auth?.userId as number, 
+      SystemPermission.CUSTOMERS_VIEW
+    )) {
+      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_VIEW}`);
+      return formatError(
+        `You don't have permission to view customer details`, 
+        403
+      );
+    }
+    
+    const id = params.id;
+    
+    if (!id) {
+      logger.error('No customer ID provided');
       return formatError('No customer ID provided', 400);
     }
     
-    const id = parseInt(params.id);
-    
-    if (isNaN(id)) {
-      return formatError('Invalid customer ID', 400);
+    // Use consistent ID validation
+    const customerId = validateId(id);
+    if (customerId === null) {
+      logger.error(`Invalid customer ID: ${id}`);
+      return formatError(`Invalid customer ID: ${id} - must be a positive number`, 400);
     }
+    
+    // Log request details for debugging
+    logger.debug(`Fetching customer details for ID: ${customerId}`, {
+      userId: req.auth?.userId
+    });
     
     // Get customer service from factory
     const customerService = serviceFactory.createCustomerService();
     
-    // Retrieve customer with the specified ID
-    const customer = await customerService.getById(id, {
-      relations: ['appointments'],
+    // Get relations from request URL if specified
+    const url = new URL(req.url);
+    const relationsParam = url.searchParams.get('relations');
+    const relations = relationsParam ? relationsParam.split(',') : ['appointments'];
+    
+    // Retrieve customer with the specified ID and relations
+    const customer = await customerService.getById(customerId, {
+      relations: relations,
       context: {
         userId: req.auth?.userId
       }
     });
     
     if (!customer) {
+      logger.warn(`Customer not found: ${customerId}`);
       return formatNotFound('Customer not found');
     }
+    
+    // Log successful retrieval
+    logger.debug(`Successfully retrieved customer: ${customerId}`);
     
     // Success response
     return formatSuccess(customer, 'Customer retrieved successfully');
@@ -47,7 +80,8 @@ export const GET = apiRouteHandler(async (req: NextRequest, params?: { [key: str
     logger.error('Error fetching customer:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      customerId: params?.id
+      customerId: params?.id,
+      userId: req.auth?.userId
     });
     
     return formatError(
@@ -64,19 +98,35 @@ export const GET = apiRouteHandler(async (req: NextRequest, params?: { [key: str
  * 
  * Updates a customer by ID
  */
-export const PUT = apiRouteHandler(async (req: NextRequest, params?: { [key: string]: string }) => {
+export const PUT = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   
   try {
-    if (!params) {
+    // Check permission using consistent pattern
+    if (!await apiPermissions.hasPermission(
+      req.auth?.userId as number, 
+      SystemPermission.CUSTOMERS_EDIT
+    )) {
+      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_EDIT}`);
+      return formatError(
+        `You don't have permission to edit customer information`, 
+        403
+      );
+    }
+    
+    const id = params.id;
+    
+    if (!id) {
+      logger.error('No customer ID provided');
       return formatError('No customer ID provided', 400);
     }
     
-    const id = parseInt(params.id);
-    
-    if (isNaN(id)) {
-      return formatError('Invalid customer ID', 400);
+    // Use consistent ID validation
+    const customerId = validateId(id);
+    if (customerId === null) {
+      logger.error(`Invalid customer ID: ${id}`);
+      return formatError(`Invalid customer ID: ${id} - must be a positive number`, 400);
     }
     
     // Parse request body as JSON
@@ -86,14 +136,15 @@ export const PUT = apiRouteHandler(async (req: NextRequest, params?: { [key: str
     const customerService = serviceFactory.createCustomerService();
     
     // Check if customer exists
-    const existingCustomer = await customerService.getById(id);
+    const existingCustomer = await customerService.getById(customerId);
     
     if (!existingCustomer) {
+      logger.warn(`Customer not found during update: ${customerId}`);
       return formatNotFound('Customer not found');
     }
     
     // Update customer
-    const updatedCustomer = await customerService.update(id, data, {
+    const updatedCustomer = await customerService.update(customerId, data, {
       context: {
         userId: req.auth?.userId,
         ipAddress: req.headers.get('x-forwarded-for') || 'unknown'
@@ -107,7 +158,8 @@ export const PUT = apiRouteHandler(async (req: NextRequest, params?: { [key: str
     logger.error('Error updating customer:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      customerId: params?.id
+      customerId: params?.id,
+      userId: req.auth?.userId
     });
     
     // Handle validation errors
@@ -132,33 +184,56 @@ export const PUT = apiRouteHandler(async (req: NextRequest, params?: { [key: str
  * 
  * Deletes a customer by ID
  */
-export const DELETE = apiRouteHandler(async (req: NextRequest, params?: { [key: string]: string }) => {
+export const DELETE = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   
   try {
-    if (!params) {
+    // Check permission using consistent pattern
+    if (!await apiPermissions.hasPermission(
+      req.auth?.userId as number, 
+      SystemPermission.CUSTOMERS_DELETE
+    )) {
+      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_DELETE}`);
+      return formatError(
+        `You don't have permission to delete customers`, 
+        403
+      );
+    }
+    
+    const id = params.id;
+    
+    if (!id) {
+      logger.error('No customer ID provided');
       return formatError('No customer ID provided', 400);
     }
     
-    const id = parseInt(params.id);
-    
-    if (isNaN(id)) {
-      return formatError('Invalid customer ID', 400);
+    // Use consistent ID validation
+    const customerId = validateId(id);
+    if (customerId === null) {
+      logger.error(`Invalid customer ID: ${id}`);
+      return formatError(`Invalid customer ID: ${id} - must be a positive number`, 400);
     }
     
     // Get customer service
     const customerService = serviceFactory.createCustomerService();
     
     // Check if customer exists
-    const existingCustomer = await customerService.getById(id);
+    const existingCustomer = await customerService.getById(customerId);
     
     if (!existingCustomer) {
+      logger.warn(`Customer not found during delete: ${customerId}`);
       return formatNotFound('Customer not found');
     }
     
+    // Check for appointment dependencies
+    if ((existingCustomer as any).appointments?.length > 0) {
+      logger.warn(`Customer ${customerId} has ${(existingCustomer as any).appointments.length} appointments and cannot be deleted directly`);
+      return formatError('This customer has appointments and cannot be deleted. Please delete the appointments first or archive the customer instead.', 400);
+    }
+    
     // Delete customer
-    const deleted = await customerService.delete(id, {
+    const deleted = await customerService.delete(customerId, {
       context: {
         userId: req.auth?.userId,
         ipAddress: req.headers.get('x-forwarded-for') || 'unknown'
@@ -172,7 +247,8 @@ export const DELETE = apiRouteHandler(async (req: NextRequest, params?: { [key: 
     logger.error('Error deleting customer:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      customerId: params?.id
+      customerId: params?.id,
+      userId: req.auth?.userId
     });
     
     return formatError(

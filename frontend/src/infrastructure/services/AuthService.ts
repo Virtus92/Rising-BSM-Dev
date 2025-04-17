@@ -14,7 +14,7 @@ import {
   RegisterDto
 } from '@/domain/dtos/AuthDtos';
 import { ServiceOptions } from '@/domain/services/IBaseService';
-import bcrypt from 'bcryptjs';
+import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { UserRole, UserStatus } from '@/domain/entities/User'; 
@@ -113,9 +113,8 @@ export class AuthService implements IAuthService {
         throw this.errorHandler.createForbiddenError('Account is inactive');
       }
       
-      // Aktualisiere den letzten Anmeldezeitpunkt
-      const updatedUser = user.recordLogin();
-      await this.userRepository.update(user.id, updatedUser);
+      // Aktualisiere den letzten Anmeldezeitpunkt - use specialized method to avoid permissions mapping issues
+      await this.userRepository.updateLastLogin(user.id);
       
       // Erstelle ein Access Token
       const accessToken = this.generateAccessToken(user);
@@ -594,7 +593,10 @@ export class AuthService implements IAuthService {
       email: user.email,
       role: user.role,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + this.accessTokenExpiry
+      exp: Math.floor(Date.now() / 1000) + this.accessTokenExpiry,
+      // Add required claims for standard JWT validation
+      iss: 'rising-bsm',
+      aud: process.env.JWT_AUDIENCE || 'rising-bsm-app'
     };
     
     // Signiere das Token
@@ -735,7 +737,7 @@ export class AuthService implements IAuthService {
    */
   private async hashPassword(password: string): Promise<string> {
     const saltRounds = 10;
-    return await bcrypt.hash(password, saltRounds);
+    return await bcryptjs.hash(password, saltRounds);
   }
 
   /**
@@ -746,7 +748,7 @@ export class AuthService implements IAuthService {
    * @returns Ob das Passwort gültig ist
    */
   private async verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
-    return await bcrypt.compare(plainPassword, hashedPassword);
+    return await bcryptjs.compare(plainPassword, hashedPassword);
   }
 
   /**

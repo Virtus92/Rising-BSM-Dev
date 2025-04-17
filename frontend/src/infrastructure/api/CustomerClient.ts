@@ -1,149 +1,200 @@
 /**
- * API-Client für Kundenverwaltung
+ * API-Client for customer management
  */
 import { 
+  CustomerResponseDto, 
+  CustomerFilterParamsDto, 
   CreateCustomerDto, 
-  UpdateCustomerDto, 
-  CustomerResponseDto
+  UpdateCustomerDto,
+  CustomerDetailResponseDto
 } from '@/domain/dtos/CustomerDtos';
-import ApiClient from '@/infrastructure/clients/ApiClient';
-import type { ApiResponse } from '@/infrastructure/clients/ApiClient';
+import ApiClient, { ApiResponse, ApiRequestError } from '@/infrastructure/clients/ApiClient';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
+import { validateId } from '@/shared/utils/validation-utils';
 
-// API-URL für Kunden
-const CUSTOMERS_API_URL = '/api/customers';
-
-/**
- * Hilfsfunktion zur Behandlung von API-Fehlern
- * 
- * @param error - Fehler
- * @param defaultMessage - Standardnachricht
- * @returns Formatierte API-Antwort mit Fehler
- */
-function handleApiError(error: any, defaultMessage: string): ApiResponse<any> {
-  console.error(defaultMessage, error);
-  return {
-    success: false,
-    message: error instanceof Error ? error.message : defaultMessage,
-    data: null
-  };
-}
+// API base URL for customers
+const CUSTOMERS_API_URL = '/customers';
 
 /**
- * Client für Kundenanfragen
+ * Client for customer API requests
  */
 export class CustomerClient {
   /**
-   * Initialize ApiClient if needed
-   */
-  private static apiClientInitialized = false;
-  
-  private static initApiClient() {
-    if (!this.apiClientInitialized) {
-      ApiClient.initialize({ baseUrl: '/api' });
-      this.apiClientInitialized = true;
-    }
-  }
-
-  /**
-   * Holt alle Kunden mit optionaler Filterung
+   * Gets all customers with optional filtering
    * 
-   * @param params - Optionale Filterparameter
-   * @returns API-Antwort
+   * @param params - Optional filter parameters
+   * @returns API response
    */
-  static async getCustomers(params: Record<string, any> = {}): Promise<ApiResponse<CustomerResponseDto[]>> {
+  static async getCustomers(params: Record<string, any> = {}): Promise<ApiResponse<PaginationResult<CustomerResponseDto>>> {
     try {
-      // Parameter in Query-String umwandeln
+      // Build query string with proper handling of parameter types
       const queryParams = new URLSearchParams();
       
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
-          queryParams.append(key, String(value));
+          // Handle boolean values properly
+          if (typeof value === 'boolean') {
+            queryParams.append(key, value ? 'true' : 'false');
+          }
+          // Handle date objects properly
+          else if (Object.prototype.toString.call(value) === '[object Date]' && 
+              typeof value === 'object' && 
+              value !== null && 
+              'toISOString' in value) {
+            queryParams.append(key, (value as Date).toISOString().split('T')[0]);
+          }
+          // Handle arrays by using multiple entries with the same key
+          else if (Array.isArray(value)) {
+            value.forEach(item => {
+              if (item !== undefined && item !== null) {
+                queryParams.append(key, String(item));
+              }
+            });
+          }
+          // Handle all other types
+          else {
+            queryParams.append(key, String(value));
+          }
         }
       });
       
-      CustomerClient.initApiClient();
+      // Build URL and make the request
       const queryString = queryParams.toString();
       const url = `${CUSTOMERS_API_URL}${queryString ? `?${queryString}` : ''}`;
       
       return await ApiClient.get(url);
-    } catch (error) {
-      return handleApiError(error, 'Fehler beim Abrufen der Kunden');
+    } catch (error: unknown) {
+      console.error('Failed to fetch customers:', error);
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : 'Failed to fetch customers',
+        500
+      );
     }
   }
-  
+
   /**
-   * Holt einen Kunden anhand der ID
+   * Gets a customer by ID
    * 
-   * @param id - Kunden-ID
-   * @returns API-Antwort
+   * @param id - Customer ID
+   * @returns API response
    */
-  static async getCustomerById(id: number | string): Promise<ApiResponse<CustomerResponseDto>> {
+  static async getCustomerById(id: number | string): Promise<ApiResponse<CustomerDetailResponseDto>> {
     try {
-      CustomerClient.initApiClient();
-      return await ApiClient.get(`${CUSTOMERS_API_URL}/${id}`);
-    } catch (error) {
-      return handleApiError(error, `Fehler beim Abrufen des Kunden mit ID ${id}`);
+      // Use the validateId utility function for consistent ID validation
+      const validatedId = validateId(id);
+      
+      // Check if ID is valid
+      if (validatedId === null) {
+        throw new ApiRequestError('Invalid customer ID format - must be a positive number', 400);
+      }
+      
+      return await ApiClient.get(`${CUSTOMERS_API_URL}/${validatedId}`);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to fetch customer with ID ${id}`,
+        500
+      );
     }
   }
-  
+
   /**
-   * Erstellt einen neuen Kunden
+   * Creates a new customer
    * 
-   * @param data - Kundendaten
-   * @returns API-Antwort
+   * @param data - Customer data
+   * @returns API response
    */
   static async createCustomer(data: CreateCustomerDto): Promise<ApiResponse<CustomerResponseDto>> {
     try {
-      CustomerClient.initApiClient();
       return await ApiClient.post(CUSTOMERS_API_URL, data);
-    } catch (error) {
-      return handleApiError(error, 'Fehler beim Erstellen des Kunden');
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : 'Failed to create customer',
+        500
+      );
     }
   }
-  
+
   /**
-   * Aktualisiert einen Kunden
+   * Updates a customer
    * 
-   * @param id - Kunden-ID
-   * @param data - Aktualisierungsdaten
-   * @returns API-Antwort
+   * @param id - Customer ID
+   * @param data - Customer update data
+   * @returns API response
    */
   static async updateCustomer(id: number | string, data: UpdateCustomerDto): Promise<ApiResponse<CustomerResponseDto>> {
     try {
-      CustomerClient.initApiClient();
-      return await ApiClient.put(`${CUSTOMERS_API_URL}/${id}`, data);
-    } catch (error) {
-      return handleApiError(error, `Fehler beim Aktualisieren des Kunden mit ID ${id}`);
+      // Use the validateId utility function for consistent ID validation
+      const validatedId = validateId(id);
+      
+      // Check if ID is valid
+      if (validatedId === null) {
+        throw new ApiRequestError('Invalid customer ID format - must be a positive number', 400);
+      }
+      
+      return await ApiClient.put(`${CUSTOMERS_API_URL}/${validatedId}`, data);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to update customer with ID ${id}`,
+        500
+      );
     }
   }
-  
+
   /**
-   * Löscht einen Kunden
+   * Deletes a customer
    * 
-   * @param id - Kunden-ID
-   * @returns API-Antwort
+   * @param id - Customer ID
+   * @returns API response
    */
   static async deleteCustomer(id: number | string): Promise<ApiResponse<void>> {
     try {
-      CustomerClient.initApiClient();
-      return await ApiClient.delete(`${CUSTOMERS_API_URL}/${id}`);
-    } catch (error) {
-      return handleApiError(error, `Fehler beim Löschen des Kunden mit ID ${id}`);
+      // Use the validateId utility function for consistent ID validation
+      const validatedId = validateId(id);
+      
+      // Check if ID is valid
+      if (validatedId === null) {
+        throw new ApiRequestError('Invalid customer ID format - must be a positive number', 400);
+      }
+      
+      return await ApiClient.delete(`${CUSTOMERS_API_URL}/${validatedId}`);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to delete customer with ID ${id}`,
+        500
+      );
     }
   }
-  
+
   /**
-   * Sucht nach Kunden basierend auf einem Suchbegriff
+   * Gets customer count
    * 
-   * @param query - Suchbegriff
-   * @returns API-Antwort
+   * @returns API response
    */
-  static async searchCustomers(query: string): Promise<ApiResponse<CustomerResponseDto[]>> {
+  static async getCustomerCount(): Promise<ApiResponse<number>> {
     try {
-      CustomerClient.initApiClient();
-      return await ApiClient.get(`${CUSTOMERS_API_URL}/search?q=${encodeURIComponent(query)}`);
-    } catch (error) {
-      return handleApiError(error, `Fehler bei der Suche nach Kunden mit Abfrage "${query}"`);
+      return await ApiClient.get(`${CUSTOMERS_API_URL}/count`);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : 'Failed to get customer count',
+        500
+      );
+    }
+  }
+
+  /**
+   * Gets customer statistics
+   * 
+   * @param period - Time period (weekly, monthly, yearly)
+   * @returns API response
+   */
+  static async getCustomerStats(period: 'weekly' | 'monthly' | 'yearly'): Promise<ApiResponse<any>> {
+    try {
+      return await ApiClient.get(`${CUSTOMERS_API_URL}/stats/${period}`);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to get ${period} customer statistics`,
+        500
+      );
     }
   }
 }

@@ -35,13 +35,61 @@ export class NotificationClient {
       if (options.unreadOnly) params.append('unreadOnly', 'true');
       
       const queryString = params.toString() ? `?${params.toString()}` : '';
-      return await ApiClient.get(`${this.API_URL}${queryString}`);
+      const response = await ApiClient.get(`${this.API_URL}${queryString}`);
+      
+      // Ensure response has the expected structure
+      if (response.success && response.data) {
+        // Check if response.data already has a nested data array property
+        if (!response.data.data) {
+          // If not, assume the response.data itself was meant to be the data array
+          // and restructure it to match the expected format
+          const restructuredData = {
+            data: Array.isArray(response.data) ? response.data : [],
+            pagination: response.data.pagination || {
+              page: 1,
+              limit: 10,
+              total: Array.isArray(response.data) ? response.data.length : 0,
+              totalPages: 1
+            }
+          };
+          return {
+            ...response,
+            data: restructuredData
+          };
+        }
+        
+        // Make sure response.data.data is always an array
+        if (!Array.isArray(response.data.data)) {
+          return {
+            ...response,
+            data: {
+              data: [],
+              pagination: response.data.pagination || {
+                page: 1,
+                limit: 10,
+                total: 0,
+                totalPages: 0
+              }
+            }
+          };
+        }
+      }
+      
+      return response;
     } catch (error) {
       console.error('Error fetching notifications:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
-        data: null
+        data: {
+          data: [],
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 0,
+            totalPages: 0
+          }
+        }
       };
     }
   }

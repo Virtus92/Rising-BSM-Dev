@@ -165,9 +165,18 @@ export const DashboardCharts = () => {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center flex-col h-[350px] w-full">
-            <BarChart2 className="h-12 w-12 mb-4 text-muted-foreground" />
-            <p className="text-lg font-medium">No data to display</p>
-            <p className="text-muted-foreground">Try changing the time frame or check back later</p>
+            <AlertCircle className="h-12 w-12 mb-4 text-amber-500" />
+            <p className="text-lg font-medium">No data available</p>
+            <p className="text-muted-foreground mb-4">There is no data available for the selected time period.</p>
+            <Button 
+              variant="outline" 
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="mt-2"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
           </div>
         </CardContent>
       </Card>

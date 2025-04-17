@@ -16,11 +16,54 @@ export class AppointmentService {
    * Get all appointments with optional filtering
    */
   static async getAppointments(filters?: AppointmentFilterParamsDto) {
-    let queryParams = '';
-    if (filters) {
-      queryParams = '?' + new URLSearchParams(filters as any).toString();
+    try {
+      let queryParams = '';
+      if (filters) {
+        // Filter out undefined values
+        const cleanFilters = Object.fromEntries(
+          Object.entries(filters).filter(([_, value]) => 
+            value !== undefined && value !== null && value !== ''
+          )
+        );
+        
+        // Handle date objects properly
+        const urlParams = new URLSearchParams();
+        
+        for (const [key, value] of Object.entries(cleanFilters)) {
+          if (value instanceof Date) {
+            try {
+              urlParams.append(key, value.toISOString());
+            } catch (e) {
+              console.error(`Invalid date format for ${key}:`, value);
+            }
+          } else {
+            urlParams.append(key, String(value));
+          }
+        }
+        
+        const paramString = urlParams.toString();
+        if (paramString) {
+          queryParams = '?' + paramString;
+        }
+      }
+      
+      return await ApiClient.get(`${this.basePath}${queryParams}`);
+    } catch (error) {
+      console.error('Error in AppointmentService.getAppointments:', error);
+      return {
+        success: false,
+        data: {
+          data: [],
+          pagination: {
+            page: filters?.page || 1,
+            limit: filters?.limit || 10,
+            total: 0,
+            totalPages: 0
+          }
+        },
+        message: error instanceof Error ? error.message : 'Error fetching appointments'
+      };
     }
-    return ApiClient.get(`${this.basePath}${queryParams}`);
   }
 
   /**

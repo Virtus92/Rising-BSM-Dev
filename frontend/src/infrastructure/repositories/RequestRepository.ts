@@ -166,8 +166,7 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         userId: note.userId,
         userName: note.userName,
         text: note.text,
-        createdAt: note.createdAt,
-        updatedAt: note.updatedAt || note.createdAt
+        createdAt: note.createdAt
       }));
     } catch (error) {
       this.logger.error('Error getting notes for request', { error, id });

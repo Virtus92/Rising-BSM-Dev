@@ -1,32 +1,35 @@
+/**
+ * Public Requests API Route
+ * Handles contact requests from unauthenticated users
+ */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError, formatValidationError } from '@/infrastructure/api/response-formatter';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
 import { getLogger } from '@/infrastructure/common/logging';
 import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * POST /api/requests/public
  * 
- * Erstellt eine neue öffentliche Kontaktanfrage (ohne Authentifizierung).
+ * Creates a new public contact request (no authentication required)
  */
 export const POST = apiRouteHandler(async (request: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   
   try {
-    // Daten aus Request-Body auslesen
+    // Get request data from body
     const body = await request.json();
     const { name, email, phone, service, message } = body;
     
     // Basic validation
     if (!name || !email || !service || !message) {
-      return formatError('Incomplete data - Please fill all required fields', 400);
+      return formatResponse.error('Incomplete data - Please fill all required fields', 400);
     }
     
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return formatError('The provided email address has an invalid format', 400);
+      return formatResponse.error('The provided email address has an invalid format', 400);
     }
     
     // Get client IP address
@@ -58,7 +61,7 @@ export const POST = apiRouteHandler(async (request: NextRequest) => {
     const newRequest = await requestService.create(requestData, { context });
     
     // Success response
-    return formatSuccess({
+    return formatResponse.success({
       id: newRequest.id,
       createdAt: newRequest.createdAt
     }, 'Thank you for your request! We will contact you shortly.', 201);
@@ -70,13 +73,12 @@ export const POST = apiRouteHandler(async (request: NextRequest) => {
     
     // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
-      return formatValidationError(
-        (error as any).validationErrors,
-        'The request could not be processed due to validation errors'
+      return formatResponse.validationError(
+        (error as any).validationErrors
       );
     }
     
-    return formatError(
+    return formatResponse.error(
       'Sorry, there was an error processing your request. Please try again later.',
       500
     );

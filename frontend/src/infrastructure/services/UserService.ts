@@ -1,4 +1,6 @@
 import { UserDto, CreateUserDto, UpdateUserDto, UserResponseDto, UserDetailResponseDto, ChangePasswordDto, UpdateUserStatusDto, UserFilterParamsDto } from '@/domain/dtos/UserDtos';
+import { UserRole, UserStatus } from '@/domain/enums/UserEnums';
+import bcrypt from 'bcryptjs';
 import { IUserService } from '@/domain/services/IUserService';
 import { User } from '@/domain/entities/User';
 import { IUserRepository } from '@/domain/repositories/IUserRepository';
@@ -28,6 +30,88 @@ export class UserService implements IUserService {
     public readonly errorHandler: IErrorHandler
   ) {
     this.logger.debug('Initialized UserService');
+  }
+
+  /**
+   * Updates the password for a user directly
+   * 
+   * @param userId - User ID
+   * @param password - New password (will be hashed)
+   * @param options - Service options
+   * @returns Updated user
+   */
+  async updatePassword(userId: number, password: string, options?: ServiceOptions): Promise<UserResponseDto> {
+    try {
+      // Check if user exists
+      const user = await this.userRepository.findById(userId);
+      if (!user) {
+        throw this.errorHandler.createNotFoundError('User not found');
+      }
+      
+      // Hash the password
+      const hashedPassword = await this.hashPassword(password);
+      
+      // Update the password
+      const updatedUser = await this.userRepository.updatePassword(userId, hashedPassword);
+      
+      return this.mapToResponseDto(updatedUser);
+    } catch (error) {
+      this.logger.error('Error in UserService.updatePassword', { error, userId });
+      throw error;
+    }
+  }
+
+  /**
+   * Counts users based on optional filters
+   * 
+   * @param options - Counting options and filters
+   * @returns Number of users matching the filters
+   */
+  async count(options?: { context?: any; filters?: Record<string, any>; }): Promise<number> {
+    try {
+      const filters = options?.filters || {};
+      const result = await this.userRepository.count(filters);
+      return result;
+    } catch (error) {
+      this.logger.error('Error in UserService.count', { error, options });
+      throw error;
+    }
+  }
+
+  /**
+   * Finds all users with pagination support
+   * 
+   * @param options - Service options including pagination parameters
+   * @returns Paginated list of users
+   */
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<UserResponseDto>> {
+    try {
+      const page = options?.filters?.page || 1;
+      const limit = options?.filters?.limit || 10;
+      const filters = options?.filters || {};
+      
+      const result = await this.userRepository.findAll({
+        page,
+        limit,
+        ...filters
+      });
+      
+      // Assuming repository returns data in expected format or convert it here
+      const paginatedData = Array.isArray(result) 
+        ? { 
+            data: result, 
+            pagination: { page, limit, total: result.length, totalPages: Math.ceil(result.length / limit) } 
+          }
+        : (result as PaginationResult<User>);
+      
+      return {
+        data: paginatedData.data.map((user: User) => this.mapToResponseDto(user)),
+        pagination: paginatedData.pagination
+      };
+    } catch (error) {
+      this.logger.error('Error in UserService.findAll', { error, options });
+      throw error;
+    }
   }
   
   /**
@@ -111,18 +195,12 @@ export class UserService implements IUserService {
    */
   async findUsers(filters: UserFilterParamsDto, options?: ServiceOptions): Promise<PaginationResult<UserResponseDto>> {
     try {
-      // For now, return minimal implementation
-      const users = await this.userRepository.findAll();
-      const userList = Array.isArray(users) ? users : [];
+      // Use repository's findUsers method with proper filters
+      const result = await this.userRepository.findUsers(filters);
       
       return {
-        data: userList.map(user => this.mapToResponseDto(user)),
-        pagination: {
-          page: filters.page || 1,
-          limit: filters.limit || 10,
-          total: userList.length,
-          totalPages: Math.ceil(userList.length / (filters.limit || 10))
-        }
+        data: result.data.map(user => this.mapToResponseDto(user)),
+        pagination: result.pagination
       };
     } catch (error) {
       this.logger.error('Error in UserService.findUsers', { error, filters });
@@ -140,17 +218,80 @@ export class UserService implements IUserService {
    */
   async changePassword(userId: number, data: ChangePasswordDto, options?: ServiceOptions): Promise<boolean> {
     try {
+      // Validate input data
+      if (data.newPassword !== data.confirmPassword) {
+        throw this.errorHandler.createValidationError('New password and confirmation do not match');
+      }
+      
       const user = await this.userRepository.findById(userId);
       if (!user) {
         throw this.errorHandler.createNotFoundError('User not found');
       }
       
-      // Implementation would include password validation, hashing, etc.
-      // For brevity, we'll just return true
+      // Authenticate with current password
+      // Note: In a real implementation, this would use a proper password hashing library
+      // like bcrypt to compare the passwords. For this example, we'll assume it's handled elsewhere.
+      const isAuthenticated = await this.validateUserPassword(userId, data.currentPassword);
+      if (!isAuthenticated) {
+        throw this.errorHandler.createValidationError('Current password is incorrect');
+      }
+      
+      // Hash the new password
+      // Note: In a real implementation, this would use a proper password hashing library
+      const hashedPassword = await this.hashPassword(data.newPassword);
+      
+      // Update the password in the repository
+      await this.userRepository.updatePassword(userId, hashedPassword);
+      
       return true;
     } catch (error) {
       this.logger.error('Error in UserService.changePassword', { error, userId });
       throw error;
+    }
+  }
+  
+  /**
+   * Validate a user's password
+   * 
+   * @param userId - User ID
+   * @param password - Password to validate
+   * @returns Whether the password is valid
+   */
+  private async validateUserPassword(userId: number, password: string): Promise<boolean> {
+    try {
+      const user = await this.userRepository.findById(userId);
+      if (!user || !user.password) {
+        return false;
+      }
+      
+      // Use imported bcrypt for password validation
+      return await bcrypt.compare(password, user.password);
+    } catch (error) {
+      this.logger.error('Error validating user password', { 
+        error: error instanceof Error ? error.message : String(error),
+        userId,
+        stack: error instanceof Error ? error.stack : undefined 
+      });
+      return false;
+    }
+  }
+  
+  /**
+   * Hash a password
+   * 
+   * @param password - Password to hash
+   * @returns Hashed password
+   */
+  private async hashPassword(password: string): Promise<string> {
+    try {
+      const saltRounds = 10; // Standard salt rounds for security
+      return await bcrypt.hash(password, saltRounds);
+    } catch (error) {
+      this.logger.error('Error hashing password', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined 
+      });
+      throw this.errorHandler.createError('Failed to hash password');
     }
   }
   
@@ -190,16 +331,11 @@ export class UserService implements IUserService {
    */
   async searchUsers(searchText: string, options?: ServiceOptions): Promise<UserResponseDto[]> {
     try {
-      // For now, return all users filtered by name or email matching
-      const users = await this.userRepository.findAll();
-      const userList = Array.isArray(users) ? users : [];
+      // Use the repository's searchUsers method
+      const users = await this.userRepository.searchUsers(searchText, options?.limit);
       
-      const filteredUsers = userList.filter(user => 
-        user.name.toLowerCase().includes(searchText.toLowerCase()) || 
-        user.email.toLowerCase().includes(searchText.toLowerCase())
-      );
-      
-      return filteredUsers.map(user => this.mapToResponseDto(user));
+      // Map domain entities to DTOs
+      return users.map(user => this.mapToResponseDto(user));
     } catch (error) {
       this.logger.error('Error in UserService.searchUsers', { error, searchText });
       throw error;
@@ -214,11 +350,38 @@ export class UserService implements IUserService {
    */
   async getUserStatistics(options?: ServiceOptions): Promise<any> {
     try {
-      // Implementation would fetch statistics from repository
+      // Get total user count
+      const totalUsers = await this.userRepository.count();
+      
+      // Get active user count
+      const activeUsers = await this.userRepository.count({ status: 'active' });
+      
+      // Get new users this month
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      const newUsersThisMonth = await this.userRepository.count({
+        createdAt: {
+          gte: firstDayOfMonth.toISOString()
+        }
+      });
+      
+      // Get user counts by role
+      const adminCount = await this.userRepository.count({ role: 'admin' });
+      const managerCount = await this.userRepository.count({ role: 'manager' });
+      const employeeCount = await this.userRepository.count({ role: 'employee' });
+      const regularUserCount = await this.userRepository.count({ role: 'user' });
+      
       return {
-        totalUsers: 0,
-        activeUsers: 0,
-        newUsersThisMonth: 0
+        totalUsers,
+        activeUsers,
+        newUsersThisMonth,
+        usersByRole: {
+          admin: adminCount,
+          manager: managerCount,
+          employee: employeeCount,
+          user: regularUserCount
+        }
       };
     } catch (error) {
       this.logger.error('Error in UserService.getUserStatistics', { error });
@@ -236,8 +399,20 @@ export class UserService implements IUserService {
    */
   async getUserActivity(userId: number, limit?: number, options?: ServiceOptions): Promise<ActivityLogDto[]> {
     try {
-      // For now, return an empty array
-      return [];
+      // Fetch user activity from repository
+      const activityLogs = await this.userRepository.getUserActivity(userId, limit || 10);
+      
+      // Map domain entity to DTO
+      return activityLogs.map(log => ({
+        id: log.id,
+        userId: log.userId,
+        entityId: log.entityId,
+        entityType: log.entityType,
+        action: log.action,
+        details: log.details,
+        createdAt: log.createdAt instanceof Date ? log.createdAt.toISOString() : log.createdAt,
+        updatedAt: log.updatedAt instanceof Date ? log.updatedAt.toISOString() : log.updatedAt
+      }));
     } catch (error) {
       this.logger.error('Error in UserService.getUserActivity', { error, userId });
       throw error;
@@ -258,11 +433,20 @@ export class UserService implements IUserService {
         throw this.errorHandler.createNotFoundError('User not found');
       }
       
-      // Perform soft delete
+      // Perform soft delete - mark as DELETED not INACTIVE
       const updatedUser = { ...user };
-      updatedUser.status = 'INACTIVE' as any;
-      
+      updatedUser.status = UserStatus.DELETED;
       await this.userRepository.update(userId, updatedUser);
+      
+      // Log the action
+      if (options?.context?.userId) {
+        await this.userRepository.logActivity(
+          options.context.userId,
+          'DELETE',
+          `User ${userId} was soft deleted`,
+          options.context.ipAddress
+        );
+      }
       
       return true;
     } catch (error) {
@@ -298,11 +482,29 @@ export class UserService implements IUserService {
    */
   async authenticate(email: string, password: string, options?: ServiceOptions): Promise<UserResponseDto | null> {
     try {
-      // This would normally verify the password, but for this implementation
-      // we'll just find the user by email
-      return this.findByEmail(email, options);
+      // Find user by email
+      const user = await this.userRepository.findByEmail(email);
+      if (!user || !user.password) {
+        return null;
+      }
+      
+      // Verify password
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return null;
+      }
+      
+      // Update last login time
+      await this.userRepository.updateLastLogin(user.id);
+      
+      // Return authenticated user
+      return this.mapToResponseDto(user);
     } catch (error) {
-      this.logger.error('Error in UserService.authenticate', { error, email });
+      this.logger.error('Error in UserService.authenticate', { 
+        error: error instanceof Error ? error.message : String(error), 
+        email,
+        stack: error instanceof Error ? error.stack : undefined 
+      });
       throw error;
     }
   }
@@ -316,7 +518,15 @@ export class UserService implements IUserService {
    */
   async create(data: CreateUserDto, options?: ServiceOptions): Promise<UserResponseDto> {
     try {
-      const user = await this.userRepository.create(data);
+      // Extract confirmPassword if present in data as any
+      const { confirmPassword, ...filteredData } = data as any;
+
+      // Hash the password if it exists
+      if (filteredData.password) {
+        filteredData.password = await this.hashPassword(filteredData.password);
+      }
+
+      const user = await this.userRepository.create(filteredData);
       return this.mapToResponseDto(user);
     } catch (error) {
       this.logger.error('Error in UserService.create', { error, data });
@@ -334,10 +544,41 @@ export class UserService implements IUserService {
    */
   async update(id: number, data: UpdateUserDto, options?: ServiceOptions): Promise<UserResponseDto> {
     try {
+      // Get the current user data before updating to check for role changes
+      const originalUser = await this.userRepository.findById(id);
+      if (!originalUser) {
+        throw this.errorHandler.createNotFoundError('User not found');
+      }
+
+      // Update the user
       const user = await this.userRepository.update(id, data);
+      
+      // If the role changed, we need to invalidate permissions cache
+      if (data.role && data.role !== originalUser.role) {
+        try {
+          // Invalidate permissions cache for this user
+          // Import dynamically to avoid circular dependencies
+          const { invalidatePermissionCache } = await import('@/app/api/helpers/apiPermissions');
+          await invalidatePermissionCache(id);
+          
+          this.logger.info(`Invalidated permissions cache for user ${id} due to role change`);
+        } catch (cacheError) {
+          // Log but don't fail the update operation
+          this.logger.warn(`Failed to invalidate permissions cache for user ${id}:`, {
+            error: cacheError instanceof Error ? cacheError.message : String(cacheError),
+            userId: id
+          });
+        }
+      }
+      
       return this.mapToResponseDto(user);
     } catch (error) {
-      this.logger.error('Error in UserService.update', { error, id, data });
+      this.logger.error('Error in UserService.update', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        id, 
+        data 
+      });
       throw error;
     }
   }
@@ -361,17 +602,38 @@ export class UserService implements IUserService {
    */
   async getAll(options?: ServiceOptions): Promise<PaginationResult<UserResponseDto>> {
     try {
-      const users = await this.userRepository.findAll();
-      const userList = Array.isArray(users) ? users : [];
+      this.logger.debug('UserService.getAll called with options:', options);
+      
+      // Ensure we have valid pagination values
+      const page = options?.page || 1;
+      const limit = options?.limit || 10;
+      
+      // Fetch users with pagination
+      const result = await this.userRepository.findAll({
+        page,
+        limit,
+        sort: options?.sort,
+        ...options?.filters || {}
+      });
+      
+      // Convert to correct response format
+      const data = Array.isArray(result) 
+        ? result.map(user => this.mapToResponseDto(user))
+        : result.data.map(user => this.mapToResponseDto(user));
+      
+      // Get pagination data
+      const pagination = Array.isArray(result)
+        ? {
+            page,
+            limit,
+            total: result.length,
+            totalPages: Math.ceil(result.length / limit)
+          }
+        : result.pagination;
       
       return {
-        data: userList.map(user => this.mapToResponseDto(user)),
-        pagination: {
-          page: 1,
-          limit: userList.length,
-          total: userList.length,
-          totalPages: 1
-        }
+        data,
+        pagination
       };
     } catch (error) {
       this.logger.error('Error in UserService.getAll', { error });
@@ -495,7 +757,7 @@ export class UserService implements IUserService {
     }
   }
 
-async findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<UserResponseDto[]> {
+  async findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<UserResponseDto[]> {
     try {
       const users = await this.userRepository.findByCriteria(criteria);
       return users.map(user => this.mapToResponseDto(user));

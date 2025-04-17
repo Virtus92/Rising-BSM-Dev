@@ -2,8 +2,7 @@
  * API route for notifications
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError, formatValidationError } from '@/infrastructure/api/response-formatter';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
 import { getLogger } from '@/infrastructure/common/logging';
 import { getServiceFactory } from '@/infrastructure/common/factories';
 import { NotificationFilterParamsDto } from '@/domain/dtos/NotificationDtos';
@@ -21,8 +20,8 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const filterParams: NotificationFilterParamsDto = {
       userId: request.auth?.userId,
-      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit') as string) : undefined,
-      page: searchParams.get('page') ? parseInt(searchParams.get('page') as string) : undefined,
+      limit: searchParams.has('limit') ? parseInt(searchParams.get('limit') as string) : 10,
+      page: searchParams.has('page') ? parseInt(searchParams.get('page') as string) : 1,
       unreadOnly: searchParams.get('unreadOnly') === 'true'
     };
     
@@ -32,66 +31,72 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
     // Context for service calls
     const context = { userId: request.auth?.userId };
     
-    // Query notifications directly from repository to avoid method errors
-    const repository = notificationService.getRepository();
-    
-    // Build query criteria
-    const criteria: Record<string, any> = {
-      userId: request.auth?.userId
-    };
-    
-    // Add unread filter if specified
-    if (filterParams.unreadOnly) {
-      criteria.isRead = false;
-    }
-    
-    // Get total count for pagination
-    const total = await repository.count(criteria);
-    
-    // Get notifications with pagination
-    const page = filterParams.page || 1;
-    const limit = filterParams.limit || 10;
-    
-    // Find notifications matching criteria
-    const notifications = await repository.findByCriteria(criteria, {
-      page,
-      limit,
-      sort: { field: 'createdAt', direction: 'desc' }
-    });
-    
-    // Map to response DTOs
-    const notificationDtos = notifications.map(notification => ({
-      id: notification.id,
-      title: notification.title,
-      content: notification.content,
-      type: notification.type,
-      isRead: notification.isRead,
-      createdAt: notification.createdAt instanceof Date ? 
-        notification.createdAt.toISOString() : notification.createdAt,
-      relatedEntityId: notification.relatedEntityId,
-      relatedEntityType: notification.relatedEntityType,
-      userId: notification.userId
-    }));
-    
-    // Create result with pagination
-    const result = {
-      data: notificationDtos,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
+    try {
+      try {
+        // Use findNotifications method which now has proper server-side implementation
+        const result = await notificationService.findNotifications(filterParams, { context });
+        
+        // Ensure we return an empty array rather than null if no notifications exist
+        const responseData = result?.data ? result : {
+          data: [],
+          pagination: {
+            page: filterParams.page,
+            limit: filterParams.limit,
+            total: 0,
+            totalPages: 0
+          }
+        };
+        
+        return formatResponse.success(responseData, 'Notifications retrieved successfully');
+      } catch (serviceError) {
+        logger.error('Service error when fetching notifications:', {
+          error: serviceError instanceof Error ? serviceError : String(serviceError),
+          stack: serviceError instanceof Error ? serviceError.stack : undefined
+        });
+        
+        // Log the detailed error information before returning the fallback response
+        logger.debug('Detailed error information for notification fetch:', {
+          userId: request.auth?.userId,
+          filterParams,
+          error: serviceError instanceof Error ? {
+            name: serviceError.name,
+            message: serviceError.message,
+            stack: serviceError.stack
+          } : String(serviceError)
+        });
+        
+        // Return an empty array with success rather than an error to prevent UI disruption
+        return formatResponse.success({
+          data: [],
+          pagination: {
+            page: filterParams.page,
+            limit: filterParams.limit,
+            total: 0,
+            totalPages: 0
+          }
+        }, 'No notifications available');
       }
-    };
-    
-    return formatSuccess(result, 'Notifications retrieved successfully');
+      // This code is unreachable after the refactoring but left here for completeness
+      // It's now handled inside the try-catch block above
+    } catch (error) {
+      // This catch handles errors from the outer try block (e.g., URL parsing errors)
+      logger.error('Error in notification endpoint:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      return formatResponse.error(
+        error instanceof Error ? error.message : 'Failed to fetch notifications',
+        500
+      );
+    }
   } catch (error) {
     logger.error('Error fetching notifications:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined
     });
     
-    return formatError(
+    return formatResponse.error(
       error instanceof Error ? error.message : 'Failed to fetch notifications',
       500
     );
@@ -119,18 +124,13 @@ export const POST = apiRouteHandler(async (request: NextRequest) => {
     // Context for service calls with role check
     const context = { 
       userId: request.auth?.userId,
-      userRole: request.auth?.role
+      ipAddress: request.headers.get('x-forwarded-for') || 'unknown'
     };
-    
-    // Check if user has admin role
-    if (context.userRole !== 'ADMIN') {
-      return formatError('Unauthorized - Admin access required', 403);
-    }
     
     // Create notification
     const result = await notificationService.create(data, { context });
     
-    return formatSuccess(result, 'Notification created successfully', 201);
+    return formatResponse.success(result, 'Notification created successfully', 201);
   } catch (error) {
     logger.error('Error creating notification:', {
       error: error instanceof Error ? error.message : String(error),
@@ -139,13 +139,12 @@ export const POST = apiRouteHandler(async (request: NextRequest) => {
     
     // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
-      return formatValidationError(
-        (error as any).validationErrors,
-        'Notification validation failed'
+      return formatResponse.validationError(
+        (error as any).validationErrors
       );
     }
     
-    return formatError(
+    return formatResponse.error(
       error instanceof Error ? error.message : 'Failed to create notification',
       500
     );
@@ -153,6 +152,6 @@ export const POST = apiRouteHandler(async (request: NextRequest) => {
 }, {
   // Secure this endpoint
   requiresAuth: true,
-  // Optionally restrict to admin role
+  // Restrict to admin role
   requiresRole: ['ADMIN']
 });

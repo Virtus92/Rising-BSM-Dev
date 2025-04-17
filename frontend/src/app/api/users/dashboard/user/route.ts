@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { apiRouteHandler } from '@/infrastructure/api/route-handler';
 import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
-
-const prisma = new PrismaClient();
+import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * GET /api/users/dashboard/user
@@ -11,11 +10,19 @@ const prisma = new PrismaClient();
  * Retrieves user dashboard data including user statistics for charts
  */
 export const GET = apiRouteHandler(async (request: NextRequest) => {
+  const logger = getLogger();
+  const serviceFactory = getServiceFactory();
+  
   try {
     // Get current date
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
+    
+    // Get user service
+    const userService = serviceFactory.createUserService();
+    
+    // Context for service calls
+    const context = { userId: request.auth?.userId };
     
     // Prepare response data structure
     const data = [];
@@ -32,11 +39,10 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
       }
       
       // Get user count up to this month (cumulative)
-      const userCount = await prisma.user.count({
-        where: {
-          createdAt: {
-            lte: monthEnd
-          }
+      const userCount = await userService.count({
+        context,
+        filters: {
+          createdBefore: monthEnd
         }
       });
       
@@ -50,12 +56,20 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
       });
     }
     
-    return formatSuccess(data);
+    logger.info('User dashboard data retrieved successfully');
+    return formatSuccess(data, 'User dashboard data retrieved successfully');
   } catch (error) {
-    console.error('Error fetching user dashboard data:', error);
+    logger.error('Error fetching user dashboard data:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
     return formatError(
       error instanceof Error ? error.message : 'Server error while retrieving user dashboard data',
       500
     );
   }
+}, {
+  // Secure this endpoint
+  requiresAuth: true
 });

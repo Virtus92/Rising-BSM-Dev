@@ -6,6 +6,7 @@ import { ILoggingService } from '@/infrastructure/common/logging/ILoggingService
 import { IValidationService } from '@/infrastructure/common/validation/IValidationService';
 import { IErrorHandler } from '@/infrastructure/common/error/ErrorHandler';
 import { ServiceOptions } from '@/domain/services/IBaseService';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 
 /**
  * Service für Refresh-Tokens
@@ -36,6 +37,90 @@ export class RefreshTokenService extends BaseService<
     super(refreshTokenRepository as any, logger, validator, errorHandler);
     
     this.logger.debug('Initialized RefreshTokenService');
+  }
+
+  /**
+   * Count refresh tokens with optional filtering
+   * 
+   * @param options Options with filters
+   * @returns Number of tokens matching criteria
+   */
+  async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
+    try {
+      const criteria: Record<string, any> = {};
+      
+      if (options?.filters) {
+        if (options.filters.userId) {
+          criteria.userId = options.filters.userId;
+        }
+        
+        if (options.filters.isRevoked !== undefined) {
+          criteria.isRevoked = options.filters.isRevoked;
+        }
+        
+        if (options.filters.expiresAfter) {
+          criteria.expiresAt = { gt: new Date(options.filters.expiresAfter) };
+        }
+        
+        if (options.filters.expiresBefore) {
+          criteria.expiresAt = { lt: new Date(options.filters.expiresBefore) };
+        }
+      }
+      
+      return await this.repository.count(criteria);
+    } catch (error) {
+      this.logger.error('Error in RefreshTokenService.count', { error });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Find all refresh tokens with pagination and filtering
+   * 
+   * @param options Service options including pagination and filters
+   * @returns Paginated results
+   */
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<RefreshToken>> {
+    try {
+      // Convert service options to repository options
+      const repoOptions = this.mapToRepositoryOptions(options);
+      
+      // Add filter criteria if provided in options
+      if (options?.filters) {
+        repoOptions.criteria = {};
+        
+        if (options.filters.userId) {
+          repoOptions.criteria.userId = options.filters.userId;
+        }
+        
+        if (options.filters.isRevoked !== undefined) {
+          repoOptions.criteria.isRevoked = options.filters.isRevoked;
+        }
+        
+        if (options.filters.expiresAfter) {
+          repoOptions.criteria.expiresAt = { gt: new Date(options.filters.expiresAfter) };
+        }
+        
+        if (options.filters.expiresBefore) {
+          repoOptions.criteria.expiresAt = { lt: new Date(options.filters.expiresBefore) };
+        }
+      }
+      
+      // Get tokens from repository
+      const result = await this.repository.findAll(repoOptions);
+      
+      // RefreshToken service returns the entities directly as DTOs
+      return {
+        data: result.data,
+        pagination: result.pagination
+      };
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.findAll`, { 
+        error: error instanceof Error ? error.message : String(error),
+        options 
+      });
+      throw this.handleError(error);
+    }
   }
 
   /**

@@ -21,7 +21,7 @@ export interface NotificationResponseDto extends BaseResponseDto {
   message: string;
   
   /**
-   * Benachrichtigungsinhalt
+   * Benachrichtigungsinhalt (falls 'message' nicht verfügbar ist)
    */
   content: string;
   

@@ -32,7 +32,7 @@ import {
   PopoverTrigger,
 } from '@/shared/components/ui/popover';
 import { CheckIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/shared/utils/cn';
 
 // Validierungsschema für das Formular
 const formSchema = z.object({
@@ -80,7 +80,8 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
 
   const selectedCustomerId = form.watch('customerId');
   
-  const selectedCustomer = customers?.data?.find(
+  // Handle the new PaginationResult structure that has data array instead of direct access
+  const selectedCustomer = customers?.data?.data?.find(
     (customer: any) => customer.id === selectedCustomerId
   );
 
@@ -138,9 +139,9 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
                         )}
                       </CommandEmpty>
                       <CommandGroup>
-                        {customers?.data?.map((customer: any) => (
+                        {customers?.data?.data?.map((customer: any) => (
                           <CommandItem
-                            value={customer.name}
+                            value={customer.name || `customer-${customer.id}`}
                             key={customer.id}
                             onSelect={() => {
                               form.setValue("customerId", customer.id);

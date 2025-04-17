@@ -1,6 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+/**
+ * Login API Route
+ * Handles user authentication and token generation
+ */
+import { NextRequest } from 'next/server';
+import { formatResponse } from '@/infrastructure/api/response-formatter';
 import { getLogger } from '@/infrastructure/common/logging';
-import { getAuthService } from '@/infrastructure/common/factories';
+import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * POST /api/auth/login
@@ -8,10 +13,11 @@ import { getAuthService } from '@/infrastructure/common/factories';
  */
 export async function POST(request: NextRequest) {
   const logger = getLogger();
+  const serviceFactory = getServiceFactory();
   
   try {
     // Get the auth service
-    const authService = getAuthService();
+    const authService = serviceFactory.createAuthService();
     
     // Parse request data
     const data = await request.json();
@@ -19,10 +25,7 @@ export async function POST(request: NextRequest) {
 
     // Validate input
     if (!email || !password) {
-      return NextResponse.json(
-        { success: false, message: 'Email and password are required' },
-        { status: 400 }
-      );
+      return formatResponse.error('Email and password are required', 400);
     }
 
     // Perform login
@@ -34,25 +37,29 @@ export async function POST(request: NextRequest) {
       rememberMe: remember
     });
     
+    // Calculate expiration times in seconds
+    const accessExpiration = 24 * 60 * 60; // 24 hours default
+    const refreshExpiration = 30 * 24 * 60 * 60; // 30 days default
+    
+    // Add expiration fields if not already present
+    result.accessExpiration = result.accessExpiration || accessExpiration;
+    result.refreshExpiration = result.refreshExpiration || refreshExpiration;
+    
     // Log successful login
     logger.info('User logged in successfully', { userId: result.user.id });
     
     // Create response
-    const response = NextResponse.json({
-      success: true,
-      message: 'Login successful',
-      data: {
-        user: {
-          id: result.user.id,
-          name: result.user.name,
-          email: result.user.email,
-          role: result.user.role
-        },
-        // Include tokens in response body for client-side storage backup
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken
-      }
-    });
+    const response = formatResponse.success({
+      user: {
+        id: result.user.id,
+        name: result.user.name,
+        email: result.user.email,
+        role: result.user.role
+      },
+      // Include tokens in response body for client-side storage backup
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken
+    }, 'Login successful');
     
     // Set HTTP-only cookies with proper settings
     response.cookies.set({
@@ -60,7 +67,7 @@ export async function POST(request: NextRequest) {
       value: result.accessToken,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Changed to lax to allow cross-site requests during login redirects
+      sameSite: 'lax', 
       path: '/',
       maxAge: result.accessExpiration // in seconds
     });
@@ -105,9 +112,6 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    return NextResponse.json(
-      { success: false, message, details: process.env.NODE_ENV === 'development' ? String(error) : undefined },
-      { status }
-    );
+    return formatResponse.error(message, status);
   }
 }

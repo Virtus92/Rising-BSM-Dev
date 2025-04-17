@@ -128,7 +128,6 @@ export const StatsCards = () => {
               <div>
                 <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
                 <CardDescription className="text-xs">
-                  {/* No mock trends, just a simple description */}
                   Current total
                 </CardDescription>
               </div>

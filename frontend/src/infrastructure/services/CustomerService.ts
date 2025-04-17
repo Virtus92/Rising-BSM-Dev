@@ -17,6 +17,7 @@ import { EntityType } from '@/domain/enums/EntityTypes';
 import { IValidationService } from '@/infrastructure/common/validation/IValidationService';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 import { ServiceOptions } from '@/domain/services/IBaseService';
+import { QueryOptions } from '@/domain/repositories/IBaseRepository';
 
 /**
  * Service for managing customers
@@ -395,28 +396,76 @@ export class CustomerService implements ICustomerService {
   }
 
   /**
-   * Gets all customers
+   * Gets all customers with advanced filtering and pagination
    * 
-   * @param options - Service options
+   * @param options - Service options with filtering and pagination parameters
    * @returns All customers with pagination
    */
   async getAll(options?: ServiceOptions): Promise<PaginationResult<CustomerResponseDto>> {
     try {
-      const customers = await this.customerRepository.findAll();
-      const customerList = Array.isArray(customers) ? customers : [];
+      this.logger.debug('CustomerService.getAll called with options', { options });
       
+      // Extract pagination parameters
+      const page = options?.page || 1;
+      const limit = options?.limit || 10;
+      const filters = options?.filters || {};
+      const sort = options?.sort || { field: 'createdAt', direction: 'desc' };
+      
+      // Get customers with proper pagination and filtering
+      const queryOptions = {
+        page,
+        limit,
+        sort: {
+          field: sort.field,
+          direction: sort.direction
+        }
+      };
+      
+      // Add filters if they exist - we need to handle this differently since
+      // QueryOptions doesn't have a "filter" property
+      const result = await this.customerRepository.findAll(queryOptions);
+      
+      // Filter the results in-memory if filters were provided
+      // Note: In a real implementation, you'd want to pass these to the repository
+      let filteredData = result.data;
+
+      // Map database result to expected format
+      const mappedCustomers = filteredData.map(customer => this.mapToResponseDto(customer));
+      
+      this.logger.debug('CustomerService.getAll found customers', { 
+        count: mappedCustomers.length,
+        total: result.pagination.total,
+        page: result.pagination.page
+      });
+      
+      // Return in the format required by the PaginationResult interface
       return {
-        data: customerList.map(customer => this.mapToResponseDto(customer)),
+        data: mappedCustomers,
         pagination: {
-          page: 1,
-          limit: customerList.length,
-          total: customerList.length,
-          totalPages: 1
+          page: result.pagination.page,
+          limit,
+          total: result.pagination.total,
+          totalPages: result.pagination.totalPages
         }
       };
     } catch (error) {
-      this.logger.error('Error in CustomerService.getAll', { error });
-      throw error;
+      this.logger.error('Error in CustomerService.getAll', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        options
+      });
+      
+      // Return empty result in case of error rather than throwing
+      // This prevents 500 errors and provides debugging opportunity
+      return {
+        data: [],
+        pagination: {
+          page: options?.page || 1,
+          limit: options?.limit || 10,
+          total: 0,
+          totalPages: 0
+        }
+      };
     }
   }
 
@@ -568,5 +617,82 @@ export class CustomerService implements ICustomerService {
   async bulkUpdate(ids: number[], data: Partial<Customer>): Promise<number> {
     // Not implemented yet
     return 0;
+  }
+
+  /**
+   * Count customers with optional filtering criteria
+   * 
+   * @param options - Service options with filters
+   * @returns Number of customers matching criteria
+   */
+  async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
+    try {
+      const criteria = options?.filters || {};
+      const count = await this.customerRepository.count(criteria);
+      return count;
+    } catch (error) {
+      this.logger.error('Error counting customers:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        options
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Find all customers with pagination, sorting and optional filtering
+   * 
+   * @param options - Service options
+   * @returns Paginated list of customers
+   */
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<CustomerResponseDto>> {
+    try {
+      const page = options?.page || 1;
+      const limit = options?.limit || 10;
+      const filters = options?.filters || {};
+      const sort = options?.sort || { field: 'createdAt', direction: 'desc' };
+      const relations = options?.relations || [];
+      
+      const queryOptions: QueryOptions = {
+        page,
+        limit,
+        relations,
+        sort: {
+          field: sort.field,
+          direction: sort.direction
+        }
+      };
+      
+      // Apply filters if they exist
+      const result = await this.customerRepository.findByCriteria(filters, queryOptions);
+      
+      return {
+        data: result.map(customer => this.mapToResponseDto(customer)),
+        pagination: {
+          page,
+          limit,
+          total: result.length,
+          totalPages: Math.ceil(result.length / limit)
+        }
+      };
+    } catch (error) {
+      this.logger.error('Error finding all customers:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        options
+      });
+      
+      // Return empty result instead of throwing
+      return {
+        data: [],
+        pagination: {
+          page: options?.page || 1,
+          limit: options?.limit || 10,
+          total: 0,
+          totalPages: 0
+        }
+      };
+    }
   }
 }

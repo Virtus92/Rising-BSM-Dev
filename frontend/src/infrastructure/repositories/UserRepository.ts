@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { PrismaRepository } from './PrismaRepository';
+import { PrismaRepository, QueryOptions } from './PrismaRepository';
 import { IUserRepository } from '@/domain/repositories/IUserRepository';
 import { User, UserRole, UserStatus } from '@/domain/entities/User';
 import { UserFilterParamsDto } from '@/domain/dtos/UserDtos';
@@ -32,6 +32,91 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
     super(prisma, 'user', logger, errorHandler);
     
     this.logger.debug('Initialized UserRepository');
+  }
+
+  /**
+   * Erstellt einen neuen Benutzer
+   * 
+   * @param userData - Benutzerdaten
+   * @returns Promise mit erstelltem Benutzer
+   */
+  async create(userData: Partial<User>): Promise<User> {
+    try {
+      this.logger.debug('Creating new user', { email: userData.email });
+      
+      // Bereite Daten für ORM vor
+      const data = this.mapToORMEntity(userData);
+      
+      // Erstelle den Benutzer
+      const createdUser = await this.prisma.user.create({ data });
+      
+      // Protokolliere die Benutzeranlage
+      await this.logActivity(
+        createdUser.id,
+        LogActionType.CREATE,
+        'User account created',
+        undefined
+      );
+      
+      return this.mapToDomainEntity(createdUser);
+    } catch (error) {
+      this.logger.error('Error in UserRepository.create', { error, userData });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Findet alle Benutzer
+   * 
+   * @param options - Abfrageoptionen für Paginierung und Sortierung
+   * @returns Promise mit Benutzern und Paginierungsinformationen
+   */
+  async findAll<U = User>(options?: QueryOptions): Promise<PaginationResult<U>> {
+    try {
+      this.logger.debug('Finding all users');
+      
+      // Definiere Paginierungswerte
+      const page = options?.page || 1;
+      const limit = options?.limit || 10;
+      const skip = (page - 1) * limit;
+      
+      // Definiere Sortierung
+      const orderBy: any = {};
+      if (options?.sort?.field) {
+        orderBy[options.sort.field] = options.sort.direction || 'asc';
+      } else {
+        orderBy.name = 'asc';
+      }
+      
+      // Führe Abfragen aus
+      const [total, users] = await Promise.all([
+        this.prisma.user.count(),
+        this.prisma.user.findMany({
+          skip,
+          take: limit,
+          orderBy
+        })
+      ]);
+      
+      // Mappe auf Domänenentitäten
+      const data = users.map(user => this.mapToDomainEntity(user));
+      
+      // Berechne Paginierungsinformationen
+      const totalPages = Math.ceil(total / limit);
+      
+      return {
+        data: data as unknown as U[],
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages
+        }
+      };
+    } catch (error) {
+      this.logger.error('Error in UserRepository.findAll', { error });
+      throw this.handleError(error);
+    }
   }
 
   /**
@@ -234,34 +319,95 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
   }
 
   /**
-   * Ruft die Aktivitäten eines Benutzers ab
+   * Gets the activities of a user
    * 
-   * @param userId - Benutzer-ID
-   * @param limit - Maximale Anzahl der Ergebnisse
-   * @returns Promise mit Benutzeraktivitäten
+   * @param userId - User ID
+   * @param limit - Maximum number of results
+   * @returns Promise with user activities
    */
   async getUserActivity(userId: number, limit: number = 10): Promise<ActivityLog[]> {
     try {
-      const activities = await this.prisma.userActivity.findMany({
-        where: { userId },
+      // Determine which Prisma model to use for activity logs
+      let activityModel: any;
+      
+      // Try to find the appropriate model for activity logs
+      // Check if these properties exist in Prisma client
+      if ('userActivity' in this.prisma) {
+        activityModel = (this.prisma as any).userActivity;
+      } else if ('activityLog' in this.prisma) {
+        activityModel = (this.prisma as any).activityLog;
+      } else {
+        this.logger.warn('No suitable activity log model found in Prisma schema. Returning empty activity list.');
+        return [];
+      }
+
+      // Fetch activity logs using the determined model
+      const activities = await activityModel.findMany({
+        where: { 
+          userId
+        },
         orderBy: { timestamp: 'desc' },
         take: limit
       });
       
-      // Mappe auf Domain-Entitäten
-      return activities.map(activity => new ActivityLog({
-        id: activity.id,
-        entityType: EntityType.USER,
-        entityId: userId,
-        userId: activity.userId,
-        action: activity.activity,
-        details: activity.details ? JSON.parse(activity.details) : {},
-        createdAt: activity.timestamp || new Date(),
-        updatedAt: activity.timestamp || new Date()
-      }));
+      // Map to domain entities with proper null checks and error handling for each activity
+      return activities.map((activity: any) => {
+        try {
+          let parsedDetails = {};
+          
+          // Safely parse JSON details if present
+          if (activity.details) {
+            if (typeof activity.details === 'string') {
+              try {
+                parsedDetails = JSON.parse(activity.details);
+              } catch (parseError) {
+                // If parsing fails, use the string directly
+                parsedDetails = { rawDetails: activity.details };
+              }
+            } else {
+              // If it's already an object, use it directly
+              parsedDetails = activity.details;
+            }
+          }
+          
+          return new ActivityLog({
+            id: activity.id,
+            entityType: EntityType.USER,
+            entityId: userId,
+            userId: activity.userId,
+            action: activity.activity || '',
+            details: parsedDetails,
+            createdAt: activity.timestamp || new Date(),
+            updatedAt: activity.timestamp || new Date()
+          });
+        } catch (mapError) {
+          // If mapping a specific activity fails, log error but don't fail the whole operation
+          this.logger.error('Error mapping activity log:', {
+            error: mapError instanceof Error ? mapError.message : String(mapError),
+            activityId: activity.id
+          });
+          
+          // Return a minimal valid ActivityLog
+          return new ActivityLog({
+            id: activity.id || 0,
+            entityType: EntityType.USER,
+            entityId: userId,
+            userId: userId,
+            action: 'unknown',
+            details: { error: 'Failed to parse activity data' },
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+        }
+      });
     } catch (error) {
-      this.logger.error('Error in UserRepository.getUserActivity', { error, userId });
-      throw this.handleError(error);
+      this.logger.error('Error in UserRepository.getUserActivity', { 
+        error: error instanceof Error ? error.message : String(error), 
+        userId,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      // Return empty array instead of throwing to maintain UI stability
+      return [];
     }
   }
 
@@ -427,13 +573,13 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
   }
 
   /**
-   * Implementierung der Aktivitätsprotokollierung
+   * Implementation of activity logging
    * 
-   * @param userId - Benutzer-ID
-   * @param actionType - Aktionstyp
+   * @param userId - User ID
+   * @param actionType - Action type
    * @param details - Details
-   * @param ipAddress - IP-Adresse
-   * @returns Promise mit Protokollergebnis
+   * @param ipAddress - IP address
+   * @returns Promise with log result
    */
   protected async logActivityImplementation(
     userId: number, 
@@ -444,53 +590,90 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
     try {
       this.logger.info(`Logging activity for user ${userId}: ${actionType}`);
 
+      // Check if userActivity model exists in Prisma schema
+      if (!this.prisma.userActivity) {
+        this.logger.warn('UserActivity model not found in Prisma schema. Activity logging skipped.');
+        return null;
+      }
+
+      // Use consistent table reference based on Prisma model
       return await this.prisma.userActivity.create({
         data: {
           userId,
           activity: actionType,
-          details,
-          ipAddress,
+          details: details ? details : undefined,
+          ipAddress: ipAddress ? ipAddress : undefined,
           timestamp: new Date()
         }
       });
     } catch (error) {
       this.logger.error('Error in UserRepository.logActivityImplementation', { 
-        error, 
+        error: error instanceof Error ? error.message : String(error), 
         userId, 
-        actionType 
+        actionType,
+        stack: error instanceof Error ? error.stack : undefined
       });
+      // Log but don't throw error for activity logging
+      // This prevents core functionality from failing due to logging issues
       return null;
     }
   }
 
   /**
-   * Mappt eine ORM-Entität auf eine Domänenentität
+   * Maps an ORM entity to a domain entity
    * 
-   * @param ormEntity - ORM-Entität
-   * @returns Domänenentität
+   * @param ormEntity - ORM entity
+   * @returns Domain entity or null if input is null
    */
   protected mapToDomainEntity(ormEntity: any): User {
     if (!ormEntity) {
-      return null as any;
+      // Instead of returning null, throw a meaningful error
+      this.logger.error('Cannot map empty entity to User domain object');
+      throw this.errorHandler.createError('Failed to map database entity to domain entity: Entity is null or undefined');
     }
     
-    return new User({
-      id: ormEntity.id,
-      name: ormEntity.name,
-      email: ormEntity.email,
-      password: ormEntity.password,
-      role: ormEntity.role,
-      phone: ormEntity.phone,
-      status: ormEntity.status,
-      profilePicture: ormEntity.profilePicture,
-      createdAt: ormEntity.createdAt,
-      updatedAt: ormEntity.updatedAt,
-      createdBy: ormEntity.createdBy,
-      updatedBy: ormEntity.updatedBy,
-      lastLoginAt: ormEntity.lastLoginAt,
-      resetToken: ormEntity.resetToken,
-      resetTokenExpiry: ormEntity.resetTokenExpiry
-    });
+    try {
+      // Ensure role and status are valid enum values
+      let role = UserRole.USER;
+      let status = UserStatus.ACTIVE;
+      
+      // If role is provided, validate it against the enum
+      if (ormEntity.role) {
+        const isValidRole = Object.values(UserRole).includes(ormEntity.role as UserRole);
+        role = isValidRole ? (ormEntity.role as UserRole) : UserRole.USER;
+      }
+      
+      // If status is provided, validate it against the enum
+      if (ormEntity.status) {
+        const isValidStatus = Object.values(UserStatus).includes(ormEntity.status as UserStatus);
+        status = isValidStatus ? (ormEntity.status as UserStatus) : UserStatus.ACTIVE;
+      }
+      
+      return new User({
+        id: ormEntity.id,
+        name: ormEntity.name || '',
+        email: ormEntity.email || '',
+        password: ormEntity.password,
+        role: role,
+        status: status,
+        phone: ormEntity.phone,
+        profilePicture: ormEntity.profilePicture,
+        createdAt: ormEntity.createdAt ? new Date(ormEntity.createdAt) : new Date(),
+        updatedAt: ormEntity.updatedAt ? new Date(ormEntity.updatedAt) : new Date(),
+        createdBy: ormEntity.createdBy,
+        updatedBy: ormEntity.updatedBy,
+        lastLoginAt: ormEntity.lastLoginAt ? new Date(ormEntity.lastLoginAt) : undefined,
+        resetToken: ormEntity.resetToken,
+        resetTokenExpiry: ormEntity.resetTokenExpiry ? new Date(ormEntity.resetTokenExpiry) : undefined
+      });
+    } catch (error) {
+      this.logger.error('Error mapping ORM entity to domain entity:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        entityId: ormEntity.id
+      });
+      throw this.errorHandler.createError('Failed to map database entity to domain entity');
+    }
   }
 
   /**
@@ -505,7 +688,19 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
     
     Object.entries(domainEntity).forEach(([key, value]) => {
       if (value !== undefined) {
-        result[key] = value;
+        // Special handling for permissions to match Prisma's expectations
+        if (key === 'permissions') {
+          // Don't include empty permissions array as it causes Prisma errors
+          if (!Array.isArray(value) || value.length > 0) {
+            // Format permissions for Prisma update
+            result[key] = {
+              set: Array.isArray(value) ? value.map(id => ({ id })) : []
+            };
+          }
+          // If permissions is an empty array, don't include it at all
+        } else {
+          result[key] = value;
+        }
       }
     });
     

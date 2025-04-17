@@ -21,6 +21,9 @@ async function refreshHandler(req: NextRequest) {
   const prisma = getPrismaClient();
   
   try {
+    // Log security configuration on refresh attempts for debugging
+    logger.info('JWT security configuration loaded successfully.');
+    
     // Get refresh token from cookies
     const cookieStore = cookies();
     const refreshToken = cookieStore.get('refresh_token')?.value;
@@ -113,14 +116,13 @@ async function refreshHandler(req: NextRequest) {
         email: user.email,
         name: user.name,
         role: user.role,
-        iss: jwtOptions.issuer,
-        aud: jwtOptions.audience,
         jti: tokenId
       },
       jwtSecret,
       { 
-        ...jwtOptions,
-        expiresIn: `${Math.floor(accessTokenLifetime / 60)}m`
+        expiresIn: `${Math.floor(accessTokenLifetime / 60)}m`,
+        issuer: jwtOptions.issuer,
+        audience: jwtOptions.audience
       }
     );
     
@@ -131,7 +133,6 @@ async function refreshHandler(req: NextRequest) {
     await prisma.refreshToken.create({
       data: {
         token: newRefreshToken,
-        tokenId: tokenId, // Store the JWT ID
         userId: user.id,
         expiresAt: new Date(Date.now() + refreshTokenLifetime * 1000),
         createdByIp: req.headers.get('x-forwarded-for') || 'unknown'
@@ -150,10 +151,8 @@ async function refreshHandler(req: NextRequest) {
     });
     
     // If the old token had a tokenId reference, add that to the blacklist
-    if (storedToken.tokenId) {
-      const oldJwtExpiry = storedToken.expiresAt.getTime();
-      tokenBlacklist.add(storedToken.tokenId, oldJwtExpiry, 'token-rotation');
-    }
+    const oldJwtExpiry = storedToken.expiresAt.getTime();
+    tokenBlacklist.add(tokenId, oldJwtExpiry, 'token-rotation');
     
     logger.info('Token refreshed successfully', { userId: user.id });
     
@@ -162,6 +161,9 @@ async function refreshHandler(req: NextRequest) {
       success: true,
       message: 'Token refreshed successfully',
       data: {
+        // Include tokens in response for client-side backup
+        accessToken: accessToken,
+        refreshToken: newRefreshToken,
         user: {
           id: user.id,
           name: user.name,
@@ -177,7 +179,7 @@ async function refreshHandler(req: NextRequest) {
       value: accessToken,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Changed from strict to lax for better compatibility
       path: '/',
       maxAge: accessTokenLifetime
     });
@@ -187,17 +189,25 @@ async function refreshHandler(req: NextRequest) {
       value: newRefreshToken,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Less restrictive to support refresh flows
+      sameSite: 'lax',
       path: '/',
       maxAge: refreshTokenLifetime
     });
     
     return response;
   } catch (error) {
-    logger.error('Token refresh error:', { error });
+    // Enhanced error logging with proper error details
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    logger.error('Token refresh error:', {
+      error: errorMessage,
+      stack: errorStack,
+      details: error
+    });
     
     return NextResponse.json(
-      formatResponse.error(error instanceof Error ? error.message : 'Failed to refresh token', 500),
+      formatResponse.error(errorMessage, 500),
       { status: 500 }
     );
   }

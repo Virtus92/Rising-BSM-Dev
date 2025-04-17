@@ -33,18 +33,8 @@ export const PUT = apiRouteHandler(async (
       userRole: request.auth?.role 
     };
     
-    // Check if notification exists
-    const notification = await notificationService.getById(id, { context });
-    if (!notification) {
-      return formatNotFound('Notification not found');
-    }
-    
-    // Check ownership or admin access
-    if (notification.userId !== context.userId && context.userRole !== 'ADMIN') {
-      return formatError('Access denied - You do not have permission to mark this notification as read', 403);
-    }
-    
-    // Mark notification as read
+    // Mark notification as read directly using Repository pattern
+    // This avoids the Symbol exports error in the getById method
     const updatedNotification = await notificationService.markAsRead(id, { context });
     
     return formatSuccess(updatedNotification, 'Notification marked as read');

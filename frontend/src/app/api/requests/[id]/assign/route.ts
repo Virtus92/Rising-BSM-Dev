@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { getServerSession, authOptions } from '@/app/api/auth/middleware/authMiddleware';
-
-const prisma = new PrismaClient();
+import { NextRequest } from 'next/server';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
+import { getLogger } from '@/infrastructure/common/logging';
+import { getServiceFactory } from '@/infrastructure/common/factories';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { apiPermissions } from '../../../helpers/apiPermissions';
 
 type RequestParams = {
   params: {
@@ -15,127 +16,40 @@ type RequestParams = {
  * 
  * Weist eine Kontaktanfrage einem Benutzer zu.
  */
-export async function POST(request: NextRequest, { params }: RequestParams) {
-  try {
-    // Authentifizierung prüfen
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
+export const POST = apiRouteHandler(
+  apiPermissions.withPermission(
+    async (req: NextRequest, { params }: RequestParams) => {
+      const logger = getLogger();
+      const serviceFactory = getServiceFactory();
 
-    const requestId = parseInt(params.id);
-    if (isNaN(requestId)) {
-      return NextResponse.json(
-        { success: false, message: 'Ungültige Anfrage-ID' },
-        { status: 400 }
-      );
-    }
-
-    // Überprüfen, ob die Anfrage existiert
-    const existingRequest = await prisma.contactRequest.findUnique({
-      where: { id: requestId }
-    });
-
-    if (!existingRequest) {
-      return NextResponse.json(
-        { success: false, message: 'Kontaktanfrage nicht gefunden' },
-        { status: 404 }
-      );
-    }
-
-    // Daten aus dem Request-Body auslesen
-    const body = await request.json();
-    const { userId, note } = body;
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: 'Benutzer-ID ist erforderlich' },
-        { status: 400 }
-      );
-    }
-
-    // Überprüfen, ob der Benutzer existiert
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, message: 'Benutzer nicht gefunden' },
-        { status: 404 }
-      );
-    }
-
-    // Begin transaction
-    const result = await prisma.$transaction(async (prisma) => {
-      // Anfrage aktualisieren
-      const updatedRequest = await prisma.contactRequest.update({
-        where: { id: requestId },
-        data: {
-          processorId: userId,
-          status: existingRequest.status === 'new' ? 'in_progress' : existingRequest.status
-        }
-      });
-
-      // Log-Eintrag erstellen
-      await prisma.requestLog.create({
-        data: {
-          requestId,
-          userId: parseInt(session.user.id),
-          userName: session.user.name || 'Unbekannt',
-          action: 'Anfrage zugewiesen',
-          details: note || `Anfrage an ${user.name} zugewiesen`
-        }
-      });
-
-      return {
-        request: updatedRequest,
-        user
-      };
-    });
-
-    // Status-Label und CSS-Klasse bestimmen
-    let statusLabel, statusClass;
-    switch (result.request.status) {
-      case 'new':
-        statusLabel = 'Neu';
-        statusClass = 'text-blue-500';
-        break;
-      case 'in_progress':
-        statusLabel = 'In Bearbeitung';
-        statusClass = 'text-yellow-500';
-        break;
-      case 'completed':
-        statusLabel = 'Abgeschlossen';
-        statusClass = 'text-green-500';
-        break;
-      case 'cancelled':
-        statusLabel = 'Abgebrochen';
-        statusClass = 'text-red-500';
-        break;
-      default:
-        statusLabel = 'Unbekannt';
-        statusClass = 'text-gray-500';
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Kontaktanfrage erfolgreich zugewiesen',
-      data: {
-        ...result.request,
-        statusLabel,
-        statusClass,
-        processorName: result.user.name
+      const requestId = parseInt(params.id);
+      if (isNaN(requestId)) {
+        return formatResponse.error('Invalid request ID', 400);
       }
-    });
-  } catch (error) {
-    console.error('Error assigning request:', error);
-    return NextResponse.json(
-      { success: false, message: 'Server-Fehler', error: String(error) },
-      { status: 500 }
-    );
-  }
-}
+      
+      // Parse request body
+      const body = await req.json();
+      const { userId, note } = body;
+      
+      if (!userId) {
+        return formatResponse.error('User ID is required', 400);
+      }
+      
+      // Create context for service calls
+      const context = {
+        userId: req.auth?.userId,
+        userRole: req.auth?.role
+      };
+      
+      // Get request service
+      const requestService = serviceFactory.createRequestService();
+      
+      // Assign request to user
+      const updatedRequest = await requestService.assignRequest(requestId, userId, note, { context });
+      
+      return formatResponse.success(updatedRequest, 'Request assigned successfully');
+    },
+    SystemPermission.REQUESTS_ASSIGN
+  ),
+  { requiresAuth: true }
+);

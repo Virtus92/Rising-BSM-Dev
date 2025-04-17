@@ -1,12 +1,11 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
 import { getLogger } from '@/infrastructure/common/logging';
 import { getServiceFactory } from '@/infrastructure/common/factories';
 
 /**
  * GET /api/appointments/upcoming
- * Returns upcoming appointments within the next 7 days
+ * Returns upcoming appointments within the next X days
  */
 export const GET = apiRouteHandler(async (request: NextRequest) => {
   const logger = getLogger();
@@ -14,9 +13,9 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
   
   try {
     // Get URL parameters
-    const url = new URL(request.url);
-    const days = parseInt(url.searchParams.get('days') || '7', 10);
-    const limit = parseInt(url.searchParams.get('limit') || '10', 10);
+    const { searchParams } = new URL(request.url);
+    const days = parseInt(searchParams.get('days') || '7', 10);
+    const limit = parseInt(searchParams.get('limit') || '10', 10);
     
     // Get appointment service
     const appointmentService = serviceFactory.createAppointmentService();
@@ -24,47 +23,61 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
     // Context for service calls
     const context = { userId: request.auth?.userId };
     
-    // Get upcoming appointments directly from repository
-    const today = new Date();
-    const endDate = new Date(today);
-    endDate.setDate(today.getDate() + days);
-    
-    // Find appointments between today and end date
-    const appointments = await appointmentService.getRepository().findByDateRange(today, endDate);
-    
-    // Sort by date and limit
-    const sortedAppointments = appointments
-      .sort((a, b) => {
-        const dateA = new Date(a.appointmentDate);
-        const dateB = new Date(b.appointmentDate);
-        return dateA.getTime() - dateB.getTime();
-      })
-      .slice(0, limit);
-    
-    // Map to DTOs
-    const result = sortedAppointments.map(appointment => {
-      const dateObj = new Date(appointment.appointmentDate);
-      return {
-        id: appointment.id,
-        title: appointment.title,
-        appointmentDate: appointment.appointmentDate instanceof Date ? 
-          appointment.appointmentDate.toISOString() : appointment.appointmentDate,
-        dateFormatted: dateObj.toLocaleDateString(),
-        timeFormatted: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: appointment.status,
-        customerId: appointment.customerId,
-        duration: appointment.duration || 60
-      };
+    // Use service method to get upcoming appointments
+    const appointments = await appointmentService.getUpcoming(limit, {
+      context,
+      days
     });
     
-    return formatSuccess(result, `Retrieved upcoming appointments successfully`);
+    // Get customer service for enriching customer data
+    const customerService = serviceFactory.createCustomerService();
+    
+    // Process appointments to ensure they have customer info
+    if (appointments && Array.isArray(appointments)) {
+      // Use Promise.all to load all customer data in parallel
+      await Promise.all(
+        appointments.map(async (appointment) => {
+          if (appointment.customerId && (!appointment.customerName || !appointment.customerData)) {
+            try {
+              const customer = await customerService.getById(appointment.customerId, {
+                context
+              });
+              
+              if (customer) {
+                appointment.customerName = customer.name;
+                appointment.customerData = {
+                  id: customer.id,
+                  name: customer.name,
+                  email: customer.email,
+                  phone: customer.phone
+                };
+              } else {
+                // Set default values if customer not found
+                appointment.customerName = `Customer ${appointment.customerId}`;
+              }
+            } catch (customerError) {
+              // Log error but continue processing
+              logger.warn(`Failed to load customer data for appointment ${appointment.id}:`, {
+                error: customerError instanceof Error ? customerError.message : String(customerError),
+                customerId: appointment.customerId
+              });
+              
+              // Set default values
+              appointment.customerName = `Customer ${appointment.customerId}`;
+            }
+          }
+        })
+      );
+    }
+    
+    return formatResponse.success(appointments, `Retrieved upcoming appointments successfully`);
   } catch (error) {
     logger.error('Error fetching upcoming appointments:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined
     });
     
-    return formatError(
+    return formatResponse.error(
       error instanceof Error ? error.message : 'Failed to retrieve upcoming appointments',
       500
     );

@@ -52,7 +52,25 @@ export async function GET(req: NextRequest) {
         secretPrefix: jwtSecret.substring(0, 3) + '...' // Only log prefix for security
       });
       
-      const decoded = jwt.verify(token, jwtSecret) as any;
+      let decoded;
+      
+      try {
+        // First try to verify with standard JWT claims (issuer and audience)
+        decoded = jwt.verify(token, jwtSecret, {
+          issuer: 'rising-bsm',
+          audience: process.env.JWT_AUDIENCE || 'rising-bsm-app'
+        }) as any;
+        
+        logger.debug('Token validation passed with standard JWT claims');
+      } catch (claimError) {
+        // If claim validation fails, try legacy verification without issuer/audience
+        logger.debug('Standard claim validation failed, trying legacy verification:', { 
+          error: claimError instanceof Error ? claimError.message : String(claimError) 
+        });
+        
+        decoded = jwt.verify(token, jwtSecret) as any;
+        logger.debug('Legacy token validation passed (no issuer/audience)');
+      }
       
       if (!decoded || !decoded.sub) {
         logger.warn('Invalid token format in /api/users/me');

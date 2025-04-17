@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { faker } from '@faker-js/faker';
@@ -52,28 +52,32 @@ async function main() {
     return await bcrypt.hash(password, 10);
   };
 
-  // Admin-Benutzer erstellen
+  // Replace hardcoded admin and employee user data with environment variables or configuration
+  const adminUserData = {
+    name: process.env.ADMIN_NAME || 'Admin User',
+    email: process.env.ADMIN_EMAIL || 'admin@example.com',
+    password: await hashPassword(process.env.ADMIN_PASSWORD || 'AdminPass123!'),
+    role: 'admin',
+    status: 'active',
+    phone: process.env.ADMIN_PHONE || '+49 123 456 7890'
+  };
+
+  const employeeUserData = {
+    name: process.env.EMPLOYEE_NAME || 'Max Mustermann',
+    email: process.env.EMPLOYEE_EMAIL || 'max.mustermann@rising-bsm.com',
+    password: await hashPassword(process.env.EMPLOYEE_PASSWORD || 'EmployeePassword123!'),
+    role: 'employee',
+    status: 'active',
+    phone: process.env.EMPLOYEE_PHONE || '+49 987 654 3210'
+  };
+
+  // Use these objects in the user creation logic
   const adminUser = await prisma.user.create({
-    data: {
-      name: 'Admin User',
-      email: 'admin@example.com',
-      password: await hashPassword('AdminPass123!'),
-      role: 'admin',
-      status: 'active',
-      phone: '+49 123 456 7890'
-    }
+    data: adminUserData
   });
 
-  // Mitarbeiter-Benutzer erstellen
   const employeeUser = await prisma.user.create({
-    data: {
-      name: 'Max Mustermann',
-      email: 'max.mustermann@rising-bsm.com',
-      password: await hashPassword('EmployeePassword123!'),
-      role: 'employee',
-      status: 'active',
-      phone: '+49 987 654 3210'
-    }
+    data: employeeUserData
   });
 
   // User-Settings erstellen

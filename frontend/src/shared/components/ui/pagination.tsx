@@ -1,159 +1,183 @@
-import React from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
-import { cn } from '@/shared/utils/cn';
-import { Button } from './button';
+import * as React from "react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react"
 
-/**
- * Pagination-Komponente für Seitennavigation
- */
-interface PaginationProps {
-  /**
-   * Aktuelle Seite
-   */
-  currentPage: number;
-  
-  /**
-   * Gesamtanzahl der Seiten
-   */
-  totalPages: number;
-  
-  /**
-   * Callback für Seitenwechsel
-   */
-  onPageChange: (page: number) => void;
-  
-  /**
-   * Maximale Anzahl an Seitenzahlen, die angezeigt werden
-   * @default 5
-   */
-  maxVisiblePages?: number;
-  
-  /**
-   * Zusätzliche CSS-Klassen
-   */
-  className?: string;
-}
+import { cn } from "@/shared/utils/cn"
+import { ButtonProps, Button, buttonVariants } from "@/shared/components/ui/button"
 
-/**
- * Pagination-Komponente für die Seitennavigation in Listen
- */
-export const Pagination: React.FC<PaginationProps> = ({
-  currentPage,
-  totalPages,
-  onPageChange,
-  maxVisiblePages = 5,
+const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
+  <nav
+    role="navigation"
+    aria-label="pagination"
+    className={cn("mx-auto flex w-full justify-center", className)}
+    {...props}
+  />
+)
+Pagination.displayName = "Pagination"
+
+const PaginationContent = React.forwardRef<
+  HTMLUListElement,
+  React.ComponentProps<"ul">
+>(({ className, ...props }, ref) => (
+  <ul
+    ref={ref}
+    className={cn("flex flex-row items-center gap-1", className)}
+    {...props}
+  />
+))
+PaginationContent.displayName = "PaginationContent"
+
+const PaginationItem = React.forwardRef<
+  HTMLLIElement,
+  React.ComponentProps<"li">
+>(({ className, ...props }, ref) => (
+  <li ref={ref} className={cn("", className)} {...props} />
+))
+PaginationItem.displayName = "PaginationItem"
+
+type PaginationLinkProps = {
+  isActive?: boolean
+  href?: string
+} & Pick<ButtonProps, "size"> &
+  Omit<React.ComponentProps<typeof Button>, "href">
+
+const PaginationLink = ({
   className,
-}) => {
-  // Sicherstellen, dass die Seitenwerte gültig sind
-  const validCurrentPage = Math.max(1, Math.min(currentPage, totalPages));
-  const validTotalPages = Math.max(1, totalPages);
-  
-  // Keine Pagination anzeigen, wenn nur eine Seite vorhanden ist
-  if (validTotalPages <= 1) {
-    return null;
+  isActive,
+  size = "icon",
+  href,
+  ...props
+}: PaginationLinkProps) => {
+  // Simple direct rendering of either anchor or button
+  // This avoids any nesting issues with buttons inside buttons
+  if (href) {
+    return (
+      <a
+        href={href}
+        className={cn(
+          buttonVariants({
+            variant: isActive ? "outline" : "ghost",
+            size,
+          }),
+          "w-9 h-9",
+          isActive && "bg-accent pointer-events-none",
+          className
+        )}
+        aria-current={isActive ? "page" : undefined}
+        {...props}
+      />
+    )
   }
-
-  // Sichtbare Seitenzahlen berechnen
-  const getVisiblePageNumbers = () => {
-    const pages = [];
-    
-    // Bei wenigen Seiten alle anzeigen
-    if (validTotalPages <= maxVisiblePages) {
-      for (let i = 1; i <= validTotalPages; i++) {
-        pages.push(i);
-      }
-      return pages;
-    }
-    
-    // Ansonsten erste, letzte und einige Seiten um die aktuelle herum anzeigen
-    const sidePages = Math.floor((maxVisiblePages - 2) / 2);
-    const leftSide = Math.max(1, validCurrentPage - sidePages);
-    const rightSide = Math.min(validTotalPages, validCurrentPage + sidePages);
-    
-    // Immer die erste Seite einschließen
-    if (leftSide > 1) {
-      pages.push(1);
-      if (leftSide > 2) {
-        pages.push(-1); // Platzhalter für Ellipsis
-      }
-    }
-    
-    // Seiten um die aktuelle herum
-    for (let i = leftSide; i <= rightSide; i++) {
-      pages.push(i);
-    }
-    
-    // Immer die letzte Seite einschließen
-    if (rightSide < validTotalPages) {
-      if (rightSide < validTotalPages - 1) {
-        pages.push(-2); // Platzhalter für Ellipsis (anderer Wert für den Key)
-      }
-      pages.push(validTotalPages);
-    }
-    
-    return pages;
-  };
-
-  const visiblePages = getVisiblePageNumbers();
-
+  
   return (
-    <nav
-      className={cn("flex items-center justify-center space-x-1", className)}
-      aria-label="Pagination"
-    >
-      {/* Zurück-Button */}
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={validCurrentPage === 1}
-        onClick={() => onPageChange(validCurrentPage - 1)}
-        aria-label="Vorherige Seite"
-        className="h-8 w-8 p-0"
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-      
-      {/* Seitenzahlen */}
-      {visiblePages.map((page, index) => {
-        // Ellipsis für ausgelassene Seiten
-        if (page < 0) {
-          return (
-            <span
-              key={`ellipsis-${index}`}
-              className="flex h-8 w-8 items-center justify-center text-sm text-muted-foreground"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </span>
-          );
-        }
-        
-        // Normale Seitenzahl
-        return (
-          <Button
-            key={page}
-            variant={page === validCurrentPage ? "default" : "outline"}
-            size="sm"
-            onClick={() => onPageChange(page)}
-            aria-label={`Gehe zu Seite ${page}`}
-            aria-current={page === validCurrentPage ? "page" : undefined}
-            className="h-8 w-8 p-0"
-          >
-            {page}
-          </Button>
-        );
-      })}
-      
-      {/* Vorwärts-Button */}
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={validCurrentPage === validTotalPages}
-        onClick={() => onPageChange(validCurrentPage + 1)}
-        aria-label="Nächste Seite"
-        className="h-8 w-8 p-0"
-      >
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-    </nav>
-  );
-};
+    <button
+      type="button"
+      className={cn(
+        buttonVariants({
+          variant: isActive ? "outline" : "ghost",
+          size,
+        }),
+        "w-9 h-9",
+        isActive && "bg-accent pointer-events-none",
+        className
+      )}
+      aria-current={isActive ? "page" : undefined}
+      {...props}
+    />
+  )
+}
+PaginationLink.displayName = "PaginationLink"
+
+const PaginationPrevious = ({
+  className,
+  ...props
+}: React.ComponentProps<typeof PaginationLink>) => (
+  <PaginationLink
+    aria-label="Go to previous page"
+    size="default"
+    className={cn("gap-1 pr-2.5", className)}
+    {...props}
+  >
+    <ChevronLeft className="h-4 w-4" />
+    <span>Previous</span>
+  </PaginationLink>
+)
+PaginationPrevious.displayName = "PaginationPrevious"
+
+const PaginationNext = ({
+  className,
+  ...props
+}: React.ComponentProps<typeof PaginationLink>) => (
+  <PaginationLink
+    aria-label="Go to next page"
+    size="default"
+    className={cn("gap-1 pl-2.5", className)}
+    {...props}
+  >
+    <span>Next</span>
+    <ChevronRight className="h-4 w-4" />
+  </PaginationLink>
+)
+PaginationNext.displayName = "PaginationNext"
+
+const PaginationFirst = ({
+  className,
+  ...props
+}: React.ComponentProps<typeof PaginationLink>) => (
+  <PaginationLink
+    aria-label="Go to first page"
+    size="icon"
+    className={cn("", className)}
+    {...props}
+  >
+    <ChevronsLeft className="h-4 w-4" />
+  </PaginationLink>
+)
+PaginationFirst.displayName = "PaginationFirst"
+
+const PaginationLast = ({
+  className,
+  ...props
+}: React.ComponentProps<typeof PaginationLink>) => (
+  <PaginationLink
+    aria-label="Go to last page"
+    size="icon"
+    className={cn("", className)}
+    {...props}
+  >
+    <ChevronsRight className="h-4 w-4" />
+  </PaginationLink>
+)
+PaginationLast.displayName = "PaginationLast"
+
+const PaginationEllipsis = ({
+  className,
+  ...props
+}: React.ComponentProps<"span">) => (
+  <span
+    aria-hidden
+    className={cn("flex h-9 w-9 items-center justify-center", className)}
+    {...props}
+  >
+    <MoreHorizontal className="h-4 w-4" />
+    <span className="sr-only">More pages</span>
+  </span>
+)
+PaginationEllipsis.displayName = "PaginationEllipsis"
+
+export {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationFirst,
+  PaginationLast,
+}

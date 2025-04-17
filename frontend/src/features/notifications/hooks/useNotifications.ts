@@ -1,205 +1,260 @@
-import { useState, useEffect, useCallback } from 'react';
-import { NotificationClient } from '@/infrastructure/api/NotificationClient';
-import { NotificationResponseDto } from '@/domain/dtos/NotificationDtos';
-import { useToast } from '@/shared/hooks/useToast';
+'use client';
 
-type UseNotificationsOptions = {
-  autoFetch?: boolean;
-  limit?: number;
-  unreadOnly?: boolean;
-  pollInterval?: number | null;
-};
+import { useCallback, useEffect, useRef } from 'react';
+import { useToast } from '@/shared/hooks/useToast';
+import { NotificationService } from '@/infrastructure/clients/NotificationService';
+import { NotificationResponseDto, NotificationFilterParamsDto } from '@/domain/dtos/NotificationDtos';
+import { createBaseListUtility, BaseListUtility } from '@/shared/utils/list/baseListUtils';
 
 /**
- * Hook zum Verwalten von Benachrichtigungen
- * 
- * Bietet Funktionen zum Laden, Markieren als gelesen und Filtern von Benachrichtigungen
+ * Extended interface for notification list operations
  */
-export function useNotifications({
+export interface UseNotificationsResult extends BaseListUtility<NotificationResponseDto, NotificationFilterParamsDto> {
+  // Alias for better semantics
+  notifications: NotificationResponseDto[];
+  
+  // Notification-specific operations
+  unreadCount: number;
+  markAsRead: (id: number) => Promise<boolean>;
+  markAllAsRead: () => Promise<boolean>;
+  deleteNotification: (id: number) => Promise<boolean>;
+  fetchUnreadCount: () => Promise<number>;
+  
+  // Ensure pagination is exposed for direct access
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+interface UseNotificationsProps {
+  limit?: number;
+  unreadOnly?: boolean;
+  page?: number;
+  autoFetch?: boolean;
+  pollInterval?: number;
+}
+
+/**
+ * Hook for managing notification list with the unified list utilities
+ */
+export const useNotifications = ({ 
+  limit = 10, 
+  unreadOnly = false,
+  page = 1,
   autoFetch = true,
-  limit,
-  unreadOnly,
-  pollInterval = null,
-}: UseNotificationsOptions = {}) {
-  const [notifications, setNotifications] = useState<NotificationResponseDto[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  pollInterval
+}: UseNotificationsProps = {}): UseNotificationsResult => {
   const { toast } = useToast();
-
-  // Funktion zum Laden der Benachrichtigungen
-  const fetchNotifications = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const options: { limit?: number; unreadOnly?: boolean } = {};
-      if (limit) options.limit = limit;
-      if (unreadOnly) options.unreadOnly = true;
-      
-      const response = await NotificationClient.getNotifications(options);
-      
-      if (response.success && response.data) {
-        // Make sure we always have an array
-        const notificationData = Array.isArray(response.data) ? response.data : [];
-        setNotifications(notificationData);
-        
-        // Ungelesene Benachrichtigungen zählen
-        const unreadCount = notificationData.filter(n => !n.isRead).length;
-        setUnreadCount(unreadCount);
-      } else {
-        setError(response.message || 'Fehler beim Laden der Benachrichtigungen');
-      }
-    } catch (error) {
-      console.error('Fehler beim Laden der Benachrichtigungen:', error);
-      setError('Fehler beim Laden der Benachrichtigungen');
-    } finally {
-      setLoading(false);
-    }
-  }, [limit, unreadOnly]);
-
-  // Funktion zum Markieren einer Benachrichtigung als gelesen
-  const markAsRead = useCallback(async (notificationId: number) => {
-    try {
-      const response = await NotificationClient.markNotificationAsRead(notificationId);
-      
-      if (response.success) {
-        // Benachrichtigungsstatus in der UI aktualisieren
-        setNotifications(prevNotifications =>
-          prevNotifications.map(notification =>
-            notification.id === notificationId
-              ? { ...notification, isRead: true }
-              : notification
-          )
-        );
-        
-        // Ungelesenen Zähler aktualisieren
-        setUnreadCount(prev => Math.max(0, prev - 1));
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Fehler beim Markieren als gelesen:', error);
-      toast({
-        title: 'Fehler',
-        description: 'Benachrichtigung konnte nicht als gelesen markiert werden',
-        variant: 'error'
-      });
-      return false;
-    }
-  }, [toast]);
-
-  // Funktion zum Markieren aller Benachrichtigungen als gelesen
-  const markAllAsRead = useCallback(async () => {
-    try {
-      const response = await NotificationClient.markAllNotificationsAsRead();
-      
-      if (response.success) {
-        // Alle Benachrichtigungen in der UI als gelesen markieren
-        setNotifications(prevNotifications =>
-          prevNotifications.map(notification => ({ ...notification, isRead: true }))
-        );
-        
-        // Ungelesenen Zähler zurücksetzen
-        setUnreadCount(0);
-        
-        toast({
-          title: 'Erfolg',
-          description: 'Alle Benachrichtigungen wurden als gelesen markiert',
-          variant: 'success'
-        });
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Fehler beim Markieren aller als gelesen:', error);
-      toast({
-        title: 'Fehler',
-        description: 'Benachrichtigungen konnten nicht als gelesen markiert werden',
-        variant: 'error'
-      });
-      return false;
-    }
-  }, [toast]);
-
-  // Funktion zum Löschen einer Benachrichtigung
-  const deleteNotification = useCallback(async (notificationId: number) => {
-    try {
-      const response = await NotificationClient.deleteNotification(notificationId);
-      
-      if (response.success) {
-        // Benachrichtigung aus der UI entfernen
-        setNotifications(prevNotifications =>
-          prevNotifications.filter(notification => notification.id !== notificationId)
-        );
-        
-        // Ungelesenen Zähler aktualisieren, falls die gelöschte Benachrichtigung ungelesen war
-        const wasUnread = notifications.find(n => n.id === notificationId)?.isRead === false;
-        if (wasUnread) {
-          setUnreadCount(prev => Math.max(0, prev - 1));
-        }
-        
-        toast({
-          title: 'Erfolg',
-          description: 'Benachrichtigung wurde gelöscht',
-          variant: 'success'
-        });
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Fehler beim Löschen der Benachrichtigung:', error);
-      toast({
-        title: 'Fehler',
-        description: 'Benachrichtigung konnte nicht gelöscht werden',
-        variant: 'error'
-      });
-      return false;
-    }
-  }, [notifications, toast]);
-
-  // Funktion zum Ausführen einer Abfrage des ungelesenen Zählers
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const response = await NotificationClient.getNotifications({ unreadOnly: true });
-      if (response.success && response.data) {
-        setUnreadCount(response.data.length);
-      }
-    } catch (error) {
-      console.error('Fehler beim Abrufen des ungelesenen Zählers:', error);
-    }
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const didInitialFetchRef = useRef(false);
+  
+  // Define the fetch function for notifications
+  const fetchNotifications = useCallback(async (filters: NotificationFilterParamsDto) => {
+    return await NotificationService.getNotifications(filters);
   }, []);
-
-  // Automatisches Laden beim ersten Render, wenn autoFetch aktiviert ist
+  
+  // Use the base list utility
+  const baseList = createBaseListUtility<NotificationResponseDto, NotificationFilterParamsDto>({
+    fetchFunction: fetchNotifications,
+    initialFilters: {
+      page,
+      limit,
+      unreadOnly,
+      sortBy: 'createdAt',
+      sortDirection: 'desc'
+    },
+    defaultSortField: 'createdAt' as string,
+    defaultSortDirection: 'desc',
+    syncWithUrl: false,
+    // Critical fix: Let the baseList handle auto-fetching properly
+    autoFetch
+  });
+  
+  // Calculate unread count from the actual items in the list
+  const unreadCount = baseList.items.filter(notification => !notification.isRead).length;
+  
+  // Setup polling if pollInterval is provided
   useEffect(() => {
-    if (autoFetch) {
-      fetchNotifications();
+    // Clean up any existing interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
-  }, [autoFetch, fetchNotifications]);
-
-  // Polling für den ungelesenen Zähler, falls gewünscht
-  useEffect(() => {
+    
+    // Don't setup polling if no interval specified
     if (!pollInterval) return;
     
-    const intervalId = setInterval(() => {
-      fetchUnreadCount();
+    // Setup new polling interval
+    intervalRef.current = setInterval(() => {
+      // Use the refetch method from baseList to update data
+      baseList.refetch();
     }, pollInterval);
     
-    return () => clearInterval(intervalId);
-  }, [pollInterval, fetchUnreadCount]);
+    // Cleanup on unmount
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [pollInterval, baseList]);
+  
+  // Handle initial fetch if autoFetch is true
+  useEffect(() => {
+    if (autoFetch && !didInitialFetchRef.current) {
+      // Only fetch once to avoid duplicate fetching
+      baseList.refetch();
+      didInitialFetchRef.current = true;
+    }
+  }, [autoFetch, baseList]);
+  
+  /**
+   * Mark a notification as read
+   */
+  const markAsRead = useCallback(async (id: number) => {
+    try {
+      const response = await NotificationService.markAsRead(id);
+      
+      if (response.success) {
+        // Update the item in the list
+        const updatedItems = baseList.items.map(item => 
+          item.id === id ? { ...item, isRead: true } : item
+        );
+        
+        // Update the list
+        baseList.setItems(updatedItems);
+        
+        return true;
+      } else {
+        toast?.({ 
+          title: 'Error',
+          description: response.message || 'Failed to mark notification as read',
+          variant: 'destructive'
+        });
+        return false;
+      }
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+      toast?.({ 
+        title: 'Error',
+        description: 'An unexpected error occurred',
+        variant: 'destructive'
+      });
+      return false;
+    }
+  }, [toast, baseList]);
+  
+  /**
+   * Mark all notifications as read
+   */
+  const markAllAsRead = useCallback(async () => {
+    try {
+      const response = await NotificationService.markAllAsRead();
+      
+      if (response.success) {
+        // Update all items in the list
+        const updatedItems = baseList.items.map(item => ({ ...item, isRead: true }));
+        
+        // Update the list
+        baseList.setItems(updatedItems);
+        
+        toast?.({ 
+          title: 'Success',
+          description: 'All notifications marked as read',
+          variant: 'success'
+        });
+        
+        return true;
+      } else {
+        toast?.({ 
+          title: 'Error',
+          description: response.message || 'Failed to mark all notifications as read',
+          variant: 'destructive'
+        });
+        return false;
+      }
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err);
+      toast?.({ 
+        title: 'Error',
+        description: 'An unexpected error occurred',
+        variant: 'destructive'
+      });
+      return false;
+    }
+  }, [toast, baseList]);
+  
+  /**
+   * Delete a notification
+   */
+  const deleteNotification = useCallback(async (id: number) => {
+    try {
+      const response = await NotificationService.deleteNotification(id);
+      
+      if (response.success) {
+        // Remove the item from the list
+        const updatedItems = baseList.items.filter(item => item.id !== id);
+        
+        // Update the list
+        baseList.setItems(updatedItems);
+        
+        toast?.({ 
+          title: 'Success',
+          description: 'Notification deleted successfully',
+          variant: 'success'
+        });
+        
+        return true;
+      } else {
+        toast?.({ 
+          title: 'Error',
+          description: response.message || 'Failed to delete notification',
+          variant: 'destructive'
+        });
+        return false;
+      }
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      toast?.({ 
+        title: 'Error',
+        description: 'An unexpected error occurred',
+        variant: 'destructive'
+      });
+      return false;
+    }
+  }, [toast, baseList]);
+  
+  /**
+   * Fetch just the unread count without loading all notifications
+   * This method now properly uses the baseList's refetch mechanism
+   */
+  const fetchUnreadCount = useCallback(async (): Promise<number> => {
+    try {
+      // Instead of making a separate API call, use the baseList's refetch method
+      // which will properly update the internal state
+      await baseList.refetch();
+      
+      // Return the count from filtered items
+      return baseList.items.filter(notification => !notification.isRead).length;
+    } catch (err) {
+      console.error('Error fetching unread notification count:', err);
+      return 0;
+    }
+  }, [baseList]);
 
   return {
-    notifications,
+    ...baseList,
+    // Alias items as notifications for better semantics
+    notifications: baseList.items,
+    
+    // Notification-specific properties and methods
     unreadCount,
-    loading,
-    error,
-    fetchNotifications,
     markAsRead,
     markAllAsRead,
     deleteNotification,
     fetchUnreadCount
   };
-}
+};

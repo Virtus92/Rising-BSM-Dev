@@ -39,6 +39,111 @@ export class ActivityLogService extends BaseService<
   }
 
   /**
+   * Count activity logs with optional filtering
+   * 
+   * @param options Options with filters
+   * @returns Number of logs matching criteria
+   */
+  async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
+    try {
+      const criteria: Record<string, any> = {};
+      
+      if (options?.filters) {
+        if (options.filters.entityType) {
+          criteria.entityType = options.filters.entityType;
+        }
+        
+        if (options.filters.entityId) {
+          criteria.entityId = options.filters.entityId;
+        }
+        
+        if (options.filters.userId) {
+          criteria.userId = options.filters.userId;
+        }
+        
+        if (options.filters.action) {
+          criteria.action = options.filters.action;
+        }
+        
+        if (options.filters.startDate && options.filters.endDate) {
+          criteria.createdAtRange = {
+            start: options.filters.startDate,
+            end: options.filters.endDate
+          };
+        }
+      }
+      
+      return await this.repository.count(criteria);
+    } catch (error) {
+      this.logger.error('Error in ActivityLogService.count', { 
+        error, 
+        filters: options?.filters 
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Find all activity logs with pagination and filtering
+   * 
+   * @param options Service options including pagination and filters
+   * @returns Paginated results
+   */
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<ActivityLogDto>> {
+    try {
+      // Convert service options to repository options
+      const repoOptions = this.mapToRepositoryOptions(options);
+      
+      // Add filter criteria if provided in options
+      if (options?.filters) {
+        repoOptions.criteria = {};
+        
+        if (options.filters.entityType) {
+          repoOptions.criteria.entityType = options.filters.entityType;
+        }
+        
+        if (options.filters.entityId) {
+          repoOptions.criteria.entityId = options.filters.entityId;
+        }
+        
+        if (options.filters.userId) {
+          repoOptions.criteria.userId = options.filters.userId;
+        }
+        
+        if (options.filters.action) {
+          repoOptions.criteria.action = options.filters.action;
+        }
+        
+        if (options.filters.startDate && options.filters.endDate) {
+          repoOptions.criteria.createdAtRange = {
+            start: options.filters.startDate,
+            end: options.filters.endDate
+          };
+        } else if (options.filters.startDate) {
+          repoOptions.criteria.createdAtAfter = options.filters.startDate;
+        } else if (options.filters.endDate) {
+          repoOptions.criteria.createdAtBefore = options.filters.endDate;
+        }
+      }
+      
+      // Get logs from repository
+      const result = await this.repository.findAll(repoOptions);
+      
+      // Map entities to DTOs
+      return {
+        data: result.data.map(log => this.toDTO(log)),
+        pagination: result.pagination
+      };
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.findAll`, { 
+        error: error instanceof Error ? error.message : String(error),
+        options 
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Erstellt einen neuen Protokolleintrag
    * 
    * @param entityType - Entitätstyp

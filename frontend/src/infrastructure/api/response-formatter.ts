@@ -126,17 +126,36 @@ export function formatNotFound(
 /**
  * Format a validation error response
  * 
- * @param errors - Validation errors
+ * @param errors - Validation errors as a string, array of strings, or object with field-specific errors
  * @param message - Error message
  * @param status - HTTP status code (default: 400)
  * @returns Formatted error response
  */
 export function formatValidationError(
-  errors: string[] | string,
+  errors: string[] | string | Record<string, string[]>,
   message: string = 'Validation failed',
   status: number = 400
 ): NextResponse<ApiResponse> {
-  const errorArray = Array.isArray(errors) ? errors : [errors];
+  // Handle different error formats
+  let errorArray: string[] = [];
+  
+  if (Array.isArray(errors)) {
+    errorArray = errors;
+  } else if (typeof errors === 'string') {
+    errorArray = [errors];
+  } else if (typeof errors === 'object' && errors !== null) {
+    // Handle objects with validation errors per field
+    // For example: { field1: ['Error 1', 'Error 2'], field2: ['Error 3'] }
+    Object.entries(errors).forEach(([field, fieldErrors]) => {
+      if (Array.isArray(fieldErrors)) {
+        fieldErrors.forEach(error => {
+          errorArray.push(`${field}: ${error}`);
+        });
+      } else if (typeof fieldErrors === 'string') {
+        errorArray.push(`${field}: ${fieldErrors}`);
+      }
+    });
+  }
   
   const response: ApiResponse = {
     success: false,

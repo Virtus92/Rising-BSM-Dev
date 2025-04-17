@@ -30,10 +30,13 @@ export default function NotificationsPage() {
         unreadOnly: unreadOnly || activeTab === 'unread'
       });
 
-      if (response.success) {
-        setNotifications(response.data || []);
+      if (response.success && response.data) {
+        // Extract the actual notifications array from the response structure
+        const notificationsData = response.data.data || [];
+        setNotifications(notificationsData);
       } else {
         setError(response.message || 'Fehler beim Laden der Benachrichtigungen');
+        setNotifications([]);
       }
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
@@ -272,10 +275,10 @@ export default function NotificationsPage() {
                           )}
                         </div>
                         
-                        {notification.message && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {notification.message}
-                          </p>
+                        {(notification.message || notification.content) && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                        {notification.message || notification.content}
+                        </p>
                         )}
                         
                         <div className="mt-1 flex justify-between items-center">
@@ -368,9 +371,9 @@ export default function NotificationsPage() {
                             <span className="ml-2 flex-shrink-0 h-2 w-2 bg-primary rounded-full" />
                           </div>
                           
-                          {notification.message && (
+                          {(notification.message || notification.content) && (
                             <p className="text-sm text-muted-foreground mt-1">
-                              {notification.message}
+                              {notification.message || notification.content}
                             </p>
                           )}
                           

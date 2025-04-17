@@ -36,7 +36,10 @@ export enum AppointmentStatus {
  */
 export enum CustomerType {
   PRIVATE = "private",
-  BUSINESS = "business"
+  BUSINESS = "business",
+  INDIVIDUAL = "individual",
+  GOVERNMENT = "government",
+  NON_PROFIT = "non_profit"
 }
 
 /**

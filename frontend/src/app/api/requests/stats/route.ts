@@ -1,46 +1,37 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
+import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
 import { getLogger } from '@/infrastructure/common/logging';
 import { getServiceFactory } from '@/infrastructure/common/factories';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { apiPermissions } from '../../helpers/apiPermissions';
 
 /**
  * GET /api/requests/stats
  * 
  * Returns statistics about contact requests.
  */
-export const GET = apiRouteHandler(async (request: NextRequest) => {
-  const logger = getLogger();
-  const serviceFactory = getServiceFactory();
-  
-  try {
-    // Get URL parameters
-    const { searchParams } = new URL(request.url);
-    const period = searchParams.get('period') || 'month';
+export const GET = apiRouteHandler(
+  apiPermissions.withPermission(
+    async (req: NextRequest) => {
+      const logger = getLogger();
+      const serviceFactory = getServiceFactory();
+      
+      // Get URL parameters
+      const { searchParams } = new URL(req.url);
+      const period = searchParams.get('period') || 'month';
 
-    // Get request service
-    const requestService = serviceFactory.createRequestService();
-    
-    // Create context with user ID
-    const context = { userId: request.auth?.userId };
-    
-    // Get request stats
-    const stats = await requestService.getRequestStats(period, { context });
-    
-    return formatSuccess(stats, 'Request statistics retrieved successfully');
-    
-  } catch (error) {
-    logger.error('Error fetching request stats:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
-    });
-    
-    return formatError(
-      error instanceof Error ? error.message : 'Failed to retrieve request statistics',
-      500
-    );
-  }
-}, {
-  // Secure this endpoint
-  requiresAuth: true
-});
+      // Create context with user ID
+      const context = { userId: req.auth?.userId };
+      
+      // Get request service
+      const requestService = serviceFactory.createRequestService();
+      
+      // Get request stats
+      const stats = await requestService.getRequestStats(period, { context });
+      
+      return formatResponse.success(stats, 'Request statistics retrieved successfully');
+    },
+    SystemPermission.REQUESTS_VIEW
+  ),
+  { requiresAuth: true }
+);
