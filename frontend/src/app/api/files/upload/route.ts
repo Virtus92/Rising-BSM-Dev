@@ -69,7 +69,7 @@ export const POST = apiRouteHandler(async (request: NextRequest) => {
     // Generate unique filename
     const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}${extension}`;
     const filepath = join(uploadPath, filename);
-    const relativePath = `/${uploadPath.replace(/^public\//, '')}/${filename}`;
+    const relativePath = `/uploads/${uploadType}/${filename}`;
 
     // Convert the file to an ArrayBuffer and then to a Buffer
     const buffer = Buffer.from(await file.arrayBuffer());

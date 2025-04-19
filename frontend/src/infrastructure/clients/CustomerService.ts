@@ -10,6 +10,7 @@ import {
   CustomerDetailResponseDto,
   CustomerLogDto
 } from '@/domain/dtos/CustomerDtos';
+import { CommonStatus } from '@/domain/enums/CommonEnums';
 
 // Define interface for API responses for consistency with other services
 interface ApiResponse<T = any> {
@@ -18,6 +19,7 @@ interface ApiResponse<T = any> {
   message?: string;
   errors?: string[];
   statusCode?: number;
+  errorType?: string;
 }
 
 // Define interface for paginated responses for consistency with other services
@@ -205,13 +207,6 @@ export class CustomerService {
       };
     }
   }
-  
-  /**
-   * Alias method for deleteCustomer to maintain consistency with other services
-   */
-  static async delete(id: number): Promise<ApiResponse<void>> {
-    return this.deleteCustomer(id);
-  }
 
   /**
    * Get customer count
@@ -286,31 +281,190 @@ export class CustomerService {
   
   /**
    * Update customer status
+   * @param id Customer ID
+   * @param status Status string that will be converted to CommonStatus enum
+   * @param note Optional note about the status change
    */
   static async updateStatus(id: number, status: string, note?: string): Promise<ApiResponse<CustomerResponseDto>> {
     try {
-      // First try to use the dedicated status endpoint
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Updating customer ${id} status to ${status}`);
+      }
+
+      // Validate that the status is a valid CommonStatus enum value
+      if (!Object.values(CommonStatus).includes(status as CommonStatus)) {
+        throw new Error(`Invalid status value: ${status}`);
+      }
+      
+      const validStatus = status as CommonStatus;
+      let retryCount = 0;
+      const maxRetries = 1;
+      
+      // Try to use the dedicated status endpoint with improved error handling
       try {
-        return await ApiClient.patch(`${this.basePath}/${id}/status`, { status, note });
-      } catch (error) {
-        // If PATCH fails with 404 Not Found, fallback to regular update
-        if (error instanceof Error && 'statusCode' in error && (error as any).statusCode === 404) {
-          console.warn('Status endpoint not found, falling back to regular update');
-          return await this.update(id, { status });
+        // Add retry logic with exponential backoff for transient errors
+        const response = await this.retryOperation(
+          () => ApiClient.patch(`${this.basePath}/${id}/status`, { status: validStatus, note }),
+          maxRetries
+        );
+        return response;
+      } catch (error: any) {
+        console.error('Status update endpoint error:', error);
+        
+        // Check for specific error conditions to determine if we should fall back
+        const shouldFallback = this.shouldFallbackToRegularUpdate(error);
+        
+        if (shouldFallback) {
+          console.warn(`Status endpoint issue for customer ${id}, falling back to regular update`, 
+            error instanceof Error ? error.message : 'Unknown error');
+            
+          // Fall back to regular update with minimal data
+          return await this.update(id, { status: validStatus });
         }
-        // Otherwise rethrow the original error
+        
+        // Handle authentication errors specifically
+        if (error?.statusCode === 401 || error?.status === 401) {
+          console.error('Authentication error when updating status. User may need to re-login.');
+          return {
+            success: false,
+            data: null,
+            message: 'Authentication error. Please log in again.',
+            statusCode: 401,
+            errorType: 'authentication'
+          };
+        }
+        
+        // For other types of errors, rethrow to be handled by the outer catch
         throw error;
       }
     } catch (error) {
       console.error('Error in CustomerService.updateStatus:', error);
+      
+      // Create a standardized error response
+      let errorMessage = 'Error updating customer status';
+      let errorType = 'unknown';
+      let statusCode = 500;
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      // Add more context for status-specific errors
+      if (typeof error === 'object' && error !== null) {
+        statusCode = (error as any).statusCode || (error as any).status || 500;
+        
+        if (statusCode === 403) {
+          errorMessage = 'You do not have permission to update customer status';
+          errorType = 'permission';
+        } else if (statusCode === 404) {
+          errorMessage = `Customer with ID ${id} not found`;
+          errorType = 'not_found';
+        } else if (statusCode === 400) {
+          errorMessage = (error as any).message || 'Invalid status update request';
+          errorType = 'validation';
+        } else if (statusCode === 401) {
+          errorMessage = 'Authentication error. Please log in again.';
+          errorType = 'authentication';
+        }
+      }
+      
       return {
         success: false,
         data: null,
-        message: error instanceof Error ? error.message : `Error updating customer status for ID ${id}`
+        message: errorMessage,
+        errorType,
+        statusCode
       };
     }
   }
-
+  
+  /**
+   * Retry an operation with exponential backoff
+   * @param operation The function to retry
+   * @param maxRetries Maximum number of retries
+   * @param baseDelay Base delay in ms
+   */
+  private static async retryOperation<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 1,
+    baseDelay: number = 500
+  ): Promise<T> {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        
+        // Don't retry for certain error types
+        if (
+          (error && (error as any).statusCode === 400) || // Bad request
+          (error && (error as any).statusCode === 403) || // Permission denied
+          (error && (error as any).statusCode === 404)    // Not found
+        ) {
+          throw error;
+        }
+        
+        if (attempt < maxRetries) {
+          // Wait with exponential backoff before retrying
+          const delay = baseDelay * Math.pow(2, attempt);
+          console.log(`Retrying operation, attempt ${attempt + 1} in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw lastError;
+        }
+      }
+    }
+    
+    // This should never happen due to the throw in the loop
+    throw lastError;
+  }
+  
+  /**
+   * Helper method to determine if we should fall back to regular update
+   * when the status endpoint fails
+   */
+  private static shouldFallbackToRegularUpdate(error: any): boolean {
+    // Case 1: API returned 404 Not Found (endpoint doesn't exist)
+    if (error?.statusCode === 404 || error?.status === 404) {
+      return true;
+    }
+    
+    // Case 2: Response object with 404 status
+    if (error?.response?.status === 404) {
+      return true;
+    }
+    
+    // Case 3: API response with 404 status code
+    if (error?.success === false && error?.statusCode === 404) {
+      return true;
+    }
+    
+    // Case 4: Specific server errors that might indicate temporary issues
+    if (error?.statusCode === 500 || error?.status === 500) {
+      // For 500 errors, we'll only fall back for specific known issues
+      const errorMsg = error.message || '';
+      const knownRecoverableErrors = [
+        'database connection', 
+        'timeout', 
+        'deadlock', 
+        'connection refused',
+        'foreign key constraint',
+        'database error',
+        'constraint violation'
+      ];
+      
+      // Check if this is a known recoverable error
+      return knownRecoverableErrors.some(known => 
+        errorMsg.toLowerCase().includes(known.toLowerCase())
+      );
+    }
+    
+    // Default: don't fall back
+    return false;
+  }
+  
   /**
    * Legacy alias methods for backward compatibility
    */

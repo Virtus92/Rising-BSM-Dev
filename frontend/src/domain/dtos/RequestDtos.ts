@@ -415,6 +415,11 @@ export interface RequestFilterParamsDto extends BaseFilterParamsDto {
   processorId?: number;
   
   /**
+   * ID des zugehörigen Kunden
+   */
+  customerId?: number;
+  
+  /**
    * Nur nicht zugewiesene Anfragen
    */
   unassigned?: boolean;

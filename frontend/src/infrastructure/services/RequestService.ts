@@ -371,7 +371,54 @@ export class RequestService extends BaseService<
     data: UpdateRequestDto,
     options?: ServiceOptions
   ): Promise<RequestResponseDto> {
-    return this.update(id, data, options);
+    try {
+      // Verify that the request exists before trying to update it
+      const existingRequest = await this.requestRepository.findById(id);
+      if (!existingRequest) {
+        throw this.errorHandler.createNotFoundError(`Request with ID ${id} not found`);
+      }
+    
+      // Create a clean version of data without non-Prisma fields and nested relations
+      // This prevents problems with Prisma's expectations for nested relations
+      const cleanData: Record<string, any> = {};
+      
+      // Only include fields that are part of the ContactRequest model
+      // and explicitly exclude nested relations that need special handling
+      const allowedFields = [
+        'name', 'email', 'phone', 'service', 'message', 'status', 
+        'processorId', 'customerId', 'appointmentId', 'ipAddress',
+        'source', 'metadata'
+      ];
+      
+      // Only copy allowed fields that are present in the data
+      // Use type assertion to treat data as a record with string keys
+      const dataRecord = data as Record<string, unknown>;
+      for (const field of allowedFields) {
+        if (field in dataRecord && dataRecord[field] !== undefined) {
+          cleanData[field] = dataRecord[field];
+        }
+      }
+      
+      // Set updatedAt timestamp
+      cleanData.updatedAt = new Date();
+      
+      // Log user ID for audit purposes
+      if (options?.context?.userId) {
+        this.logger.info(`Request ${id} updated by user ${options.context.userId}`);
+      }
+      
+      // Use the repository directly for the update to have better control over the operation
+      const updatedRequest = await this.requestRepository.update(id, cleanData);
+      
+      return this.toDTO(updatedRequest);
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.updateRequest`, {
+        error: error instanceof Error ? error.message : String(error),
+        id,
+        data
+      });
+      throw this.handleError(error);
+    }
   }
 
   /**
@@ -404,17 +451,18 @@ export class RequestService extends BaseService<
       }
 
       // Create clean update object with only the needed properties
-      // This ensures we don't accidentally include the ID in the update data
+      // Important: Don't include createdBy/updatedBy fields that might not exist in Prisma schema
       const updateData = {
         status: data.status,
-        updatedAt: new Date(),
-        updatedBy: options?.context?.userId
+        updatedAt: new Date()
+        // Don't include updatedBy as it's not in the Prisma schema
       };
 
       // Log the update attempt
       this.logger.info(`Updating request status`, {
         id,
         newStatus: data.status,
+        // Store the user ID in the log but don't include in the update data
         updateBy: options?.context?.userId
       });
       
@@ -963,7 +1011,7 @@ export class RequestService extends BaseService<
     return {
       name: { type: 'string', minLength: 2, maxLength: 100, required: false },
       email: { type: 'string', format: 'email', required: false },
-      phone: { type: 'string', pattern: '^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}}', required: false },
+      phone: { type: 'string', pattern: '^[+]?[(]?[0-9]{3}[)]?[-\\s.]?[0-9]{3}[-\\s.]?[0-9]{4,6}$', required: false },
       service: { type: 'string', minLength: 2, maxLength: 100, required: false },
       message: { type: 'string', minLength: 10, maxLength: 1000, required: false },
       status: { type: 'string', enum: Object.values(RequestStatus), required: false },

@@ -15,7 +15,9 @@ const logger = getLogger();
  * Requires USERS_VIEW permission
  */
 export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  const userId = parseInt(params.id);
+  // Ensure params is properly resolved before using
+  const resolvedParams = await params;
+  const userId = parseInt(resolvedParams.id);
   if (isNaN(userId)) {
     return formatResponse.error('Invalid user ID', 400);
   }

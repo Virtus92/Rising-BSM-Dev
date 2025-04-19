@@ -18,7 +18,9 @@ export const GET = apiRouteHandler(async (
   const serviceFactory = getServiceFactory();
 
   try {
-    const role = params.role;
+    // Ensure params is properly resolved before using
+    const resolvedParams = await params;
+    const role = resolvedParams.role;
     
     if (!role) {
       return formatResponse.error('Invalid or missing role', 400);

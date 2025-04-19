@@ -30,7 +30,9 @@ export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params
       );
     }
     
-    const id = params.id;
+    // Ensure params is properly resolved before using
+    const resolvedParams = await params;
+    const id = resolvedParams.id;
     
     if (!id) {
       logger.error('No customer ID provided');
@@ -115,7 +117,9 @@ export const PUT = apiRouteHandler(async (req: NextRequest, { params }: { params
       );
     }
     
-    const id = params.id;
+    // Ensure params is properly resolved before using
+    const resolvedParams = await params;
+    const id = resolvedParams.id;
     
     if (!id) {
       logger.error('No customer ID provided');
@@ -201,7 +205,9 @@ export const DELETE = apiRouteHandler(async (req: NextRequest, { params }: { par
       );
     }
     
-    const id = params.id;
+    // Ensure params is properly resolved before using
+    const resolvedParams = await params;
+    const id = resolvedParams.id;
     
     if (!id) {
       logger.error('No customer ID provided');

@@ -44,7 +44,7 @@ export async function getServerSession(req?: NextRequest, options: AuthOptions =
     
     // If no token in X-Auth-Token, THEN check cookies (as fallback)
     if (!authToken) {
-      const cookieStore = cookies();
+      const cookieStore = await cookies();
       authToken = cookieStore.get('auth_token')?.value;
       
       if (!authToken) {
@@ -326,7 +326,9 @@ export async function auth(request: Request, options: AuthOptions = {}) {
           select: { 
             id: true, 
             status: true,
-            role: true
+            role: true,
+            name: true,
+            email: true
           }
         });
         
@@ -352,16 +354,28 @@ export async function auth(request: Request, options: AuthOptions = {}) {
           };
         }
         
-        // Use the role from the database rather than the token for better security
-        decoded.role = user.role;
+        logger.debug('Auth successful for user', { id: user.id, role: user.role });
+        
+        // Return success with user information from database (safer than using token data)
+        return {
+          success: true,
+          user: {
+            id: user.id,
+            name: user.name || decoded.name, // Fallback to token data if missing
+            email: user.email || decoded.email, // Fallback to token data if missing
+            role: user.role // Always use role from database
+          }
+        };
       } catch (dbError) {
         // Log detailed error
+        const errorDetails = dbError instanceof Error ? {
+          message: dbError.message,
+          stack: dbError.stack,
+          name: dbError.name
+        } : String(dbError);
+        
         logger.error('Database error checking user existence in auth function:', { 
-          error: dbError instanceof Error ? {
-            message: dbError.message,
-            stack: dbError.stack,
-            name: dbError.name
-          } : dbError,
+          error: errorDetails,
           userId: decoded.sub
         });
         
@@ -384,28 +398,15 @@ export async function auth(request: Request, options: AuthOptions = {}) {
           };
         }
       }
-      
-      logger.debug('Auth successful for user', { id: decoded.sub, role: decoded.role });
-      
-      // Return success with user information
-      return {
-        success: true,
-        user: {
-          id: decoded.sub,
-          name: decoded.name,
-          email: decoded.email,
-          role: decoded.role
-        }
-      };
     } catch (jwtError) {
       // Log detailed error
-      logger.warn('JWT verification failed in auth function', { 
-        error: jwtError instanceof Error ? {
-          message: jwtError.message,
-          name: jwtError.name,
-          stack: jwtError.stack
-        } : jwtError
-      });
+      const errorDetails = jwtError instanceof Error ? {
+        message: jwtError.message,
+        name: jwtError.name,
+        stack: jwtError.stack
+      } : String(jwtError);
+      
+      logger.warn('JWT verification failed in auth function', { error: errorDetails });
       
       return {
         success: false,
@@ -414,14 +415,14 @@ export async function auth(request: Request, options: AuthOptions = {}) {
       };
     }
   } catch (error) {
-    // Log detailed error
-    logger.error('Error in auth middleware', { 
-      error: error instanceof Error ? {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      } : error
-    });
+    // Ensure error details are always properly formatted for logging
+    const errorDetails = error instanceof Error ? {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    } : String(error);
+    
+    logger.error('Error in auth middleware', { error: errorDetails });
     
     return {
       success: false,

@@ -30,7 +30,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     email: string;
     phone: string;
     profilePicture?: string;
-    profilePictureId?: number;
+    profilePictureId?: string; // Changed from number to string to match UserDto
   }>({
     name: '',
     email: '',
@@ -49,17 +49,22 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
   // Use the file upload hook
   const { upload, isUploading, error: uploadError } = useFileUpload({
     onSuccess: (result) => {
-      if (result.fileId && result.filePath) {
-        setFormData(prev => ({ 
-          ...prev, 
-          profilePictureId: result.fileId as number,
-          profilePicture: result.filePath
-        }));
-        
-        // If not in editing mode, directly save the profile picture
-        if (!isEditing) {
-          handleProfilePictureUpdate(result.fileId as number, result.filePath);
-        }
+      // The API might return the file ID in the filePath or as a different property
+      // We need to extract it from the response or use an identifier from the path
+      const fileIdFromPath = result.filePath ? 
+        result.filePath.split('/').pop() || undefined : 
+        undefined;
+      
+      setFormData(prev => ({ 
+        ...prev, 
+        // Use the appropriate ID source (could be in the file path or result object)
+        profilePictureId: fileIdFromPath,
+        profilePicture: result.filePath
+      }));
+      
+      // If not in editing mode, directly save the profile picture
+      if (!isEditing && fileIdFromPath) {
+        handleProfilePictureUpdate(fileIdFromPath, result.filePath || '');
       }
     },
     onError: (error) => {
@@ -96,7 +101,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     }));
     
     // Clear validation errors when user edits a field
-    if (validationErrors[name]) {
+    if (name in validationErrors) {
       setValidationErrors(prev => ({
         ...prev,
         [name]: undefined
@@ -165,7 +170,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
   };
 
   // Handle profile picture update specifically
-  const handleProfilePictureUpdate = async (fileId: number, filePath: string) => {
+  const handleProfilePictureUpdate = async (fileId: string, filePath: string) => {
     if (!user) return;
     
     try {

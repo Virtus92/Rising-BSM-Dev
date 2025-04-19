@@ -29,6 +29,40 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
   ) {
     super(prisma, 'contactRequest', logger, errorHandler);
   }
+  
+  /**
+   * Override update method specifically for contact requests
+   * to handle missing schema fields
+   */
+  async update(id: number, data: Partial<ContactRequest>): Promise<ContactRequest> {
+    try {
+      // Create a safe copy of data without fields that don't exist in Prisma schema
+      const safeData: any = { ...data };
+      
+      // Remove these fields because they don't exist in the Prisma schema
+      delete safeData.updatedBy;
+      delete safeData.createdBy;
+      
+      // Set updatedAt timestamp
+      safeData.updatedAt = new Date();
+      
+      // Debug logging
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug(`Safely updating request ${id} with filtered data`, safeData);
+      }
+      
+      // Execute the update using the filtered data
+      const updatedRequest = await this.prisma.contactRequest.update({
+        where: { id },
+        data: safeData
+      });
+      
+      return this.mapToDomainEntity(updatedRequest);
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.update:`, { error, id, data });
+      throw this.handleError(error);
+    }
+  }
 
   /**
    * Verarbeitet die Kriterien für Abfragen
@@ -651,6 +685,12 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         where.customerId = null;
       }
       
+      // Explicitly handle customerId filter
+      if (filters.customerId !== undefined && filters.customerId !== null) {
+        this.logger.info(`Filtering requests by customer ID: ${filters.customerId}`);
+        where.customerId = filters.customerId;
+      }
+      
       // Datumsfilter
       if (filters.startDate || filters.endDate) {
         where.createdAt = {};
@@ -791,11 +831,11 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
    * @returns ORM-Entität
    */
   protected mapToORMEntity(domainEntity: Partial<ContactRequest>): any {
-    // Entferne undefined-Werte und ID für die Datenbank
-    const { id, createdAt, updatedAt, requestData, ...dataWithoutId } = domainEntity;
+    // Entferne undefined-Werte, ID und andere problematische Felder für die Datenbank
+    const { id, createdAt, updatedAt, requestData, updatedBy, createdBy, ...dataWithoutProblematicFields } = domainEntity;
     const result: Record<string, any> = {};
     
-    Object.entries(dataWithoutId).forEach(([key, value]) => {
+    Object.entries(dataWithoutProblematicFields).forEach(([key, value]) => {
       if (value !== undefined) {
         result[key] = value;
       }
@@ -808,10 +848,15 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
     
     result.updatedAt = new Date();
     
-    // Always ensure ID is not included in data for Prisma operations
-    if ('id' in result) {
-      delete result.id;
-      this.logger.debug('Removed id from ORM entity data in RequestRepository');
+    // Log fields being removed for troubleshooting
+    if (process.env.NODE_ENV === 'development') {
+      const removedFields = [];
+      if ('id' in domainEntity) removedFields.push('id');
+      if ('createdBy' in domainEntity) removedFields.push('createdBy');
+      if ('updatedBy' in domainEntity) removedFields.push('updatedBy');
+      if (removedFields.length > 0) {
+        this.logger.debug(`Removed fields from ORM entity data in RequestRepository: ${removedFields.join(', ')}`);
+      }
     }
     
     return result;

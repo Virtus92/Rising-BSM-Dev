@@ -33,10 +33,12 @@ export const GET = apiRouteHandler(async (
       );
     }
     
+    // Ensure params is properly resolved before using
+    const resolvedParams = await params;
     // Use consistent ID validation
-    const userId = validateId(params.id);
+    const userId = validateId(resolvedParams.id);
     if (userId === null) {
-      return formatResponse.error(`Invalid user ID: ${params.id} - must be a positive number`, 400);
+      return formatResponse.error(`Invalid user ID: ${resolvedParams.id} - must be a positive number`, 400);
     }
 
     // Get user service
@@ -56,7 +58,7 @@ export const GET = apiRouteHandler(async (
     logger.error('Error fetching user:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      userId: params.id
+      userId: resolvedParams.id
     });
     
     return formatResponse.error(
@@ -92,10 +94,12 @@ export const PUT = apiRouteHandler(async (
       );
     }
     
+    // Ensure params is properly resolved before using
+    const resolvedParams = await params;
     // Use consistent ID validation
-    const userId = validateId(params.id);
+    const userId = validateId(resolvedParams.id);
     if (userId === null) {
-      return formatResponse.error(`Invalid user ID: ${params.id} - must be a positive number`, 400);
+      return formatResponse.error(`Invalid user ID: ${resolvedParams.id} - must be a positive number`, 400);
     }
 
     // Parse request body
@@ -142,7 +146,7 @@ export const PUT = apiRouteHandler(async (
     logger.error('Error updating user:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      userId: params.id
+      userId: resolvedParams.id
     });
     
     return formatResponse.error(
@@ -178,10 +182,12 @@ export const DELETE = apiRouteHandler(async (
       );
     }
     
+    // Ensure params is properly resolved before using
+    const resolvedParams = await params;
     // Use consistent ID validation
-    const userId = validateId(params.id);
+    const userId = validateId(resolvedParams.id);
     if (userId === null) {
-      return formatResponse.error(`Invalid user ID: ${params.id} - must be a positive number`, 400);
+      return formatResponse.error(`Invalid user ID: ${resolvedParams.id} - must be a positive number`, 400);
     }
     
     // Get user service
@@ -211,7 +217,7 @@ export const DELETE = apiRouteHandler(async (
     logger.error('Error deleting user:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      userId: params.id
+      userId: resolvedParams.id
     });
     
     return formatResponse.error(

@@ -14,12 +14,9 @@ import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 
 /**
- * PUT /api/appointments/[id]/status
- * 
- * Updates the status of an appointment
- * Requires APPOINTMENTS_EDIT permission
+ * Handler function for both PUT and PATCH methods
  */
-export const PUT = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+async function handleStatusUpdate(req: NextRequest, params: { id: string }) {
   const logger = getLogger();
   
   try {
@@ -98,6 +95,30 @@ export const PUT = apiRouteHandler(async (req: NextRequest, { params }: { params
       500
     );
   }
+}
+
+/**
+ * PUT /api/appointments/[id]/status
+ * 
+ * Updates the status of an appointment
+ * Requires APPOINTMENTS_EDIT permission
+ */
+export const PUT = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+  // Reuse the handler function for both PUT and PATCH
+  return handleStatusUpdate(req, params);
+}, {
+  requiresAuth: true
+});
+
+/**
+ * PATCH /api/appointments/[id]/status
+ * 
+ * Updates the status of an appointment (partial update)
+ * Requires APPOINTMENTS_EDIT permission
+ */
+export const PATCH = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+  // Reuse the handler function for both PUT and PATCH
+  return handleStatusUpdate(req, params);
 }, {
   requiresAuth: true
 });

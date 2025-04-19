@@ -19,7 +19,9 @@ export const POST = apiRouteHandler(async (
   const serviceFactory = getServiceFactory();
 
   try {
-    const id = parseInt(params.id);
+    // Ensure params is properly resolved before using
+    const resolvedParams = await params;
+    const id = parseInt(resolvedParams.id);
     if (isNaN(id)) {
       return formatResponse.error('Invalid user ID', 400);
     }

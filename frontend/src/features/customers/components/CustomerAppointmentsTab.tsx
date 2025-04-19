@@ -68,7 +68,10 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
   const [isDeleting, setIsDeleting] = useState(false);
   const [changingStatusId, setChangingStatusId] = useState<number | null>(null);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
+  const [isAppointmentEditModalOpen, setIsAppointmentEditModalOpen] = useState(false);
+  const [currentEditAppointment, setCurrentEditAppointment] = useState<number | null>(null);
   const [isCreatingAppointment, setIsCreatingAppointment] = useState(false);
+  const [isEditingAppointment, setIsEditingAppointment] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [appointmentForm, setAppointmentForm] = useState({
     title: '',
@@ -434,6 +437,87 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
       setIsCreatingAppointment(false);
     }
   };
+  
+  const handleEditAppointment = async () => {
+    if (!validateAppointmentForm() || !currentEditAppointment) {
+      return;
+    }
+    
+    setIsEditingAppointment(true);
+    
+    try {
+      // Format the date and time properly for the API
+      const dateTime = `${appointmentForm.appointmentDate}T${appointmentForm.appointmentTime}`;
+      
+      const formData = {
+        title: appointmentForm.title,
+        appointmentDate: dateTime,
+        duration: appointmentForm.duration,
+        location: appointmentForm.location,
+        description: appointmentForm.description,
+        status: appointmentForm.status,
+        customerId: customerId
+      };
+      
+      const response = await AppointmentService.update(currentEditAppointment, formData);
+      
+      if (response.success && response.data) {
+        toast({
+          title: 'Success',
+          description: 'Appointment updated successfully',
+          variant: 'success'
+        });
+        
+        // Update the appointment in the list
+        setAppointments(appointments.map(appointment => 
+          appointment.id === currentEditAppointment 
+            ? response.data
+            : appointment
+        ));
+        
+        // Close the modal
+        setIsAppointmentEditModalOpen(false);
+        setCurrentEditAppointment(null);
+      } else {
+        toast({
+          title: 'Error',
+          description: response.message || 'Failed to update appointment',
+          variant: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      toast({
+        title: 'Error',
+        description: 'An error occurred while updating the appointment',
+        variant: 'error'
+      });
+    } finally {
+      setIsEditingAppointment(false);
+    }
+  };
+  
+  const handleOpenEditModal = (appointment: any) => {
+    // Parse the appointment date and time
+    const appointmentDate = new Date(appointment.appointmentDate);
+    
+    // Set the form data
+    setAppointmentForm({
+      title: appointment.title,
+      appointmentDate: format(appointmentDate, 'yyyy-MM-dd'),
+      appointmentTime: format(appointmentDate, 'HH:mm'),
+      duration: appointment.duration || 60,
+      location: appointment.location || '',
+      description: appointment.description || '',
+      status: appointment.status || AppointmentStatus.PLANNED,
+    });
+    
+    // Set the current appointment ID
+    setCurrentEditAppointment(appointment.id);
+    
+    // Open the edit modal
+    setIsAppointmentEditModalOpen(true);
+  };
 
   return (
     <div>
@@ -619,6 +703,176 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         </DialogContent>
       </Dialog>
 
+      {/* Appointment Edit Modal */}
+      <Dialog open={isAppointmentEditModalOpen} onOpenChange={setIsAppointmentEditModalOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Edit Appointment</DialogTitle>
+            <DialogDescription>
+              Update the details of this appointment.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">
+                Title <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="title"
+                name="title"
+                value={appointmentForm.title}
+                onChange={handleAppointmentInputChange}
+                placeholder="Appointment title"
+                disabled={isEditingAppointment}
+              />
+              {formErrors.title && (
+                <p className="text-red-500 text-sm mt-1">{formErrors.title}</p>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="appointmentDate">
+                  Date <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    id="appointmentDate"
+                    name="appointmentDate"
+                    type="date"
+                    value={appointmentForm.appointmentDate}
+                    onChange={handleAppointmentInputChange}
+                    className="pl-10"
+                    disabled={isEditingAppointment}
+                  />
+                </div>
+                {formErrors.appointmentDate && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.appointmentDate}</p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="appointmentTime">
+                  Time <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    id="appointmentTime"
+                    name="appointmentTime"
+                    type="time"
+                    value={appointmentForm.appointmentTime}
+                    onChange={handleAppointmentInputChange}
+                    className="pl-10"
+                    disabled={isEditingAppointment}
+                  />
+                </div>
+                {formErrors.appointmentTime && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.appointmentTime}</p>
+                )}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="duration">
+                  Duration (minutes) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="duration"
+                  name="duration"
+                  type="number"
+                  min="15"
+                  step="15"
+                  value={appointmentForm.duration}
+                  onChange={handleAppointmentInputChange}
+                  disabled={isEditingAppointment}
+                />
+                {formErrors.duration && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.duration}</p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={appointmentForm.status}
+                  onValueChange={(value) => handleSelectChange('status', value)}
+                  disabled={isEditingAppointment}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(AppointmentStatus).map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                name="location"
+                value={appointmentForm.location}
+                onChange={handleAppointmentInputChange}
+                placeholder="Appointment location"
+                disabled={isEditingAppointment}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={appointmentForm.description}
+                onChange={handleAppointmentInputChange}
+                placeholder="Appointment details or notes"
+                rows={3}
+                disabled={isEditingAppointment}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsAppointmentEditModalOpen(false);
+                setCurrentEditAppointment(null);
+              }}
+              disabled={isEditingAppointment}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleEditAppointment}
+              disabled={isEditingAppointment}
+            >
+              {isEditingAppointment ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Update Appointment
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-4">
         {sortedAppointments.map((appointment) => (
           <Card key={appointment.id} className="mb-4">
@@ -716,7 +970,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
                     variant="ghost"
                     size="sm"
                     className="h-8 px-2 text-gray-500"
-                    onClick={() => router.push(`/dashboard/appointments/edit/${appointment.id}`)}
+                    onClick={() => handleOpenEditModal(appointment)}
                   >
                     <Edit className="h-4 w-4 mr-1" />
                     Edit

@@ -299,7 +299,10 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
       setError(null);
       
       // Fetch default permissions for the role
-      const rolePerms = await fetchRolePermissions(role);
+      const rolePermsResponse = await fetchRolePermissions(role);
+      
+      // Ensure rolePerms is always treated as an array
+      const rolePerms = Array.isArray(rolePermsResponse) ? rolePermsResponse : [];
       
       // Get the user's existing individual permissions (not from role)
       // Ensure rolePermissions is always treated as an array

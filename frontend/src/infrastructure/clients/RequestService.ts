@@ -46,12 +46,19 @@ export class RequestService {
       if (filters) {
         Object.entries(filters).forEach(([key, value]) => {
           if (value !== undefined && value !== null) {
+            // Log the filter parameter we're adding
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`Adding filter parameter: ${key}=${String(value)}`);
+            }
             queryParams.append(key, String(value));
           }
         });
       }
       
       const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Sending request to API: /requests${query}`);
+      }
       return ApiClient.get(`/requests${query}`);
     } catch (error) {
       console.error('Error in RequestService.getRequests:', error);
@@ -150,14 +157,36 @@ export class RequestService {
     service?: string;
     message?: string;
     status?: string;
+    customerId?: number;
+    appointmentId?: number;
+    processorId?: number;
   }): Promise<ApiResponse<RequestResponseDto>> {
     try {
-      // Log the update in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Updating request ${id} with data:`, data);
+      // Clean the data before sending to avoid Prisma errors with nested relations
+      const cleanData: Record<string, any> = {};
+      
+      // Only include non-undefined fields to prevent null overrides
+      if (data.name !== undefined) cleanData.name = data.name;
+      if (data.email !== undefined) cleanData.email = data.email;
+      if (data.phone !== undefined) cleanData.phone = data.phone;
+      if (data.service !== undefined) cleanData.service = data.service;
+      if (data.message !== undefined) cleanData.message = data.message;
+      if (data.customerId !== undefined) cleanData.customerId = data.customerId;
+      if (data.appointmentId !== undefined) cleanData.appointmentId = data.appointmentId;
+      if (data.processorId !== undefined) cleanData.processorId = data.processorId;
+      
+      // Handle status separately to avoid conflicts with status endpoint
+      // The status should be updated via the dedicated status endpoint
+      if (data.status !== undefined) {
+        console.warn('Status should be updated using updateStatus or updateRequestStatus methods');
       }
       
-      return ApiClient.put(`/requests/${id}`, data);
+      // Log the update in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Updating request ${id} with data:`, cleanData);
+      }
+      
+      return ApiClient.put(`/requests/${id}`, cleanData);
     } catch (error) {
       console.error('Error in RequestService.update:', error);
       return {
@@ -173,7 +202,19 @@ export class RequestService {
    */
   static async updateRequestStatus(id: number, status: string, note?: string): Promise<ApiResponse<RequestResponseDto>> {
     try {
-      return ApiClient.put(`/requests/${id}/status`, { status, note });
+      // Add debug logging
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Updating request ${id} status to ${status}`);
+      }
+      
+      // Create a properly formatted request body object
+      const requestBody = {
+        status: status,
+        ...(note ? { note } : {})
+      };
+      
+      // Use PUT instead of PATCH to match the API expectations
+      return ApiClient.put(`/requests/${id}/status`, requestBody);
     } catch (error) {
       console.error('Error in RequestService.updateRequestStatus:', error);
       return {
@@ -193,18 +234,8 @@ export class RequestService {
         console.log(`Updating request ${id} status:`, statusData);
       }
       
-      // First try to use PATCH method for standards compliance
-      try {
-        return await ApiClient.patch(`/requests/${id}/status`, statusData);
-      } catch (error) {
-        // If PATCH fails with 405 Method Not Allowed, fallback to PUT
-        if (error instanceof Error && 'statusCode' in error && (error as any).statusCode === 405) {
-          console.warn('PATCH method failed with 405, falling back to PUT');
-          return await ApiClient.put(`/requests/${id}/status`, statusData);
-        }
-        // Otherwise rethrow the original error
-        throw error;
-      }
+      // Use PUT directly instead of PATCH to avoid HTTP 500 errors
+      return await ApiClient.put(`/requests/${id}/status`, statusData);
     } catch (error) {
       console.error('Error in RequestService.updateStatus:', error);
       return {

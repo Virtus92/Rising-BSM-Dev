@@ -42,8 +42,15 @@ export const GET = apiRouteHandler(
         sortDirection: sortDirection,
         processorId: searchParams.get('processorId') ? parseInt(searchParams.get('processorId')!) : undefined,
         unassigned: searchParams.get('unassigned') === 'true',
-        notConverted: searchParams.get('notConverted') === 'true'
+        notConverted: searchParams.get('notConverted') === 'true',
+        // Add customerId filter parameter
+        customerId: searchParams.get('customerId') ? parseInt(searchParams.get('customerId')!) : undefined
       };
+      
+      // Log the customerId for debugging
+      if (searchParams.get('customerId')) {
+        logger.info(`Filtering requests by customer ID: ${searchParams.get('customerId')}`);
+      }
       
       logger.debug('Request filters:', filters);
       
