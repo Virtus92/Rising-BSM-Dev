@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,6 +23,8 @@ import {
 } from '@/shared/components/ui/select';
 import { useRequest } from '../hooks/useRequest';
 import { RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
+import { AppointmentService } from '@/infrastructure/clients/AppointmentService';
+import { useToast } from '@/shared/hooks/useToast';
 import { format, addDays } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 
@@ -52,7 +54,8 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
   request,
   onClose,
 }) => {
-  const { createAppointment, isCreatingAppointment } = useRequest(request.id);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   // Default-Werte
   const tomorrow = addDays(new Date(), 1);
@@ -72,17 +75,56 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
     defaultValues,
   });
 
-  const onSubmit = (data: FormValues) => {
-    createAppointment({
-      title: data.title,
-      appointmentDate: data.appointmentDate,
-      appointmentTime: data.appointmentTime,
-      duration: data.duration,
-      location: data.location,
-      description: data.description,
-      status: data.status,
-    }, data.note);
-    onClose();
+  /**
+   * Direct approach to create the appointment through AppointmentService
+   * This avoids the nested form issue by keeping form handling in one place
+   */
+  const onSubmit = async (data: FormValues) => {
+    try {
+      setIsSubmitting(true);
+      
+      // Create appointment data object with proper date formatting
+      const appointmentData = {
+        title: data.title,
+        appointmentDate: data.appointmentDate,
+        appointmentTime: data.appointmentTime,
+        duration: data.duration,
+        location: data.location,
+        description: data.description,
+        status: data.status,
+        // Include request and customer relationships
+        requestId: request.id,
+        customerId: request.customerId, // Pass along the customer ID if the request has one
+        note: data.note
+      };
+      
+      // Create appointment directly through AppointmentService
+      const response = await AppointmentService.create(appointmentData);
+      
+      if (response.success) {
+        toast({
+          title: 'Success',
+          description: 'Appointment created successfully',
+          variant: 'success'
+        });
+        onClose();
+      } else {
+        toast({
+          title: 'Error',
+          description: response.message || 'Failed to create appointment',
+          variant: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error creating appointment:', error);
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred',
+        variant: 'error'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -234,8 +276,8 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           <Button variant="outline" type="button" onClick={onClose}>
             Abbrechen
           </Button>
-          <Button type="submit" disabled={isCreatingAppointment}>
-            {isCreatingAppointment && (
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
             Termin erstellen

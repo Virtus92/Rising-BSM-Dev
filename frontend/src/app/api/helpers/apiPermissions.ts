@@ -18,6 +18,9 @@ const permissionsCache: Map<number, {
 // Cache timeout in milliseconds (5 minutes)
 const CACHE_TIMEOUT = 5 * 60 * 1000;
 
+// Valid user statuses that allow access
+const ACTIVE_USER_STATUSES = ['active'];
+
 /**
  * Invalidates the permissions cache for a specific user
  * Should be called whenever a user's roles or permissions change
@@ -28,13 +31,31 @@ const CACHE_TIMEOUT = 5 * 60 * 1000;
 export async function invalidatePermissionCache(userId: number): Promise<boolean> {
   const logger = getLogger();
   
-  if (permissionsCache.has(userId)) {
-    permissionsCache.delete(userId);
-    logger.debug(`Invalidated permissions cache for user ${userId}`);
-    return true;
+  if (!userId || isNaN(userId) || userId <= 0) {
+    logger.warn('Invalid user ID provided for cache invalidation', { userId });
+    return false;
   }
   
-  return false;
+  try {
+    // Always return true if we're able to delete or if it wasn't in cache
+    // This simplifies error handling for callers
+    if (permissionsCache.has(userId)) {
+      permissionsCache.delete(userId);
+      logger.info(`Invalidated permissions cache for user ${userId}`);
+    } else {
+      logger.debug(`No cache entry found to invalidate for user ${userId}`);
+    }
+    
+    return true;
+  } catch (error) {
+    logger.error('Error invalidating permissions cache:', { 
+      error: error instanceof Error ? error.message : String(error),
+      userId,
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    // Don't throw so that the main operation can continue
+    return false;
+  }
 }
 
 /**
@@ -54,14 +75,20 @@ async function getUserPermissions(userId: number): Promise<string[]> {
   }
   
   try {
-    // Get user's role first to determine role-based permissions
+    // Get user with both role and status to ensure proper validation
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { role: true }
+      select: { role: true, status: true }
     });
     
     if (!user) {
       logger.warn(`User with ID ${userId} not found when fetching permissions`);
+      return [];
+    }
+    
+    // Verify user status (only active users should have permissions)
+    if (!ACTIVE_USER_STATUSES.includes(user.status)) {
+      logger.warn(`User with ID ${userId} has inactive status ${user.status}, denying permissions`);
       return [];
     }
     
@@ -80,12 +107,13 @@ async function getUserPermissions(userId: number): Promise<string[]> {
     // Combine role permissions with user-specific permissions
     const permissions = [...new Set([...rolePermissions, ...userPermissionCodes])];
     
-    // Update cache
+    // Update cache with proper timestamp
     permissionsCache.set(userId, {
       permissions,
       timestamp: Date.now()
     });
     
+    logger.debug(`Updated permissions cache for user ${userId} with ${permissions.length} permissions`);
     return permissions;
   } catch (error) {
     logger.error('Error fetching user permissions from database:', {
@@ -109,13 +137,19 @@ export async function hasPermission(
 ): Promise<boolean> {
   const logger = getLogger();
   
-  if (!userId) {
-    logger.warn('Attempted permission check with invalid user ID');
+  // Validate inputs
+  if (!userId || isNaN(userId) || userId <= 0) {
+    logger.warn('Attempted permission check with invalid user ID', { userId });
+    return false;
+  }
+  
+  if (!permission || typeof permission !== 'string' || permission.trim() === '') {
+    logger.warn('Attempted permission check with invalid permission', { permission });
     return false;
   }
   
   try {
-    // Admin users bypass permission checks
+    // Get user with role and status information
     const user = await db.user.findUnique({
       where: { id: userId },
       select: { role: true, status: true }
@@ -127,7 +161,8 @@ export async function hasPermission(
       return false;
     }
     
-    if (user.status !== 'active') {
+    // Check if user status allows access
+    if (!ACTIVE_USER_STATUSES.includes(user.status)) {
       logger.warn(`User with ID ${userId} has status ${user.status} in permission check`);
       return false;
     }
@@ -138,7 +173,7 @@ export async function hasPermission(
       return true;
     }
     
-    // Get permissions for the user
+    // Get permissions for the user from cache or database
     const permissions = await getUserPermissions(userId);
     
     // Check if user has the required permission
@@ -148,11 +183,12 @@ export async function hasPermission(
   } catch (error) {
     logger.error('Error checking user permission:', {
       error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
       userId,
       permission
     });
     
-    // Default to denying permission on error
+    // Default to denying permission on error (fail closed for security)
     return false;
   }
 }

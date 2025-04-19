@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../providers/AuthProvider';
 import { Button } from '@/shared/components/ui/button';
@@ -18,6 +18,9 @@ const LoginForm: React.FC = () => {
   const { toast } = useToast();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  
+  // We're using the toast hook directly for notifications
+  // No need for a separate showToast function that would cause duplicates
   
   // Reset the error message when inputs change
   useEffect(() => {
@@ -61,17 +64,21 @@ const LoginForm: React.FC = () => {
       
       console.log('LoginForm: Login completed successfully');
       
-      // If login succeeds, the auth provider will redirect to dashboard
+          // First display the success toast - using a deduplication key to prevent duplicates
       toast({
         title: 'Anmeldung erfolgreich',
         description: 'Sie werden zum Dashboard weitergeleitet...',
-        variant: 'default'
+        variant: 'success',
+        dedupeKey: 'login-success',
+        dedupeStrategy: 'replace'
       });
       
-      // Reset form on success
-      setEmail('');
-      setPassword('');
-      formRef.current?.reset();
+      // Then reset form (with slight delay to ensure toast is visible)
+      setTimeout(() => {
+        setEmail('');
+        setPassword('');
+        formRef.current?.reset();
+      }, 100);
       
       // Do NOT navigate here - let AuthProvider handle it
     } catch (error) {
@@ -93,28 +100,56 @@ const LoginForm: React.FC = () => {
             error.message.toLowerCase().includes('invalid') ||
             error.message.toLowerCase().includes('ungültig')) {
           setErrorMessage('Ungültige E-Mail oder Passwort');
+          
+          // For authentication errors, don't show a toast since we already have an inline message
         } else if (error.message.includes('profile')) {
           setErrorMessage('Anmeldung erfolgreich, konnte aber Benutzerprofil nicht laden');
+          
+          // Show toast for profile issues as they're more serious
+          toast({
+            title: 'Profilfehler',
+            description: 'Anmeldung erfolgreich, konnte aber Benutzerprofil nicht laden',
+            variant: 'destructive',
+            dedupeKey: 'login-profile-error',
+            dedupeStrategy: 'replace'
+          });
         } else if (error.message.includes('not active')) {
           setErrorMessage('Ihr Konto ist nicht aktiv. Bitte kontaktieren Sie den Administrator.');
+          
+          // Show toast for account status issues
+          toast({
+            title: 'Konto inaktiv',
+            description: 'Ihr Konto ist nicht aktiv. Bitte kontaktieren Sie den Administrator.',
+            variant: 'destructive',
+            dedupeKey: 'login-inactive-error',
+            dedupeStrategy: 'replace'
+          });
         } else {
           // Set regular error message display in the form
           setErrorMessage(error.message || 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
+          
+          // Show toast for unexpected errors only
+          toast({
+            title: 'Login fehlgeschlagen',
+            description: error.message || 'Ein unerwarteter Fehler ist aufgetreten',
+            variant: 'destructive',
+            dedupeKey: 'login-error',
+            dedupeStrategy: 'replace'
+          });
         }
       } else {
-        setErrorMessage('An unexpected error occurred. Please try again.');
+        // Set a specific German error message instead of the generic English one
+        setErrorMessage('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
+        
+        // Show toast for unexpected errors
+        toast({
+          title: 'Login fehlgeschlagen',
+          description: 'Ein unerwarteter Fehler ist aufgetreten',
+          variant: 'destructive',
+          dedupeKey: 'login-error',
+          dedupeStrategy: 'replace'
+        });
       }
-      
-      // Handle login error with toast notification
-      toast({
-        title: 'Login fehlgeschlagen',
-        description: error instanceof Error 
-          ? (error.message.includes('401') 
-              ? 'Ungültige E-Mail oder Passwort' 
-              : error.message || 'Anmeldefehler')
-          : 'Anmeldung konnte nicht durchgeführt werden',
-        variant: 'destructive'
-      });
     } finally {
       setIsSubmitting(false);
     }
@@ -122,12 +157,6 @@ const LoginForm: React.FC = () => {
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-      {errorMessage && (
-        <div className="bg-destructive/15 p-3 rounded-md flex items-start gap-2 text-sm text-destructive mb-4">
-          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
       
       <div>
         <Label htmlFor="email">Email</Label>

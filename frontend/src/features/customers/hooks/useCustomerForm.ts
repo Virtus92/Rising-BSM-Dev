@@ -36,7 +36,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
   const [country, setCountry] = useState(initialData.country || '');
   const [company, setCompany] = useState(initialData.company || ''); // Changed from companyName to company
   const [vatNumber, setVatNumber] = useState(initialData.vatNumber || '');
-  const [notes, setNotes] = useState(initialData.notes || '');
+  // Notes removed from form - now managed exclusively via the Notes tab
   
   // Adding the missing fields
   const [customerType, setCustomerType] = useState(initialData.type || CustomerType.PRIVATE);
@@ -86,7 +86,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
       country: country || undefined,
       company: company || undefined,
       vatNumber: vatNumber || undefined,
-      notes: notes || undefined,
+      // notes field removed from form
       // Add the missing fields to the form data
       type: customerType,
       status: status,
@@ -95,7 +95,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
   }, [
     name, email, phone, address, 
     city, postalCode, country, company,
-    vatNumber, notes, customerType, status, newsletter
+    vatNumber, customerType, status, newsletter // notes removed
   ]);
   
   // Formular absenden
@@ -153,7 +153,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
     setCountry(initialData.country || '');
     setCompany(initialData.company || '');
     setVatNumber(initialData.vatNumber || '');
-    setNotes(initialData.notes || '');
+    // Notes field removed from form
     
     // Reset the new fields
     setCustomerType(initialData.type || CustomerType.PRIVATE);
@@ -176,7 +176,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
       country: setCountry,
       company: setCompany, // Changed from companyName to company
       vatNumber: setVatNumber,
-      notes: setNotes,
+      // notes field removed from form
       // Add the new fields
       customerType: setCustomerType,
       type: setCustomerType, // Support both 'type' and 'customerType'
@@ -219,8 +219,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
     setCompany, // Changed from companyName to company
     vatNumber,
     setVatNumber,
-    notes,
-    setNotes,
+    // Notes field removed from form
     
     // Add the new fields to the return object
     customerType,

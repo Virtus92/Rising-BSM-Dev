@@ -1,5 +1,3 @@
-'use client';
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
 import { UserService } from '@/infrastructure/clients/UserService';
@@ -121,17 +119,13 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     
     try {
       // Use Promise.allSettled with dedicated count endpoints
-      const [
-        usersResponse,
-        customersResponse,
-        requestsResponse,
-        appointmentsResponse
-      ] = await Promise.allSettled([
-        UserService.count(),
-        CustomerService.count(),
-        RequestService.count(),
-        AppointmentService.count()
-      ]);
+      const [usersResponse, customersResponse, requestsResponse, appointmentsResponse] = 
+        await Promise.allSettled([
+          UserService.count(),
+          CustomerService.count(),
+          RequestService.count(),
+          AppointmentService.count()
+        ]);
 
       // Track successful fetch time
       lastFetchTimeRef.current = Date.now();
@@ -149,6 +143,11 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
           
         const appointmentCount = appointmentsResponse.status === 'fulfilled' ? 
           extractCount(appointmentsResponse.value) : 0;
+
+        // Log successful responses for debugging
+        if (requestsResponse.status === 'fulfilled') {
+          console.log('Request count response:', requestsResponse.value);
+        }
 
         // Update state with fetched data
         setState(prev => ({

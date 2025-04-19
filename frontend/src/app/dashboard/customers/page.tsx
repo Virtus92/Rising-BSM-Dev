@@ -4,14 +4,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CustomerList } from '@/features/customers/components/CustomerList';
 import CustomerForm from '@/features/customers/components/CustomerForm';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { CustomerService } from '@/infrastructure/clients/CustomerService';
-import { CreateCustomerDto, CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
+import { CreateCustomerDto, CustomerResponseDto, UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { useToast } from '@/shared/hooks/useToast';
 
 export default function CustomersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   
   // Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -66,15 +67,17 @@ export default function CustomersPage() {
   }, [searchParams]);
 
   // Handle customer creation
-  const handleCreateCustomer = async (data: CreateCustomerDto): Promise<CustomerResponseDto | null> => {
+  const handleCreateCustomer = async (data: CreateCustomerDto | UpdateCustomerDto): Promise<CustomerResponseDto | null> => {
     setError(null);
     setSuccess(false);
     setIsSubmitting(true);
     
     try {
-      // Make sure postalCode is set from zipCode if it exists
-      const formattedData = {
+      // Format and validate the data before sending
+      const formattedData: CreateCustomerDto = {
         ...data,
+        // Ensure required name property is never undefined
+        name: data.name || '',
         // Field mapping happens in the CustomerService, but we'll ensure it here too
         postalCode: data.zipCode || data.postalCode
       };
@@ -83,6 +86,28 @@ export default function CustomersPage() {
       
       if (response.success) {
         setSuccess(true);
+        setError(null);
+        
+        // Add customer note if there's one entered
+        if (data.notes && response.data?.id) {
+          try {
+            // Add a delay to ensure the customer is properly created first
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            const noteResponse = await CustomerService.addCustomerNote(
+              response.data.id, 
+              data.notes
+            );
+            
+            if (noteResponse.success) {
+              console.log('Note added successfully', noteResponse);
+            } else {
+              console.error('Failed to add note:', noteResponse.message);
+            }
+          } catch (noteError) {
+            console.error('Error adding note:', noteError);
+          }
+        }
         
         // Show success toast
         toast({
@@ -94,18 +119,25 @@ export default function CustomersPage() {
         // Close dialog after a delay
         setTimeout(() => {
           setIsDialogOpen(false);
-          // Reload the page to refresh the customer list
-          window.location.reload();
+          // Redirect to the customer detail page
+          if (response.data?.id) {
+            router.push(`/dashboard/customers/${response.data.id}`);
+          } else {
+            // Fallback to reload if for some reason we don't have an ID
+            window.location.reload();
+          }
         }, 1500);
         
         return response.data;
       } else {
         setError(response.message || 'Failed to create customer');
+        setSuccess(false);
         return null;
       }
     } catch (err) {
       console.error('Error creating customer:', err);
       setError('An unexpected error occurred');
+      setSuccess(false);
       return null;
     } finally {
       setIsSubmitting(false);
@@ -135,6 +167,7 @@ export default function CustomersPage() {
         <DialogContent className={`${isMobile ? 'sm:max-w-[100%] p-4' : 'sm:max-w-[600px]'} max-h-[90vh] overflow-y-auto`}>
           <DialogHeader className="sticky top-0 bg-white dark:bg-gray-950 z-10 pb-4">
             <DialogTitle>Add New Customer</DialogTitle>
+            <DialogDescription>Enter the customer's information below</DialogDescription>
           </DialogHeader>
           
           <CustomerForm

@@ -197,7 +197,31 @@ export class PermissionClient {
    * @returns API response
    */
   static async getUserPermissions(userId: number | string): Promise<ApiResponse<UserPermissionsResponseDto>> {
-    return await PermissionClient.apiRequest<UserPermissionsResponseDto>('get', `${USER_PERMISSIONS_API_URL}?userId=${userId}`);
+    try {
+      if (!userId) {
+        return {
+          success: false,
+          message: 'Invalid user ID provided',
+          data: null,
+          statusCode: 400
+        };
+      }
+      
+      return await PermissionClient.apiRequest<UserPermissionsResponseDto>(
+        'get', 
+        `${USER_PERMISSIONS_API_URL}?userId=${userId}`,
+        undefined,
+        { maxRetries: 2 } // Use 2 retries for permission requests
+      );
+    } catch (error) {
+      console.error('Error fetching user permissions:', error instanceof Error ? error.message : String(error));
+      return {
+        success: false,
+        message: 'Failed to fetch user permissions',
+        data: null,
+        statusCode: 500
+      };
+    }
   }
   
   /**
@@ -207,7 +231,35 @@ export class PermissionClient {
    * @returns API response
    */
   static async updateUserPermissions(data: UpdateUserPermissionsDto): Promise<ApiResponse<boolean>> {
-    return await PermissionClient.apiRequest<boolean>('post', USER_PERMISSIONS_API_URL, data);
+    try {
+      if (!data.userId || !Array.isArray(data.permissions)) {
+        return {
+          success: false,
+          message: 'Invalid data: userId and permissions array are required',
+          data: null,
+          statusCode: 400
+        };
+      }
+      
+      const response = await PermissionClient.apiRequest<boolean>('post', USER_PERMISSIONS_API_URL, data);
+      
+      // Log update for debugging purposes
+      if (response.success) {
+        console.debug(`Successfully updated permissions for user ${data.userId}: ${data.permissions.length} permissions`);
+      } else {
+        console.error(`Failed to update permissions for user ${data.userId}:`, response.message);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error updating user permissions:', error instanceof Error ? error.message : String(error));
+      return {
+        success: false,
+        message: 'Failed to update user permissions',
+        data: null,
+        statusCode: 500
+      };
+    }
   }
   
   /**

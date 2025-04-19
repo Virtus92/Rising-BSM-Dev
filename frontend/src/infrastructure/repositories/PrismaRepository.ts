@@ -247,9 +247,18 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
           // Normalisiere die ID für Prisma
           const updateId = this.normalizeId(args[0]);
           
+          // Ensure we don't include the ID field in the data object for update operations
+          const updateData = { ...args[1] };
+          
+          // Remove id from update data to prevent Prisma errors
+          if (updateData && typeof updateData === 'object' && 'id' in updateData) {
+            delete updateData.id;
+            this.logger.debug('Removed id from update data to prevent Prisma errors');
+          }
+          
           result = await (model as any).update({
             where: { id: updateId },
-            data: args[1]
+            data: updateData
           });
           break;
           

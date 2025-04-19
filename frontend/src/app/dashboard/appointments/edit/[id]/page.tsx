@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { AppointmentForm } from '@/features/appointments/components/AppointmentForm';
 import { validateId } from '@/shared/utils/validation-utils';
@@ -8,11 +9,12 @@ import { PermissionGuard } from '@/shared/components/PermissionGuard';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { Button } from '@/shared/components/ui/button';
 
-export default function EditAppointmentPage({ params }: { params: { id: string } }) {
+export default function EditAppointmentPage() {
   const router = useRouter();
+  const params = useParams();
   
   // Force the ID to be valid
-  const appointmentId = params.id;
+  const appointmentId = params.id as string;
   
   return (
     <PermissionGuard

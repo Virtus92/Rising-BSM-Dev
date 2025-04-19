@@ -17,10 +17,6 @@ export const GET = apiRouteHandler(
     const logger = getLogger();
     logger.info('Hole Systemeinstellungen');
     
-    // TODO: Fuck this Mockup
-    // In der fertigen Implementierung würden wir hier die Einstellungen aus der Datenbank holen
-    // Für jetzt geben wir Standardeinstellungen zurück
-    
     return formatSuccess({
       companyName: 'Rising BSM',
       companyLogo: '/images/logo.png',

@@ -1,65 +1,418 @@
 /**
- * Client for request service API
+ * Client service for request-related API calls
  */
-import { ApiClient, ApiResponse } from '@/infrastructure/clients/ApiClient';
+import { ApiClient } from '@/infrastructure/clients/ApiClient';
 import { 
   RequestResponseDto, 
-  RequestDetailResponseDto,
-  RequestFilterParamsDto, 
-  CreateRequestDto, 
-  UpdateRequestDto,
+  RequestDetailResponseDto, 
+  RequestFilterParamsDto,
   RequestStatusUpdateDto,
-  ConvertToCustomerDto
+  RequestNoteDto,
+  ConvertToCustomerDto 
 } from '@/domain/dtos/RequestDtos';
-import { PaginationResult } from '@/domain/repositories/IBaseRepository';
+import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
 
+// Define interface for API responses
+interface ApiResponse<T = any> {
+  success: boolean;
+  data: T | null;
+  message?: string;
+  errors?: string[];
+  statusCode?: number;
+}
+
+// Define interface for paginated responses
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+/**
+ * Client service for request-related API calls
+ */
 export class RequestService {
-  private static readonly basePath = "/requests";
-
   /**
    * Get all requests with optional filtering
    */
-  static async getAll(filters?: RequestFilterParamsDto): Promise<ApiResponse<PaginationResult<RequestResponseDto>>> {
+  static async getRequests(filters?: RequestFilterParamsDto): Promise<ApiResponse<PaginatedResponse<RequestResponseDto>>> {
     try {
-      let queryParams = '';
+      // Build query parameters
+      const queryParams = new URLSearchParams();
       if (filters) {
-        const urlParams = new URLSearchParams();
-        
-        // Add all defined filters to query params
-        if (filters.page) urlParams.append('page', String(filters.page));
-        if (filters.limit) urlParams.append('limit', String(filters.limit));
-        if (filters.status) urlParams.append('status', filters.status);
-        if (filters.service) urlParams.append('service', filters.service);
-        if (filters.search) urlParams.append('search', filters.search);
-        if (filters.processorId) urlParams.append('processorId', String(filters.processorId));
-        if (filters.unassigned) urlParams.append('unassigned', String(filters.unassigned));
-        if (filters.notConverted) urlParams.append('notConverted', String(filters.notConverted));
-        if (filters.sortBy) urlParams.append('sortBy', filters.sortBy);
-        if (filters.sortDirection) urlParams.append('sortDirection', filters.sortDirection);
-        
-        // Add date filters with proper ISO string format
-        if (filters.startDate) {
-          try {
-            urlParams.append('startDate', filters.startDate.toISOString());
-          } catch (e) {
-            console.error('Invalid startDate format:', filters.startDate);
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            queryParams.append(key, String(value));
           }
-        }
-        if (filters.endDate) {
-          try {
-            urlParams.append('endDate', filters.endDate.toISOString());
-          } catch (e) {
-            console.error('Invalid endDate format:', filters.endDate);
-          }
-        }
-        
-        const paramString = urlParams.toString();
-        if (paramString) {
-          queryParams = '?' + paramString;
-        }
+        });
       }
       
-      return await ApiClient.get(`${this.basePath}${queryParams}`);
+      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      return ApiClient.get(`/requests${query}`);
+    } catch (error) {
+      console.error('Error in RequestService.getRequests:', error);
+      return {
+        success: false,
+        data: {
+          data: [],
+          pagination: {
+            page: filters?.page || 1,
+            limit: filters?.limit || 10,
+            total: 0,
+            totalPages: 0
+          }
+        },
+        message: error instanceof Error ? error.message : 'Error fetching requests'
+      };
+    }
+  }
+
+  /**
+   * Get a request by ID
+   */
+  static async getRequestById(id: number): Promise<ApiResponse<RequestDetailResponseDto>> {
+    try {
+      return ApiClient.get(`/requests/${id}`);
+    } catch (error) {
+      console.error('Error in RequestService.getRequestById:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error fetching request'
+      };
+    }
+  }
+
+  /**
+   * Alias for getRequestById to maintain compatibility
+   */
+  static async getById(id: number): Promise<ApiResponse<RequestDetailResponseDto>> {
+    return this.getRequestById(id);
+  }
+
+  /**
+   * Create a new request (public form submission)
+   */
+  static async createRequest(data: {
+    name: string;
+    email: string;
+    phone?: string;
+    service: string;
+    message: string;
+    ipAddress?: string;
+  }): Promise<ApiResponse<RequestResponseDto>> {
+    try {
+      return ApiClient.post('/requests/public', data);
+    } catch (error) {
+      console.error('Error in RequestService.createRequest:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error creating request'
+      };
+    }
+  }
+
+  /**
+   * Create a request from the dashboard
+   */
+  static async createInternalRequest(data: {
+    name: string;
+    email: string;
+    phone?: string;
+    service: string;
+    message: string;
+    customerId?: number;
+  }): Promise<ApiResponse<RequestResponseDto>> {
+    try {
+      return ApiClient.post('/requests', data);
+    } catch (error) {
+      console.error('Error in RequestService.createInternalRequest:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error creating internal request'
+      };
+    }
+  }
+
+  /**
+   * Update a request
+   */
+  static async update(id: number, data: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    service?: string;
+    message?: string;
+    status?: string;
+  }): Promise<ApiResponse<RequestResponseDto>> {
+    try {
+      // Log the update in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Updating request ${id} with data:`, data);
+      }
+      
+      return ApiClient.put(`/requests/${id}`, data);
+    } catch (error) {
+      console.error('Error in RequestService.update:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error updating request'
+      };
+    }
+  }
+
+  /**
+   * Update a request's status
+   */
+  static async updateRequestStatus(id: number, status: string, note?: string): Promise<ApiResponse<RequestResponseDto>> {
+    try {
+      return ApiClient.put(`/requests/${id}/status`, { status, note });
+    } catch (error) {
+      console.error('Error in RequestService.updateRequestStatus:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error updating request status'
+      };
+    }
+  }
+
+  /**
+   * Update a request's status (alias method that accepts status update DTO)
+   */
+  static async updateStatus(id: number, statusData: RequestStatusUpdateDto): Promise<ApiResponse<RequestResponseDto>> {
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Updating request ${id} status:`, statusData);
+      }
+      
+      // First try to use PATCH method for standards compliance
+      try {
+        return await ApiClient.patch(`/requests/${id}/status`, statusData);
+      } catch (error) {
+        // If PATCH fails with 405 Method Not Allowed, fallback to PUT
+        if (error instanceof Error && 'statusCode' in error && (error as any).statusCode === 405) {
+          console.warn('PATCH method failed with 405, falling back to PUT');
+          return await ApiClient.put(`/requests/${id}/status`, statusData);
+        }
+        // Otherwise rethrow the original error
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error in RequestService.updateStatus:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error updating request status'
+      };
+    }
+  }
+
+  /**
+   * Add a note to a request
+   */
+  static async addNote(id: number, text: string): Promise<ApiResponse<RequestNoteDto>> {
+    try {
+      return ApiClient.post(`/requests/${id}/notes`, { text });
+    } catch (error) {
+      console.error('Error in RequestService.addNote:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error adding note'
+      };
+    }
+  }
+
+  /**
+   * Assign a request to a user
+   */
+  static async assignRequest(id: number, userId: number, note?: string): Promise<ApiResponse<RequestResponseDto>> {
+    try {
+      return ApiClient.post(`/requests/${id}/assign`, { userId, note });
+    } catch (error) {
+      console.error('Error in RequestService.assignRequest:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error assigning request'
+      };
+    }
+  }
+
+  /**
+   * Convert a request to a customer
+   */
+  static async convertToCustomer(data: ConvertToCustomerDto): Promise<ApiResponse<{
+    customer: any;
+    request: RequestResponseDto;
+  }>> {
+    try {
+      return ApiClient.post(`/requests/${data.requestId}/convert`, data);
+    } catch (error) {
+      console.error('Error in RequestService.convertToCustomer:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error converting request to customer'
+      };
+    }
+  }
+
+  /**
+   * Link a request to an existing customer
+   */
+  static async linkToCustomer(requestId: number, customerId: number, note?: string): Promise<ApiResponse<RequestResponseDto>> {
+    try {
+      return ApiClient.post(`/requests/${requestId}/link-customer`, { customerId, note });
+    } catch (error) {
+      console.error('Error in RequestService.linkToCustomer:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error linking request to customer'
+      };
+    }
+  }
+
+  /**
+   * Create an appointment for a request
+   */
+  static async createAppointment(
+    requestId: number, 
+    appointmentData: {
+      title: string;
+      appointmentDate: string;
+      appointmentTime: string;
+      duration: number;
+      location?: string;
+      description?: string;
+      status?: string;
+      customerId?: number; // Add support for direct customer relation
+    },
+    note?: string
+  ): Promise<ApiResponse<AppointmentResponseDto>> {
+    try {
+      // Combine date and time for the API and extract only needed properties
+      const { appointmentDate, appointmentTime, customerId, ...restData } = appointmentData;
+      
+      // Format combined data properly
+      const combinedData = {
+        ...restData,
+        dateTime: `${appointmentDate}T${appointmentTime}:00`,
+        note,
+        // Only include customerId if it's defined
+        ...(customerId ? { customerId } : {})
+      };
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Creating appointment for request ${requestId}:`, combinedData);
+      }
+      
+      return ApiClient.post(`/requests/${requestId}/appointment`, combinedData);
+    } catch (error) {
+      console.error('Error in RequestService.createAppointment:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error creating appointment'
+      };
+    }
+  }
+
+  /**
+   * Get request statistics
+   */
+  static async getRequestStats(period?: string): Promise<ApiResponse<{
+    totalRequests: number;
+    newRequests: number;
+    inProgressRequests: number;
+    completedRequests: number;
+    cancelledRequests: number;
+    requestsWithCustomer: number;
+    conversionRate: number;
+  }>> {
+    try {
+      const query = period ? `?period=${period}` : '';
+      return ApiClient.get(`/requests/stats${query}`);
+    } catch (error) {
+      console.error('Error in RequestService.getRequestStats:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error fetching request statistics'
+      };
+    }
+  }
+
+  /**
+   * Count requests with optional filtering
+   */
+  static async countRequests(filters?: {
+    status?: string;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+    assignedTo?: number;
+  }): Promise<ApiResponse<number>> {
+    try {
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            queryParams.append(key, String(value));
+          }
+        });
+      }
+      
+      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      return ApiClient.get(`/requests/count${query}`);
+    } catch (error) {
+      console.error('Error in RequestService.countRequests:', error);
+      return {
+        success: false,
+        data: 0,
+        message: error instanceof Error ? error.message : 'Error counting requests'
+      };
+    }
+  }
+
+  /**
+   * Alias for countRequests to maintain compatibility with dashboard components
+   */
+  static async count(filters?: {
+    status?: string;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+    assignedTo?: number;
+  }) {
+    try {
+      return await this.countRequests(filters);
+    } catch (error) {
+      console.error('Error in RequestService.count:', error);
+      return {
+        success: false,
+        data: { count: 0 },
+        message: error instanceof Error ? error.message : 'Error counting requests'
+      };
+    }
+  }
+
+  /**
+   * Alias for getRequests to maintain compatibility with list components
+   */
+  static async getAll(filters?: RequestFilterParamsDto) {
+    try {
+      return await this.getRequests(filters);
     } catch (error) {
       console.error('Error in RequestService.getAll:', error);
       return {
@@ -79,108 +432,18 @@ export class RequestService {
   }
 
   /**
-   * Get a specific request by ID
-   */
-  static async getById(id: number): Promise<ApiResponse<RequestDetailResponseDto>> {
-    return ApiClient.get(`${this.basePath}/${id}`);
-  }
-
-  /**
-   * Create a new request
-   */
-  static async create(data: CreateRequestDto): Promise<ApiResponse<RequestResponseDto>> {
-    return ApiClient.post(this.basePath, data);
-  }
-
-  /**
-   * Update an existing request
-   */
-  static async update(id: number, data: UpdateRequestDto) {
-    return ApiClient.put(`${this.basePath}/${id}`, data);
-  }
-
-  /**
-   * Update request status
-   */
-  static async updateStatus(id: number, data: RequestStatusUpdateDto) {
-    return ApiClient.patch(`${this.basePath}/${id}/status`, data);
-  }
-
-  /**
    * Delete a request
    */
-  static async delete(id: number) {
-    return ApiClient.delete(`${this.basePath}/${id}`);
-  }
-
-  /**
-   * Get monthly statistics
-   */
-  static async getMonthlyStats() {
-    return ApiClient.get(`${this.basePath}/stats/monthly`);
-  }
-
-  /**
-   * Get weekly statistics
-   */
-  static async getWeeklyStats() {
-    return ApiClient.get(`${this.basePath}/stats/weekly`);
-  }
-
-  /**
-   * Get yearly statistics
-   */
-  static async getYearlyStats() {
-    return ApiClient.get(`${this.basePath}/stats/yearly`);
-  }
-
-  /**
-   * Get request count
-   */
-  static async count() {
-    return ApiClient.get(`${this.basePath}/count`);
-  }
-
-  /**
-   * Convert a request to a customer
-   */
-  static async convertToCustomer(data: ConvertToCustomerDto) {
-    return ApiClient.post(`${this.basePath}/${data.requestId}/convert`, data);
-  }
-
-  /**
-   * Create an appointment for a request
-   */
-  static async createAppointment(requestId: number, appointmentData: any, note?: string) {
-    const data = {
-      appointmentData,
-      note
-    };
-    return ApiClient.post(`${this.basePath}/${requestId}/appointment`, data);
-  }
-
-  /**
-   * Link a request to an existing customer
-   */
-  static async linkToCustomer(requestId: number, customerId: number, note?: string) {
-    const data = {
-      customerId,
-      note
-    };
-    return ApiClient.post(`${this.basePath}/${requestId}/link-customer`, data);
-  }
-
-  /**
-   * Add a note to a request
-   */
-  static async addNote(requestId: number, text: string) {
-    return ApiClient.post(`${this.basePath}/${requestId}/notes`, { text });
-  }
-
-  /**
-   * Assign a request to a user
-   */
-  static async assignRequest(requestId: number, userId: number) {
-    return ApiClient.post(`${this.basePath}/${requestId}/assign`, { userId });
+  static async delete(id: number): Promise<ApiResponse<void>> {
+    try {
+      return ApiClient.delete(`/requests/${id}`);
+    } catch (error) {
+      console.error('Error in RequestService.delete:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error deleting request'
+      };
+    }
   }
 }

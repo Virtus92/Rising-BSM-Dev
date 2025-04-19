@@ -13,7 +13,7 @@ type RequestParams = {
 };
 
 /**
- * PATCH /api/requests/[id]/status
+ * PATCH and PUT /api/requests/[id]/status
  * 
  * Aktualisiert den Status einer Kontaktanfrage.
  */
@@ -42,6 +42,50 @@ export const PATCH = apiRouteHandler(
       };
       
       // Get request service
+      const requestService = serviceFactory.createRequestService();
+      
+      // Update request status
+      const updatedRequest = await requestService.updateRequestStatus(requestId, statusUpdateData, { context });
+      
+      return formatResponse.success(updatedRequest, 'Request status updated successfully');
+    },
+    SystemPermission.REQUESTS_EDIT
+  ),
+  { requiresAuth: true }
+);
+
+/**
+ * PUT /api/requests/[id]/status
+ * 
+ * Alias for PATCH to maintain compatibility with client implementation.
+ */
+export const PUT = apiRouteHandler(
+  apiPermissions.withPermission(
+    async (req: NextRequest, { params }: RequestParams) => {
+      const logger = getLogger();
+      logger.debug('PUT request received for status update, delegating to PATCH handler');
+      
+      // Call the same handler code as PATCH
+      const requestId = parseInt(params.id);
+      if (isNaN(requestId)) {
+        return formatResponse.error('Invalid request ID', 400);
+      }
+      
+      // Parse request body
+      const body = await req.json();
+      const statusUpdateData: RequestStatusUpdateDto = {
+        status: body.status,
+        note: body.note
+      };
+      
+      // Create context for service calls
+      const context = {
+        userId: req.auth?.userId,
+        userRole: req.auth?.role
+      };
+      
+      // Get request service
+      const serviceFactory = getServiceFactory();
       const requestService = serviceFactory.createRequestService();
       
       // Update request status

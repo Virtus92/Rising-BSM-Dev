@@ -175,6 +175,15 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
     // Invalidate the permissions cache for this user
     await apiPermissions.invalidatePermissionCache(Number(userId));
     
+    // Log the permission update for audit purposes
+    const logger = getLogger();
+    logger.info(`User permissions updated for user ${userId} by ${req.auth?.userId}`, {
+      userId: Number(userId),
+      updatedBy: req.auth?.userId,
+      permissionCount: validatedPermissions.length,
+      ipAddress: req.headers.get('x-forwarded-for') || 'unknown'
+    });
+    
     return formatResponse.success({
       userId: Number(userId),
       success,

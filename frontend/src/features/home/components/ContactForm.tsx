@@ -62,8 +62,8 @@ export const ContactForm: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      // Initialize the API client (this is safe to call multiple times)
-      ApiClient.initialize({ baseUrl: '/api' });
+      // Initialize the API client with the correct base URL
+      await ApiClient.initialize();
       
       // Use ApiClient directly since it's now a static class
       const requestData: CreateRequestDto = {
@@ -74,8 +74,9 @@ export const ContactForm: React.FC = () => {
         message: data.message,
       };
       
-      // Use ApiClient post method directly
-      const response = await ApiClient.post('/api/requests/public', requestData);
+      // Use ApiClient post method directly with the correct endpoint
+      // Note: Don't include /api in the URL as it's already included in the base URL
+      const response = await ApiClient.post('/requests/public', requestData);
       
       setIsSuccess(true);
       form.reset();

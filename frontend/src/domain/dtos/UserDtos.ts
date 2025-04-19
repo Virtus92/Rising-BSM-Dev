@@ -10,6 +10,7 @@ export interface UserDto {
   phone?: string;
   status: UserStatus;
   profilePicture?: string;
+  profilePictureId?: string;
   createdAt: Date | string;
   updatedAt: Date | string;
   permissions?: string[];
@@ -22,6 +23,9 @@ export interface CreateUserDto {
   role?: UserRole;
   phone?: string;
   profilePicture?: string;
+  profilePictureId?: string;
+  status?: UserStatus;
+  permissions?: string[];
 }
 
 export interface UpdateUserDto {
@@ -31,6 +35,7 @@ export interface UpdateUserDto {
   phone?: string;
   status?: UserStatus;
   profilePicture?: string;
+  profilePictureId?: string;
 }
 
 export interface UserResponseDto extends BaseResponseDto {

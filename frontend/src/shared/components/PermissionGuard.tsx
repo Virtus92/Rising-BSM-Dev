@@ -5,6 +5,8 @@ import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { usePermissions } from '@/features/users/hooks/usePermissions';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { UserRole } from '@/domain/entities/User';
+import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
+import { PermissionDeniedMessage } from '@/shared/components/permissions/PermissionIndicator';
 
 interface PermissionGuardProps {
   /**
@@ -42,6 +44,23 @@ interface PermissionGuardProps {
    * @default true
    */
   adminBypass?: boolean;
+  
+  /**
+   * Shows a loading indicator while permissions are being loaded
+   * @default true
+   */
+  showLoading?: boolean;
+  
+  /**
+   * Custom content to display while loading permissions
+   */
+  loadingFallback?: ReactNode;
+  
+  /**
+   * Whether to show a permission denied message when user lacks permission
+   * @default false
+   */
+  showDeniedMessage?: boolean;
 }
 
 /**
@@ -54,7 +73,10 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = React.memo(functi
   userId,
   children,
   fallback = null,
-  adminBypass = true
+  adminBypass = true,
+  showLoading = true,
+  loadingFallback = null,
+  showDeniedMessage = false
 }) {
   const { hasPermission, hasAnyPermission, hasAllPermissions, isLoading, error, userRole } = usePermissions(userId);
   const { user } = useAuth();
@@ -62,26 +84,34 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = React.memo(functi
   
   // Calculate access in a memoized function to prevent unnecessary recalculations
   const accessState = useMemo(() => {
-    // Log debug info
-    console.debug('PermissionGuard check:', {
-      permission,
-      anyPermission,
-      allPermissions,
-      adminBypass,
-      userRole,
-      userPermissions: permissions,
-      isLoading,
-      error
-    });
+    // Only log in development to avoid cluttering production logs
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('PermissionGuard check:', {
+        permission,
+        anyPermission,
+        allPermissions,
+        adminBypass,
+        userRole,
+        userPermissions: permissions?.length,
+        isLoading,
+        error
+      });
+    }
     
     // Admin bypass: If user is an admin and adminBypass is enabled, grant access
-    if (adminBypass && (
-      userRole === UserRole.ADMIN || 
-      user?.role === UserRole.ADMIN ||
-      (user?.role || '').toLowerCase() === 'admin' // Case-insensitive check
-    )) {
-      console.debug('Admin bypass granted');
-      return { hasAccess: true, isLoading: false, error: null };
+    if (adminBypass) {
+      // Check user role in a case-insensitive way to be consistent with server-side checks
+      const isAdmin = 
+        userRole === UserRole.ADMIN || 
+        user?.role === UserRole.ADMIN || 
+        (user?.role && typeof user.role === 'string' && user.role.toLowerCase() === 'admin');
+      
+      if (isAdmin) {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('Admin bypass granted');
+        }
+        return { hasAccess: true, isLoading: false, error: null };
+      }
     }
     
     // If permissions are still loading, we don't know yet
@@ -129,17 +159,55 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = React.memo(functi
   }, [permission, anyPermission, allPermissions, hasPermission, hasAnyPermission, 
       hasAllPermissions, isLoading, error, adminBypass, userRole, user?.role, permissions]);
   
-  // While loading, show a loading indicator or nothing based on configuration
+  // Handle loading state with a spinner or custom loading fallback
   if (accessState.isLoading) {
-    return null; // Could return a loading spinner here instead
+    if (loadingFallback) {
+      return <>{loadingFallback}</>;
+    } else if (showLoading) {
+      return (
+        <div className="flex justify-center items-center py-4">
+          <LoadingSpinner size="sm" />
+          <span className="ml-2 text-sm text-muted-foreground">Checking permissions...</span>
+        </div>
+      );
+    }
+    return null;
   }
   
   // If there was an error fetching permissions, deny access and optionally show error
   if (accessState.error) {
     console.error('Permission check error:', accessState.error);
-    return fallback ? <>{fallback}</> : null;
+    // If fallback is provided, use it
+    if (fallback) {
+      return <>{fallback}</>;
+    }
+    // Otherwise show a permission error message if enabled
+    if (showDeniedMessage) {
+      return <PermissionDeniedMessage 
+        title="Permission Error" 
+        message={`An error occurred while checking permissions: ${accessState.error}`} 
+      />;
+    }
+    return null;
   }
   
-  // Render based on permission check
-  return accessState.hasAccess ? <>{children}</> : <>{fallback}</>;
+  // If user has access, render the children
+  if (accessState.hasAccess) {
+    return <>{children}</>;
+  }
+  
+  // If user doesn't have access, render the fallback or permission denied message
+  if (fallback) {
+    return <>{fallback}</>;
+  }
+  
+  if (showDeniedMessage) {
+    return <PermissionDeniedMessage 
+      title="Access Restricted" 
+      message={`You don't have the required permissions to access this feature.`} 
+    />;
+  }
+  
+  // Default case: no access, no fallback, no message
+  return null;
 })

@@ -55,11 +55,8 @@ export function useAuthManagement() {
       // Der AuthProvider kümmert sich um die Weiterleitung, daher keine weitere Router-Navigation hier
       await authLogin({ email, password, remember });
       
-      toast({
-        title: 'Erfolgreich angemeldet',
-        description: 'Willkommen zurück!',
-        variant: 'success'
-      });
+      // Success toast is now handled by the LoginForm component
+      // This prevents duplicate toast notifications
       
       // Keine Weiterleitung hier, die wird vom AuthProvider übernommen
       // Router-Navigation hier würde zu Dopplung führen und Konflikte verursachen
@@ -69,13 +66,11 @@ export function useAuthManagement() {
     } catch (error) {
       console.error('Login fehlgeschlagen:', error);
       
+      // Store the error message in state for potential UI display
       setError(error instanceof Error ? error.message : 'Anmeldung fehlgeschlagen');
       
-      toast({
-        title: 'Anmeldung fehlgeschlagen',
-        description: error instanceof Error ? error.message : 'Bitte überprüfen Sie Ihre Zugangsdaten.',
-        variant: 'error'
-      });
+      // Error toast is now handled by the LoginForm component
+      // This prevents duplicate toast notifications
       
       return false;
     } finally {

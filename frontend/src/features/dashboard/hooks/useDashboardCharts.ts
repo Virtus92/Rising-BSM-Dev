@@ -393,13 +393,14 @@ export const useDashboardCharts = (): DashboardChartState => {
     });
     
     // Create a merged dataset with all statistics
-    return sortedPeriods.map(period => ({
+    // Use a more unique key pattern that includes index to avoid duplicates
+    return sortedPeriods.map((period, index) => ({
       period,
       requests: statsData.requests[period] || 0,
       appointments: statsData.appointments[period] || 0,
       customers: statsData.customers[period] || 0,
       users: statsData.users[period] || 0,
-      key: `${timeFrame}-${period}`
+      key: `${timeFrame}-${period}-${index}`
     }));
   }, [statsData, timeFrame]);
 

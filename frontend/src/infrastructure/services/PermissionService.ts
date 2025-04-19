@@ -20,6 +20,8 @@ import { getPermissionsForRole } from '@/domain/enums/PermissionEnums';
 /**
  * Service for managing permissions
  */
+import apiPermissions from '@/app/api/helpers/apiPermissions';
+
 export class PermissionService implements IPermissionService {
   /**
    * Constructor
@@ -36,6 +38,35 @@ export class PermissionService implements IPermissionService {
     public readonly errorHandler: IErrorHandler
   ) {
     this.logger.debug('Initialized PermissionService');
+  }
+  
+  /**
+   * Helper method to invalidate the permission cache for a user
+   * 
+   * @param userId - User ID to invalidate the cache for
+   * @returns Promise that resolves when cache invalidation is complete
+   */
+  private async invalidateUserPermissionCache(userId: number): Promise<boolean> {
+    try {
+      // Check if apiPermissions module is available
+      if (!apiPermissions || !apiPermissions.invalidatePermissionCache) {
+        this.logger.warn(`Cannot invalidate permission cache for user ${userId}: apiPermissions module not available`);
+        return false;
+      }
+      
+      // Call the cache invalidation function
+      const result = await apiPermissions.invalidatePermissionCache(userId);
+      this.logger.info(`Invalidated permission cache for user ${userId}, result: ${result}`);
+      return result;
+    } catch (error) {
+      // Log error but don't throw it to avoid breaking the main operation
+      this.logger.error(`Failed to invalidate permission cache for user ${userId}`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        userId
+      });
+      return false;
+    }
   }
 
   /**
@@ -212,11 +243,18 @@ export class PermissionService implements IPermissionService {
       }
       
       // Update the permissions
-      return await this.permissionRepository.updateUserPermissions(
+      const result = await this.permissionRepository.updateUserPermissions(
         data.userId, 
         data.permissions,
         options?.context?.userId
       );
+      
+      // Invalidate permission cache for this user if the update was successful
+      if (result) {
+        await this.invalidateUserPermissionCache(data.userId);
+      }
+      
+      return result;
     } catch (error) {
       this.logger.error('Error in PermissionService.updateUserPermissions', { error, data });
       throw error;
@@ -257,11 +295,14 @@ export class PermissionService implements IPermissionService {
    */
   async addUserPermission(userId: number, permissionCode: string, options?: ServiceOptions): Promise<boolean> {
     try {
-      await this.permissionRepository.addUserPermission(
+      const result = await this.permissionRepository.addUserPermission(
         userId, 
         permissionCode,
         options?.context?.userId
       );
+      
+      // Invalidate permission cache for this user
+      await this.invalidateUserPermissionCache(userId);
       
       return true;
     } catch (error) {
@@ -280,7 +321,14 @@ export class PermissionService implements IPermissionService {
    */
   async removeUserPermission(userId: number, permissionCode: string, options?: ServiceOptions): Promise<boolean> {
     try {
-      return await this.permissionRepository.removeUserPermission(userId, permissionCode);
+      const result = await this.permissionRepository.removeUserPermission(userId, permissionCode);
+      
+      // Invalidate permission cache for this user if the removal was successful
+      if (result) {
+        await this.invalidateUserPermissionCache(userId);
+      }
+      
+      return result;
     } catch (error) {
       this.logger.error('Error in PermissionService.removeUserPermission', { error, userId, permissionCode });
       throw error;
@@ -313,10 +361,22 @@ export class PermissionService implements IPermissionService {
    */
   async getDefaultPermissionsForRole(role: string, options?: ServiceOptions): Promise<string[]> {
     try {
+      this.logger.debug(`Getting default permissions for role: ${role}`);
+      
+      // Normalize role name to lowercase for case-insensitive comparison
+      const normalizedRole = role.toLowerCase();
+      
       // Get the default permissions for the role from the enum
-      return getPermissionsForRole(role);
+      const permissions = getPermissionsForRole(normalizedRole);
+      
+      this.logger.debug(`Found ${permissions.length} default permissions for role ${role}`);
+      
+      return permissions;
     } catch (error) {
-      this.logger.error('Error in PermissionService.getDefaultPermissionsForRole', { error, role });
+      this.logger.error('Error in PermissionService.getDefaultPermissionsForRole', { 
+        error: error instanceof Error ? error.message : String(error),
+        role 
+      });
       throw error;
     }
   }

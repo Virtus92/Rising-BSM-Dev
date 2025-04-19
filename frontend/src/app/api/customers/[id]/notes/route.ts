@@ -46,9 +46,9 @@ export const POST = apiRouteHandler(async (req: NextRequest, { params }: { param
     // Parse request body as JSON
     const data = await req.json();
     
-    if (!data.note) {
+    if (!data.text && !data.note) {
       return formatValidationError({
-        note: ['Note text is required']
+        text: ['Note text is required']
       }, 'Invalid note data');
     }
     
@@ -72,7 +72,7 @@ export const POST = apiRouteHandler(async (req: NextRequest, { params }: { param
     const customerLog = await customerService.createCustomerLog(
       customerId,
       'NOTE',
-      data.note,
+      data.text || data.note,
       { context }
     );
     
@@ -156,13 +156,14 @@ export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params
       filters: { action: 'NOTE' }
     });
     
-    // Map logs to notes format if needed
+    // Map logs to notes format with consistent fields
     const notes = logs.map(log => ({
       id: log.id,
       customerId: log.customerId,
       userId: log.userId,
       userName: log.userName,
-      text: log.details,
+      text: log.details, // Keep using details as text
+      details: log.details, // Also include details field for consistency
       createdAt: log.createdAt,
       formattedDate: new Date(log.createdAt).toLocaleString()
     }));

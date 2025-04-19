@@ -11,22 +11,9 @@ export async function POST(request: Request) {
   const logger = getLogger();
   
   try {
-    // Improved error handling for JSON parsing
-    let userId, token;
-    try {
-      const body = await request.json();
-      userId = body.userId;
-      token = body.token;
-    } catch (parseError) {
-      logger.error('Error parsing JSON in verify-user endpoint', { error: String(parseError) });
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Invalid JSON in request body'
-      }, { status: 400 });
-    }
+    const { userId, token } = await request.json();
     
     if (!userId) {
-      logger.warn('Missing userId in verify-user request');
       return NextResponse.json({ 
         success: false, 
         message: 'User ID is required'

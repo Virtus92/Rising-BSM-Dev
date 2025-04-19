@@ -358,26 +358,44 @@ export function mapAppointmentToDto(appointment: Appointment): AppointmentDto {
   let appointmentDate = '';
   let appointmentTime = '00:00';
   
+  // Helper function to safely extract date and time from any date format
+  const extractDateAndTime = (dateValue: any): { date: string, time: string } => {
+    // If it's a Date object
+    if (dateValue instanceof Date) {
+      const isoString = dateValue.toISOString();
+      const dateParts = isoString.split('T');
+      return {
+        date: dateParts[0],
+        time: dateParts[1].substring(0, 5)
+      };
+    }
+    // If it's an ISO string
+    else if (typeof dateValue === 'string' && dateValue.indexOf('T') !== -1) {
+      const dateParts = dateValue.split('T');
+      return {
+        date: dateParts[0],
+        time: dateParts.length > 1 ? dateParts[1].substring(0, 5) : '00:00'
+      };
+    }
+    // If it's just a date string without time
+    else if (typeof dateValue === 'string') {
+      return {
+        date: dateValue,
+        time: '00:00'
+      };
+    }
+    // Default fallback
+    return {
+      date: new Date().toISOString().split('T')[0], // Today's date as fallback
+      time: '00:00'
+    };
+  };
+  
   // Safely handle appointmentDate based on its type
   if (appointment.appointmentDate) {
-    // Handle Date objects
-    if (appointment.appointmentDate instanceof Date) {
-      const isoString = appointment.appointmentDate.toISOString();
-      const dateParts = isoString.split('T');
-      appointmentDate = dateParts[0];
-      appointmentTime = dateParts[1].substring(0, 5);
-    } 
-    // Handle string values
-    else if (typeof appointment.appointmentDate === 'string') {
-      const dateStr = appointment.appointmentDate as string;
-      if (dateStr.indexOf('T') !== -1) {
-        const dateParts = dateStr.split('T');
-        appointmentDate = dateParts[0];
-        appointmentTime = dateParts.length > 1 ? dateParts[1].substring(0, 5) : '00:00';
-      } else {
-        appointmentDate = dateStr;
-      }
-    }
+    const extracted = extractDateAndTime(appointment.appointmentDate);
+    appointmentDate = extracted.date;
+    appointmentTime = extracted.time;
   }
   
   // Ensure duration is a number

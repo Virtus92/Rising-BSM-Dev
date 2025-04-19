@@ -66,7 +66,7 @@ export const UserForm: React.FC<UserFormProps> = ({
     status: initialData?.status as UserStatus || UserStatus.ACTIVE,
     phone: initialData?.phone || '',
     profilePicture: initialData?.profilePicture || '',
-    profilePictureId: initialData?.profilePictureId
+    profilePictureId: initialData?.profilePictureId ? Number(initialData.profilePictureId) : undefined
   });
 
   const [internalError, setError] = useState<string | null>(null);
@@ -80,10 +80,12 @@ export const UserForm: React.FC<UserFormProps> = ({
     onSuccess: (result) => {
       if (result.filePath) {
         setPreviewImage(result.filePath);
+        // Use a type assertion to access the fileId property from the API response
+        const fileId = (result as any).fileId;
         setFormData(prev => ({ 
           ...prev, 
           profilePicture: result.filePath,
-          profilePictureId: result.fileId as number
+          profilePictureId: fileId ? Number(fileId) : undefined
         }));
         setError(null);
       }

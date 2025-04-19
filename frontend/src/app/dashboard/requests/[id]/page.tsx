@@ -1,23 +1,23 @@
 'use client';
 
 import React from 'react';
+import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { RequestDetail } from '@/features/requests/components/RequestDetail';
 import { Button } from '@/shared/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 
-interface RequestDetailPageProps {
-  params: {
-    id: string;
-  };
-}
+/**
+ * Dashboard page for request details
+ */
 
 /**
  * Dashboard-Seite für die Detailansicht einer Kontaktanfrage
  */
-export default function RequestDetailPage({ params }: RequestDetailPageProps) {
+export default function RequestDetailPage() {
   const router = useRouter();
-  const requestId = parseInt(params.id);
+  const params = useParams();
+  const requestId = parseInt(params.id as string);
 
   if (isNaN(requestId)) {
     return (

@@ -2,7 +2,7 @@
  * PasswordChangeForm.tsx
  * Standalone component for changing passwords with enhanced UI and validation
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { UserService } from '@/infrastructure/clients/UserService';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -20,6 +20,9 @@ interface PasswordChangeFormProps {
 
 export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = false }: PasswordChangeFormProps) {
   const { toast } = useToast();
+  
+  // We're using the toast hook directly for notifications
+  // No need for a separate showToast function that would cause duplicates
   
   // Password state
   const [passwordData, setPasswordData] = useState({
@@ -97,15 +100,21 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
       confirmPassword: newPassword
     }));
     
-    // Show the passwords when auto-generating
-    setShowNewPassword(true);
-    setShowConfirmPassword(true);
-    
+    // Show the toast first, then update state
     toast({
       title: "Passwort generiert",
       description: "Ein sicheres Passwort wurde generiert. Bitte speichern Sie es an einem sicheren Ort.",
-      variant: "success"
+      variant: "success",
+      dedupeKey: "password-generated",
+      dedupeStrategy: "replace"
     });
+    
+    // Brief delay to ensure toast appears before state changes
+    setTimeout(() => {
+      // Show the passwords when auto-generating
+      setShowNewPassword(true);
+      setShowConfirmPassword(true);
+    }, 50);
   };
   
   // Submit password change
@@ -134,36 +143,47 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
       });
       
       if (response.success) {
+        // First show the toast BEFORE resetting anything
         toast({
           title: "Erfolg",
           description: "Passwort wurde erfolgreich geändert",
-          variant: "success"
+          variant: "success",
+          dedupeKey: "password-change-success",
+          dedupeStrategy: "replace"
         });
         
-        // Reset form
-        setPasswordData({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-        
-        // Call callback if provided
-        if (onPasswordChanged) {
-          onPasswordChanged();
-        }
+        // Add a small delay before resetting the form to ensure the toast is visible
+        setTimeout(() => {
+          // Reset form
+          setPasswordData({
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: ''
+          });
+          
+          // Call callback if provided
+          if (onPasswordChanged) {
+            onPasswordChanged();
+          }
+        }, 100);
       } else {
         throw new Error(response.message || "Fehler beim Ändern des Passworts");
       }
     } catch (error) {
       console.error('Failed to change password:', error);
-      setChangingPasswordError(
-        error instanceof Error ? error.message : "Passwort konnte nicht geändert werden"
-      );
+      // First show the error toast
       toast({
         title: "Fehler",
         description: error instanceof Error ? error.message : "Passwort konnte nicht geändert werden",
-        variant: "error"
+        variant: "destructive",
+        dedupeKey: "password-change-error",
+        dedupeStrategy: "replace"
       });
+      
+      // Then set the error message in the UI
+      setChangingPasswordError(
+        error instanceof Error ? error.message : "Passwort konnte nicht geändert werden"
+      );
     } finally {
       setIsChangingPassword(false);
     }

@@ -100,7 +100,7 @@ export class AppointmentClient {
    * @param relations - Optional relations to include (e.g., 'customer', 'notes')
    * @returns API response
    */
-  static async getAppointmentById(id: number | string, relations: string[] = ['customer', 'notes']): Promise<ApiResponse<AppointmentDetailResponseDto>> {
+  static async getById(id: number | string, relations: string[] = ['customer', 'notes']): Promise<ApiResponse<AppointmentDetailResponseDto>> {
     try {
       // Use the validateId utility function for consistent ID validation
       const validatedId = validateId(id);
@@ -142,12 +142,24 @@ export class AppointmentClient {
   }
   
   /**
+   * Legacy alias for getById method
+   * 
+   * @param id - Appointment ID
+   * @param relations - Optional relations to include
+   * @returns API response
+   * @deprecated Use getById() instead
+   */
+  static async getAppointmentById(id: number | string, relations: string[] = ['customer', 'notes']): Promise<ApiResponse<AppointmentDetailResponseDto>> {
+    return this.getById(id, relations);
+  }
+  
+  /**
    * Erstellt einen neuen Termin
    * 
    * @param data - Termindaten
    * @returns API-Antwort
    */
-  static async createAppointment(data: CreateAppointmentDto): Promise<ApiResponse<AppointmentResponseDto>> {
+  static async create(data: CreateAppointmentDto): Promise<ApiResponse<AppointmentResponseDto>> {
     try {
       return await ApiClient.post(APPOINTMENTS_API_URL, data);
     } catch (error: unknown) {
@@ -159,13 +171,24 @@ export class AppointmentClient {
   }
   
   /**
+   * Legacy alias for create method
+   * 
+   * @param data - Termindaten
+   * @returns API-Antwort
+   * @deprecated Use create() instead
+   */
+  static async createAppointment(data: CreateAppointmentDto): Promise<ApiResponse<AppointmentResponseDto>> {
+    return this.create(data);
+  }
+  
+  /**
    * Aktualisiert einen Termin
    * 
    * @param id - Termin-ID
    * @param data - Aktualisierungsdaten
    * @returns API-Antwort
    */
-  static async updateAppointment(id: number | string, data: UpdateAppointmentDto): Promise<ApiResponse<AppointmentResponseDto>> {
+  static async update(id: number | string, data: UpdateAppointmentDto): Promise<ApiResponse<AppointmentResponseDto>> {
     try {
       // Use the validateId utility function for consistent ID validation
       const validatedId = validateId(id);
@@ -184,6 +207,18 @@ export class AppointmentClient {
         500
       );
     }
+  }
+  
+  /**
+   * Legacy alias for update method
+   * 
+   * @param id - Termin-ID
+   * @param data - Aktualisierungsdaten
+   * @returns API-Antwort
+   * @deprecated Use update() instead
+   */
+  static async updateAppointment(id: number | string, data: UpdateAppointmentDto): Promise<ApiResponse<AppointmentResponseDto>> {
+    return this.update(id, data);
   }
   
   /**
@@ -220,7 +255,7 @@ export class AppointmentClient {
    * @param statusData - Statusdaten
    * @returns API-Antwort
    */
-  static async updateAppointmentStatus(id: number | string, statusData: StatusUpdateDto): Promise<ApiResponse<AppointmentResponseDto>> {
+  static async updateStatus(id: number | string, statusData: StatusUpdateDto): Promise<ApiResponse<AppointmentResponseDto>> {
     try {
       // Use the validateId utility function for consistent ID validation
       const validatedId = validateId(id);
@@ -242,13 +277,25 @@ export class AppointmentClient {
   }
   
   /**
+   * Legacy alias for updateStatus method
+   * 
+   * @param id - Termin-ID
+   * @param statusData - Statusdaten
+   * @returns API-Antwort
+   * @deprecated Use updateStatus() instead
+   */
+  static async updateAppointmentStatus(id: number | string, statusData: StatusUpdateDto): Promise<ApiResponse<AppointmentResponseDto>> {
+    return this.updateStatus(id, statusData);
+  }
+  
+  /**
    * Fügt eine Notiz zu einem Termin hinzu
    * 
    * @param id - Termin-ID
    * @param note - Notiz
    * @returns API-Antwort
    */
-  static async addAppointmentNote(id: number | string, note: string): Promise<ApiResponse<any>> {
+  static async addNote(id: number | string, note: string): Promise<ApiResponse<any>> {
     try {
       // Use the validateId utility function for consistent ID validation
       const validatedId = validateId(id);
@@ -280,6 +327,18 @@ export class AppointmentClient {
         500
       );
     }
+  }
+  
+  /**
+   * Legacy alias for addNote method
+   * 
+   * @param id - Termin-ID
+   * @param note - Notiz
+   * @returns API-Antwort
+   * @deprecated Use addNote() instead
+   */
+  static async addAppointmentNote(id: number | string, note: string): Promise<ApiResponse<any>> {
+    return this.addNote(id, note);
   }
   
   /**

@@ -223,6 +223,8 @@ export function createActiveFilters<F extends BaseFilterParamsDto>(
   }>,
   clearFilter: <K extends keyof F>(key: K) => void
 ): ActiveFilterInfo[] {
+  if (!filters) return [];
+  
   return filterConfig
     .filter(({ key }) => {
       // Check if the filter has a value
@@ -233,6 +235,11 @@ export function createActiveFilters<F extends BaseFilterParamsDto>(
       
       // Handle arrays
       if (Array.isArray(value) && value.length === 0) {
+        return false;
+      }
+      
+      // Handle common pagination and sorting keys which shouldn't show up as filters
+      if (['page', 'limit', 'sortBy', 'sortDirection'].includes(String(key))) {
         return false;
       }
       
@@ -261,6 +268,8 @@ export function hasActiveFilters<F extends BaseFilterParamsDto>(
   filters: F,
   exclude: Array<keyof F> = ['page', 'limit', 'sortBy', 'sortDirection']
 ): boolean {
+  if (!filters) return false;
+  
   return Object.entries(filters).some(([key, value]) => {
     if (exclude.includes(key as keyof F)) {
       return false;
@@ -276,6 +285,7 @@ export function hasActiveFilters<F extends BaseFilterParamsDto>(
       return false;
     }
     
+    // Return true only for non-empty, non-default values
     return true;
   });
 }

@@ -41,14 +41,17 @@ export class Customer extends BaseEntity {
   postalCode?: string;
   
   /**
-   * Alias for postalCode - used on the frontend
+   * Alias for postalCode - used for backward compatibility
    * @deprecated Use postalCode instead
+   * @private This should not be used in new code
    */
-  get zipCode(): string | undefined {
+  private get zipCode(): string | undefined {
+    console.warn('Customer.zipCode is deprecated, use postalCode instead');
     return this.postalCode;
   }
   
-  set zipCode(value: string | undefined) {
+  private set zipCode(value: string | undefined) {
+    console.warn('Customer.zipCode is deprecated, use postalCode instead');
     this.postalCode = value;
   }
   

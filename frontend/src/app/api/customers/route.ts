@@ -16,25 +16,24 @@ import { SystemPermission } from '@/domain/enums/PermissionEnums';
  * 
  * Retrieves a list of customers, optionally filtered and paginated
  */
-export const GET = apiRouteHandler(async (req: NextRequest) => {
-  const logger = getLogger();
-  const serviceFactory = getServiceFactory();
-  
-  try {
-    // Check permission using the same pattern as appointment routes
-    if (!await apiPermissions.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.CUSTOMERS_VIEW
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_VIEW}`);
-      return formatResponse.error(
-        `You don't have permission to view customers`, 
-        403
-      );
-    }
-    
+export const GET = apiRouteHandler(
+  apiPermissions.withPermission(
+    async (req: NextRequest) => {
+      const logger = getLogger();
+      const serviceFactory = getServiceFactory();
+    try {
     // Extract filter parameters from query
     const { searchParams } = new URL(req.url);
+    
+    // Check for permitted sort fields to prevent errors
+    const requestedSortBy = searchParams.get('sortBy') || 'createdAt';
+    const permittedSortFields = ['createdAt', 'updatedAt', 'name', 'email', 'company', 'city', 'type', 'status', 'newsletter', 'postalCode'];
+    const sortBy = permittedSortFields.includes(requestedSortBy) ? requestedSortBy : 'createdAt';
+    
+    // Ensure sort direction is valid
+    const requestedSortDirection = searchParams.get('sortDirection') || 'desc';
+    const sortDirection = ['asc', 'desc'].includes(requestedSortDirection) ? requestedSortDirection as 'asc' | 'desc' : 'desc';
+    
     const filters: CustomerFilterParamsDto = {
       search: searchParams.get('search') || undefined,
       status: searchParams.get('status') as any || undefined,
@@ -50,9 +49,11 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
       limit: searchParams.has('limit') 
         ? parseInt(searchParams.get('limit') as string)
         : 10,
-      sortBy: searchParams.get('sortBy') || 'createdAt',
-      sortDirection: (searchParams.get('sortDirection') as 'asc' | 'desc') || 'desc'
+      sortBy: sortBy,
+      sortDirection: sortDirection
     };
+    
+    logger.debug('Customer filters:', filters);
 
     // Get the customer service
     const customerService = serviceFactory.createCustomerService();
@@ -110,33 +111,23 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
       500
     );
   }
-}, {
-  // Secure this endpoint
-  requiresAuth: true
-});
+    },
+    SystemPermission.CUSTOMERS_VIEW
+  ),
+  { requiresAuth: true }
+);
 
 /**
  * POST /api/customers
  * 
  * Creates a new customer
  */
-export const POST = apiRouteHandler(async (req: NextRequest) => {
-  const logger = getLogger();
-  const serviceFactory = getServiceFactory();
-  
-  try {
-    // Check permission using the same pattern as appointment routes
-    if (!await apiPermissions.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.CUSTOMERS_CREATE
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_CREATE}`);
-      return formatResponse.error(
-        `You don't have permission to create customers`, 
-        403
-      );
-    }
-    
+export const POST = apiRouteHandler(
+  apiPermissions.withPermission(
+    async (req: NextRequest) => {
+      const logger = getLogger();
+      const serviceFactory = getServiceFactory();
+    try {
     // Parse the request body
     const data = await req.json() as CreateCustomerDto;
     
@@ -178,7 +169,8 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
       500
     );
   }
-}, {
-  // Secure this endpoint
-  requiresAuth: true
-});
+    },
+    SystemPermission.CUSTOMERS_CREATE
+  ),
+  { requiresAuth: true }
+);

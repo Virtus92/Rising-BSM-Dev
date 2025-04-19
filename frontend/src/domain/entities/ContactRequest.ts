@@ -1,5 +1,9 @@
 import { BaseEntity } from './BaseEntity';
 import { RequestStatus } from '../enums/CommonEnums';
+import { RequestData } from './RequestData';
+import { RequestSource, RequestMetadata } from '../dtos/RequestDtos';
+
+// Import types from RequestDtos.ts to prevent circular dependency
 
 /**
  * Kontaktanfrage-Entität
@@ -58,6 +62,21 @@ export class ContactRequest extends BaseEntity {
   ipAddress?: string;
   
   /**
+   * Source of the request (human, AI, etc.)
+   */
+  source?: RequestSource;
+  
+  /**
+   * Metadata for AI processing
+   */
+  metadata?: RequestMetadata;
+  
+  /**
+   * Associated structured data
+   */
+  requestData?: RequestData[];
+  
+  /**
    * Konstruktor
    * 
    * @param data - Initialisierungsdaten
@@ -75,6 +94,11 @@ export class ContactRequest extends BaseEntity {
     this.customerId = data.customerId;
     this.appointmentId = data.appointmentId;
     this.ipAddress = data.ipAddress;
+    
+    // New fields
+    this.source = data.source;
+    this.metadata = data.metadata || {};
+    this.requestData = data.requestData || [];
   }
   
   /**
@@ -124,6 +148,58 @@ export class ContactRequest extends BaseEntity {
    */
   isLinkedToAppointment(): boolean {
     return !!this.appointmentId;
+  }
+  
+  /**
+   * Checks if the request has been processed by AI
+   */
+  isAIProcessed(): boolean {
+    return !!this.metadata?.aiProcessed;
+  }
+  
+  /**
+   * Gets data for a specific category
+   * 
+   * @param category - Category to filter by
+   * @returns Array of matching RequestData items
+   */
+  getDataByCategory(category: string): RequestData[] {
+    return this.requestData?.filter(d => d.category === category) || [];
+  }
+  
+  /**
+   * Add metadata key-value pair
+   * 
+   * @param key - Metadata key
+   * @param value - Metadata value
+   * @returns This instance for chaining
+   */
+  addMetadata(key: string, value: any): ContactRequest {
+    if (!this.metadata) this.metadata = {};
+    this.metadata[key] = value;
+    return this;
+  }
+  
+  /**
+   * Add a processing step to metadata
+   * 
+   * @param agentId - ID of the agent that performed the step
+   * @param action - Action performed
+   * @param result - Result of the action
+   * @returns This instance for chaining
+   */
+  addProcessingStep(agentId: string, action: string, result: string): ContactRequest {
+    if (!this.metadata) this.metadata = {};
+    if (!this.metadata.processingSteps) this.metadata.processingSteps = [];
+    
+    this.metadata.processingSteps.push({
+      agentId,
+      timestamp: new Date().toISOString(),
+      action,
+      result
+    });
+    
+    return this;
   }
   
   /**
@@ -234,6 +310,8 @@ export class ContactRequest extends BaseEntity {
     if (data.processorId !== undefined) this.processorId = data.processorId;
     if (data.customerId !== undefined) this.customerId = data.customerId;
     if (data.appointmentId !== undefined) this.appointmentId = data.appointmentId;
+    if (data.source !== undefined) this.source = data.source;
+    if (data.metadata !== undefined) this.metadata = data.metadata;
     
     // Auditdaten aktualisieren
     this.updateAuditData(updatedBy);
@@ -266,7 +344,10 @@ export class ContactRequest extends BaseEntity {
       processorId: this.processorId,
       customerId: this.customerId,
       appointmentId: this.appointmentId,
-      ipAddress: this.ipAddress
+      ipAddress: this.ipAddress,
+      source: this.source,
+      metadata: this.metadata
+      // requestData is omitted intentionally, should be fetched separately
     };
   }
 }

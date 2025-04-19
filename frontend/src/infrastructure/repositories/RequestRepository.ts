@@ -164,7 +164,7 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         id: note.id,
         requestId: note.requestId,
         userId: note.userId,
-        userName: note.userName,
+        userName: note.userName || 'Unknown User',
         text: note.text,
         createdAt: note.createdAt
       }));
@@ -791,21 +791,28 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
    * @returns ORM-Entität
    */
   protected mapToORMEntity(domainEntity: Partial<ContactRequest>): any {
-    // Entferne undefined-Werte für die Datenbank
+    // Entferne undefined-Werte und ID für die Datenbank
+    const { id, createdAt, updatedAt, requestData, ...dataWithoutId } = domainEntity;
     const result: Record<string, any> = {};
     
-    Object.entries(domainEntity).forEach(([key, value]) => {
+    Object.entries(dataWithoutId).forEach(([key, value]) => {
       if (value !== undefined) {
         result[key] = value;
       }
     });
     
     // Bei neuen Entitäten Zeitstempel setzen
-    if (!result.id) {
+    if (!domainEntity.id) {
       result.createdAt = new Date();
     }
     
     result.updatedAt = new Date();
+    
+    // Always ensure ID is not included in data for Prisma operations
+    if ('id' in result) {
+      delete result.id;
+      this.logger.debug('Removed id from ORM entity data in RequestRepository');
+    }
     
     return result;
   }

@@ -47,8 +47,10 @@ export interface ApiResponse<T = any> {
 export function formatSuccess<T = any>(
   data?: T,
   message: string = 'Operation successful',
-  status: number = 200
+  status: number | string = 200
 ): NextResponse<ApiResponse<T>> {
+  // Convert string status to number if needed
+  const statusCode = typeof status === 'string' ? parseInt(status, 10) : status;
   const response: ApiResponse<T> = {
     success: true,
     message,
@@ -56,7 +58,7 @@ export function formatSuccess<T = any>(
     timestamp: new Date().toISOString()
   };
   
-  return NextResponse.json(response, { status });
+  return NextResponse.json(response, { status: statusCode });
 }
 
 /**
@@ -68,10 +70,12 @@ export function formatSuccess<T = any>(
  */
 export function formatError(
   error: any,
-  defaultStatus: number = 500
+  defaultStatus: number | string = 500
 ): NextResponse<ApiResponse> {
+  // Convert string status to number if needed
+  const statusCode = typeof defaultStatus === 'string' ? parseInt(defaultStatus, 10) : defaultStatus;
   // Determine status code and error details
-  let status = defaultStatus;
+  let status = statusCode;
   let errorCode = 'server_error';
   let message = 'An unexpected error occurred';
   let errors: string[] | undefined = undefined;
@@ -99,7 +103,7 @@ export function formatError(
     timestamp: new Date().toISOString()
   };
   
-  return NextResponse.json(response, { status });
+  return NextResponse.json(response, { status: statusCode });
 }
 
 /**
@@ -111,8 +115,10 @@ export function formatError(
  */
 export function formatNotFound(
   message: string = 'Resource not found',
-  status: number = 404
+  status: number | string = 404
 ): NextResponse<ApiResponse> {
+  // Convert string status to number if needed
+  const statusCode = typeof status === 'string' ? parseInt(status, 10) : status;
   const response: ApiResponse = {
     success: false,
     message,
@@ -120,7 +126,7 @@ export function formatNotFound(
     timestamp: new Date().toISOString()
   };
   
-  return NextResponse.json(response, { status });
+  return NextResponse.json(response, { status: statusCode });
 }
 
 /**
@@ -134,8 +140,10 @@ export function formatNotFound(
 export function formatValidationError(
   errors: string[] | string | Record<string, string[]>,
   message: string = 'Validation failed',
-  status: number = 400
+  status: number | string = 400
 ): NextResponse<ApiResponse> {
+  // Convert string status to number if needed
+  const statusCode = typeof status === 'string' ? parseInt(status, 10) : status;
   // Handle different error formats
   let errorArray: string[] = [];
   
@@ -165,7 +173,7 @@ export function formatValidationError(
     timestamp: new Date().toISOString()
   };
   
-  return NextResponse.json(response, { status });
+  return NextResponse.json(response, { status: statusCode });
 }
 
 /**

@@ -1,91 +1,116 @@
 /**
  * API Authentication helpers
- * Uses standardized apiRouteHandler for consistency
+ * Simplified utilities for securing API routes
  */
 
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
+import { auth, AuthOptions } from '../auth/middleware/authMiddleware';
 import { getLogger } from '@/infrastructure/common/logging';
-import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Wraps an API handler function with authentication
- * Using standardized apiRouteHandler for consistency
+ * @param handler The API handler function to wrap
+ * @param options Authentication options
+ * @returns The wrapped handler with authentication
  */
-export function withAuth(
-  handler: (req: NextRequest, user: any, ...args: any[]) => Promise<NextResponse<unknown>>,
-  options: { requiresRole?: string[] } = {}
+export function withAuth<T extends any[]>(
+  handler: (req: Request, user: any, ...args: T) => Promise<Response>,
+  options: AuthOptions = {}
 ) {
-  return apiRouteHandler(async (req: NextRequest, params?: any) => {
-    // Handler receives auth info directly from req.auth set by apiRouteHandler
-    if (!req.auth) {
-      const logger = getLogger();
-      logger.error('Authentication required but req.auth is undefined');
-      return formatResponse.error('Authentication required', 401);
-    }
+  return async (req: Request, ...args: T): Promise<Response> => {
+    const logger = getLogger();
     
-    return await handler(req, req.auth, params);
-  }, {
-    requiresAuth: true,
-    requiresRole: options.requiresRole
-  });
+    try {
+      // Authenticate user
+      const authResult = await auth(req, options);
+      
+      // If not authenticated, return error
+      if (!authResult.success) {
+        logger.warn(`API authentication failed: ${authResult.message}`, { 
+          path: req.url,
+          status: authResult.status
+        });
+        
+        return Response.json({ 
+          success: false, 
+          message: authResult.message || 'Authentication required' 
+        }, { 
+          status: authResult.status || 401 
+        });
+      }
+      
+      // Call handler with authenticated user info
+      return handler(req, authResult.user, ...args);
+    } catch (error) {
+      logger.error('API authentication error', { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        path: req.url
+      });
+      
+      return Response.json({ 
+        success: false, 
+        message: 'Authentication error' 
+      }, { 
+        status: 500 
+      });
+    }
+  };
 }
 
 /**
- * Extracts auth token from request
- * For use in custom auth implementations
+ * Checks if a request is authenticated
+ * Returns the authenticated user or throws an error
+ * 
+ * @param req The request to check
+ * @param options Authentication options
+ * @returns The authenticated user
+ * @throws Error if not authenticated
  */
-export function extractAuthToken(req: Request): string | null {
-  const logger = getLogger();
-  let token: string | null = null;
+export async function requireAuth(req: Request, options: AuthOptions = {}) {
+  const authResult = await auth(req, options);
   
-  try {
-    // Check cookies first
-    const cookieHeader = req.headers.get('cookie');
-    if (cookieHeader) {
-      const cookies = cookieHeader.split(';').map(cookie => cookie.trim());
-      const authCookie = cookies.find(cookie => 
-          cookie.startsWith('auth_token=') ||
-          cookie.startsWith('token=') ||
-          cookie.startsWith('authorization=') ||
-          cookie.startsWith('auth='));
-      if (authCookie) {
-        token = authCookie.split('=')[1];
-        // Handle URL-encoded values
-        if (token?.startsWith('%22') && token?.endsWith('%22')) {
-          token = decodeURIComponent(token);
-        }
-        // Remove surrounding quotes if present
-        if (token?.startsWith('"') && token?.endsWith('"')) {
-          token = token.slice(1, -1);
-        }
-      }
-    }
-    
-    // If no token in cookies, check X-Auth-Token header
-    if (!token) {
-      const xAuthToken = req.headers.get('x-auth-token');
-      if (xAuthToken) {
-        token = xAuthToken;
-      }
-    }
-    
-    // If still no token, check authorization header
-    if (!token) {
-      const authHeader = req.headers.get('authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        token = authHeader.substring(7);
-      }
-    }
-  } catch (error) {
-    logger.error('Error extracting auth token', {
-      error: error instanceof Error ? error.message : String(error)
-    });
+  if (!authResult.success) {
+    throw new Error(authResult.message || 'Authentication required');
   }
   
-  return token;
+  return authResult.user;
+}
+
+/**
+ * Extract authentication token from a request
+ * Checks multiple sources for the token
+ * 
+ * @param req The request
+ * @returns The token if found, null otherwise
+ */
+export function extractAuthToken(req: Request): string | null {
+  // Check authorization header
+  const authHeader = req.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  
+  // Check X-Auth-Token header
+  const xAuthToken = req.headers.get('x-auth-token');
+  if (xAuthToken) {
+    return xAuthToken;
+  }
+  
+  // Check cookies
+  const cookieHeader = req.headers.get('cookie');
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(';').map(cookie => cookie.trim());
+    const authCookie = cookies.find(cookie => cookie.startsWith('auth_token='));
+    if (authCookie) {
+      return authCookie.split('=')[1];
+    }
+  }
+  
+  return null;
 }
 
 export default {
   withAuth,
+  requireAuth,
   extractAuthToken
 };

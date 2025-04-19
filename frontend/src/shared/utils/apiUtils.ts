@@ -1,42 +1,6 @@
 /**
  * Utility functions for API interactions
  */
-import { ApiResponse } from '@/infrastructure/clients/ApiClient';
-
-/**
- * Process an API response, extracting the data and handling errors
- * @param responsePromise Promise returning an API response
- * @param options Options for processing
- * @returns Extracted data from API response
- */
-export async function processApiResponse<T>(
-  responsePromise: Promise<ApiResponse<T>>,
-  options: { context?: string } = {}
-): Promise<T> {
-  try {
-    const response = await responsePromise;
-    
-    // Response should be an object with data property
-    if (response && typeof response === 'object') {
-      // Access .data field of the response if it exists
-      if ('data' in response && response.data !== undefined) {
-        return response.data as T;
-      }
-      
-      // If response doesn't have data property but looks like data itself, return it
-      if (!('success' in response) && !('error' in response)) {
-        return response as unknown as T;
-      }
-    }
-    
-    // Handle missing or empty data
-    console.warn(`API response missing data in ${options.context || 'unknown context'}`, response);
-    return {} as T;
-  } catch (error) {
-    console.error(`Error processing API response in ${options.context || 'unknown context'}:`, error);
-    throw error;
-  }
-}
 
 /**
  * Safe fetch utility that handles errors and returns fallback data when needed

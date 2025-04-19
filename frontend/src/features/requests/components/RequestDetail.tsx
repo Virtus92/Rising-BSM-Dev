@@ -331,7 +331,19 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                 </DialogHeader>
                 <ConvertToCustomerForm
                   request={request}
-                  onClose={() => document.querySelector('dialog')?.close()}
+                  onClose={() => {
+                    // Find and close the dialog without directly using a query selector
+                    const dialogs = document.getElementsByTagName('dialog');
+                    // Close the most recently opened dialog
+                    if (dialogs && dialogs.length > 0) {
+                      const currentDialog = dialogs[dialogs.length - 1];
+                      if (currentDialog) {
+                        if (typeof currentDialog.close === 'function') {
+                          currentDialog.close();
+                        }
+                      }
+                    }
+                  }}
                 />
               </DialogContent>
             </Dialog>
@@ -361,7 +373,19 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                 </DialogHeader>
                 <LinkToCustomerForm
                   requestId={request.id}
-                  onClose={() => document.querySelector('dialog')?.close()}
+                  onClose={() => {
+                    // Find and close the dialog without directly using a query selector
+                    const dialogs = document.getElementsByTagName('dialog');
+                    // Close the most recently opened dialog
+                    if (dialogs && dialogs.length > 0) {
+                      const currentDialog = dialogs[dialogs.length - 1];
+                      if (currentDialog) {
+                        if (typeof currentDialog.close === 'function') {
+                          currentDialog.close();
+                        }
+                      }
+                    }
+                  }}
                 />
               </DialogContent>
             </Dialog>
@@ -391,7 +415,20 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                 </DialogHeader>
                 <CreateAppointmentForm
                   request={request}
-                  onClose={() => document.querySelector('dialog')?.close()}
+                  onClose={() => {
+                    // Find and close the dialog without directly using a query selector
+                    // This avoids React hydration mismatch issues
+                    const dialogs = document.getElementsByTagName('dialog');
+                    // Close the most recently opened dialog
+                    if (dialogs && dialogs.length > 0) {
+                      const currentDialog = dialogs[dialogs.length - 1];
+                      if (currentDialog) {
+                        if (typeof currentDialog.close === 'function') {
+                          currentDialog.close();
+                        }
+                      }
+                    }
+                  }}
                 />
               </DialogContent>
             </Dialog>

@@ -17,22 +17,11 @@ import { SystemPermission } from '@/domain/enums/PermissionEnums';
  * Retrieves a list of appointments, optionally filtered and paginated
  * Requires APPOINTMENTS_VIEW permission
  */
-export const GET = apiRouteHandler(async (req: NextRequest) => {
-  const logger = getLogger();
-  const serviceFactory = getServiceFactory();
-  
-  try {
-    // Check permission
-    if (!await apiPermissions.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.APPOINTMENTS_VIEW
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_VIEW}`);
-      return formatResponse.error(
-        `You don't have permission to perform this action (requires ${SystemPermission.APPOINTMENTS_VIEW})`, 
-        403
-      );
-    }
+export const GET = apiRouteHandler(
+  apiPermissions.withPermission(
+    async (req: NextRequest) => {
+      const logger = getLogger();
+      const serviceFactory = getServiceFactory();
     
     // Extract filter parameters from query
     const { searchParams } = new URL(req.url);
@@ -41,7 +30,7 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
     const requestedSortBy = searchParams.get('sortBy') || 'appointmentDate';
     const permittedSortFields = ['appointmentDate', 'title', 'status', 'createdAt', 'updatedAt', 'customerName', 'customer.name'];
     const sortBy = permittedSortFields.includes(requestedSortBy) ? requestedSortBy : 'appointmentDate';
-    
+    try {
     const filters = {
       status: searchParams.get('status') || undefined,
       startDate: searchParams.get('startDate') || undefined,
@@ -97,9 +86,11 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
       500
     );
   }
-}, {
-  requiresAuth: true
-});
+    },
+    SystemPermission.APPOINTMENTS_VIEW
+  ),
+  { requiresAuth: true }
+);
 
 /**
  * POST /api/appointments
@@ -107,23 +98,12 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
  * Creates a new appointment
  * Requires APPOINTMENTS_CREATE permission
  */
-export const POST = apiRouteHandler(async (req: NextRequest) => {
-  const logger = getLogger();
-  const serviceFactory = getServiceFactory();
-  
-  try {
-    // Check permission
-    if (!await apiPermissions.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.APPOINTMENTS_CREATE
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_CREATE}`);
-      return formatResponse.error(
-        `You don't have permission to perform this action (requires ${SystemPermission.APPOINTMENTS_CREATE})`, 
-        403
-      );
-    }
-    
+export const POST = apiRouteHandler(
+  apiPermissions.withPermission(
+    async (req: NextRequest) => {
+      const logger = getLogger();
+      const serviceFactory = getServiceFactory();
+    try {
     // Parse request body
     const data = await req.json() as CreateAppointmentDto;
     
@@ -159,6 +139,8 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
       500
     );
   }
-}, {
-  requiresAuth: true
-});
+    },
+    SystemPermission.APPOINTMENTS_CREATE
+  ),
+  { requiresAuth: true }
+);

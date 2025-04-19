@@ -526,7 +526,8 @@ export function BaseListComponent<T>({
   
   // Render pagination
   const renderPagination = useCallback(() => {
-    if (!totalPages || totalPages <= 1) return null;
+    // Always render pagination if we have items, even with only one page
+    if (!totalPages) return null;
     
     // Calculate visible page range
     const maxButtons = 5;

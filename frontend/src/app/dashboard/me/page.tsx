@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { Separator } from '@/shared/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
@@ -43,10 +43,59 @@ export default function UserProfilePage() {
     }
   };
 
-  if (isLoading) {
+  const [loadingState, setLoadingState] = useState<'initial' | 'loaded' | 'error'>('initial');
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Handle loading and error states with timeout detection
+  useEffect(() => {
+    if (isLoading) {
+      // Set a timeout for loading - if it takes too long, show an error
+      const timeoutId = setTimeout(() => {
+        if (loadingState === 'initial') {
+          setLoadError('Loading timed out. The server might be unavailable.');
+          setLoadingState('error');
+        }
+      }, 15000); // 15 seconds timeout
+      
+      return () => clearTimeout(timeoutId);
+    } else {
+      // When loading completes
+      setLoadingState('loaded');
+    }
+  }, [isLoading, loadingState]);
+  
+  // Retry handler for timeout errors
+  const handleRetry = useCallback(() => {
+    setLoadingState('initial');
+    setLoadError(null);
+    refreshAuth();
+  }, [refreshAuth]);
+  
+  if (isLoading && loadingState === 'initial') {
     return (
-      <div className="flex justify-center items-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <div className="flex flex-col justify-center items-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+        <p className="text-muted-foreground">Lade Profildaten...</p>
+      </div>
+    );
+  }
+  
+  if (loadingState === 'error') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-4">
+        <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Fehler beim Laden</h2>
+        <p className="text-muted-foreground text-center mb-6">
+          {loadError || 'Fehler beim Laden der Profildaten. Bitte versuchen Sie es später erneut.'}
+        </p>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => window.location.href = '/auth/login'}>
+            Zum Login
+          </Button>
+          <Button onClick={handleRetry}>
+            Erneut versuchen
+          </Button>
+        </div>
       </div>
     );
   }
@@ -59,9 +108,14 @@ export default function UserProfilePage() {
         <p className="text-muted-foreground text-center mb-6">
           Sie müssen angemeldet sein, um Ihr Profil anzuzeigen.
         </p>
-        <Button onClick={() => window.location.href = '/auth/login'}>
-          Zum Login
-        </Button>
+        <div className="flex gap-3">
+          <Button onClick={() => window.location.href = '/auth/login'}>
+            Zum Login
+          </Button>
+          <Button variant="outline" onClick={handleRetry}>
+            Erneut versuchen
+          </Button>
+        </div>
       </div>
     );
   }

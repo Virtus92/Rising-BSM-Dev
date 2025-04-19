@@ -38,6 +38,13 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     profilePicture: '',
     profilePictureId: undefined
   });
+  
+  // Add validation states
+  const [validationErrors, setValidationErrors] = useState<{
+    name?: string;
+    email?: string;
+    phone?: string;
+  }>({});
 
   // Use the file upload hook
   const { upload, isUploading, error: uploadError } = useFileUpload({
@@ -80,12 +87,50 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     }
   }, [user]);
 
+  // Handle form input changes with validation
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+    
+    // Clear validation errors when user edits a field
+    if (validationErrors[name]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [name]: undefined
+      }));
+    }
+  };
+  
+  // Validate form inputs
+  const validateForm = (): boolean => {
+    const errors: typeof validationErrors = {};
+    
+    // Name validation
+    if (!formData.name.trim()) {
+      errors.name = 'Name ist erforderlich';
+    } else if (formData.name.length < 2) {
+      errors.name = 'Name muss mindestens 2 Zeichen lang sein';
+    }
+    
+    // Email validation
+    if (!formData.email.trim()) {
+      errors.email = 'E-Mail ist erforderlich';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Gültige E-Mail-Adresse erforderlich';
+    }
+    
+    // Phone validation (optional field)
+    if (formData.phone && !/^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/.test(formData.phone)) {
+      errors.phone = 'Ungültiges Telefonnummer-Format';
+    }
+    
+    setValidationErrors(errors);
+    
+    // Form is valid if there are no errors
+    return Object.keys(errors).length === 0;
   };
 
   // Handle file selection
@@ -162,14 +207,27 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     
     if (!user) return;
     
+    // Validate form before submission
+    if (!validateForm()) {
+      // Show a validation error toast
+      toast({
+        title: "Validierungsfehler",
+        description: "Bitte überprüfen Sie Ihre Eingaben.",
+        variant: "error",
+        dedupeKey: "profile-validation-error",
+        dedupeStrategy: "replace"
+      });
+      return;
+    }
+    
     try {
       setIsSaving(true);
       
       // Prepare update data
       const updateData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone ? formData.phone.trim() : undefined,
       };
       
       // Only include profile picture fields if they've changed
@@ -187,7 +245,9 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
         toast({
           title: "Erfolg",
           description: "Profil wurde aktualisiert.",
-          variant: "success"
+          variant: "success",
+          dedupeKey: "profile-update-success",
+          dedupeStrategy: "replace"
         });
         
         // Notify parent component
@@ -203,7 +263,9 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
       toast({
         title: "Fehler",
         description: error instanceof Error ? error.message : "Profil konnte nicht aktualisiert werden.",
-        variant: "error"
+        variant: "error",
+        dedupeKey: "profile-update-error",
+        dedupeStrategy: "replace"
       });
     } finally {
       setIsSaving(false);
@@ -303,7 +365,11 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
                   value={formData.name} 
                   onChange={handleInputChange}
                   placeholder="Ihr vollständiger Name"
+                  className={validationErrors.name ? "border-red-500" : ""}
                 />
+                {validationErrors.name && (
+                  <p className="text-sm text-red-500 mt-1">{validationErrors.name}</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">E-Mail</Label>
@@ -314,7 +380,11 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
                   value={formData.email} 
                   onChange={handleInputChange}
                   placeholder="Ihre E-Mail-Adresse"
+                  className={validationErrors.email ? "border-red-500" : ""}
                 />
+                {validationErrors.email && (
+                  <p className="text-sm text-red-500 mt-1">{validationErrors.email}</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="phone">Telefon</Label>
@@ -324,7 +394,11 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
                   value={formData.phone} 
                   onChange={handleInputChange}
                   placeholder="Ihre Telefonnummer"
+                  className={validationErrors.phone ? "border-red-500" : ""}
                 />
+                {validationErrors.phone && (
+                  <p className="text-sm text-red-500 mt-1">{validationErrors.phone}</p>
+                )}
               </div>
               <div className="flex space-x-2 pt-4">
                 <Button 

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import RequestForm from '@/features/requests/components/RequestForm';
 import { RequestService } from '@/infrastructure/clients/RequestService';
@@ -10,8 +11,9 @@ import { usePermissions } from '@/features/users/hooks/usePermissions';
 import { AccessDenied } from '@/shared/components/AccessDenied';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 
-export default function EditRequestPage({ params }: { params: { id: string } }) {
-  const requestId = parseInt(params.id);
+export default function EditRequestPage() {
+  const params = useParams();
+  const requestId = parseInt(params.id as string);
   const [request, setRequest] = useState<RequestResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -50,7 +50,6 @@ export default function CustomerForm({
   const [hasChanges, setHasChanges] = useState(false);
   const [showConfirmLeave, setShowConfirmLeave] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
-  const [internalSuccess, setInternalSuccess] = useState(false); // Add internal success state
 
   const {
     name, setName,
@@ -62,7 +61,7 @@ export default function CustomerForm({
     country, setCountry,
     company, setCompany,
     vatNumber, setVatNumber,
-    notes, setNotes,
+    // Notes removed - now managed in customer detail page
     customerType, setCustomerType,
     status, setStatus,
     newsletter, setNewsletter,
@@ -83,8 +82,7 @@ export default function CustomerForm({
             ? 'Kunde wurde erfolgreich erstellt' 
             : 'Kunde wurde erfolgreich aktualisiert';
             
-          // Set internal success state
-          setInternalSuccess(true);
+          // Success is managed by the parent component
             
           toast({
             title: 'Erfolg',
@@ -109,8 +107,7 @@ export default function CustomerForm({
       } catch (error) {
         console.error('Form submission error:', error);
         
-        // Make sure to set success to false when an error occurs
-        setInternalSuccess(false);
+        // Error handling is managed by the parent component
         
         toast({
           title: 'Fehler',
@@ -127,8 +124,8 @@ export default function CustomerForm({
   const submitting = isLoading || formSubmitting;
   const errors = error ? { general: error, ...formErrors } : formErrors;
   
-  // Use either parent success prop or internal success state
-  const showSuccess = success || internalSuccess;
+  // Only use the parent success prop for consistent state management
+  const showSuccess = success;
 
   // Funktion zum Überprüfen, ob Änderungen vorgenommen wurden
   const checkForChanges = useCallback(() => {
@@ -141,7 +138,7 @@ export default function CustomerForm({
     const hasCountryChanged = country !== (initialData.country || '');
     const hasCompanyChanged = company !== (initialData.company || '');
     const hasVatNumberChanged = vatNumber !== (initialData.vatNumber || '');
-    const hasNotesChanged = notes !== (initialData.notes || '');
+    // Notes field removed from form
     const hasTypeChanged = customerType !== (initialData.type || CustomerType.PRIVATE);
     const hasStatusChanged = status !== (initialData.status || CommonStatus.ACTIVE);
     const hasNewsletterChanged = newsletter !== (initialData.newsletter || false);
@@ -149,13 +146,14 @@ export default function CustomerForm({
     const changes = hasNameChanged || hasEmailChanged || hasPhoneChanged || 
       hasAddressChanged || hasCityChanged || hasPostalCodeChanged || 
       hasCountryChanged || hasCompanyChanged || hasVatNumberChanged || 
-      hasNotesChanged || hasTypeChanged || hasStatusChanged || 
-      hasNewsletterChanged;
+      hasTypeChanged || hasStatusChanged || hasNewsletterChanged;
+      // Notes field removed from changes detection
     
     setHasChanges(changes);
   }, [
     name, email, phone, address, city, postalCode, country,
-    company, vatNumber, notes, customerType, status, newsletter, initialData
+    company, vatNumber, customerType, status, newsletter, initialData
+    // notes dependency removed
   ]);
 
   // Die checkForChanges-Funktion bei jeder Änderung aufrufen
@@ -412,20 +410,7 @@ export default function CustomerForm({
                 </div>
               </div>
               
-              <div className="space-y-2 mt-4">
-                <Label htmlFor="notes" className="flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5 text-blue-600" />
-                  Notes
-                </Label>
-                <Textarea
-                  id="notes"
-                  name="notes"
-                  rows={4}
-                  value={notes}
-                  onChange={(e) => handleFieldChange('notes', e.target.value)}
-                  placeholder="Additional information or notes about this customer..."
-                />
-              </div>
+              {/* Notes field removed - now managed exclusively in the customer detail page's Notes tab */}
             </TabsContent>
           </Tabs>
         </CardContent>

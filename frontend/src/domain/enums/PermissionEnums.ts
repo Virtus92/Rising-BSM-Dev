@@ -62,6 +62,7 @@ export enum SystemPermission {
   REQUESTS_APPROVE = "requests.approve",
   REQUESTS_REJECT = "requests.reject",
   REQUESTS_ASSIGN = "requests.assign",
+  REQUESTS_MANAGE = "requests.manage",
   
   // Appointment permissions
   APPOINTMENTS_VIEW = "appointments.view",
@@ -101,6 +102,7 @@ export const RolePermissions: Record<string, SystemPermission[]> = {
     SystemPermission.REQUESTS_APPROVE,
     SystemPermission.REQUESTS_REJECT,
     SystemPermission.REQUESTS_ASSIGN,
+    SystemPermission.REQUESTS_MANAGE,
     SystemPermission.APPOINTMENTS_VIEW,
     SystemPermission.APPOINTMENTS_CREATE,
     SystemPermission.APPOINTMENTS_EDIT,

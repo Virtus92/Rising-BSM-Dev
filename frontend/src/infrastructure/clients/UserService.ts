@@ -34,36 +34,94 @@ export class UserService {
         if (filters.sortDirection !== undefined) cleanedFilters.sortDirection = filters.sortDirection;
       }
       
-      const response = await UserClient.getUsers(cleanedFilters);
+      // Set default values if not provided
+      const page = cleanedFilters.page || 1;
+      const limit = cleanedFilters.limit || 10;
       
-      if (response.success) {
-        // If the API already returns the correct pagination structure
-        if (response.data && response.data.data && response.data.pagination) {
-          return response;
-        }
-        
-        // If the API returns just a data array without pagination
-        if (response.data && Array.isArray(response.data)) {
-          const paginationResult: PaginationResult<UserDto> = {
-            data: response.data,
-            pagination: {
-              page: filters?.page || 1,
-              limit: filters?.limit || 10,
-              total: response.data.length,
-              totalPages: Math.ceil(response.data.length / (filters?.limit || 10))
-            }
-          };
+      // Add retry mechanism for network resilience
+      let retries = 0;
+      const maxRetries = 2;
+      
+      while (retries <= maxRetries) {
+        try {
+          const response = await UserClient.getUsers(cleanedFilters);
           
-          return {
-            success: true,
-            data: paginationResult,
-            message: response.message,
-            statusCode: response.statusCode
-          };
+          if (response.success) {
+            // If the API already returns the correct pagination structure
+            if (response.data && response.data.data && response.data.pagination) {
+              return response;
+            }
+            
+            // If the API returns just a data array without pagination
+            if (response.data && Array.isArray(response.data)) {
+              const paginationResult: PaginationResult<UserDto> = {
+                data: response.data,
+                pagination: {
+                  page: page,
+                  limit: limit,
+                  total: response.data.length,
+                  totalPages: Math.ceil(response.data.length / limit)
+                }
+              };
+              
+              return {
+                success: true,
+                data: paginationResult,
+                message: response.message,
+                statusCode: response.statusCode
+              };
+            }
+            
+            // If the response data is not in an expected format but the request was successful
+            // Try to extract user data from response and create a pagination wrapper
+            if (response.data) {
+              // Check if response.data might be a single user that should be wrapped in an array
+              if (typeof response.data === 'object' && 'id' in response.data && 'email' in response.data) {
+                const userData = response.data as UserDto;
+                
+                const paginationResult: PaginationResult<UserDto> = {
+                  data: [userData],
+                  pagination: {
+                    page: page,
+                    limit: limit,
+                    total: 1,
+                    totalPages: 1
+                  }
+                };
+                
+                return {
+                  success: true,
+                  data: paginationResult,
+                  message: 'Single user record retrieved',
+                  statusCode: 200
+                };
+              }
+            }
+          }
+          
+          // If we get here, either the request failed or the response wasn't in an expected format
+          // We'll just return the original response
+          return response as any;
+        } catch (requestError) {
+          retries++;
+          
+          // Only retry for network-related errors, not for application errors
+          const isNetworkError = requestError instanceof Error && 
+            (requestError.message.includes('network') || 
+             requestError.message.includes('fetch') ||
+             requestError.message.includes('timeout'));
+          
+          if (!isNetworkError || retries > maxRetries) {
+            throw requestError; // Re-throw for non-network errors or if max retries reached
+          }
+          
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 300 * Math.pow(2, retries - 1)));
         }
       }
       
-      return response as any;
+      // If we get here, all retries failed
+      throw new Error('Failed to fetch users after multiple attempts');
     } catch (error) {
       console.error('Error in UserService.getUsers:', error);
       return {
@@ -77,7 +135,8 @@ export class UserService {
             totalPages: 0
           }
         },
-        message: error instanceof Error ? error.message : 'Failed to fetch users'
+        message: error instanceof Error ? error.message : 'Failed to fetch users',
+        statusCode: 500
       };
     }
   }
@@ -86,7 +145,46 @@ export class UserService {
    * Get a user by ID
    */
   static async getUserById(id: number | string): Promise<ApiResponse<UserDto>> {
-    return UserClient.getUserById(id);
+    try {
+      // Input validation
+      if (!id) {
+        return {
+          success: false,
+          message: 'Invalid user ID',
+          data: null,
+          statusCode: 400
+        };
+      }
+      
+      const response = await UserClient.getUserById(id);
+      
+      // Handle case where response is successful but data is not in expected format
+      if (response.success && response.data) {
+        // If data already looks like a UserDto, return as is
+        if ('id' in response.data && 'email' in response.data) {
+          return response;
+        }
+        
+        // If data is wrapped in a data property (common API pattern)
+        if ('data' in response.data && typeof response.data.data === 'object') {
+          const userData = response.data.data as UserDto;
+          return {
+            ...response,
+            data: userData
+          };
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      console.error(`Error fetching user ${id}:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to fetch user',
+        data: null,
+        statusCode: 500
+      };
+    }
   }
 
   /**
@@ -152,13 +250,64 @@ export class UserService {
     try {
       // Use the auth/change-password endpoint directly
       const response = await apiClient.post('/auth/change-password', payload);
-      return response;
+      
+      // Ensure we return a properly structured response
+      if (response.success) {
+        return {
+          success: true,
+          message: response.message || 'Passwort wurde erfolgreich geändert',
+          data: null,
+          statusCode: response.statusCode || 200
+        };
+      } else {
+        // Handle specific error messages from the API response
+        let errorMessage = response.message || 'Fehler beim Ändern des Passworts';
+        
+        // Format the error message to be more user-friendly
+        if (errorMessage.includes('Current password is incorrect') || 
+            errorMessage.includes('Das aktuelle Passwort')) {
+          errorMessage = 'Das aktuelle Passwort ist nicht korrekt';
+        } else if (errorMessage.includes('match') || errorMessage.includes('stimmen nicht')) {
+          errorMessage = 'Die neuen Passwörter stimmen nicht überein';
+        } else if (errorMessage.includes('requirements') || errorMessage.includes('Sicherheitsanforderungen')) {
+          errorMessage = 'Das neue Passwort erfüllt nicht die Sicherheitsanforderungen';
+        } else if (errorMessage === 'Bad Request') {
+          errorMessage = 'Eingabefehler: Bitte überprüfen Sie Ihre Eingaben';
+        }
+        
+        return {
+          success: false,
+          message: errorMessage,
+          data: null,
+          statusCode: response.statusCode || 400
+        };
+      }
     } catch (error) {
       console.error('Error changing password:', error);
+      
+      // Create a properly structured error response
+      let errorMessage = 'Fehler beim Ändern des Passworts';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // Handle specific error cases
+        if (error.message.includes('incorrect') || error.message.includes('invalid')) {
+          errorMessage = 'Das aktuelle Passwort ist nicht korrekt';
+        } else if (error.message.includes('match')) {
+          errorMessage = 'Die neuen Passwörter stimmen nicht überein';
+        } else if (error.message.includes('requirements')) {
+          errorMessage = 'Das neue Passwort erfüllt nicht die Sicherheitsanforderungen';
+        } else if (error.message === 'Bad Request') {
+          errorMessage = 'Eingabefehler: Bitte überprüfen Sie Ihre Eingaben';
+        }
+      }
+      
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to change password',
-        data: null
+        message: errorMessage,
+        data: null,
+        statusCode: 400
       };
     }
   }

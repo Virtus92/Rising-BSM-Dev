@@ -24,7 +24,7 @@ import { PrismaClient } from '@prisma/client';
  * Service for managing customers
  */
 export class CustomerService implements ICustomerService {
-  private prisma: PrismaClient;
+  private prismaClient: PrismaClient;
   
   /**
    * Constructor
@@ -33,15 +33,23 @@ export class CustomerService implements ICustomerService {
    * @param logger - Logging service
    * @param validator - Validation service
    * @param errorHandler - Error handling service
+   * @param prisma - Optional Prisma client instance
    */
   constructor(
     public readonly customerRepository: ICustomerRepository,
     public readonly logger: ILoggingService,
     public readonly validator: IValidationService,
-    public readonly errorHandler: IErrorHandler
+    public readonly errorHandler: IErrorHandler,
+    prisma?: PrismaClient
   ) {
     this.logger.debug('Initialized CustomerService');
-    this.prisma = new PrismaClient();
+    // Use provided prisma instance or get from global instance
+    if (prisma) {
+      this.prismaClient = prisma;
+    } else {
+      this.prismaClient = new PrismaClient();
+      this.logger.debug('Created new PrismaClient in CustomerService');
+    }
   }
   
   // Private variable to store notes in memory (temporary solution until database implementation)
@@ -240,7 +248,7 @@ export class CustomerService implements ICustomerService {
       }
       
       // Get logs from database using Prisma
-      const logs = await this.prisma.customerLog.findMany({
+      const logs = await this.prismaClient.customerLog.findMany({
         where: filter,
         orderBy: { createdAt: 'desc' },
         include: { 
@@ -255,25 +263,37 @@ export class CustomerService implements ICustomerService {
         filter: options?.filters 
       });
       
-      // Map logs to DTOs
-      return logs.map(log => ({
-        id: log.id,
-        customerId: log.customerId,
-        customerName: log.customer?.name || 'Unknown Customer',
-        entityType: EntityType.CUSTOMER, 
-        entityId: log.customerId,
-        userId: log.userId || 0,
-        userName: log.userName,
-        action: log.action,
-        details: log.details ? (
-          typeof log.details === 'string' ? 
-            // If it's a string, try to parse as JSON or wrap in an object
-            { text: log.details } : 
-            log.details as Record<string, any>
-        ) : {},
-        createdAt: log.createdAt.toISOString(),
-        updatedAt: log.createdAt.toISOString() // CustomerLog doesn't have updatedAt
-      }));
+      // Map logs to DTOs with consistent format
+      return logs.map(log => {
+        let details: Record<string, any> = {};
+        
+        // Safely parse JSON details
+        if (log.details) {
+        try {
+          details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+        } catch (e) {
+          // If parsing fails, create a simple object with the string value
+          details = { text: log.details };
+          this.logger.warn('Failed to parse log details as JSON', { logId: log.id, details: log.details });
+        }
+      }
+        
+        return {
+          id: log.id,
+          customerId: log.customerId,
+          customerName: log.customer?.name || 'Unknown Customer',
+          entityType: EntityType.CUSTOMER, 
+          entityId: log.customerId,
+          userId: log.userId || 0,
+          userName: log.userName,
+          action: log.action,
+          details: details,
+          // Use undefined instead of null to match CustomerLogDto type
+          text: log.details === null ? undefined : log.details,
+          createdAt: log.createdAt.toISOString(),
+          updatedAt: log.createdAt.toISOString() // CustomerLog doesn't have updatedAt
+        };
+      });
     } catch (error) {
       this.logger.error('Error in CustomerService.getCustomerLogs', { error, customerId });
       throw error;
@@ -305,11 +325,8 @@ export class CustomerService implements ICustomerService {
       const userName = options?.context?.userName || 'System';
       const userId = options?.context?.userId;
       
-      // Convert string details to object format that matches CustomerLogDto requirements
-      const detailsObject = details ? { text: details } : {};
-      
       // Create log entry in database using Prisma
-      const log = await this.prisma.customerLog.create({
+      const log = await this.prismaClient.customerLog.create({
         data: {
           customerId,
           userId, 
@@ -330,7 +347,20 @@ export class CustomerService implements ICustomerService {
         action 
       });
       
-      // Return as DTO with properly formatted fields
+      // Parse or create details as an object
+      let detailsObj: Record<string, any> = {};
+      
+      if (log.details) {
+        try {
+          detailsObj = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+        } catch (e) {
+          // If parsing fails, create a simple object with the string value
+          detailsObj = { text: log.details };
+          this.logger.warn('Failed to parse log details as JSON', { logId: log.id, details: log.details });
+        }
+      }
+      
+      // Return as DTO with consistent fields
       return {
         id: log.id,
         customerId: log.customerId,
@@ -340,7 +370,9 @@ export class CustomerService implements ICustomerService {
         userId: log.userId || 0,
         userName: log.userName,
         action: log.action,
-        details: detailsObject, // Use the object format for the DTO
+        details: detailsObj,
+        // Use undefined instead of null to match CustomerLogDto type
+        text: log.details === null ? undefined : log.details,
         createdAt: log.createdAt.toISOString(),
         updatedAt: log.createdAt.toISOString() // CustomerLog doesn't have updatedAt
       };

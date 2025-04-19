@@ -1,33 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Disable React Strict Mode to prevent double-mounting
-  reactStrictMode: false,
-  
-  // Wichtige Umgebungsvariablen auf Client-Seite verfügbar machen
-  env: {
-    // API-URLs und Basis-Konfiguration
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api',
-    NEXT_PUBLIC_FRONTEND_URL: process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000',
-  },
-  
-  // ESLint während des Builds deaktivieren
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  
-  // Image-Optimierung konfigurieren
-  images: {
-    domains: ['localhost'],
-  },
-
-  // Add a Webpack rule to ignore .html files
+  reactStrictMode: true,
+  // Remove swcMinify as it's no longer a recognized option in this Next.js version
   webpack: (config) => {
-    config.module.rules.push({
-      test: /\.html$/,
-      use: 'ignore-loader',
-    });
+    // Add fallbacks for crypto-related modules that are required by jsonwebtoken and bcryptjs
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      crypto: require.resolve('crypto-browserify'),
+      stream: require.resolve('stream-browserify'),
+      buffer: require.resolve('buffer'),
+      util: require.resolve('util'),
+      vm: false, // Add empty shim for the vm module that asn1.js requires
+      fs: false, // Add empty shim for the fs module
+      path: false, // Add empty shim for the path module
+      os: false // Add empty shim for the os module
+    };
     return config;
   },
-};
+}
 
 module.exports = nextConfig;

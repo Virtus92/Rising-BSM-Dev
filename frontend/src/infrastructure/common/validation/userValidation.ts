@@ -169,13 +169,14 @@ export function isValidEmail(email: string): boolean {
 export function isValidPhone(phone: string): boolean {
   if (!phone) return true; // Empty is valid (optional field)
   
-  // Modified regex that doesn't allow extensions (x12345)
+  // More flexible phone regex that supports various international formats
   // Supports formats:
   // - International: +XX XXX XXX XXXX
   // - European: +XX XXX XXXXXX
+  // - German: +49 123 456789 or 0123 456789
   // - US/Standard: (XXX) XXX-XXXX or XXX-XXX-XXXX
   // - Simple: XXXXXXXXXX
-  const phoneRegex = /^(\+?\d{1,3}[- ]?)?\(?(?:\d{2,3})\)?[- ]?(?:\d{3})[- ]?(?:\d{4,6})$/;
+  const phoneRegex = /^(\+?\d{1,3}[- .]?)?\(?(?:\d{1,5})\)?[- .]?(?:\d{1,5})[- .]?(?:\d{1,9})$/;
   
   // Remove any extension part (x12345)
   const cleanPhone = phone.split(/\s*x\d+/).join('');

@@ -58,6 +58,7 @@ export class RequestService extends BaseService<
     protected customerRepository: ICustomerRepository,
     protected userRepository: IUserRepository,
     protected appointmentRepository: IAppointmentRepository,
+    protected notificationService: any, // Inject the NotificationService
     logger: ILoggingService,
     validator: IValidationService,
     errorHandler: IErrorHandler
@@ -176,7 +177,74 @@ export class RequestService extends BaseService<
     data: CreateRequestDto,
     options?: ServiceOptions
   ): Promise<RequestResponseDto> {
-    return this.create(data, options);
+    try {
+      // Create the request using the base method
+      const createdRequest = await this.create(data, options);
+      
+      // Determine if this is a customer-created request or a public request
+      // A customer request is one where:
+      // 1. We have a userId in context (authenticated user)
+      // 2. User role is 'user' (not admin, manager, or employee)
+      // 3. OR we explicitly have a customerId in the context
+      const isCustomerRequest = 
+        (options?.context?.userId && options?.context?.role === 'user') ||
+        (options?.context?.customerId !== undefined);
+      
+      const customerId = options?.context?.customerId;
+      const requestType = isCustomerRequest ? 'customer_request' : 'public_request';
+      
+      this.logger.info(`Creating ${requestType}`, { 
+        isCustomerRequest, 
+        userId: options?.context?.userId,
+        customerId
+      });
+      
+      // Find admins and managers to notify about the new request
+      const adminsAndManagers = await this.userRepository.findByCriteria({
+        role: { in: ['admin', 'manager'] },
+        status: 'active'
+      });
+      
+      if (adminsAndManagers.length > 0 && this.notificationService) {
+        const userIds = adminsAndManagers.map(user => user.id);
+        
+        // Different notifications for customer vs public requests
+        if (isCustomerRequest) {
+          // Customer request notification
+          await this.notificationService.createNotificationForMultipleUsers(
+            userIds,
+            `New Request from Existing Customer`,
+            `Customer ${data.name} (${data.email}) has submitted a new request for ${data.service}.`,
+            'customer', // NotificationType.CUSTOMER
+            {
+              contactRequestId: createdRequest.id,
+              customerId: options?.context?.customerId || customerId,
+              link: `/dashboard/requests/${createdRequest.id}`
+            }
+          );
+        } else {
+          // Public request notification
+          await this.notificationService.createNotificationForMultipleUsers(
+            userIds,
+            `New Public Request`,
+            `${data.name} (${data.email}) has submitted a public request for ${data.service}.`,
+            'request', // NotificationType.REQUEST
+            {
+              contactRequestId: createdRequest.id,
+              link: `/dashboard/requests/${createdRequest.id}`
+            }
+          );
+        }
+      }
+      
+      return createdRequest;
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.createRequest`, {
+        error: error instanceof Error ? error.message : String(error),
+        data
+      });
+      throw this.handleError(error);
+    }
   }
 
   /**
@@ -335,12 +403,23 @@ export class RequestService extends BaseService<
         );
       }
 
-      // Aktualisiere den Status
-      request.status = data.status;
-      request.updateAuditData(options?.context?.userId);
+      // Create clean update object with only the needed properties
+      // This ensures we don't accidentally include the ID in the update data
+      const updateData = {
+        status: data.status,
+        updatedAt: new Date(),
+        updatedBy: options?.context?.userId
+      };
 
-      // Speichere die Änderungen
-      const updatedRequest = await this.requestRepository.update(id, request);
+      // Log the update attempt
+      this.logger.info(`Updating request status`, {
+        id,
+        newStatus: data.status,
+        updateBy: options?.context?.userId
+      });
+      
+      // Speichere die Änderungen - using repository directly to avoid potential id issues
+      const updatedRequest = await this.requestRepository.update(id, updateData);
 
       // Füge optional eine Notiz hinzu
       if (data.note && options?.context?.userId) {
@@ -552,6 +631,34 @@ export class RequestService extends BaseService<
         await this.addNote(data.requestId, options.context.userId, userName, `Request converted to customer ID ${customer.id}${
             appointment ? ` and appointment ID ${appointment.id} created` : ''
           }`, options);
+            
+        // Send notification to all managers and admins about customer conversion
+        if (this.notificationService) {
+          // Find admins and managers 
+          const adminsAndManagers = await this.userRepository.findByCriteria({
+            role: { in: ['admin', 'manager'] },
+            status: 'active'
+          });
+          
+          if (adminsAndManagers.length > 0) {
+            const userIds = adminsAndManagers.map(u => u.id);
+            const title = 'Request Converted to Customer';
+            const message = `Request from ${request.name} was converted to a new customer${appointment ? ' with appointment' : ''}.`;
+            
+            await this.notificationService.createNotificationForMultipleUsers(
+              userIds,
+              title,
+              message,
+              'customer',
+              {
+                customerId: customer.id,
+                contactRequestId: data.requestId,
+                appointmentId: appointment?.id,
+                link: `/dashboard/customers/${customer.id}`
+              }
+            );
+          }
+        }
       }
 
       return {
@@ -601,12 +708,22 @@ export class RequestService extends BaseService<
         throw this.errorHandler.createNotFoundError(`Customer with ID ${customerId} not found`);
       }
 
-      // Verknüpfe die Anfrage mit dem Kunden
-      request.customerId = customerId;
-      request.updateAuditData(options?.context?.userId);
+      // Create a clean update object with only the necessary fields
+      const updateData = {
+        customerId,
+        updatedAt: new Date(),
+        updatedBy: options?.context?.userId
+      };
 
-      // Speichere die Änderungen
-      const updatedRequest = await this.requestRepository.update(requestId, request);
+      // Log the linking operation
+      this.logger.info(`Linking request ${requestId} to customer ${customerId}`, {
+        requestId,
+        customerId,
+        updatedBy: options?.context?.userId
+      });
+
+      // Speichere die Änderungen - using clean object without id
+      const updatedRequest = await this.requestRepository.update(requestId, updateData);
 
       // Füge eine Notiz hinzu
       if (options?.context?.userId) {
@@ -664,12 +781,22 @@ export class RequestService extends BaseService<
       // Erstelle den Termin
       const appointment = await this.appointmentRepository.create(appointmentEntity);
 
-      // Verknüpfe die Anfrage mit dem Termin
-      request.appointmentId = appointment.id;
-      request.updateAuditData(options?.context?.userId);
+      // Prepare only the necessary fields for update to avoid inclusion of ID
+      const requestUpdate = {
+        appointmentId: appointment.id,
+        updatedAt: new Date(),
+        updatedBy: options?.context?.userId
+      };
+      
+      // Log the update operation
+      this.logger.info(`Linking appointment ${appointment.id} to request ${requestId}`, {
+        requestId,
+        appointmentId: appointment.id,
+        updatedBy: options?.context?.userId
+      });
 
-      // Speichere die Änderungen an der Anfrage
-      await this.requestRepository.update(requestId, request);
+      // Speichere die Änderungen an der Anfrage - using minimal update object
+      await this.requestRepository.update(requestId, requestUpdate);
 
       // Füge eine Notiz hinzu
       if (options?.context?.userId) {

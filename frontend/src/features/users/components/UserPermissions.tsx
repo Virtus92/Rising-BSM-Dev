@@ -20,6 +20,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { UserDto } from '@/domain/dtos/UserDtos';
 import { PermissionClient } from '@/infrastructure/api/PermissionClient';
 import { SystemPermission, getPermissionsForRole } from '@/domain/enums/PermissionEnums';
+import { SystemPermissionMap, createPermissionDefinitionList } from '@/domain/permissions/SystemPermissionMap';
 import { 
   Select,
   SelectContent,
@@ -46,165 +47,9 @@ export interface Permission {
 }
 
 /**
- * Map to convert raw permission codes to human-readable information
+ * Using centralized permission definitions from SystemPermissionMap
+ * This ensures consistency between backend and frontend
  */
-const permissionDisplayMap: Record<string, { name: string; description: string; category: string }> = {
-  // System
-  [SystemPermission.SYSTEM_ACCESS]: { 
-    name: 'System Access', 
-    description: 'Can access the system', 
-    category: 'System' 
-  },
-  
-  // Users
-  [SystemPermission.USERS_VIEW]: { 
-    name: 'View Users', 
-    description: 'Can view user list and details', 
-    category: 'Users' 
-  },
-  [SystemPermission.USERS_CREATE]: { 
-    name: 'Create Users', 
-    description: 'Can create new users', 
-    category: 'Users' 
-  },
-  [SystemPermission.USERS_EDIT]: { 
-    name: 'Edit Users', 
-    description: 'Can edit existing users', 
-    category: 'Users' 
-  },
-  [SystemPermission.USERS_DELETE]: { 
-    name: 'Delete Users', 
-    description: 'Can delete users', 
-    category: 'Users' 
-  },
-  
-  // Roles
-  [SystemPermission.ROLES_VIEW]: { 
-    name: 'View Roles', 
-    description: 'Can view roles and permissions', 
-    category: 'Roles' 
-  },
-  [SystemPermission.ROLES_CREATE]: { 
-    name: 'Create Roles', 
-    description: 'Can create new roles', 
-    category: 'Roles' 
-  },
-  [SystemPermission.ROLES_EDIT]: { 
-    name: 'Edit Roles', 
-    description: 'Can edit existing roles', 
-    category: 'Roles' 
-  },
-  [SystemPermission.ROLES_DELETE]: { 
-    name: 'Delete Roles', 
-    description: 'Can delete roles', 
-    category: 'Roles' 
-  },
-  
-  // Customers
-  [SystemPermission.CUSTOMERS_VIEW]: { 
-    name: 'View Customers', 
-    description: 'Can view customer list and details', 
-    category: 'Customers' 
-  },
-  [SystemPermission.CUSTOMERS_CREATE]: { 
-    name: 'Create Customers', 
-    description: 'Can create new customers', 
-    category: 'Customers' 
-  },
-  [SystemPermission.CUSTOMERS_EDIT]: { 
-    name: 'Edit Customers', 
-    description: 'Can edit existing customers', 
-    category: 'Customers' 
-  },
-  [SystemPermission.CUSTOMERS_DELETE]: { 
-    name: 'Delete Customers', 
-    description: 'Can delete customers', 
-    category: 'Customers' 
-  },
-  
-  // Requests
-  [SystemPermission.REQUESTS_VIEW]: { 
-    name: 'View Requests', 
-    description: 'Can view request list and details', 
-    category: 'Requests' 
-  },
-  [SystemPermission.REQUESTS_CREATE]: { 
-    name: 'Create Requests', 
-    description: 'Can create new requests', 
-    category: 'Requests' 
-  },
-  [SystemPermission.REQUESTS_EDIT]: { 
-    name: 'Edit Requests', 
-    description: 'Can edit existing requests', 
-    category: 'Requests' 
-  },
-  [SystemPermission.REQUESTS_DELETE]: { 
-    name: 'Delete Requests', 
-    description: 'Can delete requests', 
-    category: 'Requests' 
-  },
-  [SystemPermission.REQUESTS_APPROVE]: { 
-    name: 'Approve Requests', 
-    description: 'Can approve requests', 
-    category: 'Requests' 
-  },
-  [SystemPermission.REQUESTS_REJECT]: { 
-    name: 'Reject Requests', 
-    description: 'Can reject requests', 
-    category: 'Requests' 
-  },
-  [SystemPermission.REQUESTS_ASSIGN]: { 
-    name: 'Assign Requests', 
-    description: 'Can assign requests to users', 
-    category: 'Requests' 
-  },
-  
-  // Appointments
-  [SystemPermission.APPOINTMENTS_VIEW]: { 
-    name: 'View Appointments', 
-    description: 'Can view appointment list and details', 
-    category: 'Appointments' 
-  },
-  [SystemPermission.APPOINTMENTS_CREATE]: { 
-    name: 'Create Appointments', 
-    description: 'Can create new appointments', 
-    category: 'Appointments' 
-  },
-  [SystemPermission.APPOINTMENTS_EDIT]: { 
-    name: 'Edit Appointments', 
-    description: 'Can edit existing appointments', 
-    category: 'Appointments' 
-  },
-  [SystemPermission.APPOINTMENTS_DELETE]: { 
-    name: 'Delete Appointments', 
-    description: 'Can delete appointments', 
-    category: 'Appointments' 
-  },
-  
-  // Settings
-  [SystemPermission.SETTINGS_VIEW]: { 
-    name: 'View Settings', 
-    description: 'Can view system settings', 
-    category: 'Settings' 
-  },
-  [SystemPermission.SETTINGS_EDIT]: { 
-    name: 'Edit Settings', 
-    description: 'Can edit system settings', 
-    category: 'Settings' 
-  },
-  
-  // Profile
-  [SystemPermission.PROFILE_VIEW]: { 
-    name: 'View Profile', 
-    description: 'Can view own profile', 
-    category: 'Profile' 
-  },
-  [SystemPermission.PROFILE_EDIT]: { 
-    name: 'Edit Profile', 
-    description: 'Can edit own profile', 
-    category: 'Profile' 
-  }
-};
 
 /**
  * Creates formatted permissions list from system permissions enum and raw permission codes
@@ -213,51 +58,16 @@ const permissionDisplayMap: Record<string, { name: string; description: string; 
  * @returns Formatted permissions list with display information
  */
 const createPermissionsList = (permissionCodes: string[]): Permission[] => {
-  const permissions: Permission[] = [];
+  // Use the centralized utility function
+  const definitions = createPermissionDefinitionList(permissionCodes);
   
-  // First add all known enum permissions
-  Object.values(SystemPermission).forEach(permissionCode => {
-    const info = permissionDisplayMap[permissionCode];
-    if (info) {
-      permissions.push({
-        id: permissionCode,
-        name: info.name,
-        description: info.description,
-        category: info.category
-      });
-    }
-  });
-  
-  // Then add any additional permissions from the API that aren't in the enum
-  permissionCodes.forEach(code => {
-    // Skip if this permission is already in the list
-    if (permissions.some(p => p.id === code)) {
-      return;
-    }
-    
-    // If we have display info for this permission, use it
-    if (permissionDisplayMap[code]) {
-      const info = permissionDisplayMap[code];
-      permissions.push({
-        id: code,
-        name: info.name,
-        description: info.description,
-        category: info.category
-      });
-    } else {
-      // Otherwise create a generic entry based on the code
-      const parts = code.split('.');
-      const category = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : 'Other';
-      const action = parts[1] ? parts[1].charAt(0).toUpperCase() + parts[1].slice(1) : 'Access';
-      
-      permissions.push({
-        id: code,
-        name: `${action} ${category}`,
-        description: `Can ${parts[1] || 'access'} ${parts[0] || 'system'}`,
-        category: category
-      });
-    }
-  });
+  // Map to our component's Permission interface
+  const permissions = definitions.map(def => ({
+    id: def.code.toString(),
+    name: def.name,
+    description: def.description,
+    category: def.category
+  }));
   
   // Sort permissions by category and then by name
   return permissions.sort((a, b) => {
@@ -540,11 +350,11 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
       
       <CardContent className="space-y-6">
         {/* Notification about permissions feature being under development */}
-        <Alert variant="warning" className="bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Permissions Feature in Development</AlertTitle>
+        <Alert variant="success" className="bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400 border border-green-200 dark:border-green-900">
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Permissions System Active</AlertTitle>
           <AlertDescription>
-            The permissions management system is not fully implemented yet. Some settings may not take effect immediately or may be overridden by role-based permissions.
+            Manage user permissions by selecting the permissions you want to grant. Role-based permissions are automatically applied based on the user's role.
           </AlertDescription>
         </Alert>
         

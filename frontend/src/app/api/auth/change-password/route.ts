@@ -103,9 +103,19 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
     
     // Handle specific error cases
     if (error instanceof Error) {
-      if (error.message.includes('incorrect')) {
+      if (error.message.includes('incorrect') || error.message.toLowerCase().includes('falsches passwort')) {
         return NextResponse.json(
-          formatError('Current password is incorrect', 400),
+          formatError('Das aktuelle Passwort ist nicht korrekt', 400),
+          { status: 400 }
+        );
+      } else if (error.message.includes('requirements')) {
+        return NextResponse.json(
+          formatError('Das neue Passwort erfüllt nicht die Sicherheitsanforderungen', 400),
+          { status: 400 }
+        );
+      } else if (error.message.includes('match')) {
+        return NextResponse.json(
+          formatError('Die neuen Passwörter stimmen nicht überein', 400),
           { status: 400 }
         );
       }

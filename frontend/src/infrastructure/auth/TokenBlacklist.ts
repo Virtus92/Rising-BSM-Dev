@@ -1,3 +1,5 @@
+'use client';
+
 import { getLogger } from '../common/logging';
 import { jwtDecode } from 'jwt-decode';
 
@@ -35,23 +37,8 @@ class TokenBlacklist {
         return;
       }
       
-      // Safely decode JWT payload without dependency on external library
-      let decoded: { sub?: string | number, exp?: number } = {};
-      
-      try {
-        // First try using jwtDecode if available (client-side)
-        if (typeof jwtDecode === 'function') {
-          decoded = jwtDecode<{ sub?: string | number, exp?: number }>(token);
-        } else {
-          // Manual decoding as fallback (server-side)
-          const base64Payload = payload.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = Buffer.from(base64Payload, 'base64').toString('utf8');
-          decoded = JSON.parse(jsonPayload);
-        }
-      } catch (decodeError) {
-        console.error('Error decoding token:', decodeError);
-        return;
-      }
+      // Decode payload to get expiration and user ID
+      const decoded = jwtDecode<{ sub?: string | number, exp?: number }>(token);
       
       if (!decoded || !decoded.exp) {
         console.warn('Token missing expiration, cannot blacklist properly');
@@ -103,33 +90,6 @@ class TokenBlacklist {
    * @param token JWT token to check
    * @returns true if blacklisted, false otherwise
    */
-  /**
-   * Add a token to the blacklist with a specific expiration and reason
-   * @param tokenOrId Token string or JWT token ID
-   * @param expiresAt Expiration timestamp in milliseconds
-   * @param reason Reason for blacklisting the token
-   */
-  add(tokenOrId: string, expiresAt: number, reason?: string): void {
-    try {
-      // If it looks like a JWT, blacklist the token itself
-      if (tokenOrId.includes('.')) {
-        this.blacklistToken(tokenOrId);
-        return;
-      }
-      
-      // Otherwise, assume it's a token ID and add it to the blacklist
-      this.blacklistedTokens.push({
-        signature: tokenOrId, // Use the token ID as the signature
-        expires: expiresAt
-      });
-      
-      // Clean up expired tokens periodically
-      this.cleanupIfNeeded();
-    } catch (error) {
-      console.error('Error adding token to blacklist:', error);
-    }
-  }
-
   isBlacklisted(token: string): boolean {
     try {
       // Extract parts of the token
@@ -150,24 +110,7 @@ class TokenBlacklist {
       
       // Check if user is blacklisted
       try {
-        // Safely decode JWT payload without dependency on external library
-        // This works in both client and server environments
-        let decoded: { sub?: string | number } = {};
-        
-        try {
-          // First try using jwtDecode if available (client-side)
-          if (typeof jwtDecode === 'function') {
-            decoded = jwtDecode<{ sub?: string | number }>(token);
-          } else {
-            // Manual decoding as fallback (server-side)
-            const base64Payload = payload.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = Buffer.from(base64Payload, 'base64').toString('utf8');
-            decoded = JSON.parse(jsonPayload);
-          }
-        } catch (decodeError) {
-          console.error('Error decoding token:', decodeError);
-          return false;
-        }
+        const decoded = jwtDecode<{ sub?: string | number }>(token);
         
         if (!decoded || !decoded.sub) {
           return false;
@@ -184,7 +127,7 @@ class TokenBlacklist {
         // Or check if this specific token is blacklisted
         return userBlacklist ? userBlacklist.has(signature) : false;
       } catch (e) {
-        console.error('Error processing token for blacklist check:', e);
+        console.error('Error decoding token for blacklist check:', e);
         return false;
       }
     } catch (error) {

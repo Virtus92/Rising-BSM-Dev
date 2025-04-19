@@ -4,6 +4,9 @@
 export enum CommonStatus {
   ACTIVE = "active",
   INACTIVE = "inactive",
+  PENDING = "pending",
+  ARCHIVED = "archived",
+  SUSPENDED = "suspended",
   DELETED = "deleted"
 }
 

@@ -293,7 +293,8 @@ export interface CustomerDetailResponseDto extends CustomerResponseDto {
  * @returns CustomerDto
  */
 export function mapCustomerToDto(customer: Customer): CustomerDto {
-  return {
+  // Create base DTO with all standard properties
+  const dto: CustomerDto = {
     id: customer.id,
     name: customer.name,
     company: customer.company,
@@ -308,8 +309,46 @@ export function mapCustomerToDto(customer: Customer): CustomerDto {
     status: customer.status,
     type: customer.type,
     createdAt: customer.createdAt,
-    updatedAt: customer.updatedAt
+    updatedAt: customer.updatedAt,
   };
+  
+  // Add display labels for status and type
+  dto.statusLabel = getStatusLabel(customer.status);
+  dto.typeLabel = getTypeLabel(customer.type);
+  
+  return dto;
+}
+
+/**
+ * Helper function to get a human-readable status label
+ */
+function getStatusLabel(status: CommonStatus): string {
+  switch (status) {
+    case CommonStatus.ACTIVE:
+      return 'Active';
+    case CommonStatus.INACTIVE:
+      return 'Inactive';
+    case CommonStatus.PENDING:
+      return 'Pending';
+    case CommonStatus.DELETED:
+      return 'Deleted';
+    default:
+      return status; // Fallback to the enum value as string
+  }
+}
+
+/**
+ * Helper function to get a human-readable type label
+ */
+function getTypeLabel(type: CustomerType): string {
+  switch (type) {
+    case CustomerType.PRIVATE:
+      return 'Private';
+    case CustomerType.BUSINESS:
+      return 'Business';
+    default:
+      return type; // Fallback to the enum value as string
+  }
 }
 
 /**
@@ -325,6 +364,12 @@ export interface CustomerLogDto extends ActivityLogDto {
    * Kundenname
    */
   customerName: string;
+
+  /**
+   * Text representation of details for display purposes
+   * Uses undefined instead of null to be compatible with the rest of the system
+   */
+  text?: string;
 }
 
 /**

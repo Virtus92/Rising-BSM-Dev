@@ -1,74 +1,74 @@
 import { BaseEntity } from './BaseEntity';
 import { UserRole, UserStatus } from '../enums/UserEnums';
 
-// Re-export der Enums für einfachen Zugriff
+// Re-export the enums for easy access
 export { UserRole, UserStatus } from '../enums/UserEnums';
 
 /**
- * Benutzer-Entität
+ * User Entity
  * 
- * Repräsentiert einen Benutzer im System.
+ * Represents a user in the system.
  */
 export class User extends BaseEntity {
   /**
-   * Benutzername
+   * Username
    */
   name: string;
   
   /**
-   * E-Mail-Adresse
+   * Email address
    */
   email: string;
   
   /**
-   * Gehashtes Passwort
+   * Hashed password
    */
   password?: string;
   
   /**
-   * Benutzerrolle
+   * User role
    */
   role: UserRole;
   
   /**
-   * Telefonnummer
+   * Phone number
    */
   phone?: string;
   
   /**
-   * Benutzerstatus
+   * User status
    */
   status: UserStatus;
   
   /**
-   * Profilbild-URL
+   * Profile picture URL
    */
   profilePicture?: string;
   
   /**
-   * Benutzerberechtigungen
+   * User permissions
    */
   permissions?: string[];
   
   /**
-   * Letzter Anmeldezeitpunkt
+   * Last login timestamp
    */
   lastLoginAt?: Date;
   
   /**
-   * Token zum Zurücksetzen des Passworts
+   * Password reset token
    */
   resetToken?: string;
   
   /**
-   * Ablaufzeitpunkt des Tokens zum Zurücksetzen des Passworts
+   * Expiration timestamp of the password reset token
    */
   resetTokenExpiry?: Date;
   
   /**
-   * Konstruktor
+   * Constructor
    * 
-   * @param data - Initialisierungsdaten
+   * @param data - Initialization data
    */
   constructor(data: Partial<User> = {}) {
     super(data);
@@ -89,14 +89,14 @@ export class User extends BaseEntity {
   }
   
   /**
-   * Gibt den Vornamen zurück
+   * Returns the first name
    */
   get firstName(): string {
     return this.name.split(' ')[0];
   }
   
   /**
-   * Gibt den Nachnamen zurück
+   * Returns the last name
    */
   get lastName(): string {
     const nameParts = this.name.split(' ');
@@ -104,44 +104,44 @@ export class User extends BaseEntity {
   }
   
   /**
-   * Gibt den vollständigen Namen zurück
+   * Returns the full name
    */
   getFullName(): string {
     return this.name.trim();
   }
   
   /**
-   * Prüft, ob der Benutzer aktiv ist
+   * Checks if the user is active
    */
   isActive(): boolean {
     return this.status === UserStatus.ACTIVE;
   }
   
   /**
-   * Prüft, ob der Benutzer Admin-Rechte hat
+   * Checks if the user has admin rights
    */
   isAdmin(): boolean {
     return this.role === UserRole.ADMIN;
   }
   
   /**
-   * Prüft, ob der Benutzer Manager-Rechte oder höher hat
+   * Checks if the user has manager rights or higher
    */
   isManagerOrAbove(): boolean {
     return this.role === UserRole.ADMIN || this.role === UserRole.MANAGER;
   }
   
   /**
-   * Prüft, ob der Benutzer eine bestimmte Rolle hat
+   * Checks if the user has a specific role
    * 
-   * @param role - Zu prüfende Rolle
+   * @param role - Role to check
    */
   hasRole(role: UserRole): boolean {
     return this.role === role;
   }
   
   /**
-   * Zeichnet eine Anmeldung auf
+   * Records a login
    */
   recordLogin(): User {
     this.lastLoginAt = new Date();
@@ -149,9 +149,9 @@ export class User extends BaseEntity {
   }
   
   /**
-   * Ändert das Passwort des Benutzers
+   * Changes the user's password
    * 
-   * @param hashedPassword - Neues gehashtes Passwort
+   * @param hashedPassword - New hashed password
    */
   changePassword(hashedPassword: string): User {
     this.password = hashedPassword;
@@ -162,10 +162,10 @@ export class User extends BaseEntity {
   }
   
   /**
-   * Setzt ein Token zum Zurücksetzen des Passworts
+   * Sets a token for password reset
    * 
-   * @param token - Token zum Zurücksetzen
-   * @param expiryHours - Ablaufzeit in Stunden
+   * @param token - Reset token
+   * @param expiryHours - Expiry time in hours
    */
   setResetToken(token: string, expiryHours: number = 24): User {
     this.resetToken = token;
@@ -179,21 +179,21 @@ export class User extends BaseEntity {
   }
   
   /**
-   * Prüft, ob ein Token zum Zurücksetzen des Passworts gültig ist
+   * Checks if a password reset token is valid
    * 
-   * @param token - Zu prüfendes Token
+   * @param token - Token to check
    */
   isResetTokenValid(token: string): boolean {
     if (!this.resetToken || !this.resetTokenExpiry) {
       return false;
     }
     
-    // Prüfen, ob das Token übereinstimmt
+    // Check if the token matches
     if (this.resetToken !== token) {
       return false;
     }
     
-    // Prüfen, ob das Token nicht abgelaufen ist
+    // Check if the token has not expired
     return this.resetTokenExpiry > new Date();
   }
   
@@ -228,7 +228,7 @@ export class User extends BaseEntity {
   }
   
   /**
-   * Validiert das E-Mail-Format
+   * Validates the email format
    */
   isValidEmail(): boolean {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -236,10 +236,10 @@ export class User extends BaseEntity {
   }
   
   /**
-   * Aktualisiert den Benutzerstatus
+   * Updates the user status
    * 
-   * @param status - Neuer Status
-   * @param updatedBy - ID des Benutzers, der die Änderung durchführt
+   * @param status - New status
+   * @param updatedBy - ID of the user making the change
    */
   updateStatus(status: UserStatus, updatedBy?: number): User {
     this.status = status;
@@ -248,40 +248,40 @@ export class User extends BaseEntity {
   }
   
   /**
-   * Deaktiviert den Benutzer
+   * Deactivates the user
    * 
-   * @param updatedBy - ID des Benutzers, der die Deaktivierung durchführt
+   * @param updatedBy - ID of the user performing the deactivation
    */
   deactivate(updatedBy?: number): User {
     return this.updateStatus(UserStatus.INACTIVE, updatedBy);
   }
   
   /**
-   * Aktiviert den Benutzer
+   * Activates the user
    * 
-   * @param updatedBy - ID des Benutzers, der die Aktivierung durchführt
+   * @param updatedBy - ID of the user performing the activation
    */
   activate(updatedBy?: number): User {
     return this.updateStatus(UserStatus.ACTIVE, updatedBy);
   }
   
   /**
-   * Markiert den Benutzer als gelöscht (Soft Delete)
+   * Marks the user as deleted (Soft Delete)
    * 
-   * @param updatedBy - ID des Benutzers, der die Löschung durchführt
+   * @param updatedBy - ID of the user performing the deletion
    */
   softDelete(updatedBy?: number): User {
     return this.updateStatus(UserStatus.DELETED, updatedBy);
   }
   
   /**
-   * Aktualisiert die Benutzerdaten
+   * Updates the user data
    * 
-   * @param data - Neue Daten
-   * @param updatedBy - ID des Benutzers, der die Aktualisierung durchführt
+   * @param data - New data
+   * @param updatedBy - ID of the user performing the update
    */
   update(data: Partial<User>, updatedBy?: number): User {
-    // Nur definierte Eigenschaften aktualisieren
+    // Only update defined properties
     if (data.name !== undefined) this.name = data.name;
     if (data.email !== undefined) this.email = data.email;
     if (data.role !== undefined) this.role = data.role;
@@ -291,14 +291,14 @@ export class User extends BaseEntity {
     if (data.password !== undefined) this.password = data.password;
     if (data.permissions !== undefined) this.permissions = data.permissions;
     
-    // Auditdaten aktualisieren
+    // Update audit data
     this.updateAuditData(updatedBy);
     
     return this;
   }
   
   /**
-   * Konvertiert die Entität in ein einfaches Objekt
+   * Converts the entity to a plain object
    */
   override toObject(): Record<string, any> {
     const baseObject = super.toObject();

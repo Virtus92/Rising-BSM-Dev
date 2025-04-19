@@ -13,10 +13,11 @@ import {
   FormLabel,
   FormMessage,
 } from '@/shared/components/ui/form';
-import { useRequest } from '../hooks/useRequest';
 import { useQuery } from '@tanstack/react-query';
 import { ApiClient } from '@/infrastructure/clients/ApiClient';
 import { CustomerClient } from '@/infrastructure/api/CustomerClient';
+import { RequestService } from '@/infrastructure/clients/RequestService';
+import { useToast } from '@/shared/hooks/useToast';
 import { Loader2, Search } from 'lucide-react';
 import {
   Command,
@@ -56,9 +57,10 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   requestId,
   onClose,
 }) => {
-  const { linkToCustomer, isLinking } = useRequest(requestId);
+  const [isLinking, setIsLinking] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const { toast } = useToast();
 
   // Kundensuche
   // Use the static method directly
@@ -85,9 +87,35 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
     (customer: any) => customer.id === selectedCustomerId
   );
 
-  const onSubmit = (data: FormValues) => {
-    linkToCustomer(data.customerId, data.note);
-    onClose();
+  const onSubmit = async (data: FormValues) => {
+    try {
+      setIsLinking(true);
+      const response = await RequestService.linkToCustomer(requestId, data.customerId, data.note);
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Request successfully linked to customer",
+          variant: "success"
+        });
+        onClose();
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to link customer",
+          variant: "error"
+        });
+      }
+    } catch (error) {
+      console.error("Error linking customer:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "error"
+      });
+    } finally {
+      setIsLinking(false);
+    }
   };
 
   return (

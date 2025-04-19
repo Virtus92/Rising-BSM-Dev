@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { AppointmentDetail } from '@/features/appointments/components/AppointmentDetail';
 import { validateId } from '@/shared/utils/validation-utils';
@@ -8,11 +9,12 @@ import { PermissionGuard } from '@/shared/components/PermissionGuard';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { Button } from '@/shared/components/ui/button';
 
-export default function AppointmentDetailPage({ params }: { params: { id: string } }) {
+export default function AppointmentDetailPage() {
   const router = useRouter();
+  const params = useParams();
   
   // CRITICAL FIX: Only use the validated ID and not the fallback to raw params.id
-  const validId = validateId(params.id);
+  const validId = validateId(params.id as string);
   
   // If we don't have a valid ID, we'll show an error message in the component
   return (

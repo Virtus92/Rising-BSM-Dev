@@ -306,9 +306,10 @@ export const RequestList: React.FC<RequestListProps> = ({ initialFilters, onCrea
         }}
         onActionClick={handleCardAction}
         
-        // Create button
-        createButtonLabel="New Request"
-        onCreateClick={onCreateClick || (() => router.push('/dashboard/requests/new'))}
+        // No Create button for requests as they come from public form
+        // createButtonLabel="New Request"
+        // onCreateClick={onCreateClick || (() => router.push('/dashboard/requests/new'))}
+        
         
         // Sort state
         sortColumn={filters.sortBy}

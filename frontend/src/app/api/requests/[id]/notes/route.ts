@@ -101,7 +101,7 @@ export const GET = apiRouteHandler(
         id: note.id,
         requestId: note.requestId,
         userId: note.userId,
-        userName: note.userName,
+        userName: note.userName || 'Unknown User',
         text: note.text,
         createdAt: note.createdAt,
         updatedAt: note.updatedAt || note.createdAt,

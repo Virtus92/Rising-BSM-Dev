@@ -2,6 +2,40 @@ import { BaseResponseDto, BaseFilterParamsDto } from './BaseDto';
 import { RequestStatus } from '../enums/CommonEnums';
 import { ContactRequest } from '../entities/ContactRequest';
 
+// Explicitly redefine these types here to avoid circular dependencies with Symbol exports
+export type RequestSource = 'human' | 'chatbot' | 'call-agent' | 'email' | 'form' | 'api';
+
+export interface RequestMetadata {
+  aiProcessed?: boolean;
+  confidenceScore?: number;
+  lastProcessedBy?: string;
+  lastProcessedAt?: string;
+  processingSteps?: Array<{
+    agentId: string;
+    timestamp: string;
+    action: string;
+    result: string;
+  }>;
+  tags?: string[];
+  n8n?: {
+    workflowTriggered?: boolean;
+    workflowName?: string;
+    workflowId?: string;
+    executionId?: string;
+    workflowStatus?: string;
+    triggerTimestamp?: string;
+    progress?: number;
+    currentStep?: string;
+    error?: {
+      message: string;
+      code?: string;
+      details?: any;
+    };
+    [key: string]: any;
+  };
+  [key: string]: any; // Allow for flexible extension
+}
+
 /**
  * Haupt-DTO für Kontaktanfragen
  */
@@ -16,6 +50,10 @@ export interface RequestDto extends BaseResponseDto {
   customerId?: number;
   appointmentId?: number;
   ipAddress?: string;
+  
+  // New fields
+  source?: RequestSource;
+  metadata?: RequestMetadata;
 }
 
 /**
@@ -51,6 +89,16 @@ export interface CreateRequestDto {
    * IP-Adresse (optional, wird automatisch gesetzt)
    */
   ipAddress?: string;
+  
+  /**
+   * Source of the request (human, AI, etc.)
+   */
+  source?: RequestSource;
+  
+  /**
+   * Metadata for AI processing
+   */
+  metadata?: RequestMetadata;
 }
 
 /**
@@ -101,6 +149,16 @@ export interface UpdateRequestDto {
    * ID des zugeordneten Termins
    */
   appointmentId?: number;
+  
+  /**
+   * Source of the request (human, AI, etc.)
+   */
+  source?: RequestSource;
+  
+  /**
+   * Metadata for AI processing
+   */
+  metadata?: RequestMetadata;
 }
 
 /**
@@ -289,6 +347,16 @@ export interface RequestResponseDto extends BaseResponseDto {
    * IP-Adresse
    */
   ipAddress?: string;
+  
+  /**
+   * Source of the request (human, AI, etc.)
+   */
+  source?: RequestSource;
+  
+  /**
+   * Metadata for AI processing
+   */
+  metadata?: RequestMetadata;
 }
 
 /**
@@ -355,6 +423,11 @@ export interface RequestFilterParamsDto extends BaseFilterParamsDto {
    * Nur Anfragen, die keinem Kunden zugeordnet sind
    */
   notConverted?: boolean;
+  
+  /**
+   * Filter by source
+   */
+  source?: RequestSource;
 }
 
 /**
@@ -376,6 +449,8 @@ export function mapRequestToDto(request: ContactRequest): RequestDto {
     customerId: request.customerId,
     appointmentId: request.appointmentId,
     ipAddress: request.ipAddress,
+    source: request.source,
+    metadata: request.metadata,
     createdAt: request.createdAt.toISOString(),
     updatedAt: request.updatedAt.toISOString()
   };

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as jose from 'jose';  // Using jose for Edge-compatible JWT validation
-import { tokenBlacklist } from '@/infrastructure/auth/TokenBlacklist';
-import { securityConfig } from '@/infrastructure/common/config/SecurityConfig';
+import { tokenBlacklistServer } from '@/infrastructure/auth/TokenBlacklistServer';
+import { securityConfigEdge } from '@/infrastructure/common/config/SecurityConfigEdge';
 import { TokenManager } from '@/infrastructure/auth/TokenManager';
 
 // Cache for user verification results to reduce API calls
@@ -18,16 +18,16 @@ const CACHE_TTL = 60 * 1000; // 1 minute cache TTL
 async function isTokenValid(token: string): Promise<boolean> {
   try {
     // Initialize security config
-    securityConfig.initialize();
+    securityConfigEdge.initialize();
     
     // First check if the token is blacklisted
-    if (tokenBlacklist.isBlacklisted(token)) {
+    if (tokenBlacklistServer.isBlacklisted(token)) {
       console.log('Token is blacklisted');
       return false;
     }
     
     // Get JWT secret from security config
-    const jwtSecret = securityConfig.getJwtSecret();
+    const jwtSecret = securityConfigEdge.getJwtSecret();
     
     // Create secret key for validation
     const secretKey = new TextEncoder().encode(jwtSecret);
@@ -60,51 +60,39 @@ async function isTokenValid(token: string): Promise<boolean> {
         // This is for backward compatibility with existing tokens
         console.log('Claim validation failed, trying legacy verification:', claimError);
         
-        // Only try legacy verification if the error is specifically about missing claims
-        // and not some other verification error
-        if (claimError instanceof Error && 
-            (claimError.name === 'JWTClaimValidationFailed' || 
-             claimError.message.includes('claim validation'))) {
-          
-          const { payload } = await jose.jwtVerify(token, secretKey, {
-            // No issuer or audience requirements for backward compatibility
-          });
-          
-          // Check for expiration
-          const exp = payload.exp;
-          if (!exp) {
-            console.log('Token missing expiration');
-            return false;
-          }
-          
-          // Check if token is expired
-          const now = Math.floor(Date.now() / 1000);
-          if (exp < now) {
-            console.log(`Token expired at ${new Date(exp * 1000).toISOString()}`);
-            return false;
-          }
-          
-          // Verify that the user referenced in the token still exists and is active
-          if (payload.sub) {
-            const isUserValid = await verifyUserExists(payload.sub.toString());
-            if (!isUserValid) {
-              console.log(`User ${payload.sub} not found or inactive`);
-              return false;
-            }
-          } else {
-            console.log('Legacy token missing user ID (sub claim)');
-            return false;
-          }
-          
-          // Basic validation passed for legacy token
-          console.log('Legacy token validation passed (no issuer/audience) with valid user');
-          return true;
-        } else {
-          // If it's not a claim validation error, it's likely a more serious issue like
-          // an invalid signature, so we don't fall back to less secure validation
-          console.log('Token validation failed with non-claim error:', claimError);
+        const { payload } = await jose.jwtVerify(token, secretKey, {
+          // No issuer or audience requirements for backward compatibility
+        });
+        
+        // Check for expiration
+        const exp = payload.exp;
+        if (!exp) {
+          console.log('Token missing expiration');
           return false;
         }
+        
+        // Check if token is expired
+        const now = Math.floor(Date.now() / 1000);
+        if (exp < now) {
+          console.log(`Token expired at ${new Date(exp * 1000).toISOString()}`);
+          return false;
+        }
+        
+        // Verify that the user referenced in the token still exists and is active
+        if (payload.sub) {
+          const isUserValid = await verifyUserExists(payload.sub.toString());
+          if (!isUserValid) {
+            console.log(`User ${payload.sub} not found or inactive`);
+            return false;
+          }
+        } else {
+          console.log('Legacy token missing user ID (sub claim)');
+          return false;
+        }
+        
+        // Basic validation passed for legacy token
+        console.log('Legacy token validation passed (no issuer/audience) with valid user');
+        return true;
       }
     } catch (verifyError) {
       console.log('Token signature verification failed:', verifyError);
@@ -167,7 +155,7 @@ async function verifyUserExists(userId: string): Promise<boolean> {
  */
 export async function middleware(request: NextRequest) {
   // Initialize security config
-  securityConfig.initialize();
+  securityConfigEdge.initialize();
   
   // USE CONSISTENT TOKEN NAMES
   const token = request.cookies.get('auth_token')?.value;
@@ -277,83 +265,29 @@ export async function middleware(request: NextRequest) {
         // Log successful validation
         console.log(`Token validation passed for ${pathname}`);
         
-        // Extract user data from the token
-        let userData = null;
-        try {
-          const decoded = jose.decodeJwt(token);
-          userData = {
-            userId: Number(decoded.sub),
-            name: decoded.name as string || '',
-            email: decoded.email as string || '',
-            role: decoded.role as string || ''
-          };
-        } catch (e) {
-          console.log('Error decoding token data:', e);
-        }
-        
         // Token is valid, create response
         const response = NextResponse.next();
         
-        // CRITICAL FIX: Always add auth info for API routes
+        // CRITICAL FIX: Always add X-Auth-Token for API routes
+        // This ensures the token is available to API handlers
         if (pathname.startsWith('/api/')) {
-          console.log(`Adding authentication headers for API route: ${pathname}`);
-          
-          // Add the JWT token itself
+          console.log(`Adding X-Auth-Token header for API route: ${pathname}`);
           response.headers.set('X-Auth-Token', token);
-          
-          // Also add decoded user data for API routes to access
-          if (userData) {
-            response.headers.set('X-Auth-User-Id', userData.userId.toString());
-            if (userData.role) response.headers.set('X-Auth-User-Role', userData.role);
-            
-            // Add a more complete set of data in a single header
-            const authDataJson = JSON.stringify({
-              userId: userData.userId,
-              role: userData.role || '',
-              name: userData.name || '',
-              email: userData.email || ''
-            });
-            
-            response.headers.set('X-Auth-Data', Buffer.from(authDataJson).toString('base64'));
-          }
-          
-          // Ensure the auth_token cookie is properly set
-          if (!request.cookies.has('auth_token') || request.cookies.get('auth_token')?.value !== token) {
-            // Get expiration time from the token
-            let expiresIn = 24 * 60 * 60; // Default 24 hours
-            try {
-              const decoded = jose.decodeJwt(token);
-              if (decoded.exp) {
-                // Calculate seconds until expiration
-                expiresIn = Math.max(0, decoded.exp - Math.floor(Date.now() / 1000));
-              }
-            } catch (e) {
-              console.log('Error decoding token expiration, using default:', e);
-            }
-            
-            // Set the auth_token cookie on the response
-            response.cookies.set({
-              name: 'auth_token',
-              value: token,
-              httpOnly: true,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'strict',
-              path: '/',
-              maxAge: expiresIn
-            });
-          }
         }
         
         return response;
       } else {
+        // Token is invalid or expired - handle appropriately
         console.log(`Token appears invalid in middleware for ${pathname}`);
         
         // For protected page routes: redirect to login
         if (!isPublicPath && !pathname.startsWith('/api/')) {
+          // Clean the returnUrl to prevent loops
           const cleanPath = pathname.replace(/\/api\/api\//, '/api/');
           const url = new URL('/auth/login', request.url);
           url.searchParams.set('returnUrl', encodeURI(cleanPath));
           
+          // Clear the invalid token
           const response = NextResponse.redirect(url);
           response.cookies.delete('auth_token');
           response.cookies.delete('refresh_token');
@@ -374,6 +308,7 @@ export async function middleware(request: NextRequest) {
         }
       }
     } catch (error) {
+      // Token validation error
       console.log(`Token validation error in middleware for ${pathname}:`, error);
       
       // For protected page routes: redirect to login
@@ -381,6 +316,7 @@ export async function middleware(request: NextRequest) {
         const url = new URL('/auth/login', request.url);
         url.searchParams.set('returnUrl', encodeURI(pathname));
         
+        // Clear the invalid token
         const response = NextResponse.redirect(url);
         response.cookies.delete('auth_token');
         response.cookies.delete('refresh_token');
@@ -402,6 +338,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Default behavior for routes that don't match any condition
   console.log(`Default middleware behavior for ${pathname}`);
   return NextResponse.next();
 }

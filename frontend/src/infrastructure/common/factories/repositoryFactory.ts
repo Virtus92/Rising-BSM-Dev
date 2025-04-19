@@ -14,6 +14,7 @@ import { AppointmentRepository } from '@/infrastructure/repositories/Appointment
 import { RequestRepository } from '@/infrastructure/repositories/RequestRepository';
 import { NotificationRepository } from '@/infrastructure/repositories/NotificationRepository';
 import { PermissionRepository } from '@/infrastructure/repositories/PermissionRepository';
+import { RequestDataRepository } from '@/infrastructure/repositories/request-data/RequestDataRepository';
 
 // Interfaces
 import { IUserRepository } from '@/domain/repositories/IUserRepository';
@@ -24,6 +25,7 @@ import { IAppointmentRepository } from '@/domain/repositories/IAppointmentReposi
 import { IRequestRepository } from '@/domain/repositories/IRequestRepository';
 import { INotificationRepository } from '@/domain/repositories/INotificationRepository';
 import { IPermissionRepository } from '@/domain/repositories/IPermissionRepository';
+import { IRequestDataRepository } from '@/domain/repositories/IRequestDataRepository';
 
 // Singleton-Instanzen für Repositories
 let userRepository: UserRepository;
@@ -34,6 +36,7 @@ let appointmentRepository: AppointmentRepository;
 let requestRepository: RequestRepository;
 let notificationRepository: NotificationRepository;
 let permissionRepository: PermissionRepository;
+let requestDataRepository: RequestDataRepository;
 
 /**
  * Gibt eine Singleton-Instanz des UserRepository zurück
@@ -120,6 +123,20 @@ export function getRequestRepository(): IRequestRepository {
 }
 
 /**
+ * Returns a singleton instance of the RequestDataRepository
+ */
+export function getRequestDataRepository(): IRequestDataRepository {
+  if (!requestDataRepository) {
+    requestDataRepository = new RequestDataRepository(
+      getPrismaClient(),
+      getLogger(),
+      getErrorHandler()
+    );
+  }
+  return requestDataRepository;
+}
+
+/**
  * Gibt eine Singleton-Instanz des NotificationRepository zurück
  */
 export function getNotificationRepository(): INotificationRepository {
@@ -160,4 +177,5 @@ export function resetRepositories(): void {
   requestRepository = undefined as any;
   notificationRepository = undefined as any;
   permissionRepository = undefined as any;
+  requestDataRepository = undefined as any;
 }

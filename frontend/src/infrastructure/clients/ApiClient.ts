@@ -5,12 +5,13 @@
  * Uses cookies for authentication instead of localStorage
  * This is explicitly marked as a client component and should not be used directly in server components
  */
+import { permissionErrorHandler, formatPermissionDeniedMessage } from '@/shared/utils/permission-error-handler';
 
 // GLOBAL INITIALIZATION FLAG - outside the class to ensure it's truly a singleton across all imports
 // This is critically important - React may import this file multiple times
 let GLOBAL_API_INITIALIZED = false;
 let GLOBAL_INIT_PROMISE: Promise<void> | null = null;
-let GLOBAL_API_BASE_URL = '/api';
+let GLOBAL_API_BASE_URL = '';
 let GLOBAL_API_HEADERS: Record<string, string> = { 'Content-Type': 'application/json' };
 
 // Expose a window-level flag we can check for debugging
@@ -29,6 +30,7 @@ export interface ApiResponse<T = any> {
   message?: string;
   errors?: string[];
   statusCode?: number;
+  errorType?: 'permission' | 'validation' | 'network' | 'unknown';
 }
 
 export class ApiClient {
@@ -387,6 +389,38 @@ export class ApiClient {
   }
 
   /**
+   * Handle permission errors
+   * @param status HTTP status code
+   * @param message Error message
+   * @returns API response with permission error details
+   */
+  private static handlePermissionError<T>(status: number, message: string): ApiResponse<T> {
+    // Use the permission error handler to format a friendly message
+    const formattedMessage = formatPermissionDeniedMessage(message);
+    
+    // Format a user-friendly permission error message
+    const permissionMessage = message?.includes('permission') 
+      ? formattedMessage || message
+      : 'You do not have permission to perform this action';
+    
+    // Log the permission error for debugging
+    console.error('Permission error:', { status, message, formattedMessage });
+    
+    // Call the permission error handler to show appropriate UI feedback
+    permissionErrorHandler.handle(permissionMessage);
+    
+    // Include error type for better client-side handling
+    return {
+      success: false,
+      data: null as any,
+      message: permissionMessage,
+      errors: [permissionMessage],
+      statusCode: status,
+      errorType: 'permission'
+    };
+  }
+
+  /**
    * Handle API response
    * @param response Fetch API response
    * @returns API response
@@ -439,8 +473,8 @@ export class ApiClient {
             if (!response.url.includes('/api/auth/refresh') && typeof window !== 'undefined') {
               try {
                 // Import TokenManager dynamically to avoid circular dependencies
-                const { TokenManager } = await import('@/infrastructure/auth/TokenManager');
-                const refreshSuccess = await TokenManager.refreshAccessToken();
+                const { ClientTokenManager } = await import('@/infrastructure/auth/ClientTokenManager');
+                const refreshSuccess = await ClientTokenManager.refreshAccessToken();
                 
                 if (refreshSuccess) {
                   // Retry the original request after token refresh
@@ -463,6 +497,14 @@ export class ApiClient {
             if (typeof window !== 'undefined') {
               window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
             }
+          }
+          
+          // Check for permission errors (403 Forbidden)
+          if (response.status === 403) {
+            return this.handlePermissionError<T>(
+              response.status, 
+              json.message || json.error || response.statusText
+            );
           }
           
           // Error with JSON details
@@ -490,9 +532,9 @@ export class ApiClient {
           if (response.status === 401 && typeof window !== 'undefined') {
             // Try to refresh the token first
             try {
-              // Import TokenManager dynamically to avoid circular dependencies
-              const { TokenManager } = await import('@/infrastructure/auth/TokenManager');
-              const refreshSuccess = await TokenManager.refreshAccessToken();
+                // Import TokenManager dynamically to avoid circular dependencies
+                const { ClientTokenManager } = await import('@/infrastructure/auth/ClientTokenManager');
+                const refreshSuccess = await ClientTokenManager.refreshAccessToken();
               
               if (refreshSuccess) {
                 // Retry the original request after token refresh
@@ -512,6 +554,14 @@ export class ApiClient {
             
             // If refresh fails, redirect to login page
             window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
+          }
+          
+          // Check for permission errors (403 Forbidden)
+          if (response.status === 403) {
+            return this.handlePermissionError<T>(
+              response.status, 
+              text || response.statusText
+            );
           }
           
           // Error with text details

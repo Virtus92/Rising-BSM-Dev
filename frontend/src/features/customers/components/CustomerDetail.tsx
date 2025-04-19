@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Edit, Trash2, Mail, Phone, MapPin, Building, Calendar, Tag, ArrowLeft } from 'lucide-react';
+import { Edit, Trash2, Mail, Phone, MapPin, Building, Calendar, Tag, ArrowLeft, MessageSquare, FileText } from 'lucide-react';
 import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
 import { useCustomer } from '@/features/customers/hooks/useCustomer';
 import { useToast } from '@/shared/hooks/useToast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { CustomerAppointmentsTab } from './CustomerAppointmentsTab';
+import { NotesTab } from './NotesTab';
 
 interface CustomerDetailProps {
   customerId: string | number;
@@ -268,6 +271,40 @@ export default function CustomerDetail({ customerId, onClose }: CustomerDetailPr
             </div>
           </div>
         )}
+      </div>
+
+      {/* Tabs for customer data */}
+      <div className="mt-6">
+        <Tabs defaultValue="info" className="w-full">
+          <div className="overflow-x-auto pb-2">
+            <TabsList className="mb-2 flex w-full justify-start md:justify-center flex-nowrap">
+              <TabsTrigger value="info" className="min-w-max">
+                <FileText className="h-4 w-4 mr-2" />
+                <span className="whitespace-nowrap">Information</span>
+              </TabsTrigger>
+              <TabsTrigger value="appointments" className="min-w-max">
+                <Calendar className="h-4 w-4 mr-2" />
+                <span className="whitespace-nowrap">Appointments</span>
+              </TabsTrigger>
+              <TabsTrigger value="notes" className="min-w-max">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                <span className="whitespace-nowrap">Notes</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          
+          <TabsContent value="info" className="mt-2">
+            {/* Customer information is shown by default */}
+          </TabsContent>
+          
+          <TabsContent value="appointments" className="mt-2 px-4">
+            <CustomerAppointmentsTab customerId={parseInt(String(customerId))} />
+          </TabsContent>
+          
+          <TabsContent value="notes" className="mt-2 px-4">
+            <NotesTab customerId={parseInt(String(customerId))} />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Löschen-Bestätigungsdialog */}

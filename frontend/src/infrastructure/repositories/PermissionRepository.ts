@@ -5,6 +5,7 @@ import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 import { ILoggingService } from '@/infrastructure/common/logging/ILoggingService';
 import { IErrorHandler } from '@/infrastructure/common/error/ErrorHandler';
 import { getPermissionsForRole } from '@/domain/enums/PermissionEnums';
+import { SystemPermissionMap, getAllPermissionCodes } from '@/domain/permissions/SystemPermissionMap';
 import { UserRole } from '@/domain/entities/User';
 import { QueryOptions } from './PrismaRepository';
 
@@ -45,37 +46,13 @@ export class PermissionRepository implements IPermissionRepository {
       
       this.logger.info('Seeding default permissions into database...');
       
-      // Define common system permissions
-      const allPermissions = [
-        { code: 'system.access', name: 'System Access', description: 'Can access the system', category: 'System' },
-        { code: 'users.view', name: 'View Users', description: 'Can view user list and details', category: 'Users' },
-        { code: 'users.create', name: 'Create Users', description: 'Can create new users', category: 'Users' },
-        { code: 'users.edit', name: 'Edit Users', description: 'Can edit existing users', category: 'Users' },
-        { code: 'users.delete', name: 'Delete Users', description: 'Can delete users', category: 'Users' },
-        { code: 'roles.view', name: 'View Roles', description: 'Can view roles and permissions', category: 'Roles' },
-        { code: 'roles.create', name: 'Create Roles', description: 'Can create new roles', category: 'Roles' },
-        { code: 'roles.edit', name: 'Edit Roles', description: 'Can edit existing roles', category: 'Roles' },
-        { code: 'roles.delete', name: 'Delete Roles', description: 'Can delete roles', category: 'Roles' },
-        { code: 'customers.view', name: 'View Customers', description: 'Can view customer list and details', category: 'Customers' },
-        { code: 'customers.create', name: 'Create Customers', description: 'Can create new customers', category: 'Customers' },
-        { code: 'customers.edit', name: 'Edit Customers', description: 'Can edit existing customers', category: 'Customers' },
-        { code: 'customers.delete', name: 'Delete Customers', description: 'Can delete customers', category: 'Customers' },
-        { code: 'requests.view', name: 'View Requests', description: 'Can view request list and details', category: 'Requests' },
-        { code: 'requests.create', name: 'Create Requests', description: 'Can create new requests', category: 'Requests' },
-        { code: 'requests.edit', name: 'Edit Requests', description: 'Can edit existing requests', category: 'Requests' },
-        { code: 'requests.delete', name: 'Delete Requests', description: 'Can delete requests', category: 'Requests' },
-        { code: 'requests.approve', name: 'Approve Requests', description: 'Can approve requests', category: 'Requests' },
-        { code: 'requests.reject', name: 'Reject Requests', description: 'Can reject requests', category: 'Requests' },
-        { code: 'requests.assign', name: 'Assign Requests', description: 'Can assign requests to users', category: 'Requests' },
-        { code: 'appointments.view', name: 'View Appointments', description: 'Can view appointment list and details', category: 'Appointments' },
-        { code: 'appointments.create', name: 'Create Appointments', description: 'Can create new appointments', category: 'Appointments' },
-        { code: 'appointments.edit', name: 'Edit Appointments', description: 'Can edit existing appointments', category: 'Appointments' },
-        { code: 'appointments.delete', name: 'Delete Appointments', description: 'Can delete appointments', category: 'Appointments' },
-        { code: 'settings.view', name: 'View Settings', description: 'Can view system settings', category: 'Settings' },
-        { code: 'settings.edit', name: 'Edit Settings', description: 'Can edit system settings', category: 'Settings' },
-        { code: 'profile.view', name: 'View Profile', description: 'Can view own profile', category: 'Profile' },
-        { code: 'profile.edit', name: 'Edit Profile', description: 'Can edit own profile', category: 'Profile' },
-      ];
+      // Get permission definitions from centralized map
+      const allPermissions = Object.values(SystemPermissionMap).map(permission => ({
+        code: permission.code,
+        name: permission.name,
+        description: permission.description,
+        category: permission.category
+      }));
       
       // Insert all permissions in a transaction
       await this.prisma.$transaction(
@@ -205,15 +182,24 @@ export class PermissionRepository implements IPermissionRepository {
       // Find user in database to get role
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true }
+        select: { role: true, status: true }
       });
       
       if (!user) {
+        this.logger.warn(`User with ID ${userId} not found when fetching permissions`);
         throw this.errorHandler.createNotFoundError('User not found');
+      }
+
+      // Check if user is active
+      if (user.status !== 'active') {
+        this.logger.warn(`User with ID ${userId} has inactive status: ${user.status}`);
+        // Still continue to get permissions, but log a warning
       }
       
       // First get role-based default permissions
-      const rolePermissions = getPermissionsForRole(user.role);
+      const normalizedRole = user.role.toLowerCase();
+      this.logger.debug(`Getting role-based permissions for user ${userId} with role ${normalizedRole}`);
+      const rolePermissions = getPermissionsForRole(normalizedRole);
       
       // Then get user-specific permissions from the database
       const userPermissions = await this.prisma.userPermission.findMany({
@@ -226,10 +212,17 @@ export class PermissionRepository implements IPermissionRepository {
       
       // Use a Set to ensure uniqueness of permission codes
       const allPermissions = new Set([...rolePermissions, ...userPermissionCodes]);
+      const result = Array.from(allPermissions);
       
-      return Array.from(allPermissions);
+      this.logger.debug(`Retrieved ${result.length} permissions for user ${userId} (${rolePermissions.length} from role, ${userPermissionCodes.length} individual)`);
+      
+      return result;
     } catch (error) {
-      this.logger.error('Error in PermissionRepository.getUserPermissions', { error, userId });
+      this.logger.error('Error in PermissionRepository.getUserPermissions', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        userId 
+      });
       throw this.errorHandler.createError('Failed to get user permissions');
     }
   }

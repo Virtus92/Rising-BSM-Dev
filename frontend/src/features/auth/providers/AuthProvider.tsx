@@ -219,7 +219,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // If we still don't have user data, this is an application error
           console.error('AuthProvider: Critical error - authenticated but cannot retrieve user profile');
-          throw new Error('Authentication successful but user profile unavailable. Contact system administrator.');
+          // Instead of throwing an error that might crash the app,
+            // set user to null and log the error
+            console.error('Authentication successful but user profile unavailable');
+            setUser(null);
+            return false;
         }
       }
       
@@ -256,38 +260,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
               
               if (!authToken) {
-                throw new Error('No authentication token available after token refresh');
-              }
-              
-              const apiResponse = await fetch('/api/users/me', {
-                method: 'GET',
-                credentials: 'include',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${authToken}`,
-                  'Cache-Control': 'no-cache, no-store, must-revalidate'
-                }
-              });
-              
-              if (apiResponse.ok) {
-                const userData = await apiResponse.json();
-                if (userData && userData.data) {
-                  console.log('AuthProvider: Successfully retrieved user data after token refresh');
-                  setUser(userData.data);
-                  return true;
+                // Use the localStorage backup if cookie isn't available
+                authToken = localStorage.getItem('auth_token_backup');
+                if (!authToken) {
+                  console.warn('No authentication token available after token refresh');
+                  setUser(null);
+                  return false;
                 }
               }
               
-              // Log detailed error information
-              console.error('AuthProvider: Failed to fetch user data after token refresh', {
-                status: apiResponse.status,
-                statusText: apiResponse.statusText
-              });
-              
-              throw new Error(`User data fetch failed with status ${apiResponse.status}`);
+              // Use a more reliable error handling approach
+              try {
+                const apiResponse = await fetch('/api/users/me', {
+                  method: 'GET',
+                  credentials: 'include',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                    'Cache-Control': 'no-cache, no-store, must-revalidate'
+                  }
+                });
+                
+                if (apiResponse.ok) {
+                  const userData = await apiResponse.json();
+                  if (userData && userData.data) {
+                    console.log('AuthProvider: Successfully retrieved user data after token refresh');
+                    setUser(userData.data);
+                    return true;
+                  } else if (userData && userData.success && (userData.id || userData.email)) {
+                    // Handle response where user data is at top level
+                    console.log('AuthProvider: Successfully retrieved user data in alternate format');
+                    
+                    // Extract user info, ignoring standard response fields
+                    const { success, message, timestamp, ...possibleUser } = userData;
+                    setUser(possibleUser);
+                    return true;
+                  }
+                }
+                
+                // Log detailed error information
+                console.error('AuthProvider: Failed to fetch user data after token refresh', {
+                  status: apiResponse.status,
+                  statusText: apiResponse.statusText
+                });
+                
+                // Instead of throwing an error, return false
+                return false;
+              } catch (fetchError) {
+                console.error('AuthProvider: Network error fetching user data', fetchError);
+                return false;
+              }
             } catch (error) {
               console.error('AuthProvider: User fetch error after token refresh', error);
-              throw new Error('Authentication refresh successful but user profile unavailable');
+              return false;
             }
           }
         }

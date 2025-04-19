@@ -6,6 +6,7 @@ import { AppointmentService } from '@/infrastructure/clients/AppointmentService'
 import { AppointmentDto, AppointmentFilterParamsDto } from '@/domain/dtos/AppointmentDtos';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 import { createBaseListUtility, BaseListUtility } from '@/shared/utils/list/baseListUtils';
+import { permissionErrorHandler } from '@/shared/utils/permission-error-handler';
 
 /**
  * Extended interface for appointment list operations
@@ -59,7 +60,7 @@ export const useAppointments = (initialFilters?: Partial<AppointmentFilterParams
       if (process.env.NODE_ENV === 'development') {
         console.log('Mapped appointment filters:', mappedFilters);
       }
-      return await AppointmentService.getAppointments(mappedFilters);
+      return await AppointmentService.getAll(mappedFilters);
     },
     initialFilters: initialFilters as AppointmentFilterParamsDto,
     defaultSortField: 'appointmentDate' as keyof AppointmentFilterParamsDto,
@@ -92,20 +93,28 @@ export const useAppointments = (initialFilters?: Partial<AppointmentFilterParams
         baseList.refetch();
         return true;
       } else {
-        toast?.({ 
-          title: 'Error',
-          description: response.message || 'Failed to delete appointment',
-          variant: 'destructive'
-        });
+        // Check if it's a permission error first
+        if (!permissionErrorHandler.handlePermissionError(response, toast)) {
+          // If not a permission error, show generic error
+          toast?.({ 
+            title: 'Error',
+            description: response.message || 'Failed to delete appointment',
+            variant: 'destructive'
+          });
+        }
         return false;
       }
     } catch (err) {
       console.error('Error deleting appointment:', err);
-      toast?.({ 
-        title: 'Error',
-        description: 'An unexpected error occurred',
-        variant: 'destructive'
-      });
+      // Check if it's a permission error first
+      if (!permissionErrorHandler.handlePermissionError(err, toast)) {
+        // If not a permission error, show generic error
+        toast?.({ 
+          title: 'Error',
+          description: 'An unexpected error occurred',
+          variant: 'destructive'
+        });
+      }
       return false;
     }
   }, [toast, baseList]);

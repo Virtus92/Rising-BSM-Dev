@@ -96,7 +96,7 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
           return;
         }
         
-        const response = await AppointmentClient.getAppointmentById(validatedId);
+        const response = await AppointmentClient.getById(validatedId);
         
         if (response.success && response.data) {
           // Ensure customer data is consistently formatted
@@ -158,7 +158,7 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
       }
       
       setIsSubmittingNote(true);
-      const response = await AppointmentClient.addAppointmentNote(validatedId, note);
+      const response = await AppointmentClient.addNote(validatedId, note);
       
       if (response.success) {
       // Set the updated appointment data from the response
@@ -167,7 +167,7 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
           setAppointment(response.data as AppointmentDetailResponseDto);
         } else {
           // Always refetch to ensure we have the latest data
-          const updatedResponse = await AppointmentClient.getAppointmentById(validatedId);
+          const updatedResponse = await AppointmentClient.getById(validatedId);
           if (updatedResponse.success && updatedResponse.data) {
             setAppointment(updatedResponse.data as AppointmentDetailResponseDto);
           }
@@ -193,7 +193,7 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
         return;
       }
       
-      const response = await AppointmentClient.updateAppointmentStatus(validatedId, { status });
+      const response = await AppointmentClient.updateStatus(validatedId, { status });
       
       if (response.success && response.data) {
         // Check if the response includes complete appointment data
@@ -202,7 +202,7 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
           setAppointment(response.data as AppointmentDetailResponseDto);
         } else {
           // Always refetch to ensure we have the latest data
-          const updatedResponse = await AppointmentClient.getAppointmentById(validatedId);
+          const updatedResponse = await AppointmentClient.getById(validatedId);
           if (updatedResponse.success && updatedResponse.data) {
             setAppointment(updatedResponse.data as AppointmentDetailResponseDto);
           } else {

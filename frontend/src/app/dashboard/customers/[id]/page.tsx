@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Building, FileText, 
-  Calendar, RefreshCw, Tag, Bell, Globe, CreditCard, MessageSquare, User, Loader2
+  Calendar, RefreshCw, Tag, Bell, Globe, CreditCard, MessageSquare, User, Loader2,
+  ChevronDown, CheckCircle2
 } from 'lucide-react';
 import { CustomerService } from '@/infrastructure/clients/CustomerService';
 import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
@@ -16,14 +18,25 @@ import { DeleteConfirmationDialog } from '@/shared/components/DeleteConfirmation
 import { usePermissions } from '@/features/users/hooks/usePermissions';
 import { AccessDenied } from '@/shared/components/AccessDenied';
 import { Badge } from '@/shared/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel
+} from '@/shared/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/shared/components/ui/avatar';
 import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Separator } from '@/shared/components/ui/separator';
 import { useCustomerNotes } from '@/features/customers/hooks/useCustomerNotes';
 import { formatDate } from '@/shared/utils/date-utils';
-import { CustomerNotesTab } from '@/features/customers/components/CustomerNotesTab';
+import { NotesTab } from '@/features/customers/components/NotesTab';
+import { CustomerRequestsTab } from '@/features/customers/components/CustomerRequestsTab';
+import { CustomerAppointmentsTab } from '@/features/customers/components/CustomerAppointmentsTab';
 
 // Helper to get status badge styling
 const getStatusBadge = (status: string) => {
@@ -58,30 +71,52 @@ const getTypeBadge = (type: string) => {
 };
 
 // Helper to get customer avatar initials
-const getInitials = (name: string) => {
+const getInitials = (name: string | undefined): string => {
+  if (!name) return 'UN'; // UN for Unknown if no name provided
+  
   return name
     .split(' ')
-    .map(part => part[0])
+    .map(part => part?.[0] || '')
     .slice(0, 2)
     .join('')
     .toUpperCase();
 };
 
-export default function CustomerDetailsPage({ params }: { params: { id: string } }) {
-  const customerId = parseInt(params.id);
+export default function CustomerDetailsPage() {
+  // Use the useParams hook to get route parameters in client components
+  const params = useParams();
+  const customerId = parseInt(params.id as string);
   const [customer, setCustomer] = useState<CustomerResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [changingStatus, setChangingStatus] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { hasPermission } = usePermissions();
   
-  // Force permissions to true for now to fix access issues
-  const canViewCustomer = true; // Bypass permission check
-  const canEditCustomer = true; // Bypass permission check
-  const canDeleteCustomer = true; // Bypass permission check
+  // Debug permissions loading state and get permission functions
+  const { hasPermission, isLoading: permissionsLoading, permissions, refetch } = usePermissions();
+  
+  // Log permissions debugging info
+  useEffect(() => {
+    console.log('Permissions state:', { 
+      permissionsLoading, 
+      permissions, 
+      hasCustomersView: permissions.includes(SystemPermission.CUSTOMERS_VIEW.toString()),
+      hasCustomersEdit: permissions.includes(SystemPermission.CUSTOMERS_EDIT.toString())
+    });
+    
+    // If permissions aren't loaded yet, try to fetch them explicitly
+    if (permissionsLoading || permissions.length === 0) {
+      refetch(true); // Force refresh permissions
+    }
+  }, [permissionsLoading, permissions, refetch]);
+  
+  // Use proper permission checks but wait until permissions are loaded
+  const canViewCustomer = !permissionsLoading && hasPermission(SystemPermission.CUSTOMERS_VIEW);
+  const canEditCustomer = !permissionsLoading && hasPermission(SystemPermission.CUSTOMERS_EDIT);
+  const canDeleteCustomer = !permissionsLoading && hasPermission(SystemPermission.CUSTOMERS_DELETE);
 
   // Fetch customer details
   useEffect(() => {
@@ -119,6 +154,41 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
     fetchCustomer();
   }, [customerId, canViewCustomer]);
 
+  // Handle customer status change
+  const handleStatusChange = async (newStatus: CommonStatus) => {
+    try {
+      setChangingStatus(true);
+      
+      const response = await CustomerService.updateStatus(customerId, newStatus);
+      
+      if (response.success) {
+        // Update customer state with new status
+        setCustomer(prev => prev ? { ...prev, status: newStatus } : null);
+        
+        toast({
+          title: 'Status updated',
+          description: `Customer status changed to ${newStatus}`,
+          variant: 'success'
+        });
+      } else {
+        toast({
+          title: 'Update failed',
+          description: response.message || 'Failed to update customer status',
+          variant: 'error'
+        });
+      }
+    } catch (err) {
+      console.error('Error updating customer status:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to update customer status',
+        variant: 'error'
+      });
+    } finally {
+      setChangingStatus(false);
+    }
+  };
+
   // Handle delete customer
   const handleDeleteCustomer = async () => {
     try {
@@ -150,6 +220,10 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
       setShowDeleteDialog(false);
     }
   };
+
+  if (permissionsLoading) {
+    return <LoadingSpinner message="Loading permissions..." />;
+  }
 
   if (!canViewCustomer) {
     return <AccessDenied resource="customers" action="view" />;
@@ -189,29 +263,77 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
 
   return (
     <div className="container mx-auto space-y-6 py-4 max-w-7xl">
-      {/* Top navigation and action buttons */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6">
-        <div className="flex items-center">
+      {/* Top navigation and action buttons - improved for mobile */}
+      <div className="space-y-4 pb-6">
+        {/* Back button */}
+        <div className="flex">
           <Link href="/dashboard/customers">
-            <Button variant="ghost" size="sm" className="mr-4">
+            <Button variant="ghost" size="sm">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold truncate">
-            {customer.name}
-          </h1>
-          {getStatusBadge(customer.status)}
         </div>
         
-        <div className="flex space-x-3">
+        {/* Customer name and status badge - better wrapping on mobile */}
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold mr-2">{customer.name}</h1>
+          <div className="mt-0.5">{getStatusBadge(customer.status)}</div>
+        </div>
+        
+        {/* Action buttons - full width on mobile, row on desktop */}
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-2">
           {canEditCustomer && (
-            <Link href={`/dashboard/customers/${customerId}/edit`}>
-              <Button variant="outline" size="sm" className="h-9">
+            <Link href={`/dashboard/customers/${customerId}/edit`} className="w-full sm:w-auto">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto h-9">
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
               </Button>
             </Link>
+          )}
+          
+          {canEditCustomer && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full sm:w-auto h-9"
+                  disabled={changingStatus}
+                >
+                  {changingStatus ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <ChevronDown className="mr-2 h-4 w-4" />
+                  )}
+                  Change Status
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                
+                {Object.values(CommonStatus).filter(status => [
+                  CommonStatus.ACTIVE, 
+                  CommonStatus.INACTIVE, 
+                  CommonStatus.DELETED
+                ].includes(status as CommonStatus)).map((status) => (
+                  <DropdownMenuItem
+                    key={status}
+                    disabled={customer?.status === status}
+                    className={customer?.status === status ? 'bg-muted cursor-default' : ''}
+                    onClick={() => customer?.status !== status && handleStatusChange(status as CommonStatus)}
+                  >
+                    {customer?.status === status && (
+                      <CheckCircle2 className="h-4 w-4 mr-2 text-primary" />
+                    )}
+                    <span className={customer?.status === status ? 'font-medium ml-6' : ''}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           
           {canDeleteCustomer && (
@@ -219,7 +341,7 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
               variant="destructive" 
               size="sm" 
               onClick={() => setShowDeleteDialog(true)}
-              className="h-9"
+              className="w-full sm:w-auto h-9"
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
@@ -303,17 +425,48 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
         </div>
       </div>
       
-      {/* Tabs for customer details */}
+      {/* Tabs for customer details - 2 row layout */}
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-1">
-          <TabsTrigger value="overview" className="rounded-md">Overview</TabsTrigger>
-          <TabsTrigger value="address" className="rounded-md">Address</TabsTrigger>
-          <TabsTrigger value="notes" className="rounded-md">Notes</TabsTrigger>
-          <TabsTrigger value="activity" className="rounded-md">Activity</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col space-y-2">
+          {/* First row of tabs */}
+          <div className="overflow-x-auto pb-1">
+            <TabsList className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-1 flex w-full justify-center flex-nowrap">
+              <TabsTrigger value="overview" className="rounded-md min-w-max">
+                <FileText className="h-4 w-4 mr-2" />
+                <span className="whitespace-nowrap">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="address" className="rounded-md min-w-max">
+                <MapPin className="h-4 w-4 mr-2" />
+                <span className="whitespace-nowrap">Address</span>
+              </TabsTrigger>
+              <TabsTrigger value="notes" className="rounded-md min-w-max">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                <span className="whitespace-nowrap">Notes</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          
+          {/* Second row of tabs */}
+          <div className="overflow-x-auto pb-1">
+            <TabsList className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-1 flex w-full justify-center flex-nowrap">
+              <TabsTrigger value="requests" className="rounded-md min-w-max">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                <span className="whitespace-nowrap">Requests</span>
+              </TabsTrigger>
+              <TabsTrigger value="appointments" className="rounded-md min-w-max">
+                <Calendar className="h-4 w-4 mr-2" />
+                <span className="whitespace-nowrap">Appointments</span>
+              </TabsTrigger>
+              <TabsTrigger value="activity" className="rounded-md min-w-max">
+                <User className="h-4 w-4 mr-2" />
+                <span className="whitespace-nowrap">Activity</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
         
         {/* Overview tab content */}
-        <TabsContent value="overview" className="mt-6">
+        <TabsContent value="overview" className="mt-6 px-2 sm:px-0">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Latest activity card */}
             <Card className="md:col-span-2">
@@ -477,7 +630,7 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
         </TabsContent>
         
         {/* Address tab content */}
-        <TabsContent value="address" className="mt-6">
+        <TabsContent value="address" className="mt-6 px-2 sm:px-0">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -554,17 +707,27 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
           </Card>
         </TabsContent>
         
+        {/* Requests tab content */}
+        <TabsContent value="requests" className="mt-6 px-2 sm:px-0">
+          <CustomerRequestsTab customerId={customerId} />
+        </TabsContent>
+        
         {/* Notes tab content */}
-        <TabsContent value="notes" className="mt-6">
-          <CustomerNotesTab customerId={customerId} canEdit={canEditCustomer} />
+        <TabsContent value="notes" className="mt-6 px-2 sm:px-0">
+          <NotesTab customerId={customerId} />
+        </TabsContent>
+        
+        {/* Appointments tab content */}
+        <TabsContent value="appointments" className="mt-6 px-2 sm:px-0">
+          <CustomerAppointmentsTab customerId={customerId} />
         </TabsContent>
         
         {/* Activity tab content */}
-        <TabsContent value="activity" className="mt-6">
+        <TabsContent value="activity" className="mt-6 px-2 sm:px-0">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2 text-blue-500" />
+                <User className="h-5 w-5 mr-2 text-blue-500" />
                 Activity History
               </CardTitle>
               <CardDescription>
@@ -573,7 +736,7 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="py-8 text-center">
-                <Calendar className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                <User className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Recent Activity</h3>
                 <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
                   There is no recorded activity for this customer yet.

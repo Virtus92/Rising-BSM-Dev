@@ -56,17 +56,67 @@ export default function DashboardErrorBoundary(
     }
   }, [errorInfo]);
 
-  // Determine if error is authentication-related
+  // Determine error type for better handling
   const isAuthError = errorInfo.message.toLowerCase().includes('auth') || 
                       errorInfo.message.toLowerCase().includes('token') || 
                       errorInfo.message.toLowerCase().includes('permission') || 
                       errorInfo.message.toLowerCase().includes('unauthorized') || 
                       errorInfo.message.toLowerCase().includes('forbidden');
+                      
+  // Check for network connectivity issues
+  const isNetworkError = errorInfo.message.toLowerCase().includes('network') ||
+                         errorInfo.message.toLowerCase().includes('failed to fetch') ||
+                         errorInfo.message.toLowerCase().includes('connection') ||
+                         errorInfo.message.toLowerCase().includes('offline') ||
+                         navigator.onLine === false;
+                         
+  // Check for API timeouts and server errors
+  const isServerError = errorInfo.message.toLowerCase().includes('timeout') ||
+                         errorInfo.message.toLowerCase().includes('500') ||
+                         errorInfo.message.toLowerCase().includes('server error') ||
+                         errorInfo.message.toLowerCase().includes('service unavailable');
+                         
+  // Check for CORS issues
+  const isCorsError = errorInfo.message.toLowerCase().includes('cors') ||
+                     errorInfo.message.toLowerCase().includes('cross-origin');
 
   const handleRetry = () => {
-    // Reset error boundary
-    reset();
+    // Force reload if it's a network error as a simple reset may not be enough
+    if (isNetworkError || isServerError) {
+      window.location.reload();
+    } else {
+      // Reset error boundary
+      reset();
+    }
   };
+  
+  // Attempt to automatically recover from temporary network issues
+  useEffect(() => {
+    // Only set up auto-retry for network issues
+    if (isNetworkError) {
+      // Create a network recovery listener
+      const handleOnline = () => {
+        console.log('Network connection restored, attempting recovery...');
+        setTimeout(() => reset(), 1000); // Small delay to ensure connection is stable
+      };
+      
+      // Listen for online event
+      window.addEventListener('online', handleOnline);
+      
+      // Set a timer to automatically retry after a delay
+      const retryTimer = setTimeout(() => {
+        if (navigator.onLine) {
+          console.log('Auto-retry after network error');
+          reset();
+        }
+      }, 5000); // 5 second auto-retry
+      
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        clearTimeout(retryTimer);
+      };
+    }
+  }, [isNetworkError, reset]);
 
   const handleLogout = () => {
     // Clear any authentication state
@@ -105,7 +155,13 @@ export default function DashboardErrorBoundary(
           <p className="text-sm text-muted-foreground mt-4">
             {isAuthError 
               ? 'This appears to be related to your login session. You may need to log in again.'
-              : 'You can try refreshing the page or contact support if the problem persists.'}
+              : isNetworkError
+                ? 'It looks like you may be experiencing network connectivity issues. Please check your internet connection.'
+                : isServerError
+                  ? 'Our servers appear to be experiencing issues. Please try again in a few moments.'
+                  : isCorsError
+                    ? 'There appears to be a security configuration issue. Please contact support.'
+                    : 'You can try refreshing the page or contact support if the problem persists.'}
           </p>
         </CardContent>
         

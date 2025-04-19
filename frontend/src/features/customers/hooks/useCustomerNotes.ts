@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CustomerService } from '@/infrastructure/clients/CustomerService';
 import { useToast } from '@/shared/hooks/useToast';
+import { CustomerLogDto } from '@/domain/dtos/CustomerDtos';
 
 interface CustomerNote {
   id: number;
   customerId: number;
-  userId: number;
-  userName: string;
-  text: string | { text: string } | any; // Handle different possible formats
-  details?: string; // Some APIs might use this field instead
+  userId?: number | undefined;
+  userName?: string; // Make userName optional to match CustomerLogDto
+  text?: string | { text: string } | any; // Make text optional to match CustomerLogDto
+  details?: string | Record<string, any>; // Update to accept both string and object types
   createdAt: string;
   formattedDate?: string;
 }
@@ -44,7 +45,13 @@ export const useCustomerNotes = (customerId: number) => {
       
       if (response.success) {
         console.log('Setting notes from API:', JSON.stringify(response.data || [], null, 2));
-        setNotes(response.data || []);
+        // Map CustomerLogDto[] to CustomerNote[] to ensure type compatibility
+        const mappedNotes = (response.data || []).map((note: CustomerLogDto): CustomerNote => ({
+          ...note,
+          userName: note.userName || '',
+          text: note.text || '', // Provide a default value for text
+        }));
+        setNotes(mappedNotes);
       } else {
         console.error('API error fetching notes:', response.message);
         setError(response.message || 'Failed to fetch customer notes');

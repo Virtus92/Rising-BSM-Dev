@@ -14,11 +14,13 @@ import {
   getAppointmentRepository,
   getRequestRepository,
   getNotificationRepository,
-  getPermissionRepository
+  getPermissionRepository,
+  getRequestDataRepository
 } from './repositoryFactory';
 
 // Services
-import { AuthService } from '@/infrastructure/services/AuthService';
+// Remove static import of AuthService to prevent bundling in client code
+import { AuthClientService } from '@/infrastructure/clients/AuthClientService'; // Client-side auth service
 import { UserService } from '@/infrastructure/services/UserService';
 import { CustomerService } from '@/infrastructure/services/CustomerService';
 import { AppointmentService } from '@/infrastructure/services/AppointmentService';
@@ -27,6 +29,8 @@ import { ActivityLogService } from '@/infrastructure/services/ActivityLogService
 import { NotificationService } from '@/infrastructure/services/NotificationService';
 import { RefreshTokenService } from '@/infrastructure/services/RefreshTokenService';
 import { PermissionService } from '@/infrastructure/services/PermissionService';
+import { RequestDataService } from '@/infrastructure/services/request-data/RequestDataService';
+import { N8NIntegrationService } from '@/infrastructure/services/n8n/N8NIntegrationService';
 
 // Interfaces
 import { IAuthService } from '@/domain/services/IAuthService';
@@ -38,6 +42,8 @@ import { IActivityLogService } from '@/domain/services/IActivityLogService';
 import { INotificationService } from '@/domain/services/INotificationService';
 import { IRefreshTokenService } from '@/domain/services/IRefreshTokenService';
 import { IPermissionService } from '@/domain/services/IPermissionService';
+import { IRequestDataService } from '@/domain/services/IRequestDataService';
+import { IN8NIntegrationService } from '@/domain/services/IN8NIntegrationService';
 
 /**
  * ServiceFactory Klasse für einheitliche Erstellung von Services
@@ -55,6 +61,8 @@ export class ServiceFactory {
   private notificationService?: NotificationService;
   private refreshTokenService?: RefreshTokenService;
   private permissionService?: PermissionService;
+  private requestDataService?: RequestDataService;
+  private n8nIntegrationService?: N8NIntegrationService;
 
   /**
    * Private Konstruktor für Singleton-Pattern
@@ -75,18 +83,35 @@ export class ServiceFactory {
    * Erstellt eine Instanz des AuthService
    */
   public createAuthService(): IAuthService {
+    // Always use client-side auth service when running in the browser
+    if (typeof window !== 'undefined') {
+      // Return the client-side auth service that avoids crypto modules
+      // No need to create a new instance each time - this is a stateless service
+      return AuthClientService as unknown as IAuthService;
+    }
+    
+    // Use server-side auth service with full crypto capabilities - only on server
     if (!this.authService) {
-      // Verwende die JWT-Konfiguration aus dem ConfigService
-      const jwtConfig = configService.getJwtConfig();
-      
-      this.authService = new AuthService(
-        getUserRepository(),
-        getRefreshTokenRepository(),
-        getLogger(),
-        getValidationService(),
-        getErrorHandler(),
-        jwtConfig
-      );
+      try {
+        // Verwende die JWT-Konfiguration aus dem ConfigService
+        const jwtConfig = configService.getJwtConfig();
+        
+        // Dynamic import to prevent bundling in client code
+        const { AuthService } = require('@/infrastructure/services/AuthService');
+        
+        this.authService = new AuthService(
+          getUserRepository(),
+          getRefreshTokenRepository(),
+          getLogger(),
+          getValidationService(),
+          getErrorHandler(),
+          jwtConfig
+        );
+      } catch (error) {
+        // Fallback to client version if server import fails (should not happen)
+        console.error('Failed to initialize server-side AuthService:', error);
+        return AuthClientService as unknown as IAuthService;
+      }
     }
     return this.authService;
   }
@@ -103,10 +128,9 @@ export class ServiceFactory {
         getValidationService(),
         getErrorHandler()
       );
-      
+
       // For now, use type assertion to bridge the interface gap
-      // This is a temporary solution until the service is fully implemented
-      this.userService = staticUserService as any as UserService;
+      this.userService = staticUserService as UserService;
     }
     return this.userService as unknown as IUserService;
   }
@@ -158,12 +182,51 @@ export class ServiceFactory {
         getCustomerRepository(),
         getUserRepository(),
         getAppointmentRepository(),
+        getRequestDataRepository(),
         getLogger(),
         getValidationService(),
         getErrorHandler()
       );
     }
     return this.requestService as unknown as IRequestService;
+  }
+
+  /**
+   * Creates a RequestDataService instance
+   */
+  public createRequestDataService(): IRequestDataService {
+    if (!this.requestDataService) {
+      // Get repository instances
+      const repository = getRequestDataRepository();
+      const requestRepo = getRequestRepository();
+      
+      // Create service with proper repositories
+      // Both repository.findAll and repository interfaces now match what's expected
+      this.requestDataService = new RequestDataService(
+        repository,
+        requestRepo,
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
+    }
+    return this.requestDataService;
+  }
+
+  /**
+   * Creates an N8NIntegrationService instance
+   */
+  public createN8NIntegrationService(): IN8NIntegrationService {
+    if (!this.n8nIntegrationService) {
+      this.n8nIntegrationService = new N8NIntegrationService(
+        getRequestRepository(),
+        getRequestDataRepository(),
+        getLogger(),
+        getErrorHandler(),
+        configService
+      );
+    }
+    return this.n8nIntegrationService as unknown as IN8NIntegrationService;
   }
 
   /**
@@ -239,6 +302,8 @@ export class ServiceFactory {
     this.notificationService = undefined;
     this.refreshTokenService = undefined;
     this.permissionService = undefined;
+    this.requestDataService = undefined;
+    this.n8nIntegrationService = undefined;
   }
 }
 
@@ -268,6 +333,14 @@ export function getAppointmentService(): IAppointmentService {
 
 export function getRequestService(): IRequestService {
   return getServiceFactory().createRequestService();
+}
+
+export function getRequestDataService(): IRequestDataService {
+  return getServiceFactory().createRequestDataService();
+}
+
+export function getN8NIntegrationService(): IN8NIntegrationService {
+  return getServiceFactory().createN8NIntegrationService();
 }
 
 export function getActivityLogService(): IActivityLogService {

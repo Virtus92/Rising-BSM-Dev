@@ -515,27 +515,44 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
    * @param userId - Benutzer-ID
    * @returns Aktualisierter Benutzer
    */
-  async updateLastLogin(userId: number): Promise<User> {
+  async updateLastLogin(userId: number, ipAddress?: string): Promise<User | null> {
     try {
+      const timestamp = new Date();
+      
+      // Get the current user first to ensure it exists
+      const currentUser = await this.prisma.user.findUnique({
+        where: { id: userId }
+      });
+      
+      if (!currentUser) {
+        this.logger.warn(`Failed to update last login - user with ID ${userId} not found`);
+        return null;
+      }
+      
+      // Update both lastLoginAt and updatedAt with the same timestamp for consistency
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
         data: {
-          lastLoginAt: new Date(),
-          updatedAt: new Date()
+          lastLoginAt: timestamp,
+          updatedAt: timestamp
         }
       });
       
-      // Protokolliere die Anmeldung
+      // Log the login activity with IP address if available
       await this.logActivity(
         userId,
         LogActionType.LOGIN,
-        'User logged in',
-        undefined
+        `User logged in${ipAddress ? ` from ${ipAddress}` : ''}`,
+        ipAddress
       );
       
       return this.mapToDomainEntity(updatedUser);
     } catch (error) {
-      this.logger.error('Error in UserRepository.updateLastLogin', { error, userId });
+      this.logger.error('Error in UserRepository.updateLastLogin', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        userId 
+      });
       throw this.handleError(error);
     }
   }
@@ -625,11 +642,11 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
    * @param ormEntity - ORM entity
    * @returns Domain entity or null if input is null
    */
-  protected mapToDomainEntity(ormEntity: any): User {
+  protected mapToDomainEntity(ormEntity: any): User | null {
     if (!ormEntity) {
-      // Instead of returning null, throw a meaningful error
-      this.logger.error('Cannot map empty entity to User domain object');
-      throw this.errorHandler.createError('Failed to map database entity to domain entity: Entity is null or undefined');
+      // Return null for consistency with other repositories instead of throwing
+      this.logger.debug('Null or undefined entity passed to mapToDomainEntity, returning null');
+      return null;
     }
     
     try {
@@ -670,9 +687,10 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
       this.logger.error('Error mapping ORM entity to domain entity:', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        entityId: ormEntity.id
+        entityId: ormEntity.id || 'unknown'
       });
-      throw this.errorHandler.createError('Failed to map database entity to domain entity');
+      // Log error but return null for consistency instead of throwing
+      return null;
     }
   }
 

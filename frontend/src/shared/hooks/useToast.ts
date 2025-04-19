@@ -54,6 +54,12 @@ export function useToast() {
       dedupeStrategy = 'replace'
     } = options;
     
+    // Debug log to help trace toast issues
+    console.log(`Toast triggered: "${title}" - ${variant}`, { 
+      description: description?.substring(0, 30) + (description && description.length > 30 ? '...' : ''),
+      stackTrace: new Error().stack?.split('\n').slice(1,3).join('\n') 
+    });
+    
     // Generiere eine eindeutige ID, wenn keine angegeben wurde
     const id = providedId || `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
@@ -88,59 +94,74 @@ export function useToast() {
       };
     }
     
-    // Varianten-spezifische Styling
-    let sonnerVariant: Parameters<typeof sonnerToast>[1] = {};
+    // Map our variant names to Sonner's expected style parameters
+    let toastFunction = sonnerToast;
     
+    // Use the appropriate Sonner function based on our variant
     switch (variant) {
       case 'success':
-        sonnerVariant = { 
-          className: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
-          descriptionClassName: 'text-green-700 dark:text-green-300',
-          icon: '✓',
-        };
-        break;
+        return sonnerToast.success(title, {
+          description,
+          duration,
+          position: position as any,
+          id,
+          onDismiss,
+          action: action ? {
+            label: action.label,
+            onClick: action.onClick,
+          } : undefined,
+        });
       case 'error':
       case 'destructive':
-        sonnerVariant = {
-          className: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
-          descriptionClassName: 'text-red-700 dark:text-red-300',
-          icon: '✕',
-        };
-        break;
+        return sonnerToast.error(title, {
+          description,
+          duration,
+          position: position as any,
+          id,
+          onDismiss,
+          action: action ? {
+            label: action.label,
+            onClick: action.onClick,
+          } : undefined,
+        });
       case 'warning':
-        sonnerVariant = {
-          className: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
-          descriptionClassName: 'text-amber-700 dark:text-amber-300',
-          icon: '⚠',
-        };
-        break;
+        return sonnerToast.warning(title, {
+          description,
+          duration,
+          position: position as any,
+          id,
+          onDismiss,
+          action: action ? {
+            label: action.label,
+            onClick: action.onClick,
+          } : undefined,
+        });
       case 'info':
-        sonnerVariant = {
-          className: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
-          descriptionClassName: 'text-blue-700 dark:text-blue-300',
-          icon: 'ℹ',
-        };
-        break;
+        return sonnerToast.info(title, {
+          description,
+          duration,
+          position: position as any,
+          id,
+          onDismiss,
+          action: action ? {
+            label: action.label,
+            onClick: action.onClick,
+          } : undefined,
+        });
       default:
-        sonnerVariant = {
-          className: 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700',
-          descriptionClassName: 'text-gray-600 dark:text-gray-300',
-        };
+        // For default variant, use the standard toast function
+        return sonnerToast(title, {
+          description,
+          duration,
+          position: position as any,
+          id,
+          onDismiss,
+          action: action ? {
+            label: action.label,
+            onClick: action.onClick,
+          } : undefined,
+        });
     }
-    
-    // Toast anzeigen
-    return sonnerToast(title, {
-      description,
-      duration,
-      position: position as any,
-      ...sonnerVariant,
-      id,
-      onDismiss,
-      action: action ? {
-        label: action.label,
-        onClick: action.onClick,
-      } : undefined,
-    });
   }, []);
 
   /**
@@ -164,6 +185,7 @@ export function useToast() {
    * Hilfsmethode für Erfolgs-Toast
    */
   const success = useCallback((options: Omit<ToastOptions, 'variant'>) => {
+    console.log('Success toast called:', options.title);
     return toast({ ...options, variant: 'success' });
   }, [toast]);
 
@@ -171,6 +193,7 @@ export function useToast() {
    * Hilfsmethode für Fehler-Toast
    */
   const error = useCallback((options: Omit<ToastOptions, 'variant'>) => {
+    console.log('Error toast called:', options.title);
     return toast({ ...options, variant: 'error' });
   }, [toast]);
 

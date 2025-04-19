@@ -5,6 +5,8 @@ import ThemeProvider from '@/shared/providers/ThemeProvider';
 import { QueryProvider } from '@/shared/providers/QueryProvider';
 import ApiInitializer from '@/shared/components/ApiInitializer';
 import ClientOnly from '@/shared/components/ClientOnly';
+// Add Toaster import
+import { Toaster } from 'sonner';
 // Add AuthProvider import
 import { AuthProvider } from '@/features/auth/providers/AuthProvider';
 
@@ -36,6 +38,8 @@ export default function RootLayout({
                 </AuthProvider>
             </ClientOnly>
           </QueryProvider>
+          {/* Add Sonner Toaster component */}
+          <Toaster position="bottom-right" richColors closeButton />
         </ThemeProvider>
       </body>
     </html>

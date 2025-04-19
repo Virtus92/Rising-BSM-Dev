@@ -23,8 +23,9 @@ import {
   SelectValue,
 } from '@/shared/components/ui/select';
 import { Separator } from '@/shared/components/ui/separator';
-import { useRequest } from '../hooks/useRequest';
 import { ConvertToCustomerDto, RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
+import { RequestService } from '@/infrastructure/clients/RequestService';
+import { useToast } from '@/shared/hooks/useToast';
 import { Loader2 } from 'lucide-react';
 
 // Validierungsschema für das Formular
@@ -63,8 +64,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
   request,
   onClose,
 }) => {
-  const { convertToCustomer, isConverting } = useRequest(request.id);
+  const [isConverting, setIsConverting] = useState(false);
   const [showAppointmentFields, setShowAppointmentFields] = useState(false);
+  const { toast } = useToast();
 
   // Default-Werte aus der Anfrage
   const defaultValues: Partial<FormValues> = {
@@ -91,39 +93,79 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
     setShowAppointmentFields(watchCreateAppointment);
   }, [watchCreateAppointment]);
 
-  const onSubmit = (data: FormValues) => {
-    const convertData: ConvertToCustomerDto = {
-      requestId: request.id,
-      customerData: {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        company: data.company,
-        address: data.address,
-        postalCode: data.postalCode,
-        city: data.city,
-        country: data.country,
-        type: data.type,
-        newsletter: data.newsletter,
-      },
-      note: data.note,
-      createAppointment: data.createAppointment,
-    };
-
-    // Wenn ein Termin erstellt werden soll, füge die Termindaten hinzu
-    if (data.createAppointment) {
-      convertData.appointmentData = {
-        title: data.appointmentTitle,
-        appointmentDate: data.appointmentDate,
-        appointmentTime: data.appointmentTime,
-        duration: data.appointmentDuration,
-        location: data.appointmentLocation,
-        description: data.appointmentDescription,
+  const onSubmit = async (data: FormValues) => {
+    try {
+      setIsConverting(true);
+      
+      const convertData: ConvertToCustomerDto = {
+        requestId: request.id,
+        customerData: {
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          company: data.company,
+          address: data.address,
+          postalCode: data.postalCode,
+          city: data.city,
+          country: data.country,
+          type: data.type,
+          newsletter: data.newsletter,
+        },
+        note: data.note,
+        createAppointment: data.createAppointment,
       };
-    }
 
-    convertToCustomer(convertData);
-    onClose();
+      // If creating an appointment, add appointment data
+      if (data.createAppointment) {
+        if (!data.appointmentDate || !data.appointmentTime) {
+          toast({
+            title: "Error",
+            description: "Appointment date and time are required",
+            variant: "error"
+          });
+          setIsConverting(false);
+          return;
+        }
+
+        convertData.appointmentData = {
+          title: data.appointmentTitle || `Appointment with ${data.name}`,
+          appointmentDate: data.appointmentDate,
+          appointmentTime: data.appointmentTime,
+          duration: data.appointmentDuration || 60,
+          location: data.appointmentLocation,
+          description: data.appointmentDescription,
+        };
+      }
+      
+      // Call the service directly
+      const response = await RequestService.convertToCustomer(convertData);
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: data.createAppointment 
+            ? "Customer created with appointment" 
+            : "Customer created successfully",
+          variant: "success"
+        });
+        onClose();
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to convert request to customer",
+          variant: "error"
+        });
+      }
+    } catch (error) {
+      console.error("Error converting to customer:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "error"
+      });
+    } finally {
+      setIsConverting(false);
+    }
   };
 
   return (

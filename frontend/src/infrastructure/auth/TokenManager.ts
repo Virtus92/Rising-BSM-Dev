@@ -75,21 +75,55 @@ export class TokenManager {
       const authTokenBackup = localStorage.getItem('auth_token_backup');
       const refreshTokenBackup = localStorage.getItem('refresh_token_backup');
       
-      // Get current cookies
-      const cookies = document.cookie.split(';').map(c => c.trim());
-      const hasAuthCookie = cookies.some(c => c.startsWith('auth_token='));
-      const hasRefreshCookie = cookies.some(c => c.startsWith('refresh_token='));
+      // Parse all cookies into a more reliable format
+      const cookies = {};
+      document.cookie.split(';').forEach(cookie => {
+        const [name, value] = cookie.trim().split('=');
+        if (name) cookies[name] = value;
+      });
+      
+      // More reliable cookie detection
+      const hasAuthCookie = 'auth_token' in cookies || 'auth_token_access' in cookies;
+      const hasRefreshCookie = 'refresh_token' in cookies || 'refresh_token_access' in cookies;
+      
+      logger.debug('Token status during synchronization', {
+        hasAuthCookie,
+        hasRefreshCookie,
+        hasAuthBackup: !!authTokenBackup,
+        hasRefreshBackup: !!refreshTokenBackup
+      });
       
       // If we have backup but no cookie, set temporary client-side cookies
       // This will help until the next API call refreshes them properly
       if (authTokenBackup && !hasAuthCookie) {
         logger.debug('Setting auth_token cookie from backup');
-        document.cookie = `auth_token=${authTokenBackup};path=/;max-age=3600`;
+        // Set multiple cookie variants for backward compatibility
+        document.cookie = `auth_token=${authTokenBackup};path=/;max-age=3600;SameSite=Lax`;
+        document.cookie = `auth_token_access=${authTokenBackup};path=/;max-age=3600;SameSite=Lax`;
       }
       
       if (refreshTokenBackup && !hasRefreshCookie) {
         logger.debug('Setting refresh_token cookie from backup');
-        document.cookie = `refresh_token=${refreshTokenBackup};path=/;max-age=86400`;
+        document.cookie = `refresh_token=${refreshTokenBackup};path=/;max-age=86400;SameSite=Lax`;
+        document.cookie = `refresh_token_access=${refreshTokenBackup};path=/;max-age=86400;SameSite=Lax`;
+      }
+      
+      // Also synchronize in the reverse direction - if we have cookies but no backup
+      if (!authTokenBackup && hasAuthCookie) {
+        const authToken = cookies['auth_token'] || cookies['auth_token_access'];
+        if (authToken) {
+          logger.debug('Setting localStorage backup from cookie');
+          localStorage.setItem('auth_token_backup', authToken);
+          localStorage.setItem('auth_token', authToken);
+        }
+      }
+      
+      if (!refreshTokenBackup && hasRefreshCookie) {
+        const refreshToken = cookies['refresh_token'] || cookies['refresh_token_access'];
+        if (refreshToken) {
+          logger.debug('Setting refresh token backup from cookie');
+          localStorage.setItem('refresh_token_backup', refreshToken);
+        }
       }
       
       // If auth_token in localStorage is undefined but we have a backup,
@@ -97,6 +131,11 @@ export class TokenManager {
       if (authTokenBackup && localStorage.getItem('auth_token') === 'undefined') {
         logger.debug('Fixing undefined auth_token in localStorage');
         localStorage.setItem('auth_token', authTokenBackup);
+      }
+      
+      // Record authentication timestamp if we have either cookie or backup token
+      if ((hasAuthCookie || authTokenBackup) && !localStorage.getItem('auth_timestamp')) {
+        localStorage.setItem('auth_timestamp', Date.now().toString());
       }
     } catch (error) {
       logger.error('Error synchronizing tokens:', { error });

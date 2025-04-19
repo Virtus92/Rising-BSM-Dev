@@ -6,6 +6,7 @@ import { RequestService } from '@/infrastructure/clients/RequestService';
 import { RequestDto, RequestFilterParamsDto } from '@/domain/dtos/RequestDtos';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
 import { createBaseListUtility, BaseListUtility } from '@/shared/utils/list/baseListUtils';
+import { permissionErrorHandler } from '@/shared/utils/permission-error-handler';
 
 /**
  * Extended interface for request list operations
@@ -92,20 +93,28 @@ export const useRequests = (initialFilters?: Partial<RequestFilterParamsDto>): U
         baseList.refetch();
         return true;
       } else {
+        // Check if it's a permission error first
+        if (!permissionErrorHandler.handlePermissionError(response, toast)) {
+        // If not a permission error, show generic error
         toast?.({ 
-          title: 'Error',
+            title: 'Error',
           description: response.message || 'Failed to delete request',
           variant: 'destructive'
         });
+      }
         return false;
       }
     } catch (err) {
       console.error('Error deleting request:', err);
-      toast?.({ 
-        title: 'Error',
-        description: 'An unexpected error occurred',
-        variant: 'destructive'
-      });
+      // Check if it's a permission error first
+      if (!permissionErrorHandler.handlePermissionError(err, toast)) {
+        // If not a permission error, show generic error
+        toast?.({ 
+          title: 'Error',
+          description: 'An unexpected error occurred',
+          variant: 'destructive'
+        });
+      }
       return false;
     }
   }, [toast, baseList]);

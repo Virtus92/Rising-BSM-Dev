@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import CustomerForm from '@/features/customers/components/CustomerForm';
 import { CustomerService } from '@/infrastructure/clients/CustomerService';
@@ -9,8 +10,9 @@ import { useToast } from '@/shared/hooks/useToast';
 import { usePermissions } from '@/features/users/hooks/usePermissions';
 import { AccessDenied } from '@/shared/components/AccessDenied';
 
-export default function EditCustomerPage({ params }: { params: { id: string } }) {
-  const customerId = parseInt(params.id);
+export default function EditCustomerPage() {
+  const params = useParams();
+  const customerId = parseInt(params.id as string);
   const [customer, setCustomer] = useState<CustomerResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

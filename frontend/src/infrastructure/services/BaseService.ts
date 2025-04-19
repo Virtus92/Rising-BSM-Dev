@@ -327,11 +327,32 @@ export abstract class BaseService<T, C extends Record<string, any>, U extends Re
   }
 
   /**
-   * Führt eine Transaktion aus
+   * Counts entities based on criteria
    * 
-   * @param callback - Callback-Funktion
-   * @returns Ergebnis der Transaktion
+   * @param criteria - Filter criteria
+   * @param options - Service options
+   * @returns Number of entities
    */
+  async count(criteria?: Record<string, any>, options?: ServiceOptions): Promise<number> {
+    try {
+      // Repository count method only accepts criteria parameter
+      return await this.repository.count(criteria);
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.count`, { error, criteria });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Finds all entities (alias for getAll)
+   * 
+   * @param options - Service options
+   * @returns Paginated result of entities
+   */
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<R>> {
+    return this.getAll(options);
+  }
+
   async transaction<r>(callback: (service: IBaseService<T, C, U, R, ID>) => Promise<r>): Promise<r> {
     try {
       // Verwende Repository, um Transaktion zu verwalten
