@@ -23,11 +23,11 @@ services:
   # Frontend service (production mode)
   app:
     build:
-      context: ./frontend
+      context: ./app
       dockerfile: Dockerfile
     container_name: rising-bsm-app-prod
     env_file:
-      - ./frontend/.env.production
+      - ./app/.env.production
     environment:
       - NODE_ENV=production
       # Override DATABASE_URL to ensure it uses the Docker network service name

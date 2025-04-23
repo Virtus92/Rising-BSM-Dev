@@ -22,11 +22,11 @@ services:
   # Next.js Frontend & API service (development mode)
   app:
     build:
-      context: ./frontend
+      context: ./app
       dockerfile: Dockerfile.dev
     container_name: rising-bsm-app
     env_file:
-      - ./frontend/.env
+      - ./app/.env
     environment:
       - NODE_ENV=development
       - SEED_DATABASE=true
@@ -37,7 +37,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./frontend:/app
+      - ./app:/app
       - /app/node_modules
       - /app/.next
     networks:
