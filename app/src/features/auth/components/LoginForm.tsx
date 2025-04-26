@@ -101,7 +101,7 @@ const LoginForm: React.FC = () => {
           });
         } else if (error instanceof Error && error.message.includes('TokenManager')) {
           // Handle TokenManager initialization errors specifically
-          console.error(`LoginForm: TokenManager initialization error (${loginId})`, error);
+          console.error(`LoginForm: TokenManager initialization error (${loginId})`, error as Error);
           setErrorMessage('System-Initialisierungsfehler. Bitte aktualisieren Sie die Seite und versuchen Sie es erneut.');
           
           toast({
@@ -118,7 +118,7 @@ const LoginForm: React.FC = () => {
       }
     } catch (error) {
       // Detailed error logging
-      console.error('LoginForm Error:', error);
+      console.error('LoginForm Error:', error as Error);
       
       // Clear submission state immediately to allow retry
       setIsSubmitting(false);

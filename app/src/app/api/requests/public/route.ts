@@ -1,18 +1,16 @@
-/**
- * Public Requests API Route
- * Handles contact requests from unauthenticated users
- */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
+import { CreateRequestDto, RequestSource } from '@/domain/dtos/RequestDtos';
 
 /**
  * POST /api/requests/public
  * 
  * Creates a new public contact request (no authentication required)
  */
-export const POST = apiRouteHandler(async (request: NextRequest) => {
+export const POST = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   
@@ -40,16 +38,17 @@ export const POST = apiRouteHandler(async (request: NextRequest) => {
     // Get request service
     const requestService = serviceFactory.createRequestService();
     
-    // Prepare request data
-    const requestData = {
+    // Create the request - with properly typed RequestDTO
+    const requestData: CreateRequestDto = {
       name,
       email,
       phone,
       service,
       message,
-      status: 'NEW',
-      source: 'website',
-      priority: 'MEDIUM'
+      source: 'form' as RequestSource,
+      metadata: {
+        tags: ['public', 'website-form']
+      }
     };
     
     // Create context with IP address

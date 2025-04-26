@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ApiClient } from '@/infrastructure/clients/ApiClient';
+import { ApiClient } from '@/core/api/ApiClient';
 import { useToast } from '@/shared/hooks/useToast';
 
 export interface DashboardActivity {
@@ -156,7 +156,7 @@ export function useRecentActivities(options: {
         });
       }
     } catch (error) {
-      console.error('Fehler beim Formatieren des Datums', error);
+      console.error('Fehler beim Formatieren des Datums', error as Error);
       return 'Unbekanntes Datum';
     }
   }, []);

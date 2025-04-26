@@ -4,15 +4,15 @@
  * Diese Route bietet Zugriff auf Systemeinstellungen.
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess } from '@/core/errors/index';
+import { getLogger } from '@/core/logging';
 
 /**
  * GET /api/settings
  * Gibt die Systemeinstellungen zurück
  */
-export const GET = apiRouteHandler(
+export const GET = routeHandler(
   async (request: NextRequest) => {
     const logger = getLogger();
     logger.info('Hole Systemeinstellungen');
@@ -41,7 +41,7 @@ export const GET = apiRouteHandler(
  * PUT /api/settings
  * Aktualisiert die Systemeinstellungen
  */
-export const PUT = apiRouteHandler(
+export const PUT = routeHandler(
   async (request: NextRequest) => {
     const logger = getLogger();
     const data = await request.json();
@@ -68,7 +68,7 @@ export const PUT = apiRouteHandler(
  * POST /api/settings/reset
  * Setzt die Systemeinstellungen auf die Standardwerte zurück
  */
-export const POST = apiRouteHandler(
+export const POST = routeHandler(
   async (request: NextRequest) => {
     const logger = getLogger();
     logger.info('Setze Systemeinstellungen zurück');

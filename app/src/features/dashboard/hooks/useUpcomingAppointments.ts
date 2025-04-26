@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AppointmentClient } from '@/infrastructure/api/AppointmentClient';
-import { CustomerService } from '@/infrastructure/clients/CustomerService';
+import { AppointmentClient } from '@/features/appointments/lib/clients/AppointmentClient';
+import { CustomerService } from '@/features/customers/lib/services/CustomerService';
 import { AppointmentDto } from '@/domain/dtos/AppointmentDtos';
 
 // Define response type interface
@@ -42,7 +42,7 @@ export const useUpcomingAppointments = () => {
       }
       return null;
     } catch (error) {
-      console.warn(`Failed to load customer data for ID ${customerId}:`, error);
+      console.warn(`Failed to load customer data for ID ${customerId}:`, error as Error);
       return null;
     }
   };
@@ -162,7 +162,7 @@ export const useUpcomingAppointments = () => {
         }
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred while fetching appointments';
-        console.error('Critical error in appointments fetch:', errorMsg, error);
+        console.error('Critical error in appointments fetch:', errorMsg, error as Error);
         setError(`Data fetching error: ${errorMsg}`);
       } finally {
         setIsLoading(false);
@@ -283,7 +283,7 @@ export const useUpcomingAppointments = () => {
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred while refreshing';
-      console.error('Refresh: Critical error:', errorMsg, error);
+      console.error('Refresh: Critical error:', errorMsg, error as Error);
       setError(`Refresh error: ${errorMsg}`);
     } finally {
       setIsLoading(false);

@@ -4,8 +4,8 @@
  * Provides standardized error handling for permission-related errors across the application.
  */
 import { NextResponse } from 'next/server';
-import { formatResponse } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 
 /**
@@ -135,7 +135,7 @@ export const permissionErrorHandler = {
         });
       }
     } catch (error) {
-      console.error('Failed to show permission error toast:', error);
+      console.error('Failed to show permission error toast:', error as Error);
     }
   }
 };

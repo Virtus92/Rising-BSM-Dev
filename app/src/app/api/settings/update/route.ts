@@ -4,15 +4,15 @@
  * This route provides a dedicated endpoint for updating individual system settings.
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError } from '@/core/errors/index';
+import { getLogger } from '@/core/logging';
 
 /**
  * PUT /api/settings/update
  * Updates a specific system setting
  */
-export const PUT = apiRouteHandler(
+export const PUT = routeHandler(
   async (request: NextRequest) => {
     const logger = getLogger();
     

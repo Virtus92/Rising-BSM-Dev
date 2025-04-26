@@ -37,7 +37,7 @@ export function convertRouteToModalParam(route: string): string | null {
     
     return null;
   } catch (error) {
-    console.error('Error converting route to modal param:', error);
+    console.error('Error converting route to modal param:', error as Error);
     return null;
   }
 }
@@ -71,7 +71,7 @@ export function convertModalParamToRoute(param: string, basePath: string): strin
     
     return null;
   } catch (error) {
-    console.error('Error converting modal param to route:', error);
+    console.error('Error converting modal param to route:', error as Error);
     return null;
   }
 }
@@ -91,7 +91,7 @@ export function getModalParamFromUrl(url: string): string | null {
     // Otherwise, try to extract from the path
     return convertRouteToModalParam(urlObj.pathname);
   } catch (error) {
-    console.error('Error getting modal param from URL:', error);
+    console.error('Error getting modal param from URL:', error as Error);
     return null;
   }
 }
@@ -119,7 +119,7 @@ export function parseModalFromUrl(): { modalName: string | null; modalParams: Re
     
     return { modalName, modalParams };
   } catch (error) {
-    console.error('Error parsing modal from URL:', error);
+    console.error('Error parsing modal from URL:', error as Error);
     return { modalName: null, modalParams: {} };
   }
 }
@@ -145,7 +145,7 @@ export function addModalParamToUrl(
     
     return url.toString();
   } catch (error) {
-    console.error('Error adding modal param to URL:', error);
+    console.error('Error adding modal param to URL:', error as Error);
     return baseUrl;
   }
 }
@@ -174,7 +174,7 @@ export function removeModalParamFromUrl(url: string): string {
     
     return urlObj.toString();
   } catch (error) {
-    console.error('Error removing modal param from URL:', error);
+    console.error('Error removing modal param from URL:', error as Error);
     return url;
   }
 }
@@ -188,6 +188,6 @@ export function updateUrlWithoutNavigation(url: string): void {
   try {
     window.history.replaceState({}, '', url);
   } catch (error) {
-    console.error('Error updating URL without navigation:', error);
+    console.error('Error updating URL without navigation:', error as Error);
   }
 }

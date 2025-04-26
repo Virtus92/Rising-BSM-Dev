@@ -140,7 +140,7 @@ export const UserForm: React.FC<UserFormProps> = ({
       // The onSuccess callback in useFileUpload will update the form data
       // with the file path and file ID returned from the server
     } catch (error) {
-      console.error('Error uploading file:', error);
+      console.error('Error uploading file:', error as Error);
       // Error handling is done in the useFileUpload hook via onError callback
     } finally {
       if (fileInputRef.current) {
@@ -520,3 +520,5 @@ export const UserForm: React.FC<UserFormProps> = ({
     </Card>
   );
 };
+
+export default UserForm;

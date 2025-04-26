@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { getPrismaClient } from '@/infrastructure/common/database/prisma';
-import { formatResponse } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
+import { getPrismaClient } from '@/core/db/prisma/client';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
 
 // Get the current user profile using the auth cookie
 export async function GET(req: NextRequest) {

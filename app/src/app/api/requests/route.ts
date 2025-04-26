@@ -2,11 +2,12 @@
  * API route for requests
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { apiPermissions } from '../helpers/apiPermissions';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
 import { RequestFilterParamsDto } from '@/domain/dtos/RequestDtos';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
 
@@ -14,8 +15,8 @@ import { RequestStatus } from '@/domain/enums/CommonEnums';
  * GET /api/requests
  * Get requests with optional filtering
  */
-export const GET = apiRouteHandler(
-  apiPermissions.withPermission(
+export const GET = routeHandler(
+  withPermission(
     async (req: NextRequest) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
@@ -90,7 +91,7 @@ export const GET = apiRouteHandler(
  * POST /api/requests
  * Create a new request
  */
-export const POST = apiRouteHandler(async (req: NextRequest) => {
+export const POST = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   

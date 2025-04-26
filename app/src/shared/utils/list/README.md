@@ -26,7 +26,7 @@ Create a custom hook for your feature that uses `useBaseList`:
 // useCustomers.ts
 import { useBaseList } from '@/shared/utils/list';
 import { CustomerDto, CustomerFilterParamsDto } from '@/domain/dtos/CustomerDtos';
-import { CustomerService } from '@/infrastructure/clients/CustomerService';
+import { CustomerService } from '@/features/customers/lib/services/CustomerService';
 
 export function useCustomers(initialFilters?: CustomerFilterParamsDto) {
   // Define fetch function

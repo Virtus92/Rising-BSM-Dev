@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import CustomerForm from '@/features/customers/components/CustomerForm';
-import { CustomerService } from '@/infrastructure/clients/CustomerService';
+import { CustomerService } from '@/features/customers/lib/services/CustomerService';
 import { usePermissions } from '@/features/users/hooks/usePermissions';
 import { AccessDenied } from '@/shared/components/AccessDenied';
 import { CreateCustomerDto, CustomerResponseDto, UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
@@ -20,7 +20,7 @@ export default function NewCustomerPage() {
       const response = await CustomerService.createCustomer(data as CreateCustomerDto);
       return response.success && response.data ? response.data as CustomerResponseDto : null;
     } catch (error) {
-      console.error('Error creating customer:', error);
+      console.error('Error creating customer:', error as Error);
       return null;
     }
   };

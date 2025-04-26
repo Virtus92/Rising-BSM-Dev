@@ -23,7 +23,7 @@ import {
 } from '@/shared/components/ui/select';
 import { useRequest } from '../hooks/useRequest';
 import { RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
-import { AppointmentService } from '@/infrastructure/clients/AppointmentService';
+import { AppointmentService } from '@/features/appointments/lib/services/AppointmentService';
 import { useToast } from '@/shared/hooks/useToast';
 import { format, addDays } from 'date-fns';
 import { Loader2 } from 'lucide-react';
@@ -116,7 +116,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
         });
       }
     } catch (error) {
-      console.error('Error creating appointment:', error);
+      console.error('Error creating appointment:', error as Error);
       toast({
         title: 'Error',
         description: 'An unexpected error occurred',
@@ -133,7 +133,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
         <FormField
           control={form.control}
           name="title"
-          render={({ field }) => (
+          render={({ field }: any) => (
             <FormItem>
               <FormLabel>Titel *</FormLabel>
               <FormControl>
@@ -148,7 +148,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           <FormField
             control={form.control}
             name="appointmentDate"
-            render={({ field }) => (
+            render={({ field }: any) => (
               <FormItem>
                 <FormLabel>Datum *</FormLabel>
                 <FormControl>
@@ -162,7 +162,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           <FormField
             control={form.control}
             name="appointmentTime"
-            render={({ field }) => (
+            render={({ field }: any) => (
               <FormItem>
                 <FormLabel>Uhrzeit *</FormLabel>
                 <FormControl>
@@ -178,7 +178,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           <FormField
             control={form.control}
             name="duration"
-            render={({ field }) => (
+            render={({ field }: any) => (
               <FormItem>
                 <FormLabel>Dauer (Minuten) *</FormLabel>
                 <FormControl>
@@ -192,7 +192,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           <FormField
             control={form.control}
             name="location"
-            render={({ field }) => (
+            render={({ field }: any) => (
               <FormItem>
                 <FormLabel>Ort</FormLabel>
                 <FormControl>
@@ -207,7 +207,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
         <FormField
           control={form.control}
           name="description"
-          render={({ field }) => (
+          render={({ field }: any) => (
             <FormItem>
               <FormLabel>Beschreibung</FormLabel>
               <FormControl>
@@ -225,7 +225,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
         <FormField
           control={form.control}
           name="status"
-          render={({ field }) => (
+          render={({ field }: any) => (
             <FormItem>
               <FormLabel>Status</FormLabel>
               <Select
@@ -255,7 +255,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
         <FormField
           control={form.control}
           name="note"
-          render={({ field }) => (
+          render={({ field }: any) => (
             <FormItem>
               <FormLabel>Notiz</FormLabel>
               <FormControl>

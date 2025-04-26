@@ -2,16 +2,17 @@
  * API route for notifications
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { NotificationFilterParamsDto } from '@/domain/dtos/NotificationDtos';
 
 /**
  * GET /api/notifications
  * Get notifications for the current user
  */
-export const GET = apiRouteHandler(async (request: NextRequest) => {
+export const GET = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   
@@ -110,7 +111,7 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
  * POST /api/notifications
  * Create a new notification (admin only)
  */
-export const POST = apiRouteHandler(async (request: NextRequest) => {
+export const POST = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   

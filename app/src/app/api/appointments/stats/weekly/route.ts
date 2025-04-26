@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError } from '@/core/errors/index';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { generateWeeklyStats } from '@/shared/utils/statistics-utils';
 import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
@@ -12,7 +12,7 @@ import { AppointmentStatus } from '@/domain/enums/CommonEnums';
  * 
  * Returns weekly appointment statistics
  */
-export const GET = apiRouteHandler(async (request: NextRequest) => {
+export const GET = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   
   try {

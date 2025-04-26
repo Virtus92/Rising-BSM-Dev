@@ -1,0 +1,223 @@
+/**
+ * Server-only bootstrap utilities for initializing application services
+ * This module is exclusively for server contexts and should never be imported in client code.
+ */
+
+// Mark as server-only to prevent client-side imports
+import 'server-only';
+
+import { getLogger as getLoggerInternal, resetLogger } from '../logging';
+import { ErrorHandler, IErrorHandler } from '../errors';
+import { IValidationService } from '../validation/IValidationService';
+import { ValidationService } from '../validation/ValidationService';
+import { createApiErrorInterceptor } from '../errors/api-error-interceptor';
+import { configService } from '../config/ConfigService';
+import { UserStatus } from '@/domain/enums/UserEnums';
+
+// Singleton instances
+let errorHandler: IErrorHandler;
+let validationService: IValidationService;
+
+/**
+ * Returns a singleton instance of the ErrorHandler
+ */
+export function getErrorHandler(): IErrorHandler {
+  if (!errorHandler) {
+    errorHandler = new ErrorHandler(getLogger());
+  }
+  return errorHandler;
+}
+
+/**
+ * Returns a singleton instance of the ValidationService
+ */
+export function getValidationService(): IValidationService {
+  if (!validationService) {
+    validationService = new ValidationService(getLogger());
+  }
+  return validationService;
+}
+
+/**
+ * Initializes all server-side application services
+ * This should only be called in true server environments (not Edge or Browser)
+ * 
+ * @returns Promise resolved after initialization
+ */
+export async function bootstrapServer(): Promise<void> {
+  try {
+    // Check that we're actually in a server environment
+    if (typeof window !== 'undefined') {
+      throw new Error('Server bootstrap cannot be used in browser context');
+    }
+    
+    if (process.env.NEXT_RUNTIME === 'edge') {
+      throw new Error('Server bootstrap cannot be used in Edge Runtime');
+    }
+
+    // Initialize logger
+    const logger = getLogger();
+    logger.info('Server-side application bootstrap started');
+    
+    // Log configuration information
+    logger.info(`Bootstrapping application in ${configService.getEnvironment()} environment`);
+    
+    // Initialize error handler
+    getErrorHandler();
+    logger.debug('Error handler initialized');
+    
+    // Initialize validation service
+    getValidationService();
+    logger.debug('Validation service initialized');
+    
+    // Initialize API error interceptor
+    const apiErrorInterceptor = createApiErrorInterceptor(logger, {
+      verbose: configService.isDevelopment(),
+      retry: {
+        statusCodes: [408, 429, 500, 502, 503, 504],
+        maxRetries: configService.getApiConfig().retries,
+        delayMs: 1000,
+        exponentialBackoff: true
+      }
+    });
+    logger.debug('API error interceptor initialized');
+    
+    // Import factory functions explicitly with a modified approach
+    // Using destructuring import to ensure we get the required functions
+    // This is more reliable than dynamic imports in case of circular references
+    let getServiceFactory, getRepositoryFactory, getDatabaseFactory;
+    try {
+      // Try standard import first
+      const factories = await import('../factories');
+      getServiceFactory = factories.getServiceFactory;
+      getRepositoryFactory = factories.getRepositoryFactory;
+      getDatabaseFactory = factories.getDatabaseFactory;
+      
+      // Verify we got all the required functions
+      if (!getServiceFactory || !getRepositoryFactory || !getDatabaseFactory) {
+        throw new Error('One or more factory functions not available');
+      }
+      
+      logger.debug('Factory functions imported successfully');
+    } catch (importError) {
+      logger.error('Error importing factory functions', { error: importError });
+      throw new Error('Failed to initialize application: Factory functions unavailable');
+    }
+    
+    // Get service factory
+    const serviceFactory = getServiceFactory();
+    
+    // Get repository factory
+    const repositoryFactory = getRepositoryFactory();
+    
+    // Get database factory
+    const databaseFactory = getDatabaseFactory();
+    
+    // Initialize Prisma
+    const prismaClient = databaseFactory.getPrismaClient();
+    logger.debug('Prisma client initialized');
+    
+    // Initialize repositories
+    const userRepository = repositoryFactory.createUserRepository();
+    repositoryFactory.createCustomerRepository();
+    repositoryFactory.createAppointmentRepository();
+    repositoryFactory.createRequestRepository();
+    repositoryFactory.createActivityLogRepository();
+    repositoryFactory.createNotificationRepository();
+    repositoryFactory.createRefreshTokenRepository();
+    const permissionRepository = repositoryFactory.createPermissionRepository();
+    logger.debug('Repositories initialized');
+    
+    // Seed permissions if needed
+    try {
+      logger.info('Seeding permissions...');
+      await permissionRepository.seedDefaultPermissions();
+      logger.info('Permission seeding completed');
+    } catch (error) {
+      logger.error('Error seeding permissions', { error });
+      // Don't block startup for permission seeding
+    }
+    
+    // Initialize server-side services
+    const userService = serviceFactory.createUserService();
+    serviceFactory.createCustomerService();
+    serviceFactory.createAppointmentService();
+    serviceFactory.createRequestService();
+    serviceFactory.createActivityLogService();
+    serviceFactory.createNotificationService();
+    serviceFactory.createRefreshTokenService();
+    const permissionService = serviceFactory.createPermissionService();
+    
+    // Pre-warm caches on server only
+    try {
+      logger.info('Pre-warming permission cache...');
+      // Get a limited number of active users to pre-warm the cache
+      const activeUsers = await userService.findUsers({
+        status: UserStatus.ACTIVE,
+        limit: 20,
+        page: 1
+      });
+      
+      if (activeUsers.data?.length) {
+        // Initialize permission cache for these users
+        for (const user of activeUsers.data) {
+          await permissionService.getUserPermissions(user.id);
+        }
+        logger.info(`Pre-warmed permission cache for ${activeUsers.data.length} active users`);
+      }
+    } catch (error) {
+      logger.error('Error pre-warming permission cache', { error });
+      // Don't block startup for cache warming
+    }
+    
+    logger.debug('Server-side services initialized');
+    logger.info('Server-side application bootstrap completed successfully');
+  } catch (error) {
+    // Use the logger if it's already initialized
+    const logger = getLogger();
+    logger.error('Server bootstrap failed', error instanceof Error ? error : { message: String(error) });
+    throw error;
+  }
+}
+
+/**
+ * Resets all singleton instances (mainly for testing)
+ */
+export function resetServices(): void {
+  resetLogger();
+  errorHandler = undefined as any;
+  validationService = undefined as any;
+  
+  // Import from core factories with improved error handling
+  // This is critical for proper test cleanup
+  try {
+    const factories = require('../factories');
+    if (factories) {
+      // Use require instead of import to avoid any potential circular dependencies
+      // This is more reliable for this specific use case
+      if (factories.getDatabaseFactory) {
+        const databaseFactory = factories.getDatabaseFactory();
+        databaseFactory.resetPrismaClient();
+      }
+      
+      if (factories.getRepositoryFactory) {
+        const repositoryFactory = factories.getRepositoryFactory();
+        repositoryFactory.resetRepositories();
+      }
+      
+      if (factories.getServiceFactory) {
+        const serviceFactory = factories.getServiceFactory();
+        serviceFactory.resetServices();
+      }
+    }
+  } catch (error) {
+    console.error('Error resetting services:', error as Error);
+  }
+}
+
+/**
+ * Returns the logger service instance
+ */
+function getLogger() {
+  return getLoggerInternal();
+}

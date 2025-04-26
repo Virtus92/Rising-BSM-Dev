@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
-import { RequestService } from '@/infrastructure/clients/RequestService';
+import { RequestClient } from '@/features/requests/lib/clients/RequestClient';
 import { 
   RequestDetailResponseDto, 
   ConvertToCustomerDto,
@@ -25,7 +25,7 @@ export const useRequest = (requestId?: number) => {
     
     try {
       setIsLoading(true);
-      const response = await RequestService.getById(requestId);
+      const response = await RequestClient.getRequestById(requestId);
       if (response.success && response.data) {
         setRequest(response.data);
       } else {
@@ -51,9 +51,10 @@ export const useRequest = (requestId?: number) => {
     
     try {
       setIsUpdating(true);
-      const response = await RequestService.updateStatus(requestId, status);
+      const response = await RequestClient.updateStatus(requestId, status);
       if (response.success && response.data) {
-        setRequest(response.data);
+        // Cast the response.data to RequestDetailResponseDto to match the state type
+        setRequest(response.data as RequestDetailResponseDto);
         toast({
           title: 'Status updated',
           description: `Request status updated to ${statusValue}`,
@@ -85,7 +86,7 @@ export const useRequest = (requestId?: number) => {
     
     try {
       setIsConverting(true);
-      const response = await RequestService.convertToCustomer(data);
+      const response = await RequestClient.convertToCustomer(requestId, data);
       if (response.success) {
         toast({
           title: 'Conversion successful',
@@ -123,7 +124,7 @@ export const useRequest = (requestId?: number) => {
     
     try {
       setIsCreatingAppointment(true);
-      const response = await RequestService.createAppointment(requestId, appointmentData, note);
+      const response = await RequestClient.createAppointment(requestId, appointmentData, note);
       if (response.success) {
         toast({
           title: 'Appointment created',
@@ -161,7 +162,7 @@ export const useRequest = (requestId?: number) => {
     
     try {
       setIsLinking(true);
-      const response = await RequestService.linkToCustomer(requestId, customerId, note);
+      const response = await RequestClient.linkToCustomer(requestId, customerId, note);
       if (response.success) {
         toast({
           title: 'Link successful',
@@ -199,7 +200,7 @@ export const useRequest = (requestId?: number) => {
     
     try {
       setIsAddingNote(true);
-      const response = await RequestService.addNote(requestId, noteText);
+      const response = await RequestClient.addNote(requestId, noteText);
       if (response.success) {
         toast({
           title: 'Note added',
@@ -237,7 +238,7 @@ export const useRequest = (requestId?: number) => {
     
     try {
       setIsDeleting(true);
-      const response = await RequestService.delete(requestId);
+      const response = await RequestClient.deleteRequest(requestId);
       if (response.success) {
         toast({
           title: 'Request deleted',
@@ -276,7 +277,7 @@ export const useRequest = (requestId?: number) => {
     
     try {
       setIsAssigning(true);
-      const response = await RequestService.assignRequest(requestId, userId);
+      const response = await RequestClient.assignRequest(requestId, userId);
       if (response.success) {
         toast({
           title: 'Request assigned',

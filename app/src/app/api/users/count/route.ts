@@ -1,14 +1,14 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError } from '@/core/errors/index';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 
 /**
  * GET /api/users/count
  * Get user count
  */
-export const GET = apiRouteHandler(async (request: NextRequest) => {
+export const GET = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   
   try {

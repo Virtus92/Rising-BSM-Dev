@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { validateId, isValidId } from '@/shared/utils/validation-utils';
-import { AppointmentClient } from '@/infrastructure/api/AppointmentClient';
-import { CustomerClient } from '@/infrastructure/api/CustomerClient';
+import { AppointmentClient } from '@/features/appointments/lib/clients';
+import { CustomerClient } from '@/features/customers/lib/clients';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 import { CreateAppointmentDto, UpdateAppointmentDto } from '@/domain/dtos/AppointmentDtos';
 import { Button } from '@/shared/components/ui/button';
@@ -121,7 +121,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({
         setCustomerLoadError(`Failed to load customers: ${response.message || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Failed to fetch customers:', error);
+      console.error('Failed to fetch customers:', error as Error);
       setCustomers([]);
       setCustomerLoadError('Failed to load customers. Please check your connection and try again.');
     } finally {
@@ -155,7 +155,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({
               const dateObj = new Date(data.appointmentDate);
               formattedDate = format(dateObj, 'yyyy-MM-dd');
             } catch (error) {
-              console.error('Error formatting date:', error);
+              console.error('Error formatting date:', error as Error);
               formattedDate = data.appointmentDate as string;
             }
           }
@@ -177,7 +177,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'An error occurred while fetching appointment data';
         setError(errorMessage);
-        console.error('Error fetching appointment data:', error);
+        console.error('Error fetching appointment data:', error as Error);
       } finally {
         setIsLoading(false);
       }

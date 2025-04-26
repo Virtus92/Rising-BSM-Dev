@@ -1,18 +1,20 @@
-/**
- * API route for specific notification operations
- */
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { getServiceFactory } from '@/core/factories';
 import { authMiddleware } from '../../auth/middleware/authMiddleware';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
 
 /**
  * GET /api/notifications/[id]
  * Get specific notification by id
  */
-export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const GET = routeHandler(async (req: NextRequest) => {
   try {
-    const id = parseInt(params.id);
+    // Extract ID from URL path segments
+    const urlParts = req.nextUrl.pathname.split('/');
+    const idStr = urlParts[urlParts.length - 1]; // Last segment is the [id] part
+    const id = parseInt(idStr);
+    
     if (isNaN(id)) {
       return formatResponse.error('Invalid notification ID', 400);
     }
@@ -32,16 +34,20 @@ export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params
 
     return formatResponse.success(notification);
   } catch (error) {
-    console.error('Error fetching notification:', error);
+    console.error('Error fetching notification:', error as Error);
     return formatResponse.error('Error fetching notification', 500);
   }
 }, {
   requiresAuth: true
 });
 
-export const DELETE = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const DELETE = routeHandler(async (req: NextRequest) => {
   try {
-    const id = parseInt(params.id);
+    // Extract ID from URL path segments
+    const urlParts = req.nextUrl.pathname.split('/');
+    const idStr = urlParts[urlParts.length - 1]; // Last segment is the [id] part
+    const id = parseInt(idStr);
+    
     if (isNaN(id)) {
       return formatResponse.error('Invalid notification ID', 400);
     }
@@ -63,7 +69,7 @@ export const DELETE = apiRouteHandler(async (req: NextRequest, { params }: { par
 
     return formatResponse.success({ success: true }, 'Notification deleted successfully');
   } catch (error) {
-    console.error('Error deleting notification:', error);
+    console.error('Error deleting notification:', error as Error);
     return formatResponse.error('Error deleting notification', 500);
   }
 }, {

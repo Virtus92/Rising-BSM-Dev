@@ -13,7 +13,7 @@ import { CustomerType, CommonStatus } from '@/domain/enums/CommonEnums';
 import { useCustomers } from '../hooks/useCustomers';
 import { useCustomerPermissions } from '../hooks/useCustomerPermissions';
 import { DeleteConfirmationDialog } from '@/shared/components/DeleteConfirmationDialog';
-import { formatPhoneNumber } from '@/infrastructure/common/validation/userValidation';
+import { formatPhoneNumber } from '@/core/validation/userValidation';
 import { CustomerFilterPanel } from './CustomerFilterPanel';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';

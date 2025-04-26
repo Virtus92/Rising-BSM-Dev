@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { apiPermissions } from '../../helpers/apiPermissions';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
 
 type RequestParams = {
   params: {
@@ -16,8 +17,8 @@ type RequestParams = {
  * 
  * Ruft eine einzelne Kontaktanfrage ab.
  */
-export const GET = apiRouteHandler(
-  apiPermissions.withPermission(
+export const GET = routeHandler(
+  withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
@@ -51,8 +52,8 @@ export const GET = apiRouteHandler(
  * 
  * Aktualisiert eine Kontaktanfrage.
  */
-export const PUT = apiRouteHandler(
-  apiPermissions.withPermission(
+export const PUT = routeHandler(
+  withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
@@ -89,8 +90,8 @@ export const PUT = apiRouteHandler(
  * 
  * Löscht eine Kontaktanfrage.
  */
-export const DELETE = apiRouteHandler(
-  apiPermissions.withPermission(
+export const DELETE = routeHandler(
+  withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();

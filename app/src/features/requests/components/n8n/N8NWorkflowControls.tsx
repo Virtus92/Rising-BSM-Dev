@@ -32,12 +32,18 @@ export const N8NWorkflowControls: React.FC<N8NWorkflowControlsProps> = ({
   request, 
   onComplete 
 }) => {
+  const n8nHook = useN8NWorkflows();
   const { 
     workflows, 
-    isLoading, 
-    isProcessing, 
+    loading, 
+    currentExecutionId,
+    executionStatus,
     triggerWorkflow 
-  } = useN8NWorkflows(request.id);
+  } = n8nHook;
+  
+  // Derive processing state from execution status
+  const isLoading = loading;
+  const isProcessing = currentExecutionId !== null && executionStatus?.status === 'running';
   
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>('');
   const [workflowStatus, setWorkflowStatus] = useState<string | null>(
@@ -85,15 +91,34 @@ export const N8NWorkflowControls: React.FC<N8NWorkflowControlsProps> = ({
   const handleRunWorkflow = async () => {
     if (!selectedWorkflow) return;
     
-    const result = await triggerWorkflow(selectedWorkflow);
+    const result = await triggerWorkflow(selectedWorkflow, {
+      requestId: request.id,
+      requestData: request
+    });
     
-    if (result.success) {
+    // Assuming result being truthy indicates success
+    if (result && result.success) {
       setWorkflowStatus('started');
       
       // This is where you would set up polling for status updates
       // or configure a WebSocket connection to get real-time updates
     }
   };
+  
+  // Update workflow status when execution status changes
+  useEffect(() => {
+    if (executionStatus) {
+      if (executionStatus.status === 'running') {
+        setWorkflowStatus('in_progress');
+      } else if (executionStatus.status === 'success') {
+        setWorkflowStatus('completed');
+        // Notify parent that workflow completed successfully
+        onComplete();
+      } else if (executionStatus.status === 'error') {
+        setWorkflowStatus('error');
+      }
+    }
+  }, [executionStatus, onComplete]);
   
   // Get the n8n metadata or an empty object if it doesn't exist
   const n8nMetadata = request.metadata?.n8n || {};
@@ -126,7 +151,7 @@ export const N8NWorkflowControls: React.FC<N8NWorkflowControlsProps> = ({
               </SelectItem>
             ) : (
               workflows.map((workflow) => (
-                <SelectItem key={workflow.id} value={workflow.name}>
+                <SelectItem key={workflow.id} value={workflow.id}>
                   {workflow.name}
                 </SelectItem>
               ))

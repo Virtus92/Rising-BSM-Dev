@@ -57,7 +57,7 @@ export default function ForgotPasswordForm() {
         setIsSuccess(true);
       }
     } catch (error) {
-      console.error('Error requesting password reset:', error);
+      console.error('Error requesting password reset:', error as Error);
     } finally {
       setIsSubmitting(false);
     }

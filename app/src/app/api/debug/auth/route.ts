@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatResponse } from '@/infrastructure/api/response-formatter';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors/formatting/response-formatter';
 
 /**
  * DEBUG ENDPOINT: Returns authentication status information.
  * 
  * WARNING: This endpoint should be disabled in production.
  */
-export const GET = apiRouteHandler(async (request: NextRequest) => {
+export const GET = routeHandler(async (request: NextRequest) => {
   // Always disable in production for security
   if (process.env.NODE_ENV === 'production') {
     return formatResponse.error('This endpoint is disabled in production', 404);

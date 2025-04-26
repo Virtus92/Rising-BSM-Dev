@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/infrastructure/api/response-formatter';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
+import { getServiceFactory } from '@/core/factories';
 import { UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
-import { getLogger } from '@/infrastructure/common/logging';
-import { apiPermissions } from '@/app/api/helpers/apiPermissions';
+import { getLogger } from '@/core/logging';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 
@@ -13,13 +14,15 @@ import { validateId } from '@/shared/utils/validation-utils';
  * 
  * Retrieves a single customer by ID
  */
-export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const GET = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
+  // Extract ID from URL path
+  const params = { id: req.nextUrl.pathname.split('/').pop() || '' };
   const serviceFactory = getServiceFactory();
   
   try {
     // Check permission using consistent pattern
-    if (!await apiPermissions.hasPermission(
+    if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
       SystemPermission.CUSTOMERS_VIEW
     )) {
@@ -100,13 +103,15 @@ export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params
  * 
  * Updates a customer by ID
  */
-export const PUT = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const PUT = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
+  // Extract ID from URL path
+  const params = { id: req.nextUrl.pathname.split('/').pop() || '' };
   const serviceFactory = getServiceFactory();
   
   try {
     // Check permission using consistent pattern
-    if (!await apiPermissions.hasPermission(
+    if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
       SystemPermission.CUSTOMERS_EDIT
     )) {
@@ -188,13 +193,15 @@ export const PUT = apiRouteHandler(async (req: NextRequest, { params }: { params
  * 
  * Deletes a customer by ID
  */
-export const DELETE = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const DELETE = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
+  // Extract ID from URL path
+  const params = { id: req.nextUrl.pathname.split('/').pop() || '' };
   const serviceFactory = getServiceFactory();
   
   try {
     // Check permission using consistent pattern
-    if (!await apiPermissions.hasPermission(
+    if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
       SystemPermission.CUSTOMERS_DELETE
     )) {

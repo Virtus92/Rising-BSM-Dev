@@ -1,0 +1,12 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "TypeScript Watch",
+        "type": "shell",
+        "command": "npx tsc --noEmit --watch",
+        "problemMatcher": "$tsc-watch"
+      }
+    ]
+  }
+  

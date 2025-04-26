@@ -14,7 +14,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Loader2, KeyRound, Eye, EyeOff } from 'lucide-react';
-import { UserService } from '@/infrastructure/clients/UserService';
+import { UserService } from '@/features/users/lib/services/UserService';
 
 interface PasswordResetFormProps {
   userId: number;
@@ -196,3 +196,5 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
     </Card>
   );
 };
+
+export default PasswordResetForm;

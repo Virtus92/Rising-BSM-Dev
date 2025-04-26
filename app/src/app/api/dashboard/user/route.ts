@@ -3,10 +3,10 @@
  * Provides personalized dashboard data for the current user
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError } from '@/core/errors/index';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 
 /**
  * GET /api/dashboard/user
@@ -17,7 +17,7 @@ import { getServiceFactory } from '@/infrastructure/common/factories';
  * - User's recent activities
  * - User's performance metrics
  */
-export const GET = apiRouteHandler(async (request: NextRequest) => {
+export const GET = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   

@@ -19,7 +19,7 @@ try {
     console.log('No .env or .env.local file found, using existing environment variables');
   }
 } catch (error) {
-  console.log('Error loading environment variables:', error);
+  console.log('Error loading environment variables:', error as Error);
 }
 
 const prisma = new PrismaClient();

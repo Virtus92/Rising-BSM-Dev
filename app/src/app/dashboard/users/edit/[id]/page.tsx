@@ -36,7 +36,7 @@ import { UserForm } from '@/features/users/components/UserForm';
 import { UserPermissions } from '@/features/users/components/UserPermissions';
 import { UserDto } from '@/domain/dtos/UserDtos';
 import { UserRole, UserStatus } from '@/domain/entities/User';
-import { UserService } from '@/infrastructure/clients/UserService';
+import { UserService } from '@/features/users/lib/services/UserService';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';

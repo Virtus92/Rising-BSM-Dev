@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CustomerService } from '@/infrastructure/clients/CustomerService';
+import { CustomerService } from '@/features/customers/lib/services';
 import { useToast } from '@/shared/hooks/useToast';
 import { Button } from '@/shared/components/ui/button';
 import { Textarea } from '@/shared/components/ui/textarea';

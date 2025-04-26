@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
-import { NotificationService } from '@/infrastructure/clients/NotificationService';
+import { NotificationClient } from '@/features/notifications/lib/clients';
 import { NotificationResponseDto, NotificationFilterParamsDto } from '@/domain/dtos/NotificationDtos';
 import { createBaseListUtility, BaseListUtility } from '@/shared/utils/list/baseListUtils';
+
 
 /**
  * Extended interface for notification list operations
@@ -53,7 +54,7 @@ export const useNotifications = ({
   
   // Define the fetch function for notifications
   const fetchNotifications = useCallback(async (filters: NotificationFilterParamsDto) => {
-    return await NotificationService.getNotifications(filters);
+    return await NotificationClient.getNotifications(filters);
   }, []);
   
   // Use the base list utility
@@ -116,7 +117,7 @@ export const useNotifications = ({
    */
   const markAsRead = useCallback(async (id: number) => {
     try {
-      const response = await NotificationService.markAsRead(id);
+      const response = await NotificationClient.markAsRead(id);
       
       if (response.success) {
         // Update the item in the list
@@ -152,7 +153,7 @@ export const useNotifications = ({
    */
   const markAllAsRead = useCallback(async () => {
     try {
-      const response = await NotificationService.markAllAsRead();
+      const response = await NotificationClient.markAllAsRead();
       
       if (response.success) {
         // Update all items in the list
@@ -192,7 +193,7 @@ export const useNotifications = ({
    */
   const deleteNotification = useCallback(async (id: number) => {
     try {
-      const response = await NotificationService.deleteNotification(id);
+      const response = await NotificationClient.deleteNotification(id);
       
       if (response.success) {
         // Remove the item from the list
@@ -258,3 +259,6 @@ export const useNotifications = ({
     fetchUnreadCount
   };
 };
+
+// Add default export for compatibility with import statements
+export default useNotifications;

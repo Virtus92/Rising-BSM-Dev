@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { apiPermissions } from '../../../helpers/apiPermissions';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
 
 type RequestParams = {
   params: {
@@ -16,8 +17,8 @@ type RequestParams = {
  * 
  * Fügt eine Notiz zu einer Kontaktanfrage hinzu.
  */
-export const POST = apiRouteHandler(
-  apiPermissions.withPermission(
+export const POST = routeHandler(
+  withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
@@ -66,8 +67,8 @@ export const POST = apiRouteHandler(
  * 
  * Ruft alle Notizen einer Kontaktanfrage ab.
  */
-export const GET = apiRouteHandler(
-  apiPermissions.withPermission(
+export const GET = routeHandler(
+  withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();

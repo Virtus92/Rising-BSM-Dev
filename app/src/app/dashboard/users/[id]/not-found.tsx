@@ -31,7 +31,7 @@ export default function UserNotFound({
   if (isNewUserRoute) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <LoadingSpinner size="large" />
+        <LoadingSpinner size="lg" />
         <p className="mt-4 text-lg text-center">
           Redirecting to user management...
         </p>

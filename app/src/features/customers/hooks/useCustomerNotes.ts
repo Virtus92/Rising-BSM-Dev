@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { CustomerService } from '@/infrastructure/clients/CustomerService';
+import { CustomerService } from '@/features/customers/lib/services';
 import { useToast } from '@/shared/hooks/useToast';
 import { CustomerLogDto } from '@/domain/dtos/CustomerDtos';
 

@@ -109,7 +109,7 @@ export function useRequestForm({ initialData = {}, onSubmit }: UseRequestFormOpt
       
       return false;
     } catch (error) {
-      console.error('Form error:', error);
+      console.error('Form error:', error as Error);
       
       toast({
         title: 'Error',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ApiClient } from '@/infrastructure/clients/ApiClient';
+import { ApiClient } from '@/core/api/ApiClient';
 import { useToast } from '@/shared/hooks/useToast';
 
 export type FileUploadType = 'profilePictures' | 'documents' | 'general' | 'customerFiles' | 'projectFiles';

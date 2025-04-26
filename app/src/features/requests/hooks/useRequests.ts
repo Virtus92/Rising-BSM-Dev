@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
-import { RequestService } from '@/infrastructure/clients/RequestService';
+import { RequestService } from '@/features/requests/lib/services';
 import { RequestDto, RequestFilterParamsDto } from '@/domain/dtos/RequestDtos';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
 import { createBaseListUtility, BaseListUtility } from '@/shared/utils/list/baseListUtils';

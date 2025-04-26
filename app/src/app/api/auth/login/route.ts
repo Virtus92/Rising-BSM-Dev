@@ -1,117 +1,49 @@
 /**
  * Login API Route
- * Handles user authentication and token generation
+ * 
+ * This file uses the handler from the features/auth module
  */
 import { NextRequest } from 'next/server';
-import { formatResponse } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { loginHandler } from '@/features/auth/api';
+import { getLogger } from '@/core/logging';
+import { formatResponse } from '@/core/errors';
+import { getServiceFactory } from '@/core/factories';
 
 /**
  * POST /api/auth/login
  * Authenticates a user and returns access and refresh tokens
  */
 export async function POST(request: NextRequest) {
-  const logger = getLogger();
-  const serviceFactory = getServiceFactory();
-  
   try {
-    // Get the auth service
+    // Diagnostic logging to help troubleshoot the login issue
+    const logger = getLogger();
+    logger.info('Login route handling request');
+    
+    // Verify auth service before delegating to loginHandler
+    const serviceFactory = getServiceFactory();
     const authService = serviceFactory.createAuthService();
     
-    // Parse request data
-    const data = await request.json();
-    const { email, password, remember = false } = data;
-
-    // Validate input
-    if (!email || !password) {
-      return formatResponse.error('Email and password are required', 400);
+    // Verify the auth service has the login method
+    if (!authService || typeof authService.login !== 'function') {
+      logger.error('Auth service is missing login method:', {
+        authServiceExists: !!authService,
+        methods: authService ? Object.keys(authService) : 'none',
+        env: typeof window !== 'undefined' ? 'browser' : 'server'
+      });
+      
+      return formatResponse.error('Authentication service unavailable', 500);
     }
-
-    // Perform login
-    const result = await authService.login({
-      email,
-      password,
-      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
-      userAgent: request.headers.get('user-agent') || 'unknown',
-      rememberMe: remember
-    });
     
-    // Calculate expiration times in seconds
-    const accessExpiration = 24 * 60 * 60; // 24 hours default
-    const refreshExpiration = 30 * 24 * 60 * 60; // 30 days default
-    
-    // Add expiration fields if not already present
-    result.accessExpiration = result.accessExpiration || accessExpiration;
-    result.refreshExpiration = result.refreshExpiration || refreshExpiration;
-    
-    // Log successful login
-    logger.info('User logged in successfully', { userId: result.user.id });
-    
-    // Create response
-    const response = formatResponse.success({
-      user: {
-        id: result.user.id,
-        name: result.user.name,
-        email: result.user.email,
-        role: result.user.role
-      },
-      // Include tokens in response body for client-side storage backup
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken
-    }, 'Login successful');
-    
-    // Set HTTP-only cookies with proper settings
-    response.cookies.set({
-      name: 'auth_token',
-      value: result.accessToken,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', 
-      path: '/',
-      maxAge: result.accessExpiration // in seconds
-    });
-    
-    response.cookies.set({
-      name: 'refresh_token',
-      value: result.refreshToken,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: result.refreshExpiration // in seconds
-    });
-    
-    // Add debugging headers
-    response.headers.set('X-Token-Set', 'true');
-    response.headers.set('X-Auth-User-ID', result.user.id.toString());
-    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    response.headers.set('Pragma', 'no-cache');
-    
-    return response;
+    // Auth service appears valid, proceed with login handler
+    logger.info('Auth service verification passed, delegating to loginHandler');
+    return loginHandler(request);
   } catch (error) {
-    // Handle authentication errors
-    logger.error('Login error:', { 
+    const logger = getLogger();
+    logger.error('Unexpected error in login route:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined
     });
     
-    // Determine appropriate error message and status
-    let message = 'An error occurred during login';
-    let status = 500;
-    
-    if (error instanceof Error) {
-      if (error.message.includes('Invalid credentials') || 
-          error.message.includes('not found') || 
-          error.message.includes('invalid password')) {
-        message = 'Invalid email or password';
-        status = 401;
-      } else if (error.message.includes('not active')) {
-        message = 'Account is not active. Please contact admin.';
-        status = 403;
-      }
-    }
-    
-    return formatResponse.error(message, status);
+    return formatResponse.error('An unexpected error occurred during login', 500);
   }
 }

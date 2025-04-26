@@ -2,7 +2,7 @@
 
 import { Check, Trash, ChevronDown, ChevronUp, Calendar, AlertCircle, Bell } from 'lucide-react';
 import { NotificationResponseDto } from '@/domain/dtos/NotificationDtos';
-import { formatRelativeTime } from './utils/date-utils';
+import { formatRelativeTime } from '@/features/notifications/utils/date-utils';
 
 interface NotificationItemProps {
   notification: NotificationResponseDto;

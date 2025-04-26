@@ -4,11 +4,12 @@
  * Handles appointment notes operations
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/infrastructure/api/response-formatter';
-import { getAppointmentService } from '@/infrastructure/common/factories';
-import { getLogger } from '@/infrastructure/common/logging';
-import { apiPermissions } from '@/app/api/helpers/apiPermissions';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
+import { getAppointmentService } from '@/core/factories';
+import { getLogger } from '@/core/logging';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 
@@ -18,12 +19,14 @@ import { validateId } from '@/shared/utils/validation-utils';
  * Retrieves notes for an appointment
  * Requires APPOINTMENTS_VIEW permission
  */
-export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const GET = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
+  // Extract ID from URL path
+  const params = { id: req.nextUrl.pathname.split('/').slice(-2)[0] };
   
   try {
     // Check permission - moved inside handler for better authentication flow
-    if (!await apiPermissions.hasPermission(
+    if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
       SystemPermission.APPOINTMENTS_VIEW
     )) {
@@ -89,12 +92,14 @@ export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params
  * Adds a note to an appointment
  * Requires APPOINTMENTS_EDIT permission
  */
-export const POST = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const POST = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
+  // Extract ID from URL path
+  const params = { id: req.nextUrl.pathname.split('/').slice(-2)[0] };
   
   try {
     // Check permission - moved inside handler for better authentication flow
-    if (!await apiPermissions.hasPermission(
+    if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
       SystemPermission.APPOINTMENTS_EDIT
     )) {
@@ -142,7 +147,7 @@ export const POST = apiRouteHandler(async (req: NextRequest, { params }: { param
     const success = await appointmentService.addNote(validId, data.note, {
       context: {
         userId: req.auth?.userId,
-        ipAddress: req.headers.get('x-forwarded-for') || req.ip
+        ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined
       }
     });
     

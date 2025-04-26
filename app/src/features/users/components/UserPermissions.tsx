@@ -18,7 +18,7 @@ import { UserRole } from '@/domain/enums/UserEnums';
 import { Separator } from '@/shared/components/ui/separator';
 import { Badge } from '@/shared/components/ui/badge';
 import { UserDto } from '@/domain/dtos/UserDtos';
-import { PermissionClient } from '@/infrastructure/api/PermissionClient';
+import { PermissionClient } from '@/features/permissions/lib/clients/PermissionClient';
 import { SystemPermission, getPermissionsForRole } from '@/domain/enums/PermissionEnums';
 import { SystemPermissionMap, createPermissionDefinitionList } from '@/domain/permissions/SystemPermissionMap';
 import { 
@@ -544,3 +544,5 @@ const RoleBadge: React.FC<{ role: string }> = ({ role }) => {
     </Badge>
   );
 };
+
+export default UserPermissions;

@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 
 /**
  * POST /api/webhooks/n8n
  * Webhook endpoint for N8N to send updates and processing results
  */
-export const POST = apiRouteHandler(async (req: NextRequest) => {
+export const POST = routeHandler(async (req: NextRequest) => {
   const { action, requestId, payload, workflowId, executionId } = await req.json();
   const logger = getLogger();
   

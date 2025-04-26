@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { UserService } from '@/infrastructure/clients/UserService';
+import { UserService } from '@/features/users/lib/services/UserService';
 import { UserDto, UserFilterParamsDto, UserResponseDto } from '@/domain/dtos/UserDtos';
 import { UserRole, UserStatus } from '@/domain/enums/UserEnums';
 import { useToast } from '@/shared/hooks/useToast';
@@ -86,7 +86,7 @@ export function useUsers(initialFilters?: Partial<UserFilterParamsDto>): UseUser
           setCurrentUserId(response.data.id);
         }
       } catch (error) {
-        console.error('Error fetching current user:', error);
+        console.error('Error fetching current user:', error as Error);
       }
     };
     
@@ -248,3 +248,5 @@ export function useUsers(initialFilters?: Partial<UserFilterParamsDto>): UseUser
     hasFilters
   };
 }
+
+export default useUsers;

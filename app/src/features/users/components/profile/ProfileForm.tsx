@@ -3,7 +3,7 @@
  * Component for user profile information editing
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { UserService } from '@/infrastructure/clients/UserService';
+import { UserService } from '@/features/users/lib/services/UserService';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -150,7 +150,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     setIsUploadingImage(true);
     upload(file, 'profilePictures', { userId: user?.id?.toString() || '' })
       .catch(error => {
-        console.error('Upload error:', error);
+        console.error('Upload error:', error as Error);
         toast({
           title: "Fehler",
           description: "Beim Hochladen des Profilbilds ist ein Fehler aufgetreten.",
@@ -228,7 +228,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
             throw new Error(response.message || "Profilbild konnte nicht aktualisiert werden.");
           }
         } catch (error) {
-          console.error(`Error updating profile picture (attempt ${attempts}/${maxAttempts}):`, error);
+          console.error(`Error updating profile picture (attempt ${attempts}/${maxAttempts}):`, error as Error);
           lastError = error;
           
           // Only show toast on final error
@@ -251,7 +251,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
         });
       }
     } catch (error) {
-      console.error('Profile picture update failed:', error);
+      console.error('Profile picture update failed:', error as Error);
       toast({
         title: "Fehler",
         description: error instanceof Error ? error.message : "Profilbild konnte nicht aktualisiert werden.",

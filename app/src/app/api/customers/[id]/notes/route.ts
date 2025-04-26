@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/infrastructure/api/response-formatter';
-import { getServiceFactory } from '@/infrastructure/common/factories';
-import { getLogger } from '@/infrastructure/common/logging';
-import { apiPermissions } from '@/app/api/helpers/apiPermissions';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
+import { getServiceFactory } from '@/core/factories';
+import { getLogger } from '@/core/logging';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 
@@ -13,12 +14,14 @@ import { validateId } from '@/shared/utils/validation-utils';
  * Adds a note to a customer
  * Requires CUSTOMERS_EDIT permission
  */
-export const POST = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const POST = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
+  // Extract ID from URL path
+  const params = { id: req.nextUrl.pathname.split('/').slice(-2)[0] };
   
   try {
     // Check permission
-    if (!await apiPermissions.hasPermission(
+    if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
       SystemPermission.CUSTOMERS_EDIT
     )) {
@@ -111,12 +114,14 @@ export const POST = apiRouteHandler(async (req: NextRequest, { params }: { param
  * Retrieves notes for a customer
  * Requires CUSTOMERS_VIEW permission
  */
-export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const GET = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
+  // Extract ID from URL path
+  const params = { id: req.nextUrl.pathname.split('/').slice(-2)[0] };
   
   try {
     // Check permission
-    if (!await apiPermissions.hasPermission(
+    if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
       SystemPermission.CUSTOMERS_VIEW
     )) {

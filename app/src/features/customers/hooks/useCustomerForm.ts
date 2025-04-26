@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { CustomerResponseDto, CreateCustomerDto, UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { useToast } from '@/shared/hooks/useToast';
-import { formatPhoneNumber, isValidPhone } from '@/infrastructure/common/validation/userValidation';
+import { formatPhoneNumber, validatePhone } from '@/core/validation/userValidation';
 import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
 
 type FormErrors = {
@@ -65,7 +65,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
     }
     
     // Validiere Telefonnummer (falls vorhanden)
-    if (phone && !isValidPhone(phone)) {
+    if (phone && !validatePhone(phone)) {
       newErrors.phone = 'Ungültiges Telefonnummer-Format';
     }
     
@@ -128,7 +128,7 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
       
       return false;
     } catch (error) {
-      console.error('Formularfehler:', error);
+      console.error('Formularfehler:', error as Error);
       
       toast({
         title: 'Fehler',

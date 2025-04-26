@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as jose from 'jose';  // Using jose for Edge-compatible JWT validation
-import { tokenBlacklistServer } from '@/infrastructure/auth/TokenBlacklistServer';
-import { securityConfigEdge } from '@/infrastructure/common/config/SecurityConfigEdge';
-import { TokenManager } from '@/infrastructure/auth/TokenManager';
+import { tokenBlacklistServer } from '@/features/auth/lib/clients/token/blacklist/TokenBlacklistServer';
+import { securityConfigEdge } from '@/core/config/SecurityConfigEdge';
+import { TokenManager } from '@/features/auth/lib/clients/token/TokenManager';
 
-// Cache for user verification results to reduce API calls
-// Format: { userId: { timestamp: number, isValid: boolean } }
+// Clear the verification cache completely on startup
+// This ensures we don't have stale verification results
 const USER_VERIFICATION_CACHE: Record<string, { timestamp: number, isValid: boolean }> = {};
-const CACHE_TTL = 60 * 1000; // 1 minute cache TTL
+const CACHE_TTL = 30 * 1000; // Reduce to 30 seconds cache TTL for more frequent verification
 
 /**
  * Improved JWT verification for Edge Runtime
@@ -99,7 +99,7 @@ async function isTokenValid(token: string): Promise<boolean> {
       return false;
     }
   } catch (error) {
-    console.log('Token validation error:', error);
+    console.log('Token validation error:', error as Error);
     return false;
   }
 }
@@ -110,28 +110,81 @@ async function isTokenValid(token: string): Promise<boolean> {
  */
 async function verifyUserExists(userId: string): Promise<boolean> {
   try {
-    // Check cache first to reduce API calls
+    // Force a fresh verification for user 3 (the problematic user)
+    // This bypasses the cache for this specific user
+    const isUser3 = userId === '3';
+    
+    // Check cache first to reduce API calls (but skip for user 3)
     const cacheEntry = USER_VERIFICATION_CACHE[userId];
-    if (cacheEntry && Date.now() - cacheEntry.timestamp < CACHE_TTL) {
+    if (!isUser3 && cacheEntry && Date.now() - cacheEntry.timestamp < CACHE_TTL) {
       console.log(`Using cached verification for user ${userId}: ${cacheEntry.isValid}`);
       return cacheEntry.isValid;
     }
     
     console.log(`Verifying user ${userId} via API call`);
     
+    // Add a timestamp to prevent any caching at the browser/network level
+    const url = new URL('/api/auth/verify-user', 
+                        process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
+    url.searchParams.append('_', Date.now().toString());
+                        
     // Call the verify-user API endpoint
-    const response = await fetch(new URL('/api/auth/verify-user', 
-                                       process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').toString(), {
+    const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Auth-Skip': 'true' // Special header to prevent middleware recursion
+        'X-Auth-Skip': 'true', // Special header to prevent middleware recursion
+        'Cache-Control': 'no-cache, no-store' // Prevent caching at HTTP level
       },
       body: JSON.stringify({ userId })
     });
     
-    // Parse response
-    const isValid = response.ok && (await response.json()).success === true;
+    // Check if the fetch itself failed
+    if (!response) {
+      console.error(`User ${userId} verification failed: No response from API`);
+      return false;
+    }
+    
+    // Parse response with detailed error reporting
+    let responseData: any;
+    try {
+      responseData = await response.json();
+      console.debug(`Response data for user ${userId}:`, JSON.stringify(responseData, null, 2));
+    } catch (jsonError) {
+      console.error(`User ${userId} verification failed: Invalid JSON response`);
+      console.error(`Response status: ${response.status} ${response.statusText}`);
+      return false;
+    }
+    
+    // Check success flag in response data
+    // Properly handle API response structure from formatResponse.success()
+    const isValid = response.ok && responseData && responseData.success === true;
+    
+    // Enhanced diagnostics
+    if (!isValid) {
+      // Extract error message if available
+      const errorMessage = responseData?.message || 'Unknown error';
+      const statusCode = response.status;
+      
+      if (statusCode === 404) {
+        console.error(`User ${userId} not found in database`);
+      } else if (statusCode === 403) {
+        console.error(`User ${userId} exists but has a non-active status (likely inactive, suspended, or deleted)`);
+      } else if (statusCode === 200 && (!responseData || !responseData.success)) {
+        console.error(`User ${userId} verification received 200 OK but response missing success flag`);
+        console.error(`Response structure issue - full response:`, JSON.stringify(responseData, null, 2));
+      } else {
+        console.error(`User ${userId} verification failed: ${errorMessage} (Status: ${statusCode})`);
+      }
+      
+      // For user 3, always dump additional diagnostic info
+      if (isUser3) {
+        console.error(`Detailed response for user 3:`, JSON.stringify(responseData, null, 2));
+        if (statusCode === 200) {
+          console.error(`User 3 verification received 200 OK but isValid=${isValid}, success flag=${responseData?.success}`);
+        }
+      }
+    }
     
     // Store result in cache
     USER_VERIFICATION_CACHE[userId] = {
@@ -142,7 +195,7 @@ async function verifyUserExists(userId: string): Promise<boolean> {
     console.log(`User ${userId} verification result: ${isValid}`);
     return isValid;
   } catch (error) {
-    console.error(`Error verifying user ${userId}:`, error);
+    console.error(`Error verifying user ${userId}:`, error as Error);
     
     // In production, fail closed (assume invalid) on errors
     return false;
@@ -309,7 +362,7 @@ export async function middleware(request: NextRequest) {
       }
     } catch (error) {
       // Token validation error
-      console.log(`Token validation error in middleware for ${pathname}:`, error);
+      console.log(`Token validation error in middleware for ${pathname}:`, error as Error);
       
       // For protected page routes: redirect to login
       if (!isPublicPath && !pathname.startsWith('/api/')) {

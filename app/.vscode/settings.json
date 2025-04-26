@@ -1,0 +1,5 @@
+{
+    "WillLuke.nextjs.addTypesOnSave": true,
+    "WillLuke.nextjs.hasPrompted": true,
+    "typescript.tsserver.maxTsServerMemory": 4096
+}

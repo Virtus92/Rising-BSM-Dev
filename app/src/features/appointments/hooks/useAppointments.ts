@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
-import { AppointmentService } from '@/infrastructure/clients/AppointmentService';
+import { AppointmentClient } from '@/features/appointments/lib/clients';
 import { AppointmentDto, AppointmentFilterParamsDto } from '@/domain/dtos/AppointmentDtos';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 import { createBaseListUtility, BaseListUtility } from '@/shared/utils/list/baseListUtils';
@@ -60,7 +60,7 @@ export const useAppointments = (initialFilters?: Partial<AppointmentFilterParams
       if (process.env.NODE_ENV === 'development') {
         console.log('Mapped appointment filters:', mappedFilters);
       }
-      return await AppointmentService.getAll(mappedFilters);
+      return await AppointmentClient.getAppointments(mappedFilters);
     },
     initialFilters: initialFilters as AppointmentFilterParamsDto,
     defaultSortField: 'appointmentDate' as keyof AppointmentFilterParamsDto,
@@ -80,7 +80,7 @@ export const useAppointments = (initialFilters?: Partial<AppointmentFilterParams
    */
   const deleteAppointment = useCallback(async (appointmentId: number) => {
     try {
-      const response = await AppointmentService.deleteAppointment(appointmentId);
+      const response = await AppointmentClient.deleteAppointment(appointmentId);
       
       if (response.success) {
         toast?.({ 
@@ -148,3 +148,6 @@ export const useAppointments = (initialFilters?: Partial<AppointmentFilterParams
     filterByDateRange
   };
 };
+
+// Add default export for compatibility with import statements
+export default useAppointments;

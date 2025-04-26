@@ -1,7 +1,7 @@
 /**
  * Utility functions for API interactions
  */
-import { ApiResponse } from '@/infrastructure/clients/ApiClient';
+import { ApiResponse } from '@/core/api/ApiClient';
 
 /**
  * Process API response to extract data and handle errors consistently
@@ -32,18 +32,18 @@ export async function processApiResponse<T>(
       
       // Return appropriate empty values based on context
       if (options.context?.includes('count')) {
-        return 0 as unknown as T;
+        return 0 as T;
       } else if (options.context?.includes('stats')) {
-        return [] as unknown as T;
+        return [] as T;
       }
       
       // Default empty response based on expected type
-      return (Array.isArray(response.data) ? [] : {}) as unknown as T;
+      return (Array.isArray(response.data) ? [] : {}) as T;
     }
     
     return response.data;
   } catch (error) {
-    console.error(`API error in ${options.context || 'unknown context'}:`, error);
+    console.error(`API error in ${options.context || 'unknown context'}:`, error as Error);
     throw error;
   }
 }
@@ -105,7 +105,7 @@ export async function safeFetch<T>(
     if (response.status === 404) {
       console.warn(`API endpoint not found: ${url}`);
       if (Array.isArray(fallbackData)) {
-        return [] as unknown as T;
+        return [] as T;
       } else if (fallbackData !== undefined) {
         return fallbackData;
       } else {
@@ -136,7 +136,7 @@ export async function safeFetch<T>(
     
     throw new Error(`API error (${response.status}): ${errorText}`);
   } catch (error) {
-    console.error(`Failed to fetch ${url}:`, error);
+    console.error(`Failed to fetch ${url}:`, error as Error);
     
     if (fallbackData !== undefined) {
       return fallbackData;
@@ -160,7 +160,7 @@ export function createSafeApiFetcher<T, A extends any[]>(
     try {
       return await fetchFn(...args);
     } catch (error) {
-      console.error('API fetch error:', error);
+      console.error('API fetch error:', error as Error);
       return fallbackData;
     }
   };

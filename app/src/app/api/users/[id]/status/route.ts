@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
-import { formatResponse } from '@/infrastructure/api/response-formatter';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { prisma } from '@/infrastructure/common/database/prisma';
-import { apiPermissions } from '@/app/api/helpers/apiPermissions';
+import { formatResponse } from '@/core/errors';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { prisma } from '@/core/db/index';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { getLogger } from '@/infrastructure/common/logging';
+import { getLogger } from '@/core/logging';
 import { UserStatus, isUserManageableStatus } from '@/domain/enums/UserEnums';
+import { permissionMiddleware } from '@/features/permissions';
 
 const logger = getLogger();
 
@@ -15,8 +15,9 @@ const logger = getLogger();
  * Updates a user's status
  * Requires USERS_EDIT permission
  */
-export const PATCH = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  const userId = parseInt(params.id);
+export const PATCH = routeHandler(async (req: NextRequest) => {
+  // Extract ID from URL path
+  const userId = parseInt(req.nextUrl.pathname.split('/')[3]);
   if (isNaN(userId)) {
     return formatResponse.error('Invalid user ID', 400);
   }
@@ -36,7 +37,7 @@ export const PATCH = apiRouteHandler(async (req: NextRequest, { params }: { para
 
   try {
     // Check permission
-    if (!await apiPermissions.hasPermission(
+    if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
       SystemPermission.USERS_EDIT
     )) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ApiResponse } from '@/infrastructure/clients/ApiClient';
+import { ApiResponse } from '@/core/api/ApiClient';
 import { useToast } from '@/shared/hooks/useToast';
 
 export type TimeFrame = 'weekly' | 'monthly' | 'yearly';
@@ -214,7 +214,7 @@ export const useDashboardCharts = (): DashboardChartState => {
       
       return { success: true, data: result };
     } catch (error) {
-      console.error(`Error fetching ${entityType} ${timeFrameValue} stats:`, error);
+      console.error(`Error fetching ${entityType} ${timeFrameValue} stats:`, error as Error);
       return { success: false, data: {} };
     }
   }, []);
@@ -361,7 +361,7 @@ export const useDashboardCharts = (): DashboardChartState => {
         }
       }
     } catch (error) {
-      console.error(`Failed to fetch ${selectedTimeFrame} stats:`, error);
+      console.error(`Failed to fetch ${selectedTimeFrame} stats:`, error as Error);
       
       if (isMountedRef.current) {
         setError(`Failed to load ${selectedTimeFrame} chart data. Please try again later.`);
@@ -416,7 +416,7 @@ export const useDashboardCharts = (): DashboardChartState => {
         });
       }
     } catch (error) {
-      console.error('Error refreshing chart data:', error);
+      console.error('Error refreshing chart data:', error as Error);
       // Error handling is already in fetchStatistics
     }
   }, [timeFrame, fetchStatistics, toast]);

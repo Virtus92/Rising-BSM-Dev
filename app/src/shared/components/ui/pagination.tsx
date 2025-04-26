@@ -51,52 +51,54 @@ const PaginationLink = ({
   isActive,
   size = "icon",
   href,
+  children,
   ...props
 }: PaginationLinkProps) => {
   // Simple direct rendering of either anchor or button
   // This avoids any nesting issues with buttons inside buttons
+  const commonClassNames = cn(
+    buttonVariants({
+      variant: isActive ? "outline" : "ghost",
+      size,
+    }),
+    "w-9 h-9",
+    isActive && "bg-accent pointer-events-none",
+    className
+  );
+  
+  const ariaCurrent = isActive ? "page" : undefined;
+  
   if (href) {
+    // Only pass specific props that are valid for anchor tags
     return (
       <a
         href={href}
-        className={cn(
-          buttonVariants({
-            variant: isActive ? "outline" : "ghost",
-            size,
-          }),
-          "w-9 h-9",
-          isActive && "bg-accent pointer-events-none",
-          className
-        )}
-        aria-current={isActive ? "page" : undefined}
-        {...props}
-      />
-    )
+        className={commonClassNames}
+        aria-current={ariaCurrent}
+        aria-label={props["aria-label"]}
+      >
+        {children}
+      </a>
+    );
   }
   
   return (
     <button
       type="button"
-      className={cn(
-        buttonVariants({
-          variant: isActive ? "outline" : "ghost",
-          size,
-        }),
-        "w-9 h-9",
-        isActive && "bg-accent pointer-events-none",
-        className
-      )}
-      aria-current={isActive ? "page" : undefined}
+      className={commonClassNames}
+      aria-current={ariaCurrent}
       {...props}
-    />
-  )
+    >
+      {children}
+    </button>
+  );
 }
 PaginationLink.displayName = "PaginationLink"
 
 const PaginationPrevious = ({
   className,
   ...props
-}: React.ComponentProps<typeof PaginationLink>) => (
+}: PaginationLinkProps) => (
   <PaginationLink
     aria-label="Go to previous page"
     size="default"
@@ -112,7 +114,7 @@ PaginationPrevious.displayName = "PaginationPrevious"
 const PaginationNext = ({
   className,
   ...props
-}: React.ComponentProps<typeof PaginationLink>) => (
+}: PaginationLinkProps) => (
   <PaginationLink
     aria-label="Go to next page"
     size="default"
@@ -128,7 +130,7 @@ PaginationNext.displayName = "PaginationNext"
 const PaginationFirst = ({
   className,
   ...props
-}: React.ComponentProps<typeof PaginationLink>) => (
+}: PaginationLinkProps) => (
   <PaginationLink
     aria-label="Go to first page"
     size="icon"
@@ -143,7 +145,7 @@ PaginationFirst.displayName = "PaginationFirst"
 const PaginationLast = ({
   className,
   ...props
-}: React.ComponentProps<typeof PaginationLink>) => (
+}: PaginationLinkProps) => (
   <PaginationLink
     aria-label="Go to last page"
     size="icon"

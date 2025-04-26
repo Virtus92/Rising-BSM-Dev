@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import RequestForm from '@/features/requests/components/RequestForm';
-import { RequestService } from '@/infrastructure/clients/RequestService';
+import { RequestService } from '@/features/requests/lib/services';
 import { RequestResponseDto } from '@/domain/dtos/RequestDtos';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { useToast } from '@/shared/hooks/useToast';
@@ -28,7 +28,8 @@ export default function EditRequestPage() {
     const fetchRequest = async () => {
       try {
         setLoading(true);
-        const response = await RequestService.getById(requestId);
+        // Use the proper method from the service - findRequestById is the actual method name
+        const response = await RequestService.findRequestById(requestId);
         
         if (response.success && response.data) {
           setRequest(response.data);
@@ -63,7 +64,7 @@ export default function EditRequestPage() {
   // Update request handler
   const handleUpdateRequest = async (data: any) => {
     try {
-      const response = await RequestService.update(requestId, data);
+      const response = await RequestService.updateRequest(requestId, data);
       
       if (response.success && response.data) {
         toast({

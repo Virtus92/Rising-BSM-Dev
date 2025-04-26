@@ -3,8 +3,8 @@
  * 
  * Bietet einheitliche Funktionen zum Umgang mit Fehlern, Logging und Benachrichtigungen.
  */
-import { getLogger } from '@/infrastructure/common/logging';
-import { ApiRequestError } from '@/infrastructure/clients/ApiClient';
+import { getLogger } from '@/core/logging';
+import { ApiRequestError } from '@/core/api/ApiClient';
 import { useToast } from '@/shared/hooks/useToast';
 
 /**

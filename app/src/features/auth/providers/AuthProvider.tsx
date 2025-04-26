@@ -14,8 +14,8 @@ import { LoginDto, RegisterDto } from '@/domain/dtos/AuthDtos';
 import { UserRole } from '@/domain/enums/UserEnums';
 
 // Import AuthClient
-import AuthClient from '@/infrastructure/auth/AuthClient';
-// TokenManager will be dynamically imported when needed
+import AuthClient from '@/features/auth/lib/clients/AuthClient';
+// TokenManager and ClientTokenManager will be dynamically imported from features path
 
 // More robust global state tracking with proper types
 const AUTH_PROVIDER_STATE_KEY = '__AUTH_PROVIDER_STATE';
@@ -54,10 +54,10 @@ export interface RegisterFormData extends RegisterDto {
   confirmPassword: string;
 }
 
-export interface User extends UserDto {}
+export interface AuthUser extends UserDto {}
 
 interface AuthContextType {
-  user: UserDto | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: LoginDto) => Promise<void>;
@@ -135,9 +135,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Initialize authentication system
       const initAuth = async () => {
         try {
-          // Import and initialize in sequence
-          const { ClientTokenManager } = await import('@/infrastructure/auth/ClientTokenManager');
-          const { TokenManager } = await import('@/infrastructure/auth/TokenManager');
+          // Import and initialize in sequence - using feature paths
+          const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
+          const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
           
           // First initialize client token manager
           await ClientTokenManager.initialize();
@@ -260,7 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             return await globalRefresh.currentPromise;
           } catch (error) {
-            console.warn(`AuthProvider: Waiting for existing refresh failed (${refreshId}):`, error);
+            console.warn(`AuthProvider: Waiting for existing refresh failed (${refreshId}):`, error as Error);
             // Continue with our own refresh attempt
           }
         }
@@ -321,9 +321,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           // First ensure tokens are properly synchronized
           try {
-            // Import modules dynamically to avoid circular dependencies
-            const tokenManagerModule = await import('@/infrastructure/auth/TokenManager');
-            const clientTokenManagerModule = await import('@/infrastructure/auth/ClientTokenManager');
+            // Import modules dynamically to avoid circular dependencies - using feature paths
+            const tokenManagerModule = await import('@/features/auth/lib/clients/token/TokenManager');
+            const clientTokenManagerModule = await import('@/features/auth/lib/clients/token/ClientTokenManager');
             
             const TokenManager = tokenManagerModule.TokenManager;
             const ClientTokenManager = clientTokenManagerModule.ClientTokenManager;
@@ -371,6 +371,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // If no user data or requiresUserFetch, try token refresh
           console.log(`AuthProvider: No user data, attempting token refresh (${refreshId})`);
           
+          // Import ClientTokenManager and Tokenmanager here to avoid circular dependencies
+          const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
+          const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
+
           // Explicit token refresh with ClientTokenManager
           const refreshSuccess = await ClientTokenManager.refreshAccessToken();
           
@@ -458,7 +462,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     } catch (error) {
-      console.error(`AuthProvider [${instanceIdRef.current}]: Authentication refresh error (${refreshId}):`, error);
+      console.error(`AuthProvider [${instanceIdRef.current}]: Authentication refresh error (${refreshId}):`, error as Error);
       
       // Clear fetching flag on error
       isFetchingUserRef.current = false;
@@ -474,7 +478,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Update auth status even in case of error
       try {
-        const { TokenManager } = await import('@/infrastructure/auth/TokenManager');
+        const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
         await TokenManager.notifyAuthChange(false);
       } catch (notifyError) {
         console.error(`Failed to notify about auth change (${refreshId}):`, notifyError);
@@ -560,7 +564,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // Clear tokens to ensure clean login state
           try {
-            const { ClientTokenManager } = await import('@/infrastructure/auth/ClientTokenManager');
+            const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
             ClientTokenManager.clearTokens();
           } catch (clearError) {
             console.warn('Error clearing tokens during auth failure:', clearError);
@@ -572,7 +576,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }, 100);
         }
       } catch (error) {
-        console.error(`AuthProvider [${instanceIdRef.current}]: Auth check error:`, error);
+        console.error(`AuthProvider [${instanceIdRef.current}]: Auth check error:`, error as Error);
         setUser(null);
         
         // Update global state if available
@@ -636,11 +640,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Login attempt with returnUrl:', returnUrl);
       
       // Clear any existing tokens before attempting login
-      const { ClientTokenManager } = await import('@/infrastructure/auth/ClientTokenManager');
+      const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
       ClientTokenManager.clearTokens();
       
       // Import TokenManager here to use synchronizeTokens
-      const { TokenManager } = await import('@/infrastructure/auth/TokenManager');
+      const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
       // Synchronize any existing tokens before login attempt
       TokenManager.synchronizeTokens(true);
       
@@ -670,7 +674,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Redirect immediately since we already have user data
         setTimeout(() => {
           // Ensure token synchronization before navigation
-          import('@/infrastructure/auth/TokenManager').then(({ TokenManager }) => {
+          import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
             TokenManager.synchronizeTokens(true);
             
             // Wait for token sync to complete
@@ -707,7 +711,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Redirect immediately since we already have user data
         setTimeout(() => {
           // Ensure token synchronization before navigation
-          import('@/infrastructure/auth/TokenManager').then(({ TokenManager }) => {
+          import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
             TokenManager.synchronizeTokens(true);
             
             // Wait for token sync to complete
@@ -743,8 +747,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(response.data.user);
         
         // Notify auth change with the proper user data
-        await import('@/infrastructure/auth/TokenManager').then(({ TokenManager }) => {
-          TokenManager.notifyAuthChange(true);
+        await import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
+        TokenManager.notifyAuthChange(true);
         });
         
         // Delay navigation to ensure state is updated
@@ -791,7 +795,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setUser(userResponse.data);
               
               // Notify about auth change with proper user data
-              await import('@/infrastructure/auth/TokenManager').then(({ TokenManager }) => {
+              await import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
                 TokenManager.notifyAuthChange(true);
               });
               
@@ -857,7 +861,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setUser(userInfo);
               
               // Notify about auth change
-              await import('@/infrastructure/auth/TokenManager').then(({ TokenManager }) => {
+              await import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
                 TokenManager.notifyAuthChange(true);
               });
               
@@ -891,7 +895,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         router.push(redirectPath);
       }, 500);
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login error:', error as Error);
       
       // Set auth error for UI feedback
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
@@ -921,7 +925,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // After successful registration, redirect to login page
       router.push('/auth/login?registered=true');
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Registration error:', error as Error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -944,21 +948,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       
       // Import and use ClientTokenManager to clear tokens
-      const { ClientTokenManager } = await import('@/infrastructure/auth/ClientTokenManager');
+      const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
       ClientTokenManager.clearTokens();
       
       // Call logout endpoint - server deletes cookies
       await AuthClient.logout();
       
       // Also notify TokenManager about logout
-      const { TokenManager } = await import('@/infrastructure/auth/TokenManager');
+      const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
       TokenManager.notifyLogout();
       
       console.log('Logout successful, redirecting to login page');
       // Redirect to login page
       router.push('/auth/login');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Logout error:', error as Error);
       
       // Even on error, force logout on client side
       setUser(null);
@@ -1024,7 +1028,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 } else {
                   // Update user data on authentication - use the reference to avoid stale closures
                   refreshAuth().catch(error => {
-                    console.error(`AuthProvider [${instanceIdRef.current}]: Error refreshing auth after status change:`, error);
+                    console.error(`AuthProvider [${instanceIdRef.current}]: Error refreshing auth after status change:`, error as Error);
                   });
                 }
               } else {
@@ -1032,7 +1036,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setUser(null);
               }
             } catch (error) {
-              console.error(`AuthProvider [${instanceIdRef.current}]: Error handling auth status change:`, error);
+              console.error(`AuthProvider [${instanceIdRef.current}]: Error handling auth status change:`, error as Error);
             } finally {
               // Reset processing flag with slight delay
               setTimeout(() => {
@@ -1094,7 +1098,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const hasAuthTokenBackup = localStorage.getItem('auth_token_backup');
             
             if (hasAuthTokenBackup) {
-              import('@/infrastructure/auth/TokenManager').then(({ TokenManager }) => {
+              import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
                 TokenManager.synchronizeTokens(true);
               }).catch(err => {
                 console.error('Error synchronizing tokens during consistency check:', err);

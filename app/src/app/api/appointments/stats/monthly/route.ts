@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError } from '@/core/errors/index';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { generateMonthlyStats } from '@/shared/utils/statistics-utils';
 import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
@@ -11,7 +11,7 @@ import { AppointmentStatus } from '@/domain/enums/CommonEnums';
  * GET /api/appointments/stats/monthly
  * Returns monthly appointment statistics for the past 12 months
  */
-export const GET = apiRouteHandler(async (request: NextRequest) => {
+export const GET = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   
   try {
@@ -25,21 +25,31 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
     // Get all appointments
     const appointmentsResponse = await appointmentService.findAll({
       limit: 1000, // High limit to get all appointments
-      includeDetails: false, // Optimize by excluding details
       context: {
         userId: request.auth?.userId
-      }
+      },
+      // Add custom options as additional property using type assertion
+      ...({
+        includeDetails: false // Optimize by excluding details
+      } as any)
     });
     
+    // Safely extract appointment data from response
     let appointments: AppointmentResponseDto[] = [];
     
-    // Safely extract appointment data from response
-    if (appointmentsResponse && appointmentsResponse.success) {
-      if (appointmentsResponse.data && Array.isArray(appointmentsResponse.data)) {
-        appointments = appointmentsResponse.data;
-      } else if (appointmentsResponse.data && appointmentsResponse.data.data && 
-                Array.isArray(appointmentsResponse.data.data)) {
-        appointments = appointmentsResponse.data.data;
+    if (appointmentsResponse) {
+      // Use type assertion to avoid 'never' type issues
+      const typedResponse = appointmentsResponse as Record<string, any>;
+      
+      if (typedResponse.success) {
+        if (typedResponse.data && Array.isArray(typedResponse.data)) {
+          appointments = typedResponse.data;
+        } else if (typedResponse.data && typeof typedResponse.data === 'object') {
+          const typedData = typedResponse.data as Record<string, any>;
+          if (typedData.data && Array.isArray(typedData.data)) {
+            appointments = typedData.data;
+          }
+        }
       }
     }
     

@@ -841,7 +841,7 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
       try {
         fetchData();
       } catch (error) {
-        console.error('Error during initial fetch:', error);
+        console.error('Error during initial fetch:', error as Error);
         // Reset isLoading on error
         dispatch({ 
           type: 'FETCH_ERROR', 

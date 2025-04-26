@@ -1,16 +1,17 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { apiPermissions } from '../../../helpers/apiPermissions';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
 
 /**
  * GET /api/n8n/workflow-status/[executionId]
  * Gets the status of a specific workflow execution
  */
-export const GET = apiRouteHandler(
-  apiPermissions.withPermission(
+export const GET = routeHandler(
+  withPermission(
     async (req: NextRequest, { params }: { params: { executionId: string } }) => {
       const executionId = params.executionId;
       

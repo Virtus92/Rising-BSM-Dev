@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, ControllerRenderProps, FieldPath } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/shared/components/ui/button';
@@ -24,7 +24,7 @@ import {
 } from '@/shared/components/ui/select';
 import { Separator } from '@/shared/components/ui/separator';
 import { ConvertToCustomerDto, RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
-import { RequestService } from '@/infrastructure/clients/RequestService';
+import { RequestClient } from '@/features/requests/lib/clients/RequestClient';
 import { useToast } from '@/shared/hooks/useToast';
 import { Loader2 } from 'lucide-react';
 
@@ -82,7 +82,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
     appointmentDescription: request.message,
   };
 
-  const form = useForm<FormValues, any, FormValues>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues,
   });
@@ -138,7 +138,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
       }
       
       // Call the service directly
-      const response = await RequestService.convertToCustomer(convertData);
+      const response = await RequestClient.convertToCustomer(request.id, convertData);
       
       if (response.success) {
         toast({
@@ -157,7 +157,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
         });
       }
     } catch (error) {
-      console.error("Error converting to customer:", error);
+      console.error("Error converting to customer:", error as Error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -177,7 +177,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
             <FormField
               control={form.control}
               name="name"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<FormValues, "name"> }) => (
                 <FormItem>
                   <FormLabel>Name *</FormLabel>
                   <FormControl>
@@ -192,7 +192,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               <FormField
                 control={form.control}
                 name="email"
-                render={({ field }) => (
+                render={({ field }: { field: ControllerRenderProps<FormValues, "email"> }) => (
                   <FormItem>
                     <FormLabel>E-Mail *</FormLabel>
                     <FormControl>
@@ -206,7 +206,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               <FormField
                 control={form.control}
                 name="phone"
-                render={({ field }) => (
+                render={({ field }: { field: ControllerRenderProps<FormValues, "phone"> }) => (
                   <FormItem>
                     <FormLabel>Telefon</FormLabel>
                     <FormControl>
@@ -221,7 +221,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
             <FormField
               control={form.control}
               name="company"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<FormValues, "company"> }) => (
                 <FormItem>
                   <FormLabel>Firma</FormLabel>
                   <FormControl>
@@ -235,7 +235,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
             <FormField
               control={form.control}
               name="address"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<FormValues, "address"> }) => (
                 <FormItem>
                   <FormLabel>Adresse</FormLabel>
                   <FormControl>
@@ -250,7 +250,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               <FormField
                 control={form.control}
                 name="postalCode"
-                render={({ field }) => (
+                render={({ field }: { field: ControllerRenderProps<FormValues, "postalCode"> }) => (
                   <FormItem>
                     <FormLabel>PLZ</FormLabel>
                     <FormControl>
@@ -264,7 +264,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               <FormField
                 control={form.control}
                 name="city"
-                render={({ field }) => (
+                render={({ field }: { field: ControllerRenderProps<FormValues, "city"> }) => (
                   <FormItem>
                     <FormLabel>Stadt</FormLabel>
                     <FormControl>
@@ -279,7 +279,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
             <FormField
               control={form.control}
               name="country"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<FormValues, "country"> }) => (
                 <FormItem>
                   <FormLabel>Land</FormLabel>
                   <FormControl>
@@ -293,7 +293,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
             <FormField
               control={form.control}
               name="type"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<FormValues, "type"> }) => (
                 <FormItem>
                   <FormLabel>Kundentyp</FormLabel>
                   <Select
@@ -318,7 +318,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
             <FormField
               control={form.control}
               name="newsletter"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<FormValues, "newsletter"> }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                   <FormControl>
                     <Checkbox
@@ -343,7 +343,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
           <FormField
             control={form.control}
             name="note"
-            render={({ field }) => (
+            render={({ field }: { field: ControllerRenderProps<FormValues, "note"> }) => (
               <FormItem>
                 <FormLabel>Notiz</FormLabel>
                 <FormControl>
@@ -387,7 +387,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               <FormField
                 control={form.control}
                 name="appointmentTitle"
-                render={({ field }) => (
+                render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentTitle"> }) => (
                   <FormItem>
                     <FormLabel>Termintitel</FormLabel>
                     <FormControl>
@@ -402,7 +402,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                 <FormField
                   control={form.control}
                   name="appointmentDate"
-                  render={({ field }) => (
+                  render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentDate"> }) => (
                     <FormItem>
                       <FormLabel>Datum</FormLabel>
                       <FormControl>
@@ -416,7 +416,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                 <FormField
                   control={form.control}
                   name="appointmentTime"
-                  render={({ field }) => (
+                  render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentTime"> }) => (
                     <FormItem>
                       <FormLabel>Uhrzeit</FormLabel>
                       <FormControl>
@@ -432,7 +432,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                 <FormField
                   control={form.control}
                   name="appointmentDuration"
-                  render={({ field }) => (
+                  render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentDuration"> }) => (
                     <FormItem>
                       <FormLabel>Dauer (Minuten)</FormLabel>
                       <FormControl>
@@ -450,7 +450,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                 <FormField
                   control={form.control}
                   name="appointmentLocation"
-                  render={({ field }) => (
+                  render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentLocation"> }) => (
                     <FormItem>
                       <FormLabel>Ort</FormLabel>
                       <FormControl>
@@ -465,7 +465,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               <FormField
                 control={form.control}
                 name="appointmentDescription"
-                render={({ field }) => (
+                render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentDescription"> }) => (
                   <FormItem>
                     <FormLabel>Beschreibung</FormLabel>
                     <FormControl>

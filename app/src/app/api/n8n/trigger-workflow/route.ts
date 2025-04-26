@@ -1,16 +1,17 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { apiPermissions } from '../../helpers/apiPermissions';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
 
 /**
  * POST /api/n8n/trigger-workflow
  * Triggers an N8N workflow by name for a specific request
  */
-export const POST = apiRouteHandler(
-  apiPermissions.withPermission(
+export const POST = routeHandler(
+  withPermission(
     async (req: NextRequest) => {
       const { requestId, workflowName, data } = await req.json();
       

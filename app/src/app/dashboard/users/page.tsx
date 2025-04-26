@@ -6,7 +6,7 @@ import { UserList } from '@/features/users/components/UserList';
 import { UserForm, UserFormData } from '@/features/users/components/UserForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { UserRole } from '@/domain/enums/UserEnums';
-import { UserService } from '@/infrastructure/clients/UserService';
+import { UserService } from '@/features/users/lib/services/UserService';
 import { ModalController } from '@/shared/components/ModalController';
 import { parseModalFromUrl, updateUrlWithoutNavigation, removeModalParamFromUrl } from '@/shared/utils/modal-controller';
 
@@ -84,11 +84,12 @@ export default function UsersPage() {
     
     try {
       // Convert role to proper UserRole enum value
-      // Also ensure required fields are present
+      // Also ensure required fields are present and proper types
       const updatedData = {
         ...data,
         role: data.role as UserRole, // Use the enum value directly
         password: data.password || '',  // Ensure password is always a string
+        profilePictureId: data.profilePictureId !== undefined ? String(data.profilePictureId) : undefined, // Convert to string if exists
       };
       
       const response = await UserService.createUser(updatedData);

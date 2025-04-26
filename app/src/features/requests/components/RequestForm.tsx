@@ -71,7 +71,7 @@ export default function RequestForm({ initialData = {}, onSubmit, mode, onCancel
         
         return null;
       } catch (error) {
-        console.error('Form submission error:', error);
+        console.error('Form submission error:', error as Error);
         toast({
           title: 'Error',
           description: error instanceof Error ? error.message : 'An error occurred',

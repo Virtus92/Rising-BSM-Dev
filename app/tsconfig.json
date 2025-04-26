@@ -20,6 +20,9 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
+      "@core/*": ["./src/core/*"],
+      "@features/*": ["./src/features/*"],
+      "@shared/*": ["./src/shared/*"],
       "common/*": ["./src/lib/types/common/*"],
       "dtos/*": ["./src/lib/dtos/*"],
       "models/*": ["./src/lib/types/models/*"]

@@ -7,6 +7,29 @@ import { NotificationFilterParamsDto } from '../dtos/NotificationDtos';
  */
 export interface INotificationRepository extends IBaseRepository<Notification> {
   /**
+   * Checks if a notification exists by ID
+   * 
+   * @param id - Notification ID
+   * @returns Whether the notification exists
+   */
+  exists(id: number): Promise<boolean>;
+  
+  /**
+   * Checks if any notifications exist matching certain criteria
+   * 
+   * @param criteria - Search criteria
+   * @returns Whether any notifications exist matching the criteria
+   */
+  existsByCriteria(criteria: Record<string, any>): Promise<boolean>;
+  
+  /**
+   * Search for notifications with specific criteria
+   * 
+   * @param criteria - Search criteria
+   * @returns Found notifications
+   */
+  search(criteria: Record<string, any>): Promise<Notification[]>;
+  /**
    * Findet Benachrichtigungen für einen Benutzer
    * 
    * @param userId - Benutzer-ID

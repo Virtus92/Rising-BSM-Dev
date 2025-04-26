@@ -8,7 +8,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { BaseListComponent, CardProps, ColumnDef } from '@/shared/components/data/BaseListComponent';
 import { useNotifications } from '../hooks/useNotifications';
-import { formatRelativeTime } from './utils/date-utils';
+import { formatRelativeTime } from '@/features/notifications/utils/date-utils';
 import { DeleteConfirmationDialog } from '@/shared/components/DeleteConfirmationDialog';
 import { EntityColors } from '@/shared/utils/entity-colors';
 
@@ -141,7 +141,7 @@ export default function NotificationList({
       try {
         if (isMounted) await refetch();
       } catch (error) {
-        console.error('Failed to fetch notifications:', error);
+        console.error('Failed to fetch notifications:', error as Error);
         // Do not retry automatically on error
       }
     };

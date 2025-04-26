@@ -1,10 +1,9 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/infrastructure/db';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { auth } from '@/app/api/auth/middleware/authMiddleware';
-// Import permission constants
+import { db } from '@/core/db';
+import { formatSuccess, formatError } from '@/core/errors/index';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { getLogger } from '@/core/logging';
+import { auth } from '@/features/auth/api/index';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { CommonStatus } from '@/domain/enums/CommonEnums';
 
@@ -12,23 +11,14 @@ import { CommonStatus } from '@/domain/enums/CommonEnums';
  * PATCH endpoint to update customer status
  * 
  * @param request - Next.js request object
- * @param context - Route context with params
  * @returns API response
  */
-export const PATCH = apiRouteHandler(async (request: NextRequest, context: { params: { id: string } }) => {
+export const PATCH = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   
-  // IMPORTANT: Await the params before using them to avoid Next.js App Router errors
-  const params = await Promise.resolve(context.params);
-  
-  logger.debug('Customer status update requested', { 
-    params,
-    method: request.method,
-    url: request.url
-  });
-  
-  // Get ID from resolved params
-  const { id } = params;
+  // Extract ID from URL path segments
+  const urlParts = request.nextUrl.pathname.split('/');
+  const id = urlParts[urlParts.length - 2]; // Take the second-to-last segment (the [id] part)
   
   if (!id || isNaN(Number(id))) {
     logger.warn('Invalid customer ID provided', { id });
@@ -38,25 +28,44 @@ export const PATCH = apiRouteHandler(async (request: NextRequest, context: { par
   const customerId = Number(id);
   
   try {
-    // Step 1: Authenticate the user using built-in auth function
-    const authResult = await auth(request);
+    // Step 1: Authenticate the user - use direct JWT verification for reliability
+    const { extractAuthToken } = await import('@/features/auth/api/middleware/authMiddleware');
+    const token = extractAuthToken(request);
     
-    if (!authResult.success || !authResult.user) {
-      logger.warn('Authentication failed', { 
-        message: authResult.message,
-        status: authResult.status
-      });
-      return formatError(authResult.message || 'Authentication failed', authResult.status || 403);
+    if (!token) {
+      logger.warn('Authentication failed - no token provided');
+      return formatError('Authentication required', 401);
     }
     
-    const user = authResult.user;
-    logger.debug('User authenticated successfully', { userId: user.id, role: user.role });
+    // Verify JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-me';
+    let userId;
+    let userRole;
+    
+    try {
+      const jwt = await import('jsonwebtoken');
+      const decoded = jwt.verify(token, jwtSecret) as any;
+      userId = decoded.sub ? Number(decoded.sub) : null;
+      userRole = decoded.role;
+      
+      if (!userId) {
+        logger.warn('Invalid token - no user ID found');
+        return formatError('Invalid authentication token', 401);
+      }
+    } catch (tokenError) {
+      logger.error('Token verification failed', {
+        error: tokenError instanceof Error ? tokenError.message : 'Unknown error'
+      });
+      return formatError('Invalid or expired authentication token', 401);
+    }
+    
+    logger.debug('User authenticated successfully', { userId, role: userRole });
     
     // Step 2: Check if the user has the CUSTOMERS_EDIT permission
     // For admin users, automatically grant permission
     let hasPermission = false;
     
-    if (user.role === 'admin') {
+    if (userRole === 'admin') {
       hasPermission = true;
       logger.debug('Admin user - permission automatically granted');
     } else {
@@ -66,7 +75,7 @@ export const PATCH = apiRouteHandler(async (request: NextRequest, context: { par
         
         const userPermission = await db.userPermission.findFirst({
           where: {
-            userId: user.id,
+            userId,
             permission: {
               code: permissionCode
             }
@@ -78,7 +87,7 @@ export const PATCH = apiRouteHandler(async (request: NextRequest, context: { par
         
         hasPermission = !!userPermission;
         logger.debug('Permission check result', { 
-          userId: user.id, 
+          userId, 
           permissionCode, 
           hasPermission,
           permissionFound: userPermission ? 'yes' : 'no'
@@ -86,7 +95,7 @@ export const PATCH = apiRouteHandler(async (request: NextRequest, context: { par
       } catch (permissionError) {
         logger.error('Error checking user permissions', {
           error: permissionError instanceof Error ? permissionError.message : 'Unknown error',
-          userId: user.id
+          userId
         });
         // Default to no permission on error
         hasPermission = false;
@@ -95,7 +104,7 @@ export const PATCH = apiRouteHandler(async (request: NextRequest, context: { par
     
     if (!hasPermission) {
       logger.warn('User lacks required permission', { 
-        userId: user.id, 
+        userId, 
         requiredPermission: SystemPermission.CUSTOMERS_EDIT.toString() 
       });
       return formatError('You do not have permission to update customer status', 403);
@@ -147,20 +156,20 @@ export const PATCH = apiRouteHandler(async (request: NextRequest, context: { par
       return formatSuccess(existingCustomer);
     }
     
-    // Safely determine userId for updatedBy
-    let userId = null;
+    // Verify the userId exists in the database before using it as updatedBy
+    let verifiedUserId = null;
     try {
       const userExists = await db.user.findUnique({
-        where: { id: user.id },
+        where: { id: userId },
         select: { id: true }
       });
       
       if (userExists) {
-        userId = user.id;
+        verifiedUserId = userId;
       }
     } catch (userError) {
       logger.warn('Error verifying user for updatedBy field, using null instead', { 
-        userId: user.id,
+        userId,
         error: userError instanceof Error ? userError.message : 'Unknown error'
       });
       // Continue with null userId
@@ -182,8 +191,8 @@ export const PATCH = apiRouteHandler(async (request: NextRequest, context: { par
       } as any;
       
       // Only add updatedBy if we have a valid user ID
-      if (userId !== null) {
-        updateData.updatedBy = userId;
+      if (verifiedUserId !== null) {
+        updateData.updatedBy = verifiedUserId;
       }
       
       const updatedCustomer = await db.customer.update({
@@ -199,8 +208,8 @@ export const PATCH = apiRouteHandler(async (request: NextRequest, context: { par
           await db.customerLog.create({
             data: {
               customerId,
-              userId: userId, 
-              userName: user.name || 'System',
+              userId: verifiedUserId, 
+              userName: userRole ? (userRole === 'admin' ? 'Administrator' : userRole) : 'System',
               action: 'STATUS_CHANGE',
               details: note,
               createdAt: new Date()
@@ -264,19 +273,13 @@ export const PATCH = apiRouteHandler(async (request: NextRequest, context: { par
  * PUT endpoint to update customer status (for compatibility)
  * 
  * @param request - Next.js request object
- * @param context - Route context with params
  * @returns API response
  */
-export const PUT = apiRouteHandler(async (request: NextRequest, context: { params: { id: string } }) => {
+export const PUT = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   
-  // IMPORTANT: Await the params here too for the PUT endpoint
-  const params = await Promise.resolve(context.params);
-  
-  logger.debug('PUT request received for customer status', {
-    params
-  });
+  logger.debug('PUT request received for customer status');
   
   // Delegate to PATCH handler for consistency
-  return PATCH(request, context);
+  return PATCH(request);
 });

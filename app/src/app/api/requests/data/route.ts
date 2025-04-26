@@ -1,16 +1,17 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { apiPermissions } from '../../helpers/apiPermissions';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
 
 /**
  * GET /api/requests/data
  * Get structured data for a request
  */
-export const GET = apiRouteHandler(
-  apiPermissions.withPermission(
+export const GET = routeHandler(
+  withPermission(
     async (req: NextRequest) => {
       const { searchParams } = new URL(req.url);
       const requestId = searchParams.get('requestId');
@@ -64,8 +65,8 @@ export const GET = apiRouteHandler(
  * POST /api/requests/data
  * Create structured data for a request
  */
-export const POST = apiRouteHandler(
-  apiPermissions.withPermission(
+export const POST = routeHandler(
+  withPermission(
     async (req: NextRequest) => {
       const data = await req.json();
       
@@ -125,8 +126,8 @@ export const POST = apiRouteHandler(
  * PUT /api/requests/data/[id]
  * Update structured data for a request
  */
-export const PUT = apiRouteHandler(
-  apiPermissions.withPermission(
+export const PUT = routeHandler(
+  withPermission(
     async (req: NextRequest) => {
       const { searchParams } = new URL(req.url);
       const id = searchParams.get('id');

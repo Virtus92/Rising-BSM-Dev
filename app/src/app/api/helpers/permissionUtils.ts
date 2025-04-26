@@ -4,10 +4,10 @@
  * Provides consistent permission checking methods to be used across API routes
  */
 
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { apiPermissions } from './apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 
 /**
  * Checks if a user has a specific permission
@@ -34,7 +34,7 @@ export async function checkUserPermission(
       return false;
     }
     
-    return await apiPermissions.hasPermission(userId, permission);
+    return await permissionMiddleware.hasPermission(userId, permission);
   } catch (error) {
     logger.error('Error checking user permission:', {
       error: error instanceof Error ? error.message : String(error),
@@ -71,7 +71,7 @@ export async function checkUserHasAnyPermission(
   
   try {
     // Check if user role is admin (admin has all permissions)
-    const userRepository = (await import('@/infrastructure/common/factories/repositoryFactory.server')).getUserRepository();
+    const userRepository = (await import('@/core/factories/repositoryFactory')).getRepositoryFactory().createUserRepository();
     const user = await userRepository.findById(userId);
     
     if (user?.role?.toLowerCase() === 'admin') {

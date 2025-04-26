@@ -2,15 +2,16 @@
  * API route for finding a user by email
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 
 /**
  * GET /api/users/find-by-email?email=example@email.com
  * Find a user by email
  */
-export const GET = apiRouteHandler(async (req: NextRequest) => {
+export const GET = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
 

@@ -8,7 +8,7 @@ import { useUpcomingAppointments } from '../hooks/useUpcomingAppointments';
 import { Button } from '@/shared/components/ui/button';
 import { AppointmentDto } from '@/domain/dtos/AppointmentDtos';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
-import { AppointmentClient } from '@/infrastructure/api/AppointmentClient';
+import { AppointmentClient } from '@/features/appointments/lib/clients/AppointmentClient';
 import { Badge } from '@/shared/components/ui/badge';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
@@ -64,7 +64,7 @@ export const UpcomingAppointments = () => {
           alert(`Failed to add note: ${response.message || 'Unknown error'}`);
         }
       } catch (error) {
-        console.error('Error adding note:', error);
+        console.error('Error adding note:', error as Error);
         alert('Failed to add note. Please try again.');
       } finally {
         setIsActionLoading(null);
@@ -84,7 +84,7 @@ export const UpcomingAppointments = () => {
           alert(`Failed to update status: ${response.message || 'Unknown error'}`);
         }
       } catch (error) {
-        console.error('Error updating status:', error);
+        console.error('Error updating status:', error as Error);
         alert('Failed to update status. Please try again.');
       } finally {
         setIsActionLoading(null);

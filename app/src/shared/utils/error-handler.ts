@@ -139,7 +139,7 @@ export function extractValidationErrors(error: unknown): Record<string, string> 
 export function logError(error: unknown, context?: Record<string, any>): void {
   // Log to console in development, could be replaced with proper logging service
   if (process.env.NODE_ENV !== 'production') {
-    console.error('Error:', error);
+    console.error('Error:', error as Error);
     if (context) {
       console.error('Context:', context);
     }

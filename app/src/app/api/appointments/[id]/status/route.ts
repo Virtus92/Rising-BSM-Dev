@@ -4,12 +4,13 @@
  * Handles appointment status updates
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/infrastructure/api/response-formatter';
-import { getAppointmentService } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
+import { getAppointmentService } from '@/core/factories';
 import { UpdateAppointmentStatusDto } from '@/domain/dtos/AppointmentDtos';
-import { getLogger } from '@/infrastructure/common/logging';
-import { apiPermissions } from '@/app/api/helpers/apiPermissions';
+import { getLogger } from '@/core/logging';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 
@@ -21,7 +22,7 @@ async function handleStatusUpdate(req: NextRequest, params: { id: string }) {
   
   try {
     // Check permission - moved inside handler for better authentication flow
-    if (!await apiPermissions.hasPermission(
+    if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
       SystemPermission.APPOINTMENTS_EDIT
     )) {
@@ -103,7 +104,9 @@ async function handleStatusUpdate(req: NextRequest, params: { id: string }) {
  * Updates the status of an appointment
  * Requires APPOINTMENTS_EDIT permission
  */
-export const PUT = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const PUT = routeHandler(async (req: NextRequest) => {
+  // Extract the ID from the URL path
+  const params = { id: req.nextUrl.pathname.split('/').pop() || '' };
   // Reuse the handler function for both PUT and PATCH
   return handleStatusUpdate(req, params);
 }, {
@@ -116,7 +119,9 @@ export const PUT = apiRouteHandler(async (req: NextRequest, { params }: { params
  * Updates the status of an appointment (partial update)
  * Requires APPOINTMENTS_EDIT permission
  */
-export const PATCH = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const PATCH = routeHandler(async (req: NextRequest) => {
+  // Extract the ID from the URL path
+  const params = { id: req.nextUrl.pathname.split('/').pop() || '' };
   // Reuse the handler function for both PUT and PATCH
   return handleStatusUpdate(req, params);
 }, {

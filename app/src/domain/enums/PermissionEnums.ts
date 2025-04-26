@@ -41,6 +41,7 @@ export enum SystemPermission {
   USERS_CREATE = "users.create",
   USERS_EDIT = "users.edit",
   USERS_DELETE = "users.delete",
+  USERS_MANAGE = "users.manage",
   
   // Role permissions
   ROLES_VIEW = "roles.view",
@@ -53,6 +54,7 @@ export enum SystemPermission {
   CUSTOMERS_CREATE = "customers.create",
   CUSTOMERS_EDIT = "customers.edit",
   CUSTOMERS_DELETE = "customers.delete",
+  CUSTOMERS_HARD_DELETE = "customers.hard_delete",
   
   // Request permissions
   REQUESTS_VIEW = "requests.view",
@@ -70,6 +72,12 @@ export enum SystemPermission {
   APPOINTMENTS_EDIT = "appointments.edit",
   APPOINTMENTS_DELETE = "appointments.delete",
   
+  // Notification permissions
+  NOTIFICATIONS_VIEW = "notifications.view",
+  NOTIFICATIONS_CREATE = "notifications.create",
+  NOTIFICATIONS_EDIT = "notifications.edit",
+  NOTIFICATIONS_DELETE = "notifications.delete",
+
   // Settings permissions
   SETTINGS_VIEW = "settings.view",
   SETTINGS_EDIT = "settings.edit",
@@ -87,6 +95,7 @@ export const RolePermissions: Record<string, SystemPermission[]> = {
     SystemPermission.USERS_CREATE,
     SystemPermission.USERS_EDIT,
     SystemPermission.USERS_DELETE,
+    SystemPermission.USERS_MANAGE,
     SystemPermission.ROLES_VIEW,
     SystemPermission.ROLES_CREATE,
     SystemPermission.ROLES_EDIT,
@@ -95,6 +104,7 @@ export const RolePermissions: Record<string, SystemPermission[]> = {
     SystemPermission.CUSTOMERS_CREATE,
     SystemPermission.CUSTOMERS_EDIT,
     SystemPermission.CUSTOMERS_DELETE,
+    SystemPermission.CUSTOMERS_HARD_DELETE,
     SystemPermission.REQUESTS_VIEW,
     SystemPermission.REQUESTS_CREATE,
     SystemPermission.REQUESTS_EDIT,
@@ -115,6 +125,7 @@ export const RolePermissions: Record<string, SystemPermission[]> = {
   "manager": [
     SystemPermission.SYSTEM_ACCESS,
     SystemPermission.USERS_VIEW,
+    SystemPermission.USERS_MANAGE,
     SystemPermission.CUSTOMERS_VIEW,
     SystemPermission.CUSTOMERS_CREATE,
     SystemPermission.CUSTOMERS_EDIT,

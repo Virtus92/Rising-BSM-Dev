@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError } from '@/core/errors/index';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { UserResponseDto } from '@/domain/dtos/UserDtos';
 import { generateYearlyStats } from '@/shared/utils/statistics-utils';
 
@@ -10,7 +10,7 @@ import { generateYearlyStats } from '@/shared/utils/statistics-utils';
  * GET /api/users/stats/yearly
  * Returns yearly user statistics for the past 5 years
  */
-export const GET = apiRouteHandler(async (request: NextRequest) => {
+export const GET = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   
   try {

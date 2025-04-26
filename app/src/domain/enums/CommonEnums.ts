@@ -56,6 +56,20 @@ export enum RequestStatus {
 }
 
 /**
+ * Request type
+ */
+export enum RequestType {
+  GENERAL = "general",
+  SUPPORT = "support",
+  SALES = "sales",
+  BILLING = "billing",
+  FEEDBACK = "feedback",
+  COMPLAINT = "complaint",
+  INFORMATION = "information",
+  OTHER = "other"
+}
+
+/**
  * Benachrichtigungstyp
  */
 export enum NotificationType {
@@ -66,6 +80,11 @@ export enum NotificationType {
   SYSTEM = 'system',
   TASK = 'task',
   APPOINTMENT = 'appointment',
+  REQUEST = 'request',
+  FILE = 'file',
+  CONTACT = 'contact',
+  CUSTOMER = 'customer',
+  USER = 'user',
   PROJECT = 'project',
   MESSAGE = 'message',
   ALERT = 'alert'
@@ -84,6 +103,10 @@ export enum LogActionType {
   RESET_PASSWORD = 'reset_password',
   CHANGE_PASSWORD = 'change_password',
   CHANGE_STATUS = 'change_status',
+  CHANGE_ROLE = 'change_role',
+  CHANGE_PERMISSION = 'change_permission',
+  CHANGE_SETTINGS = 'change_settings',
+  CHANGE_PROFILE = 'change_profile',
   ASSIGN = 'assign',
   LINK = 'link',
   CONVERT = 'convert'

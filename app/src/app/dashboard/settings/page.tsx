@@ -41,7 +41,7 @@ export default function SettingsPage() {
         setThemeValue(settings.theme);
       }
     } catch (error) {
-      console.error('Failed to update theme setting:', error);
+      console.error('Failed to update theme setting:', error as Error);
       toast({
         title: 'Fehler',
         description: 'Die Theme-Einstellung konnte nicht gespeichert werden.',
@@ -69,7 +69,7 @@ export default function SettingsPage() {
         });
       }
     } catch (error) {
-      console.error('Failed to update notification setting:', error);
+      console.error('Failed to update notification setting:', error as Error);
       // Reset to original value on failure
       setNotificationsEnabled(settings.notificationsEnabled);
       toast({
@@ -97,7 +97,7 @@ export default function SettingsPage() {
         });
       }
     } catch (error) {
-      console.error('Failed to update email notification setting:', error);
+      console.error('Failed to update email notification setting:', error as Error);
       // Reset to original value on failure
       setEmailNotifications(settings.emailNotifications);
       toast({

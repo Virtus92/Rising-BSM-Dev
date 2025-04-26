@@ -1,177 +1,227 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { ApiClient } from '@/core/api/ApiClient';
 import { useToast } from '@/shared/hooks/useToast';
 
+// Types for N8N API responses
 export interface N8NWorkflow {
   id: string;
   name: string;
-  description: string;
-  tags: string[];
   active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  tags?: string[];
 }
 
-export interface WorkflowTriggerOptions {
-  additionalData?: any;
-  onComplete?: (result: any) => void;
+export interface N8NWebhook {
+  id: string;
+  name: string;
+  webhookPath: string;
+  workflowId: string;
+  httpMethod: string;
 }
 
-export interface WorkflowStatus {
-  status: string;
-  progress?: number;
-  currentStep?: string;
-  result?: any;
-  error?: any;
-  success?: boolean; // Add success property
+export interface N8NExecutionStatus {
+  id: string;
+  status: 'running' | 'success' | 'error' | 'waiting';
+  workflowId: string;
+  startedAt: string;
+  finishedAt?: string;
+  data?: any;
 }
 
 /**
  * Hook for interacting with N8N workflows
  * 
- * @param requestId - ID of the request to process
- * @returns Functions and state for working with N8N
+ * @returns N8N workflows and methods to interact with them
  */
-export const useN8NWorkflows = (requestId: number) => {
-  const [isProcessing, setIsProcessing] = useState(false);
+export function useN8NWorkflows() {
   const [workflows, setWorkflows] = useState<N8NWorkflow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [webhooks, setWebhooks] = useState<N8NWebhook[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null);
+  const [executionStatus, setExecutionStatus] = useState<N8NExecutionStatus | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  
   const { toast } = useToast();
-  
-  // Fetch available workflows
-  useEffect(() => {
-    const fetchWorkflows = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch('/api/n8n/workflows');
-        const data = await response.json();
-        
-        if (data.success) {
-          setWorkflows(data.data);
-        } else {
-          console.error('Failed to fetch workflows:', data.message);
-        }
-      } catch (error) {
-        console.error('Error fetching workflows:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchWorkflows();
-  }, []);
-  
-  /**
-   * Trigger a workflow for the current request
-   * 
-   * @param workflowName - Name of the workflow to trigger
-   * @param options - Additional options for the workflow
-   * @returns Result of the trigger operation
-   */
-  const triggerWorkflow = async (
-    workflowName: string, 
-    options: WorkflowTriggerOptions = {}
-  ) => {
-    setIsProcessing(true);
-    
+
+  // Fetch all workflows
+  const fetchWorkflows = useCallback(async () => {
     try {
-      const response = await fetch('/api/n8n/trigger-workflow', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          requestId,
-          workflowName,
-          data: options.additionalData || {}
-        })
+      setLoading(true);
+      setError(null);
+      
+      const response = await ApiClient.get('/api/n8n/workflows');
+      
+      if (response.success) {
+        setWorkflows(response.data);
+        
+        // If the response includes webhooks, set them
+        if (response.data?.webhooks) {
+        setWebhooks(response.data.webhooks);
+        }
+      } else {
+        setError(response.message || 'Failed to fetch workflows');
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch N8N workflows',
+          variant: 'error'
+        });
+      }
+    } catch (err) {
+      setError('Failed to fetch workflows');
+      toast({
+        title: 'Error',
+        description: 'Failed to connect to N8N',
+        variant: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  // Trigger a workflow
+  const triggerWorkflow = useCallback(async (workflowId: string, payload: any = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Clear any existing polling interval
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }
+      
+      // Reset current execution
+      setCurrentExecutionId(null);
+      setExecutionStatus(null);
+      
+      const response = await ApiClient.post('/api/n8n/trigger-workflow', {
+        workflowId,
+        payload
       });
       
-      const result = await response.json();
-      
-      if (result.success) {
+      if (response.success && response.data?.executionId) {
+        setCurrentExecutionId(response.data.executionId);
+        
+        // Start polling for execution status
+        const interval = setInterval(() => {
+          checkExecutionStatus(response.data.executionId);
+        }, 2000); // Check every 2 seconds
+        
+        setPollingInterval(interval);
+        
         toast({
           title: 'Workflow Triggered',
-          description: `Successfully triggered workflow: ${workflowName}`,
+          description: 'Workflow execution started',
           variant: 'success'
         });
         
         return {
           success: true,
-          executionId: result.data.executionId
+          executionId: response.data.executionId
         };
       } else {
+        setError(response.message || 'Failed to trigger workflow');
         toast({
-          title: 'Workflow Trigger Failed',
-          description: result.message || 'Failed to trigger workflow',
+          title: 'Error',
+          description: 'Failed to trigger workflow',
           variant: 'error'
         });
         
         return {
           success: false,
-          message: result.message
+          error: response.message
         };
       }
-    } catch (error) {
-      console.error('Error triggering workflow:', error);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to trigger workflow';
+      setError(errorMessage);
       toast({
-        title: 'Workflow Trigger Failed',
-        description: 'An unexpected error occurred',
+        title: 'Error',
+        description: errorMessage,
         variant: 'error'
       });
       
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage
       };
     } finally {
-      setIsProcessing(false);
+      setLoading(false);
     }
-  };
-  
-  /**
-   * Get the current status of a workflow execution
-   * 
-   * @param executionId - ID of the execution to check
-   * @returns Current status information
-   */
-  const getWorkflowStatus = async (executionId: string): Promise<WorkflowStatus> => {
+  }, [pollingInterval, toast]);
+
+  // Check execution status
+  const checkExecutionStatus = useCallback(async (executionId: string) => {
     try {
-      const response = await fetch(`/api/n8n/workflow-status/${executionId}`);
-      const data = await response.json();
+      const response = await ApiClient.get(`/api/n8n/workflow-status/${executionId}`);
       
-      if (data.success) {
-        return {
-          status: data.data.status,
-          progress: data.data.progress,
-          result: data.data.result,
-          success: true
-        };
+      if (response.success) {
+        setExecutionStatus(response.data);
+        
+        // If execution is complete (success or error), stop polling
+        if (['success', 'error'].includes(response.data.status)) {
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+          
+          // Show toast based on status
+          toast({
+            title: response.data.status === 'success' ? 'Workflow Completed' : 'Workflow Failed',
+            description: response.data.status === 'success' 
+              ? 'Workflow executed successfully' 
+              : 'Workflow execution failed',
+            variant: response.data.status === 'success' ? 'success' : 'error'
+          });
+        }
+        
+        return response.data;
       } else {
-        return {
-          status: 'error',
-          error: {
-            message: data.message
-          },
-          success: false
-        };
+        console.error('Failed to check execution status:', response.message);
+        return null;
       }
-    } catch (error) {
-      console.error('Error fetching workflow status:', error);
-      return {
-        status: 'error',
-        error: {
-          message: error instanceof Error ? error.message : 'Unknown error'
-        },
-        success: false
-      };
+    } catch (err) {
+      console.error('Error checking execution status:', err);
+      return null;
     }
-  };
-  
+  }, [pollingInterval, toast]);
+
+  // Clear current execution
+  const clearExecution = useCallback(() => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+    
+    setCurrentExecutionId(null);
+    setExecutionStatus(null);
+  }, [pollingInterval]);
+
+  // Fetch workflows on component mount
+  useEffect(() => {
+    fetchWorkflows();
+    
+    return () => {
+      // Clean up polling interval on unmount
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [fetchWorkflows, pollingInterval]);
+
   return {
     workflows,
-    isLoading,
-    isProcessing,
+    webhooks,
+    currentExecutionId,
+    executionStatus,
+    loading,
+    error,
+    fetchWorkflows,
     triggerWorkflow,
-    getWorkflowStatus
+    checkExecutionStatus,
+    clearExecution,
+    setCurrentExecutionId
   };
-};
+}

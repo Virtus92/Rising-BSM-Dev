@@ -105,7 +105,7 @@ export default function CustomerForm({
         
         return null;
       } catch (error) {
-        console.error('Form submission error:', error);
+        console.error('Form submission error:', error as Error);
         
         // Error handling is managed by the parent component
         

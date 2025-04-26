@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { PermissionClient } from '@/infrastructure/api/PermissionClient';
+import { PermissionClient } from '@/features/permissions/lib/clients/PermissionClient';
 import { SystemPermission, getPermissionsForRole } from '@/domain/enums/PermissionEnums';
 import { UserRole } from '@/domain/entities/User';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
@@ -90,8 +90,7 @@ export const usePermissions = (userId?: number) => {
           setPermissions([]);
         }
         setIsLoading(false);
-      };
-      
+      };      
       // Check if there's an ongoing fetch for this user
       const ongoingFetch = ongoingPermissionsFetches.get(effectiveUserId);
       if (ongoingFetch && !force) {
@@ -375,7 +374,7 @@ export const prefetchPermissions = async (userId: number): Promise<void> => {
       }
     }
   } catch (error) {
-    console.error(`Error prefetching permissions for user ${userId}:`, error);
+    console.error(`Error prefetching permissions for user ${userId}:`, error as Error);
   } finally {
     // Clean up
     setTimeout(() => {
@@ -383,3 +382,5 @@ export const prefetchPermissions = async (userId: number): Promise<void> => {
     }, 300);
   }
 };
+
+export default usePermissions;

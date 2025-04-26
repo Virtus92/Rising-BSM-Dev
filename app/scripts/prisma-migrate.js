@@ -29,6 +29,6 @@ try {
   
   console.log(`${colors.green}Migrationen erfolgreich angewendet!${colors.reset}`);
 } catch (error) {
-  console.error(`${colors.red}Fehler beim Ausführen der Migrationen:${colors.reset}`, error);
+  console.error(`${colors.red}Fehler beim Ausführen der Migrationen:${colors.reset}`, error as Error);
   process.exit(1);
 }

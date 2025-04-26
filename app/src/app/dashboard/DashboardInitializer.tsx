@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { initializeApi, isApiInitialized } from '@/infrastructure/api/ApiInitializer';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 
 // Global dashboard initialization state tracking with improved structure
@@ -27,8 +26,8 @@ if (typeof window !== 'undefined' && typeof (window as any)[DASHBOARD_STATE_KEY]
 }
 
 // Import TokenManager and ClientTokenManager directly to avoid dynamic imports
-import { TokenManager } from '@/infrastructure/auth/TokenManager';
-import { ClientTokenManager } from '@/infrastructure/auth/ClientTokenManager';
+import { TokenManager } from '@/features/auth/lib/clients/token/TokenManager';
+import { ClientTokenManager } from '@/features/auth/lib/clients/token/ClientTokenManager';
 
 /**
  * This component initializes the dashboard by ensuring the authentication state is properly set
@@ -90,7 +89,7 @@ export default function DashboardInitializer() {
       console.warn(`DashboardInitializer: Max retry count (${MAX_RETRY_COUNT}) reached, redirecting to login (${currentInitId})`);
       // Clear any existing tokens before redirecting to ensure clean login state
       try {
-        import('@/infrastructure/auth/ClientTokenManager').then(({ ClientTokenManager }) => {
+        import('@/features/auth/lib/clients/token/ClientTokenManager').then(({ ClientTokenManager }) => {
           ClientTokenManager.clearTokens();
           setTimeout(() => {
             router.push('/auth/login?error=max_retries');
@@ -169,7 +168,7 @@ export default function DashboardInitializer() {
     
     // Start initialization
     initializeDashboard(currentInitId, initTimeoutId).catch(error => {
-      console.error(`DashboardInitializer: Unhandled error during initialization (${currentInitId}):`, error);
+      console.error(`DashboardInitializer: Unhandled error during initialization (${currentInitId}):`, error as Error);
       
       // Clear timeout
       if (initTimeoutId) {
@@ -226,21 +225,6 @@ export default function DashboardInitializer() {
         globalDashboardState.checkpoints.authVerified = false;
       }
       
-      // Initialize API client using the central ApiInitializer service
-      console.log(`DashboardInitializer: Initializing API client (${initId})`);
-      await initializeApi({
-        force: false, // Don't force initialization unless necessary
-        autoRefreshToken: true,
-        handleImbalancedTokens: true, // Handle case where refresh token exists but auth token doesn't
-        source: `dashboard-initializer-${initId}`,
-        timeout: 10000, // 10 second timeout for API initialization
-        headers: {
-          'X-Client-Init': 'dashboard',
-          'X-Init-ID': initId,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
-      });
       
       // Record checkpoint - API initialized
       if (globalDashboardState?.checkpoints) {
@@ -816,7 +800,7 @@ export default function DashboardInitializer() {
         if (error && error.name === 'AbortError') {
         console.warn('DashboardInitializer: Authentication check timed out');
         } else {
-        console.error('DashboardInitializer: Error during authentication check:', error);
+        console.error('DashboardInitializer: Error during authentication check:', error as Error);
         // We'll try one more approach - checking with the AuthProvider
         try {
         // Use the refreshAuth from props instead of a new hook call

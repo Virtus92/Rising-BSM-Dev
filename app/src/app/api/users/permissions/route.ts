@@ -2,19 +2,20 @@
  * API route for managing user permissions
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 
 import { UserRole } from '@/domain/enums/UserEnums';
-import { apiPermissions } from '../../helpers/apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 
 /**
  * GET /api/users/permissions?userId=123
  * Get permissions for a specific user
  */
-export const GET = apiRouteHandler(async (req: NextRequest) => {
+export const GET = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
 
@@ -51,8 +52,8 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
         currentUser?.role !== UserRole.MANAGER) {
       
       // Check if the current user has specific permission to view users
-      const hasPermission = await apiPermissions.hasPermission(
-        Number(currentUserId), 
+      const hasPermission = await permissionMiddleware.hasPermission(
+        currentUserId, 
         SystemPermission.USERS_VIEW
       );
       
@@ -95,7 +96,7 @@ export const GET = apiRouteHandler(async (req: NextRequest) => {
  * POST /api/users/permissions
  * Update permissions for a user
  */
-export const POST = apiRouteHandler(async (req: NextRequest) => {
+export const POST = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
 
@@ -173,7 +174,7 @@ export const POST = apiRouteHandler(async (req: NextRequest) => {
     );
     
     // Invalidate the permissions cache for this user
-    await apiPermissions.invalidatePermissionCache(Number(userId));
+    await permissionMiddleware.invalidatePermissionCache(Number(userId));
     
     // Log the permission update for audit purposes
     const logger = getLogger();

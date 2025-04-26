@@ -6,10 +6,10 @@ import { NextRequest } from 'next/server';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { getLogger } from '@/infrastructure/common/logging';
-import { formatResponse } from '@/infrastructure/api/response-formatter';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { prisma } from '@/infrastructure/common/database/prisma';
+import { getLogger } from '@/core/logging';
+import { formatResponse } from '@/core/errors';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { prisma } from '@/core/db/index';
 
 // Configure upload directory
 const UPLOAD_DIR = process.env.UPLOAD_DIR || 'public/uploads';
@@ -42,7 +42,7 @@ const MAX_SIZE = 5 * 1024 * 1024;
  * POST /api/files/upload
  * Uploads a file to the server and returns a reference
  */
-export const POST = apiRouteHandler(async (request: NextRequest) => {
+export const POST = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   try {
     const formData = await request.formData();

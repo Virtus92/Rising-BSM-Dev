@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
-import { formatResponse } from '@/infrastructure/api/response-formatter';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { prisma } from '@/infrastructure/common/database/prisma';
-import { apiPermissions } from '@/app/api/helpers/apiPermissions';
+import { formatResponse } from '@/core/errors';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { prisma } from '@/core/db/index';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { getLogger } from '@/infrastructure/common/logging';
+import { getLogger } from '@/core/logging';
 
 const logger = getLogger();
 
@@ -14,10 +14,9 @@ const logger = getLogger();
  * Gets activity logs for a user
  * Requires USERS_VIEW permission
  */
-export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  // Ensure params is properly resolved before using
-  const resolvedParams = await params;
-  const userId = parseInt(resolvedParams.id);
+export const GET = routeHandler(async (req: NextRequest) => {
+  // Extract ID from URL path
+  const userId = parseInt(req.nextUrl.pathname.split('/').pop() || '0');
   if (isNaN(userId)) {
     return formatResponse.error('Invalid user ID', 400);
   }
@@ -30,7 +29,7 @@ export const GET = apiRouteHandler(async (req: NextRequest, { params }: { params
 
   try {
     // Check permission
-    if (!await apiPermissions.hasPermission(
+    if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
       SystemPermission.USERS_VIEW
     )) {

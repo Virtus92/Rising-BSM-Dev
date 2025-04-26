@@ -121,7 +121,7 @@ async function cacheFirstStrategy(request, cacheName) {
     }
     
     // Keine Fallback-Ressource verfügbar
-    console.error('Fetch failed:', error);
+    console.error('Fetch failed:', error as Error);
     throw error;
   }
 }
@@ -155,7 +155,7 @@ async function networkFirstStrategy(request) {
     }
     
     // Keine Fallback-Ressource verfügbar
-    console.error('Fetch failed and no cache available:', error);
+    console.error('Fetch failed and no cache available:', error as Error);
     throw error;
   }
 }
@@ -170,7 +170,7 @@ async function updateCache(request, cacheName) {
       cache.put(request, networkResponse);
     }
   } catch (error) {
-    // console.log('Background cache update failed:', error);
+    // console.log('Background cache update failed:', error as Error);
   }
 }
 
@@ -212,6 +212,6 @@ async function syncDashboardData() {
     await Promise.all(promises);
     // console.log('Dashboard data synchronized successfully');
   } catch (error) {
-    console.error('Failed to sync dashboard data:', error);
+    console.error('Failed to sync dashboard data:', error as Error);
   }
 }

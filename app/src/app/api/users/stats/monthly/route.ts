@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError } from '@/core/errors/index';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { UserResponseDto } from '@/domain/dtos/UserDtos';
 import { generateMonthlyStats } from '@/shared/utils/statistics-utils';
 
@@ -10,7 +10,7 @@ import { generateMonthlyStats } from '@/shared/utils/statistics-utils';
  * GET /api/users/stats/monthly
  * Returns monthly user statistics for the current year
  */
-export const GET = apiRouteHandler(async (request: NextRequest) => {
+export const GET = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   
   try {
@@ -22,8 +22,11 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
     const usersResponse = await userService.findUsers({
       page: 1,
       limit: 1000, // Set a high limit to get all users
-      includePermissions: false, // Exclude permissions for optimization
-      includeRole: false // Exclude role details for optimization
+      // Use type assertion to add custom properties not in the DTO
+      ...({
+        includePermissions: false, // Exclude permissions for optimization
+        includeRole: false // Exclude role details for optimization
+      } as any)
     }, {
       context: {
         userId: request.auth?.userId
@@ -33,11 +36,19 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
     let users: UserResponseDto[] = [];
     
     // Safely extract user data from response
-    if (usersResponse && usersResponse.success) {
-      if (usersResponse.data && Array.isArray(usersResponse.data)) {
-        users = usersResponse.data;
-      } else if (usersResponse.data && usersResponse.data.data && Array.isArray(usersResponse.data.data)) {
-        users = usersResponse.data.data;
+    if (usersResponse) {
+      // Use type assertion to avoid 'never' type issues
+      const typedResponse = usersResponse as Record<string, any>;
+      
+      if (typedResponse.success) {
+        if (typedResponse.data && Array.isArray(typedResponse.data)) {
+          users = typedResponse.data;
+        } else if (typedResponse.data && typeof typedResponse.data === 'object') {
+          const typedData = typedResponse.data as Record<string, any>;
+          if (typedData.data && Array.isArray(typedData.data)) {
+            users = typedData.data;
+          }
+        }
       }
     }
     
@@ -47,7 +58,11 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
     // Generate monthly stats using our utility function
     const monthlyStats = generateMonthlyStats(
       users,
-      (user) => user.createdAt,
+      (user) => {
+        // Use type assertion to avoid 'never' type issues
+        const typedUser = user as Record<string, any>;
+        return typedUser.createdAt;
+      },
       12  // Past 12 months
     );
     

@@ -3,11 +3,12 @@
  * Returns the total count of appointments in the system
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 
-export const GET = apiRouteHandler(async (request: NextRequest) => {
+export const GET = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   
@@ -45,10 +46,12 @@ export const GET = apiRouteHandler(async (request: NextRequest) => {
     if (typeof result === 'number') {
       count = result;
     } else if (result && typeof result === 'object') {
-      if ('count' in result) {
-        count = result.count as number;
-      } else if ('total' in result) {
-        count = result.total as number;
+      // Use type assertion to avoid 'never' type issues
+      const resultObj = result as Record<string, any>;
+      if ('count' in resultObj) {
+        count = resultObj.count;
+      } else if ('total' in resultObj) {
+        count = resultObj.total;
       }
     }
     

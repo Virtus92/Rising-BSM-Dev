@@ -15,8 +15,8 @@ import {
 } from '@/shared/components/ui/dropdown-menu';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
-import { formatDate } from '@/features/notifications/components/utils/date-utils';
-import { AppointmentService } from '@/infrastructure/clients/AppointmentService';
+import { formatDate } from '@/features/notifications/utils/date-utils';
+import { AppointmentService } from '@/features/appointments/lib/services';
 import { useToast } from '@/shared/hooks/useToast';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
@@ -142,7 +142,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
           return;
         }
       } catch (error) {
-        console.warn('Error with updateStatus, falling back to update:', error);
+        console.warn('Error with updateStatus, falling back to update:', error as Error);
         // Continue to fallback
       }
       
@@ -170,7 +170,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         });
       }
     } catch (error) {
-      console.error('Error updating appointment status:', error);
+      console.error('Error updating appointment status:', error as Error);
       toast({
         title: 'Update failed',
         description: 'An error occurred while updating the status',
@@ -204,7 +204,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         });
       }
     } catch (error) {
-      console.error('Error deleting appointment:', error);
+      console.error('Error deleting appointment:', error as Error);
       toast({
         title: 'Delete failed',
         description: 'An error occurred while deleting the appointment',
@@ -427,7 +427,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         });
       }
     } catch (error) {
-      console.error('Error creating appointment:', error);
+      console.error('Error creating appointment:', error as Error);
       toast({
         title: 'Error',
         description: 'An error occurred while creating the appointment',
@@ -486,7 +486,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         });
       }
     } catch (error) {
-      console.error('Error updating appointment:', error);
+      console.error('Error updating appointment:', error as Error);
       toast({
         title: 'Error',
         description: 'An error occurred while updating the appointment',

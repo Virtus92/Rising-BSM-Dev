@@ -24,7 +24,7 @@ import {
   Key,
   Lock
 } from 'lucide-react';
-import { UserService } from '@/infrastructure/clients/UserService';
+import { UserService } from '@/features/users/lib/services/UserService';
 import { UserDto } from '@/domain/dtos/UserDtos';
 import { UserRole, UserStatus } from '@/domain/entities/User';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';

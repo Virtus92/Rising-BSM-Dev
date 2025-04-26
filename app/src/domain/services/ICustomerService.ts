@@ -123,6 +123,16 @@ export interface ICustomerService extends IBaseService<Customer, CreateCustomerD
   softDelete(customerId: number, options?: ServiceOptions): Promise<boolean>;
   
   /**
+   * Führt einen Hard Delete eines Kunden durch (permanentes Löschen)
+   * 
+   * @param customerId - Kunden-ID
+   * @param options - Service-Optionen
+   * @returns Erfolg der Operation
+   * @throws ServiceError - Bei Fehlern
+   */
+  hardDelete(customerId: number, options?: ServiceOptions): Promise<boolean>;
+  
+  /**
    * Exportiert Kunden
    * 
    * @param filters - Filterparameter

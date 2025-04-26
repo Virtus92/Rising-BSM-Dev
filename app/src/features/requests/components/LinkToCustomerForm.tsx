@@ -14,9 +14,9 @@ import {
   FormMessage,
 } from '@/shared/components/ui/form';
 import { useQuery } from '@tanstack/react-query';
-import { ApiClient } from '@/infrastructure/clients/ApiClient';
-import { CustomerClient } from '@/infrastructure/api/CustomerClient';
-import { RequestService } from '@/infrastructure/clients/RequestService';
+import { ApiClient } from '@/core/api/ApiClient';
+import { CustomerClient } from '@/features/customers/lib/clients/CustomerClient';
+import { RequestClient } from '@/features/requests/lib/clients/RequestClient';
 import { useToast } from '@/shared/hooks/useToast';
 import { Loader2, Search } from 'lucide-react';
 import {
@@ -90,7 +90,7 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   const onSubmit = async (data: FormValues) => {
     try {
       setIsLinking(true);
-      const response = await RequestService.linkToCustomer(requestId, data.customerId, data.note);
+      const response = await RequestClient.linkToCustomer(requestId, data.customerId, data.note);
       
       if (response.success) {
         toast({
@@ -107,7 +107,7 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
         });
       }
     } catch (error) {
-      console.error("Error linking customer:", error);
+      console.error("Error linking customer:", error as Error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",

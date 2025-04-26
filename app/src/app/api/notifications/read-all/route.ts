@@ -1,14 +1,14 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler } from '@/infrastructure/api/route-handler';
-import { formatSuccess, formatError } from '@/infrastructure/api/response-formatter';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getNotificationService } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatSuccess, formatError } from '@/core/errors/index';
+import { getLogger } from '@/core/logging';
+import { getNotificationService } from '@/core/factories';
 
 /**
  * PUT /api/notifications/read-all
  * Mark all notifications as read for the current user
  */
-export const PUT = apiRouteHandler(async (request: NextRequest) => {
+export const PUT = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
   
   try {

@@ -25,7 +25,7 @@ import {
   FileText,
   Settings
 } from 'lucide-react';
-import { UserService } from '@/infrastructure/clients/UserService';
+import { UserService } from '@/features/users/lib/services/UserService';
 import { ActivityLogDto } from '@/domain/dtos/ActivityLogDto';
 import { EntityType } from '@/domain/enums/EntityTypes';
 import { format, parseISO, isValid } from 'date-fns';
@@ -54,7 +54,7 @@ const formatTime = (dateString: string | Date): string => {
     }
     return format(date, 'MMM d, yyyy h:mm a');
   } catch (error) {
-    console.error('Error formatting date:', error);
+    console.error('Error formatting date:', error as Error);
     return 'Invalid date';
   }
 };
@@ -222,3 +222,5 @@ export const UserActivity: React.FC<UserActivityProps> = ({
     </Card>
   );
 };
+
+export default UserActivity;

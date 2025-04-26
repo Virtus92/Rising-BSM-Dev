@@ -8,7 +8,7 @@ import {
   Calendar, RefreshCw, Tag, Bell, Globe, CreditCard, MessageSquare, User, Loader2,
   ChevronDown, CheckCircle2
 } from 'lucide-react';
-import { CustomerService } from '@/infrastructure/clients/CustomerService';
+import { CustomerService } from '@/features/customers/lib/services/CustomerService';
 import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
 import { Button } from '@/shared/components/ui/button';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';

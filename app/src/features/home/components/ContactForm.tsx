@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from '@/shared/components/ui/select';
 import { useToast } from '@/shared/hooks/useToast';
-import ApiClient from '@/infrastructure/clients/ApiClient';
+import ApiClient from '@/core/api/ApiClient';
 import { CreateRequestDto } from '@/domain/dtos/RequestDtos';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 
@@ -92,7 +92,7 @@ export const ContactForm: React.FC = () => {
         description: 'Beim Senden Ihrer Anfrage ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut.',
         variant: 'error'
       });
-      console.error('Error submitting contact form:', error);
+      console.error('Error submitting contact form:', error as Error);
     } finally {
       setIsSubmitting(false);
     }

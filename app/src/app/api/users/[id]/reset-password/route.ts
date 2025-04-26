@@ -2,26 +2,23 @@
  * API route for admin reset of user password
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
-import { generateSecurePassword } from '@/infrastructure/common/security/passwordUtils';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
+import { generateSecurePassword } from '@/core/security/password-utils';
 
 /**
  * POST /api/users/[id]/reset-password
  * Reset a user's password (admin function)
  */
-export const POST = apiRouteHandler(async (
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) => {
+export const POST = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
 
   try {
-    // Ensure params is properly resolved before using
-    const resolvedParams = await params;
-    const id = parseInt(resolvedParams.id);
+    // Extract ID from URL path
+    const id = parseInt(req.nextUrl.pathname.split('/')[3]);
     if (isNaN(id)) {
       return formatResponse.error('Invalid user ID', 400);
     }
@@ -62,8 +59,7 @@ export const POST = apiRouteHandler(async (
   } catch (error) {
     logger.error('Error resetting user password:', {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      userId: params.id
+      stack: error instanceof Error ? error.stack : undefined
     });
     
     return formatResponse.error(

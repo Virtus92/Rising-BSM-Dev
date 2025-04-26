@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
-import { UserService } from '@/infrastructure/clients/UserService';
-import { RequestService } from '@/infrastructure/clients/RequestService';
-import { AppointmentService } from '@/infrastructure/clients/AppointmentService';
-import { CustomerService } from '@/infrastructure/clients/CustomerService';
-import { ApiResponse } from '@/infrastructure/clients/ApiClient';
+import { UserService } from '@/features/users/lib/services/UserService';
+import { RequestService } from '@/features/requests/lib/services/RequestService';
+import { AppointmentService } from '@/features/appointments/lib/services/AppointmentService';
+import { CustomerService } from '@/features/customers/lib/services/CustomerService';
+import { ApiResponse } from '@/core/api/ApiClient';
 
 // Define API response types for count endpoints
 interface CountResponse {
@@ -246,7 +246,7 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
         }
       }
     } catch (error) {
-      console.error('Failed to fetch dashboard stats', error);
+      console.error('Failed to fetch dashboard stats', error as Error);
       if (isMountedRef.current) {
         setState(prev => ({
           ...prev,
@@ -278,7 +278,7 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
         variant: 'success'
       });
     } catch (error) {
-      console.error('Failed to manually refresh stats:', error);
+      console.error('Failed to manually refresh stats:', error as Error);
       // Error handling and toasts are already in fetchStats with showErrors=true
     }
   }, [fetchStats, toast]);

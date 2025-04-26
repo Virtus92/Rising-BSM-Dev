@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
-import { getServiceFactory } from '@/infrastructure/common/factories';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
+import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { apiPermissions } from '../../../helpers/apiPermissions';
+import { withPermission } from '@/app/api/helpers/apiPermissions';
 import { RequestStatusUpdateDto } from '@/domain/dtos/RequestDtos';
 
 type RequestParams = {
@@ -17,8 +18,8 @@ type RequestParams = {
  * 
  * Aktualisiert den Status einer Kontaktanfrage.
  */
-export const PATCH = apiRouteHandler(
-  apiPermissions.withPermission(
+export const PATCH = routeHandler(
+  withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
@@ -59,8 +60,8 @@ export const PATCH = apiRouteHandler(
  * 
  * Alias for PATCH to maintain compatibility with client implementation.
  */
-export const PUT = apiRouteHandler(
-  apiPermissions.withPermission(
+export const PUT = routeHandler(
+  withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       logger.debug('PUT request received for status update, delegating to PATCH handler');

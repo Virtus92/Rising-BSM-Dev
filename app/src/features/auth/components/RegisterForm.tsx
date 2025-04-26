@@ -153,7 +153,7 @@ export default function RegisterForm() {
         router.push('/auth/login');
       }
     } catch (error) {
-      console.error('Registrierung fehlgeschlagen:', error);
+      console.error('Registrierung fehlgeschlagen:', error as Error);
       toast({
         title: 'Fehler bei der Registrierung',
         description: error instanceof Error ? error.message : 'Ein unerwarteter Fehler ist aufgetreten',

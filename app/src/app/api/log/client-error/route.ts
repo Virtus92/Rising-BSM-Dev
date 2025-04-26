@@ -2,8 +2,9 @@
  * API route for logging client-side errors
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
 
 interface ClientErrorPayload {
   message: string;
@@ -21,7 +22,7 @@ interface ClientErrorPayload {
  * POST /api/log/client-error
  * Log a client-side error
  */
-export const POST = apiRouteHandler(async (req: NextRequest) => {
+export const POST = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
 
   try {

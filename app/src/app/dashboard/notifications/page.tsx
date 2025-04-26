@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
-import { NotificationClient } from '@/infrastructure/api/NotificationClient';
+import { NotificationClient } from '@/features/notifications/lib/clients/NotificationClient';
 import { NotificationResponseDto } from '@/domain/dtos/NotificationDtos';
 import { Check, Calendar, FileText, Clock, AlertCircle, Info, Trash2, Bell, Filter, Loader2 } from 'lucide-react';
 import { NotificationType } from '@/domain/enums/CommonEnums';
@@ -32,14 +32,14 @@ export default function NotificationsPage() {
 
       if (response.success && response.data) {
         // Extract the actual notifications array from the response structure
-        const notificationsData = response.data.data || [];
+        const notificationsData = response.data || [];
         setNotifications(notificationsData);
       } else {
         setError(response.message || 'Fehler beim Laden der Benachrichtigungen');
         setNotifications([]);
       }
     } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+      console.error('Failed to fetch notifications:', error as Error);
       setError('Fehler beim Laden der Benachrichtigungen. Bitte versuchen Sie es später erneut.');
     } finally {
       setIsLoading(false);
@@ -90,7 +90,7 @@ export default function NotificationsPage() {
   // Mark a single notification as read
   const handleMarkAsRead = async (notificationId: number) => {
     try {
-      const response = await NotificationClient.markNotificationAsRead(notificationId);
+      const response = await NotificationClient.markAsRead(notificationId);
       
       if (response.success) {
         setNotifications(prev => 
@@ -109,7 +109,7 @@ export default function NotificationsPage() {
         throw new Error(response.message || 'Fehler beim Markieren als gelesen');
       }
     } catch (error) {
-      console.error('Failed to mark notification as read:', error);
+      console.error('Failed to mark notification as read:', error as Error);
       toast({
         title: 'Fehler',
         description: 'Die Benachrichtigung konnte nicht als gelesen markiert werden.',
@@ -122,7 +122,7 @@ export default function NotificationsPage() {
   const handleMarkAllAsRead = async () => {
     try {
       setIsMarkingAllRead(true);
-      const response = await NotificationClient.markAllNotificationsAsRead();
+      const response = await NotificationClient.markAllAsRead();
       
       if (response.success) {
         setNotifications(prev => 
@@ -138,7 +138,7 @@ export default function NotificationsPage() {
         throw new Error(response.message || 'Fehler beim Markieren aller Benachrichtigungen als gelesen');
       }
     } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
+      console.error('Failed to mark all notifications as read:', error as Error);
       toast({
         title: 'Fehler',
         description: 'Die Benachrichtigungen konnten nicht als gelesen markiert werden.',

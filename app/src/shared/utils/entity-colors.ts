@@ -137,39 +137,51 @@ export function getStatusBadgeColor(
   // Handle status mapping for each entity type
   switch (entityType) {
     case 'users':
-      switch (status.toLowerCase()) {
-        case 'active': return colors.status.active;
-        case 'inactive': return colors.status.inactive;
-        case 'suspended': return colors.status.suspended;
-        case 'deleted': return colors.status.deleted;
-        default: return colors.badge; // Default to entity color
+      if ('status' in colors) {
+        const userColors = colors as typeof EntityColors.users;
+        switch (status.toLowerCase()) {
+          case 'active': return userColors.status.active;
+          case 'inactive': return userColors.status.inactive;
+          case 'suspended': return userColors.status.suspended;
+          case 'deleted': return userColors.status.deleted;
+          default: return userColors.badge; // Default to entity color
+        }
       }
-    
+      return colors.badge;
+      
     case 'requests':
-      switch (status.toLowerCase()) {
-        case 'new': return colors.status.new;
-        case 'in_progress': 
-        case 'inprogress': 
-        case 'in progress': return colors.status.inProgress;
-        case 'completed': return colors.status.completed;
-        case 'cancelled': return colors.status.cancelled;
-        default: return colors.badge; // Default to entity color
+      if ('status' in colors) {
+        const requestColors = colors as typeof EntityColors.requests;
+        switch (status.toLowerCase()) {
+          case 'new': return requestColors.status.new;
+          case 'in_progress': 
+          case 'inprogress': 
+          case 'in progress': return requestColors.status.inProgress;
+          case 'completed': return requestColors.status.completed;
+          case 'cancelled': return requestColors.status.cancelled;
+          default: return requestColors.badge; // Default to entity color
+        }
       }
-    
+      return colors.badge;
+      
     case 'appointments':
-      switch (status.toLowerCase()) {
-        case 'scheduled': return colors.status.scheduled;
-        case 'confirmed': return colors.status.confirmed;
-        case 'in_progress': 
-        case 'inprogress': 
-        case 'in progress': return colors.status.inProgress;
-        case 'completed': return colors.status.completed;
-        case 'cancelled': return colors.status.cancelled;
-        case 'no_show': 
-        case 'noshow': 
-        case 'no show': return colors.status.noShow;
-        default: return colors.badge; // Default to entity color
+      if ('status' in colors) {
+        const apptColors = colors as typeof EntityColors.appointments;
+        switch (status.toLowerCase()) {
+          case 'scheduled': return apptColors.status.scheduled;
+          case 'confirmed': return apptColors.status.confirmed;
+          case 'in_progress': 
+          case 'inprogress': 
+          case 'in progress': return apptColors.status.inProgress;
+          case 'completed': return apptColors.status.completed;
+          case 'cancelled': return apptColors.status.cancelled;
+          case 'no_show': 
+          case 'noshow': 
+          case 'no show': return apptColors.status.noShow;
+          default: return apptColors.badge; // Default to entity color
+        }
       }
+      return colors.badge;
     
     // Customers don't have statuses, but may have types
     case 'customers':

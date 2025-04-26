@@ -462,3 +462,5 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
     </>
   );
 };
+
+export default UserList;

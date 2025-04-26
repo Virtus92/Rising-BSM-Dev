@@ -2,15 +2,16 @@
  * API route for getting available user roles
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
-import { getLogger } from '@/infrastructure/common/logging';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
+import { getLogger } from '@/core/logging';
 import { UserRole } from '@/domain/enums/UserEnums';
 
 /**
  * GET /api/users/roles
  * Get all available user roles
  */
-export const GET = apiRouteHandler(async (req: NextRequest) => {
+export const GET = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
 
   try {

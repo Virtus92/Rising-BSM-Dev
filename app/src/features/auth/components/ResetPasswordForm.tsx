@@ -109,7 +109,7 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         }, 3000);
       }
     } catch (error) {
-      console.error('Error resetting password:', error);
+      console.error('Error resetting password:', error as Error);
     } finally {
       setIsLoading(false);
     }

@@ -4,11 +4,12 @@
  * Handles customer management requests
  */
 import { NextRequest } from 'next/server';
-import { apiRouteHandler, formatResponse } from '@/infrastructure/api/route-handler';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { formatResponse } from '@/core/errors';
 import { CreateCustomerDto, CustomerFilterParamsDto } from '@/domain/dtos/CustomerDtos';
-import { getServiceFactory } from '@/infrastructure/common/factories';
-import { getLogger } from '@/infrastructure/common/logging';
-import { apiPermissions } from '@/app/api/helpers/apiPermissions';
+import { getServiceFactory } from '@/core/factories';
+import { getLogger } from '@/core/logging';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 
 /**
@@ -16,8 +17,8 @@ import { SystemPermission } from '@/domain/enums/PermissionEnums';
  * 
  * Retrieves a list of customers, optionally filtered and paginated
  */
-export const GET = apiRouteHandler(
-  apiPermissions.withPermission(
+export const GET = routeHandler(
+  permissionMiddleware.withPermission(
     async (req: NextRequest) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
@@ -122,8 +123,8 @@ export const GET = apiRouteHandler(
  * 
  * Creates a new customer
  */
-export const POST = apiRouteHandler(
-  apiPermissions.withPermission(
+export const POST = routeHandler(
+  permissionMiddleware.withPermission(
     async (req: NextRequest) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();

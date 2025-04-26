@@ -3,14 +3,14 @@
  * Standalone component for changing passwords with enhanced UI and validation
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { UserService } from '@/infrastructure/clients/UserService';
+import { UserService } from '@/features/users/lib/services/UserService';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Loader2, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
 import { useToast } from '@/shared/hooks/useToast';
-import { isPasswordValid, getPasswordValidationDetails, generateSecurePassword } from '@/infrastructure/common/security/passwordUtils';
+import { validatePasswordStrength, getPasswordValidationDetails, generateSecurePassword } from '@/core/security/validation/password-validation';
 
 interface PasswordChangeFormProps {
   onPasswordChanged?: () => void;
@@ -93,7 +93,7 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
   
   // Generate a secure password
   const handleGeneratePassword = () => {
-    const newPassword = generateSecurePassword(12);
+    const newPassword = generateSecurePassword();
     setPasswordData(prev => ({
       ...prev,
       newPassword,
@@ -127,7 +127,7 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
       return;
     }
     
-    if (!isPasswordValid(passwordData.newPassword)) {
+    if (!validatePasswordStrength(passwordData.newPassword)) {
       setChangingPasswordError('Das neue Passwort erfüllt nicht die Sicherheitsanforderungen');
       return;
     }
@@ -170,7 +170,7 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
         throw new Error(response.message || "Fehler beim Ändern des Passworts");
       }
     } catch (error) {
-      console.error('Failed to change password:', error);
+      console.error('Failed to change password:', error as Error);
       // First show the error toast
       toast({
         title: "Fehler",

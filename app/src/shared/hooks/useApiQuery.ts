@@ -11,7 +11,7 @@ import {
   UseMutationOptions,
   QueryClient
 } from '@tanstack/react-query';
-import { ApiResponse } from '@/infrastructure/clients/ApiClient';
+import { ApiResponse } from '@/core/api/ApiClient';
 import { useToast } from './useToast';
 import { useErrorHandler } from '@/shared/utils/errorHandler';
 import { processApiResponse } from '@/shared/utils/apiUtils';

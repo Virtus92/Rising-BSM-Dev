@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { initializeApi, getApiInitializationStatus } from '@/infrastructure/api/ApiInitializer';
+import { ApiClient } from '@/core/api/ApiClient';
 
 /**
  * ApiInitializer Component - React component that ensures the API client is properly initialized
@@ -64,30 +64,30 @@ export default function ApiInitializer() {
           if (authTimestamp && now - parseInt(authTimestamp, 10) > 60 * 60 * 1000) {
             console.log('Auth tokens may be stale, clearing before initialization');
             // Import and clear tokens
-            const { ClientTokenManager } = await import('@/infrastructure/auth/ClientTokenManager');
+            const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
             ClientTokenManager.clearTokens();
           }
         }
         
         // Step 1: Initialize API client
-        await initializeApi({ 
+        await ApiClient.initialize({ 
           baseUrl: '/api',
           autoRefreshToken: true,
           force: false, // Don't force reinitialization unless necessary
-          source: `component-${instanceIdRef.current}`, // Track initialization source
-          handleImbalancedTokens: true, // Handle cases where we have refresh but no auth token
-          timeout: 15000 // 15 second timeout for initialization
+          headers: {
+            'X-Initialization-Source': `component-${instanceIdRef.current}`, // Track initialization source
+          }
         });
         
         console.log('API Client initialized successfully');
         
         // Step 2: Synchronize tokens
-        const { TokenManager } = await import('@/infrastructure/auth/TokenManager');
+        const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
         await TokenManager.synchronizeTokens(true);
         console.log('Tokens synchronized after initialization');
         
         // Step 3: Check for token imbalance and fix if needed
-        const { ClientTokenManager } = await import('@/infrastructure/auth/ClientTokenManager');
+        const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
         
         // Check all possible token locations
         const hasAuthToken = !!localStorage.getItem('auth_token_backup');
@@ -132,7 +132,7 @@ export default function ApiInitializer() {
         setIsInitializing(false);
       } catch (error) {
         // Handle initialization error
-        console.error('API Client initialization failed:', error);
+        console.error('API Client initialization failed:', error as Error);
         
         if (initTimeoutRef.current) {
           clearTimeout(initTimeoutRef.current);
@@ -159,7 +159,7 @@ export default function ApiInitializer() {
           
           // Try to clear tokens before redirecting
           try {
-            const { ClientTokenManager } = await import('@/infrastructure/auth/ClientTokenManager');
+            const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
             ClientTokenManager.clearTokens();
           } catch (e) {
             console.warn('Failed to clear tokens before redirect:', e);

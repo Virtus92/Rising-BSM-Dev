@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { bootstrap } from '@/infrastructure/common/bootstrap';
+import { bootstrap } from '@/core/bootstrap';
 
 /**
  * Bootstrap API endpoint
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     if (isServerSide) {
       try {
         // Import the server bootstrap directly to avoid router detection issues
-        const { bootstrapServer } = await import('@/infrastructure/common/bootstrap.server');
+        const { bootstrapServer } = await import('@/core/bootstrap/bootstrap.server');
         await bootstrapServer();
         
         return NextResponse.json({
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
         console.warn('Server bootstrap failed, fallback to client bootstrap:', serverError);
         
         // Fallback to client bootstrap if server bootstrap fails
-        const { bootstrapClient } = await import('@/infrastructure/common/bootstrap.client');
+        const { bootstrapClient } = await import('@/core/bootstrap/bootstrap.client');
         await bootstrapClient();
         
         return NextResponse.json({
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
       });
     }
   } catch (error) {
-    console.error('Bootstrap API error:', error);
+    console.error('Bootstrap API error:', error as Error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     
     return NextResponse.json({ 

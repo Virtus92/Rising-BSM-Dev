@@ -129,7 +129,7 @@ export function formatDate(
     
     return format(dateObj, formatString);
   } catch (error) {
-    console.error('Error formatting date:', error);
+    console.error('Error formatting date:', error as Error);
     return 'Invalid date';
   }
 }
@@ -230,7 +230,7 @@ export function getAppointmentDate(appointment: AppointmentDto | any): Date {
     // Fallback
     return new Date();
   } catch (error) {
-    console.error('Error parsing appointment date:', error);
+    console.error('Error parsing appointment date:', error as Error);
     return new Date();
   }
 }
@@ -254,7 +254,7 @@ export function getFormattedDateTime(appointment: AppointmentDto | any): string 
     
     return `${dateString} at ${timeString}`;
   } catch (error) {
-    console.error('Error formatting appointment date and time:', error);
+    console.error('Error formatting appointment date and time:', error as Error);
     return 'Invalid date';
   }
 }

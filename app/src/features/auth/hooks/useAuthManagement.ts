@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
-import { AuthClient } from '@/infrastructure/auth/AuthClient';
+import { AuthClient } from '@/features/auth/lib/clients/AuthClient';
 import { useToast } from '@/shared/hooks/useToast';
 
 type ForgotPasswordData = {
@@ -64,7 +64,7 @@ export function useAuthManagement() {
       
       return true;
     } catch (error) {
-      console.error('Login fehlgeschlagen:', error);
+      console.error('Login fehlgeschlagen:', error as Error);
       
       // Store the error message in state for potential UI display
       setError(error instanceof Error ? error.message : 'Anmeldung fehlgeschlagen');
@@ -96,7 +96,7 @@ export function useAuthManagement() {
       router.push('/auth/login');
       return true;
     } catch (error) {
-      console.error('Abmeldung fehlgeschlagen:', error);
+      console.error('Abmeldung fehlgeschlagen:', error as Error);
       
       toast({
         title: 'Fehler bei der Abmeldung',
@@ -137,7 +137,7 @@ export function useAuthManagement() {
         return false;
       }
     } catch (error) {
-      console.error('Fehler bei Passwort vergessen:', error);
+      console.error('Fehler bei Passwort vergessen:', error as Error);
       
       setError(error instanceof Error ? error.message : 'Fehler beim Anfordern des Passwort-Resets');
       
@@ -182,7 +182,7 @@ export function useAuthManagement() {
         return false;
       }
     } catch (error) {
-      console.error('Fehler beim Zurücksetzen des Passworts:', error);
+      console.error('Fehler beim Zurücksetzen des Passworts:', error as Error);
       
       setError(error instanceof Error ? error.message : 'Fehler beim Zurücksetzen des Passworts');
       
@@ -218,7 +218,7 @@ export function useAuthManagement() {
       router.push('/auth/login');
       return true;
     } catch (error) {
-      console.error('Fehler bei der Registrierung:', error);
+      console.error('Fehler bei der Registrierung:', error as Error);
       
       setError(error instanceof Error ? error.message : 'Fehler bei der Registrierung');
       
@@ -261,7 +261,7 @@ export function useAuthManagement() {
         return false;
       }
     } catch (error) {
-      console.error('Fehler beim Ändern des Passworts:', error);
+      console.error('Fehler beim Ändern des Passworts:', error as Error);
       
       setError(error instanceof Error ? error.message : 'Fehler beim Ändern des Passworts');
       
@@ -299,7 +299,7 @@ export function useAuthManagement() {
         return false;
       }
     } catch (error) {
-      console.error('Fehler beim Validieren des Tokens:', error);
+      console.error('Fehler beim Validieren des Tokens:', error as Error);
       
       setError(error instanceof Error ? error.message : 'Ungültiger oder abgelaufener Token');
       

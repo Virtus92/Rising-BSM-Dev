@@ -14,7 +14,7 @@ import { useSettings } from '@/shared/contexts/SettingsContext';
 import { useToast } from '@/shared/hooks/useToast';
 import { Button } from '@/shared/components/ui/button';
 import { NotificationType } from '@/domain/enums/CommonEnums';
-import { getLogger } from '@/infrastructure/common/logging';
+import { getLogger } from '@/core/logging';
 
 // Removed notification item props as we're using the NotificationBadge component
 
@@ -110,7 +110,7 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
       // Log success for debugging
       console.log(`Theme toggled to ${newTheme}`);
     } catch (error) {
-      console.error('Failed to toggle theme:', error);
+      console.error('Failed to toggle theme:', error as Error);
       toast({
         title: 'Fehler',
         description: 'Designeinstellung konnte nicht gespeichert werden',

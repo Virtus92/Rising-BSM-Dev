@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { validateId, isValidId } from '@/shared/utils/validation-utils';
-import { AppointmentClient } from '@/infrastructure/api/AppointmentClient';
-import { CustomerClient } from '@/infrastructure/api/CustomerClient';
+import { AppointmentClient } from '@/features/appointments/lib/clients';
+import { CustomerClient } from '@/features/customers/lib/clients';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 import { Button } from '@/shared/components/ui/button';
 import { usePermissions } from '@/features/users/hooks/usePermissions';

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo, ReactNode } from 'react';
-import { SettingsClient, SystemSettings as SystemSettingsType } from '@/infrastructure/api/SettingsClient';
-import { initializeClientSettings } from '@/infrastructure/common/settings/SettingsHelper';
+import { SettingsClient, SystemSettings as SystemSettingsType } from '@/features/settings/lib/clients/SettingsClient';
+import { initializeClientSettings } from '@/features/settings/lib/utils/SettingsHelper';
 import { useToast } from '@/shared/hooks/useToast';
 
 export interface SystemSettings extends SystemSettingsType {}

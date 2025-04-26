@@ -385,3 +385,5 @@ export const AppointmentList: React.FC<AppointmentListProps> = ({
     </>
   );
 };
+
+export default AppointmentList;

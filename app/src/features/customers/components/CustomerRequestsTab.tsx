@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
 import { formatDate } from '@/shared/utils/date-utils';
-import { RequestService } from '@/infrastructure/clients/RequestService';
+import { RequestService } from '@/features/requests/lib/services';
 import { useToast } from '@/shared/hooks/useToast';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
@@ -92,7 +92,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         
         // Properly filter requests by customerId on the backend
         // Ensure the customerId is passed as a number to avoid type mismatches
-        const response = await RequestService.getAll({
+        const response = await RequestService.findAll({
           customerId: Number(customerId),  // Convert to number to ensure type consistency
           sortBy: 'createdAt',
           sortDirection: 'desc'
@@ -110,7 +110,24 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
             // Use the requests returned by the backend, which should be filtered by customerId
             // Add a safety check during transition to ensure we only show requests for this customer
             const data = response.data.data;
-            const filteredData = data.filter(request => Number(request.customerId) === Number(customerId));
+            // Define Request interface to match the API response structure
+            interface Request {
+              id: number;
+              customerId: number | string;
+              name: string;
+              email: string;
+              phone?: string;
+              service: string;
+              message: string;
+              status: string;
+              statusLabel?: string;
+              createdAt: string;
+              processorId?: number;
+              processorName?: string;
+            }
+            
+            // Filter requests by customer ID
+            const filteredData: Request[] = data.filter((request: Request) => Number(request.customerId) === Number(customerId));
             
             // If filtering happened on the client, log a warning for debugging
             if (filteredData.length !== data.length) {
@@ -152,7 +169,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
       
       // Use PUT for status update instead of PATCH to avoid 500 errors
       // Use the correct parameters for updateRequestStatus method
-      const response = await RequestService.updateRequestStatus(id, newStatus, 'Status updated via customer requests tab');
+      const response = await RequestService.updateRequestStatus(id, newStatus as RequestStatus, 'Status updated via customer requests tab');
       
       if (response.success) {
         // Update local state
@@ -176,7 +193,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         });
       }
     } catch (error) {
-      console.error('Error updating request status:', error);
+      console.error('Error updating request status:', error as Error);
       toast({
         title: 'Update failed',
         description: 'An error occurred while updating the status',
@@ -221,7 +238,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         });
       }
     } catch (error) {
-      console.error('Error deleting request:', error);
+      console.error('Error deleting request:', error as Error);
       toast({
         title: 'Delete failed',
         description: 'An error occurred while deleting the request',
@@ -364,7 +381,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         });
       }
     } catch (error) {
-      console.error('Error creating request:', error);
+      console.error('Error creating request:', error as Error);
       toast({
         title: 'Error',
         description: 'An error occurred while creating the request',
@@ -481,7 +498,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         });
       }
     } catch (error) {
-      console.error('Error updating request:', error);
+      console.error('Error updating request:', error as Error);
       toast({
         title: 'Error',
         description: 'An error occurred while updating the request',

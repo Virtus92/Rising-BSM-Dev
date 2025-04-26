@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CustomerClient } from '@/infrastructure/api/CustomerClient';
+import { CustomerClient } from '@/features/customers/lib/clients';
 import { UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { useToast } from '@/shared/hooks/useToast';
 
