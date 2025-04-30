@@ -1,18 +1,13 @@
 /**
- * Auth Middleware Index
- * 
- * This file conditionally exports the server or client version of the auth middleware
- * to ensure client components don't import server-only APIs
+ * Authentication Middleware Exports
+ * Provides a clean public API for auth middleware
  */
 
-// Detect the environment - 'use client' directives are processed before any imports
-// For client components, import the client-safe version
-// For server components, import the full version with server-only APIs
+// Export everything from authMiddleware
+export * from './authMiddleware';
 
-// Export client-safe versions that can be imported by client components
-export * from './client/authMiddleware';
-export { default as authMiddleware } from './client/authMiddleware';
-export { default as apiAuth } from './client/authMiddleware';
+// Export default for convenience
+export { default } from './authMiddleware';
 
-// NOTE: Server components should import directly from './authMiddleware'
-// Example: import { getServerSession } from '@/features/auth/api/middleware/authMiddleware';
+// Export auth middleware function directly
+export { authMiddleware as apiAuth } from './authMiddleware';

@@ -8,7 +8,6 @@ import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
 import { getAppointmentService } from '@/core/factories';
 import { getLogger } from '@/core/logging';
-import { withPermission } from '@/app/api/helpers/apiPermissions';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';

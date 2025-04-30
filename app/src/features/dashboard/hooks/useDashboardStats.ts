@@ -138,14 +138,21 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
   // Track last successful fetch time to prevent excessive refresh
   const lastFetchTimeRef = useRef(0);
 
+  // First mount flag to prevent duplicate fetches on initial mount
+  const isFirstMountRef = useRef(true);
+
   // Extract fetchStats as a separate callback with debounce protection
   const fetchStats = useCallback(async (showErrors = false) => {
     // Don't allow multiple simultaneous fetches
-    if (isFetchingRef.current) return;
+    if (isFetchingRef.current) {
+      console.log('Already fetching stats, skipping duplicate request');
+      return;
+    }
     
     // Throttle refreshes (minimum 5 seconds between refreshes)
     const now = Date.now();
     if (now - lastFetchTimeRef.current < 5000) {
+      console.log('Throttling stats fetch - too soon since last fetch');
       return;
     }
     
@@ -283,27 +290,55 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     }
   }, [fetchStats, toast]);
 
-  // Fetch stats on initial mount
+  // Fetch stats on initial mount with duplicate request prevention
   useEffect(() => {
-    fetchStats();
+    // Set mounted flag
+    isMountedRef.current = true;
     
-    // Set the isMounted ref for cleanup
+    // Skip duplicate fetch on React Strict Mode double mount
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      
+      // Delay initial fetch slightly to avoid race conditions
+      const initialFetchTimer = setTimeout(() => {
+        if (isMountedRef.current && !isFetchingRef.current) {
+          console.log('Performing initial stats fetch');
+          fetchStats();
+        }
+      }, 100);
+      
+      return () => {
+        clearTimeout(initialFetchTimer);
+        isMountedRef.current = false;
+      };
+    }
+    
+    // Cleanup function
     return () => {
       isMountedRef.current = false;
     };
-  }, [fetchStats]);
+  }, []); // Empty dependency array to run only once
 
-  // Set up a refresh interval - increased to 5 minutes to reduce load
+  // Set up a refresh interval - using a stable interval reference
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetchStats();
-    }, 300000); // Refresh every 5 minutes instead of every minute
+    // Only set up interval if component is mounted
+    if (!isMountedRef.current) return;
     
+    console.log('Setting up dashboard stats refresh interval (5 minutes)');
+    const intervalId = setInterval(() => {
+      // Only fetch if component is still mounted and not already fetching
+      if (isMountedRef.current && !isFetchingRef.current) {
+        console.log('Interval-triggered stats refresh');
+        fetchStats();
+      }
+    }, 300000); // Refresh every 5 minutes
+    
+    // Clean up interval on unmount
     return () => {
+      console.log('Clearing dashboard stats refresh interval');
       clearInterval(intervalId);
-      isMountedRef.current = false;
     }; 
-  }, [fetchStats]);
+  }, []); // Empty dependency array for stable interval
 
   // Return the state and the refresh function
   return { ...state, refreshStats };

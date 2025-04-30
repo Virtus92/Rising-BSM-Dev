@@ -341,10 +341,10 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
   /**
    * Execute a transaction
    * 
-   * @param callback - Callback function
+   * @param callback - Callback function that accepts a repository instance
    * @returns Promise with transaction result
    */
-  async transaction<R>(callback: () => Promise<R>): Promise<R> {
+  async transaction<R>(callback: (repo: any) => Promise<R>): Promise<R> {
     try {
       const timeout = configService.isDevelopment() ? 30000 : 10000;
       
@@ -358,8 +358,8 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
             // Log transaction start
             this.logger.debug(`Starting transaction for ${this.modelName}`);
             
-            // Execute operation
-            return await callback();
+            // Execute operation - pass this repository instance to the callback
+            return await callback(this);
           } finally {
             // Clear transaction client (always executed)
             this.prismaTransaction = null;

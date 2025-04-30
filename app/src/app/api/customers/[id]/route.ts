@@ -4,7 +4,7 @@ import { formatSuccess, formatError, formatNotFound, formatValidationError } fro
 import { getServiceFactory } from '@/core/factories';
 import { UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { getLogger } from '@/core/logging';
-import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
@@ -16,8 +16,8 @@ import { validateId } from '@/shared/utils/validation-utils';
  */
 export const GET = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
-  // Extract ID from URL path
-  const params = { id: req.nextUrl.pathname.split('/').pop() || '' };
+  // Get ID from params (provided by Next.js route handler)
+  const id = req.nextUrl.pathname.split('/').pop() || '';
   const serviceFactory = getServiceFactory();
   
   try {
@@ -32,10 +32,6 @@ export const GET = routeHandler(async (req: NextRequest) => {
         403
       );
     }
-    
-    // Ensure params is properly resolved before using
-    const resolvedParams = await params;
-    const id = resolvedParams.id;
     
     if (!id) {
       logger.error('No customer ID provided');
@@ -85,7 +81,7 @@ export const GET = routeHandler(async (req: NextRequest) => {
     logger.error('Error fetching customer:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      customerId: params?.id,
+      customerId: id,
       userId: req.auth?.userId
     });
     
@@ -105,8 +101,8 @@ export const GET = routeHandler(async (req: NextRequest) => {
  */
 export const PUT = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
-  // Extract ID from URL path
-  const params = { id: req.nextUrl.pathname.split('/').pop() || '' };
+  // Get ID from params (provided by Next.js route handler)
+  const id = req.nextUrl.pathname.split('/').pop() || '';
   const serviceFactory = getServiceFactory();
   
   try {
@@ -121,10 +117,6 @@ export const PUT = routeHandler(async (req: NextRequest) => {
         403
       );
     }
-    
-    // Ensure params is properly resolved before using
-    const resolvedParams = await params;
-    const id = resolvedParams.id;
     
     if (!id) {
       logger.error('No customer ID provided');
@@ -167,7 +159,7 @@ export const PUT = routeHandler(async (req: NextRequest) => {
     logger.error('Error updating customer:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      customerId: params?.id,
+      customerId: id,
       userId: req.auth?.userId
     });
     
@@ -195,8 +187,8 @@ export const PUT = routeHandler(async (req: NextRequest) => {
  */
 export const DELETE = routeHandler(async (req: NextRequest) => {
   const logger = getLogger();
-  // Extract ID from URL path
-  const params = { id: req.nextUrl.pathname.split('/').pop() || '' };
+  // Get ID from params (provided by Next.js route handler)
+  const id = req.nextUrl.pathname.split('/').pop() || '';
   const serviceFactory = getServiceFactory();
   
   try {
@@ -211,10 +203,6 @@ export const DELETE = routeHandler(async (req: NextRequest) => {
         403
       );
     }
-    
-    // Ensure params is properly resolved before using
-    const resolvedParams = await params;
-    const id = resolvedParams.id;
     
     if (!id) {
       logger.error('No customer ID provided');
@@ -260,7 +248,7 @@ export const DELETE = routeHandler(async (req: NextRequest) => {
     logger.error('Error deleting customer:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      customerId: params?.id,
+      customerId: id,
       userId: req.auth?.userId
     });
     

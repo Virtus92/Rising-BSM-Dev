@@ -10,8 +10,8 @@ export { getPrismaClient as getPrismaClientServer } from './db';
 // Errors exports - Split into value exports and type exports
 import { 
   formatResponse, formatError, formatSuccess, formatValidationError,
-  createErrorInterceptor,
-  ErrorHandler,
+  createApiErrorInterceptor,
+  errorHandler,
   AppError, ValidationError, NotFoundError, UnauthorizedError, ForbiddenError, ConflictError, BadRequestError,
   handleApiError
 } from './errors';
@@ -25,8 +25,8 @@ import type {
 // Export values (non-type exports)
 export { 
   formatResponse, formatError, formatSuccess, formatValidationError,
-  createErrorInterceptor,
-  ErrorHandler,
+  createApiErrorInterceptor,
+  errorHandler,
   handleApiError
 };
 
@@ -111,7 +111,7 @@ export {
 };
 
 // API module exports
-import { ApiClient, routeHandler } from './api';
+import { ApiClient, RouteHandler } from './api';
 // Define the ApiClientOptions type ourselves to avoid import errors
 export interface ApiClientOptions {
   baseUrl?: string;
@@ -129,7 +129,7 @@ export interface ApiClientResponse<T = any> {
 }
 
 // Export API values
-export { ApiClient, routeHandler };
+export { ApiClient, type RouteHandler };
 
 // Repository exports
 import { BaseRepository, PrismaRepository } from './repositories';
@@ -162,4 +162,3 @@ export { configService, ConfigService };
 
 // Additional exports for simplified imports
 export { getErrorHandler } from './bootstrap';
-export { createApiErrorInterceptor } from './errors';

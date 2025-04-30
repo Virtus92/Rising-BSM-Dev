@@ -9,6 +9,7 @@ import 'server-only';
 import { getLogger } from '@/core/logging';
 import { getErrorHandler, getValidationService } from '@/core/bootstrap/bootstrap.server';
 import { configService } from '@/core/config/ConfigService';
+import { IServiceFactory } from './serviceFactory.interface';
 
 // Server-only repository factories
 import { 
@@ -52,7 +53,7 @@ import { IN8NIntegrationService } from '@/domain/services/IN8NIntegrationService
 /**
  * ServiceFactory class for uniform creation of services
  */
-export class ServiceFactory {
+export class ServiceFactory implements IServiceFactory {
   private static instance: ServiceFactory;
 
   // Singleton instances for services
@@ -108,10 +109,10 @@ export class ServiceFactory {
    */
   public createUserService(): IUserService {
     if (!this.userService) {
+      // Import the server-side UserService implementation
+      const { UserService } = require('@/features/users/lib/services/UserService.server');
       // Create a properly initialized UserService instance
       this.userService = new UserService();
-
-      // No need for type assertion since UserService implements IUserService
     }
     return this.userService as IUserService;
   }

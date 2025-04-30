@@ -1,20 +1,27 @@
-export * from './components';
-export * from './hooks/useAuthManagement';
-// Re-export specific items from AuthProvider to avoid ambiguity
-export { AuthProvider, useAuth } from './providers/AuthProvider';
-export type { AuthRole } from './providers/AuthProvider';
-// Rename User to AuthUser to avoid conflict
-export type{ AuthUser } from './providers/AuthProvider';
-// Export authentication utility functions
-export { 
-  initializeAuth,
-  isAuthInitialized,
-  getAuthStatus,
-  resetAuthInitialization,
-  clearAuthState,
-  setupAuth,
-  isAuthenticated,
-  getUserFromAuthToken
-} from './utils/authUtils';
-export * from './api';
-export * from './lib';
+/**
+ * Authentication Module
+ * 
+ * This file exports all authentication-related functionality for easy imports
+ */
+
+// Auth Middleware
+export * from './api/middleware';
+
+// Auth API Routes
+export * from './api/routes';
+
+// Auth Initialization
+export * from './lib/initialization/AuthInitializer';
+
+// Token Management
+export * from './lib/clients/token';
+
+// Auth Provider
+export * from './providers/AuthProvider';
+
+// Re-export AuthClient for API access
+export { AuthClient } from './lib/clients/AuthClient';
+
+// Default export for backward compatibility
+import * as AuthModule from './api/middleware';
+export default AuthModule;

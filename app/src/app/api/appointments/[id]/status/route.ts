@@ -9,7 +9,7 @@ import { formatSuccess, formatError, formatNotFound, formatValidationError } fro
 import { getAppointmentService } from '@/core/factories';
 import { UpdateAppointmentStatusDto } from '@/domain/dtos/AppointmentDtos';
 import { getLogger } from '@/core/logging';
-import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
@@ -104,11 +104,12 @@ async function handleStatusUpdate(req: NextRequest, params: { id: string }) {
  * Updates the status of an appointment
  * Requires APPOINTMENTS_EDIT permission
  */
-export const PUT = routeHandler(async (req: NextRequest) => {
-  // Extract the ID from the URL path
-  const params = { id: req.nextUrl.pathname.split('/').pop() || '' };
+export const PUT = routeHandler(async (req: NextRequest, { params }) => {
+  // Get the ID directly from the params
+  const id = params?.id;
+  
   // Reuse the handler function for both PUT and PATCH
-  return handleStatusUpdate(req, params);
+  return handleStatusUpdate(req, { id });
 }, {
   requiresAuth: true
 });
@@ -119,11 +120,12 @@ export const PUT = routeHandler(async (req: NextRequest) => {
  * Updates the status of an appointment (partial update)
  * Requires APPOINTMENTS_EDIT permission
  */
-export const PATCH = routeHandler(async (req: NextRequest) => {
-  // Extract the ID from the URL path
-  const params = { id: req.nextUrl.pathname.split('/').pop() || '' };
+export const PATCH = routeHandler(async (req: NextRequest, { params }) => {
+  // Get the ID directly from the params
+  const id = params?.id;
+  
   // Reuse the handler function for both PUT and PATCH
-  return handleStatusUpdate(req, params);
+  return handleStatusUpdate(req, { id });
 }, {
   requiresAuth: true
 });

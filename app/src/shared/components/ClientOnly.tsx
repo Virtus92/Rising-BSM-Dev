@@ -12,7 +12,6 @@ export default function ClientOnly({ children }: { children: ReactNode }) {
   // Only show children when component is mounted on the client
   useEffect(() => {
     setMounted(true);
-    return () => setMounted(false);
   }, []);
 
   // Return null during server-side rendering or first client render

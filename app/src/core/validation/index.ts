@@ -31,4 +31,4 @@ export { ValidationService } from './ValidationService';
 export * from './validators';
 
 // Export user validation utilities
-export { validateUserData as validateUserCreate, validateUserData as validateUserUpdate } from './userValidation';
+export { validateUserData as validateUserCreate, validateUserUpdateData as validateUserUpdate } from './userValidation';

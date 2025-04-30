@@ -10,6 +10,37 @@ import { ConvertToCustomerDto, RequestStatusUpdateDto, RequestFilterParamsDto } 
  */
 export interface IRequestRepository extends IBaseRepository<ContactRequest> {
   /**
+   * Findet Anfragen basierend auf Kriterien
+   * 
+   * @param criteria - Suchkriterien
+   * @returns Array von Anfragen, die den Kriterien entsprechen
+   */
+  find(criteria: Record<string, any>): Promise<ContactRequest[]>;
+  
+  /**
+   * Prüft, ob eine Anfrage existiert
+   * 
+   * @param id - Anfrage-ID
+   * @returns true, wenn die Anfrage existiert, sonst false
+   */
+  exists(id: number): Promise<boolean>;
+
+  /**
+   * Findet Notizen zu einer Anfrage
+   * 
+   * @param requestId - Anfrage-ID
+   * @returns Notizen zur Anfrage
+   */
+  findNotes(requestId: number): Promise<RequestNote[]>;
+
+  /**
+   * Findet eine Anfrage mit allen Beziehungen
+   * 
+   * @param id - Anfrage-ID
+   * @returns Anfrage mit Beziehungen
+   */
+  findByIdWithRelations(id: number): Promise<ContactRequest | null>;
+  /**
    * Findet Anfragen mit erweiterten Filteroptionen
    * 
    * @param filters - Filterparameter
@@ -111,4 +142,23 @@ export interface IRequestRepository extends IBaseRepository<ContactRequest> {
     cancelledRequests: number;
     conversionRate: number;
   }>;
+
+  /**
+   * Aktualisiert mehrere Anfragen auf einmal
+   * 
+   * @param ids - Array von Anfrage-IDs
+   * @param data - Zu aktualisierende Daten
+   * @returns Anzahl der aktualisierten Anfragen
+   */
+  bulkUpdate(ids: number[], data: Partial<ContactRequest>): Promise<number>;
+
+  /**
+   * Aktualisiert den Status einer Anfrage
+   * 
+   * @param id - Anfrage-ID
+   * @param status - Neuer Status
+   * @param updatedBy - ID des Benutzers, der die Änderung durchführt
+   * @returns Aktualisierte Anfrage
+   */
+  updateStatus(id: number, status: string, updatedBy?: number): Promise<ContactRequest>;
 }

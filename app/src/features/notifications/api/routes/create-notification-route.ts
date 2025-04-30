@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/features/auth/api/middleware/authMiddleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { formatResponse } from '@/core/errors/formatting/response-formatter';
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     }
 
     // Check permissions
-    const hasPermission = await permissionMiddleware.checkPermission(request, [SystemPermission.NOTIFICATIONS_CREATE]);
+    const hasPermission = await permissionMiddleware.checkPermission(request as NextRequest, [SystemPermission.NOTIFICATIONS_CREATE]);
     if (!hasPermission.success) {
     return formatResponse.error('You do not have permission to create notifications', 403);
     }

@@ -10,6 +10,8 @@ import { ApiClient } from '@/core/api';
 import { UserDto } from '@/domain/dtos/UserDtos';
 import { LoginDto, RegisterDto, ResetPasswordDto } from '@/domain/dtos/AuthDtos';
 import { TokenManager } from './token/index';
+import { log } from 'console';
+import { getItem, setItem, removeItem } from '@/shared/utils/storage';
 
 // GLOBAL REQUEST CACHE to deduplicate auth API calls
 // This is critically important to prevent race conditions with cookies
@@ -40,11 +42,11 @@ export class AuthClient {
     
     // Create a new request and store it
     const promise = requestFn().finally(() => {
-      // Clean up after request is complete, with slight delay to prevent race conditions
+      // Clean up after request is complete, with increased delay to prevent race conditions
       setTimeout(() => {
         delete GLOBAL_AUTH_REQUESTS[key];
         console.log(`AuthClient: Cleaned up request for ${key}`);
-      }, 100);
+      }, 1000);
     });
     
     GLOBAL_AUTH_REQUESTS[key] = promise;
@@ -95,8 +97,9 @@ export class AuthClient {
         
         // Clear any existing tokens before attempting login
         try {
-          const { ClientTokenManager } = await import('./token/index');
-          ClientTokenManager.clearTokens();
+          // Just use the clear tokens function from the module
+          const { clearTokens } = await import('./token/index');
+          await clearTokens();
           
           // Import TokenManager here to use synchronizeTokens
           const { TokenManager } = await import('./token/index');
@@ -198,41 +201,87 @@ export class AuthClient {
             userData = data;
           }
           
-          // Store tokens in localStorage as backups
+          // Store tokens and expiration data in localStorage
           // This is critically important for auth recovery
           try {
             console.log(`AuthClient: Saving token backups (${requestId})`);
-            // Save token backups if they exist in the response
+            let accessToken = null;
+            let refreshToken = null;
+            let expiresIn = 3600; // Default 1 hour expiration if not specified
+            
+            // Extract tokens and expiration from different response formats
             if (data.data) {
-              if (data.data.accessToken) {
-                localStorage.setItem('auth_token_backup', data.data.accessToken);
-                // Also set auth_token for legacy compatibility
-                localStorage.setItem('auth_token', data.data.accessToken);
+              if (data.data.accessToken || data.data.token) {
+                accessToken = data.data.accessToken || data.data.token;
+                refreshToken = data.data.refreshToken;
+                expiresIn = data.data.expiresIn || expiresIn;
               }
-              
-              if (data.data.refreshToken) {
-                localStorage.setItem('refresh_token_backup', data.data.refreshToken);
-              }
-            } else if (data.accessToken) {
-              localStorage.setItem('auth_token_backup', data.accessToken);
-              localStorage.setItem('auth_token', data.accessToken);
-              
-              if (data.refreshToken) {
-                localStorage.setItem('refresh_token_backup', data.refreshToken);
-              }
-            } else if (data.token) {
-              localStorage.setItem('auth_token_backup', data.token);
-              localStorage.setItem('auth_token', data.token);
+            } else if (data.accessToken || data.token) {
+              accessToken = data.accessToken || data.token;
+              refreshToken = data.refreshToken;
+              expiresIn = data.expiresIn || expiresIn;
             }
             
-            // Record authentication timestamp
-            localStorage.setItem('auth_timestamp', Date.now().toString());
+            if (accessToken) {
+              // Calculate expiration timestamp
+              const now = Date.now();
+              const expiryTime = now + (expiresIn * 1000);
+              const expiryDate = new Date(expiryTime);
+              
+              // Store tokens
+              setItem('auth_token_backup', accessToken);
+              setItem('auth_token', accessToken); // For legacy compatibility
+              
+              if (refreshToken) {
+                setItem('refresh_token_backup', refreshToken);
+              }
+              
+              // Store expiration information in multiple formats for robustness
+              setItem('auth_timestamp', now.toString());
+              setItem('auth_expires_at', expiryDate.toISOString());
+              setItem('auth_expires_in', expiresIn.toString());
+              setItem('auth_expires_timestamp', expiryTime.toString());
+              setItem('auth_expires_seconds', Math.floor(expiryTime / 1000).toString());
+              
+              console.log(`AuthClient: Stored tokens with expiration: ${expiryDate.toISOString()} (${requestId})`);
+            } else {
+              console.warn(`AuthClient: No tokens found in login response (${requestId})`);
+            }
           } catch (storageError) {
             console.warn(`AuthClient: Error saving token backups (${requestId}):`, storageError);
           }
           
-          // Synchronize tokens right after login to ensure consistent state
-          await TokenManager.synchronizeTokens(true);
+          // Use TokenManager.setTokens for consistent token setting
+          try {
+            // Extract tokens for TokenManager
+            let accessToken = null;
+            let refreshToken = null;
+            let expiresIn = 3600; // Default 1 hour
+            
+            if (data.data) {
+              accessToken = data.data.accessToken || data.data.token;
+              refreshToken = data.data.refreshToken;
+              expiresIn = data.data.expiresIn || expiresIn;
+            } else if (data.accessToken || data.token) {
+              accessToken = data.accessToken || data.token;
+              refreshToken = data.refreshToken;
+              expiresIn = data.expiresIn || expiresIn;
+            }
+            
+            if (accessToken && refreshToken && expiresIn) {
+              // Import TokenManager instead of using from module import
+              // This ensures we get the most up-to-date version
+              const { TokenManager } = await import('./token');
+              TokenManager.setTokens(accessToken, refreshToken, expiresIn);
+              console.log(`AuthClient: Tokens set via TokenManager (${requestId})`);
+            } else {
+              console.warn(`AuthClient: Cannot use TokenManager.setTokens - missing token data (${requestId})`);
+              throw new Error('Missing token data');
+            }
+          } catch (tokenError) {
+            console.warn(`AuthClient: Error setting tokens via TokenManager (${requestId}):`, tokenError);
+            throw new Error('Failed to set tokens');
+          }
           
           // Notify about successful authentication with a slight delay to avoid race conditions
           await TokenManager.notifyAuthChange(true);
@@ -294,9 +343,9 @@ export class AuthClient {
       try {
         // Clear localStorage tokens first for immediate effect
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('auth_token_backup');
-          localStorage.removeItem('refresh_token_backup');
+          removeItem('auth_token');
+          removeItem('auth_token_backup');
+          removeItem('refresh_token_backup');
         }
         // Clear all auth-related cookies by setting them to expire in the past
         if (typeof document !== 'undefined') {
@@ -332,7 +381,7 @@ export class AuthClient {
         
         // Notify about logout with slight delay
         setTimeout(() => {
-          TokenManager.notifyLogout();
+          TokenManager.notifyAuthChange(false);
         }, 50);
         
         return response;
@@ -341,7 +390,7 @@ export class AuthClient {
         
         // Even if the API call fails, we should still notify about logout
         setTimeout(() => {
-          TokenManager.notifyLogout();
+          TokenManager.notifyAuthChange(false);
         }, 50);
         
         return {
@@ -394,7 +443,7 @@ export class AuthClient {
 
   /**
    * Get current user
-   * Uses cookies for authentication
+   * Uses cookies for authentication with improved handling of timeouts and token data
    */
   static async getCurrentUser() {
     const requestId = `get-user-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
@@ -406,31 +455,31 @@ export class AuthClient {
         // Skip if in cooldown period
         let lastAuthChange = 0;
         try {
-        // Safely attempt to get the last auth change time
-        if (typeof window !== 'undefined' && (window as any).__AUTH_PROVIDER_STATE_KEY) {
-        lastAuthChange = (window as any).__AUTH_PROVIDER_STATE_KEY.lastLoginTime || 0;
-        }
+          // Safely attempt to get the last auth change time
+          if (typeof window !== 'undefined' && (window as any).__AUTH_PROVIDER_STATE_KEY) {
+            lastAuthChange = (window as any).__AUTH_PROVIDER_STATE_KEY.lastLoginTime || 0;
+          }
         } catch (e) {
-        console.warn(`AuthClient: Error checking last auth change time (${requestId})`, e);
+          console.warn(`AuthClient: Error checking last auth change time (${requestId})`, e);
         }
         
         if (lastAuthChange && Date.now() - lastAuthChange < 1000) {
           console.warn(`AuthClient: User fetch skipped - in cooldown (${requestId})`);
-        return {
-          success: false,
-          message: 'User fetch skipped - in cooldown',
-          data: null
-        };
-      }
+          return {
+            success: false,
+            message: 'User fetch skipped - in cooldown',
+            data: null
+          };
+        }
       
-      // Synchronize tokens to ensure cookies are set correctly
-      try {
-        const { TokenManager } = await import('./token');
-        await TokenManager.synchronizeTokens(true);
-      } catch (syncError) {
-        console.warn(`AuthClient: Error synchronizing tokens during user fetch (${requestId})`, syncError);
-        // Continue despite synchronization error
-      }
+        // Synchronize tokens to ensure cookies are set correctly
+        try {
+          const { TokenManager } = await import('./token');
+          await TokenManager.synchronizeTokens(true);
+        } catch (syncError) {
+          console.warn(`AuthClient: Error synchronizing tokens during user fetch (${requestId})`, syncError);
+          // Continue despite synchronization error
+        }
         
         // Add a debounce check to prevent excessive calls
         const now = Date.now();
@@ -475,7 +524,7 @@ export class AuthClient {
         
         // If no token in cookies, check for backup in localStorage
         if (!authToken && typeof window !== 'undefined') {
-          const tokenBackup = localStorage.getItem('auth_token_backup');
+          const tokenBackup = getItem('auth_token_backup');
           if (tokenBackup) {
             console.log(`AuthClient: Using token from localStorage backup (${requestId})`);
             authToken = tokenBackup;
@@ -492,6 +541,32 @@ export class AuthClient {
         
         if (!authToken) {
           console.warn(`AuthClient: No token found in cookies or localStorage - auth will fail (${requestId})`);
+        }
+        
+        // IMPORTANT: If we have a token but we're in a retry scenario after a timeout,
+        // try to extract user data from the token as a fallback approach
+        if (authToken && (this as any)._userFetchRetryCount > 0) {
+          try {
+            const { TokenManager } = await import('./token');
+            const userData = TokenManager.getUserFromToken(authToken);
+            if (userData && userData.id) {
+              console.log(`AuthClient: Using user data extracted from token due to API timeout (${requestId})`);
+              
+              // Reset retry count for future requests
+              (this as any)._userFetchRetryCount = 0;
+              
+              return {
+                success: true,
+                data: userData,
+                message: 'User data extracted from token due to API timeout',
+                fromToken: true,
+                statusCode: 200
+              };
+            }
+          } catch (tokenError) {
+            console.warn(`AuthClient: Failed to extract user data from token (${requestId}):`, tokenError);
+            // Continue with API call if token extraction fails
+          }
         }
         
         // The API endpoint for the current user
@@ -513,9 +588,9 @@ export class AuthClient {
           console.log(`AuthClient: Added token to Authorization header (${requestId})`);
         }
         
-        // Add timeout protection for the fetch request
+        // Add timeout protection
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
         
         try {
           const response = await fetch(userEndpoint, {
@@ -579,6 +654,9 @@ export class AuthClient {
           }
           
           if (userData && (userData.id || userData.email)) {
+            // Reset retry count on success
+            (this as any)._userFetchRetryCount = 0;
+            
             console.log(`AuthClient: Current user fetched successfully (${requestId})`);
             return {
               success: true,
@@ -601,11 +679,38 @@ export class AuthClient {
           // Check for timeout
           if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
             console.error(`AuthClient: User fetch request timed out (${requestId})`);
+            
+            // Increment retry count to track consecutive timeouts
+            (this as any)._userFetchRetryCount = ((this as any)._userFetchRetryCount || 0) + 1;
+            console.log(`Timeout retry count: ${(this as any)._userFetchRetryCount}`);
+            
+            // If we have a token, extract user information directly from it as a fallback
+            if (authToken) {
+              try {
+                const { TokenManager } = await import('./token');
+                const userData = TokenManager.getUserFromToken(authToken);
+                
+                if (userData && userData.id) {
+                  console.log(`AuthClient: Using user data extracted from token after timeout (${requestId})`);
+                  return {
+                    success: true,
+                    data: userData,
+                    message: 'User data extracted from token after API timeout',
+                    fromToken: true,
+                    statusCode: 200
+                  };
+                }
+              } catch (tokenError) {
+                console.warn(`AuthClient: Failed to extract user data from token after timeout (${requestId}):`, tokenError);
+              }
+            }
+            
             return {
               success: false,
               data: null,
               message: 'Request timed out',
-              statusCode: 408 // Request Timeout
+              statusCode: 408, // Request Timeout
+              timeoutOccurred: true
             };
           }
           
@@ -665,7 +770,7 @@ export class AuthClient {
         // Check for backup in localStorage if no cookie found
         let refreshTokenBackup = null;
         if (!hasRefreshToken && typeof localStorage !== 'undefined') {
-          refreshTokenBackup = localStorage.getItem('refresh_token_backup');
+          refreshTokenBackup = getItem('refresh_token_backup');
           if (refreshTokenBackup) {
             console.log(`AuthClient: Using refresh token from localStorage backup (${requestId})`);
             
@@ -760,17 +865,17 @@ export class AuthClient {
                 // Store tokens as backups in localStorage
                 if (accessToken && typeof localStorage !== 'undefined') {
                   console.log(`AuthClient: Saving token backups from refresh response (${requestId})`);
-                  localStorage.setItem('auth_token_backup', accessToken);
-                  localStorage.setItem('auth_token', accessToken); // For legacy compatibility
+                  setItem('auth_token_backup', accessToken);
+                  setItem('auth_token', accessToken); // For legacy compatibility
                   
                   if (refreshToken) {
-                    localStorage.setItem('refresh_token_backup', refreshToken);
+                    setItem('refresh_token_backup', refreshToken);
                   }
                   
                   // Store expiration information
                   const expirationTime = Date.now() + (expiresIn * 1000);
-                  localStorage.setItem('auth_expires_at', new Date(expirationTime).toISOString());
-                  localStorage.setItem('auth_timestamp', Date.now().toString());
+                  setItem('auth_expires_at', new Date(expirationTime).toISOString());
+                  setItem('auth_timestamp', Date.now().toString());
                 }
                 
                 // Notify about successful refresh after slight delay
@@ -863,9 +968,9 @@ export class AuthClient {
           if (response.status === 401 || response.status === 403) {
             // Clear tokens on auth failure
             if (typeof localStorage !== 'undefined') {
-            localStorage.removeItem('auth_token_backup');
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('refresh_token_backup');
+            removeItem('auth_token_backup');
+            removeItem('auth_token');
+            removeItem('refresh_token_backup');
             }
             
             // Notify about logout

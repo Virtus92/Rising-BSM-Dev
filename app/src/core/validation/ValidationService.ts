@@ -11,6 +11,9 @@ import { ILoggingService } from '../logging';
  * Implements IValidationService interface
  */
 export class ValidationService implements IValidationService {
+  // Import validation schemas
+  private userValidationSchemas: any;
+  private passwordValidation: any;
   /**
    * Constructor
    * 
@@ -29,6 +32,15 @@ export class ValidationService implements IValidationService {
       } as ILoggingService;
       
       this.logger.debug('ValidationService initialized with default console logger');
+    }
+    
+    // Import validation schemas dynamically to avoid circular dependencies
+    try {
+      this.userValidationSchemas = require('./validators/userValidation');
+      this.passwordValidation = require('./userValidation');
+      this.logger.debug('Validation schemas loaded successfully');
+    } catch (error) {
+      this.logger.error('Failed to load validation schemas', { error });
     }
   }
   
@@ -394,5 +406,85 @@ export class ValidationService implements IValidationService {
       isValid: errors.length === 0,
       errors
     };
+  }
+  
+  /**
+   * Validate user creation data
+   * 
+   * @param data User creation data
+   * @returns Validation result
+   */
+  validateCreateUser(data: any): ValidationResult {
+    try {
+      // Get schema from imported modules
+      const schema = this.userValidationSchemas?.createUserSchema || 
+        require('./validators/userValidation').createUserSchema;
+      
+      // Perform basic schema validation
+      const result = this.validate(data, schema);
+      
+      // Additional validation for password confirmation
+      if (data.password !== data.confirmPassword) {
+        result.errors.push('Password and confirmation password do not match');
+        result.isValid = false;
+      }
+      
+      return result;
+    } catch (error) {
+      this.logger?.error('Error in validateCreateUser', { error });
+      return {
+        isValid: false,
+        errors: ['Failed to validate user data']
+      };
+    }
+  }
+  
+  /**
+   * Validate user update data
+   * 
+   * @param data User update data
+   * @returns Validation result
+   */
+  validateUpdateUser(data: any): ValidationResult {
+    try {
+      // Get schema from imported modules
+      const schema = this.userValidationSchemas?.updateUserSchema || 
+        require('./validators/userValidation').updateUserSchema;
+      
+      return this.validate(data, schema);
+    } catch (error) {
+      this.logger?.error('Error in validateUpdateUser', { error });
+      return {
+        isValid: false,
+        errors: ['Failed to validate user data']
+      };
+    }
+  }
+  
+  /**
+   * Validate password against security requirements
+   * 
+   * @param password Password to validate
+   * @returns Validation result
+   */
+  validatePassword(password: string): ValidationResult {
+    try {
+      // Get validation function from imported modules
+      const validatePasswordStrength = this.passwordValidation?.validatePassword || 
+        require('./userValidation').validatePassword;
+      
+      const result = validatePasswordStrength(password);
+      
+      return {
+        isValid: result.valid || false,
+        errors: result.errors || []
+      };
+    } catch (error) {
+      this.logger?.error('Error in validatePassword', { error });
+      return {
+        isValid: false,
+        errors: ['Failed to validate password']
+      };
+    }
   }
 }

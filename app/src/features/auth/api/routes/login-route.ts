@@ -37,13 +37,20 @@ export async function loginHandler(request: NextRequest): Promise<NextResponse> 
       rememberMe: remember
     });
     
-    // Calculate expiration times in seconds
-    const accessExpiration = 24 * 60 * 60; // 24 hours default
-    const refreshExpiration = 30 * 24 * 60 * 60; // 30 days default
+    // Get token expiration from security config
+    const securityConfig = getServiceFactory().createSecurityConfig();
+    const accessExpiration = securityConfig.getAccessTokenLifetime(); // default 15 minutes
+    const refreshExpiration = securityConfig.getRefreshTokenLifetime(); // default 30 days
     
     // Add expiration fields if not already present
     result.accessExpiration = result.accessExpiration || accessExpiration;
     result.refreshExpiration = result.refreshExpiration || refreshExpiration;
+    
+    // Log expiration information
+    logger.info('Token expiration settings', { 
+      accessExpiration: `${Math.floor(accessExpiration / 60)} minutes`, 
+      refreshExpiration: `${Math.floor(refreshExpiration / 60 / 60 / 24)} days` 
+    });
     
     // Log successful login
     logger.info('User logged in successfully', { userId: result.user.id });

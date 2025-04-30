@@ -262,16 +262,16 @@ export abstract class BaseRepository<T, ID = number> implements IBaseRepository<
   /**
    * Execute a transaction
    * 
-   * @param callback - Callback function
+   * @param callback - Callback function that accepts a repository instance
    * @returns Promise with transaction result
    */
-  async transaction<R>(callback: () => Promise<R>): Promise<R> {
+  async transaction<R>(callback: (repo: any) => Promise<R>): Promise<R> {
     try {
       // Begin transaction
       await this.beginTransaction();
       
-      // Execute operation
-      const result = await callback();
+      // Execute operation - pass this repository instance to the callback
+      const result = await callback(this);
       
       // Commit transaction
       await this.commitTransaction();

@@ -1,44 +1,26 @@
 'use client';
 
 /**
- * Authentication Utilities
- * 
- * This file re-exports the authentication initialization and utility functions from AuthInitializer.ts
- * to provide a simpler, more convenient interface.
- * 
- * Note: All functionality has been moved to AuthInitializer.ts to prevent duplication.
- * This file serves as a central entry point for auth-related utilities.
+ * Auth Utils - Re-export from lib/initialization/AuthInitializer
+ * This file is kept for backwards compatibility only
+ * New code should import directly from AuthInitializer
  */
 
 import { 
-  initializeAuth, 
-  isAuthInitialized, 
-  getAuthStatus, 
-  resetAuthInitialization, 
+  initializeAuth as setupAuth,
+  isAuthInitialized,
   clearAuthState,
-  setupAuth,
-  isAuthenticated,
-  getUserFromToken as getUserFromAuthToken
+  getAuthStatus,
+  isAuthenticated
 } from '../lib/initialization/AuthInitializer';
 
-export { 
-  initializeAuth, 
-  isAuthInitialized, 
-  getAuthStatus, 
-  resetAuthInitialization, 
-  clearAuthState,
-  setupAuth,
-  isAuthenticated,
-  getUserFromAuthToken
-};
+// Re-export for backwards compatibility
+export { setupAuth as initializeAuth, isAuthInitialized, clearAuthState, getAuthStatus, isAuthenticated };
 
 export default {
-  initializeAuth,
+  initializeAuth: setupAuth,
   isAuthInitialized,
-  getAuthStatus,
-  resetAuthInitialization,
   clearAuthState,
-  setupAuth,
-  isAuthenticated,
-  getUserFromAuthToken
+  getAuthStatus,
+  isAuthenticated
 };

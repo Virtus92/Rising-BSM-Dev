@@ -10,6 +10,7 @@ import { Button } from '@/shared/components/ui/button';
 import { ProfileForm, PasswordChangeForm } from '@/features/users/components/profile';
 import { formatDate } from '@/shared/utils/date-utils';
 import { UserRole, UserStatus } from '@/domain/enums/UserEnums';
+import { getItem, setItem } from '@/shared/utils/storage/cookieStorage';
 
 export default function UserProfilePage() {
   const { user, isLoading, refreshAuth } = useAuth();
@@ -46,23 +47,57 @@ export default function UserProfilePage() {
   const [loadingState, setLoadingState] = useState<'initial' | 'loaded' | 'error'>('initial');
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Handle loading and error states with timeout detection
+  // Handle loading and error states with timeout detection and local storage caching
   useEffect(() => {
     if (isLoading) {
+      // Try to use cached user data during loading to prevent showing spinner
+      try {
+        const cachedUserData = getItem('user_profile_cache');
+        const cacheTimestamp = getItem('user_profile_cache_timestamp');
+        
+        if (cachedUserData && cacheTimestamp) {
+          const timestamp = parseInt(cacheTimestamp, 10);
+          const now = Date.now();
+          
+          // Use cached data if less than 30 minutes old
+          if (!isNaN(timestamp) && now - timestamp < 30 * 60 * 1000) {
+            const userData = JSON.parse(cachedUserData);
+            // Only use if it has basic required fields
+            if (userData && userData.id && userData.email) {
+              console.log('Using cached user profile data during load');
+              setLoadingState('loaded');
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Error accessing cached user data:', e);
+      }
+      
       // Set a timeout for loading - if it takes too long, show an error
+      // but with increased timeout (30s instead of 15s)
       const timeoutId = setTimeout(() => {
         if (loadingState === 'initial') {
           setLoadError('Loading timed out. The server might be unavailable.');
           setLoadingState('error');
         }
-      }, 15000); // 15 seconds timeout
+      }, 30000); // 30 seconds timeout
       
       return () => clearTimeout(timeoutId);
     } else {
       // When loading completes
       setLoadingState('loaded');
+      
+      // Cache the user data for future use
+      if (user) {
+        try {
+          setItem('user_profile_cache', JSON.stringify(user));
+          setItem('user_profile_cache_timestamp', Date.now().toString());
+        } catch (e) {
+          console.warn('Error caching user data:', e);
+        }
+      }
     }
-  }, [isLoading, loadingState]);
+  }, [isLoading, loadingState, user]);
   
   // Retry handler for timeout errors
   const handleRetry = useCallback(() => {

@@ -643,4 +643,140 @@ export class CustomerRepository extends PrismaRepository<Customer> implements IC
     
     return result;
   }
+
+  /**
+   * Find customers by criteria
+   * 
+   * @param criteria - Search criteria
+   * @returns Array of customers matching criteria
+   */
+  async find(criteria: Record<string, any>): Promise<Customer[]> {
+    try {
+      // Process the criteria for the WHERE clause
+      const where = this.processCriteria(criteria);
+      
+      // Execute query
+      const customers = await this.prisma.customer.findMany({
+        where,
+        orderBy: { name: 'asc' }
+      });
+      
+      // Map to domain entities
+      return customers.map(customer => this.mapToDomainEntity(customer));
+    } catch (error) {
+      this.logger.error('Error in CustomerRepository.find', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        criteria 
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Check if a customer exists
+   * 
+   * @param id - Customer ID
+   * @returns Whether the customer exists
+   */
+  async exists(id: number): Promise<boolean> {
+    try {
+      const count = await this.prisma.customer.count({
+        where: { id }
+      });
+      
+      return count > 0;
+    } catch (error) {
+      this.logger.error(`Error checking if customer with ID ${id} exists:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Add a note to a customer
+   * 
+   * @param id - Customer ID
+   * @param userId - User ID
+   * @param note - Note text
+   * @returns Created note
+   */
+  async addNote(id: number, userId: number, note: string): Promise<any> {
+    try {
+      // Get user info
+      let userName = 'System';
+      if (userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { name: true }
+        });
+        if (user) {
+          userName = user.name;
+        }
+      }
+      
+      // Create the note
+      const createdNote = await this.prisma.customerLog.create({
+        data: {
+          customerId: id,
+          userId,
+          userName,
+          action: LogActionType.NOTE,
+          details: note,
+          createdAt: new Date()
+        }
+      });
+      
+      return {
+        id: createdNote.id,
+        text: createdNote.details,
+        createdAt: createdNote.createdAt,
+        userId: createdNote.userId,
+        userName: createdNote.userName
+      };
+    } catch (error) {
+      this.logger.error(`Error adding note to customer with ID ${id}:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        userId,
+        note
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Find notes for a customer
+   * 
+   * @param customerId - Customer ID
+   * @returns Customer notes
+   */
+  async findNotes(customerId: number): Promise<any[]> {
+    try {
+      // Get all customer logs that are notes
+      const notes = await this.prisma.customerLog.findMany({
+        where: { 
+          customerId,
+          action: LogActionType.NOTE 
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      return notes.map(note => ({
+        id: note.id,
+        text: note.details,
+        createdAt: note.createdAt,
+        userId: note.userId,
+        userName: note.userName
+      }));
+    } catch (error) {
+      this.logger.error(`Error finding notes for customer with ID ${customerId}:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw this.handleError(error);
+    }
+  }
 }

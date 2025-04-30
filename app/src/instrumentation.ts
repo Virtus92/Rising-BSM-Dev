@@ -3,7 +3,7 @@
  * Diese Datei wird von Next.js beim Start geladen.
  * 
  * Hier initialisieren wir unsere Backend-Dienste einheitlich mit dem 
- * Bootstrap-System aus der Infrastrukturschicht.
+ * Bootstrap-System.
  */
 
 // Flag this file as server-only

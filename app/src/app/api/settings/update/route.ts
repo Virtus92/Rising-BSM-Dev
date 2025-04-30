@@ -66,6 +66,6 @@ export const PUT = routeHandler(
     // Require authentication for updating settings
     requiresAuth: true,
     // Only administrators can update settings
-    requiresRole: ['admin']
+    requiredRoles: ['admin']
   }
 );

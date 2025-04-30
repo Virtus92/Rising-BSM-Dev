@@ -6,8 +6,12 @@
 // Mark as server-only to prevent client-side imports
 import 'server-only';
 
+import { NextRequest } from 'next/server';
 import { getLogger as getLoggerInternal, resetLogger } from '../logging';
-import { ErrorHandler, IErrorHandler } from '../errors';
+import { errorHandler } from '../errors';
+import { formatError } from '../errors';
+import type { IErrorHandler } from '../errors/types/IErrorHandler';
+import { AppError, ValidationError, NotFoundError, AuthenticationError, PermissionError, ConflictError, BadRequestError } from '../errors';
 import { IValidationService } from '../validation/IValidationService';
 import { ValidationService } from '../validation/ValidationService';
 import { createApiErrorInterceptor } from '../errors/api-error-interceptor';
@@ -15,17 +19,118 @@ import { configService } from '../config/ConfigService';
 import { UserStatus } from '@/domain/enums/UserEnums';
 
 // Singleton instances
-let errorHandler: IErrorHandler;
+let errorHandlerInstance: IErrorHandler;
 let validationService: IValidationService;
+
+
+const logger = getLogger();
 
 /**
  * Returns a singleton instance of the ErrorHandler
  */
 export function getErrorHandler(): IErrorHandler {
-  if (!errorHandler) {
-    errorHandler = new ErrorHandler(getLogger());
+  if (!errorHandlerInstance) {
+    // Create the error handler with all required methods
+    errorHandlerInstance = {
+      createError: (message: string, statusCode = 500, errorCode?: string, details?: any) => {
+        return new AppError(message, statusCode, errorCode || 'INTERNAL_ERROR', details);
+      },
+      
+      createValidationError: (message: string, errors?: any, errorCode?: string) => {
+        return new ValidationError(message, errorCode || 'VALIDATION_ERROR', { errors });
+      },
+      
+      createNotFoundError: (message: string, errorCode?: string, details?: any) => {
+        return new NotFoundError(message, errorCode || 'NOT_FOUND', details);
+      },
+      
+      createUnauthorizedError: (message: string, errorCode?: string, details?: any) => {
+        return new AuthenticationError(message, errorCode || 'UNAUTHORIZED', details);
+      },
+      
+      createForbiddenError: (message: string, errorCode?: string, details?: any) => {
+        return new PermissionError(message, errorCode || 'FORBIDDEN', details);
+      },
+      
+      createConflictError: (message: string, errorCode?: string, details?: any) => {
+        return new ConflictError(message, errorCode || 'CONFLICT', details);
+      },
+      
+      createBadRequestError: (message: string, errorCode?: string, details?: any) => {
+        return new BadRequestError(message, errorCode || 'BAD_REQUEST', details);
+      },
+      
+      handleApiError: (error: unknown, request?: NextRequest) => {
+        return formatError(error instanceof Error ? error.message : String(error), 500);
+      },
+      
+      handleDatabaseError: (error: unknown) => {
+        logger.error('Database error:', {
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          } : String(error)
+        });
+        
+        // Map database-specific errors
+        if (error && typeof error === 'object') {
+          // Handle based on error codes or types
+          if ('code' in error) {
+            const code = (error as any).code;
+            
+            if (code === 'P2025') { // Prisma not found
+              return new NotFoundError('Resource not found');
+            }
+            
+            if (code === 'P2002') { // Prisma unique constraint
+              return new ConflictError('Duplicate record');
+            }
+            
+            if (code === 'P2003') { // Prisma foreign key constraint
+              return new ConflictError('Referenced record not found');
+            }
+          }
+          
+          // If it's an Error instance with statusCode, assume it's already handled
+          if (error instanceof Error && 'statusCode' in error) {
+            return error as Error;
+          }
+        }
+        
+        // Default to internal error
+        return new AppError(
+          error instanceof Error ? error.message : 'Database operation failed',
+          500,
+          'DATABASE_ERROR'
+        );
+      },
+      
+      mapError: (error: unknown) => {
+        logger.error('Mapping error:', {
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          } : String(error)
+        });
+        
+        // If it's already an AppError, return it
+        if (error instanceof AppError) {
+          return error;
+        }
+        
+        // Default to internal error
+        return new AppError(
+          error instanceof Error ? error.message : 'An error occurred',
+          500,
+          'INTERNAL_SERVER_ERROR'
+        );
+      },
+      
+    };
   }
-  return errorHandler;
+  return errorHandlerInstance;
 }
 
 /**
@@ -185,7 +290,7 @@ export async function bootstrapServer(): Promise<void> {
  */
 export function resetServices(): void {
   resetLogger();
-  errorHandler = undefined as any;
+  errorHandlerInstance = undefined as any;
   validationService = undefined as any;
   
   // Import from core factories with improved error handling

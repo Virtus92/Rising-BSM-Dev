@@ -1,378 +1,347 @@
-import { 
-  AppError, 
-  ValidationError, 
-  NotFoundError, 
-  UnauthorizedError, 
-  ForbiddenError, 
-  ConflictError, 
-  BadRequestError,
-  ErrorResponse
-} from './types';
+/**
+ * Error Handler Middleware
+ * Provides consistent error handling for route handlers
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { formatResponse } from './formatting/response-formatter';
+import { AppError, NotFoundError, ValidationError, AuthenticationError, PermissionError, ConflictError, BadRequestError } from './types/AppError';
+import { getLogger } from '@/core/logging';
+import { IErrorHandler } from './types/IErrorHandler';
+import { authErrorHandler, AuthErrorType } from '@/features/auth/utils/AuthErrorHandler';
 
-// Define Logger interface to avoid circular dependencies
-export interface Logger {
-  debug(message: string, ...args: any[]): void;
-  info(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
+const logger = getLogger();
+
+/**
+ * Error response interface
+ */
+export interface ErrorResponse {
+  success: false;
+  data: null;
+  message: string;
+  error: {
+    code: string;
+    details?: any;
+  };
+  timestamp: string;
 }
 
 /**
- * Interface for the ErrorHandler
+ * Success response interface
  */
-export interface IErrorHandler {
-  /**
-   * Creates a general error
-   * 
-   * @param message - Error message
-   * @param statusCode - HTTP status code
-   * @param code - Application-specific error code
-   * @param details - Error details
-   */
-  createError(message: string, statusCode?: number, code?: string, details?: any): AppError;
-  
-  /**
-   * Creates a validation error
-   * 
-   * @param message - Error message
-   * @param errors - Validation errors
-   */
-  createValidationError(message: string, errors?: string[]): ValidationError;
-  
-  /**
-   * Creates a not found error
-   * 
-   * @param message - Error message
-   * @param resource - Resource that was not found
-   */
-  createNotFoundError(message: string, resource?: string): NotFoundError;
-  
-  /**
-   * Creates an unauthorized error
-   * 
-   * @param message - Error message
-   */
-  createUnauthorizedError(message?: string): UnauthorizedError;
-  
-  /**
-   * Creates a forbidden error
-   * 
-   * @param message - Error message
-   */
-  createForbiddenError(message?: string): ForbiddenError;
-  
-  /**
-   * Creates a conflict error
-   * 
-   * @param message - Error message
-   */
-  createConflictError(message: string): ConflictError;
-  
-  /**
-   * Creates a bad request error
-   * 
-   * @param message - Error message
-   */
-  createBadRequestError(message: string): BadRequestError;
-  
-  /**
-   * Creates a database error
-   * 
-   * @param message - Error message
-   * @param code - Database error code
-   * @param details - Error details
-   */
-  createDatabaseError(message: string, code?: string, details?: any): AppError;
-
-  /**
-   * Handles a database error
-   * 
-   * @param error - Database error
-   */
-  handleDatabaseError(error: any): AppError;
-  
-  /**
-   * Maps an error to an AppError
-   * 
-   * @param error - Error
-   */
-  mapError(error: any): AppError;
-  
-  /**
-   * Handles an error
-   * 
-   * @param error - Error
-   * @param req - HTTP request
-   */
-  handleError(error: any, req?: any): ErrorResponse;
-  
-  /**
-   * Formats an error
-   * 
-   * @param error - Error
-   */
-  formatError(error: any): ErrorResponse;
+export interface SuccessResponse<T> {
+  data: T;
 }
 
 /**
- * Implementation of the ErrorHandler
+* Error handler middleware for route handlers
+* Wraps a route handler with standardized error handling
+* 
+* @param handler Route handler function
+* @returns Wrapped handler with error handling
+*/
+export function errorHandler<T>(
+handler: (request: NextRequest, ...args: any[]) => Promise<NextResponse>
+) {
+return async (request: NextRequest, ...args: any[]): Promise<NextResponse> => {
+try {
+// Execute the original handler
+return await handler(request, ...args);
+} catch (error) {
+// Log the error with detailed information
+logger.error('Unhandled error in route handler', {
+path: request.nextUrl.pathname,
+method: request.method,
+error: error instanceof Error ? {
+name: error.name,
+message: error.message,
+stack: error.stack
+} : String(error)
+});
+
+// Handle authentication errors from AuthErrorHandler
+if (error && (error as any).type === AuthErrorType.AUTH_REQUIRED) {
+return formatResponse.unauthorized(
+    error instanceof Error ? error.message : 'Authentication required',
+    {
+      details: (error as any).details || {
+        path: request.nextUrl.pathname,
+      requiredAuth: true
+    }
+}.toString()
+);
+}
+
+// Handle permission errors from AuthErrorHandler
+if (error && (error as any).type === AuthErrorType.PERMISSION_DENIED) {
+return formatResponse.forbidden(
+  error instanceof Error ? error.message : 'Permission denied',
+    {
+      details: (error as any).details || {
+        path: request.nextUrl.pathname,
+          permissionRequired: true
+          }
+          }.toString()
+          );
+        }
+        
+        // Format the error response based on error type
+        if (error instanceof AppError) {
+          return formatResponse.error(error) as NextResponse<ErrorResponse>;
+        }
+        
+        // Generic error handling
+        return formatResponse.error(
+          error instanceof Error ? error.message : 'An unexpected error occurred',
+          500,
+          'INTERNAL_SERVER_ERROR',
+          {
+            path: request.nextUrl.pathname,
+            timestamp: new Date().toISOString()
+          }
+        ) as NextResponse<ErrorResponse>;
+      }
+    };
+  }
+
+/**
+ * Context for request tracking and error information
  */
-export class ErrorHandler implements IErrorHandler {
+export interface RequestContext {
+  /** Request ID for tracking */
+  requestId: string;
+  
+  /** Request start time */
+  startTime: number;
+  
+  /** Request path */
+  path: string;
+  
+  /** HTTP method */
+  method: string;
+}
+
+/**
+ * Creates a context object for request tracking
+ */
+export function createRequestContext(request: NextRequest): RequestContext {
+  const requestId = request.headers.get('x-request-id') || 
+    `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  
+  return {
+    requestId,
+    startTime: Date.now(),
+    path: request.nextUrl.pathname,
+    method: request.method || 'UNKNOWN'
+  };
+}
+
+/**
+ * Implementation of the error handler interface
+ * Provides centralized error handling
+ */
+const errorHandlerImplementation: IErrorHandler = {
   /**
-   * Constructor
-   * 
-   * @param logger - Logging service
-   * @param showStackTraces - Whether to show stack traces
+   * Create a generic application error
    */
-  constructor(
-    private readonly logger: Logger,
-    private readonly showStackTraces: boolean = process.env.NODE_ENV !== 'production'
-  ) {}
+  createError(message, statusCode = 500, errorCode = 'INTERNAL_ERROR', details?) {
+    return new AppError(message, statusCode, errorCode, details);
+  },
   
   /**
-   * Creates a bad request error
-   * 
-   * @param message - Error message
+   * Create a validation error
    */
-  createBadRequestError(message: string): BadRequestError {
-    return new BadRequestError(message);
-  }
+  createValidationError(message, errors, errorCode = 'VALIDATION_ERROR') {
+    return new ValidationError(message, errorCode, errors);
+  },
   
   /**
-   * Creates a general error
-   * 
-   * @param message - Error message
-   * @param statusCode - HTTP status code
-   * @param code - Application-specific error code
-   * @param details - Error details
+   * Create a not found error
    */
-  createError(message: string, statusCode: number = 500, code: string = 'server_error', details?: any): AppError {
-    const error = new AppError(message, statusCode, code, details);
-    
-    // Log error creation - using info instead of debug to avoid issues
-    this.logger.info('Created application error', {
-      type: error.constructor.name,
-      message: error.message,
-      statusCode: error.statusCode
+  createNotFoundError(message, errorCode = 'NOT_FOUND', details?) {
+    return new NotFoundError(message, errorCode, details);
+  },
+  
+  /**
+   * Create an unauthorized error
+   */
+  createUnauthorizedError(message, errorCode = 'UNAUTHORIZED', details?) {
+    return new AuthenticationError(message, errorCode, details);
+  },
+  
+  /**
+   * Create a forbidden error
+   */
+  createForbiddenError(message, errorCode = 'FORBIDDEN', details?) {
+    return new PermissionError(message, errorCode, details);
+  },
+  
+  /**
+   * Create a conflict error
+   */
+  createConflictError(message, errorCode = 'CONFLICT', details?) {
+    return new ConflictError(message, errorCode, details);
+  },
+  
+  /**
+   * Create a bad request error
+   */
+  createBadRequestError(message, errorCode = 'BAD_REQUEST', details?) {
+    return new BadRequestError(message, errorCode, details);
+  },
+  
+  /**
+   * Handle an API error
+   */
+  handleApiError(error, request?) {
+    // Log the error with detailed information
+    logger.error('API error:', {
+      error: error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      } : String(error),
+      path: request?.nextUrl.pathname,
+      method: request?.method
     });
     
-    return error;
-  }
+    // Handle authentication and permission errors from AuthErrorHandler
+    if (error && (error as any).type === AuthErrorType.AUTH_REQUIRED) {
+      return formatResponse.unauthorized(
+        error instanceof Error ? error.message : 'Authentication required',
+        {
+          details: (error as any).details || {
+            requiredAuth: true
+          }
+        }.toString()
+      );
+    }
+    
+    if (error && (error as any).type === AuthErrorType.PERMISSION_DENIED) {
+      return formatResponse.forbidden(
+        error instanceof Error ? error.message : 'Permission denied',
+        {
+          details: (error as any).details || {
+            permissionRequired: true
+          }
+        }.toString()
+      );
+    }
+    
+    // Format the error response based on error type
+    if (error instanceof AppError) {
+      return formatResponse.error(error);
+    }
+    
+    // Generic error handling
+    return formatResponse.error(
+      error instanceof Error ? error.message : 'An unexpected error occurred',
+      500,
+      'INTERNAL_SERVER_ERROR'
+    );
+  },
   
   /**
-   * Creates a validation error
-   * 
-   * @param message - Error message
-   * @param errors - Validation errors
+   * Handle a database error
    */
-  createValidationError(message: string, errors: string[] = []): ValidationError {
-    const error = new ValidationError(message, errors);
-    
-    // Log error creation - using info instead of debug to avoid issues
-    this.logger.info('Created validation error', {
-      message: error.message,
-      errors: error.errors
+  handleDatabaseError(error) {
+    logger.error('Database error:', {
+      error: error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      } : String(error)
     });
     
-    return error;
-  }
-  
-  /**
-   * Creates a not found error
-   * 
-   * @param message - Error message
-   * @param resource - Resource that was not found
-   */
-  createNotFoundError(message: string, resource?: string): NotFoundError {
-    return new NotFoundError(message, resource);
-  }
-  
-  /**
-   * Creates an unauthorized error
-   * 
-   * @param message - Error message
-   */
-  createUnauthorizedError(message: string = 'Authentication required'): UnauthorizedError {
-    return new UnauthorizedError(message);
-  }
-  
-  /**
-   * Creates a forbidden error
-   * 
-   * @param message - Error message
-   */
-  createForbiddenError(message: string = 'Permission denied'): ForbiddenError {
-    return new ForbiddenError(message);
-  }
-  
-  /**
-   * Creates a conflict error
-   * 
-   * @param message - Error message
-   */
-  createConflictError(message: string): ConflictError {
-    return new ConflictError(message);
-  }
-  
-  /**
-   * Creates a database error
-   * 
-   * @param message - Error message
-   * @param code - Database error code
-   * @param details - Error details
-   */
-  createDatabaseError(message: string, code: string = 'database_error', details?: any): AppError {
-    return this.createError(message, 500, code, details);
-  }
-  
-  /**
-   * Handles an error
-   * 
-   * @param error - Error
-   * @param req - HTTP request
-   */
-  handleError(error: any, req?: any): ErrorResponse {
-    // Map the error to an AppError
-    const appError = this.mapError(error);
+    // Map database-specific errors
+    if (error && typeof error === 'object') {
+      // Handle based on error codes or types
+      if ('code' in error) {
+        const code = (error as any).code;
+        
+        if (code === 'P2025') { // Prisma not found
+          return new NotFoundError('Resource not found');
+        }
+        
+        if (code === 'P2002') { // Prisma unique constraint
+          return new ConflictError('Duplicate record');
+        }
+        
+        if (code === 'P2003') { // Prisma foreign key constraint
+          return new ConflictError('Referenced record not found');
+        }
+      }
+      
+      // If it's an Error instance with statusCode, assume it's already handled
+      if (error instanceof Error && 'statusCode' in error) {
+        return error as Error;
+      }
+    }
     
-    // Log the error with context
-    const logContext = {
-      statusCode: appError.statusCode,
-      path: req?.path || 'unknown',
-      method: req?.method || 'unknown',
-      ...(this.showStackTraces && appError.stack ? { stack: appError.stack } : {})
-    };
-    
-    this.logger.error(appError.message, logContext);
-    
-    // Format and return the error response
-    return this.formatError(appError);
-  }
+    // Default to internal error
+    return new AppError(
+      error instanceof Error ? error.message : 'Database operation failed',
+      500,
+      'DATABASE_ERROR'
+    );
+  },
   
   /**
-   * Formats an error
-   * 
-   * @param error - Error
+   * Map a generic error to an application error
    */
-  formatError(error: any): ErrorResponse {
-    const appError = error instanceof AppError ? error : this.mapError(error);
+  mapError(error) {
+    logger.error('Mapping error:', {
+      error: error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      } : String(error)
+    });
     
-    const timestamp = new Date().toISOString();
-    
-    // Standard error response
-    const response: ErrorResponse = {
-      success: false,
-      message: appError.message,
-      statusCode: appError.statusCode,
-      errorCode: appError.errorCode,
-      timestamp,
-      errors: [{
-        message: appError.message,
-        statusCode: appError.statusCode,
-        ...(appError instanceof ValidationError ? { validationErrors: appError.errors } : {}),
-        ...(this.showStackTraces && appError.stack ? { stack: appError.stack } : {})
-      }]
-    };
-    
-    return response;
-  }
-  
-  /**
-   * Maps an error to an AppError
-   * 
-   * @param error - Error
-   */
-  mapError(error: any): AppError {
-    // Already an AppError
+    // If it's already an AppError, return it
     if (error instanceof AppError) {
       return error;
     }
     
-    // Handle API request errors
-    if (error && typeof error === 'object' && 'statusCode' in error && 'message' in error) {
-      const apiError = error as { statusCode: number; message: string; errors?: string[] };
+    // If it's an auth error from AuthErrorHandler, convert appropriately
+    if (error && (error as any).type) {
+      const authError = error as any;
       
-      switch (apiError.statusCode) {
-        case 400:
-          return this.createBadRequestError(apiError.message);
-        case 401:
-          return this.createUnauthorizedError(apiError.message);
-        case 403:
-          return this.createForbiddenError(apiError.message);
-        case 404:
-          return this.createNotFoundError(apiError.message);
-        case 409:
-          return this.createConflictError(apiError.message);
-        case 422:
-          return this.createValidationError(apiError.message, apiError.errors);
-        default:
-          return this.createError(
-            apiError.message,
-            apiError.statusCode || 500,
-            'api_error',
-            this.showStackTraces ? { errors: apiError.errors } : undefined
-          );
+      if (authError.type === AuthErrorType.AUTH_REQUIRED) {
+        return new AuthenticationError(
+          authError.message || 'Authentication required',
+          authError.code || 'AUTHENTICATION_REQUIRED',
+          authError.details
+        );
+      }
+      
+      if (authError.type === AuthErrorType.PERMISSION_DENIED) {
+        return new PermissionError(
+          authError.message || 'Permission denied',
+          authError.code || 'PERMISSION_DENIED',
+          authError.details
+        );
       }
     }
     
-    // Native Error
-    if (error instanceof Error) {
-      return this.createError(
-        error.message,
-        500,
-        'server_error',
-        this.showStackTraces ? { stack: error.stack } : undefined
-      );
-    }
-    
-    // Other values
-    return this.createError(
-      typeof error === 'string' ? error : 'An unexpected error occurred',
+    // Default to internal error
+    return new AppError(
+      error instanceof Error ? error.message : 'An error occurred',
       500,
-      'server_error',
-      this.showStackTraces && typeof error === 'object' ? error : undefined
+      'INTERNAL_SERVER_ERROR'
     );
   }
-  
-  /**
-   * Handles a database error
-   * 
-   * @param error - Database error
-   */
-  handleDatabaseError(error: any): AppError {
-    // Log the database error
-    this.logger.error('Database error', { error });
-    
-    // Check for specific Prisma errors
-    if (error && typeof error === 'object' && 'code' in error) {
-      const code = error.code as string;
-      
-      // Uniqueness violated (e.g. duplicate email)
-      if (code === 'P2002') {
-        const target = error.meta?.target && Array.isArray(error.meta.target) 
-          ? error.meta.target.join(', ')
-          : 'field';
-          
-        return this.createConflictError(`Duplicate value for ${target}`);
-      }
-      
-      // Foreign key constraint violated
-      if (code === 'P2003') {
-        return this.createConflictError('Cannot delete record due to existing references');
-      }
-      
-      // Record not found
-      if (code === 'P2001' || code === 'P2025') {
-        return this.createNotFoundError('Record not found');
-      }
-    }
-    
-    // General database error
-    return this.createError(
-      'A database error occurred',
-      500,
-      'database_error',
-      this.showStackTraces ? error : undefined
-    );
-  }
+};
+
+/**
+ * Returns the error handler implementation
+ * 
+ * @returns IErrorHandler instance
+ */
+export function getErrorHandler(): IErrorHandler {
+  return errorHandlerImplementation;
 }
+
+/**
+ * Export error handler
+ */
+export default { getErrorHandler, createRequestContext, errorHandler };

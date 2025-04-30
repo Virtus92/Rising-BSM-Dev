@@ -1,0 +1,20 @@
+--- a/features/auth/lib/clients/token/ClientTokenManager.ts
++++ b/features/auth/lib/clients/token/ClientTokenManager.ts
+@@ -710,13 +710,13 @@
+       // Log successful refresh
+       console.log('Token refresh successful, setting new tokens');
+       
+-      // Check that the response contains the expected tokens
+-      if (!data.data?.token || !data.data?.refreshToken) {
++      // Check for at least one token (instead of requiring both tokens)
++      // Some APIs only refresh the access token and keep the existing refresh token
++      if (!data.data?.token && !data.data?.refreshToken) {
+         throw new TokenError(
+-          'Token refresh API returned success but missing tokens',
+-          'MISSING_TOKENS_IN_RESPONSE',
++          'Token refresh API returned success but no tokens',
++          'NO_TOKENS_IN_RESPONSE',
+           { data: { hasToken: !!data.data?.token, hasRefreshToken: !!data.data?.refreshToken } }
+         );
+       }
+       

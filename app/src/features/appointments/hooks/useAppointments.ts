@@ -60,7 +60,13 @@ export const useAppointments = (initialFilters?: Partial<AppointmentFilterParams
       if (process.env.NODE_ENV === 'development') {
         console.log('Mapped appointment filters:', mappedFilters);
       }
-      return await AppointmentClient.getAppointments(mappedFilters);
+      
+      try {
+        return await AppointmentClient.getAppointments(mappedFilters);
+      } catch (err) {
+        console.error('Error in useAppointments fetchFunction:', err);
+        throw err;
+      }
     },
     initialFilters: initialFilters as AppointmentFilterParamsDto,
     defaultSortField: 'appointmentDate' as keyof AppointmentFilterParamsDto,

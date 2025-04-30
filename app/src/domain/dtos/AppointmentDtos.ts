@@ -80,6 +80,11 @@ export interface CreateAppointmentDto {
    * Service
    */
   service?: string;
+
+  /**
+   * Notiz beim Erstellen
+   */
+  note?: string;
 }
 
 /**
@@ -130,6 +135,11 @@ export interface UpdateAppointmentDto {
    * Service
    */
   service?: string;
+
+  /**
+   * Notiz bei Aktualisierung
+   */
+  note?: string;
 }
 
 /**

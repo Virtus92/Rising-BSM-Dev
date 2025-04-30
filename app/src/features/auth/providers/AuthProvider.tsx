@@ -6,22 +6,26 @@ import React, {
   useContext, 
   useEffect,
   useCallback,
-  useRef
+  useRef,
+  useMemo
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { UserDto } from '@/domain/dtos/UserDtos';
 import { LoginDto, RegisterDto } from '@/domain/dtos/AuthDtos';
 import { UserRole } from '@/domain/enums/UserEnums';
+import { getItem, setItem } from '@/shared/utils/storage/cookieStorage';
 
-// Import AuthClient
+// Import from auth module
 import AuthClient from '@/features/auth/lib/clients/AuthClient';
-// TokenManager and ClientTokenManager will be dynamically imported from features path
+import { TokenManager } from '@/features/auth/lib/clients/token';
+import { initializeAuth, isAuthenticated as checkAuthenticated } from '@/features/auth/utils/authUtils';
+import { tokenUserToDto } from '@/features/auth/lib/clients/token/UserDtoAdapter';
 
-// More robust global state tracking with proper types
+// Global state tracking with proper types
 const AUTH_PROVIDER_STATE_KEY = '__AUTH_PROVIDER_STATE';
 const AUTH_PROVIDER_MOUNT_KEY = '__AUTH_PROVIDER_MOUNTED';
 
-// Global state for authentication status tracking
+// Initialize global state for tracking
 if (typeof window !== 'undefined') {
   if (typeof (window as any)[AUTH_PROVIDER_STATE_KEY] === 'undefined') {
     (window as any)[AUTH_PROVIDER_STATE_KEY] = {
@@ -45,6 +49,22 @@ if (typeof window !== 'undefined') {
       mountTimes: [],
       activeProviders: new Set()
     };
+  }
+}
+
+/**
+ * Custom authentication error class for proper error reporting
+ */
+class AuthenticationError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string = 'AUTHENTICATION_ERROR',
+    public readonly details?: any,
+    public readonly statusCode: number = 401
+  ) {
+    super(message);
+    this.name = 'AuthenticationError';
+    Object.setPrototypeOf(this, AuthenticationError.prototype);
   }
 }
 
@@ -87,20 +107,35 @@ const PUBLIC_PATHS = [
 ];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Instance identity tracking for better debugging and error handling
+  // Instance identity tracking for better debugging
   const instanceIdRef = useRef<string>(`auth-provider-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
+  
+  // Create a stable ID that won't change with React 18 double-mounting
+  const stableId = useMemo(() => instanceIdRef.current, []);
+  
   const [isFirstMount, setIsFirstMount] = useState<boolean>(true);
   
-  // Single instance enforcement and mount tracking with proper cleanup
+  // Prevent React 18 double-initialization issue
+  const isRegisteredRef = useRef<boolean>(false);
+  
+  // Mount tracking with proper cleanup
   useEffect(() => {
+    // Skip registration if already done (for React 18 strict mode)
+    if (isRegisteredRef.current) {
+      console.log(`AuthProvider already registered in this render cycle (instance: ${stableId})`);
+      return;
+    }
+    
+    // Mark as registered for this render cycle
+    isRegisteredRef.current = true;
+    
     // Track globally to prevent multiple providers
     if (typeof window !== 'undefined') {
       const mountRegistry = (window as any)[AUTH_PROVIDER_MOUNT_KEY];
-      const instanceId = instanceIdRef.current;
       
-      // Check if this instance is already registered (handles React 18 strict mode double-mount)
-      if (mountRegistry.activeProviders && mountRegistry.activeProviders.has(instanceId)) {
-        console.log(`AuthProvider already registered (instance: ${instanceId})`);
+      // Check if already registered
+      if (mountRegistry.activeProviders && mountRegistry.activeProviders.has(stableId)) {
+        console.log(`AuthProvider already registered (instance: ${stableId})`);
         return; // Exit early if already registered
       }
       
@@ -110,50 +145,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Add to active providers tracking
       if (mountRegistry.activeProviders) {
-        mountRegistry.activeProviders.add(instanceId);
+        mountRegistry.activeProviders.add(stableId);
       }
       
       // Track in global state 
       if ((window as any)[AUTH_PROVIDER_STATE_KEY]) {
-        (window as any)[AUTH_PROVIDER_STATE_KEY].activeInstances[instanceId] = Date.now();
+        (window as any)[AUTH_PROVIDER_STATE_KEY].activeInstances[stableId] = Date.now();
       }
       
       // Warn if multiple instances
       if (mountRegistry.instances > 1) {
         console.warn(`Multiple AuthProvider instances detected (${mountRegistry.instances}) - this may cause issues!`);
-        // In development, show more details about the instances
+        
         if (process.env.NODE_ENV === 'development') {
           console.warn('Active instances:', mountRegistry.activeProviders);
         }
       } else {
-        console.log(`AuthProvider mounted (instance: ${instanceId})`);
+        console.log(`AuthProvider mounted (instance: ${stableId})`);
       }
       
       // Set global flag
       (window as any)[AUTH_PROVIDER_STATE_KEY].mounted = true;
       
-      // Initialize authentication system
-      const initAuth = async () => {
-        try {
-          // Import and initialize in sequence - using feature paths
-          const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
-          const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
-          
-          // First initialize client token manager
-          await ClientTokenManager.initialize();
-          
-          // Then synchronize tokens to ensure consistency
-          await TokenManager.synchronizeTokens(true);
-          
-          console.log(`AuthProvider: Authentication system initialized (instance: ${instanceId})`);
-        } catch (initError) {
-          console.error(`AuthProvider: Error initializing auth system (instance: ${instanceId}):`, initError);
-        }
-      };
-      
-      // Only initialize on first mount
+      // Initialize authentication with improved coordination
       if (isFirstMount) {
-        initAuth();
+        // Check if this is really the first render after considering stored state
+        const authInitialized = typeof localStorage !== 'undefined' ? 
+          getItem('auth_init_completed') === 'true' : false;
+        
+        if (authInitialized) {
+          console.log(`AuthProvider: Using cached auth initialization (instance: ${stableId})`);
+        } else {
+          console.log(`AuthProvider: First mount, initializing auth (instance: ${stableId})`);
+          
+          initializeAuth({
+            source: `AuthProvider-${stableId}`,
+            detectDuplicates: true
+          })
+          .then(() => {
+            // Store initialization state
+            try {
+              setItem('auth_init_completed', 'true');
+              setItem('auth_init_timestamp', Date.now().toString());
+            } catch (e) {
+              console.warn('Failed to store auth initialization state:', e);
+            }
+          })
+          .catch(error => {
+            console.error(`AuthProvider: Error initializing auth system (instance: ${instanceIdRef}):`, error);
+          });
+        }
       }
     }
     
@@ -163,44 +204,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     return () => {
-      // Clean up on unmount
-      if (typeof window !== 'undefined') {
+      // Clean up on unmount - but only if we actually registered
+      if (typeof window !== 'undefined' && isRegisteredRef.current) {
         const mountRegistry = (window as any)[AUTH_PROVIDER_MOUNT_KEY];
-        const instanceId = instanceIdRef.current;
         
         // Remove from active providers tracking
-        if (mountRegistry.activeProviders) {
-          mountRegistry.activeProviders.delete(instanceId);
+        if (mountRegistry && mountRegistry.activeProviders) {
+          mountRegistry.activeProviders.delete(stableId);
         }
         
         // Remove from global state
         if ((window as any)[AUTH_PROVIDER_STATE_KEY]?.activeInstances) {
-          delete (window as any)[AUTH_PROVIDER_STATE_KEY].activeInstances[instanceId];
+          delete (window as any)[AUTH_PROVIDER_STATE_KEY].activeInstances[stableId];
         }
         
         // Update instance count
-        mountRegistry.instances = Math.max(0, mountRegistry.instances - 1);
-        console.log(`AuthProvider unmounted (instance: ${instanceId}, remaining: ${mountRegistry.instances})`);
+        if (mountRegistry) {
+          mountRegistry.instances = Math.max(0, (mountRegistry.instances || 1) - 1);
+          console.log(`AuthProvider unmounted (instance: ${stableId}, remaining: ${mountRegistry.instances})`);
+        }
         
         // Only clear global flag if this is the last instance
-        if (mountRegistry.instances === 0) {
-          (window as any)[AUTH_PROVIDER_STATE_KEY].mounted = false;
+        if (mountRegistry && mountRegistry.instances === 0) {
+          if ((window as any)[AUTH_PROVIDER_STATE_KEY]) {
+            (window as any)[AUTH_PROVIDER_STATE_KEY].mounted = false;
+          }
         }
       }
     };
   }, [isFirstMount]);
 
-  // Global state helper with proper typing
+  // Access global state with proper typing
   const globalAuthState = typeof window !== 'undefined' ? (window as any)[AUTH_PROVIDER_STATE_KEY] : null;
   
-  // Normal React state
+  // React state for user and loading status
   const [user, setUser] = useState<UserDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
-  // Helper function to check if a path is public (no authentication required)
+  // Check if a path is public (no authentication required)
   const isPublicPath = useCallback((path: string | null): boolean => {
     if (!path) return false;
     
@@ -215,7 +259,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
              normalizedPath.startsWith('/api/');
     });
     
-    // For debugging only
     if (isPublic) {
       console.log(`AuthProvider: Path '${path}' is public`);
     }
@@ -223,63 +266,102 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return isPublic;
   }, []);
 
-  // Track whether we're currently fetching user data
+  // Tracking and rate limiting state
   const isFetchingUserRef = useRef(false);
-  // Ref for preventing concurrent auth status change processing
   const isProcessingAuthEventRef = useRef(false);
-  // Track the last checked path
   const lastCheckedPathRef = useRef<string | null>(null);
-  // Track when the last refresh happened to prevent excessive refreshes
   const lastRefreshTimeRef = useRef<number>(0);
-  // Track login attempts to prevent rapid fires
+  const lastSuccessfulRefreshTimeRef = useRef<number>(0);
   const lastLoginAttemptRef = useRef<number>(0);
   
-  // Helper function for authentication checking with improved reliability, deduplication, and timeout handling
-  const refreshAuth = useCallback(async (): Promise<boolean> => {
-    // Generate a unique ID for this refresh attempt for better logging and debugging
+  // Rate limiting constants
+  const MINIMUM_REFRESH_INTERVAL = 5000; // 5 seconds
+  const RECENT_SUCCESS_INTERVAL = 10000; // 10 seconds
+  
+  // Refresh authentication with improved coordination and deduplication
+  const refreshAuth = useCallback(async (options: { force?: boolean } = {}): Promise<boolean> => {
+    // Generate a unique ID for this refresh attempt for tracking
     const refreshId = `refresh-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     
     try {
-      console.log(`AuthProvider [${instanceIdRef.current}]: Refreshing authentication (${refreshId})`);
+      // Check if we've recently done a successful refresh and have a user - common case optimization
+      const now = Date.now();
+      const hasRecentSuccess = now - lastSuccessfulRefreshTimeRef.current < RECENT_SUCCESS_INTERVAL;
       
-      // Check for existing global refresh operation
-      if (typeof window !== 'undefined' && (window as any).__GLOBAL_AUTH_REFRESH_INFO) {
+      // Skip the optimization if force=true
+      if (!options.force && hasRecentSuccess && user) {
+        console.log(`AuthProvider [${instanceIdRef.current}]: Using recent successful auth (within ${RECENT_SUCCESS_INTERVAL}ms)`);
+        return true;
+      }
+      
+      // Create a static key for this refresh attempt for deduplication
+      const dedupeKey = `auth_refresh_${Math.floor(now / 1000)}`;
+      
+      // First check for in-progress refreshes using global window state for sharing across components
+      if (typeof window !== 'undefined') {
+        // Initialize global state if needed
+        if (!(window as any).__GLOBAL_AUTH_REFRESH_INFO) {
+          (window as any).__GLOBAL_AUTH_REFRESH_INFO = {
+            inProgress: false,
+            lastAttemptTime: 0,
+            lastSuccessTime: 0,
+            currentPromise: null,
+            activeRefreshes: {}
+          };
+        }
+        
         const globalRefresh = (window as any).__GLOBAL_AUTH_REFRESH_INFO;
         
-        // If a recent refresh was successful, reuse that result
-        const RECENT_SUCCESS_INTERVAL = 2000; // 2 seconds
+        // Check for very recent successful refresh (2 seconds)
+        const ULTRA_RECENT_SUCCESS = 2000; // 2 seconds
         if (globalRefresh.lastSuccessTime && 
-            Date.now() - globalRefresh.lastSuccessTime < RECENT_SUCCESS_INTERVAL) {
-          console.log(`AuthProvider: Using recent successful refresh result (${refreshId})`);
+            now - globalRefresh.lastSuccessTime < ULTRA_RECENT_SUCCESS) {
+          console.log(`AuthProvider: Using recent global refresh result (${refreshId})`);
+          // Update local success time
+          lastSuccessfulRefreshTimeRef.current = globalRefresh.lastSuccessTime;
           return true;
         }
         
-        // If another refresh is in progress, wait for it instead of starting a new one
+        // Check if we're already refreshing with the same deduplication key
+        if (globalRefresh.activeRefreshes && globalRefresh.activeRefreshes[dedupeKey]) {
+          console.log(`AuthProvider: Already refreshing auth with same key, reusing promise (${refreshId})`);
+          try {
+            // Wait for the existing operation and reuse result
+            return await globalRefresh.activeRefreshes[dedupeKey];
+          } catch (error) {
+            console.warn(`AuthProvider: Reused refresh promise failed (${refreshId}):`, error as Error);
+            // Continue to refresh ourselves if the shared promise failed
+          }
+        }
+        
+        // If another refresh is in progress, wait for it
         if (globalRefresh.inProgress && globalRefresh.currentPromise) {
           console.log(`AuthProvider: Another refresh is in progress, waiting for it (${refreshId})`);
           try {
             return await globalRefresh.currentPromise;
           } catch (error) {
             console.warn(`AuthProvider: Waiting for existing refresh failed (${refreshId}):`, error as Error);
-            // Continue with our own refresh attempt
+            // Continue to refresh ourselves if the shared promise failed
           }
         }
       }
       
-      // Prevent concurrent auth refreshes
+      // Local instance checks
+      
+      // Prevent concurrent auth refreshes in this component instance
       if (isFetchingUserRef.current) {
-        console.log(`AuthProvider: Already refreshing auth, skipping duplicate call (${refreshId})`);
+        console.log(`AuthProvider: Already refreshing auth in this component, skipping duplicate call (${refreshId})`);
         return !!user; // Return current auth state
       }
       
-      // Rate limit refreshes to prevent flooding
-      const now = Date.now();
-      const MIN_REFRESH_INTERVAL = 2000; // Increased to 2 seconds between refreshes
-      
-      if (now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
+      // Rate limit refreshes to prevent flooding from this component instance
+      if (now - lastRefreshTimeRef.current < MINIMUM_REFRESH_INTERVAL) {
         console.log(`AuthProvider: Refresh attempt too frequent, using cached state (${refreshId})`);
         return !!user;
       }
+      
+      // If we got here, we're going to perform the refresh
+      console.log(`AuthProvider [${instanceIdRef.current}]: Refreshing authentication (${refreshId})`);
       
       // Update refresh timestamp
       lastRefreshTimeRef.current = now;
@@ -291,229 +373,282 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       // Set up global refresh tracking
+      let globalRefresh: any = null;
       if (typeof window !== 'undefined') {
-        if (!(window as any).__GLOBAL_AUTH_REFRESH_INFO) {
-          (window as any).__GLOBAL_AUTH_REFRESH_INFO = {
-            inProgress: false,
-            lastAttemptTime: 0,
-            lastSuccessTime: 0,
-            currentPromise: null
-          };
-        }
-        
-        (window as any).__GLOBAL_AUTH_REFRESH_INFO.inProgress = true;
-        (window as any).__GLOBAL_AUTH_REFRESH_INFO.lastAttemptTime = now;
+        globalRefresh = (window as any).__GLOBAL_AUTH_REFRESH_INFO;
+        globalRefresh.inProgress = true;
+        globalRefresh.lastAttemptTime = now;
       }
       
       // Set fetching flag to prevent concurrent requests
       isFetchingUserRef.current = true;
       
-      // Create a promise that will timeout after 10 seconds
-      const timeoutPromise = new Promise<boolean>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Authentication refresh timeout'));
-        }, 10000); // 10 second timeout
-      });
+      // Create a cleanup function for global state
+      const cleanupGlobalState = (result: boolean) => {
+        if (typeof window !== 'undefined' && (window as any).__GLOBAL_AUTH_REFRESH_INFO) {
+          const globalState = (window as any).__GLOBAL_AUTH_REFRESH_INFO;
+          // Update success time on success
+          if (result) {
+            globalState.lastSuccessTime = Date.now();
+          }
+          // Clear in-progress flag
+          globalState.inProgress = false;
+          globalState.currentPromise = null;
+          // Clear from active refreshes
+          if (globalState.activeRefreshes && globalState.activeRefreshes[dedupeKey]) {
+            delete globalState.activeRefreshes[dedupeKey];
+          }
+        }
+      };
       
       // Create the main refresh promise
-      // Store the promise globally to allow other components to wait for it
       const refreshPromise = (async () => {
         try {
           // First ensure tokens are properly synchronized
-          try {
-            // Import modules dynamically to avoid circular dependencies - using feature paths
-            const tokenManagerModule = await import('@/features/auth/lib/clients/token/TokenManager');
-            const clientTokenManagerModule = await import('@/features/auth/lib/clients/token/ClientTokenManager');
-            
-            const TokenManager = tokenManagerModule.TokenManager;
-            const ClientTokenManager = clientTokenManagerModule.ClientTokenManager;
-            
-            // Initialize the ClientTokenManager first
-            await ClientTokenManager.initialize();
-            
-            // Synchronize tokens before any API calls
-            console.log(`AuthProvider: Synchronizing tokens (${refreshId})`);
-            const syncResult = await TokenManager.synchronizeTokens(true);
-            console.log(`AuthProvider: Token synchronization result: ${syncResult} (${refreshId})`);
-          } catch (syncError) {
-            console.warn(`AuthProvider: Error synchronizing tokens (${refreshId}):`, syncError);
-            // Continue despite synchronization error
-          }
+          await TokenManager.synchronizeTokens(true);
           
-          // First check if we have a valid auth token by checking cookies and localStorage
-          const hasAuthToken = !!localStorage.getItem('auth_token_backup');
-          const hasRefreshToken = !!localStorage.getItem('refresh_token_backup');
+          // First check if we have a valid auth token
+          const hasAuthToken = !!getItem('auth_token_backup');
+          const hasRefreshToken = !!getItem('refresh_token_backup');
           
           console.log(`AuthProvider: Token status check - auth: ${hasAuthToken}, refresh: ${hasRefreshToken} (${refreshId})`);
           
-          // Get current user data with better error handling
-          console.log(`AuthProvider: Attempting to get current user (${refreshId})`);
-          const response = await AuthClient.getCurrentUser();
-          
-          if (response.success) {
-            if (response.data) {
-              console.log(`AuthProvider [${instanceIdRef.current}]: User authenticated successfully (${refreshId})`);
-              setUser(response.data);
+          // First try to get the current user if we have an auth token
+          if (hasAuthToken) {
+            console.log(`AuthProvider: Attempting to get current user (${refreshId})`);
+            try {
+              const response = await AuthClient.getCurrentUser();
               
-              // Also update global state
-              if (globalAuthState) {
-                globalAuthState.userProfile = { ...response.data };
-                globalAuthState.sessionExpired = false;
+              // Handle timeout case - no fallback, throw error
+              if (response.timeoutOccurred && response.statusCode === 408) {
+                throw new AuthenticationError(
+                  `Authentication API timed out with status ${response.statusCode}`,
+                  'API_TIMEOUT',
+                  { refreshId, response },
+                  408
+                );
               }
               
-              return true;
-            } else if (response.requiresUserFetch) {
-              // Handle partial authentication (token valid but no user data)
-              console.log(`AuthProvider: Authenticated but retrieving user data failed (${refreshId})`);
+              // Check if the response has data even if success is not explicitly true
+              // This handles cases where the API response format might be inconsistent
+              if ((response.success && response.data) ||
+                  (!response.success && response.data && response.data.id)) {
+                // Extract user data, normalizing between different response formats
+                const userData = response.data;
+                console.log(`AuthProvider [${instanceIdRef.current}]: User authenticated successfully (${refreshId})`);
+                setUser(userData);
+                
+                // Update successful refresh timestamp
+                lastSuccessfulRefreshTimeRef.current = Date.now();
+                
+                // Update global state
+                if (globalAuthState) {
+                  globalAuthState.userProfile = { ...userData };
+                  globalAuthState.sessionExpired = false;
+                  globalAuthState.lastSuccessfulRefresh = lastSuccessfulRefreshTimeRef.current;
+                }
+                
+                return true;
+              } else if (response.statusCode === 401 || response.statusCode === 403) {
+                // Authentication failed - throw error instead of continuing silently
+                throw new AuthenticationError(
+                  `Authentication failed with status ${response.statusCode}`,
+                  'AUTH_FAILURE',
+                  { response, refreshId },
+                  response.statusCode || 401
+                );
+              } else if (response.statusCode !== undefined && response.statusCode >= 500) {
+                // Server error - throw error instead of maintaining session
+                throw new AuthenticationError(
+                  `Server error (${response.statusCode}) during authentication check`,
+                  'SERVER_ERROR',
+                  { response, refreshId },
+                  response.statusCode
+                );
+              }
+            } catch (userError) {
+              // Network or parsing error - throw error instead of silent fallback
+              if (!(userError instanceof AuthenticationError)) {
+                throw new AuthenticationError(
+                  `Error fetching current user: ${userError instanceof Error ? userError.message : String(userError)}`,
+                  'NETWORK_ERROR',
+                  { originalError: userError, refreshId },
+                  500
+                );
+              }
+              throw userError;
             }
           }
           
-          // If no user data or requiresUserFetch, try token refresh
-          console.log(`AuthProvider: No user data, attempting token refresh (${refreshId})`);
-          
-          // Import ClientTokenManager and Tokenmanager here to avoid circular dependencies
-          const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
-          const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
-
-          // Explicit token refresh with ClientTokenManager
-          const refreshSuccess = await ClientTokenManager.refreshAccessToken();
-          
-          if (refreshSuccess) {
-            // After successful refresh, synchronize tokens again to ensure consistency
-            await TokenManager.synchronizeTokens(true);
+          // If no user data or no auth token, try token refresh
+          if (hasRefreshToken) {
+            console.log(`AuthProvider: Attempting token refresh (${refreshId})`);
             
-            // Get user data again after token refresh
-            console.log(`AuthProvider: Token refreshed, getting user data (${refreshId})`);
-            const newUserResponse = await AuthClient.getCurrentUser();
+            // Use TokenManager for token refresh
+            const refreshSuccess = await TokenManager.refreshAccessToken();
             
-            if (newUserResponse.success && newUserResponse.data) {
-              console.log(`AuthProvider [${instanceIdRef.current}]: User authenticated after token refresh (${refreshId})`);
-              setUser(newUserResponse.data);
+            if (refreshSuccess) {
+              // After successful refresh, synchronize tokens again
+              await TokenManager.synchronizeTokens(true);
               
-              // Also update global state
-              if (globalAuthState) {
-                globalAuthState.userProfile = { ...newUserResponse.data };
-                globalAuthState.sessionExpired = false;
+              // Get user data again after token refresh
+              console.log(`AuthProvider: Token refreshed, getting user data (${refreshId})`);
+              const newUserResponse = await AuthClient.getCurrentUser();
+              
+              if (newUserResponse.success && newUserResponse.data) {
+                console.log(`AuthProvider [${instanceIdRef.current}]: User authenticated after token refresh (${refreshId})`);
+                setUser(newUserResponse.data);
+                
+                // Update successful refresh timestamp
+                lastSuccessfulRefreshTimeRef.current = Date.now();
+                
+                // Update global state
+                if (globalAuthState) {
+                  globalAuthState.userProfile = { ...newUserResponse.data };
+                  globalAuthState.sessionExpired = false;
+                  globalAuthState.lastSuccessfulRefresh = lastSuccessfulRefreshTimeRef.current;
+                }
+                
+                // Notify about authentication success
+                TokenManager.notifyAuthChange?.(true);
+                
+                return true;
               }
-              
-              // Explicit notification of authentication success
-              await TokenManager.notifyAuthChange(true);
-              
-              return true;
+              // Failed to get user after token refresh - throw error
+              throw new AuthenticationError(
+                `Failed to retrieve user data after token refresh`,
+                'USER_FETCH_AFTER_REFRESH_FAILED',
+                { response: newUserResponse, refreshId }
+              );
+            }
+            // Token refresh failed - throw error
+            throw new AuthenticationError(
+              `Token refresh failed`,
+              'TOKEN_REFRESH_FAILED',
+              { refreshId }
+            );
+          }
+          
+          // No auth token and no refresh token - authentication failed
+          throw new AuthenticationError(
+            `No valid authentication tokens found`,
+            'NO_AUTH_TOKENS',
+            { refreshId }
+          );
+        } catch (error) {
+          // Add special handling for revoked refresh token errors
+          // This prevents refresh token loops by clearing tokens when a token has been revoked
+          if (error instanceof Error && 
+              (error.message.includes('revoked') || 
+               error.message.includes('Refresh token has been revoked') ||
+               (error as any)?.code === 'AUTHENTICATION_REQUIRED')) {
+            
+            console.warn(`AuthProvider [${instanceIdRef.current}]: Detected revoked refresh token, clearing tokens to prevent loops (${refreshId})`);
+            
+            // Clear all tokens to break the loop
+            try {
+              await TokenManager.clearTokens();
+            } catch (clearError) {
+              console.error('Error clearing tokens after revoked token detection:', clearError);
+            }
+            
+            // Update global state to indicate session expiry
+            if (globalAuthState) {
+              globalAuthState.sessionExpired = true;
             }
           }
           
-          // If we get here, authentication failed despite refresh attempts
-          console.log(`AuthProvider [${instanceIdRef.current}]: Authentication refresh failed (${refreshId})`);
-          setUser(null);
-          
-          // Update global state
-          if (globalAuthState) {
-            globalAuthState.userProfile = null;
-            globalAuthState.sessionExpired = true;
-          }
-          
-          // Explicit notification of authentication change
-          await TokenManager.notifyAuthChange(false);
-          
-          return false;
+          // Re-throw the error to be handled by the caller
+          throw error;
         } finally {
-          // Always clear fetching flag on completion
+          // Clear fetching flag with a slight delay to prevent race conditions
           setTimeout(() => {
             isFetchingUserRef.current = false;
           }, 300);
         }
       })();
       
-      // Use Promise.race to handle timeouts
-      // Store the promise globally
-      if (typeof window !== 'undefined' && (window as any).__GLOBAL_AUTH_REFRESH_INFO) {
-        (window as any).__GLOBAL_AUTH_REFRESH_INFO.currentPromise = Promise.race([refreshPromise, timeoutPromise]);
+      // Store the promise globally for deduplication
+      if (typeof window !== 'undefined' && globalRefresh) {
+        globalRefresh.currentPromise = refreshPromise;
+        // Store in active refreshes with deduplication key
+        if (!globalRefresh.activeRefreshes) {
+          globalRefresh.activeRefreshes = {};
+        }
+        globalRefresh.activeRefreshes[dedupeKey] = refreshPromise;
       }
       
       try {
-        const result = await Promise.race([refreshPromise, timeoutPromise]);
-        
-        // Store successful result in global state
-        if (result && typeof window !== 'undefined' && (window as any).__GLOBAL_AUTH_REFRESH_INFO) {
-          (window as any).__GLOBAL_AUTH_REFRESH_INFO.lastSuccessTime = Date.now();
-        }
-        
+        const result = await refreshPromise;
+        cleanupGlobalState(result);
         return result;
-      } catch (raceError) {
-        if (raceError instanceof Error && raceError.message === 'Authentication refresh timeout') {
-          console.warn(`AuthProvider: Authentication refresh timed out (${refreshId})`);
-          
-          // Clear fetching flag on timeout
-          setTimeout(() => {
-            isFetchingUserRef.current = false;
-          }, 100);
-        }
-        throw raceError;
-      } finally {
-        // Clear global refresh state
-        if (typeof window !== 'undefined' && (window as any).__GLOBAL_AUTH_REFRESH_INFO) {
-          setTimeout(() => {
-            if ((window as any).__GLOBAL_AUTH_REFRESH_INFO) {
-              (window as any).__GLOBAL_AUTH_REFRESH_INFO.inProgress = false;
-              (window as any).__GLOBAL_AUTH_REFRESH_INFO.currentPromise = null;
-            }
-          }, 200);
-        }
+      } catch (error) {
+        cleanupGlobalState(false);
+        throw error;
       }
     } catch (error) {
       console.error(`AuthProvider [${instanceIdRef.current}]: Authentication refresh error (${refreshId}):`, error as Error);
       
-      // Clear fetching flag on error
+      // Clear fetching flag
       isFetchingUserRef.current = false;
       
-      // Reset user state
+      // Always reset user state on authentication errors
       setUser(null);
+      
+      // Clear successful refresh timestamp
+      lastSuccessfulRefreshTimeRef.current = 0;
       
       // Update global state
       if (globalAuthState) {
         globalAuthState.userProfile = null;
         globalAuthState.error = error instanceof Error ? error.message : 'Authentication refresh failed';
+        globalAuthState.lastSuccessfulRefresh = 0;
+        globalAuthState.sessionExpired = true;
       }
       
       // Update auth status even in case of error
       try {
-        const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
-        await TokenManager.notifyAuthChange(false);
+        TokenManager.notifyAuthChange?.(false);
       } catch (notifyError) {
         console.error(`Failed to notify about auth change (${refreshId}):`, notifyError);
       }
       
-      // Clear global refresh state on error
+      // Clear global refresh state
       if (typeof window !== 'undefined' && (window as any).__GLOBAL_AUTH_REFRESH_INFO) {
         (window as any).__GLOBAL_AUTH_REFRESH_INFO.inProgress = false;
         (window as any).__GLOBAL_AUTH_REFRESH_INFO.currentPromise = null;
       }
       
-      return false;
+      throw error;
     }
   }, [user, globalAuthState, instanceIdRef]);
 
-  // Simplified path-related authentication check with better deduplication
+  // Path-based authentication check with improved error handling
   useEffect(() => {
-    // Don't do anything if there's no pathname
+    // Skip if no pathname
     if (!pathname) return;
     
-    // Skip if we've already checked this exact path recently (within 200ms)
-    if (pathname === lastCheckedPathRef.current && Date.now() - lastRefreshTimeRef.current < 200) {
+    // Create a debounced check with unique ID
+    const checkId = `check-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Check if we've already validated this path recently (use a longer window of 1000ms)
+    const pathCheckDelay = 1000;
+    if (pathname === lastCheckedPathRef.current && 
+        Date.now() - lastRefreshTimeRef.current < pathCheckDelay) {
+      console.debug(`AuthProvider: Skipping duplicate auth check for ${pathname} (${checkId})`);
       return;
     }
     
-    // Update the ref with current path and timestamp
+    // Update with current path
     lastCheckedPathRef.current = pathname;
     lastRefreshTimeRef.current = Date.now();
     
-    // Track checked paths for debugging
+    // Track checked paths in global state
     if (globalAuthState) {
       globalAuthState.authPaths[pathname] = Date.now();
     }
     
-    // Skip authentication check for public paths
+    // Skip for public paths
     if (isPublicPath(pathname)) {
       if (process.env.NODE_ENV === 'development') {
         console.debug(`AuthProvider [${instanceIdRef.current}]: Public path, skipping auth check: ${pathname}`);
@@ -522,17 +657,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     
-    // Authentication check for protected paths
+    // Check auth for protected paths with debouncing
+    let authCheckTimeoutId: NodeJS.Timeout | null = null;
+    
     const checkAuth = async () => {
       try {
         if (process.env.NODE_ENV === 'development') {
-          console.debug(`AuthProvider [${instanceIdRef.current}]: Checking auth for protected path: ${pathname}`);
+          console.debug(`AuthProvider [${instanceIdRef.current}]: Checking auth for protected path: ${pathname} (${checkId})`);
         }
         
-        // Prevent concurrent auth checks using the ref
+        // If we already have a user and checked auth recently, skip the check
+        if (user && Date.now() - lastSuccessfulRefreshTimeRef.current < 10000) {
+          console.debug(`AuthProvider: Using recent auth validation for ${pathname}`);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Prevent concurrent checks
         if (isFetchingUserRef.current) {
-          console.log('AuthProvider: Auth check already in progress, waiting...');
-          // Wait and then check the user state
+          console.log(`AuthProvider: Auth check already in progress, waiting... (${checkId})`);
+          // Wait for the existing check to complete
           await new Promise(resolve => setTimeout(resolve, 500));
           
           // If we have a user after waiting, we're good
@@ -542,44 +686,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
         
-        // Mark that we're checking auth
+        // Mark that we're checking auth - with a safety mechanism
         isFetchingUserRef.current = true;
+        // Set a safety timeout to clear the flag if something goes wrong
+        const safetyTimeoutId = setTimeout(() => {
+          isFetchingUserRef.current = false;
+        }, 5000);
         
-        // Perform the actual auth check
-        const isAuthed = await refreshAuth();
-        
-        // Clear the fetching flag
-        isFetchingUserRef.current = false;
-        
-        if (!isAuthed) {
-          console.log(`AuthProvider [${instanceIdRef.current}]: Access denied, redirecting to login`);
-          // Update global state if available
-          if (globalAuthState) {
-            globalAuthState.sessionExpired = true;
-            globalAuthState.userProfile = null;
+        try {
+          // Perform the auth check - will throw errors instead of falling back
+          const isAuthed = await refreshAuth();
+          
+          // Clear the safety timeout
+          clearTimeout(safetyTimeoutId);
+          
+          // Clear the fetching flag
+          isFetchingUserRef.current = false;
+          
+          // Set loading false regardless of auth result
+          setIsLoading(false);
+          
+          // If refresh succeeded and we have a user, we can stay on the current page
+          if (isAuthed && user) {
+            console.log(`AuthProvider [${instanceIdRef.current}]: Authentication successful for ${pathname} (${checkId})`);
+            return;
           }
           
-          // Create a clean returnUrl
-          const returnUrl = encodeURIComponent(pathname);
-          
-          // Clear tokens to ensure clean login state
-          try {
-            const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
-            ClientTokenManager.clearTokens();
-          } catch (clearError) {
-            console.warn('Error clearing tokens during auth failure:', clearError);
+          // Only redirect if we don't have a user and authentication explicitly failed
+          if (!isAuthed && !user) {
+            console.log(`AuthProvider [${instanceIdRef.current}]: Access denied, redirecting to login (${checkId})`);
+            // Update global state
+            if (globalAuthState) {
+              globalAuthState.sessionExpired = true;
+              globalAuthState.userProfile = null;
+            }
+            
+            // Create a clean returnUrl
+            const returnUrl = encodeURIComponent(pathname);
+            
+            // Clear tokens
+            try {
+              TokenManager.clearTokens();
+            } catch (clearError) {
+              console.warn('Error clearing tokens during auth failure:', clearError);
+            }
+            
+            // Redirect to login (using a timeout for better user experience)
+            setTimeout(() => {
+              router.push(`/auth/login?returnUrl=${returnUrl}&session=expired`);
+            }, 100);
           }
+        } catch (innerError) {
+          // Clear the safety timeout
+          clearTimeout(safetyTimeoutId);
           
-          // Use a safe redirect
-          setTimeout(() => {
-            router.push(`/auth/login?returnUrl=${returnUrl}&session=expired`);
-          }, 100);
+          // Clear fetching flag on error
+          isFetchingUserRef.current = false;
+          
+          // Re-throw to outer catch
+          throw innerError;
         }
       } catch (error) {
-        console.error(`AuthProvider [${instanceIdRef.current}]: Auth check error:`, error as Error);
+        console.error(`AuthProvider [${instanceIdRef.current}]: Auth check error (${checkId}):`, error as Error);
+        
+        // Always redirect on error - don't maintain sessions on error
         setUser(null);
         
-        // Update global state if available
+        // Update global state
         if (globalAuthState) {
           globalAuthState.error = error instanceof Error ? error.message : 'Authentication check failed';
           globalAuthState.sessionExpired = true;
@@ -587,21 +760,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         const returnUrl = encodeURIComponent(pathname);
-        router.push(`/auth/login?returnUrl=${returnUrl}&error=auth_check`);
+        const errorMsg = error instanceof Error ? encodeURIComponent(error.message) : 'auth_error';
+        router.push(`/auth/login?returnUrl=${returnUrl}&error=${errorMsg}`);
       } finally {
         setIsLoading(false);
       }
     };
     
-    checkAuth();
+    // Use a small delay before checking auth to prevent rapid checks during navigation
+    authCheckTimeoutId = setTimeout(() => {
+      checkAuth();
+    }, 50); // Small delay to debounce multiple rapid path changes
+    
+    // Clean up timeout on unmount or path change
+    return () => {
+      if (authCheckTimeoutId) {
+        clearTimeout(authCheckTimeoutId);
+      }
+    };
   }, [pathname, isPublicPath, refreshAuth, router, globalAuthState, user]);
 
-  // Login function with improved error handling and rate limiting
+  // Login function with improved coordination
   const login = async (credentials: LoginDto): Promise<void> => {
     try {
-      // Simple rate limiting to prevent rapid login attempts
+      // Rate limit login attempts
       const now = Date.now();
-      const MIN_LOGIN_INTERVAL = 1000; // 1 second between login attempts
+      const MIN_LOGIN_INTERVAL = 1000; // 1 second between attempts
       
       if (now - lastLoginAttemptRef.current < MIN_LOGIN_INTERVAL) {
         throw new Error('Please wait before trying again');
@@ -610,7 +794,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Update attempt timestamp
       lastLoginAttemptRef.current = now;
       
-      // Update global state if available
+      // Update global state
       if (globalAuthState) {
         globalAuthState.lastLoginTime = now;
         globalAuthState.error = null;
@@ -639,269 +823,132 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       console.log('Login attempt with returnUrl:', returnUrl);
       
-      // Clear any existing tokens before attempting login
-      const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
-      ClientTokenManager.clearTokens();
+      // Clear existing tokens
+      TokenManager.clearTokens();
       
-      // Import TokenManager here to use synchronizeTokens
-      const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
-      // Synchronize any existing tokens before login attempt
-      TokenManager.synchronizeTokens(true);
+      // Ensure tokens are synchronized
+      await TokenManager.synchronizeTokens(true);
       
-      // Perform login - cookies are set by the server
+      // Perform login
       const response = await AuthClient.login(credentials);
       
       if (!response.success) {
-        // Handle error response in structured format
         console.error('Login response error:', response);
         throw new Error(response.message || `Login failed with status ${response.statusCode || 'unknown'}`);
       }
       
       console.log('Login successful, fetching user data');
       
-      // For successful login we set the user directly if available in the response
-      // This helps with some server implementations that return the user directly
+      // Set user data if available in the response
       if (response.data && response.data.user) {
         console.log('Found user data in login response, setting directly:', response.data.user);
         setUser(response.data.user);
         
-        // Also update global state if available
+        // Update global state
         if (globalAuthState) {
           globalAuthState.userProfile = { ...response.data.user };
           globalAuthState.sessionExpired = false;
         }
         
-        // Redirect immediately since we already have user data
-        setTimeout(() => {
-          // Ensure token synchronization before navigation
-          import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
-            TokenManager.synchronizeTokens(true);
-            
-            // Wait for token sync to complete
-            setTimeout(() => {
-              const redirectPath = returnUrl && !isPublicPath(returnUrl) ? 
-                decodeURIComponent(returnUrl) : '/dashboard';
-              
-              console.log('Navigating to:', redirectPath);
-              
-              // Use Next.js router instead of direct navigation
-              router.push(redirectPath);
-            }, 300);
-          }).catch(err => {
-            // In case of error, still redirect
+        // Redirect after ensuring tokens are synchronized
+        setTimeout(async () => {
+          // Synchronize tokens before navigation
+          await TokenManager.synchronizeTokens(true);
+          
+          // Wait for sync to complete
+          setTimeout(() => {
             const redirectPath = returnUrl && !isPublicPath(returnUrl) ? 
               decodeURIComponent(returnUrl) : '/dashboard';
             
             console.log('Navigating to:', redirectPath);
             router.push(redirectPath);
-          });
+          }, 300);
         }, 300);
         
-        return; // Early return to skip refreshAuth
+        return;
       } else if (response.data && (response.data.id || response.data.email)) {
         console.log('Found direct user data in login response:', response.data);
         setUser(response.data);
         
-        // Also update global state if available
+        // Update global state
         if (globalAuthState) {
           globalAuthState.userProfile = { ...response.data };
           globalAuthState.sessionExpired = false;
         }
         
-        // Redirect immediately since we already have user data
-        setTimeout(() => {
-          // Ensure token synchronization before navigation
-          import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
-            TokenManager.synchronizeTokens(true);
-            
-            // Wait for token sync to complete
-            setTimeout(() => {
-              const redirectPath = returnUrl && !isPublicPath(returnUrl) ? 
-                decodeURIComponent(returnUrl) : '/dashboard';
-              
-              console.log('Navigating to:', redirectPath);
-              
-              // Use Next.js router instead of direct navigation
-              router.push(redirectPath);
-            }, 300);
-          }).catch(err => {
-            // In case of error, still redirect
+        // Redirect after ensuring tokens are synchronized
+        setTimeout(async () => {
+          // Synchronize tokens before navigation
+          await TokenManager.synchronizeTokens(true);
+          
+          // Wait for sync to complete
+          setTimeout(() => {
             const redirectPath = returnUrl && !isPublicPath(returnUrl) ? 
               decodeURIComponent(returnUrl) : '/dashboard';
             
             console.log('Navigating to:', redirectPath);
             router.push(redirectPath);
-          });
+          }, 300);
         }, 300);
-        
-        return; // Early return to skip refreshAuth
-      }
-      
-      // On successful login, check if we received user data
-      console.log('Login successful, checking for user data');
-      
-      if (response.success && response.data && response.data.user) {
-        console.log('User data found in login response');
-        
-        // Use the user data from the response
-        setUser(response.data.user);
-        
-        // Notify auth change with the proper user data
-        await import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
-        TokenManager.notifyAuthChange(true);
-        });
-        
-        // Delay navigation to ensure state is updated
-        setTimeout(() => {
-          const redirectPath = returnUrl && !isPublicPath(returnUrl) ? 
-            decodeURIComponent(returnUrl) : '/dashboard';
-          
-          console.log('Navigating to:', redirectPath);
-          
-          // Use Next.js router instead of direct navigation
-          router.push(redirectPath);
-        }, 500); // Increased delay to ensure everything is settled
         
         return;
       }
       
-      // If login response indicates that a user fetch is needed, retrieve it now
+      // If login requires user fetch
       if (response.requiresUserFetch) {
         console.log('No user data in login response, retrieving user profile');
         
-        // Longer wait to ensure token is set by the server
+        // Wait for token to be set by the server
         await new Promise(resolve => setTimeout(resolve, 500));
         
         try {
-          // Make multiple attempts with exponential backoff
-          let attempts = 0;
-          const maxAttempts = 3;
+          // Get user data - with limited retries
           let userResponse = null;
+          userResponse = await AuthClient.getCurrentUser();
           
-          while (attempts < maxAttempts) {
-            attempts++;
-            console.log(`Attempting to fetch user profile (attempt ${attempts}/${maxAttempts})`);
+          if (userResponse.success && userResponse.data) {
+            console.log('User profile retrieved after login');
+            setUser(userResponse.data);
             
-            // Exponential backoff delay
-            const delay = Math.pow(2, attempts - 1) * 300;
-            await new Promise(resolve => setTimeout(resolve, delay));
+            // Notify about auth change
+            TokenManager.notifyAuthChange?.(true);
             
-            // Try to get the user data
-            userResponse = await AuthClient.getCurrentUser();
-            console.log(`User profile fetch response (attempt ${attempts}):`, userResponse);
+            // Wait to ensure state is updated
+            await new Promise(resolve => setTimeout(resolve, 300));
             
-            if (userResponse.success && userResponse.data) {
-              console.log('User profile retrieved after login');
-              setUser(userResponse.data);
-              
-              // Notify about auth change with proper user data
-              await import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
-                TokenManager.notifyAuthChange(true);
-              });
-              
-              // After successful login and user fetch, wait to ensure state is updated
-              await new Promise(resolve => setTimeout(resolve, 300));
-              
-              // Use NextJS router for navigation
-              const redirectPath = returnUrl && !isPublicPath(returnUrl) ? 
-                decodeURIComponent(returnUrl) : '/dashboard';
-              
-              console.log('Navigating to:', redirectPath);
-              router.push(redirectPath);
-              return; // Exit early on success
-            }
+            // Redirect
+            const redirectPath = returnUrl && !isPublicPath(returnUrl) ? 
+              decodeURIComponent(returnUrl) : '/dashboard';
             
-            // If we got 401/403, no point in retrying
-            if (userResponse.statusCode === 401 || userResponse.statusCode === 403) {
-              console.error('Authentication failed when fetching user profile');
-              break;
-            }
+            console.log('Navigating to:', redirectPath);
+            router.push(redirectPath);
+            return;
           }
           
-          // If we get here, all attempts failed
-          // Try a direct fetch as a last resort
-          console.log('Using direct fetch as a last resort');
-          
-          // Get auth token from cookies
-          let authToken = null;
-          if (typeof document !== 'undefined') {
-            const cookies = document.cookie.split(';');
-            for (const cookie of cookies) {
-              const [name, value] = cookie.trim().split('=');
-              if (name === 'auth_token') {
-                authToken = decodeURIComponent(value);
-                break;
-              }
-            }
+          // If we got 401/403, throw error
+          if (userResponse.statusCode === 401 || userResponse.statusCode === 403) {
+            console.error('Authentication failed when fetching user profile');
+            throw new Error(`Authentication failed when fetching user profile: ${userResponse.message || 'Unknown error'}`);
           }
           
-          if (!authToken) {
-            console.error('No auth token found for direct fetch');
-            throw new Error('Authentication token not available');
-          }
-          
-          // Make direct fetch request
-          const apiResponse = await fetch('/api/users/me', {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`,
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
-            }
-          });
-          
-          if (apiResponse.ok) {
-            const userData = await apiResponse.json();
-            if (userData && (userData.data || userData.id)) {
-              // Extract user data from response
-              const userInfo = userData.data || userData;
-              console.log('User profile retrieved via direct fetch');
-              setUser(userInfo);
-              
-              // Notify about auth change
-              await import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
-                TokenManager.notifyAuthChange(true);
-              });
-              
-              // Use Next.js router for navigation
-              console.log('Navigating to dashboard');
-              const redirectPath = returnUrl && !isPublicPath(returnUrl) ? 
-                decodeURIComponent(returnUrl) : '/dashboard';
-              router.push(redirectPath);
-              return;
-            }
-          }
-          
-          console.error('Failed to retrieve user profile via direct fetch');
-          throw new Error('Login successful but profile retrieval failed');
+          // No success, no clear error - throw generic error
+          throw new Error('Failed to retrieve user profile after login');
         } catch (profileError) {
           console.error('User profile retrieval failed:', profileError);
           throw new Error('Authentication successful but profile unavailable');
         }
       }
       
-      // Handle redirect only once
-      // Longer delay for redirect to ensure the auth state is properly updated
-      setTimeout(() => {
-        // Redirect to return URL or dashboard
-        const redirectPath = returnUrl && !isPublicPath(returnUrl) ? 
-          decodeURIComponent(returnUrl) : '/dashboard';
-        
-        console.log('Navigating to:', redirectPath);
-        
-        // Use Next.js router
-        router.push(redirectPath);
-      }, 500);
+      // No explicit error but no user data either - throw error
+      throw new Error('Login succeeded but user data unavailable');
     } catch (error) {
       console.error('Login error:', error as Error);
       
-      // Set auth error for UI feedback
+      // Set error for UI feedback
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
       setAuthError(errorMessage);
       
-      // Update global state if available
+      // Update global state
       if (globalAuthState) {
         globalAuthState.error = errorMessage;
       }
@@ -922,7 +969,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(response.message || 'Registration failed');
       }
       
-      // After successful registration, redirect to login page
+      // Redirect to login after successful registration
       router.push('/auth/login?registered=true');
     } catch (error) {
       console.error('Registration error:', error as Error);
@@ -937,7 +984,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Logging out user...');
       
-      // Update global state if available
+      // Update global state
       if (globalAuthState) {
         globalAuthState.lastLogoutTime = Date.now();
         globalAuthState.userProfile = null;
@@ -947,55 +994,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Delete user status client-side first for immediate UI feedback
       setUser(null);
       
-      // Import and use ClientTokenManager to clear tokens
-      const { ClientTokenManager } = await import('@/features/auth/lib/clients/token/ClientTokenManager');
-      ClientTokenManager.clearTokens();
+      // Clear tokens
+      TokenManager.clearTokens();
       
       // Call logout endpoint - server deletes cookies
       await AuthClient.logout();
       
-      // Also notify TokenManager about logout
-      const { TokenManager } = await import('@/features/auth/lib/clients/token/TokenManager');
-      TokenManager.notifyLogout();
+      // Notify about logout
+      TokenManager.notifyAuthChange(false);
+      console.log('User logged out successfully');
       
       console.log('Logout successful, redirecting to login page');
-      // Redirect to login page
       router.push('/auth/login');
     } catch (error) {
       console.error('Logout error:', error as Error);
       
-      // Even on error, force logout on client side
+      // Force logout on client side even on error
       setUser(null);
-      
-      // Force clear cookies and localStorage
-      if (typeof document !== 'undefined') {
-        // Clear auth cookies
-        document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        
-        // Clear localStorage items
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_token_backup');
-        localStorage.removeItem('refresh_token_backup');
-      }
-      
+      TokenManager.clearTokens();
       router.push('/auth/login');
     }
   };
 
-  // Event listener for auth status changes - optimized implementation with better cleanup
+  // Listen for auth status changes
   useEffect(() => {
-    // Reference to the handler for proper cleanup
     let authChangeHandler: EventListener | null = null;
     
-    // Setup auth event listener if it doesn't already exist
     if (typeof window !== 'undefined') {
-      // Set minimum delay between processing auth events
       const MIN_EVENT_INTERVAL = 500; // milliseconds
       let lastProcessedTime = 0;
       
-      // Create a properly typed handler function
       authChangeHandler = ((evt: Event) => {
         if (evt instanceof CustomEvent) {
           const customEvent = evt as CustomEvent<{ isAuthenticated: boolean }>;
@@ -1004,7 +1032,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // Skip rapid-fire events
           if (now - lastProcessedTime < MIN_EVENT_INTERVAL) {
-            console.debug(`AuthProvider [${instanceIdRef.current}]: Auth event throttled - minimum interval not met`);
+            console.debug(`AuthProvider [${instanceIdRef.current}]: Auth event throttled`);
             return;
           }
           
@@ -1026,7 +1054,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (user) {
                   console.debug(`AuthProvider [${instanceIdRef.current}]: Already authenticated with user data, no action needed`);
                 } else {
-                  // Update user data on authentication - use the reference to avoid stale closures
+                  // Update user data on authentication
                   refreshAuth().catch(error => {
                     console.error(`AuthProvider [${instanceIdRef.current}]: Error refreshing auth after status change:`, error as Error);
                   });
@@ -1038,7 +1066,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } catch (error) {
               console.error(`AuthProvider [${instanceIdRef.current}]: Error handling auth status change:`, error as Error);
             } finally {
-              // Reset processing flag with slight delay
+              // Reset processing flag
               setTimeout(() => {
                 isProcessingAuthEventRef.current = false;
               }, 300);
@@ -1052,7 +1080,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.debug(`AuthProvider [${instanceIdRef.current}]: Registered auth status listener`);
     }
     
-    // Return cleanup function that properly removes the listener
+    // Clean up listener
     return () => {
       if (typeof window !== 'undefined' && authChangeHandler) {
         window.removeEventListener('auth_status_changed', authChangeHandler);
@@ -1061,8 +1089,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [refreshAuth, user, instanceIdRef]);
 
-  
-  // Add a safety timer to ensure flags don't get stuck and synchronize state
+  // Safety timer to ensure flags don't get stuck
   useEffect(() => {
     const safetyTimer = setInterval(() => {
       // Clear potentially stuck flags
@@ -1077,41 +1104,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         globalAuthState.userProfile = { ...user };
       } else if (globalAuthState && !user) {
         globalAuthState.userProfile = null;
-      }
-      
-      // Check for token synchronization if we have a user but no valid cookie
-      if (user && typeof document !== 'undefined') {
-        // More comprehensive cookie check
-        const cookies = document.cookie.split(';');
-        const authCookiePattern = /^(auth_token|accessToken|auth_token_access|access_token)=/;
-        const hasAuthCookie = cookies.some(c => authCookiePattern.test(c.trim()));
-        
-        // Check for inconsistency but limit correction attempts
-        if (!hasAuthCookie && Date.now() - lastRefreshTimeRef.current > 30000) {
-          // Only try to fix inconsistency every 30 seconds
-          console.log('Auth state inconsistency detected: User exists but no auth cookie - attempting repair');
-          lastRefreshTimeRef.current = Date.now(); // Reset refresh time
-          
-          // Try to synchronize tokens with improved error handling
-          try {
-            // Check if tokens exist in localStorage before trying to sync
-            const hasAuthTokenBackup = localStorage.getItem('auth_token_backup');
-            
-            if (hasAuthTokenBackup) {
-              import('@/features/auth/lib/clients/token/TokenManager').then(({ TokenManager }) => {
-                TokenManager.synchronizeTokens(true);
-              }).catch(err => {
-                console.error('Error synchronizing tokens during consistency check:', err);
-              });
-            } else {
-              // Serious inconsistency - logged in with no token backup
-              console.warn('No auth token backup found despite user being logged in - will refresh auth');
-              refreshAuth();
-            }
-          } catch (err) {
-            console.error('Error during token consistency check:', err);
-          }
-        }
       }
     }, 5000); // Check every 5 seconds
     
@@ -1138,8 +1130,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 // Custom Hook for using the Auth Context
 export const useAuth = () => {
   const context = useContext(AuthContext);
+  
+  // In development, provide more helpful error message
+  if (process.env.NODE_ENV !== 'production' && !context) {
+    console.warn(
+      'useAuth hook was used outside of AuthProvider. ' +
+      'Make sure to wrap your component tree with AuthProvider.'
+    );
+    
+    // Return a default implementation to prevent app crashes
+    // This helps during development but still makes the issue visible in console
+    return {
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: async () => { throw new Error('Auth provider not available'); },
+      register: async () => { throw new Error('Auth provider not available'); },
+      logout: async () => { console.warn('Logout called outside AuthProvider'); },
+      refreshAuth: async () => false
+    };
+  }
+  
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+  
   return context;
 };

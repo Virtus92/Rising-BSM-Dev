@@ -4,14 +4,14 @@ import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 
 /**
  * POST /api/n8n/trigger-workflow
  * Triggers an N8N workflow by name for a specific request
  */
 export const POST = routeHandler(
-  withPermission(
+  await permissionMiddleware.withPermission(
     async (req: NextRequest) => {
       const { requestId, workflowName, data } = await req.json();
       
@@ -54,8 +54,8 @@ export const POST = routeHandler(
         });
         
         return formatResponse.error(
-          'Failed to trigger workflow',
-          error instanceof Error ? error.message : String(error)
+          'Failed to trigger workflow: ' + (error instanceof Error ? error.message : String(error)),
+          500
         );
       }
     },

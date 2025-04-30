@@ -139,7 +139,17 @@ export class UserClient {
    * @returns API response
    */
   static async getUserById(id: number | string): Promise<ApiResponse<UserResponseDto>> {
-    return await UserClient.apiRequest<UserResponseDto>('get', `${USERS_API_URL}/${id}`);
+    try {
+      return await UserClient.apiRequest<UserResponseDto>('get', `${USERS_API_URL}/${id}`);
+    } catch (error: unknown) {
+      console.error(`Error in UserClient.getUserById(${id}):`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to get user',
+        data: null,
+        statusCode: (error as any)?.statusCode || 500
+      };
+    }
   }
   
   /**
@@ -148,7 +158,17 @@ export class UserClient {
    * @returns API response
    */
   static async getCurrentUser(): Promise<ApiResponse<UserResponseDto>> {
-    return await UserClient.apiRequest<UserResponseDto>('get', `${USERS_API_URL}/me`);
+    try {
+      return await UserClient.apiRequest<UserResponseDto>('get', `${USERS_API_URL}/me`);
+    } catch (error: unknown) {
+      console.error('Error in UserClient.getCurrentUser:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to get current user',
+        data: null,
+        statusCode: (error as any)?.statusCode || 500
+      };
+    }
   }
   
   /**
@@ -202,7 +222,13 @@ export class UserClient {
           }
           
           attempts++;
-          return await UserClient.apiRequest<UserResponseDto>('put', `${USERS_API_URL}/${id}`, data);
+          
+          // Create the API call first, but don't await it yet
+          // This prevents the Function.prototype.apply error
+          const apiCall = UserClient.apiRequest<UserResponseDto>('put', `${USERS_API_URL}/${id}`, data);
+          
+          // Now await the promise
+          return await apiCall;
         } catch (error) {
           lastError = error;
           console.warn(`Error updating user (attempt ${attempts}/${maxAttempts}):`, error as Error);
@@ -235,7 +261,17 @@ export class UserClient {
    * @returns API response
    */
   static async updateCurrentUser(data: UpdateUserDto): Promise<ApiResponse<UserResponseDto>> {
-    return await UserClient.apiRequest<UserResponseDto>('put', `${USERS_API_URL}/me`, data);
+    try {
+      return await UserClient.apiRequest<UserResponseDto>('put', `${USERS_API_URL}/me`, data);
+    } catch (error: unknown) {
+      console.error('Error in UserClient.updateCurrentUser:', error as Error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to update user profile',
+        data: null,
+        statusCode: (error as any)?.statusCode || 500
+      };
+    }
   }
   
   /**
@@ -337,8 +373,18 @@ export class UserClient {
    * @param userId - User ID
    * @returns API response with permissions
    */
-  static async getUserPermissions(userId: number | string): Promise<ApiResponse<{ permissions: string[] }>> {
-    return await UserClient.apiRequest<{ permissions: string[] }>('get', `${USERS_API_URL}/permissions?userId=${userId}`);
+  static async getUserPermissions(userId: number | string): Promise<ApiResponse<{ permissions: string[], role?: string }>> {
+    try {
+      return await UserClient.apiRequest<{ permissions: string[], role?: string }>('get', `${USERS_API_URL}/permissions?userId=${userId}`);
+    } catch (error: unknown) {
+      console.error('Error in UserClient.getUserPermissions:', error as Error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to get user permissions',
+        data: null,
+        statusCode: (error as any)?.statusCode || 500
+      };
+    }
   }
   
   /**
@@ -371,11 +417,21 @@ export class UserClient {
    * @returns API response with activity logs
    */
   static async getUserActivity(userId: number | string, limit?: number): Promise<ApiResponse<ActivityLogDto[]>> {
-    const params = limit ? { limit } : {};
-    const queryString = UserClient.createQueryParams(params);
-    const url = `${USERS_API_URL}/${userId}/activity${queryString}`;
-    
-    return await UserClient.apiRequest<ActivityLogDto[]>('get', url);
+    try {
+      const params = limit ? { limit } : {};
+      const queryString = UserClient.createQueryParams(params);
+      const url = `${USERS_API_URL}/${userId}/activity${queryString}`;
+      
+      return await UserClient.apiRequest<ActivityLogDto[]>('get', url);
+    } catch (error: unknown) {
+      console.error(`Error in UserClient.getUserActivity(${userId}):`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to get user activity',
+        data: null,
+        statusCode: (error as any)?.statusCode || 500
+      };
+    }
   }
 
   /**

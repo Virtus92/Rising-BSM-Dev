@@ -28,19 +28,22 @@ export interface SchemaDefinition {
   }
 }
 
+// Allow DTO types to be used as SchemaDefinition
+export type SchemaDefinitionInput = SchemaDefinition | Record<string, any>;
+
 /**
  * Validation service interface
  * Provides methods for validating data against schemas
  */
 export interface IValidationService {
   /**
-   * Validate data against a schema
+   * Validate data against a schema or schema name
    * 
-   * @param data Data to validate
-   * @param schema Schema to validate against
+   * @param schemaNameOrData Schema name or data to validate
+   * @param data Data to validate if first param is schema name, or schema if first param is data
    * @returns Validation result with isValid flag and errors array
    */
-  validate(data: any, schema: SchemaDefinition): ValidationResult;
+  validate(schemaNameOrData: string | any, data?: SchemaDefinitionInput | any): ValidationResult;
   
   /**
    * Validate a specific field against a schema
@@ -60,4 +63,28 @@ export interface IValidationService {
    * @returns Cast value
    */
   cast(value: any, type: string): any;
+
+  /**
+   * Validate user creation data
+   * 
+   * @param data User creation data
+   * @returns Validation result
+   */
+  validateCreateUser(data: any): ValidationResult;
+
+  /**
+   * Validate user update data
+   * 
+   * @param data User update data
+   * @returns Validation result
+   */
+  validateUpdateUser(data: any): ValidationResult;
+
+  /**
+   * Validate password against security requirements
+   * 
+   * @param password Password to validate
+   * @returns Validation result
+   */
+  validatePassword(password: string): ValidationResult;
 }

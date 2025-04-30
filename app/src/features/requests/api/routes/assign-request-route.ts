@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { apiAuth } from '@/features/auth/api/middleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
-import { formatResponse } from '@/core/errors/formatting/response-formatter';
+import { formatResponse } from '@/core/errors';
 import { getServiceFactory } from '@/core/factories';
 import { IRequestService } from '@/domain/services/IRequestService';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
@@ -13,7 +13,7 @@ import { AssignRequestRequest } from '../models/request-request-models';
  * @param params - Route parameters with request ID
  * @returns Response with updated request
  */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     // Extract ID from route parameters
     const id = Number(params.id);
@@ -22,10 +22,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     // Authenticate user
-    const auth = await apiAuth.auth(request);
-    if (!auth.success) {
-      return formatResponse.error(auth.message || 'Authentication required', auth.status || 401);
+    const session = await apiAuth(request);
+    if (!session) {
+      return formatResponse.error('Authentication required', 401);
     }
+    // Check if user is authenticated
+    if (!session.user) {
+      return formatResponse.error('User not authenticated', 401);
+    }
+    
+    // Access user info from either session or request.auth
+    const userId = (request as any).auth?.userId || session.user.id;
 
     // Verify permissions
     const permissionCheck = await permissionMiddleware.checkPermission(request, [SystemPermission.REQUESTS_ASSIGN]);
@@ -45,21 +52,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const serviceFactory = getServiceFactory();
     const requestService = serviceFactory.createRequestService();
 
-    // Import proper auth middleware and get user details from JWT token
-    const { extractAuthToken } = await import('@/features/auth/api/middleware/authMiddleware');
-    const token = extractAuthToken(request);
-    let userId = 0;
-    
-    if (token) {
-      try {
-        const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-me';
-        const jwt = await import('jsonwebtoken');
-        const decoded = jwt.verify(token, jwtSecret) as any;
-        userId = Number(decoded.sub) || 0;
-      } catch (e) {
-        // Continue with defaults if token decoding fails
-      }
-    }
+    // User ID is already obtained from the auth session above
     
     // Assign request
     const result = await requestService.assignRequest(id, data.processorId, data.note, {

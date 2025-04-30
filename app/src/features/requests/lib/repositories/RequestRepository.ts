@@ -110,43 +110,6 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
   }
 
   /**
-   * Update the status of a contact request
-   * 
-   * @param id - Request ID
-   * @param data - Status update data
-   * @returns Updated request
-   */
-  async updateStatus(id: number, data: RequestStatusUpdateDto): Promise<ContactRequest> {
-    try {
-      return await this.transaction(async () => {
-        // Update status
-        const updatedRequest = await this.prisma.contactRequest.update({
-          where: { id },
-          data: { status: data.status }
-        });
-
-        // Add note if available
-        if (data.note) {
-          await this.prisma.requestLog.create({
-            data: {
-              requestId: id,
-              userId: updatedRequest.processorId || 0,
-              userName: 'System',
-              action: LogActionType.CHANGE_STATUS,
-              details: data.note
-            }
-          });
-        }
-
-        return this.mapToDomainEntity(updatedRequest);
-      });
-    } catch (error) {
-      this.logger.error('Error updating request status', { error, id, data });
-      throw this.handleError(error);
-    }
-  }
-
-  /**
    * Add a note to a contact request
    * 
    * @param id - Request ID
@@ -860,5 +823,211 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
     }
     
     return result;
+  }
+
+  /**
+   * Find requests by criteria
+   * 
+   * @param criteria - Search criteria
+   * @returns Array of requests matching criteria
+   */
+  async find(criteria: Record<string, any>): Promise<ContactRequest[]> {
+    try {
+      // Process the criteria for the WHERE clause
+      const where = this.processCriteria(criteria);
+      
+      // Execute query
+      const requests = await this.prisma.contactRequest.findMany({
+        where,
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      // Map to domain entities
+      return requests.map(request => this.mapToDomainEntity(request));
+    } catch (error) {
+      this.logger.error('Error in RequestRepository.find', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        criteria 
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Check if a request exists
+   * 
+   * @param id - Request ID
+   * @returns Whether the request exists
+   */
+  async exists(id: number): Promise<boolean> {
+    try {
+      const count = await this.prisma.contactRequest.count({
+        where: { id }
+      });
+      
+      return count > 0;
+    } catch (error) {
+      this.logger.error(`Error checking if request with ID ${id} exists:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Find notes for a request
+   * 
+   * @param requestId - Request ID
+   * @returns Request notes
+   */
+  async findNotes(requestId: number): Promise<RequestNote[]> {
+    try {
+      const notes = await this.prisma.requestNote.findMany({
+        where: { requestId },
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      return notes.map(note => new RequestNote({
+        id: note.id,
+        requestId: note.requestId,
+        userId: note.userId,
+        userName: note.userName || 'Unknown User',
+        text: note.text,
+        createdAt: note.createdAt,
+        updatedAt: note.createdAt // If updatedAt doesn't exist, use createdAt
+      }));
+    } catch (error) {
+      this.logger.error(`Error finding notes for request with ID ${requestId}:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Find a request with all relationships
+   * 
+   * @param id - Request ID
+   * @returns Request with relationships
+   */
+  async findByIdWithRelations(id: number): Promise<ContactRequest | null> {
+    try {
+      const request = await this.prisma.contactRequest.findUnique({
+        where: { id },
+        include: {
+          processor: true,
+          customer: true,
+          appointment: true
+        }
+      });
+      
+      if (!request) {
+        return null;
+      }
+      
+      // Map to domain entity
+      const requestEntity = this.mapToDomainEntity(request);
+      
+      // Add related data
+      if (request.processor) {
+        (requestEntity as any).processor = {
+          id: request.processor.id,
+          name: request.processor.name,
+          email: request.processor.email,
+          role: request.processor.role
+        };
+      }
+      
+      if (request.customer) {
+        (requestEntity as any).customer = {
+          id: request.customer.id,
+          name: request.customer.name,
+          email: request.customer.email,
+          phone: request.customer.phone
+        };
+      }
+      
+      if (request.appointment) {
+        (requestEntity as any).appointment = {
+          id: request.appointment.id,
+          title: request.appointment.title,
+          appointmentDate: request.appointment.appointmentDate,
+          status: request.appointment.status
+        };
+      }
+      
+      // Load notes separately
+      const notes = await this.findNotes(id);
+      (requestEntity as any).notes = notes;
+      
+      return requestEntity;
+    } catch (error) {
+      this.logger.error(`Error finding request with ID ${id} with relations:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Update request status
+   * 
+   * @param id - Request ID
+   * @param status - New status
+   * @param updatedBy - User ID making the change
+   * @returns Updated request
+   */
+  async updateStatus(id: number, dataOrStatus: RequestStatusUpdateDto | string, updatedBy?: number): Promise<ContactRequest> {
+    // Handle both function signatures
+    let status: string;
+    let note: string | undefined;
+    
+    if (typeof dataOrStatus === 'string') {
+      // Handle the string status case
+      status = dataOrStatus;
+    } else {
+      // Handle RequestStatusUpdateDto case
+      status = dataOrStatus.status;
+      note = dataOrStatus.note;
+      // If updatedBy wasn't provided, see if it's in the notes
+      if (typeof updatedBy === 'undefined' && dataOrStatus.updatedBy) {
+        updatedBy = dataOrStatus.updatedBy;
+      }
+    }
+    try {
+      // Update the request status
+      const updatedRequest = await this.prisma.contactRequest.update({
+        where: { id },
+        data: { 
+          status: status,
+          updatedAt: new Date()
+        }
+      });
+      
+      // Log the status change
+      await this.prisma.requestLog.create({
+        data: {
+          requestId: id,
+          userId: updatedBy || 0,
+          userName: 'System',
+          action: LogActionType.CHANGE_STATUS,
+          details: note ? `Status changed to ${status}: ${note}` : `Status changed to ${status}`
+        }
+      });
+      
+      return this.mapToDomainEntity(updatedRequest);
+    } catch (error) {
+      this.logger.error(`Error updating status of request with ID ${id}:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        status,
+        updatedBy
+      });
+      throw this.handleError(error);
+    }
   }
 }

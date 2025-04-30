@@ -1,36 +1,36 @@
 import { PaginationResult } from '../repositories/IBaseRepository';
 
 /**
- * Service-Optionen
+ * Service Options
  */
 export interface ServiceOptions {
   /**
-   * Kontext der Operation
+   * Operation context
    */
   context?: {
     /**
-     * Benutzer-ID
+     * User ID
      */
     userId?: number;
     
     /**
-     * IP-Adresse
+     * IP Address
      */
     ipAddress?: string;
     
     /**
-     * Benutzerdefinierte Daten
+     * Custom data
      */
     [key: string]: any;
   };
   
   /**
-   * Zu ladende Beziehungen
+   * Relations to load
    */
   relations?: string[];
   
   /**
-   * Gelöschte Einträge einbeziehen
+   * Include deleted entries
    */
   withDeleted?: boolean;
 
@@ -62,34 +62,54 @@ export interface ServiceOptions {
    * Number of days to include in date range queries
    */
   days?: number;
+  
+  /**
+   * User ID performing the operation (shorthand for context.userId)
+   */
+  userId?: number;
+  
+  /**
+   * IP address of the client (shorthand for context.ipAddress)
+   */
+  ip?: string;
+  
+  /**
+   * Include activity logs in responses
+   */
+  includeActivity?: boolean;
+  
+  /**
+   * Perform hard delete instead of soft delete
+   */
+  hardDelete?: boolean;
 }
 
 /**
- * Service-Fehler
+ * Service Error
  */
 export class ServiceError extends Error {
   /**
-   * Fehlercode
+   * Error code
    */
   code: string;
   
   /**
-   * Statuscode
+   * Status code
    */
   statusCode: number;
   
   /**
-   * Fehlerdaten
+   * Error data
    */
   data?: any;
   
   /**
-   * Konstruktor
+   * Constructor
    * 
-   * @param message - Fehlermeldung
-   * @param code - Fehlercode
-   * @param statusCode - Statuscode
-   * @param data - Fehlerdaten
+   * @param message - Error message
+   * @param code - Error code
+   * @param statusCode - Status code
+   * @param data - Error data
    */
   constructor(message: string, code: string, statusCode: number = 400, data?: any) {
     super(message);
@@ -101,15 +121,15 @@ export class ServiceError extends Error {
 }
 
 /**
- * Basis-Service-Interface
+ * Base Service Interface
  * 
- * Definiert gemeinsame Geschäftsoperationen für alle Entitäten.
+ * Defines common business operations for all entities.
  * 
- * @template T - Entitätstyp
- * @template C - Typ für Create DTO
- * @template U - Typ für Update DTO
- * @template R - Typ für Response DTO
- * @template ID - Typ des Primärschlüssels
+ * @template T - Entity type
+ * @template C - Create DTO type
+ * @template U - Update DTO type
+ * @template R - Response DTO type
+ * @template ID - Primary key type
  */
 export interface IBaseService<T, C, U, R, ID = number> {
   /**
@@ -121,128 +141,128 @@ export interface IBaseService<T, C, U, R, ID = number> {
   count(options?: { context?: any; filters?: Record<string, any> }): Promise<number>;
 
   /**
-   * Ruft alle Entitäten ab
+   * Get all entities
    * 
-   * @param options - Service-Optionen
-   * @returns Entitäten mit Paginierung
-   * @throws ServiceError - Bei Fehlern
+   * @param options - Service options
+   * @returns Entities with pagination
+   * @throws ServiceError - On errors
    */
   getAll(options?: ServiceOptions): Promise<PaginationResult<R>>;
   
   /**
-   * Ruft eine Entität anhand ihrer ID ab
+   * Get an entity by its ID
    * 
-   * @param id - ID der Entität
-   * @param options - Service-Optionen
-   * @returns Gefundene Entität oder null
-   * @throws ServiceError - Bei Fehlern
+   * @param id - Entity ID
+   * @param options - Service options
+   * @returns Found entity or null
+   * @throws ServiceError - On errors
    */
   getById(id: ID, options?: ServiceOptions): Promise<R | null>;
   
   /**
-   * Erstellt eine neue Entität
+   * Create a new entity
    * 
-   * @param data - Erstellungsdaten
-   * @param options - Service-Optionen
-   * @returns Erstellte Entität
-   * @throws ServiceError - Bei Fehlern
+   * @param data - Creation data
+   * @param options - Service options
+   * @returns Created entity
+   * @throws ServiceError - On errors
    */
   create(data: C, options?: ServiceOptions): Promise<R>;
   
   /**
-   * Aktualisiert eine vorhandene Entität
+   * Update an existing entity
    * 
-   * @param id - ID der Entität
-   * @param data - Aktualisierungsdaten
-   * @param options - Service-Optionen
-   * @returns Aktualisierte Entität
-   * @throws ServiceError - Bei Fehlern
+   * @param id - Entity ID
+   * @param data - Update data
+   * @param options - Service options
+   * @returns Updated entity
+   * @throws ServiceError - On errors
    */
   update(id: ID, data: U, options?: ServiceOptions): Promise<R>;
   
   /**
-   * Löscht eine Entität
+   * Delete an entity
    * 
-   * @param id - ID der Entität
-   * @param options - Service-Optionen
-   * @returns Erfolg der Operation
-   * @throws ServiceError - Bei Fehlern
+   * @param id - Entity ID
+   * @param options - Service options
+   * @returns Operation success
+   * @throws ServiceError - On errors
    */
   delete(id: ID, options?: ServiceOptions): Promise<boolean>;
   
   /**
-   * Findet Entitäten anhand von Kriterien
+   * Find entities by criteria
    * 
-   * @param criteria - Filterkriterien
-   * @param options - Service-Optionen
-   * @returns Gefundene Entitäten
-   * @throws ServiceError - Bei Fehlern
+   * @param criteria - Filter criteria
+   * @param options - Service options
+   * @returns Found entities
+   * @throws ServiceError - On errors
    */
   findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<R[]>;
   
   /**
-   * Validiert Daten
+   * Validate data
    * 
-   * @param data - Zu validierende Daten
-   * @param isUpdate - Ob es sich um eine Aktualisierung handelt
-   * @param entityId - ID der Entität (bei Aktualisierungen)
-   * @returns Validierungsergebnis
-   * @throws ServiceError - Bei Validierungsfehlern
+   * @param data - Data to validate
+   * @param isUpdate - Whether it's an update
+   * @param entityId - Entity ID (for updates)
+   * @returns Validation result
+   * @throws ServiceError - On validation errors
    */
   validate(data: C | U, isUpdate?: boolean, entityId?: number): Promise<import('../dtos/ValidationDto').ValidationResultDto>;
   
   /**
-   * Führt eine Transaktion aus
+   * Execute a transaction
    * 
-   * @param callback - Callback-Funktion
-   * @returns Ergebnis der Transaktion
-   * @throws ServiceError - Bei Fehlern
+   * @param callback - Callback function
+   * @returns Transaction result
+   * @throws ServiceError - On errors
    */
   transaction<r>(callback: (service: IBaseService<T, C, U, R, ID>) => Promise<r>): Promise<r>;
   
   /**
-   * Führt einen Massenupdate durch
+   * Perform a bulk update
    * 
-   * @param ids - IDs der Entitäten
-   * @param data - Aktualisierungsdaten
-   * @param options - Service-Optionen
-   * @returns Anzahl der aktualisierten Entitäten
-   * @throws ServiceError - Bei Fehlern
+   * @param ids - Entity IDs
+   * @param data - Update data
+   * @param options - Service options
+   * @returns Number of updated entities
+   * @throws ServiceError - On errors
    */
   bulkUpdate(ids: ID[], data: U, options?: ServiceOptions): Promise<number>;
   
   /**
-   * Konvertiert eine Entität in eine Response DTO
+   * Convert an entity to a response DTO
    * 
-   * @param entity - Entität
+   * @param entity - Entity
    * @returns Response DTO
    */
   toDTO(entity: T): R;
   
   /**
-   * Konvertiert eine DTO in eine Entität
+   * Convert a DTO to an entity
    * 
    * @param dto - DTO
-   * @returns Entität
+   * @returns Entity
    */
   fromDTO(dto: C | U): Partial<T>;
   
   /**
-   * Erweiterte Suche
+   * Advanced search
    * 
-   * @param searchText - Suchbegriff
-   * @param options - Service-Optionen
-   * @returns Suchergebnisse
-   * @throws ServiceError - Bei Fehlern
+   * @param searchText - Search term
+   * @param options - Service options
+   * @returns Search results
+   * @throws ServiceError - On errors
    */
   search(searchText: string, options?: ServiceOptions): Promise<R[]>;
   
   /**
-   * Prüft, ob eine Entität existiert
+   * Check if an entity exists
    * 
-   * @param id - ID der Entität
-   * @param options - Service-Optionen
-   * @returns Ob die Entität existiert
+   * @param id - Entity ID
+   * @param options - Service options
+   * @returns Whether the entity exists
    */
   exists(id: ID, options?: ServiceOptions): Promise<boolean>;
 

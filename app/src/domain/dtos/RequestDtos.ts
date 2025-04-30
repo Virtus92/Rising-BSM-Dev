@@ -99,6 +99,30 @@ export interface CreateRequestDto {
    * Metadata for AI processing
    */
   metadata?: RequestMetadata;
+
+  /**
+   * Notiz beim Erstellen
+   */
+  note?: string;
+
+  /**
+   * Formulardaten (wenn vorhanden)
+   */
+  formData?: any;
+
+  /**
+   * Formulardaten-Metadaten
+   */
+  formMetadata?: any;
+
+  /**
+   * Typ der Anfrage
+   */
+  type?: string;
+
+  status?: RequestStatus;
+  processorId?: number;
+  customerId?: number;
 }
 
 /**
@@ -159,6 +183,31 @@ export interface UpdateRequestDto {
    * Metadata for AI processing
    */
   metadata?: RequestMetadata;
+
+  /**
+   * Notiz bei Aktualisierung
+   */
+  note?: string;
+
+  /**
+   * Formulardaten (wenn vorhanden)
+   */
+  formData?: any;
+
+  /**
+   * Formulardaten-Metadaten
+   */
+  formMetadata?: any;
+
+  /**
+   * Typ der Anfrage
+   */
+  type?: string;
+
+  /**
+   * ID des Zugewiesenen
+   */
+  assignedToId?: number;
 }
 
 /**
@@ -219,6 +268,11 @@ export interface RequestStatusUpdateDto {
    * Optionale Notiz
    */
   note?: string;
+
+  /**
+   * ID des Benutzers, der die Änderung durchführt
+   */
+  updatedBy?: number;
 }
 
 /**
@@ -274,6 +328,11 @@ export interface ConvertToCustomerDto {
  */
 export interface RequestResponseDto extends BaseResponseDto {
   /**
+   * ID der Anfrage
+   */
+  id: number;
+
+  /**
    * Name des Anfragenden
    */
   name: string;
@@ -306,17 +365,17 @@ export interface RequestResponseDto extends BaseResponseDto {
   /**
    * Status-Label (formatiert)
    */
-  statusLabel: string;
+  statusLabel?: string;
   
   /**
    * CSS-Klasse für Status
    */
-  statusClass: string;
+  statusClass?: string;
   
   /**
    * ID des bearbeitenden Benutzers
    */
-  processorId?: number;
+  processorId?: number | undefined;
   
   /**
    * Name des bearbeitenden Benutzers
@@ -326,12 +385,51 @@ export interface RequestResponseDto extends BaseResponseDto {
   /**
    * ID des zugeordneten Kunden
    */
-  customerId?: number;
+  customerId?: number | undefined;
   
   /**
    * Name des zugeordneten Kunden
    */
   customerName?: string;
+
+  customerData?: {
+    id: number;
+    name: string;
+    email?: string;
+    phone?: string;
+    company?: string;
+    address?: string;
+    postalCode?: string;
+    city?: string;
+    country?: string;
+    type?: string;
+    newsletter?: boolean;
+  };
+
+  assignedToId?: number | undefined;
+  
+  /**
+   * Name des zugeordneten Kunden
+   */
+  assignedToName?: string;
+
+  assignedToData?: {
+    id: number;
+    name: string;
+    email?: string;
+    phone?: string;
+    company?: string;
+    address?: string;
+    postalCode?: string;
+    city?: string;
+    country?: string;
+    type?: string;
+    newsletter?: boolean;
+    role?: string;
+    permissions?: string[];
+  };
+
+
   
   /**
    * ID des zugeordneten Termins
@@ -357,6 +455,22 @@ export interface RequestResponseDto extends BaseResponseDto {
    * Metadata for AI processing
    */
   metadata?: RequestMetadata;
+
+  /**
+   * Erstellungsdatum (ISO-Format)
+   */
+  createdAt: string;
+
+  /**
+   * Aktualisierungsdatum (ISO-Format)
+   */
+  updatedAt: string;
+
+  createdBy?: number | undefined;
+
+  updatedBy?: number | undefined;
+
+
 }
 
 /**
@@ -423,6 +537,11 @@ export interface RequestFilterParamsDto extends BaseFilterParamsDto {
    * Nur nicht zugewiesene Anfragen
    */
   unassigned?: boolean;
+
+  /**
+   * Nur zugewiesene Anfragen
+   */
+  assigned?: boolean;
   
   /**
    * Nur Anfragen, die keinem Kunden zugeordnet sind
@@ -433,6 +552,16 @@ export interface RequestFilterParamsDto extends BaseFilterParamsDto {
    * Filter by source
    */
   source?: RequestSource;
+
+  /**
+   * Filter for requests created after this date
+   */
+  createdAfter?: string;
+
+  /**
+   * Filter for requests created before this date
+   */
+  createdBefore?: string;
 }
 
 /**

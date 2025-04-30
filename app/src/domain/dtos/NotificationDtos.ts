@@ -59,6 +59,8 @@ export interface NotificationResponseDto extends BaseResponseDto {
    * Formatiertes Datum
    */
   formattedDate?: string;
+
+  filter?: NotificationFilterParamsDto;
 }
 
 /**

@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { apiAuth } from '@/features/auth/api/middleware';
-import { formatResponse } from '@/core/errors/formatting/response-formatter';
+import { formatResponse } from '@/core/errors';
 import { getServiceFactory } from '@/core/factories';
 import { IRequestService } from '@/domain/services/IRequestService';
 import { CreateRequestRequest } from '../models/request-request-models';
@@ -10,13 +10,23 @@ import { CreateRequestRequest } from '../models/request-request-models';
  * @param request - Next.js request object
  * @returns Response with created request
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     // Authenticate user
-    const auth = await apiAuth.auth(request);
-    if (!auth.success) {
-      return formatResponse.error(auth.message || 'Authentication required', auth.status || 401);
+    const session = await apiAuth(request);
+    if (!session) {
+      return formatResponse.error('Authentication required', 401);
     }
+    
+    // Check if user is authenticated
+    if (!session.user) {
+      return formatResponse.error('User not authenticated', 401);
+    }
+    
+    // Access user info from either session or req.auth
+    // req.auth is added by apiAuth() to maintain backward compatibility
+    const userId = (request as any).auth?.userId || session.user.id;
+    const userRole = (request as any).auth?.role || session.user.role || 'user';
 
     // Parse request body
     const data: CreateRequestRequest = await request.json();
@@ -37,23 +47,7 @@ export async function POST(request: Request) {
       source: data.source ? (data.source as any) : undefined
     };
 
-    // Import proper auth middleware and get user details from JWT token
-    const { extractAuthToken } = await import('@/features/auth/api/middleware/authMiddleware');
-    const token = extractAuthToken(request);
-    let userId = 0;
-    let userRole = 'user';
-    
-    if (token) {
-      try {
-        const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-me';
-        const jwt = await import('jsonwebtoken');
-        const decoded = jwt.verify(token, jwtSecret) as any;
-        userId = Number(decoded.sub) || 0;
-        userRole = decoded.role || 'user';
-      } catch (e) {
-        // Continue with defaults if token decoding fails
-      }
-    }
+    // User ID and role are already obtained from the auth session above
     
     // Create request
     const result = await requestService.createRequest(requestData, {

@@ -23,5 +23,5 @@ export const POST = withAuth(async (request: NextRequest) => {
   return createPermissionHandler(request);
 }, {
   // In production, only admins would have this permission
-  requiredRoles: process.env.NODE_ENV === 'production' ? ['ADMIN'] : undefined
+  allowedRoles: process.env.NODE_ENV === 'production' ? ['ADMIN'] : undefined
 });

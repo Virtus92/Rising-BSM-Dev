@@ -2,6 +2,7 @@
  * Utility functions for API interactions
  */
 import { ApiResponse } from '@/core/api/ApiClient';
+import { getItem } from '@/shared/utils/storage/cookieStorage';
 
 /**
  * Process API response to extract data and handle errors consistently
@@ -75,7 +76,7 @@ export async function safeFetch<T>(
     
     // Add auth token from localStorage as a backup if available
     if (typeof localStorage !== 'undefined') {
-      const authToken = localStorage.getItem('auth_token_backup');
+      const authToken = getItem('auth_token_backup');
       if (authToken) {
         fetchOptions.headers = {
           ...fetchOptions.headers,

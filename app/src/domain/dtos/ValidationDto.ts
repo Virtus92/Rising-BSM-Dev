@@ -23,6 +23,12 @@ export interface ValidationResultDto {
    * Benutzerdefinierte Daten
    */
   data?: Record<string, any>;
+
+  /**
+   * Convenience property to check if validation is valid
+   * Returns true if result is SUCCESS, false otherwise
+   */
+  isValid?: boolean;
 }
 
 /**
@@ -84,6 +90,7 @@ export interface ValidationWarningDto {
 export function createSuccessValidation(data?: Record<string, any>): ValidationResultDto {
   return {
     result: ValidationResult.SUCCESS,
+    isValid: true,
     data
   };
 }
@@ -101,6 +108,7 @@ export function createErrorValidation(
 ): ValidationResultDto {
   return {
     result: ValidationResult.ERROR,
+    isValid: false,
     errors,
     data
   };
@@ -119,6 +127,7 @@ export function createWarningValidation(
 ): ValidationResultDto {
   return {
     result: ValidationResult.WARNING,
+    isValid: true, // Warnings are still considered valid
     warnings,
     data
   };

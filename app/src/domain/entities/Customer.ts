@@ -59,6 +59,11 @@ export class Customer extends BaseEntity {
    * Stadt
    */
   city?: string;
+
+  /**
+   * Bundesland/Staat
+   */
+  state?: string;
   
   /**
    * Land
@@ -100,6 +105,7 @@ export class Customer extends BaseEntity {
     this.address = data.address;
     this.postalCode = data.postalCode;
     this.city = data.city;
+    this.state = data.state;
     this.country = data.country || 'Deutschland';
     this.notes = data.notes;
     this.newsletter = data.newsletter || false;
@@ -245,6 +251,7 @@ export class Customer extends BaseEntity {
       address: this.address,
       postalCode: this.postalCode,
       city: this.city,
+      state: this.state,
       country: this.country,
       notes: this.notes,
       newsletter: this.newsletter,

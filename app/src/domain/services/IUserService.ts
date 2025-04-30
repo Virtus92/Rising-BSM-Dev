@@ -13,117 +13,117 @@ import { ActivityLogDto } from '../dtos/ActivityLogDto';
 import { PaginationResult } from '../repositories/IBaseRepository';
 
 /**
- * Service-Interface für Benutzer
+ * User Service Interface
  */
 export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUserDto, UserResponseDto> {
   /**
-   * Findet einen Benutzer anhand seiner E-Mail-Adresse
+   * Find a user by email address
    * 
-   * @param email - E-Mail-Adresse
-   * @param options - Service-Optionen
-   * @returns Gefundener Benutzer oder null
+   * @param email - Email address
+   * @param options - Service options
+   * @returns Found user or null
    */
   findByEmail(email: string, options?: ServiceOptions): Promise<UserResponseDto | null>;
   
   /**
-   * Findet einen Benutzer anhand seines Namens
+   * Find a user by name
    * 
    * @param name - Name
-   * @param options - Service-Optionen
-   * @returns Gefundener Benutzer oder null
+   * @param options - Service options
+   * @returns Found user or null
    */
   findByName(name: string, options?: ServiceOptions): Promise<UserResponseDto | null>;
   
   /**
-   * Ruft detaillierte Benutzerinformationen ab
+   * Get detailed user information
    * 
-   * @param id - Benutzer-ID
-   * @param options - Service-Optionen
-   * @returns Detaillierte Benutzerinformationen oder null
+   * @param id - User ID
+   * @param options - Service options
+   * @returns Detailed user information or null
    */
   getUserDetails(id: number, options?: ServiceOptions): Promise<UserDetailResponseDto | null>;
   
   /**
-   * Findet Benutzer mit erweiterten Filteroptionen
+   * Find users with advanced filter options
    * 
-   * @param filters - Filterparameter
-   * @param options - Service-Optionen
-   * @returns Gefundene Benutzer mit Paginierung
+   * @param filters - Filter parameters
+   * @param options - Service options
+   * @returns Found users with pagination
    */
   findUsers(filters: UserFilterParamsDto, options?: ServiceOptions): Promise<PaginationResult<UserResponseDto>>;
   
   /**
-   * Ändert das Passwort eines Benutzers
+   * Change a user's password
    * 
-   * @param userId - Benutzer-ID
-   * @param data - Passwortänderungsdaten
-   * @param options - Service-Optionen
-   * @returns Erfolg der Operation
+   * @param userId - User ID
+   * @param data - Password change data
+   * @param options - Service options
+   * @returns Success of the operation
    */
   changePassword(userId: number, data: ChangePasswordDto, options?: ServiceOptions): Promise<boolean>;
   
   /**
-   * Aktualisiert den Status eines Benutzers
+   * Update a user's status
    * 
-   * @param userId - Benutzer-ID
-   * @param data - Statusänderungsdaten
-   * @param options - Service-Optionen
-   * @returns Aktualisierter Benutzer
+   * @param userId - User ID
+   * @param data - Status update data
+   * @param options - Service options
+   * @returns Updated user
    */
   updateStatus(userId: number, data: UpdateUserStatusDto, options?: ServiceOptions): Promise<UserResponseDto>;
   
   /**
-   * Sucht Benutzer anhand eines Suchbegriffs
+   * Search for users based on a search term
    * 
-   * @param searchText - Suchbegriff
-   * @param options - Service-Optionen
-   * @returns Gefundene Benutzer
+   * @param searchText - Search term
+   * @param options - Service options
+   * @returns Found users
    */
   searchUsers(searchText: string, options?: ServiceOptions): Promise<UserResponseDto[]>;
   
   /**
-   * Ruft Benutzerstatistiken ab
+   * Get user statistics
    * 
-   * @param options - Service-Optionen
-   * @returns Benutzerstatistiken
+   * @param options - Service options
+   * @returns User statistics
    */
   getUserStatistics(options?: ServiceOptions): Promise<any>;
   
   /**
-   * Ruft die Aktivitäten eines Benutzers ab
+   * Get user activities
    * 
-   * @param userId - Benutzer-ID
-   * @param limit - Maximale Anzahl der Ergebnisse
-   * @param options - Service-Optionen
-   * @returns Benutzeraktivitäten
+   * @param userId - User ID
+   * @param limit - Maximum number of results
+   * @param options - Service options
+   * @returns User activities
    */
   getUserActivity(userId: number, limit?: number, options?: ServiceOptions): Promise<ActivityLogDto[]>;
   
   /**
-   * Führt einen Soft Delete eines Benutzers durch
+   * Perform a soft delete of a user
    * 
-   * @param userId - Benutzer-ID
-   * @param options - Service-Optionen
-   * @returns Erfolg der Operation
+   * @param userId - User ID
+   * @param options - Service options
+   * @returns Success of the operation
    */
   softDelete(userId: number, options?: ServiceOptions): Promise<boolean>;
   
   /**
-   * Führt einen Hard Delete eines Benutzers durch
+   * Perform a hard delete of a user
    * 
-   * @param userId - Benutzer-ID
-   * @param options - Service-Optionen
-   * @returns Erfolg der Operation
+   * @param userId - User ID
+   * @param options - Service options
+   * @returns Success of the operation
    */
   hardDelete(userId: number, options?: ServiceOptions): Promise<boolean>;
   
   /**
-   * Authentifiziert einen Benutzer
+   * Authenticate a user
    * 
-   * @param email - E-Mail-Adresse
-   * @param password - Passwort
-   * @param options - Service-Optionen
-   * @returns Authentifizierter Benutzer oder null
+   * @param email - Email address
+   * @param password - Password
+   * @param options - Service options
+   * @returns Authenticated user or null
    */
   authenticate(email: string, password: string, options?: ServiceOptions): Promise<UserResponseDto | null>;
   

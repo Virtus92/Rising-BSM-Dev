@@ -35,6 +35,7 @@ export enum PermissionAction {
 export enum SystemPermission {
   // System permissions
   SYSTEM_ACCESS = "system.access",
+  DASHBOARD_VIEW = "dashboard.view",
   
   // User permissions
   USERS_VIEW = "users.view",
@@ -65,6 +66,7 @@ export enum SystemPermission {
   REQUESTS_REJECT = "requests.reject",
   REQUESTS_ASSIGN = "requests.assign",
   REQUESTS_MANAGE = "requests.manage",
+  REQUESTS_CONVERT = "requests.convert",
   
   // Appointment permissions
   APPOINTMENTS_VIEW = "appointments.view",
@@ -77,6 +79,7 @@ export enum SystemPermission {
   NOTIFICATIONS_CREATE = "notifications.create",
   NOTIFICATIONS_EDIT = "notifications.edit",
   NOTIFICATIONS_DELETE = "notifications.delete",
+  NOTIFICATIONS_MANAGE = "notifications.manage",
 
   // Settings permissions
   SETTINGS_VIEW = "settings.view",
@@ -84,7 +87,11 @@ export enum SystemPermission {
   
   // Profile permissions
   PROFILE_VIEW = "profile.view",
-  PROFILE_EDIT = "profile.edit"
+  PROFILE_EDIT = "profile.edit",
+
+  // System permissions
+  SYSTEM_ADMIN = "system.admin",
+  SYSTEM_LOGS = "system.logs",
 }
 
 // Role-based permission presets

@@ -15,6 +15,7 @@ import { useToast } from '@/shared/hooks/useToast';
 import { Button } from '@/shared/components/ui/button';
 import { NotificationType } from '@/domain/enums/CommonEnums';
 import { getLogger } from '@/core/logging';
+import { setItem } from '@/shared/utils/storage/cookieStorage';
 
 // Removed notification item props as we're using the NotificationBadge component
 
@@ -99,7 +100,7 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
         }
         
         // Set for localStorage persistence
-        localStorage.setItem('theme', newTheme);
+        setItem('theme', newTheme);
       }
       
       // Update theme in global settings if available

@@ -1,44 +1,41 @@
-// Export all error types and utilities
-export * from './types';
-export * from './error-handler';
-export * from './api-error-interceptor';
-export * from './formatting';
+/**
+ * Error handling exports
+ * Central export point for all error handling utilities
+ */
 
-// Re-export formatResponse directly for convenience
+// Export error types
+export * from './types/AppError';
+export * from './types/ApiTypes';
+export type { IErrorHandler } from './types/IErrorHandler';
+
+// Export response formatter
 export { formatResponse } from './formatting/response-formatter';
 
-// Re-export common errors directly for convenience
+// Export individual formatter functions
 export {
-  AppError,
-  ValidationError,
-  NotFoundError,
-  UnauthorizedError,
-  ForbiddenError,
-  ConflictError,
-  BadRequestError
-} from './types';
+  formatSuccess,
+  formatError,
+  formatNotFound,
+  formatValidationError,
+  formatUnauthorized,
+  formatForbidden,
+  formatPaginated
+} from './formatting/error-formatters';
 
-// Add a backward compatibility alias for the error interceptor
-export { createApiErrorInterceptor as createErrorInterceptor } from './api-error-interceptor';
+// Export error handler implementation
+export { errorHandler } from './error-handler';
+export { getErrorHandler } from './error-handler';
 
-// Add type exports with proper 'export type' syntax for isolatedModules compatibility
-export type { ApiResponse, ApiError, ApiRequestError, ApiValidationError } from './types';
-export type { IErrorHandler } from './error-handler';
-export type { ApiErrorInterceptorConfig, IErrorInterceptor } from './api-error-interceptor';
+// Export API error interceptor
+export { 
+  handleApiError, 
+  createApiErrorInterceptor,
+  ApiRequestError 
+} from './api-error-interceptor';
 
-// Import ErrorHandler class
-import { ErrorHandler } from './error-handler';
-import { getLogger } from '../logging';
-
-// Singleton instance
-let errorHandler: ErrorHandler;
-
-/**
- * Returns a singleton instance of ErrorHandler
- */
-export function getErrorHandler(): ErrorHandler {
-  if (!errorHandler) {
-    errorHandler = new ErrorHandler(getLogger());
-  }
-  return errorHandler;
-}
+// Alias exports for legacy code compatibility
+export { AuthenticationError as UnauthorizedError } from './types/AppError';
+export { PermissionError as ForbiddenError } from './types/AppError';
+export { BadRequestError as ValidationError } from './types/AppError';
+export type { AppError as ApiError } from './types/AppError';
+export type { ValidationError as ApiValidationError } from './types/AppError';

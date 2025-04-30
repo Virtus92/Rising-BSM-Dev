@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLogger } from '@/core/logging';
 
+// Note: In a real implementation, this would be replaced with Redis or another persistent store
+// import { redisClient } from '@/core/redis';
+
 interface RateLimitOptions {
   // Maximum number of requests in the window
   maxRequests: number;
@@ -10,43 +13,23 @@ interface RateLimitOptions {
   
   // Identifier function to determine which property to track (e.g., IP, username)
   identifierFn?: (req: NextRequest) => string;
+  
+  // Optional custom response when rate limit is exceeded
+  customResponse?: (retryAfter: number) => NextResponse;
 }
-
-interface RateLimitRecord {
-  count: number;
-  firstRequest: number;
-  lastRequest: number;
-  blocked: boolean;
-  blockUntil?: number;
-}
-
-// In-memory store for rate limiting
-// This will reset on server restart - for production, use Redis or another persistent store
-const rateLimitStore = new Map<string, RateLimitRecord>();
 
 /**
- * Clean up old records from the rate limit store
- * Should be called periodically to prevent memory leaks
+ * In-memory store for rate limiting (development/testing only)
+ * This should be replaced with Redis or another distributed store in production
  */
-function cleanupRateLimitStore() {
-  const now = Date.now();
-  // Keep records for at most 24 hours
-  const maxAge = 24 * 60 * 60 * 1000;
-  
-  for (const [key, record] of rateLimitStore.entries()) {
-    if (now - record.lastRequest > maxAge) {
-      rateLimitStore.delete(key);
-    }
-  }
-}
-
-// Clean up store every hour
-if (typeof setInterval !== 'undefined') {
-  setInterval(cleanupRateLimitStore, 60 * 60 * 1000);
-}
+const rateLimitStore = new Map<string, {
+  count: number;
+  resetTime: number;
+}>();
 
 /**
  * Rate limiting middleware for API routes
+ * Designed to work with a distributed storage system
  * 
  * @param options Rate limiting options
  * @returns Middleware function for rate limiting
@@ -56,118 +39,93 @@ export function rateLimiter(options: RateLimitOptions) {
   
   // Default identifier function uses IP address
   const getIdentifier = options.identifierFn || 
-    ((req: NextRequest) => req.headers.get('x-forwarded-for') || 'unknown');
+    ((req: NextRequest) => req.headers.get('x-forwarded-for') || 
+                         req.headers.get('x-real-ip') || 
+                         'unknown');
   
   return async function(req: NextRequest): Promise<NextResponse | null> {
     try {
       const identifier = getIdentifier(req);
-      const now = Date.now();
+      const now = Math.floor(Date.now() / 1000); // Current time in seconds
       
-      // Get record from store or create new one
-      let record = rateLimitStore.get(identifier);
+      // In a production environment, this would use Redis or another distributed store
+      // const rateLimitKey = `ratelimit:${identifier}`;
       
-      if (!record) {
-        record = {
-          count: 0,
-          firstRequest: now,
-          lastRequest: now,
-          blocked: false
-        };
-        rateLimitStore.set(identifier, record);
+      // Get current count and reset time from store or initialize
+      let count = 0;
+      let resetTime = now + options.windowSizeInSeconds;
+      
+      const record = rateLimitStore.get(identifier);
+      if (record) {
+        // If the reset time has passed, start a new window
+        if (now >= record.resetTime) {
+          count = 1;
+          resetTime = now + options.windowSizeInSeconds;
+        } else {
+          count = record.count + 1;
+          resetTime = record.resetTime;
+        }
       }
       
-      // Check if client is blocked
-      if (record.blocked && record.blockUntil && now < record.blockUntil) {
-        const retryAfter = Math.ceil((record.blockUntil - now) / 1000);
-        
-        logger.warn('Rate limit exceeded - client blocked', {
-          identifier,
-          path: req.nextUrl.pathname,
-          retryAfter
-        });
-        
-        return new NextResponse(
-          JSON.stringify({
-            success: false,
-            message: 'Too many requests. Please try again later.',
-            retryAfter
-          }),
-          {
-            status: 429,
-            headers: {
-              'Content-Type': 'application/json',
-              'Retry-After': String(retryAfter)
-            }
-          }
-        );
-      }
+      // Store updated values
+      rateLimitStore.set(identifier, {
+        count,
+        resetTime
+      });
       
-      // If previously blocked but block period expired, reset the record
-      if (record.blocked && record.blockUntil && now >= record.blockUntil) {
-        record = {
-          count: 0,
-          firstRequest: now,
-          lastRequest: now,
-          blocked: false
-        };
-      }
+      // With Redis, this would use INCRBY and EXPIRE in a transaction
+      // For example:
+      // const multi = redisClient.multi();
+      // multi.incr(rateLimitKey);
+      // multi.expire(rateLimitKey, options.windowSizeInSeconds);
+      // const results = await multi.exec();
+      // count = results[0];
       
-      // Check if window has expired and reset if needed
-      const windowSize = options.windowSizeInSeconds * 1000;
-      if (now - record.firstRequest > windowSize) {
-        record.count = 0;
-        record.firstRequest = now;
-      }
-      
-      // Increment count and update last request
-      record.count += 1;
-      record.lastRequest = now;
+      // Set rate limit headers
+      const remaining = Math.max(0, options.maxRequests - count);
+      const reset = resetTime - now;
       
       // Check if rate limit is exceeded
-      if (record.count > options.maxRequests) {
-        // Implement exponential backoff based on how many times the limit was exceeded
-        const exceededBy = record.count - options.maxRequests;
-        const blockDuration = Math.min(
-          // Start with 30 seconds, double for each excess request, max 1 hour
-          30 * Math.pow(2, exceededBy - 1) * 1000,
-          60 * 60 * 1000 // 1 hour max
-        );
-        
-        record.blocked = true;
-        record.blockUntil = now + blockDuration;
-        
-        const retryAfter = Math.ceil(blockDuration / 1000);
-        
-        logger.warn('Rate limit exceeded - blocking client', {
+      if (count > options.maxRequests) {
+        logger.warn('Rate limit exceeded', {
           identifier,
           path: req.nextUrl.pathname,
-          retryAfter,
-          exceededBy
+          count,
+          limit: options.maxRequests
         });
         
+        // Use custom response if provided
+        if (options.customResponse) {
+          return options.customResponse(reset);
+        }
+        
+        // Default response
         return new NextResponse(
           JSON.stringify({
             success: false,
             message: 'Too many requests. Please try again later.',
-            retryAfter
+            retryAfter: reset
           }),
           {
             status: 429,
             headers: {
               'Content-Type': 'application/json',
-              'Retry-After': String(retryAfter)
+              'Retry-After': String(reset),
+              'X-RateLimit-Limit': String(options.maxRequests),
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': String(resetTime)
             }
           }
         );
       }
       
-      // Update the record in the store
-      rateLimitStore.set(identifier, record);
-      
-      // Allow request to proceed
+      // Request is allowed, continue
       return null;
     } catch (error) {
-      logger.error('Error in rate limiter middleware', { error });
+      logger.error('Error in rate limiter middleware', { 
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
       // Don't block requests if rate limiter fails
       return null;
     }
@@ -175,18 +133,25 @@ export function rateLimiter(options: RateLimitOptions) {
 }
 
 /**
+ * Rate limiting middleware for general API endpoints
+ */
+export const apiRateLimiter = rateLimiter({
+  maxRequests: 60,               // 60 requests in 1 minute
+  windowSizeInSeconds: 60
+});
+
+/**
  * Rate limiting middleware specifically for authentication endpoints
  * Uses stricter limits to prevent brute force attacks
- * 
- * @param req The next request object
- * @returns NextResponse or null if request should proceed
  */
 export const authRateLimiter = rateLimiter({
   maxRequests: 5,                // 5 requests in 1 minute
   windowSizeInSeconds: 60,
   identifierFn: (req: NextRequest) => {
     // Include path in identifier to separate login/register/etc.
-    const ip = req.headers.get('x-forwarded-for') || 'unknown';
+    const ip = req.headers.get('x-forwarded-for') || 
+             req.headers.get('x-real-ip') || 
+             'unknown';
     const path = req.nextUrl.pathname;
     return `auth:${ip}:${path}`;
   }
@@ -201,7 +166,7 @@ export const authRateLimiter = rateLimiter({
  */
 export function withRateLimit(
   handler: (req: NextRequest) => Promise<NextResponse>,
-  limiter = authRateLimiter
+  limiter = apiRateLimiter
 ) {
   return async function(req: NextRequest) {
     // Apply rate limiting
@@ -215,4 +180,17 @@ export function withRateLimit(
     // Otherwise, proceed with the original handler
     return handler(req);
   };
+}
+
+/**
+ * Helper to apply authentication rate limiting to an API route handler
+ * Useful for login, register, and other auth-related endpoints
+ * 
+ * @param handler The API route handler function
+ * @returns New handler function with auth rate limiting applied
+ */
+export function withAuthRateLimit(
+  handler: (req: NextRequest) => Promise<NextResponse>
+) {
+  return withRateLimit(handler, authRateLimiter);
 }

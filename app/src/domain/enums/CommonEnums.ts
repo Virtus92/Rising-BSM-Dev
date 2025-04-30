@@ -30,8 +30,10 @@ export enum AppointmentStatus {
   PLANNED = "planned",
   CONFIRMED = "confirmed",
   CANCELLED = "cancelled",
+  IN_PROGRESS = "in_progress",
   COMPLETED = "completed",
-  RESCHEDULED = "rescheduled"
+  RESCHEDULED = "rescheduled",
+  SCHEDULED = "scheduled"
 }
 
 /**
@@ -109,5 +111,6 @@ export enum LogActionType {
   CHANGE_PROFILE = 'change_profile',
   ASSIGN = 'assign',
   LINK = 'link',
-  CONVERT = 'convert'
+  CONVERT = 'convert',
+  NOTE = 'note'
 }

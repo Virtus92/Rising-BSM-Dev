@@ -4,7 +4,7 @@ import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
 
 /**
  * GET /api/requests/stats

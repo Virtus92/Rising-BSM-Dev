@@ -77,7 +77,7 @@ interface RequestDetailProps {
 }
 
 /**
- * Komponente zur Anzeige einer Kontaktanfrage im Detail
+ * Component for displaying a contact request in detail
  */
 export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
   const router = useRouter();
@@ -111,7 +111,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
     return (
       <div className="p-4 rounded-md bg-destructive/10 text-destructive flex items-center">
         <AlertCircle className="h-5 w-5 mr-2" />
-        <p>Fehler beim Laden der Kontaktanfrage.</p>
+        <p>Error loading request details.</p>
       </div>
     );
   }
@@ -156,18 +156,18 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
 
   return (
     <div className="space-y-6">
-      {/* Zurück-Button und Header */}
+      {/* Back button and header */}
       <div className="flex items-center">
         {onBack && (
           <Button variant="ghost" onClick={onBack} className="mr-2">
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Zurück
+            Back
           </Button>
         )}
-        <h1 className="text-2xl font-bold">Kontaktanfrage Details</h1>
+        <h1 className="text-2xl font-bold">Request Details</h1>
       </div>
 
-      {/* Hauptkarte mit Basisinformationen */}
+      {/* Main card with base information */}
       <Card>
         <CardHeader className="flex flex-row items-start justify-between pb-2">
           <div>
@@ -197,26 +197,26 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
               )}
               <div className="flex items-center">
                 <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                <span>Erstellt: {formatDate(new Date(request.createdAt))}</span>
+                <span>Created: {formatDate(new Date(request.createdAt))}</span>
               </div>
             </div>
             <div className="space-y-2">
               {request.processorName ? (
                 <div className="flex items-center">
                   <User className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>Bearbeiter: {request.processorName}</span>
+                  <span>Processor: {request.processorName}</span>
                 </div>
               ) : (
                 <div className="flex items-center">
                   <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
-                  <span className="text-amber-500">Nicht zugewiesen</span>
+                  <span className="text-amber-500">Not assigned</span>
                 </div>
               )}
               {request.customerName && (
                 <div className="flex items-center">
                   <UserCheck className="h-4 w-4 mr-2 text-muted-foreground" />
                   <span>
-                    Kunde: {' '}
+                    Customer: {' '}
                     <Link 
                       href={`/dashboard/customers/${request.customerId}`}
                       className="text-primary hover:underline"
@@ -230,7 +230,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                 <div className="flex items-center">
                   <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                   <span>
-                    Termin: {' '}
+                    Appointment: {' '}
                     <Link 
                       href={`/dashboard/appointments/${request.appointmentId}`}
                       className="text-primary hover:underline"
@@ -244,7 +244,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
           </div>
 
           <div className="rounded-md bg-muted p-4 mt-4">
-            <h3 className="font-medium mb-2">Nachricht:</h3>
+            <h3 className="font-medium mb-2">Message:</h3>
             <p className="whitespace-pre-line">{request.message}</p>
           </div>
         </CardContent>
@@ -256,17 +256,17 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
               Edit Request
             </Button>
           </Link>
-          {/* Status-Dialog */}
+          {/* Status Dialog */}
           <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">Status ändern</Button>
+              <Button variant="outline">Change Status</Button>
             </DialogTrigger>
             <DialogContent>
               <form onSubmit={handleStatusUpdate}>
                 <DialogHeader>
-                  <DialogTitle>Status ändern</DialogTitle>
+                  <DialogTitle>Change Status</DialogTitle>
                   <DialogDescription>
-                    Aktualisieren Sie den Status dieser Kontaktanfrage.
+                    Update the status of this contact request.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -276,17 +276,17 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                     required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Status auswählen" />
+                      <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={RequestStatus.NEW}>Neu</SelectItem>
-                      <SelectItem value={RequestStatus.IN_PROGRESS}>In Bearbeitung</SelectItem>
-                      <SelectItem value={RequestStatus.COMPLETED}>Abgeschlossen</SelectItem>
-                      <SelectItem value={RequestStatus.CANCELLED}>Abgebrochen</SelectItem>
+                      <SelectItem value={RequestStatus.NEW}>New</SelectItem>
+                      <SelectItem value={RequestStatus.IN_PROGRESS}>In Progress</SelectItem>
+                      <SelectItem value={RequestStatus.COMPLETED}>Completed</SelectItem>
+                      <SelectItem value={RequestStatus.CANCELLED}>Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
                   <Textarea
-                    placeholder="Notiz zur Statusänderung (optional)"
+                    placeholder="Note about status change (optional)"
                     value={statusNote}
                     onChange={(e) => setStatusNote(e.target.value)}
                   />
@@ -299,14 +299,14 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                     {isUpdatingStatus && (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     )}
-                    Speichern
+                    Save
                   </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
 
-          {/* Konvertieren/Verknüpfen/Termin-Buttons */}
+          {/* Convert/Link/Appointment Buttons */}
           <TooltipProvider>
             <Dialog>
               <Tooltip>
@@ -314,19 +314,19 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                   <DialogTrigger asChild>
                     <Button variant="default">
                       <UserPlus className="h-4 w-4 mr-2" />
-                      Zu Kunde konvertieren
+                      Convert to Customer
                     </Button>
                   </DialogTrigger>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Diese Anfrage in einen neuen Kunden umwandeln
+                  Convert this request to a new customer
                 </TooltipContent>
               </Tooltip>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Zu Kunde konvertieren</DialogTitle>
+                  <DialogTitle>Convert to Customer</DialogTitle>
                   <DialogDescription>
-                    Erstellen Sie einen neuen Kunden aus dieser Kontaktanfrage.
+                    Create a new customer from this contact request.
                   </DialogDescription>
                 </DialogHeader>
                 <ConvertToCustomerForm
@@ -356,19 +356,19 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                   <DialogTrigger asChild>
                     <Button variant="outline">
                       <LinkIcon className="h-4 w-4 mr-2" />
-                      Mit Kunde verknüpfen
+                      Link to Customer
                     </Button>
                   </DialogTrigger>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Mit existierendem Kunden verknüpfen
+                  Link with existing customer
                 </TooltipContent>
               </Tooltip>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Mit Kunde verknüpfen</DialogTitle>
+                  <DialogTitle>Link to Customer</DialogTitle>
                   <DialogDescription>
-                    Verknüpfen Sie diese Anfrage mit einem bestehenden Kunden.
+                    Link this request with an existing customer.
                   </DialogDescription>
                 </DialogHeader>
                 <LinkToCustomerForm
@@ -398,19 +398,19 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                   <DialogTrigger asChild>
                     <Button variant="outline">
                       <Calendar className="h-4 w-4 mr-2" />
-                      Termin erstellen
+                      Create Appointment
                     </Button>
                   </DialogTrigger>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Termin für diese Anfrage erstellen
+                  Create appointment for this request
                 </TooltipContent>
               </Tooltip>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Termin erstellen</DialogTitle>
+                  <DialogTitle>Create Appointment</DialogTitle>
                   <DialogDescription>
-                    Erstellen Sie einen Termin für diese Kontaktanfrage.
+                    Create an appointment for this contact request.
                   </DialogDescription>
                 </DialogHeader>
                 <CreateAppointmentForm
@@ -434,24 +434,24 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
             </Dialog>
           </TooltipProvider>
 
-          {/* Löschen-Button */}
+          {/* Delete Button */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive">
                 <Trash2 className="h-4 w-4 mr-2" />
-                Löschen
+                Delete
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Wirklich löschen?</AlertDialogTitle>
+                <AlertDialogTitle>Really delete?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Möchten Sie diese Kontaktanfrage wirklich löschen? 
-                  Diese Aktion kann nicht rückgängig gemacht werden.
+                  Do you really want to delete this request? 
+                  This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={async () => {
                     const success = await deleteRequest();
@@ -465,7 +465,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                   {isDeleting && (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   )}
-                  Löschen
+                  Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -473,29 +473,29 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
         </CardFooter>
       </Card>
 
-      {/* Tabs für Notizen und weitere Infos */}
+      {/* Tabs for notes and further info */}
       <Tabs defaultValue="notes" className="w-full">
         <TabsList>
           <TabsTrigger value="notes" className="flex items-center">
             <MessageCircle className="h-4 w-4 mr-2" />
-            Notizen
+            Notes
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="notes" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Notizen</CardTitle>
+              <CardTitle className="text-lg">Notes</CardTitle>
               <CardDescription>
-                Interne Notizen zu dieser Kontaktanfrage
+                Internal notes for this contact request
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Notizen Liste */}
+              {/* Notes List */}
               <div className="space-y-4 mb-6">
                 {request.notes.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Keine Notizen vorhanden.
+                    No notes available.
                   </p>
                 ) : (
                   request.notes.map((note) => (
@@ -515,10 +515,10 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                 )}
               </div>
 
-              {/* Notiz hinzufügen */}
+              {/* Add Note */}
               <form onSubmit={handleNoteSubmit}>
                 <Textarea
-                  placeholder="Neue Notiz hinzufügen..."
+                  placeholder="Add new note..."
                   value={noteText}
                   onChange={(e) => setNoteText(e.target.value)}
                   className="min-h-[100px]"
@@ -531,7 +531,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                     {isAddingNote && (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     )}
-                    Notiz hinzufügen
+                    Add Note
                   </Button>
                 </div>
               </form>

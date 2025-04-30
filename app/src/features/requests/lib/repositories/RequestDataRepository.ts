@@ -414,7 +414,7 @@ export class RequestDataRepository extends PrismaRepository<RequestData> impleme
    * @param callback - Transaction callback
    * @returns Transaction result
    */
-  async transaction<R>(callback: () => Promise<R>): Promise<R> {
+  async transaction<R>(callback: (repo?: IRequestDataRepository) => Promise<R>): Promise<R> {
     try {
       return await this.prisma.$transaction(async (tx) => {
         try {
@@ -442,6 +442,30 @@ export class RequestDataRepository extends PrismaRepository<RequestData> impleme
   /**
    * Required by PrismaRepository, but not used for RequestData
    */
+  /**
+   * Find request data by request ID
+   * 
+   * @param requestId - Request ID
+   * @returns Request data related to the request
+   */
+  async findByRequestId(requestId: number): Promise<RequestData[]> {
+    try {
+      const where = this.processCriteria({ requestId });
+      const results = await this.prisma.requestData.findMany({
+        where,
+        orderBy: { order: 'asc' }
+      });
+      
+      return results.map(result => this.mapToDomainEntity(result));
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.findByRequestId`, { 
+        error: error instanceof Error ? error.message : String(error),
+        requestId 
+      });
+      throw this.handleError(error);
+    }
+  }
+
   protected logActivityImplementation(
     userId: number, 
     actionType: string, 

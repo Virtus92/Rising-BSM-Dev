@@ -403,12 +403,7 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
               (appointmentEntity as any).customerName = customerData.name;
               (appointmentEntity as any).customer = customerData;
             } else {
-              // Fallback if customer data can't be loaded
-              (appointmentEntity as any).customerName = `Customer ${appointment.customerId}`;
-              (appointmentEntity as any).customer = {
-                id: appointment.customerId,
-                name: `Customer ${appointment.customerId}`
-              };
+              throw new Error(`Customer data not found for ID ${appointment.customerId}`);
             }
           }
           
@@ -542,12 +537,7 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
               (appointmentEntity as any).customerName = customerData.name;
               (appointmentEntity as any).customer = customerData;
             } else {
-              // Fallback if no customer data found
-              (appointmentEntity as any).customerName = `Customer ${appointment.customerId}`;
-              (appointmentEntity as any).customer = {
-                id: appointment.customerId,
-                name: `Customer ${appointment.customerId}`
-              };
+              throw new Error(`Customer data not found for ID ${appointment.customerId}`);
             }
           }
           
@@ -692,12 +682,7 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
           // Ensure customerName is also set for consistency
           (appointmentEntity as any).customerName = customerData.name;
         } else {
-          // Fallback if customer data can't be loaded
-          (appointmentEntity as any).customer = {
-            id: appointment.customerId,
-            name: `Customer ${appointment.customerId}`
-          };
-          (appointmentEntity as any).customerName = `Customer ${appointment.customerId}`;
+          throw new Error(`Customer data not found for ID ${appointment.customerId}`);
         }
       }
       
@@ -738,32 +723,7 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
 
       // If user doesn't exist, find the first admin or any active user
       if (!user) {
-        this.logger.warn(`User with ID ${userId} not found, searching for active admin or user`);
-        
-        // Try to find an admin user
-        const adminUser = await this.prisma.user.findFirst({
-          where: { role: 'admin', status: 'active' },
-          select: { id: true, name: true }
-        });
-        
-        if (adminUser) {
-          user = adminUser;
-        } else {
-          // If no admin, find any active user
-          const anyUser = await this.prisma.user.findFirst({
-            where: { status: 'active' },
-            select: { id: true, name: true }
-          });
-          
-          if (anyUser) {
-            user = anyUser;
-          } else {
-            // No valid users found - this is a critical error
-            throw new Error('No valid user found in the system to assign as note creator');
-          }
-        }
-        
-        this.logger.info(`Using fallback user with ID ${user.id} for note creation`);
+        throw this.errorHandler.createValidationError(`User with ID ${userId} not found`);
       }
       
       // Use the found user data
@@ -910,13 +870,9 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
         appointmentDate = ormEntity.appointmentDate;
       } else if (typeof ormEntity.appointmentDate === 'string') {
         appointmentDate = new Date(ormEntity.appointmentDate);
-        // Fallback if the date is invalid
-        if (isNaN(appointmentDate.getTime())) {
-          this.logger.warn(`Invalid appointment date: ${ormEntity.appointmentDate}`);
-          appointmentDate = new Date(); // Default to current date
-        }
+        throw new Error('Invalid date format');
       } else {
-        appointmentDate = new Date(); // Default to current date
+        throw new Error('Invalid date type');
       }
     } catch (error) {
       this.logger.error(`Error parsing appointment date: ${ormEntity.appointmentDate}`, {
@@ -984,5 +940,71 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
     result.updatedAt = new Date();
     
     return result;
+  }
+
+  /**
+   * Find appointments by criteria
+   * 
+   * @param criteria - Search criteria
+   * @returns Array of appointments matching criteria
+   */
+  async find(criteria: Record<string, any>): Promise<Appointment[]> {
+    try {
+      // Process the criteria for the WHERE clause
+      const where = this.processCriteria(criteria);
+      
+      // Execute query
+      const appointments = await this.prisma.appointment.findMany({
+        where,
+        orderBy: { appointmentDate: 'asc' }
+      });
+      
+      // Map to domain entities
+      return Promise.all(
+        appointments.map(async (appointment) => {
+          const appointmentEntity = this.mapToDomainEntity(appointment);
+          
+          // Load customer data if available
+          if (appointment.customerId) {
+            const customerData = await this.loadCustomerData(appointment.customerId);
+            if (customerData) {
+              (appointmentEntity as any).customerName = customerData.name;
+              (appointmentEntity as any).customer = customerData;
+            }
+          }
+          
+          return appointmentEntity;
+        })
+      );
+    } catch (error) {
+      this.logger.error('Error in AppointmentRepository.find', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        criteria 
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Check if an appointment exists
+   * 
+   * @param id - Appointment ID
+   * @returns Whether the appointment exists
+   */
+  async exists(id: number): Promise<boolean> {
+    try {
+      const count = await this.prisma.appointment.count({
+        where: { id }
+      });
+      
+      return count > 0;
+    } catch (error) {
+      this.logger.error(`Error checking if appointment with ID ${id} exists:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw this.handleError(error);
+    }
   }
 }

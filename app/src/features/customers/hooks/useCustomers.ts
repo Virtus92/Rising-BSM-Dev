@@ -62,7 +62,18 @@ export const useCustomers = (initialFilters?: Partial<CustomerFilterParamsDto>):
       if (process.env.NODE_ENV === 'development') {
         console.log('Mapped customer filters:', mappedFilters);
       }
-      return await CustomerService.getCustomers(mappedFilters);
+      
+      try {
+        // Create the API call promise first but don't await it yet
+        // This prevents Function.prototype.apply errors on Promise objects
+        const apiCall = CustomerService.getCustomers(mappedFilters);
+        
+        // Now await the promise
+        return await apiCall;
+      } catch (err) {
+        console.error('Error in useCustomers fetchFunction:', err);
+        throw err;
+      }
     },
     initialFilters: initialFilters as CustomerFilterParamsDto,
     defaultSortField: 'sortBy' as keyof CustomerFilterParamsDto,

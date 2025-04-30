@@ -3,23 +3,35 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { AlertCircle } from 'lucide-react';
+import { ErrorBoundaryWithHooks as SharedErrorBoundary } from '@/shared/components/error/ErrorBoundary';
 
 interface ErrorFallbackProps {
   error?: Error | null;
   title?: string;
   message?: string;
   retry?: () => void;
+  resetErrorBoundary?: () => void;
 }
 
 /**
- * A component that displays an error message when a dashboard component fails to load
+ * A specialized dashboard error fallback component with dashboard styling
  */
 export function ErrorFallback({ 
   error, 
   title = "Something went wrong", 
   message = "There was an error loading this component. The issue has been reported.",
-  retry
+  retry,
+  resetErrorBoundary
 }: ErrorFallbackProps) {
+  // Use retry function if provided, otherwise use resetErrorBoundary
+  const handleRetry = () => {
+    if (retry) {
+      retry();
+    } else if (resetErrorBoundary) {
+      resetErrorBoundary();
+    }
+  };
+
   return (
     <Card className="border-destructive/50 bg-destructive/5">
       <CardHeader className="pb-2">
@@ -35,9 +47,9 @@ export function ErrorFallback({
             <p className="font-mono">{error.message}</p>
           </div>
         )}
-        {retry && (
+        {(retry || resetErrorBoundary) && (
           <button 
-            onClick={retry}
+            onClick={handleRetry}
             className="mt-3 text-xs bg-destructive/10 hover:bg-destructive/20 text-destructive px-2 py-1 rounded"
           >
             Try again
@@ -50,34 +62,20 @@ export function ErrorFallback({
 
 /**
  * A wrapper component that catches errors in its children
+ * Re-exports the shared ErrorBoundaryWithHooks with dashboard styling
  */
 export function ErrorBoundary({ 
   children,
-  fallback = <ErrorFallback />
+  fallback = <ErrorFallback />,
+  onError
 }: { 
   children: React.ReactNode,
-  fallback?: React.ReactNode
+  fallback?: React.ReactNode,
+  onError?: (error: Error, info: React.ErrorInfo) => void
 }) {
-  const [hasError, setHasError] = React.useState(false);
-  const [error, setError] = React.useState<Error | null>(null);
-
-  React.useEffect(() => {
-    const errorHandler = (error: ErrorEvent) => {
-      console.error("Caught in ErrorBoundary:", error);
-      setHasError(true);
-      setError(error.error || new Error(error.message));
-    };
-
-    window.addEventListener('error', errorHandler);
-    return () => window.removeEventListener('error', errorHandler);
-  }, []);
-
-  if (hasError) {
-    if (React.isValidElement(fallback)) {
-      return fallback;
-    }
-    return <ErrorFallback error={error} retry={() => setHasError(false)} />;
-  }
-
-  return <>{children}</>;
+  return (
+    <SharedErrorBoundary fallback={fallback} onError={onError}>
+      {children}
+    </SharedErrorBoundary>
+  );
 }

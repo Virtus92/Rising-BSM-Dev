@@ -7,18 +7,32 @@ import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
 import { generateSecurePassword } from '@/core/security/password-utils';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
 
 /**
  * POST /api/users/[id]/reset-password
  * Reset a user's password (admin function)
  */
-export const POST = routeHandler(async (req: NextRequest) => {
+export const POST = routeHandler(async (req: NextRequest, { params }) => {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
 
   try {
-    // Extract ID from URL path
-    const id = parseInt(req.nextUrl.pathname.split('/')[3]);
+    // Check permission directly - using the user management permission
+    if (!await permissionMiddleware.hasPermission(
+      req.auth?.userId as number,
+      SystemPermission.USERS_MANAGE
+    )) {
+      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.USERS_MANAGE}`);
+      return formatResponse.error(
+        `You don't have permission to perform this action (requires ${SystemPermission.USERS_MANAGE})`,
+        403
+      );
+    }
+
+    // Extract ID from params (more reliable than parsing URL)
+    const id = parseInt(params?.id || '');
     if (isNaN(id)) {
       return formatResponse.error('Invalid user ID', 400);
     }
@@ -68,6 +82,6 @@ export const POST = routeHandler(async (req: NextRequest) => {
     );
   }
 }, {
-  requiresAuth: true,
-  requiresRole: ['ADMIN']
+  requiresAuth: true
+  // Removed requiredRoles: ['ADMIN'] - we're checking permissions directly in the handler now
 });

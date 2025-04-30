@@ -18,7 +18,7 @@ import { SystemPermission } from '@/domain/enums/PermissionEnums';
  * Retrieves a list of customers, optionally filtered and paginated
  */
 export const GET = routeHandler(
-  permissionMiddleware.withPermission(
+  await permissionMiddleware.withPermission(
     async (req: NextRequest) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
@@ -124,7 +124,7 @@ export const GET = routeHandler(
  * Creates a new customer
  */
 export const POST = routeHandler(
-  permissionMiddleware.withPermission(
+  await permissionMiddleware.withPermission(
     async (req: NextRequest) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();

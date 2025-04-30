@@ -20,7 +20,7 @@ import { getPermissionsForRole } from '@/domain/enums/PermissionEnums';
 /**
  * Service for managing permissions
  */
-import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
+import { invalidateUserPermissionCache } from '@/features/permissions/lib/utils/permissionCacheUtils';
 
 export class PermissionService implements IPermissionService {
   /**
@@ -47,26 +47,13 @@ export class PermissionService implements IPermissionService {
    * @returns Promise that resolves when cache invalidation is complete
    */
   private async invalidateUserPermissionCache(userId: number): Promise<boolean> {
-    try {
-      // Check if permissionMiddleware module is available
-      if (!permissionMiddleware || !permissionMiddleware.invalidatePermissionCache) {
-        this.logger.warn(`Cannot invalidate permission cache for user ${userId}: permissionMiddleware module not available`);
-        return false;
-      }
-      
-      // Call the cache invalidation function
-      const result = await permissionMiddleware.invalidatePermissionCache(userId);
-      this.logger.info(`Invalidated permission cache for user ${userId}, result: ${result}`);
-      return result;
-    } catch (error) {
-      // Log error but don't throw it to avoid breaking the main operation
-      this.logger.error(`Failed to invalidate permission cache for user ${userId}`, {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        userId
-      });
-      return false;
+    const result = invalidateUserPermissionCache(userId);
+    if (result) {
+      this.logger.info(`Invalidated permission cache for user ${userId}`);
+    } else {
+      this.logger.warn(`Failed to invalidate permission cache for user ${userId}`);
     }
+    return result;
   }
 
   /**

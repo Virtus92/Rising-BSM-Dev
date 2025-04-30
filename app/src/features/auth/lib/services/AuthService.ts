@@ -480,38 +480,85 @@ export class AuthService implements IAuthService {
    * @param options - Service options
    * @returns Authentication status
    */
-  async verifyToken(token: string, options?: ServiceOptions): Promise<{ valid: boolean; userId?: number; }> {
+  async verifyToken(token: string, options?: ServiceOptions): Promise<{ valid: boolean; userId?: number; role?: string; }> {
     try {
       if (!token) {
         return { valid: false };
       }
       
+      // Check if we should make a detailed check
+      const performDetailedCheck = options?.context?.detailed !== false;
+      
       // Verify JWT token
       try {
+        // First perform basic JWT validation to avoid unnecessary database queries
         const decoded = jwt.verify(token, this.jwtSecret) as any;
         
         // Check if the payload is valid
         if (!decoded || !decoded.sub) {
+          this.logger.debug('Token has invalid payload structure');
           return { valid: false };
         }
         
         // Get user ID from token
-        const userId = parseInt(decoded.sub, 10);
+        const userId = typeof decoded.sub === 'number' ? decoded.sub : parseInt(decoded.sub, 10);
         
-        // Check if the user exists and is active
-        const user = await this.userRepository.findById(userId);
-        
-        if (!user || !user.isActive()) {
+        if (isNaN(userId)) {
+          this.logger.debug('Token has invalid user ID');
           return { valid: false };
         }
         
-        return { valid: true, userId };
+        // For quick validation, we can skip the database check
+        if (!performDetailedCheck) {
+          // Still verify the token hasn't expired
+          const now = Math.floor(Date.now() / 1000);
+          const isExpired = decoded.exp && decoded.exp < now;
+          
+          if (isExpired) {
+            this.logger.debug('Token is expired');
+            return { valid: false };
+          }
+          
+          // Include role from token if available
+          return { valid: true, userId, role: decoded.role };
+        }
+        
+        // Perform detailed check with database validation
+        // Check if the user exists and is active
+        const user = await this.userRepository.findById(userId);
+        
+        if (!user) {
+          this.logger.debug('User from token not found in database');
+          return { valid: false };
+        }
+        
+        if (!user.isActive()) {
+          this.logger.debug('User from token is not active');
+          return { valid: false };
+        }
+        
+        return { valid: true, userId, role: user.role };
       } catch (error) {
-        this.logger.debug('Token verification failed', { error });
+        if (error instanceof jwt.JsonWebTokenError) {
+          this.logger.debug('Token verification failed: JWT validation error', { 
+            errorType: error.name,
+            errorMessage: error.message
+          });
+        } else if (error instanceof jwt.TokenExpiredError) {
+          this.logger.debug('Token verification failed: Token expired', { 
+            errorType: 'TokenExpiredError',
+            expiredAt: error.expiredAt
+          });
+        } else {
+          this.logger.debug('Token verification failed with unexpected error', { error });
+        }
         return { valid: false };
       }
     } catch (error) {
-      this.logger.error('Error in AuthService.verifyToken', { error });
+      this.logger.error('Error in AuthService.verifyToken', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return { valid: false };
     }
   }
@@ -662,12 +709,6 @@ export class AuthService implements IAuthService {
         // Optional replacement token
         ...(reason ? { replacedByToken: reason } : {})
       };
-      
-      // Remove updatedAt field to prevent Prisma errors
-      // since RefreshToken model does not have this field
-      delete updatedToken.updatedAt;
-      
-      this.logger.debug('Removed id and updatedAt from update data to prevent Prisma errors');
       
       // Update the token
       await this.refreshTokenRepository.update(token, updatedToken);

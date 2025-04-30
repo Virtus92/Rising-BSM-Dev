@@ -267,7 +267,19 @@ export default function CustomerDetail({ customerId, onClose }: CustomerDetailPr
           <div className="mt-6">
             <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-3">Notizen</h3>
             <div className="bg-gray-50 dark:bg-slate-700/30 rounded-md p-4">
-              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{customer.notes}</p>
+              {Array.isArray(customer.notes) ? (
+                customer.notes.map((note, index) => (
+                  <div key={index} className="mb-2 last:mb-0">
+                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                      {note.text || JSON.stringify(note)}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                  {String(customer.notes)}
+                </p>
+              )}
             </div>
           </div>
         )}

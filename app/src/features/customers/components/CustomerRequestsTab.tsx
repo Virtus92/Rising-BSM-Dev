@@ -110,24 +110,9 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
             // Use the requests returned by the backend, which should be filtered by customerId
             // Add a safety check during transition to ensure we only show requests for this customer
             const data = response.data.data;
-            // Define Request interface to match the API response structure
-            interface Request {
-              id: number;
-              customerId: number | string;
-              name: string;
-              email: string;
-              phone?: string;
-              service: string;
-              message: string;
-              status: string;
-              statusLabel?: string;
-              createdAt: string;
-              processorId?: number;
-              processorName?: string;
-            }
             
             // Filter requests by customer ID
-            const filteredData: Request[] = data.filter((request: Request) => Number(request.customerId) === Number(customerId));
+            const filteredData = data.filter((request) => Number(request.customerId) === Number(customerId));
             
             // If filtering happened on the client, log a warning for debugging
             if (filteredData.length !== data.length) {
@@ -169,7 +154,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
       
       // Use PUT for status update instead of PATCH to avoid 500 errors
       // Use the correct parameters for updateRequestStatus method
-      const response = await RequestService.updateRequestStatus(id, newStatus as RequestStatus, 'Status updated via customer requests tab');
+      const response = await RequestService.updateRequest(id, { status: newStatus as RequestStatus, note: 'Status updated via customer requests tab' });
       
       if (response.success) {
         // Update local state
@@ -351,7 +336,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         customerId: customerId
       };
       
-      const response = await RequestService.createInternalRequest(formData);
+      const response = await RequestService.create(formData);
       
       if (response.success && response.data) {
         toast({
@@ -438,7 +423,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         if (originalRequest && originalRequest.status !== requestForm.status) {
           try {
             // Use the dedicated status update endpoint for status changes
-            const statusResponse = await RequestService.updateStatus(currentEditRequest, {
+            const statusResponse = await RequestService.updateRequest(currentEditRequest, {
               status: requestForm.status,
               note: 'Status updated during request edit'
             });

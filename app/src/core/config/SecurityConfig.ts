@@ -1,6 +1,16 @@
 import { getLogger } from '@/core/logging';
 
 /**
+ * JWT Configuration interface
+ */
+export interface JwtConfig {
+  secret: string;
+  accessTokenExpiry: number;
+  refreshTokenExpiry: number;
+  useTokenRotation: boolean;
+}
+
+/**
  * Security configuration manager
  * Handles security-related configuration and validation
  */
@@ -105,7 +115,7 @@ export class SecurityConfig {
   public getJwtOptions() {
     return {
       // Standard JWT options
-      expiresIn: process.env.ACCESS_TOKEN_LIFETIME || '24h',  // 24 hour default for backward compatibility
+      expiresIn: process.env.ACCESS_TOKEN_LIFETIME || '30m',  // 30 minutes default to reduce refresh frequency
       issuer: 'rising-bsm',
       audience: process.env.JWT_AUDIENCE || 'rising-bsm-app',
     };
@@ -123,7 +133,7 @@ export class SecurityConfig {
    * Get access token lifetime in seconds
    */
   public getAccessTokenLifetime(): number {
-    const lifetimeStr = process.env.ACCESS_TOKEN_LIFETIME || '24h';
+    const lifetimeStr = process.env.ACCESS_TOKEN_LIFETIME || '30m'; // Increased to 30 minutes to reduce refresh frequency
     
     if (lifetimeStr.endsWith('h')) {
       const hours = parseInt(lifetimeStr.slice(0, -1), 10);
@@ -135,7 +145,7 @@ export class SecurityConfig {
       const days = parseInt(lifetimeStr.slice(0, -1), 10);
       return days * 24 * 60 * 60;
     } else {
-      return 24 * 60 * 60; // Default to 24 hours
+      return 30 * 60; // Default to 30 minutes
     }
   }
   
@@ -158,6 +168,21 @@ export class SecurityConfig {
       return 30 * 24 * 60 * 60; // Default to 30 days
     }
   }
+  
+  /**
+   * Get JWT configuration object
+   * @returns JwtConfig with all required properties
+   */
+  public getJwtConfig(): JwtConfig {
+    return {
+      secret: this.getJwtSecret(),
+      accessTokenExpiry: this.getAccessTokenLifetime(),
+      refreshTokenExpiry: this.getRefreshTokenLifetime(),
+      useTokenRotation: process.env.USE_TOKEN_ROTATION === 'true' || false
+    };
+  }
+  
+
 }
 
 // Export singleton instance for simpler imports

@@ -101,8 +101,8 @@ export const POST = routeHandler(async (req: NextRequest) => {
     });
     
     return formatResponse.error(
-      'Error processing webhook',
-      error instanceof Error ? error.message : String(error)
+      'Error processing webhook: ' + (error instanceof Error ? error.message : String(error)),
+      500
     );
   }
 }, { requiresAuth: false });

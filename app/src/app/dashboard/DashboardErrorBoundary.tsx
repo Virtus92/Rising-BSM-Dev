@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { removeItem } from '@/shared/utils/storage/cookieStorage';
 
 interface ErrorBoundaryProps {
   error: Error;
@@ -124,8 +125,8 @@ export default function DashboardErrorBoundary(
       document.cookie = 'auth_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       document.cookie = 'auth_token_access=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       document.cookie = 'refresh_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-      localStorage.removeItem('auth_token_backup');
-      localStorage.removeItem('refresh_token_backup');
+      removeItem('auth_token_backup');
+      removeItem('refresh_token_backup');
     } catch (e) {
       // Ignore errors during cleanup
     }

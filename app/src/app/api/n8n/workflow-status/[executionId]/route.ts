@@ -4,14 +4,14 @@ import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 
 /**
  * GET /api/n8n/workflow-status/[executionId]
  * Gets the status of a specific workflow execution
  */
 export const GET = routeHandler(
-  withPermission(
+  await permissionMiddleware.withPermission(
     async (req: NextRequest, { params }: { params: { executionId: string } }) => {
       const executionId = params.executionId;
       
@@ -43,8 +43,8 @@ export const GET = routeHandler(
         });
         
         return formatResponse.error(
-          'Failed to retrieve workflow status',
-          error instanceof Error ? error.message : String(error)
+          'Failed to retrieve workflow status: ' + (error instanceof Error ? error.message : String(error)),
+          500
         );
       }
     },

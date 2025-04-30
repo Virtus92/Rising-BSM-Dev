@@ -78,17 +78,8 @@ export default function CustomerForm({
         
         const result = await onSubmit(data);
         if (result) {
-          const successMessage = mode === 'create' 
-            ? 'Kunde wurde erfolgreich erstellt' 
-            : 'Kunde wurde erfolgreich aktualisiert';
-            
-          // Success is managed by the parent component
-            
-          toast({
-            title: 'Erfolg',
-            description: successMessage,
-            variant: 'success'
-          });
+          // German toast notification removed - keeping only the English message
+          // that will show in the form UI
           
           // Only navigate if we're not in a modal
           if (!onCancel) {
@@ -110,8 +101,8 @@ export default function CustomerForm({
         // Error handling is managed by the parent component
         
         toast({
-          title: 'Fehler',
-          description: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten',
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'An error occurred',
           variant: 'error'
         });
         

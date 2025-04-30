@@ -4,6 +4,7 @@ import React, { createContext, useState, useContext, useEffect, useCallback, use
 import { SettingsClient, SystemSettings as SystemSettingsType } from '@/features/settings/lib/clients/SettingsClient';
 import { initializeClientSettings } from '@/features/settings/lib/utils/SettingsHelper';
 import { useToast } from '@/shared/hooks/useToast';
+import { getItem, setItem } from '@/shared/utils/storage/cookieStorage';
 
 export interface SystemSettings extends SystemSettingsType {}
 
@@ -96,7 +97,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
         
         // Cache settings in localStorage to reduce API calls
         try {
-          localStorage.setItem('app_settings', JSON.stringify({
+          setItem('app_settings', JSON.stringify({
             data: settingsMap,
             timestamp: Date.now()
           }));
@@ -128,7 +129,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
   useEffect(() => {
     // Versuche zuerst, die Einstellungen aus dem LocalStorage zu laden
     try {
-      const cachedSettings = localStorage.getItem('app_settings');
+      const cachedSettings = getItem('app_settings');
       if (cachedSettings) {
         const { data, timestamp } = JSON.parse(cachedSettings);
         // Prüfe, ob die Einstellungen nicht älter als 1 Stunde sind
@@ -181,7 +182,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
         }));
         
         // Notify other tabs/windows
-        localStorage.setItem('settings_updated', Date.now().toString());
+        setItem('settings_updated', Date.now().toString());
         
         toast({
           title: 'Einstellung gespeichert',
@@ -234,7 +235,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
         initializeClientSettings(defaultSettings);
         
         // Notify other tabs/windows
-        localStorage.setItem('settings_updated', Date.now().toString());
+        setItem('settings_updated', Date.now().toString());
         
         toast({
           title: 'Einstellungen zurückgesetzt',

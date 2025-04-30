@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/core/db';
-import { formatSuccess, formatError } from '@/core/errors/index';
+import { formatResponse } from '@/core/errors';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { getLogger } from '@/core/logging';
 import { auth } from '@/features/auth/api/index';
@@ -22,7 +22,7 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
   
   if (!id || isNaN(Number(id))) {
     logger.warn('Invalid customer ID provided', { id });
-    return formatError('Invalid customer ID', 400);
+    return formatResponse.error('Invalid customer ID', 400);
   }
   
   const customerId = Number(id);
@@ -30,11 +30,11 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
   try {
     // Step 1: Authenticate the user - use direct JWT verification for reliability
     const { extractAuthToken } = await import('@/features/auth/api/middleware/authMiddleware');
-    const token = extractAuthToken(request);
+    const token = await extractAuthToken(request);
     
     if (!token) {
       logger.warn('Authentication failed - no token provided');
-      return formatError('Authentication required', 401);
+      return formatResponse.error('Authentication required', 401);
     }
     
     // Verify JWT token
@@ -50,13 +50,13 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
       
       if (!userId) {
         logger.warn('Invalid token - no user ID found');
-        return formatError('Invalid authentication token', 401);
+        return formatResponse.error('Invalid authentication token', 401);
       }
     } catch (tokenError) {
       logger.error('Token verification failed', {
         error: tokenError instanceof Error ? tokenError.message : 'Unknown error'
       });
-      return formatError('Invalid or expired authentication token', 401);
+      return formatResponse.error('Invalid or expired authentication token', 401);
     }
     
     logger.debug('User authenticated successfully', { userId, role: userRole });
@@ -107,7 +107,7 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
         userId, 
         requiredPermission: SystemPermission.CUSTOMERS_EDIT.toString() 
       });
-      return formatError('You do not have permission to update customer status', 403);
+      return formatResponse.error('You do not have permission to update customer status', 403);
     }
     
     // Step 3: Parse request body
@@ -119,19 +119,19 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
       logger.error('Failed to parse request body', { 
         error: parseError instanceof Error ? parseError.message : 'Unknown error' 
       });
-      return formatError('Invalid request body', 400);
+      return formatResponse.error('Invalid request body', 400);
     }
     
     const { status, note } = body;
     
     if (!status) {
       logger.warn('Status not provided in request');
-      return formatError('Status is required', 400);
+      return formatResponse.error('Status is required', 400);
     }
     // Validate that the status is a valid CommonStatus enum value
     if (!Object.values(CommonStatus).includes(status as CommonStatus)) {
       logger.warn('Invalid status value provided', { status });
-      return formatError(`Invalid status value: ${status}. Must be one of: ${Object.values(CommonStatus).join(', ')}`, 400);
+      return formatResponse.error(`Invalid status value: ${status}. Must be one of: ${Object.values(CommonStatus).join(', ')}`, 400);
     }
     
     // Step 4: Update customer status in the database
@@ -144,7 +144,7 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
     
     if (!existingCustomer) {
       logger.warn('Customer not found', { customerId });
-      return formatError(`Customer with ID ${id} not found`, 404);
+      return formatResponse.error(`Customer with ID ${id} not found`, 404);
     }
     
     // Skip update if status is the same
@@ -153,7 +153,7 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
         customerId,
         status
       });
-      return formatSuccess(existingCustomer);
+      return formatResponse.success(existingCustomer);
     }
     
     // Verify the userId exists in the database before using it as updatedBy
@@ -231,7 +231,7 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
         updatedBy: userId
       });
       
-      return formatSuccess(updatedCustomer);
+      return formatResponse.success(updatedCustomer);
     } catch (dbError) {
       // Improved database error handling
       logger.error('Database error updating customer status', {
@@ -246,17 +246,17 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
         const errorMessage = dbError.message;
         
         if (errorMessage.includes('Foreign key constraint')) {
-          return formatError('Status update failed: Database constraint violation', 500);
+          return formatResponse.error('Status update failed: Database constraint violation', 500);
         }
         
         if (errorMessage.includes('not found')) {
-          return formatError(`Customer with ID ${id} not found`, 404);
+          return formatResponse.error(`Customer with ID ${id} not found`, 404);
         }
         
-        return formatError(`Database error: ${errorMessage}`, 500);
+        return formatResponse.error(`Database error: ${errorMessage}`, 500);
       }
       
-      return formatError('Database error occurred while updating customer status', 500);
+      return formatResponse.error('Database error occurred while updating customer status', 500);
     }
   } catch (error) {
     logger.error('Error updating customer status', {
@@ -265,7 +265,7 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
       customerId: id
     });
     
-    return formatError('An error occurred while updating customer status', 500);
+    return formatResponse.error('An error occurred while updating customer status', 500);
   }
 });
 

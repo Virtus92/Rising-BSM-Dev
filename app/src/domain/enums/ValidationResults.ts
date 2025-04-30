@@ -57,6 +57,21 @@ export enum ValidationErrorType {
   PERMISSION = 'permission',
   
   /**
+   * Ungültiges Format
+   */
+  INVALID_FORMAT = 'invalid_format',
+  
+  /**
+   * Wert zu kurz
+   */
+  TOO_SHORT = 'too_short',
+  
+  /**
+   * Interner Fehler
+   */
+  INTERNAL_ERROR = 'internal_error',
+  
+  /**
    * Sonstiger Fehler
    */
   OTHER = 'other'

@@ -29,4 +29,12 @@ export interface IRequestDataRepository extends IBaseRepository<RequestData> {
    * @returns Paginated result of RequestData
    */
   findAll(options?: QueryOptions & { criteria?: any, orderBy?: any }): Promise<PaginationResult<RequestData>>;
+
+  /**
+   * Find RequestData entries by request ID
+   * 
+   * @param requestId - Request ID to look for
+   * @returns List of RequestData entries related to the request
+   */
+  findByRequestId(requestId: number): Promise<RequestData[]>;
 }

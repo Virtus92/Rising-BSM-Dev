@@ -29,12 +29,11 @@ export async function updateUserHandler(
 
     // Validate authentication
     if (!request.auth?.userId) {
-      logger.warn('User update attempted without authentication');
-      return formatResponse.error('Authentication required', 401);
+      return formatResponse.unauthorized('Authentication required');
     }
     
     // Parse request body
-    let data = await request.json();
+    const requestData = await request.json();
     
     // Get user service
     const userService = serviceFactory.createUserService();
@@ -42,53 +41,58 @@ export async function updateUserHandler(
     // Check if user exists
     const existingUser = await userService.getById(userId);
     if (!existingUser) {
-      return formatResponse.error('User not found', 404);
+      return formatResponse.notFound('User not found');
     }
     
     // Check permissions based on update type
     const isOwnProfile = request.auth.userId === userId;
     
     // Different permission checks based on what's being updated
-    // Regular users can update their own basic info
-    // Admin/role changes require higher permissions
-    const isRoleChange = data.role && data.role !== existingUser.role;
-    const isStatusChange = data.status && data.status !== existingUser.status;
+    const isRoleChange = requestData.role && requestData.role !== existingUser.role;
+    const isStatusChange = requestData.status && requestData.status !== existingUser.status;
     
     // For role or status changes, require USERS_MANAGE permission
     if ((isRoleChange || isStatusChange) && 
         !await permissionMiddleware.hasPermission(request.auth.userId, SystemPermission.USERS_MANAGE)) {
-      logger.warn(`Permission denied: User ${request.auth.userId} attempted to change role/status for user ${userId}`);
-      return formatResponse.error('You do not have permission to change user roles or status', 403);
+      return formatResponse.forbidden('You do not have permission to change user roles or status');
     }
     
     // For updating other users, require USERS_EDIT permission
     if (!isOwnProfile && 
         !await permissionMiddleware.hasPermission(request.auth.userId, SystemPermission.USERS_EDIT)) {
-      logger.warn(`Permission denied: User ${request.auth.userId} attempted to update user ${userId}`);
-      return formatResponse.error('You do not have permission to edit this user', 403);
+      return formatResponse.forbidden('You do not have permission to edit this user');
     }
     
     // For updating own profile, some fields may be restricted
+    let dataToUpdate = requestData;
     if (isOwnProfile) {
       // Users can't change their own role or status
       if (isRoleChange || isStatusChange) {
-        logger.warn(`Denied: User ${request.auth.userId} attempted to change their own role/status`);
-        return formatResponse.error('You cannot change your own role or status', 403);
+        return formatResponse.forbidden('You cannot change your own role or status');
       }
       
       // Remove restricted fields from self-updates
-      const { role, status, ...allowedData } = data;
-      data = allowedData;
+      const { role, status, ...allowedData } = requestData;
+      dataToUpdate = allowedData;
     }
     
     // Validate update data
-    const validationResult = validateUserUpdate(data);
+    const validationResult = validateUserUpdate(dataToUpdate);
     
     if (!validationResult.valid) {
-      return formatResponse.error(
-        `Validation failed: ${Object.values(validationResult.errors).join(', ')}`,
-        400
-      );
+      // Convert validation errors to array to match the expected format
+      let errorsArray: string[] = [];
+      if (typeof validationResult.errors === 'object' && validationResult.errors !== null) {
+        Object.entries(validationResult.errors).forEach(([field, message]) => {
+          errorsArray.push(`${field}: ${message}`);
+        });
+      } else if (Array.isArray(validationResult.errors)) {
+        errorsArray = validationResult.errors;
+      } else if (typeof validationResult.errors === 'string') {
+        errorsArray = [validationResult.errors];
+      }
+      
+      return formatResponse.validationError(errorsArray);
     }
     
     // Create context with user ID for audit
@@ -98,13 +102,12 @@ export async function updateUserHandler(
     };
     
     // Update the user
-    const updatedUser = await userService.update(userId, data, { context });
+    const updatedUser = await userService.update(userId, dataToUpdate, { context });
     
     return formatResponse.success(updatedUser, 'User updated successfully');
   } catch (error) {
     logger.error('Error updating user:', {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
       userId
     });
     

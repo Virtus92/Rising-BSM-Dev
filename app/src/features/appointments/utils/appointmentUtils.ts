@@ -226,9 +226,7 @@ export function getAppointmentDate(appointment: AppointmentDto | any): Date {
         }
       }
     }
-    
-    // Fallback
-    return new Date();
+    throw new Error('Invalid appointment date format');
   } catch (error) {
     console.error('Error parsing appointment date:', error as Error);
     return new Date();

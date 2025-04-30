@@ -28,12 +28,12 @@ import { useToast } from '@/shared/hooks/useToast';
 import { format, addDays } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 
-// Validierungsschema für das Formular
+// Form validation schema
 const formSchema = z.object({
-  title: z.string().min(2, 'Titel muss mindestens 2 Zeichen haben'),
-  appointmentDate: z.string().min(1, 'Datum ist erforderlich'),
-  appointmentTime: z.string().min(1, 'Uhrzeit ist erforderlich'),
-  duration: z.coerce.number().min(15, 'Dauer muss mindestens 15 Minuten sein'),
+  title: z.string().min(2, 'Title must be at least 2 characters'),
+  appointmentDate: z.string().min(1, 'Date is required'),
+  appointmentTime: z.string().min(1, 'Time is required'),
+  duration: z.coerce.number().min(15, 'Duration must be at least 15 minutes'),
   location: z.string().optional(),
   description: z.string().optional(),
   status: z.string(),
@@ -48,7 +48,7 @@ interface CreateAppointmentFormProps {
 }
 
 /**
- * Formular zum Erstellen eines Termins für eine Kontaktanfrage
+ * Form for creating an appointment from a request
  */
 export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
   request,
@@ -57,14 +57,14 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  // Default-Werte
+  // Default values
   const tomorrow = addDays(new Date(), 1);
   const defaultValues: Partial<FormValues> = {
-    title: `Termin mit ${request.name}`,
+    title: `Appointment with ${request.name}`,
     appointmentDate: format(tomorrow, 'yyyy-MM-dd'),
     appointmentTime: '10:00',
     duration: 60,
-    location: 'Büro',
+    location: 'Office',
     description: request.message || '',
     status: 'planned',
     note: '',
@@ -135,9 +135,9 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           name="title"
           render={({ field }: any) => (
             <FormItem>
-              <FormLabel>Titel *</FormLabel>
+              <FormLabel>Title *</FormLabel>
               <FormControl>
-                <Input placeholder="Termintitel" {...field} />
+                <Input placeholder="Appointment title" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -150,7 +150,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
             name="appointmentDate"
             render={({ field }: any) => (
               <FormItem>
-                <FormLabel>Datum *</FormLabel>
+                <FormLabel>Date *</FormLabel>
                 <FormControl>
                   <Input type="date" {...field} />
                 </FormControl>
@@ -164,7 +164,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
             name="appointmentTime"
             render={({ field }: any) => (
               <FormItem>
-                <FormLabel>Uhrzeit *</FormLabel>
+                <FormLabel>Time *</FormLabel>
                 <FormControl>
                   <Input type="time" {...field} />
                 </FormControl>
@@ -180,7 +180,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
             name="duration"
             render={({ field }: any) => (
               <FormItem>
-                <FormLabel>Dauer (Minuten) *</FormLabel>
+                <FormLabel>Duration (minutes) *</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
@@ -194,9 +194,9 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
             name="location"
             render={({ field }: any) => (
               <FormItem>
-                <FormLabel>Ort</FormLabel>
+                <FormLabel>Location</FormLabel>
                 <FormControl>
-                  <Input placeholder="Ort des Termins" {...field} />
+                  <Input placeholder="Appointment location" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -209,10 +209,10 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           name="description"
           render={({ field }: any) => (
             <FormItem>
-              <FormLabel>Beschreibung</FormLabel>
+              <FormLabel>Description</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Beschreibung des Termins"
+                  placeholder="Description of the appointment"
                   rows={3}
                   {...field}
                 />
@@ -234,18 +234,18 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
               >
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Status auswählen" />
+                    <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="planned">Geplant</SelectItem>
-                  <SelectItem value="confirmed">Bestätigt</SelectItem>
-                  <SelectItem value="completed">Abgeschlossen</SelectItem>
-                  <SelectItem value="cancelled">Abgesagt</SelectItem>
+                  <SelectItem value="planned">Planned</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
               <FormDescription>
-                Der Standardstatus für neue Termine ist "Geplant"
+                The default status for new appointments is "Planned"
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -257,15 +257,15 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           name="note"
           render={({ field }: any) => (
             <FormItem>
-              <FormLabel>Notiz</FormLabel>
+              <FormLabel>Note</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Interne Notiz zum Termin (optional)"
+                  placeholder="Internal note about the appointment (optional)"
                   {...field}
                 />
               </FormControl>
               <FormDescription>
-                Diese Notiz wird als Kommentar zur Anfrage hinzugefügt
+                This note will be added as a comment to the request
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -274,13 +274,13 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" type="button" onClick={onClose}>
-            Abbrechen
+            Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            Termin erstellen
+            Create Appointment
           </Button>
         </div>
       </form>

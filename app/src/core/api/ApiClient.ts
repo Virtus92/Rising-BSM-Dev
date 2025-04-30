@@ -6,8 +6,9 @@
  * This is explicitly marked as a client component and should not be used directly in server components
  */
 import { permissionErrorHandler, formatPermissionDeniedMessage } from '@/shared/utils/permission-error-handler';
-import { TokenManager } from '@/features/auth/lib/clients/token';
+// Only import ClientTokenManager - avoid importing TokenManager directly
 import { ClientTokenManager } from '@/features/auth/lib/clients/token/ClientTokenManager';
+import { getItem } from '@/shared/utils/storage/cookieStorage';
 
 // GLOBAL INITIALIZATION FLAG - outside the class to ensure it's truly a singleton across all imports
 // This is critically important - React may import this file multiple times
@@ -16,10 +17,10 @@ let GLOBAL_INIT_PROMISE: Promise<void> | null = null;
 let GLOBAL_API_BASE_URL = '/api'; // Set default API base URL
 let GLOBAL_API_HEADERS: Record<string, string> = { 'Content-Type': 'application/json' };
 
-// Global request tracking to prevent duplicate calls and detect duplicate API instances
+// Global request tracking for diagnostic purposes only
 let GLOBAL_REQUEST_COUNT = 0;
-let GLOBAL_REQUEST_HISTORY: Array<{url: string, method: string, timestamp: number}> = [];
-const MAX_REQUEST_HISTORY = 20; // Only keep track of the last 20 requests
+let GLOBAL_REQUEST_HISTORY: Array<{url: string, method: string, timestamp: number, error?: Error}> = [];
+const MAX_REQUEST_HISTORY = 50; // Keep track of more requests for debugging
 
 // Expose window-level flags we can check for debugging and synchronization
 if (typeof window !== 'undefined') {
@@ -151,8 +152,8 @@ export class ApiClient {
         
         // Token synchronization in client environment
         const tokenPromise = typeof window !== 'undefined' && config.autoRefreshToken !== false
-          ? TokenManager.synchronizeTokens(true).catch(err => {
-              console.warn('Failed to synchronize tokens during API initialization:', err);
+          ? ClientTokenManager.refreshAccessToken().catch((err: Error) => {
+              console.warn('Error refreshing token during API initialization:', err);
               return false;
             })
           : Promise.resolve(false);
@@ -233,9 +234,23 @@ export class ApiClient {
    * @returns Request options
    */
   private static getRequestOptions(method: string, data?: any): RequestInit {
+    // Get auth token for every request by default
+    let headersToUse = {...GLOBAL_API_HEADERS};
+    
+    // Always include auth token by default for all requests
+    try {
+      const authToken = getItem('auth_token_backup') || getItem('auth_token');
+      if (authToken) {
+        headersToUse['Authorization'] = `Bearer ${authToken}`;
+        headersToUse['X-Auth-Token'] = authToken;
+      }
+    } catch (tokenError) {
+      console.warn('Error getting auth token for request:', tokenError);
+    }
+    
     return {
       method,
-      headers: GLOBAL_API_HEADERS,
+      headers: headersToUse,
       credentials: 'include', // Always include cookies for authentication
       body: data ? JSON.stringify(data) : undefined
     };
@@ -313,6 +328,7 @@ export class ApiClient {
       requestId?: string; // Optional request ID for tracking
       skipCache?: boolean; // Skip cache for this request
       cacheTime?: number; // Cache time in milliseconds (default: 30000 ms = 30 seconds)
+      includeAuthToken?: boolean; // Whether to explicitly include auth token in headers
     } = {}
   ): Promise<ApiResponse<T>> {
     // Generate request ID for tracking if not provided
@@ -355,63 +371,97 @@ export class ApiClient {
       }
 
       // Merge headers and other options
+      const headersToUse = { ...GLOBAL_API_HEADERS, ...(options.headers || {}) };
+      
+      // Explicitly include auth token if requested or for permission/user endpoints
+      if (options.includeAuthToken !== false && 
+          (endpoint.includes('/permissions') || endpoint.includes('/users') || options.includeAuthToken)) {
+        try {
+          // Get token from localStorage
+          const authToken = getItem('auth_token_backup') || getItem('auth_token');
+          if (authToken) {
+            headersToUse['Authorization'] = `Bearer ${authToken}`;
+            headersToUse['X-Auth-Token'] = authToken;
+          } else {
+            console.warn(`No auth token available for request to ${endpoint}`);
+          }
+        } catch (tokenError) {
+          console.warn(`Error getting auth token for request to ${endpoint}:`, tokenError);
+        }
+      }
+      
       const requestOptions: RequestInit = {
         method: 'GET',
-        headers: { ...GLOBAL_API_HEADERS, ...(options.headers || {}) },
+        headers: headersToUse,
         credentials: 'include', // Include cookies
         // Add cache control to prevent browser caching
         cache: 'no-cache',
       };
 
-      // Detect notification endpoint for special handling and lists for better retry strategy
-      const isNotificationEndpoint = endpoint.includes('/notifications');
-      const isListEndpoint = endpoint.includes('?page=') || 
-                             endpoint.includes('limit=') || 
-                             endpoint.includes('pagination');
-      
-      // Configure retries based on endpoint type
-      // - No retries for notifications
-      // - Limited retries for list endpoints to prevent resource exhaustion
-      // - Standard retries for other endpoints
-      const maxRetries = isNotificationEndpoint ? 0 : (isListEndpoint ? 1 : 2);
-      const retryDelay = isListEndpoint ? 1000 : 300; // Longer delay for list endpoints
-
-      // Use retry logic with configurable retries
-      return await this.retry<ApiResponse<T>>(async () => {
-        // Add request timeout for better error handling
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-        
-        try {
-          const response = await fetch(url, {
-            ...requestOptions,
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-          return this.handleResponse<T>(response);
-        } catch (error) {
-          clearTimeout(timeoutId);
-          throw error;
-        }
-      }, maxRetries, retryDelay);
+      // Use direct request execution - no retries
+      return await this.executeRequest<ApiResponse<T>>(
+        async () => {
+          // Create a stable controller that won't be garbage collected during the request
+          const controller = new AbortController();
+          let timeoutId: any = null;
+          
+          try {
+            // Set timeout with safety checks
+            if (typeof window !== 'undefined') {
+              timeoutId = window.setTimeout(() => {
+                try {
+                  // Only abort if the controller is still valid
+                  if (controller && controller.signal && !controller.signal.aborted) {
+                    controller.abort(new DOMException('Request timed out', 'TimeoutError'));
+                  }
+                } catch (abortError) {
+                  console.error('Error during abort:', abortError);
+                }
+              }, 30000); // Increase timeout to 30 seconds for more reliability
+            }
+            
+            // Make the request with the signal
+            const response = await fetch(url, {
+              ...requestOptions,
+              signal: controller.signal
+            });
+            
+            // Clear timeout once response received
+            if (timeoutId !== null && typeof window !== 'undefined') {
+              window.clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+            
+            // Process the response
+            return this.handleResponse<T>(response, { endpoint, requestId });
+          } catch (error) {
+            // Always clear timeout to prevent memory leaks
+            if (timeoutId !== null && typeof window !== 'undefined') {
+              window.clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+            
+            // Handle abort errors with better messaging
+            if (error instanceof DOMException && error.name === 'AbortError') {
+              if (error.message === 'Request timed out') {
+                throw new Error(`Request to ${endpoint} timed out after 30 seconds`);
+              } else {
+                throw new Error(`Request to ${endpoint} was aborted: ${error.message}`);
+              }
+            }
+            
+            // Re-throw other errors
+            throw error;
+          }
+        },
+        { endpoint, method: 'GET', requestId, error: null}
+      );
     } catch (error) {
-      // Special handling for notification endpoint errors
-      if (endpoint.includes('/notifications')) {
-        console.warn('Notification endpoint error, preventing retry:', error as Error);
-        return {
-          success: false,
-          data: null,
-          message: 'Failed to fetch notifications',
-          statusCode: 500
-        };
-      }
+      // Log the error but don't handle it specially - just rethrow
+      console.error(`GET request failed for ${endpoint}:`, error);
       
-      // Check if this is a list endpoint that's failing repeatedly
-      if (endpoint.includes('?page=') || endpoint.includes('limit=')) {
-        console.warn('List endpoint error, limiting retries:', endpoint);
-      }
-      
-      return this.handleError<T>(error);
+      // Return formatted error response instead of throwing
+      return this.handleError<T>(error, { endpoint, method: 'GET', requestId });
     }
   }
 
@@ -429,6 +479,7 @@ export class ApiClient {
       headers?: Record<string, string>;
       skipInitCheck?: boolean; // Skip initialization check for internal calls
       requestId?: string; // Optional request ID for tracking
+      includeAuthToken?: boolean; // Whether to explicitly include auth token in headers
     } = {}
   ): Promise<ApiResponse<T>> {
     // Generate request ID for tracking if not provided
@@ -464,9 +515,28 @@ export class ApiClient {
       }
 
       // Merge headers
+      const headersToUse = { ...GLOBAL_API_HEADERS, ...(options.headers || {}) };
+      
+      // Explicitly include auth token if requested or for permission/user endpoints
+      if (options.includeAuthToken !== false && 
+          (endpoint.includes('/permissions') || endpoint.includes('/users') || options.includeAuthToken)) {
+        try {
+          // Get token from localStorage
+          const authToken = getItem('auth_token_backup') || getItem('auth_token');
+          if (authToken) {
+            headersToUse['Authorization'] = `Bearer ${authToken}`;
+            headersToUse['X-Auth-Token'] = authToken;
+          } else {
+            console.warn(`No auth token available for request to ${endpoint}`);
+          }
+        } catch (tokenError) {
+          console.warn(`Error getting auth token for request to ${endpoint}:`, tokenError);
+        }
+      }
+      
       const requestOptions: RequestInit = {
         method: 'POST',
-        headers: { ...GLOBAL_API_HEADERS, ...(options.headers || {}) },
+        headers: headersToUse,
         credentials: 'include', // Include cookies
         body: data ? JSON.stringify(data) : undefined,
       };
@@ -493,6 +563,7 @@ export class ApiClient {
       headers?: Record<string, string>;
       skipInitCheck?: boolean; // Skip initialization check for internal calls
       requestId?: string; // Optional request ID for tracking
+      includeAuthToken?: boolean; // Whether to explicitly include auth token in headers
     } = {}
   ): Promise<ApiResponse<T>> {
     // Generate request ID for tracking if not provided
@@ -527,9 +598,28 @@ export class ApiClient {
       }
 
       // Merge headers
+      const headersToUse = { ...GLOBAL_API_HEADERS, ...(options.headers || {}) };
+      
+      // Explicitly include auth token if requested or for permission/user endpoints
+      if (options.includeAuthToken !== false && 
+          (endpoint.includes('/permissions') || endpoint.includes('/users') || options.includeAuthToken)) {
+        try {
+          // Get token from localStorage
+          const authToken = getItem('auth_token_backup') || getItem('auth_token');
+          if (authToken) {
+            headersToUse['Authorization'] = `Bearer ${authToken}`;
+            headersToUse['X-Auth-Token'] = authToken;
+          } else {
+            console.warn(`No auth token available for request to ${endpoint}`);
+          }
+        } catch (tokenError) {
+          console.warn(`Error getting auth token for request to ${endpoint}:`, tokenError);
+        }
+      }
+      
       const requestOptions: RequestInit = {
         method: 'PUT',
-        headers: { ...GLOBAL_API_HEADERS, ...(options.headers || {}) },
+        headers: headersToUse,
         credentials: 'include', // Include cookies
         body: JSON.stringify(data),
       };
@@ -556,6 +646,7 @@ export class ApiClient {
       headers?: Record<string, string>;
       skipInitCheck?: boolean; // Skip initialization check for internal calls
       requestId?: string; // Optional request ID for tracking
+      includeAuthToken?: boolean; // Whether to explicitly include auth token in headers
     } = {}
   ): Promise<ApiResponse<T>> {
     // Generate request ID for tracking if not provided
@@ -590,9 +681,28 @@ export class ApiClient {
       }
 
       // Merge headers
+      const headersToUse = { ...GLOBAL_API_HEADERS, ...(options.headers || {}) };
+      
+      // Explicitly include auth token if requested or for permission/user endpoints
+      if (options.includeAuthToken !== false && 
+          (endpoint.includes('/permissions') || endpoint.includes('/users') || options.includeAuthToken)) {
+        try {
+          // Get token from localStorage
+          const authToken = getItem('auth_token_backup') || getItem('auth_token');
+          if (authToken) {
+            headersToUse['Authorization'] = `Bearer ${authToken}`;
+            headersToUse['X-Auth-Token'] = authToken;
+          } else {
+            console.warn(`No auth token available for request to ${endpoint}`);
+          }
+        } catch (tokenError) {
+          console.warn(`Error getting auth token for request to ${endpoint}:`, tokenError);
+        }
+      }
+      
       const requestOptions: RequestInit = {
         method: 'PATCH',
-        headers: { ...GLOBAL_API_HEADERS, ...(options.headers || {}) },
+        headers: headersToUse,
         credentials: 'include', // Include cookies
         body: JSON.stringify(data),
       };
@@ -617,6 +727,7 @@ export class ApiClient {
       headers?: Record<string, string>;
       skipInitCheck?: boolean; // Skip initialization check for internal calls
       requestId?: string; // Optional request ID for tracking
+      includeAuthToken?: boolean; // Whether to explicitly include auth token in headers
     } = {}
   ): Promise<ApiResponse<T>> {
     // Generate request ID for tracking if not provided
@@ -651,9 +762,28 @@ export class ApiClient {
       }
 
       // Merge headers
+      const headersToUse = { ...GLOBAL_API_HEADERS, ...(options.headers || {}) };
+      
+      // Explicitly include auth token if requested or for permission/user endpoints
+      if (options.includeAuthToken !== false && 
+          (endpoint.includes('/permissions') || endpoint.includes('/users') || options.includeAuthToken)) {
+        try {
+          // Get token from localStorage
+          const authToken = getItem('auth_token_backup') || getItem('auth_token');
+          if (authToken) {
+            headersToUse['Authorization'] = `Bearer ${authToken}`;
+            headersToUse['X-Auth-Token'] = authToken;
+          } else {
+            console.warn(`No auth token available for request to ${endpoint}`);
+          }
+        } catch (tokenError) {
+          console.warn(`Error getting auth token for request to ${endpoint}:`, tokenError);
+        }
+      }
+      
       const requestOptions: RequestInit = {
         method: 'DELETE',
-        headers: { ...GLOBAL_API_HEADERS, ...(options.headers || {}) },
+        headers: headersToUse,
         credentials: 'include', // Include cookies
       };
 
@@ -698,11 +828,16 @@ export class ApiClient {
   }
 
   /**
-   * Handle API response
+   * Handle API response - directly expose all errors
    * @param response Fetch API response
+   * @param requestInfo Request information for better error messages
    * @returns API response
+   * @throws Detailed errors for all API issues
    */
-  private static async handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
+  private static async handleResponse<T>(
+    response: Response, 
+    requestInfo?: { endpoint?: string; method?: string; requestId?: string }
+  ): Promise<ApiResponse<T>> {
     try {
       const contentType = response.headers.get('content-type');
       
@@ -733,83 +868,7 @@ export class ApiClient {
         });
       }
       
-      // Create a function to handle 401 (unauthorized) responses that can be reused
-      const handle401Response = async (): Promise<ApiResponse<T> | null> => {
-        console.warn('API request returned 401 Unauthorized');
-        
-        // Skip token refresh for auth-related endpoints to prevent infinite loops
-        const skipTokenRefresh = isRefreshRequest || 
-        isLoginRequest || 
-        originalUrl.includes('/api/auth/validate') ||
-        originalUrl.includes('/api/auth/logout') ||
-                                originalUrl.includes('/auth/refresh');
-        
-        if (!skipTokenRefresh && typeof window !== 'undefined') {
-          try {
-            // Use the imported ClientTokenManager
-            const refreshSuccess = await ClientTokenManager.refreshAccessToken();
-            
-            if (refreshSuccess) {
-              // Retry the original request after token refresh with explicit headers
-              console.log('Token refreshed successfully, retrying original request:', originalUrl);
-              
-              // Build proper headers for retry
-              const retryHeaders = new Headers(response.headers);
-              
-              // Get the refreshed token
-              const newToken = ClientTokenManager.getAccessToken();
-              if (newToken) {
-                retryHeaders.set('Authorization', `Bearer ${newToken}`);
-              }
-              
-              // Set proper content-type if needed
-              if (!retryHeaders.has('Content-Type')) {
-                retryHeaders.set('Content-Type', 'application/json');
-              }
-              
-              // Set cache control to prevent caching issues
-              retryHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-              
-              try {
-                // Get the request body if available
-                let requestBody: string | undefined = undefined;
-                if (!response.bodyUsed) {
-                  try {
-                    requestBody = await response.clone().text();
-                  } catch (bodyError) {
-                    console.warn('Could not clone response body for retry');
-                  }
-                }
-                
-                const retryResponse = await fetch(originalUrl, {
-                  method: response.type || 'GET',
-                  headers: retryHeaders,
-                  credentials: 'include',
-                  body: requestBody
-                });
-                
-                // Process the retry response
-                return await this.handleResponse<T>(retryResponse);
-              } catch (retryError) {
-                console.error('Failed to retry request after token refresh:', retryError);
-              }
-            }
-          } catch (refreshError) {
-            console.error('Failed to refresh token during 401 response:', refreshError);
-          }
-          
-          // If token refresh or retry failed, redirect to login
-          if (typeof window !== 'undefined' && !skipTokenRefresh) {
-            console.log('Token refresh failed or request retry failed, redirecting to login');
-            // Use a timeout to allow the current code to complete
-            setTimeout(() => {
-              window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
-            }, 100);
-          }
-        }
-        
-        return null;
-      };
+      // No 401 auto-handling - let errors propagate directly
       
       // Handle JSON responses
       if (contentType && contentType.includes('application/json')) {
@@ -824,28 +883,31 @@ export class ApiClient {
             statusCode: response.status
           };
         } else {
-          // Handle 401 (Unauthorized) - Session expired
+          // Handle 401 (Unauthorized) - No automatic refresh or handling
           if (response.status === 401) {
-          // Check if we're in an authentication flow already
-          const isAuthEndpoint = originalUrl.includes('/api/auth/');
+          const errorDetails = {
+          url: originalUrl,
+          isAuthEndpoint: originalUrl.includes('/api/auth/'),
+          responseMessage: json.message || json.error,
+            requestId: requestInfo?.requestId,
+            requestEndpoint: requestInfo?.endpoint
+          };
           
-          // Avoid token refresh loops in authentication endpoints
-          if (!isAuthEndpoint) {
-          console.log('401 response for non-auth endpoint, attempting token refresh');
-          const refreshResult = await handle401Response();
-          if (refreshResult) return refreshResult;
-          } else {
-          console.log('401 response in auth endpoint, skipping token refresh');
-          }
-            
-        // If refresh handler didn't return a response or this is an auth endpoint, return standard 401 response
-        return {
-          success: false,
-          data: null as any,
-          message: json.message || json.error || 'Authentication required',
-          statusCode: 401,
-          errorType: 'network'
-        };
+          console.error('401 Unauthorized error detected:', errorDetails);
+          
+          // Create a detailed error with all information
+          const error = new ApiRequestError(
+              `Authentication error (401): ${json.message || json.error || 'Unauthorized'}`,
+          401,
+          json.errors || []
+        );
+        
+        // Add request details to the error
+        (error as any).requestDetails = errorDetails;
+        (error as any).responseData = json;
+        
+        // Throw directly - no refresh attempt
+        throw error;
       }
           
           // Check for permission errors (403 Forbidden)
@@ -894,19 +956,31 @@ export class ApiClient {
             statusCode: response.status
           };
         } else {
-          // Handle 401 (Unauthorized) - Session expired
+          // Handle 401 (Unauthorized) - No automatic handling
           if (response.status === 401) {
-            const refreshResult = await handle401Response();
-            if (refreshResult) return refreshResult;
-            
-            // If refresh handler didn't return a response, return standard 401 response
-            return {
-              success: false,
-              data: null as any,
-              message: text || 'Authentication required',
-              statusCode: 401,
-              errorType: 'network'
+            const errorDetails = {
+              url: response.url,
+              isAuthEndpoint: response.url.includes('/api/auth/'),
+              statusText: response.statusText,
+              responseText: text,
+              requestId: requestInfo?.requestId,
+              requestEndpoint: requestInfo?.endpoint
             };
+            
+            console.error('401 Unauthorized error detected (text response):', errorDetails);
+            
+            // Create detailed error
+            const error = new ApiRequestError(
+              `Authentication error (401): ${text || response.statusText || 'Unauthorized'}`,
+              401,
+              []
+            );
+            
+            // Add request details to the error
+            (error as any).requestDetails = errorDetails;
+            
+            // Throw directly - no refresh attempt
+            throw error;
           }
           
           // Check for permission errors (403 Forbidden)
@@ -1023,87 +1097,65 @@ export class ApiClient {
   }
 
   /**
-   * Retry a failed request
-   * @param fn Function to retry
-   * @param retries Number of retries
-   * @param delay Delay between retries in milliseconds
-   * @returns Result of the function
+   * Execute function without any retries to expose raw errors
+   * 
+   * @param fn Function to execute
+   * @returns Promise with the raw result or error
    */
   /**
-   * Retry a request function with exponential backoff
+   * Execute API request without any retries
+   * This method exposes all errors directly for proper debugging
    * 
-   * @param fn Function to retry
-   * @param retries Number of retries
-   * @param delay Base delay in milliseconds
-   * @param opts Additional options
-   * @returns Promise with the result
+   * @param fn Function to execute the API request
+   * @param requestInfo Request information for tracking
+   * @returns Promise with the direct result
+   * @throws Original errors without any handling
    */
-  private static async retry<T>(
-    fn: () => Promise<T>, 
-    retries: number = 3, 
-    delay: number = 300,
-    opts: {
-      isAuthRequest?: boolean;
-      requestId?: string;
-      isTokenRefresh?: boolean;
-    } = {}
+  private static async executeRequest<T>(
+    fn: () => Promise<T>,
+    requestInfo: { endpoint: string; method: string; requestId: string; error: any }
   ): Promise<T> {
+    // Track pending request for analytics only
+    if (typeof window !== 'undefined' && (window as any).__API_CLIENT_STATE) {
+      (window as any).__API_CLIENT_STATE.pendingRequests++;
+    }
+    
+    // Add to request history for diagnostics
+    const historyEntry = {
+      url: requestInfo.endpoint,
+      method: requestInfo.method,
+      error: requestInfo.error,
+      timestamp: Date.now()
+    };
+    GLOBAL_REQUEST_HISTORY.push(historyEntry);
+    
     try {
-      // Track pending request
-      if (typeof window !== 'undefined' && (window as any).__API_CLIENT_STATE) {
-        (window as any).__API_CLIENT_STATE.pendingRequests++;
-      }
-      
-      return await fn();
+      // Execute function directly - no retry logic
+      const result = await fn();
+      return result;
     } catch (error) {
-      // Don't retry if we're out of retries
-      if (retries <= 0) {
-        throw error;
-      }
+      // Add error to history entry for diagnostics
+      historyEntry.error = error instanceof Error ? error : new Error(String(error));
       
-      // Check for abort errors (e.g. timeouts) and network errors
-      const isAbortError = error instanceof DOMException && error.name === 'AbortError';
-      const isNetworkError = error instanceof TypeError && error.message === 'Failed to fetch';
+      // Log detailed error information
+      console.error(`API request failed [${requestInfo.method} ${requestInfo.endpoint}]:`, {
+        requestId: requestInfo.requestId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       
-      // Don't retry for programmatic aborts (timeouts) or certain kinds of client errors
-      if (isAbortError) {
-        console.warn('Request timed out, not retrying');
-        throw new Error('Request timed out. Please try again later.');
-      }
-      
-      // For network errors, check if navigator is online before retrying
-      if (isNetworkError && typeof navigator !== 'undefined' && !navigator.onLine) {
-        console.warn('Network offline, not retrying');
-        throw new Error('Network connection unavailable. Please check your internet connection.');
-      }
-      
-      // Special handling for token refresh to prevent cascading auth failures
-      if (opts.isTokenRefresh && isNetworkError) {
-        console.warn('Token refresh network error, waiting longer before retry');
-        // Use a longer delay for token refresh requests
-        delay = delay * 2;
-      }
-      
-      // For auth requests, check if API is initialized
-      if (opts.isAuthRequest && !GLOBAL_API_INITIALIZED) {
-        console.warn('API not initialized during auth request, initializing before retry');
-        // Initialize API before retrying
-        await ApiClient.initialize({ force: true });
-      }
-      
-      // Log retry attempt
-      console.warn(`Retrying request ${opts.requestId ? `(${opts.requestId})` : ''} - ${retries} attempts left after ${delay}ms delay`);
-      
-      // Wait for delay milliseconds
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      // Retry with one fewer retry and longer delay (exponential backoff)
-      return this.retry(fn, retries - 1, delay * 1.5, opts);
+      // Throw the original error directly - no swallowing
+      throw error;
     } finally {
       // Track pending request completion
       if (typeof window !== 'undefined' && (window as any).__API_CLIENT_STATE) {
         (window as any).__API_CLIENT_STATE.pendingRequests = 
           Math.max(0, ((window as any).__API_CLIENT_STATE.pendingRequests || 0) - 1);
+      }
+      
+      // Trim request history if needed
+      if (GLOBAL_REQUEST_HISTORY.length > MAX_REQUEST_HISTORY) {
+        GLOBAL_REQUEST_HISTORY = GLOBAL_REQUEST_HISTORY.slice(-MAX_REQUEST_HISTORY);
       }
     }
   }
@@ -1127,3 +1179,13 @@ export class ApiRequestError extends Error {
 
 export const apiClient = ApiClient;
 export default ApiClient;
+/**
+ * Function stub kept for reference - disabled
+ * This function has been disabled to expose all authentication errors directly
+ * We no longer attempt to automatically refresh tokens when 401 errors occur
+ */
+async function disabledHandle401Response<T>(): Promise<ApiResponse<T> | undefined> {
+  // This function is intentionally disabled to force proper error handling
+  console.error('Token refresh on 401 has been disabled to expose authentication errors');
+  return undefined;
+}

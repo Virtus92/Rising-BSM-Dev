@@ -120,6 +120,8 @@ export const useDashboardCharts = (): DashboardChartState => {
   const isFetchingRef = useRef(false);
   // Track last fetch time to throttle refreshes
   const lastFetchTimeRef = useRef(0);
+  // Track last time frame to avoid redundant fetches
+  const lastTimeFrameRef = useRef<TimeFrame | null>(null);
 
   // Function to fetch stats from a specific API endpoint
   const fetchStatsFromApi = useCallback(async (
@@ -385,10 +387,49 @@ export const useDashboardCharts = (): DashboardChartState => {
     }
   }, [fetchStatsFromApi, toast]);
 
+  // First mount flag to prevent duplicate fetches on initial render
+  const isFirstMountRef = useRef(true);
+  
   // Fetch data when the component mounts or the time frame changes
   useEffect(() => {
-    console.log(`Time frame changed to ${timeFrame}, fetching new data`);
-    fetchStatistics(timeFrame);
+    // Set mounted flag for lifecycle management
+    isMountedRef.current = true;
+    
+    // Don't fetch data on mount if we're already loading or have fetched data before
+    const hasExistingData = Object.keys(statsData.requests).length > 0 || 
+                          Object.keys(statsData.appointments).length > 0 || 
+                          Object.keys(statsData.customers).length > 0 || 
+                          Object.keys(statsData.users).length > 0;
+    
+    // Avoid duplicate fetch on React Strict Mode double mount
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      
+      // Check if we already have data in state
+      if (hasExistingData) {
+        console.log('Already have stats data, skipping initial fetch');
+        return;
+      }
+    }
+    
+    // Only fetch new data if the time frame changed or we have no data and are not already fetching
+    if (
+      !isFetchingRef.current && 
+      (lastTimeFrameRef.current !== timeFrame || !hasExistingData)
+    ) {
+      // Prevent duplicate requests with a small delay
+      const fetchId = setTimeout(() => {
+        console.log(`Time frame changed to ${timeFrame}, fetching new data`);
+        lastTimeFrameRef.current = timeFrame;
+        fetchStatistics(timeFrame);
+      }, 50);
+      
+      // Clear timeout on cleanup
+      return () => {
+        clearTimeout(fetchId);
+        isMountedRef.current = false;
+      };
+    }
     
     // Clean up function to prevent updates after unmount
     return () => {

@@ -5,7 +5,7 @@ import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
-import { API_PERMISSIONS } from '../../helpers/apiPermissions';
+import { API_PERMISSIONS } from '@/features/permissions/api/middleware/permissionMiddleware';
 
 /**
  * GET /api/requests/count
@@ -53,7 +53,7 @@ export const GET = routeHandler(
       
       return formatResponse.success({ count }, 'Request count retrieved successfully');
     },
-    SystemPermission.REQUESTS_VIEW
+    API_PERMISSIONS.REQUESTS.VIEW
   ),
   { requiresAuth: true }
 );

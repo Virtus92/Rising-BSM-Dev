@@ -7,7 +7,7 @@ import { UserRole } from '@/domain/entities/User';
  */
 export const GET = routeHandler(
   async (request: NextRequest) => {
-    const userId = (request as any).userId;
+    const userId = request.auth?.userId;
     
     return NextResponse.json({
       success: true,
@@ -15,7 +15,8 @@ export const GET = routeHandler(
       data: {
         userId,
         timestamp: new Date().toISOString()
-      }
+      },
+      timestamp: new Date().toISOString()
     });
   },
   { 
@@ -28,7 +29,7 @@ export const GET = routeHandler(
  */
 export const POST = routeHandler(
   async (request: NextRequest) => {
-    const userId = (request as any).userId;
+    const userId = request.auth?.userId;
     
     return NextResponse.json({
       success: true,
@@ -36,12 +37,13 @@ export const POST = routeHandler(
       data: {
         userId,
         timestamp: new Date().toISOString()
-      }
+      },
+      timestamp: new Date().toISOString()
     });
   },
   { 
     requiresAuth: true,
-    requiresRole: [UserRole.ADMIN, UserRole.MANAGER]
+    requiredRoles: [UserRole.ADMIN, UserRole.MANAGER]
   }
 );
 
@@ -50,7 +52,7 @@ export const POST = routeHandler(
  */
 export const PUT = routeHandler(
   async (request: NextRequest) => {
-    const userId = (request as any).userId;
+    const userId = request.auth?.userId;
     
     return NextResponse.json({
       success: true,
@@ -58,11 +60,12 @@ export const PUT = routeHandler(
       data: {
         userId,
         timestamp: new Date().toISOString()
-      }
+      },
+      timestamp: new Date().toISOString()
     });
   },
   { 
     requiresAuth: true,
-    requiresRole: [UserRole.EMPLOYEE]
+    requiredRoles: [UserRole.EMPLOYEE]
   }
 );

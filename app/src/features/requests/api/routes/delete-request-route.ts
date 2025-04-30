@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { apiAuth } from '@/features/auth/api/middleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { formatResponse } from '@/core/errors/formatting/response-formatter';
+import { formatResponse } from '@/core/errors';
+import { routeHandler } from '@/core/api/route-handler';
 import { IRequestService } from '@/domain/services/IRequestService';
 
 /**
@@ -12,19 +13,19 @@ import { IRequestService } from '@/domain/services/IRequestService';
  * @param params - Route parameters with request ID
  * @returns Response with success status
  */
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export const DELETE = routeHandler(async (request: NextRequest) => {
+  // Extract ID from URL path segments
+  const urlParts = request.nextUrl.pathname.split('/');
+  const id = Number(urlParts[urlParts.length - 2]); // Take the second-to-last segment (the [id] part)
   try {
-    // Extract ID from route parameters
-    const id = Number(params.id);
     if (isNaN(id) || id <= 0) {
       return formatResponse.error('Invalid request ID', 400);
     }
 
     // Authenticate user
-    const auth = await apiAuth.auth(request);
-    
-    if (!auth.success) {
-      return formatResponse.error(auth.message || 'Authentication required', auth.status || 401);
+    const auth = await apiAuth(request);
+    if (!auth) {
+      return formatResponse.error('Authentication required', 401);
     }
 
     // Check permission
@@ -42,7 +43,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     
     // Import proper auth middleware and get user details from JWT token
     const { extractAuthToken } = await import('@/features/auth/api/middleware/authMiddleware');
-    const token = extractAuthToken(request);
+    const token = await extractAuthToken(request);
     let userId = 0;
     
     if (token) {
@@ -72,4 +73,4 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   } catch (error) {
     return formatResponse.error('An error occurred while deleting the request', 500);
   }
-}
+});

@@ -4,14 +4,14 @@ import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 
 /**
  * GET /api/n8n/workflows
  * Retrieves available N8N workflows
  */
 export const GET = routeHandler(
-  withPermission(
+  await permissionMiddleware.withPermission(
     async (req: NextRequest) => {
       const logger = getLogger();
       logger.info('Retrieving available N8N workflows');
@@ -32,8 +32,8 @@ export const GET = routeHandler(
         });
         
         return formatResponse.error(
-          'Failed to retrieve workflows',
-          error instanceof Error ? error.message : String(error)
+          'Failed to retrieve workflows: ' + (error instanceof Error ? error.message : String(error)),
+          500
         );
       }
     },

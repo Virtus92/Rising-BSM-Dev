@@ -60,7 +60,7 @@ export const PUT = routeHandler(
     // Authentifizierung für das Aktualisieren von Einstellungen erfordern
     requiresAuth: true,
     // Nur Administratoren dürfen Einstellungen aktualisieren
-    requiresRole: ['admin']
+    requiredRoles: ['admin']
   }
 );
 
@@ -91,6 +91,6 @@ export const POST = routeHandler(
     // Authentifizierung für das Zurücksetzen von Einstellungen erfordern
     requiresAuth: true,
     // Nur Administratoren dürfen Einstellungen zurücksetzen
-    requiresRole: ['admin']
+    requiredRoles: ['admin']
   }
 );

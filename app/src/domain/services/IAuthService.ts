@@ -11,89 +11,89 @@ import {
 } from '../dtos/AuthDtos';
 
 /**
- * Service-Interface für Authentifizierung
+ * Service Interface for Authentication
  */
 export interface IAuthService {
   /**
-   * Registriert einen neuen Benutzer
+   * Registers a new user
    * 
-   * @param registerDto - Registrierungsdaten
-   * @param options - Service-Optionen
-   * @returns Registrierungsergebnis
+   * @param registerDto - Registration data
+   * @param options - Service options
+   * @returns Registration result
    */
   register(registerDto: RegisterDto, options?: ServiceOptions): Promise<{ success: boolean; message?: string; data?: any }>;
   
   /**
-   * Führt den Login eines Benutzers durch
+   * Handles user login
    * 
-   * @param loginDto - Login-Daten
-   * @param options - Service-Optionen
-   * @returns Authentifizierungsantwort
+   * @param loginDto - Login data
+   * @param options - Service options
+   * @returns Authentication response
    */
   login(loginDto: LoginDto, options?: ServiceOptions): Promise<AuthResponseDto>;
   
   /**
-   * Aktualisiert ein Token
+   * Refreshes an access token
    * 
-   * @param refreshTokenDto - Token-Aktualisierungsdaten
-   * @param options - Service-Optionen
-   * @returns Token-Aktualisierungsantwort
+   * @param refreshTokenDto - Token refresh data
+   * @param options - Service options
+   * @returns Token refresh response
    */
   refreshToken(refreshTokenDto: RefreshTokenDto, options?: ServiceOptions): Promise<RefreshTokenResponseDto>;
   
   /**
-   * Verarbeitet eine "Passwort vergessen"-Anfrage
+   * Processes a "Forgot Password" request
    * 
-   * @param forgotPasswordDto - "Passwort vergessen"-Daten
-   * @param options - Service-Optionen
-   * @returns Erfolg der Operation
+   * @param forgotPasswordDto - Forgot password data
+   * @param options - Service options
+   * @returns Success of the operation
    */
   forgotPassword(forgotPasswordDto: ForgotPasswordDto, options?: ServiceOptions): Promise<{ success: boolean }>;
   
   /**
-   * Validiert ein Token für das Zurücksetzen des Passworts
+   * Validates a token for password reset
    * 
    * @param token - Token
-   * @param options - Service-Optionen
-   * @returns Gültigkeit des Tokens
+   * @param options - Service options
+   * @returns Validity of the token
    */
   validateResetToken(token: string, options?: ServiceOptions): Promise<boolean>;
   
   /**
-   * Setzt ein Passwort zurück
+   * Resets a password
    * 
-   * @param resetPasswordDto - Passwort-Zurücksetzungsdaten
-   * @param options - Service-Optionen
-   * @returns Erfolg der Operation
+   * @param resetPasswordDto - Password reset data
+   * @param options - Service options
+   * @returns Success of the operation
    */
   resetPassword(resetPasswordDto: ResetPasswordDto, options?: ServiceOptions): Promise<{ success: boolean }>;
   
   /**
-   * Führt den Logout eines Benutzers durch
+   * Logs out a user
    * 
-   * @param userId - Benutzer-ID
-   * @param logoutDto - Logout-Daten
-   * @param options - Service-Optionen
-   * @returns Logout-Ergebnis
+   * @param userId - User ID
+   * @param logoutDto - Logout data
+   * @param options - Service options
+   * @returns Logout result
    */
   logout(userId: number, logoutDto?: LogoutDto, options?: ServiceOptions): Promise<{ success: boolean; tokenCount: number }>;
   
   /**
-   * Überprüft, ob ein Benutzer authentifiziert ist
+   * Verifies an authentication token
    * 
-   * @param token - Access-Token
-   * @param options - Service-Optionen
-   * @returns Authentifizierungsstatus
+   * @param token - Access token
+   * @param options - Service options
+   * @returns Authentication status with user ID if valid
    */
-  verifyToken(token: string, options?: ServiceOptions): Promise<{ valid: boolean; userId?: number; }>;
+  verifyToken(token: string, options?: ServiceOptions): Promise<{ valid: boolean; userId?: number; role?: string }>;
   
   /**
-   * Überprüft, ob ein Benutzer die angegebene Rolle hat
+   * Checks if a user has the specified role
    * 
-   * @param userId - Benutzer-ID
-   * @param role - Zu überprüfende Rolle
-   * @param options - Service-Optionen
-   * @returns Ob der Benutzer die Rolle hat
+   * @param userId - User ID
+   * @param role - Role to check
+   * @param options - Service options
+   * @returns Whether the user has the role
    */
   hasRole(userId: number, role: string, options?: ServiceOptions): Promise<boolean>;
 }

@@ -3,7 +3,7 @@ import { ILoggingService } from '@/core/logging/ILoggingService';
 import { IValidationService } from '@/core/validation/IValidationService';
 import { IErrorHandler } from '@/core/errors/';
 import { ServiceOptions } from '@/domain/services/IBaseService';
-import { PaginationResult, QueryOptions } from '@/domain/repositories/IBaseRepository';
+import { IBaseRepository, PaginationResult, QueryOptions } from '@/domain/repositories/IBaseRepository';
 import { RequestData } from '@/domain/entities/RequestData';
 import { 
   RequestDataDto, 
@@ -17,20 +17,8 @@ import { IRequestDataService } from '@/domain/services/IRequestDataService';
 /**
  * Interface for the repository handling request data operations
  */
-interface IRequestDataRepository {
-  create(data: any): Promise<any>;
-  update(id: number, data: any): Promise<any>;
-  findById(id: number, options?: any): Promise<any>;
-  findAll(options?: any): Promise<PaginationResult<any>>;
-  findOne(options: { criteria: any }): Promise<any>;
-  createHistory(data: any): Promise<any>;
-  count(criteria?: any): Promise<number>;
-  findByCriteria(criteria: any, options?: QueryOptions): Promise<any[]>;
-  findOneByCriteria(criteria: any, options?: QueryOptions): Promise<any>;
-  delete(id: number): Promise<boolean>;
-  bulkUpdate(criteria: any, data: Partial<RequestData>): Promise<number>;
-  transaction<T>(operation: () => Promise<T>): Promise<T>;
-}
+// Use the proper interface from the domain layer
+import { IRequestDataRepository } from '@/domain/repositories/IRequestDataRepository';
 
 /**
  * Interface for the repository handling requests
@@ -60,9 +48,8 @@ export class RequestDataService extends BaseService<RequestData, CreateRequestDa
     validator: IValidationService,
     errorHandler: IErrorHandler
   ) {
-    // The RequestDataRepository implements IRequestDataRepository which extends IBaseRepository
-    // This provides the required interface for BaseService
-    super(requestDataRepository, logger, validator, errorHandler);
+    // Use type assertion since IRequestDataRepository extends IBaseRepository<RequestData>
+    super(requestDataRepository as IBaseRepository<RequestData, number>, logger, validator, errorHandler);
   }
   
   /**
@@ -175,9 +162,10 @@ export class RequestDataService extends BaseService<RequestData, CreateRequestDa
       // This uses BaseService's audit info functionality
       
       // Use the create method from BaseService
-      const requestData = await this.create(createData, options) as unknown as RequestData;
+      const result = await this.create(createData, options);
       
-      return this.mapToDTO(requestData);
+      // No need to map again as result is already a DTO
+      return result;
     } catch (error) {
       this.logger.error(`Error in ${this.constructor.name}.createRequestData`, {
         error: error instanceof Error ? error.message : String(error),
@@ -220,9 +208,9 @@ export class RequestDataService extends BaseService<RequestData, CreateRequestDa
       };
       
       // Use BaseService's update method
-      const updatedData = await this.update(id, updateData, options) as unknown as RequestData;
+      const updatedDto = await this.update(id, updateData, options);
       
-      return this.mapToDTO(updatedData);
+      return updatedDto;
     } catch (error) {
       this.logger.error(`Error in ${this.constructor.name}.updateRequestData`, {
         error: error instanceof Error ? error.message : String(error),
@@ -250,6 +238,10 @@ export class RequestDataService extends BaseService<RequestData, CreateRequestDa
       if (!existingData) {
         throw this.errorHandler.createNotFoundError(`Request data with ID ${id} not found`);
       }
+      // Check if history exists
+      if (!existingData.history || existingData.history.length === 0) {
+        return [];
+      }
       
       // Return history in reverse chronological order
       return existingData.history
@@ -262,6 +254,7 @@ export class RequestDataService extends BaseService<RequestData, CreateRequestDa
           changeReason: history.changeReason,
           version: history.version,
           createdAt: history.createdAt.toISOString(),
+          updatedAt: history.updatedAt ? history.updatedAt.toISOString() : null,
           userId: history.userId
         }));
     } catch (error) {

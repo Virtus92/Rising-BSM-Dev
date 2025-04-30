@@ -92,17 +92,29 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         setIsLoading(true);
         setError(null);
         
-        // Add a query parameter to filter by customerId
-        const response = await AppointmentService.getAll({
+        // Store the API call in a variable first before awaiting it
+        // This prevents issues with Function.prototype.apply on Promise objects
+        const apiCall = AppointmentService.getAll({
           customerId: customerId,
           limit: 100 // Get a larger number to show all appointments
         });
         
+        // Now await the promise
+        const response = await apiCall;
+        
         if (response.success && response.data) {
-          setAppointments(Array.isArray(response.data.data) ? response.data.data : []);
+          // Ensure we're handling the data structure correctly
+          if ('data' in response.data && Array.isArray(response.data.data)) {
+            setAppointments(response.data.data);
+          } else if (Array.isArray(response.data)) {
+            setAppointments(response.data);
+          } else {
+            console.error('Unexpected data structure:', response.data);
+            setAppointments([]);
+          }
         } else {
           setError('Failed to load appointments');
-          console.error('Error fetching appointments:', response.message);
+          console.error('Error fetching appointments:', response.message || 'Unknown error');
         }
       } catch (err) {
         setError('Failed to load appointments');

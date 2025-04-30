@@ -54,28 +54,10 @@ export const GET = routeHandler(async (request: NextRequest) => {
           error: serviceError instanceof Error ? serviceError : String(serviceError),
           stack: serviceError instanceof Error ? serviceError.stack : undefined
         });
-        
-        // Log the detailed error information before returning the fallback response
-        logger.debug('Detailed error information for notification fetch:', {
-          userId: request.auth?.userId,
-          filterParams,
-          error: serviceError instanceof Error ? {
-            name: serviceError.name,
-            message: serviceError.message,
-            stack: serviceError.stack
-          } : String(serviceError)
-        });
-        
-        // Return an empty array with success rather than an error to prevent UI disruption
-        return formatResponse.success({
-          data: [],
-          pagination: {
-            page: filterParams.page,
-            limit: filterParams.limit,
-            total: 0,
-            totalPages: 0
-          }
-        }, 'No notifications available');
+        return formatResponse.error(
+          serviceError instanceof Error ? serviceError.message : 'Failed to fetch notifications',
+          500
+        );
       }
       // This code is unreachable after the refactoring but left here for completeness
       // It's now handled inside the try-catch block above
@@ -154,5 +136,5 @@ export const POST = routeHandler(async (request: NextRequest) => {
   // Secure this endpoint
   requiresAuth: true,
   // Restrict to admin role
-  requiresRole: ['ADMIN']
+  requiredRoles: ['ADMIN']
 });

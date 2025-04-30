@@ -1,4 +1,5 @@
-import { Logger } from './error-handler';
+import { getLogger } from '@/core/logging';
+import type { ILoggingService } from '@/core/logging';
 
 /**
  * API request error class
@@ -40,19 +41,17 @@ export class ApiRequestError extends Error {
  * @param logger - Optional logger instance
  * @returns Promise that rejects with the original error
  */
-export async function handleApiError(error: any, logger?: Logger): Promise<never> {
-  // Log error if logger is provided
-  if (logger) {
-    if (error instanceof ApiRequestError) {
-      logger.error(`API Error ${error.statusCode}: ${error.message}`, {
-        errors: error.errors
-      });
-    } else {
-      logger.error(`API Error: ${error instanceof Error ? error.message : String(error)}`);
-    }
+export async function handleApiError(error: any, logger?: ILoggingService): Promise<never> {
+  // Use provided logger or get a new one
+  const log = logger || getLogger();
+  
+  // Log error
+  if (error instanceof ApiRequestError) {
+    log.error(`API Error ${error.statusCode}: ${error.message}`, {
+      errors: error.errors
+    });
   } else {
-    // Fallback to console if logger not provided
-    console.error('API Error:', error as Error);
+    log.error(`API Error: ${error instanceof Error ? error.message : String(error)}`);
   }
   
   // Format error for client consumption
@@ -139,7 +138,7 @@ export class ApiErrorInterceptor implements IErrorInterceptor {
    * @param config Interceptor configuration
    */
   constructor(
-    private readonly logger: Logger,
+    private readonly logger: ILoggingService,
     private readonly config: ApiErrorInterceptorConfig = {}
   ) {}
   
@@ -254,8 +253,8 @@ export class ApiErrorInterceptor implements IErrorInterceptor {
  * @returns API error interceptor
  */
 export function createApiErrorInterceptor(
-  logger: Logger,
+  logger?: ILoggingService,
   config: ApiErrorInterceptorConfig = {}
 ): IErrorInterceptor {
-  return new ApiErrorInterceptor(logger, config);
+  return new ApiErrorInterceptor(logger || getLogger(), config);
 }

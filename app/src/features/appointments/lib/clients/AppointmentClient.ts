@@ -149,6 +149,22 @@ export class AppointmentClient {
   }
   
   /**
+   * Get an appointment by ID - this method exists for backwards compatibility
+   * 
+   * @param id - Appointment ID
+   * @param relations - Optional relations to include
+   * @returns API response
+   */
+  static async getAppointment(id: number | string, relations: string[] = ['customer', 'notes']): Promise<ApiResponse<AppointmentDetailResponseDto>> {
+    try {
+      return await this.getById(id, relations);
+    } catch (error: unknown) {
+      console.error(`Error in AppointmentClient.getAppointment(${id}):`, error);
+      throw error;
+    }
+  }
+  
+  /**
    * Create a new appointment
    * 
    * @param data - Appointment data

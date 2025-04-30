@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { validateId, isValidId } from '@/shared/utils/validation-utils';
 import { AppointmentClient } from '@/features/appointments/lib/clients';
@@ -58,8 +58,13 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
   const canEdit = hasPermission(SystemPermission.APPOINTMENTS_EDIT);
   const canDelete = hasPermission(SystemPermission.APPOINTMENTS_DELETE);
   
-  // Track validated ID for consistency
-  const [validatedId, setValidatedId] = useState<number | null>(null);
+  // Validate ID once on component mount, don't store in state
+  const validId = useMemo(() => {
+    if (id) {
+      return validateId(String(id));
+    }
+    return null;
+  }, [id]);
   
   // Detect mobile screen
   useLayoutEffect(() => {
@@ -75,90 +80,75 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
     };
   }, []);
 
-  // Validate ID on component mount
-  useEffect(() => {
-    if (id) {
-      const validId = validateId(id);
-      setValidatedId(validId);
-    }
-  }, [id]);
-
-  // Create a memoized fetch function to avoid recreation on each render
+  // Create a memoized fetch function that uses validId directly
   const fetchAppointment = useCallback(async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
+    if (!validId) {
+      setError('Invalid appointment ID');
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await AppointmentClient.getAppointment(validId);
+      
+      if (response.success && response.data) {
+        // Make a copy of the appointment data to avoid mutation issues
+        const appointmentData = { ...response.data };
         
-        // Check if we have a valid ID
-        if (validatedId === null) {
-          setError(`Invalid appointment ID: ${id}`);
-          setIsLoading(false);
-          return;
-        }
-        
-        const response = await AppointmentClient.getById(validatedId);
-        
-        if (response.success && response.data) {
-          // Ensure customer data is consistently formatted
-          const appointmentData = response.data as AppointmentDetailResponseDto;
-          
-          // Make sure customer data is properly formatted using our helper function
-          if (appointmentData.customerId && !getCustomerData(appointmentData)) {
-            try {
-              // Use CustomerClient to fetch customer data properly
-              const customerResponse = await CustomerClient.getCustomerById(appointmentData.customerId);
-              if (customerResponse.success && customerResponse.data) {
-                appointmentData.customer = {
-                  id: customerResponse.data.id,
-                  name: customerResponse.data.name || `Customer ${customerResponse.data.id}`,
-                  email: customerResponse.data.email,
-                  phone: customerResponse.data.phone,
-                };
-              }
-            } catch (customerError) {
-              console.error('Error fetching customer data:', customerError);
-              // Don't set an error, just add a fallback customer data
-              if (appointmentData.customerId) {
-                appointmentData.customer = {
-                  id: appointmentData.customerId,
-                  name: `Customer ${appointmentData.customerId}`,
-                };
-              }
+        // If we have a customer ID but no customer data, try to fetch it
+        if (appointmentData.customerId && !appointmentData.customerName && !appointmentData.customer) {
+          try {
+            const customerResponse = await CustomerClient.getCustomerById(appointmentData.customerId);
+            
+            if (customerResponse.success && customerResponse.data) {
+              appointmentData.customer = customerResponse.data;
+              appointmentData.customerName = customerResponse.data.name;
+            }
+          } catch (customerError) {
+            console.error('Error fetching customer data:', customerError);
+            // Don't set an error, just add a fallback customer data
+            if (appointmentData.customerId) {
+              appointmentData.customer = {
+                id: appointmentData.customerId,
+                name: `Customer ${appointmentData.customerId}`,
+              };
             }
           }
-          
-          setAppointment(appointmentData);
-        } else {
-          setError(response.message || 'Failed to fetch appointment details');
         }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again later.';
-        setError(errorMessage);
-        console.error('Error fetching appointment:', err);
-      } finally {
-        setIsLoading(false);
+        
+        setAppointment(appointmentData);
+      } else {
+        setError(response.message || 'Failed to fetch appointment details');
       }
-  }, [validatedId, id]);
-
-  // Use the memoized function in an effect
-  useEffect(() => {
-    if (validatedId !== null) {
-      fetchAppointment();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again later.';
+      setError(errorMessage);
+      console.error('Error fetching appointment:', err);
+    } finally {
+      setIsLoading(false);
     }
-  }, [validatedId, fetchAppointment]);
+  }, [validId]);
+
+  // Use the effect once to fetch on mount
+  useEffect(() => {
+    fetchAppointment();
+  }, [fetchAppointment]);
 
   const handleAddNote = async () => {
     if (!note.trim()) return;
     
     try {
       // Check if we have a valid ID
-      if (validatedId === null) {
+      if (!validId) {
         setError('Invalid appointment ID');
         return;
       }
       
       setIsSubmittingNote(true);
-      const response = await AppointmentClient.addNote(validatedId, note);
+      const response = await AppointmentClient.addNote(validId, note);
       
       if (response.success) {
       // Set the updated appointment data from the response
@@ -167,7 +157,7 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
           setAppointment(response.data as AppointmentDetailResponseDto);
         } else {
           // Always refetch to ensure we have the latest data
-          const updatedResponse = await AppointmentClient.getById(validatedId);
+          const updatedResponse = await AppointmentClient.getById(validId);
           if (updatedResponse.success && updatedResponse.data) {
             setAppointment(updatedResponse.data as AppointmentDetailResponseDto);
           }
@@ -188,12 +178,12 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
   const handleStatusChange = async (status: AppointmentStatus) => {
     try {
       // Check if we have a valid ID
-      if (validatedId === null) {
+      if (!validId) {
         setError('Invalid appointment ID');
         return;
       }
       
-      const response = await AppointmentClient.updateStatus(validatedId, { status });
+      const response = await AppointmentClient.updateStatus(validId, { status });
       
       if (response.success && response.data) {
         // Check if the response includes complete appointment data
@@ -202,19 +192,10 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
           setAppointment(response.data as AppointmentDetailResponseDto);
         } else {
           // Always refetch to ensure we have the latest data
-          const updatedResponse = await AppointmentClient.getById(validatedId);
+          const updatedResponse = await AppointmentClient.getById(validId);
           if (updatedResponse.success && updatedResponse.data) {
             setAppointment(updatedResponse.data as AppointmentDetailResponseDto);
           } else {
-            // Fallback: Update only the status in the UI if the API doesn't return full data
-            setAppointment(prev => {
-              if (!prev) return null;
-              const updatedAppointment = { ...prev };
-              updatedAppointment.status = status;
-              updatedAppointment.statusLabel = getStatusLabel(status);
-              updatedAppointment.statusClass = getStatusClassName(status);
-              return updatedAppointment;
-            });
             
             setError('Warning: Status updated but appointment data may be incomplete');
           }
@@ -236,13 +217,13 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
     
     try {
       // Check if we have a valid ID
-      if (validatedId === null) {
+      if (!validId) {
         setError('Invalid appointment ID');
         return;
       }
       
       setIsLoading(true);
-      const response = await AppointmentClient.deleteAppointment(validatedId);
+      const response = await AppointmentClient.deleteAppointment(validId);
       
       if (response.success) {
         // Navigate back to the appointments list

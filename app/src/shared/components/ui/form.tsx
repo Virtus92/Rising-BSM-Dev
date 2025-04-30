@@ -9,21 +9,21 @@ import {
   PathValue,
   useForm,
   useFormContext,
-  useFormState,
   FormProvider
 } from "react-hook-form"
 
 import { cn } from "@/shared/utils/cn"
 import { Label } from "./label"
 
-const Form = React.forwardRef<HTMLFormElement, React.ComponentProps<typeof FormProvider> & React.FormHTMLAttributes<HTMLFormElement>>(
-  ({ children, onSubmit, ...props }, ref) => {
+const Form = React.forwardRef<HTMLFormElement, 
+  React.ComponentProps<typeof FormProvider> & 
+  React.FormHTMLAttributes<HTMLFormElement>
+>(
+  ({ children, ...props }, ref) => {
     return (
-      <FormProvider {...props}>
-        <form ref={ref} onSubmit={onSubmit}>
-          {children}
-        </form>
-      </FormProvider>
+      <form ref={ref} {...props}>
+        {children}
+      </form>
     )
   }
 )
@@ -52,14 +52,15 @@ const FormField = <
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext)
   const itemContext = React.useContext(FormItemContext)
-
-  const { getFieldState, formState } = useFormContext()
-
-  const fieldState = getFieldState(fieldContext.name, formState)
+  const { formState, getFieldState } = useFormContext()
 
   if (!fieldContext) {
     throw new Error("useFormField should be used within <FormField>")
   }
+
+  const fieldState = getFieldState ? 
+    getFieldState(fieldContext.name, formState) : 
+    { invalid: false, isDirty: false, isTouched: false, error: undefined }
 
   const { id } = itemContext
 

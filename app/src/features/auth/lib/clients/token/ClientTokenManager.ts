@@ -1,707 +1,908 @@
 'use client';
 
-import { AuthClientService } from '@/features/auth/lib/clients/AuthClient';
-import Cookies from 'js-cookie';
+/**
+ * ClientTokenManager
+ * 
+ * A token management system for client-side use with robust error reporting.
+ * This implementation exposes all errors and avoids silent fallbacks.
+ */
 
-// Import TokenManager properly
-import { TokenManager } from './TokenManager';
+import { AuthClientService } from '@/features/auth/lib/clients/AuthClient';
+import { getItem, setItem, removeItem } from '@/shared/utils/storage/cookieStorage';
+// Import jwt-decode for token parsing
+import { jwtDecode } from 'jwt-decode';
+
+// Store token state and errors for debugging
+const TOKEN_STATE = {
+  // Token state only - no caching of validation results
+  tokenValue: null as string | null,
+  tokenExpiry: null as Date | null,
+  lastOperation: 0,
+  operationErrors: [] as {operation: string, error: Error, timestamp: number}[]
+};
+
+/**
+ * Error class for token-related failures
+ */
+export class TokenError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly details?: any
+  ) {
+    super(message);
+    this.name = 'TokenError';
+    Object.setPrototypeOf(this, TokenError.prototype);
+  }
+}
 
 /**
  * Client-side token manager
- * Provides a simplified interface for token management with secure token storage
- * and automatic synchronization with TokenManager
+ * Provides a robust interface for token management with proper error reporting
  */
 export class ClientTokenManager {
-  private static readonly ACCESS_TOKEN_KEY = 'accessToken';
-  private static readonly REFRESH_TOKEN_KEY = 'refreshToken';
-  private static readonly EXPIRES_AT_KEY = 'expiresAt';
-  
-  // Track initialization state
-  private static _initialized = false;
-  private static _initializePromise: Promise<void> | null = null;
-  
   /**
    * Initialize the ClientTokenManager
    * @returns Promise that resolves when initialization is complete
+   * @throws TokenError if initialization fails
    */
   static async initialize(): Promise<void> {
-    // If already initialized, return immediately
-    if (this._initialized) {
-      return Promise.resolve();
+    console.log('ClientTokenManager: Initializing...');
+    
+    try {
+      // Synchronize tokens - will throw errors if there are issues
+      await this.synchronizeTokens(true);
+      
+      console.log('ClientTokenManager: Initialization complete');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('ClientTokenManager: Initialization error:', error);
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'initialize',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Token initialization failed: ${errorMessage}`,
+        'INIT_FAILED',
+        error
+      );
     }
-    
-    // If initialization is in progress, return the existing promise
-    if (this._initializePromise) {
-      return this._initializePromise;
-    }
-    
-    // Create a new initialization promise
-    this._initializePromise = (async () => {
-      try {
-        console.log('ClientTokenManager: Initializing...');
-        
-        // Synchronize tokens with TokenManager
-        await TokenManager.synchronizeTokens(true);
-        
-        // Mark as initialized
-        this._initialized = true;
-        console.log('ClientTokenManager: Initialization complete');
-      } catch (error) {
-        console.error('ClientTokenManager: Initialization error:', error as Error);
-        // Don't mark as initialized on error
-      } finally {
-        // Clear the promise reference
-        this._initializePromise = null;
-      }
-    })();
-    
-    return this._initializePromise;
   }
   
   /**
-   * Set tokens both in cookies and localStorage backup
+   * Set tokens using cookie storage consistently
    * @param accessToken Access token
    * @param refreshToken Refresh token
    * @param expiresIn Expiration time in seconds
+   * @throws TokenError if token storage fails
    */
   static setTokens(accessToken: string, refreshToken: string, expiresIn: number) {
-    // Calculate expiry time
-    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
-    const secure = process.env.NODE_ENV === 'production';
-    
     console.log(`Setting tokens with expiration of ${expiresIn} seconds`);
     
-    try {
-      // Store in cookies securely - use multiple variants for compatibility
-      // URL encode token values to prevent cookie parsing issues
-      const encodedAccessToken = encodeURIComponent(accessToken);
-      const encodedRefreshToken = encodeURIComponent(refreshToken);
-      
-      // Auth token variants
-      Cookies.set(this.ACCESS_TOKEN_KEY, encodedAccessToken, { 
-        secure: secure,
-        sameSite: 'lax', // Changed from strict to lax for better compatibility
-        path: '/', // Ensure available for all requests
-        expires: new Date(Date.now() + expiresIn * 1000) // Explicit expiry
-      });
-      
-      // Additional auth token variants for compatibility
-      Cookies.set('auth_token', encodedAccessToken, {
-        secure: secure,
-        sameSite: 'lax',
-        path: '/',
-        expires: new Date(Date.now() + expiresIn * 1000)
-      });
-      
-      Cookies.set('auth_token_access', encodedAccessToken, {
-        secure: secure,
-        sameSite: 'lax',
-        path: '/',
-        expires: new Date(Date.now() + expiresIn * 1000)
-      });
-      
-      Cookies.set('access_token', encodedAccessToken, {
-        secure: secure,
-        sameSite: 'lax',
-        path: '/',
-        expires: new Date(Date.now() + expiresIn * 1000)
-      });
-      
-      // Refresh token variants
-      Cookies.set(this.REFRESH_TOKEN_KEY, encodedRefreshToken, { 
-        secure: secure,
-        sameSite: 'lax',
-        path: '/',
-        expires: new Date(Date.now() + expiresIn * 10 * 1000) // Longer expiry for refresh token
-      });
-      
-      Cookies.set('refresh_token', encodedRefreshToken, {
-        secure: secure,
-        sameSite: 'lax',
-        path: '/',
-        expires: new Date(Date.now() + expiresIn * 10 * 1000)
-      });
-      
-      Cookies.set('refresh_token_access', encodedRefreshToken, {
-        secure: secure,
-        sameSite: 'lax',
-        path: '/',
-        expires: new Date(Date.now() + expiresIn * 10 * 1000)
-      });
-      
-      // Expiry metadata
-      Cookies.set(this.EXPIRES_AT_KEY, expiresAt, { 
-        secure: secure,
-        sameSite: 'lax',
-        path: '/'
-      });
-    } catch (cookieError) {
-      console.warn('Error setting cookies:', cookieError);
-      // Continue anyway to ensure localStorage backups are set
+    if (!accessToken || !refreshToken || !expiresIn) {
+      throw new TokenError(
+        'Invalid token data provided',
+        'INVALID_TOKEN_DATA',
+        { hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken, expiresIn }
+      );
     }
     
-    // Also store in localStorage as fallback (TokenManager uses these)
-    try {
-      localStorage.setItem('auth_token_backup', accessToken);
-      localStorage.setItem('auth_token', accessToken); // For legacy compatibility
-      localStorage.setItem('refresh_token_backup', refreshToken);
-      localStorage.setItem('auth_timestamp', Date.now().toString());
-      localStorage.setItem('auth_expires_at', expiresAt); // Store expiry time in localStorage
-      localStorage.setItem('auth_expires_in', expiresIn.toString()); // Store original expiry duration
-    } catch (storageError) {
-      console.warn('Error setting localStorage backups:', storageError);
-    }
+    // Update token state
+    TOKEN_STATE.tokenValue = accessToken;
+    TOKEN_STATE.tokenExpiry = new Date(Date.now() + expiresIn * 1000);
+    TOKEN_STATE.lastOperation = Date.now();
     
-    // Notify TokenManager about the change - use a longer delay to ensure all cookies are set
-    setTimeout(async () => {
-      try {
-        // Ensure TokenManager synchronizes after setting tokens
-        await TokenManager.synchronizeTokens(true);
-        
-        // Notify about auth change after synchronization
-        setTimeout(() => {
-          TokenManager.notifyAuthChange(true);
-        }, 50);
-      } catch (err) {
-        console.warn('Error notifying TokenManager after setting tokens:', err);
+    try {
+      // Calculate and format expiration timestamp
+      const expiryDate = new Date(Date.now() + expiresIn * 1000);
+      const expiryISOString = expiryDate.toISOString();
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Storing auth tokens with expiration data:', {
+          tokenLength: accessToken.length,
+          expires: expiryISOString,
+          expiresTimestamp: expiryDate.getTime(),
+          currentTime: Date.now()
+        });
       }
-    }, 100);
+      
+      // Store tokens using only cookieStorage, not direct document.cookie manipulation
+      // This ensures consistent cookie behavior
+      setItem('auth_token', accessToken); // Main token
+      setItem('auth_token_backup', accessToken); // Backup copy
+      setItem('refresh_token', refreshToken); // Main refresh token
+      setItem('refresh_token_backup', refreshToken); // Backup copy
+      
+      // Store expiration metadata
+      setItem('auth_timestamp', Date.now().toString());
+      setItem('auth_expires_at', expiryISOString);
+      setItem('auth_expires_in', expiresIn.toString());
+      setItem('auth_expires_timestamp', expiryDate.getTime().toString());
+      setItem('auth_expires_seconds', Math.floor(expiryDate.getTime() / 1000).toString());
+      
+      // Set initialization flags
+      setItem('auth_init_completed', 'true');
+      setItem('auth_init_timestamp', Date.now().toString());
+      
+      // Notify about auth change after a small delay
+      setTimeout(async () => {
+        try {
+          await this.notifyAuthChange(true);
+        } catch (err) {
+          console.error('Error during auth change notification:', err);
+          throw err;
+        }
+      }, 50);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error in ClientTokenManager.setTokens:', error);
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'setTokens',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Failed to set tokens: ${errorMessage}`,
+        'TOKEN_STORAGE_FAILED',
+        error
+      );
+    }
   }
   
   /**
    * Get current access token
+   * @throws TokenError if token retrieval fails
    */
-  static getAccessToken(): string | null {
+  static async getAccessToken(): Promise<string | null> {
     try {
-      // First try cookies
-      const token = Cookies.get(this.ACCESS_TOKEN_KEY) || 
-                  Cookies.get('auth_token') || 
-                  Cookies.get('auth_token_access') || 
-                  Cookies.get('access_token');
-      
-      if (token) {
-        try {
-          // Attempt to decode if URL encoded
-          return decodeURIComponent(token);
-        } catch (decodeError) {
-          console.warn('Error decoding cookie token, returning as-is:', decodeError);
-          return token;
-        }
-      }
-      
-      // Fall back to localStorage
-      return localStorage.getItem('auth_token_backup');
+      // Check localStorage for token
+      const token = getItem('auth_token_backup');
+      return token;
     } catch (error) {
-      console.warn('Error getting access token:', error as Error);
-      return null;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error retrieving access token:', error);
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'getAccessToken',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Failed to retrieve access token: ${errorMessage}`,
+        'TOKEN_RETRIEVAL_FAILED',
+        error
+      );
     }
   }
   
   /**
    * Get current refresh token
+   * @throws TokenError if token retrieval fails
    */
   static getRefreshToken(): string | null {
     try {
-      // First try cookies
-      const token = Cookies.get(this.REFRESH_TOKEN_KEY) || 
-                  Cookies.get('refresh_token') || 
-                  Cookies.get('refresh_token_access');
-      
-      if (token) {
-        try {
-          // Attempt to decode if URL encoded
-          return decodeURIComponent(token);
-        } catch (decodeError) {
-          console.warn('Error decoding cookie token, returning as-is:', decodeError);
-          return token;
-        }
-      }
-      
-      // Fall back to localStorage
-      return localStorage.getItem('refresh_token_backup');
+      return getItem('refresh_token_backup');
     } catch (error) {
-      console.warn('Error getting refresh token:', error as Error);
-      return null;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error retrieving refresh token:', error);
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'getRefreshToken',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Failed to retrieve refresh token: ${errorMessage}`,
+        'TOKEN_RETRIEVAL_FAILED',
+        error
+      );
     }
   }
   
   /**
-   * Clear all auth tokens and notify TokenManager
-   * Comprehensive cleanup of all token variants
+   * Clear all auth tokens
+   * @throws TokenError if token clearing fails
    */
-  static clearTokens() {
+  static async clearTokens(): Promise<void> {
     console.log('Clearing all auth tokens');
     
     try {
-      // Clear cookie variants for access token
-      Cookies.remove(this.ACCESS_TOKEN_KEY, { path: '/' });
-      Cookies.remove('auth_token', { path: '/' });
-      Cookies.remove('auth_token_access', { path: '/' });
-      Cookies.remove('access_token', { path: '/' });
-      Cookies.remove('accessToken', { path: '/' });
+      // Clear token state
+      TOKEN_STATE.tokenValue = null;
+      TOKEN_STATE.tokenExpiry = null;
+      TOKEN_STATE.lastOperation = Date.now();
+      TOKEN_STATE.operationErrors = [];
       
-      // Clear cookie variants for refresh token
-      Cookies.remove(this.REFRESH_TOKEN_KEY, { path: '/' });
-      Cookies.remove('refresh_token', { path: '/' });
-      Cookies.remove('refresh_token_access', { path: '/' });
-      Cookies.remove('refresh', { path: '/' });
+      // Clear all tokens consistently using the cookieStorage utility
+      removeItem('auth_token');
+      removeItem('auth_token_backup');
+      removeItem('auth_token_access'); // Legacy name
+      removeItem('access_token'); // Legacy name
+      removeItem('refresh_token');
+      removeItem('refresh_token_backup');
       
-      // Clear expiry metadata
-      Cookies.remove(this.EXPIRES_AT_KEY, { path: '/' });
+      // Clear metadata
+      removeItem('auth_expires_at');
+      removeItem('auth_expires_in');
+      removeItem('auth_timestamp');
+      removeItem('auth_expires_timestamp');
+      removeItem('auth_expires_seconds');
+      removeItem('auth_init_completed');
+      removeItem('auth_init_timestamp');
+      removeItem('token_refresh_timestamp');
       
-      // Also clear HTTP-only cookies via document.cookie for maximum compatibility
-      // Access token variants
-      document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'auth_token_access=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      // Notify about logout
+      await this.notifyAuthChange(false);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error clearing tokens:', error);
       
-      // Refresh token variants
-      document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'refresh_token_access=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'refresh=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    } catch (cookieError) {
-      console.warn('Error clearing cookies:', cookieError);
-      // Continue to localStorage clearing
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'clearTokens',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Failed to clear tokens: ${errorMessage}`,
+        'TOKEN_CLEAR_FAILED',
+        error
+      );
     }
-    
-    try {
-      // Clear localStorage backup
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_token_backup');
-      localStorage.removeItem('refresh_token_backup');
-      localStorage.removeItem('auth_timestamp');
-      localStorage.removeItem('auth_expires_at');
-      localStorage.removeItem('auth_expires_in');
-    } catch (storageError) {
-      console.warn('Error clearing localStorage:', storageError);
-    }
-    
-    // Verify cookie removal
-    console.debug('Cookies after clearing:', document.cookie);
-    
-    // Notify TokenManager
-    setTimeout(async () => {
-      try {
-        await TokenManager.notifyAuthChange(false);
-      } catch (err) {
-        console.warn('Error notifying TokenManager after clearing tokens:', err);
-      }
-    }, 50);
   }
   
   /**
    * Check if the access token is expired
-   */
-  static isTokenExpired(): boolean {
-    try {
-      // Check localStorage first as it's more reliable
-      const storedExpiresAt = localStorage.getItem('auth_expires_at');
-      if (storedExpiresAt) {
-        const expiryTime = new Date(storedExpiresAt).getTime();
-        const currentTime = Date.now();
-        
-        // Add a 5-second buffer to avoid edge cases
-        return currentTime >= expiryTime - 5000;
-      }
-      
-      // Fall back to cookie if localStorage not available
-      const expiresAt = Cookies.get(this.EXPIRES_AT_KEY);
-      if (!expiresAt) return true;
-      
-      const expiryTime = new Date(expiresAt).getTime();
-      const currentTime = Date.now();
-      
-      // Add a 5-second buffer to avoid edge cases
-      return currentTime >= expiryTime - 5000;
-    } catch (error) {
-      console.warn('Error checking token expiration:', error as Error);
-      return true; // Assume expired on error
-    }
-  }
-  
-  /**
-   * Refresh the access token using multiple strategies:
-   * 1. Try using TokenManager's refresh method first
-   * 2. Fall back to direct API call if TokenManager fails
-   * 3. Update both TokenManager and local cookies on success
    * 
-   * @returns Promise resolving to true if refresh was successful
+   * @param bufferSeconds - Buffer time to consider token as needing refresh
+   * @returns True if token is expired or will expire soon
+   * @throws TokenError if expiration information is missing or corrupted
    */
-  private static refreshInProgress: boolean = false;
-  private static refreshPromise: Promise<boolean> | null = null;
-  private static lastRefreshAttempt: number = 0;
-  private static readonly MIN_REFRESH_INTERVAL = 2000; // Minimum interval between refresh attempts (2 seconds)
-  private static refreshCallbacks: Array<(success: boolean) => void> = [];
-  
-  static async refreshAccessToken(): Promise<boolean> {
-    console.log('ClientTokenManager: Starting token refresh process');
-    
-    // Prevent concurrent refresh calls
-    if (this.refreshInProgress && this.refreshPromise) {
-      console.log('Token refresh already in progress, waiting for completion');
-      
-      // Register for notification when the current promise completes
-      return new Promise<boolean>((resolve) => {
-        this.refreshCallbacks.push(resolve);
-      });
-    }
-    
-    // Rate limit refresh attempts
-    const now = Date.now();
-    if (now - this.lastRefreshAttempt < this.MIN_REFRESH_INTERVAL) {
-      console.log(`Token refresh attempted too soon (within ${this.MIN_REFRESH_INTERVAL}ms), throttling`);
-      return false;
-    }
-    
-    // Update last attempt timestamp
-    this.lastRefreshAttempt = now;
-    
-    // Set flags to prevent concurrent refreshes
-    this.refreshInProgress = true;
-    
-    // Create and store the refresh promise
-    this.refreshPromise = this._refreshTokenInternal()
-      .then(result => {
-        // Notify all waiting callbacks
-        const callbacks = [...this.refreshCallbacks];
-        this.refreshCallbacks = [];
-        callbacks.forEach(callback => callback(result));
-        return result;
-      })
-      .finally(() => {
-        // Clear flags when complete
-        setTimeout(() => {
-          this.refreshInProgress = false;
-          this.refreshPromise = null;
-        }, 500);
-      });
-    
-    return this.refreshPromise;
-  }
-  
-  /**
-   * Internal implementation of token refresh logic
-   * @returns Promise resolving to true if refresh was successful
-   */
-  private static async _refreshTokenInternal(): Promise<boolean> {
-    console.log('Starting token refresh process');
-    
-    // Generate a unique request ID for tracking
-    const requestId = `token-refresh-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    
-    // First try using TokenManager's refresh method
+  static isTokenExpired(bufferSeconds: number = 600): boolean {
     try {
-      // Ensure tokens are synchronized
-      const syncResult = await TokenManager.synchronizeTokens(true);
-      console.log('Token synchronization result:', { syncResult, requestId });
+      // Try to get expiration time from multiple sources
+      let expiryTime: number | null = null;
       
-      // Check for existing tokens after synchronization
-      const hasAuthTokenAfterSync = !!localStorage.getItem('auth_token_backup');
-      const hasRefreshTokenAfterSync = !!localStorage.getItem('refresh_token_backup');
-      
-      console.log('Token status after synchronization:', { 
-        hasAuthTokenAfterSync, 
-        hasRefreshTokenAfterSync,
-        requestId 
-      });
-      
-      // Try TokenManager refresh first with improved error handling
-      try {
-        const refreshResult = await TokenManager.refreshAccessToken();
-        
-        if (refreshResult) {
-          console.log('Token refreshed successfully via TokenManager');
-          return true;
-        }
-      } catch (tokenManagerError) {
-        console.warn('TokenManager refresh failed, trying direct API call', tokenManagerError);
-        // Continue to next approach instead of failing
-      }
-    } catch (syncError) {
-      console.warn('Token synchronization failed during refresh:', syncError);
-      // Continue despite sync failure
-    }
-    
-    // Fall back to our implementation if TokenManager fails
-    const refreshToken = this.getRefreshToken();
-    const backupToken = localStorage.getItem('refresh_token_backup');
-    
-    // Try with cookie token first
-    if (refreshToken) {
-      try {
-        console.log('Attempting token refresh with token from cookie');
-        const response = await this.makeRefreshRequest(refreshToken, requestId);
-        if (response) return true;
-      } catch (cookieError) {
-        console.error('Error refreshing token with cookie token:', cookieError);
-      }
-    }
-    
-    // If no cookie token or refresh failed, try with backup token
-    if (backupToken && (!refreshToken || refreshToken !== backupToken)) {
-      try {
-        console.log('Attempting token refresh with backup token from localStorage');
-        const response = await this.makeRefreshRequest(backupToken, requestId);
-        if (response) return true;
-      } catch (backupError) {
-        console.error('Error refreshing token with backup token:', backupError);
-      }
-    }
-    
-    // If we get here, all refresh attempts failed
-    console.warn('All token refresh attempts failed');
-    return false;
-  }
-  
-  /**
-   * Helper to make the actual refresh request
-   * @param refreshToken The token to use for refresh
-   * @param requestId Optional request ID for tracking
-   * @returns Promise resolving to true if successful
-   */
-  private static async makeRefreshRequest(refreshToken: string, requestId?: string): Promise<boolean> {
-    try {
-      // Get the current origin to avoid cross-origin issues
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      // Ensure we have the correct refresh token URL - avoid duplicate /api/ issues
-      let refreshUrl = `${origin}/api/auth/refresh`;
-      
-      // Handle development environment where we might need to use a different URL
-      // Sometimes in development the API runs on a different port
-      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-        const currentPort = window.location.port;
-        // If we're using a non-standard port in dev, make sure it's included
-        if (currentPort && currentPort !== '80' && currentPort !== '443') {
-          refreshUrl = `${window.location.protocol}//${window.location.hostname}:${currentPort}/api/auth/refresh`;
-        }
+      // Try TOKEN_STATE first - most up-to-date source
+      if (TOKEN_STATE.tokenExpiry instanceof Date) {
+        expiryTime = TOKEN_STATE.tokenExpiry.getTime();
       }
       
-      // Add cache-busting query parameter
-      const cacheBuster = Date.now();
-      refreshUrl = `${refreshUrl}?_=${cacheBuster}`;
-      
-      console.log('Using refresh URL:', refreshUrl);
-      try {
-        // First ensure we have all cookies synchronized
-        await TokenManager.synchronizeTokens(true);
-        
-        // Try a direct fetch first for better reliability
-        try {
-          console.log('Making direct fetch for token refresh');
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-          
-          // Check cookies before making the request
-          if (typeof document !== 'undefined') {
-            const cookieCount = document.cookie.split(';').length;
-            const cookieNames = document.cookie.split(';')
-              .map(c => c.trim().split('=')[0])
-              .filter(Boolean);
-              
-            console.debug('Cookies available before refresh request', { 
-              count: cookieCount,
-              names: cookieNames
-            });
+      // If not found in memory, try localStorage sources in different formats
+      if (!expiryTime) {
+        // Try ISO string format
+        const expiresAtStr = getItem('auth_expires_at');
+        if (expiresAtStr) {
+          try {
+            const parsedTime = new Date(expiresAtStr).getTime();
+            if (!isNaN(parsedTime)) {
+              expiryTime = parsedTime;
+            }
+          } catch (e) {
+            console.warn('Error parsing auth_expires_at:', e);
           }
-          
-          // Properly encode refreshToken in the body
-          const encodedToken = encodeURIComponent(refreshToken);
-          
-          // Add more diagnostic headers
-          const headers = {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'X-Refresh-Request': 'true',
-            'Pragma': 'no-cache',
-            'X-Request-ID': requestId || `refresh-${Date.now()}`,
-            'X-Client-Time': new Date().toISOString()
-          };
-          
-          const response = await fetch(refreshUrl, {
-            method: 'POST',
-            headers,
-            credentials: 'include',
-            body: JSON.stringify({ refreshToken }),
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-          
-          // Log response headers for debugging
-          const responseHeaders: Record<string, string> = {};
-          response.headers.forEach((value, key) => {
-            responseHeaders[key] = value;
-          });
-          console.debug('Refresh response headers', { responseHeaders });
-          
-          // Check for various types of responses
-          if (response.ok) {
+        }
+        
+        // Try direct timestamp
+        if (!expiryTime) {
+          const expiresTimestampStr = getItem('auth_expires_timestamp');
+          if (expiresTimestampStr) {
             try {
-              const data = await response.json();
-              if (data.success && data.data) {
-                console.log('Token refresh successful via direct fetch');
-                // Successfully refreshed token
-                this.setTokens(
-                  data.data.accessToken,
-                  data.data.refreshToken,
-                  data.data.expiresIn || 3600
-                );
-                
-                // After setting tokens, make sure they're properly synchronized
-                await TokenManager.synchronizeTokens(true);
-                
-                // Notify about successful token refresh
-                setTimeout(() => {
-                  TokenManager.notifyAuthChange(true);
-                }, 100);
-                
-                return true;
-              } else {
-                console.warn('Refresh response indicated success but had invalid data format');
-                console.debug('Refresh response data:', data);
+              const parsedTime = parseInt(expiresTimestampStr, 10);
+              if (!isNaN(parsedTime)) {
+                expiryTime = parsedTime;
               }
-            } catch (parseError) {
-              console.warn('Error parsing token refresh response:', parseError);
-              // Continue to fallback
+            } catch (e) {
+              console.warn('Error parsing auth_expires_timestamp:', e);
             }
-          } else {
-            // Get more detail from the error response
-            let responseText = '';
-            try {
-              responseText = await response.text();
-            } catch (e) { /* Ignore text parsing errors */ }
-            
-            console.warn(`Token refresh failed with status: ${response.status}`, { responseText });
-            
-            // For 401/403 responses, we should clear tokens
-            if (response.status === 401 || response.status === 403) {
-              console.warn('Authorization failed during token refresh, clearing tokens');
-              this.clearTokens();
-            }
-          }
-        } catch (fetchError) {
-          // Check for timeout
-          if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
-            console.warn('Token refresh request timed out');
-          } else {
-            console.warn('Direct fetch for token refresh failed, falling back to AuthClientService:', fetchError);
           }
         }
         
-        // Fall back to AuthClientService if direct fetch fails
-        try {
-          // Log the fallback attempt
-          console.log('Falling back to AuthClientService for token refresh');
-          
-          // Create a more structured request through the API client
-          const response = await AuthClientService.refreshToken();
-          
-          // Check the response format and extract tokens
-          if (!response) {
-            console.error('AuthClientService returned empty response');
-            throw new Error('Authentication required');
+        // Try seconds format
+        if (!expiryTime) {
+          const expiresSecondsStr = getItem('auth_expires_seconds');
+          if (expiresSecondsStr) {
+            try {
+              const parsedTime = parseInt(expiresSecondsStr, 10) * 1000; // Convert to ms
+              if (!isNaN(parsedTime)) {
+                expiryTime = parsedTime;
+              }
+            } catch (e) {
+              console.warn('Error parsing auth_expires_seconds:', e);
+            }
           }
-          
-          if (response.data?.accessToken && response.data?.refreshToken) {
-            console.log('Token refresh successful via AuthClientService');
-            
-            this.setTokens(
-              response.data.accessToken,
-              response.data.refreshToken,
-              response.data.expiresIn || 3600
-            );
-            
-            // After setting tokens, ensure they're synchronized
-            await TokenManager.synchronizeTokens(true);
-            
-            // Notify about auth change after a short delay
-            setTimeout(() => {
-              TokenManager.notifyAuthChange(true);
-            }, 100);
-            
-            return true;
-          }
-          
-          console.warn('AuthClientService response missing required token data');
-          return false;
-        } catch (apiError) {
-          console.error('Error in AuthClientService.refreshToken:', apiError);
-          
-          // If it's an auth error, clear tokens
-          if (apiError instanceof Error && 
-              (apiError.message.includes('Authentication required') || 
-               apiError.message.includes('Unauthorized'))) {
-            console.warn('Authentication error during token refresh, clearing tokens');
-            this.clearTokens();
-          }
-          
-          throw apiError;
         }
-      } catch (error) {
-        console.error('Error in makeRefreshRequest:', error as Error);
+        
+        // Calculate from auth_timestamp + auth_expires_in as last resort
+        if (!expiryTime) {
+          const expiresInStr = getItem('auth_expires_in');
+          const authTimestampStr = getItem('auth_timestamp');
+          
+          if (expiresInStr && authTimestampStr) {
+            try {
+              const expiresIn = parseInt(expiresInStr, 10);
+              const authTimestamp = parseInt(authTimestampStr, 10);
+              
+              if (!isNaN(expiresIn) && !isNaN(authTimestamp)) {
+                expiryTime = authTimestamp + (expiresIn * 1000);
+              }
+            } catch (e) {
+              console.warn('Error calculating expiration time:', e);
+            }
+          }
+        }
+      }
+      
+      // If no valid expiration time found after all attempts, assume token is expired
+      if (!expiryTime) {
+        console.warn('No valid token expiration time found, assuming expired');
+        return true;
+      }
+      
+      // Compare current time to expiration time with buffer
+      const currentTime = Date.now();
+      const bufferMs = bufferSeconds * 1000;
+      const isExpired = currentTime >= expiryTime - bufferMs;
+      
+      // Log expiration status for debugging
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Token expiration status:', {
+          currentTime: new Date(currentTime).toISOString(),
+          expiryTime: new Date(expiryTime).toISOString(),
+          bufferSeconds,
+          remainingSeconds: Math.floor((expiryTime - currentTime) / 1000),
+          isExpired
+        });
+      }
+      
+      return isExpired;
+    } catch (error) {
+      // Log error but don't crash - assume token is expired in case of errors
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error checking token expiration:', { error: errorMessage });
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'isTokenExpired',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // In case of any error checking expiration, assume token is expired
+      // This is safer than assuming it's valid
+      return true;
+    }
+  }
+  
+  /**
+   * Synchronize tokens and update internal state
+   * Simpler implementation with fewer unnecessary checks
+   * 
+   * @param forceRefresh Whether to force a token refresh
+   * @returns Promise resolving to true if authentication is valid
+   * @throws TokenError if synchronization fails
+   */
+  static async synchronizeTokens(forceRefresh: boolean = false): Promise<boolean> {
+    console.log(`ClientTokenManager: Synchronizing tokens (force=${forceRefresh})`);
+    
+    try {
+      // Check for tokens in consistent order (primary, then backup)
+      const accessToken = getItem('auth_token') || getItem('auth_token_backup');
+      const refreshToken = getItem('refresh_token') || getItem('refresh_token_backup');
+      
+      if (!accessToken) {
+        if (forceRefresh && refreshToken) {
+          // We have a refresh token but no access token, try refreshing
+          console.log('No access token found but refresh token exists, attempting refresh');
+          return await this.refreshAccessToken();
+        }
+        
+        // No tokens, reset state
+        TOKEN_STATE.tokenValue = null;
+        TOKEN_STATE.tokenExpiry = null;
+        TOKEN_STATE.lastOperation = Date.now();
         return false;
       }
+      
+      // We have a token, update our state
+      TOKEN_STATE.tokenValue = accessToken;
+      
+      // Get expiration time, prioritize direct timestamp for simplicity
+      let expiryTime: number | null = null;
+      
+      // First check expires_at (ISO string)
+      const expiresAtStr = getItem('auth_expires_at');
+      if (expiresAtStr) {
+        try {
+          expiryTime = new Date(expiresAtStr).getTime();
+        } catch (e) {
+          // Ignore parsing errors, will try other formats
+        }
+      }
+      
+      // If not found, try expires_timestamp (milliseconds)
+      if (!expiryTime || isNaN(expiryTime)) {
+        const expiresTimestampStr = getItem('auth_expires_timestamp');
+        if (expiresTimestampStr) {
+          try {
+            expiryTime = parseInt(expiresTimestampStr, 10);
+          } catch (e) {
+            // Ignore parsing errors, will try other formats
+          }
+        }
+      }
+      
+      // If still not found, add default 15 minute expiration
+      if (!expiryTime || isNaN(expiryTime)) {
+        // Use a reasonable default expiration
+        expiryTime = Date.now() + (15 * 60 * 1000); // 15 minutes
+        
+        // Store this for future reference
+        const expiryDate = new Date(expiryTime);
+        setItem('auth_expires_at', expiryDate.toISOString());
+        setItem('auth_expires_timestamp', expiryTime.toString());
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('Using default expiration time:', {
+            expiryTime: new Date(expiryTime).toISOString(),
+            remainingSeconds: Math.floor((expiryTime - Date.now()) / 1000)
+          });
+        }
+      }
+      
+      // Update token state
+      TOKEN_STATE.tokenExpiry = new Date(expiryTime);
+      TOKEN_STATE.lastOperation = Date.now();
+      
+      // If token is expired or close to expiry and forceRefresh is requested, refresh
+      const tokenIsExpired = Date.now() > expiryTime - (5 * 60 * 1000); // 5 min buffer
+      if (forceRefresh && tokenIsExpired && refreshToken) {
+        console.log('Token expired or close to expiry, refreshing');
+        return await this.refreshAccessToken();
+      }
+      
+      return true;
     } catch (error) {
-      console.error('Error in makeRefreshRequest:', error as Error);
+      // If it's already a TokenError, just rethrow
+      if (error instanceof TokenError) {
+        throw error;
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error synchronizing tokens:', error);
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'synchronizeTokens',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Failed to synchronize tokens: ${errorMessage}`,
+        'SYNCHRONIZATION_FAILED',
+        error
+      );
+    }
+  }
+  
+  /**
+   * Refresh the access token through the API
+   * Simplified implementation with minimal API calls
+   * 
+   * @returns Promise resolving to true if refresh was successful
+   * @throws TokenError with detailed information if refresh fails
+   */
+  static async refreshAccessToken(): Promise<boolean> {
+    console.log('ClientTokenManager: Starting token refresh');
+    
+    // Check time since last refresh to prevent frequent refreshes
+    const now = Date.now();
+    const lastRefresh = parseInt(getItem('token_refresh_timestamp') || '0', 10);
+    const timeSinceLastRefresh = now - lastRefresh;
+    
+    // Minimum 5 seconds between refresh attempts to prevent refresh storms
+    const MIN_REFRESH_INTERVAL = 5000; 
+    if (lastRefresh > 0 && timeSinceLastRefresh < MIN_REFRESH_INTERVAL) {
+      console.log(`Token refresh too frequent (${timeSinceLastRefresh}ms), skipping`);
+      return true; // Return success but skip actual refresh
+    }
+    
+    // Record operation timestamp
+    TOKEN_STATE.lastOperation = now;
+    setItem('token_refresh_timestamp', now.toString());
+    
+    try {
+      // Get refresh token consistently
+      const refreshToken = getItem('refresh_token') || getItem('refresh_token_backup');
+      
+      if (!refreshToken) {
+        throw new TokenError(
+          'No refresh token available for token refresh',
+          'MISSING_REFRESH_TOKEN'
+        );
+      }
+      
+      // Simple API call with minimal headers
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include', // Include cookies
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        body: JSON.stringify({ refreshToken }),
+        signal: AbortSignal.timeout(15000) // 15 second timeout
+      });
+      
+      // Handle non-OK response
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Clear tokens on auth error
+          await this.clearTokens();
+          throw new TokenError(
+            `Token refresh failed with status 401: Unauthorized`,
+            'REFRESH_TOKEN_EXPIRED'
+          );
+        } else {
+          throw new TokenError(
+            `Token refresh failed with status ${response.status}`,
+            'REFRESH_API_ERROR'
+          );
+        }
+      }
+      
+      // Parse response data
+      const data = await response.json();
+      
+      if (!data.success || !data.data) {
+        throw new TokenError(
+          'Token refresh API returned invalid response',
+          'INVALID_RESPONSE_FORMAT'
+        );
+      }
+      
+      // Extract tokens with standardized property names
+      const accessToken = data.data.token || data.data.accessToken;
+      const newRefreshToken = data.data.refreshToken;
+      const expiresIn = data.data.expiresIn || 3600;
+      
+      if (!accessToken) {
+        throw new TokenError(
+          'Token refresh API returned no access token',
+          'NO_ACCESS_TOKEN_RETURNED'
+        );
+      }
+      
+      // Log success and set tokens
+      console.log('Token refresh successful, setting new tokens');
+      
+      // Use new refresh token or keep existing one
+      const refreshTokenToUse = newRefreshToken || refreshToken;
+      
+      // Store both tokens
+      this.setTokens(accessToken, refreshTokenToUse, expiresIn);
+      
+      return true;
+    } catch (error) {
+      // Specific handling for network errors
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error('Network error during token refresh:', error.message);
+        // Don't clear tokens on network errors
+        return false;
+      }
+      
+      // If it's already a TokenError, just rethrow
+      if (error instanceof TokenError) {
+        throw error;
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error refreshing token:', error);
+      
+      // Track the error but don't rethrow for regular users
+      TOKEN_STATE.operationErrors.push({
+        operation: 'refreshAccessToken',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // In development, rethrow with details to help debugging
+      if (process.env.NODE_ENV === 'development') {
+        throw new TokenError(
+          `Failed to refresh access token: ${errorMessage}`,
+          'REFRESH_FAILED',
+          error
+        );
+      }
+      
       return false;
     }
   }
   
   /**
    * Check if the user is logged in with valid tokens
-   * Performs token refresh if needed
    * 
    * @returns Promise resolving to true if user is logged in
+   * @throws TokenError if login status check fails
    */
   static async isLoggedIn(): Promise<boolean> {
     try {
-      const accessToken = this.getAccessToken();
-      if (!accessToken) return false;
+      // Always check the actual token - no caching of validation results
+      const accessToken = await this.getAccessToken();
+      TOKEN_STATE.tokenValue = accessToken;
       
-      // If token is expired, try to refresh it
-      if (this.isTokenExpired()) {
-        return await this.refreshAccessToken();
+      if (!accessToken) {
+        // No token present - user is definitely not logged in
+        return false;
       }
       
+      // Check if token is expired - will throw error if expiration info is missing/invalid
+      const isExpired = this.isTokenExpired();
+      
+      if (isExpired) {
+        // Token is expired or will expire soon - refresh it
+        // This will throw error if refresh fails, so we don't need to handle it here
+        await this.refreshAccessToken();
+      }
+      
+      // If we got here, the token is valid or was successfully refreshed
       return true;
     } catch (error) {
-      console.warn('Error checking login status:', error as Error);
-      return false;
+      // If it's already a TokenError, just rethrow
+      if (error instanceof TokenError) {
+        throw error;
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error checking login status:', error);
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'isLoggedIn',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Failed to check login status: ${errorMessage}`,
+        'LOGIN_CHECK_FAILED',
+        error
+      );
     }
   }
   
   /**
-   * Log the user out by clearing tokens and notifying TokenManager
+   * Notify subscribers about authentication state changes
+   * 
+   * @param isAuthenticated Whether the user is authenticated
+   * @throws Error if notification fails
+   */
+  static async notifyAuthChange(isAuthenticated: boolean): Promise<void> {
+    console.log(`ClientTokenManager: Notifying auth change: ${isAuthenticated ? 'authenticated' : 'unauthenticated'}`);
+    
+    try {
+      // Dispatch event for any listeners
+      if (typeof window !== 'undefined') {
+        // Custom event for auth change
+        window.dispatchEvent(new CustomEvent('auth_status_changed', { 
+          detail: { isAuthenticated } 
+        }));
+        
+        // Additional event specifically for logout
+        if (!isAuthenticated) {
+          window.dispatchEvent(new CustomEvent('auth-logout'));
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error in notifyAuthChange:', error);
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'notifyAuthChange',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Failed to notify auth change: ${errorMessage}`,
+        'NOTIFICATION_FAILED',
+        error
+      );
+    }
+  }
+  
+  /**
+   * Notify about logout event
+   * 
+   * @throws Error if notification fails
+   */
+  static async notifyLogout(): Promise<void> {
+    console.log('ClientTokenManager: Notifying logout');
+    
+    try {
+      // Clear token state first
+      TOKEN_STATE.tokenValue = null;
+      TOKEN_STATE.tokenExpiry = null;
+      TOKEN_STATE.lastOperation = Date.now();
+      
+      // Just dispatch the logout event directly
+      await this.notifyAuthChange(false);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error in notifyLogout:', error);
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'notifyLogout',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Failed to notify logout: ${errorMessage}`,
+        'LOGOUT_NOTIFICATION_FAILED',
+        error
+      );
+    }
+  }
+  
+  /**
+   * Extract user information from token
+   * @param token JWT token
+   * @returns User information or null
+   * @throws TokenError if decoding fails
+   */
+  static getUserFromToken(token: string) {
+    if (!token) {
+      throw new TokenError(
+        'Cannot extract user from empty token',
+        'EMPTY_TOKEN',
+        null
+      );
+    }
+    
+    try {
+      // Use the imported jwtDecode function properly
+      const decoded = jwtDecode<{
+        sub: string | number;
+        name?: string;
+        email?: string;
+        role?: string;
+      }>(token);
+      
+      if (!decoded || !decoded.sub) {
+        throw new TokenError(
+          'Invalid token format: missing subject claim',
+          'INVALID_TOKEN_FORMAT',
+          { decodedToken: decoded }
+        );
+      }
+      
+      // Extract user information
+      let userId: number;
+      if (typeof decoded.sub === 'number') {
+        userId = decoded.sub;
+      } else if (typeof decoded.sub === 'string') {
+        userId = parseInt(decoded.sub, 10);
+      } else {
+        throw new TokenError(
+          'Invalid subject claim format',
+          'INVALID_SUBJECT_FORMAT',
+          { subjectType: typeof decoded.sub, subjectValue: decoded.sub }
+        );
+      }
+      
+      if (isNaN(userId)) {
+        throw new TokenError(
+          'Invalid user ID in token',
+          'INVALID_USER_ID',
+          { userId, decodedSub: decoded.sub }
+        );
+      }
+      
+      return {
+        id: userId,
+        name: decoded.name || '',
+        email: decoded.email || '',
+        role: decoded.role || ''
+      };
+    } catch (error) {
+      // If it's already a TokenError, just rethrow
+      if (error instanceof TokenError) {
+        throw error;
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error decoding token:', error);
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'getUserFromToken',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Failed to decode token: ${errorMessage}`,
+        'TOKEN_DECODE_FAILED',
+        error
+      );
+    }
+  }
+  
+  /**
+   * Log the user out by clearing tokens and calling the logout API
    * 
    * @param allDevices Whether to log out from all devices
    * @returns Promise resolving to true if logout was successful
+   * @throws TokenError if logout fails
    */
   static async logout(allDevices: boolean = false): Promise<boolean> {
     try {
-      const refreshToken = this.getRefreshToken();
-      
       // Clear tokens first for immediate UI feedback
-      this.clearTokens();
+      await this.clearTokens();
       
-      // Call the logout API if we have a refresh token
-      if (refreshToken) {
-        try {
-          const response = await AuthClientService.logout();
-          return response.success;
-        } catch (error) {
-          console.error('Error during logout:', error as Error);
-          return false;
-        }
+      // Call the logout API
+      const response = await AuthClientService.logout();
+      
+      if (!response.success) {
+        throw new TokenError(
+          `Logout API failed: ${response.message || 'Unknown error'}`,
+          'LOGOUT_API_FAILED',
+          response
+        );
       }
       
       return true;
     } catch (error) {
-      console.error('Error during logout:', error as Error);
-      // Ensure tokens are cleared even if API call fails
-      this.clearTokens();
-      return false;
+      // If it's already a TokenError, just rethrow
+      if (error instanceof TokenError) {
+        throw error;
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error during logout:', error);
+      
+      // Track the error
+      TOKEN_STATE.operationErrors.push({
+        operation: 'logout',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        timestamp: Date.now()
+      });
+      
+      // Rethrow with additional context
+      throw new TokenError(
+        `Logout failed: ${errorMessage}`,
+        'LOGOUT_FAILED',
+        error
+      );
     }
   }
 }
+
+// Export for backward compatibility
+export default ClientTokenManager;

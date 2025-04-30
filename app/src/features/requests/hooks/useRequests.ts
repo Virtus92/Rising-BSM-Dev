@@ -60,7 +60,17 @@ export const useRequests = (initialFilters?: Partial<RequestFilterParamsDto>): U
         console.log('Mapped request filters:', mappedFilters);
       }
       
-      return await RequestService.getAll(mappedFilters);
+      try {
+        // Create the API call promise first but don't await it yet
+        // This prevents Function.prototype.apply errors on Promise objects
+        const apiCall = RequestService.getAll(mappedFilters);
+        
+        // Now await the promise
+        return await apiCall;
+      } catch (err) {
+        console.error('Error in useRequests fetchFunction:', err);
+        throw err;
+      }
     },
     initialFilters: initialFilters as RequestFilterParamsDto,
     defaultSortField: 'createdAt' as keyof RequestFilterParamsDto,

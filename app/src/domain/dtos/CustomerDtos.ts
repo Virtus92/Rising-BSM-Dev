@@ -63,6 +63,11 @@ export interface CreateCustomerDto {
   city?: string;
   
   /**
+   * Bundesland/Staat
+   */
+  state?: string;
+  
+  /**
    * Land
    */
   country?: string;
@@ -95,6 +100,19 @@ export interface CreateCustomerDto {
   /* Support for frontend aliases */
   zipCode?: string; 
   companyName?: string;
+  /**
+   * Status
+   */
+  status?: CommonStatus;
+
+  /**
+   * Erstellungsdatum
+   */
+  createdAt?: Date | string;
+  /**
+   * Aktualisierungsdatum
+   */
+  updatedAt?: Date | string;
 }
 
 /**
@@ -135,6 +153,11 @@ export interface UpdateCustomerDto {
    * Stadt
    */
   city?: string;
+  
+  /**
+   * Bundesland/Staat
+   */
+  state?: string;
   
   /**
    * Land
@@ -211,6 +234,11 @@ export interface CustomerResponseDto extends BaseResponseDto {
   city?: string;
   
   /**
+   * Bundesland/Staat
+   */
+  state?: string;
+  
+  /**
    * Land
    */
   country: string;
@@ -218,7 +246,9 @@ export interface CustomerResponseDto extends BaseResponseDto {
   /**
    * Notizen
    */
-  notes?: string;
+  notes?: CustomerLogDto[];
+
+  logs?: CustomerLogDto[];
   
   /**
    * Newsletter-Anmeldung
@@ -420,4 +450,14 @@ export interface CustomerFilterParamsDto extends BaseFilterParamsDto {
    * Newsletter-Anmeldung
    */
   newsletter?: boolean;
+
+  /**
+   * Filter for customers created after this date
+   */
+  createdAfter?: string;
+
+  /**
+   * Filter for customers created before this date
+   */
+  createdBefore?: string;
 }

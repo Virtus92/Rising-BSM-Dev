@@ -14,29 +14,39 @@ export { getErrorHandler, getValidationService } from './bootstrap.server';
  */
 export async function bootstrap(): Promise<void> {
   try {
-    // More robust environment detection using explicit checks
+    // Simplified and more reliable environment detection
+    // 1. First check for server-only marker - the most reliable method
+    const isServerOnlyModule = typeof require !== 'undefined' && require?.main?.path?.includes('node_modules/next');
+    
+    // 2. Then check for window which definitively indicates client
     const hasWindow = typeof window !== 'undefined';
+    
+    // 3. Check for Next.js Edge runtime
     const isNextEdge = typeof process !== 'undefined' && process.env.NEXT_RUNTIME === 'edge';
-    const isServer = !hasWindow && !isNextEdge && typeof process !== 'undefined';
+    
+    // Determine environment using the checks above
+    const isServer = isServerOnlyModule || (!hasWindow && !isNextEdge);
+    const isClient = hasWindow;
     
     if (isServer) {
       // Server environment - use server bootstrap
-      // Wrap in try-catch to avoid hard crashes on environment mismatch
+      // Use dynamic import to avoid server-only module errors
       try {
-        const { bootstrapServer } = await import('./bootstrap.server');
+        // Import without using await to improve error handling
+        const serverModule = await import('./bootstrap.server');
         console.log('Running server bootstrap');
-        return await bootstrapServer();
+        return await serverModule.bootstrapServer();
       } catch (serverError) {
-        console.warn('Server bootstrap failed, likely environment mismatch:', serverError);
+        console.warn('Server bootstrap failed:', serverError);
         // Don't rethrow - allow for graceful degradation
         return;
       }
-    } else if (hasWindow) {
+    } else if (isClient) {
       // Client environment - use client bootstrap
       try {
-        const { bootstrapClient } = await import('./bootstrap.client');
+        const clientModule = await import('./bootstrap.client');
         console.log('Running client bootstrap');
-        return await bootstrapClient();
+        return await clientModule.bootstrapClient();
       } catch (clientError) {
         console.warn('Client bootstrap failed:', clientError);
         // Don't crash the application on bootstrap failure
@@ -47,7 +57,7 @@ export async function bootstrap(): Promise<void> {
       console.log('Detected Edge Runtime environment, using minimal bootstrap');
       return;
     } else {
-      console.warn('Unknown environment detected, skipping bootstrap');
+      console.warn('Unknown environment detected, skipping bootstrap (this may be an RSC environment)');
       return;
     }
   } catch (error) {

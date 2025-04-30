@@ -3,7 +3,7 @@ import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
 import { getServiceFactory } from '@/core/factories';
 import { getLogger } from '@/core/logging';
-import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';

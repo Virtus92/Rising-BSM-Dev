@@ -8,6 +8,39 @@ import { CommonStatus, CustomerType } from '../enums/CommonEnums';
  */
 export interface ICustomerRepository extends IBaseRepository<Customer> {
   /**
+   * Findet Kunden basierend auf Kriterien
+   * 
+   * @param criteria - Suchkriterien
+   * @returns Array von Kunden, die den Kriterien entsprechen
+   */
+  find(criteria: Record<string, any>): Promise<Customer[]>;
+  
+  /**
+   * Prüft, ob ein Kunde existiert
+   * 
+   * @param id - Kunden-ID
+   * @returns true, wenn der Kunde existiert, sonst false
+   */
+  exists(id: number): Promise<boolean>;
+
+  /**
+   * Findet Notizen zu einem Kunden
+   * 
+   * @param customerId - Kunden-ID
+   * @returns Notizen zum Kunden
+   */
+  findNotes(customerId: number): Promise<any[]>;
+
+  /**
+   * Fügt einem Kunden eine Notiz hinzu
+   * 
+   * @param customerId - Kunden-ID
+   * @param userId - Benutzer-ID
+   * @param text - Notiztext
+   * @returns Erstellte Notiz
+   */
+  addNote(customerId: number, userId: number, text: string): Promise<any>;
+  /**
    * Findet einen Kunden anhand seiner E-Mail-Adresse
    * 
    * @param email - E-Mail-Adresse
@@ -103,4 +136,29 @@ export interface ICustomerRepository extends IBaseRepository<Customer> {
    * @returns Gefundene Kunden
    */
   findRecent(limit?: number): Promise<Customer[]>;
+
+  /**
+   * Aktualisiert mehrere Kunden auf einmal
+   * 
+   * @param ids - Array von Kunden-IDs
+   * @param data - Zu aktualisierende Daten
+   * @returns Anzahl der aktualisierten Kunden
+   */
+  bulkUpdate(ids: number[], data: Partial<Customer>): Promise<number>;
+
+  /**
+   * Gets logs for a customer
+   * 
+   * @param customerId - Customer ID
+   * @returns Customer logs
+   */
+  getCustomerLogs(customerId: number): Promise<any[]>;
+  
+  /**
+   * Creates a customer log entry
+   * 
+   * @param data - Log data
+   * @returns Created log
+   */
+  createCustomerLog(data: { customerId: number; userId?: number; action: string; details?: string }): Promise<any>;
 }

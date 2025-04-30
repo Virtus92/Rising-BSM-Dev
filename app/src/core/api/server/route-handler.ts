@@ -1,162 +1,213 @@
 /**
- * API Route Handler - SERVER VERSION
+ * Route Handler
  * 
- * Provides utility functions for API route handlers with error handling and logging
- * This version is for server-side use only and includes next/headers imports
+ * Provides a wrapper for Next.js API route handlers
+ * that ensures consistent response types and error handling
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { formatResponse } from '../../errors';
-import { getLogger } from '../../logging';
-import { cookies } from 'next/headers';
-import { getAuthService } from '@/core/factories/serviceFactory';
-import { ServiceOptions } from '@/domain/services/IBaseService';
+import { 
+  ErrorResponse, 
+  SuccessResponse 
+} from '@/core/errors/types/ApiTypes';
+import { getLogger } from '@/core/logging';
+import jwt from 'jsonwebtoken';
+
+// Logger for debugging auth issues
+const logger = getLogger();
 
 /**
- * Route handler options
+ * Options for route handlers
  */
 export interface RouteHandlerOptions {
+  /**
+   * Whether the route requires authentication
+   */
   requiresAuth?: boolean;
-  requiresRole?: string[];
+  
+  /**
+   * Required roles for accessing this route
+   */
+  requiredRoles?: string[];
+  
+  /**
+   * Whether to skip the default error handler
+   */
+  skipErrorHandler?: boolean;
+
+  detailedErrors?: boolean;
 }
 
 /**
- * Simple route handler function for API routes
- * Used to wrap handlers with try/catch and error handling
+ * Use auth information interface from route-handler.ts to avoid duplication
  */
-export function routeHandler(
-  handler: (request: NextRequest) => Promise<NextResponse>, 
-  options?: RouteHandlerOptions
-): (request: NextRequest) => Promise<NextResponse> {
-  const logger = getLogger();
+import { AuthInfo } from '../route-handler';
+export type { AuthInfo };
+
+/**
+ * Route handler type
+ * Ensures consistent response types
+ * Must match the type definition in the main route-handler.ts
+ */
+export type RouteHandler<T = any> = (request: NextRequest, ...args: any[]) => Promise<NextResponse>;
+
+// Import the RouteHandler type from the main route-handler.ts to ensure compatibility
+import { RouteHandler as BaseRouteHandler } from '../route-handler';
+// Ensure our RouteHandler type is compatible with the base RouteHandler type
+type _EnsureTypeCompatibility<T> = RouteHandler<T> extends BaseRouteHandler<T> ? true : false;
+
+/**
+ * Helper function to extract auth information from a request
+ * Parses the token from authorization headers and attaches user info to the request
+ * 
+ * @param request NextRequest object
+ * @returns The request with auth information attached
+ */
+function extractAuthFromRequest(request: NextRequest): NextRequest {
+  try {
+    // Check if auth is already attached - don't process twice
+    if ((request as any).auth) {
+      return request;
+    }
+    
+    // Get token from authorization header or X-Auth-Token header
+    let token: string | null = null;
+    
+    // Check Authorization header first (Bearer token)
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+    
+    // If no token in Authorization header, check X-Auth-Token
+    if (!token) {
+      token = request.headers.get('X-Auth-Token');
+    }
+    
+    // If no token in headers, check cookies
+    if (!token) {
+      const authCookie = request.cookies.get('auth_token');
+      if (authCookie) {
+        token = authCookie.value;
+      }
+    }
+    
+    // If no token found, return request as is
+    if (!token) {
+      return request;
+    }
+    
+    // Decode the token without verification (verification was done by middleware)
+    const decoded = jwt.decode(token) as any;
+    
+    // If token is invalid or has no subject, return request as is
+    if (!decoded || !decoded.sub) {
+      return request;
+    }
+    
+    // Create auth information
+    const auth: AuthInfo = {
+      userId: parseInt(decoded.sub, 10),
+      role: decoded.role,
+      name: decoded.name,
+      email: decoded.email
+    };
+    
+    // Attach auth to request
+    (request as any).auth = auth;
+    
+    // Return the modified request
+    return request;
+  } catch (error) {
+    // Log error but don't break the request
+    logger.error('Error extracting auth from request:', error as Error);
+    return request;
+  }
+}
+
+/**
+ * Create a route handler with error handling
+ * 
+ * @param handler Handler function
+ * @param options Route handler options
+ * @returns Wrapped handler with error handling
+ */
+export function routeHandler<T>(
+  handler: RouteHandler<T>,
+  options: RouteHandlerOptions = {}
+): RouteHandler<T> {
+  // Check if the handler is a function
+  if (typeof handler !== 'function') {
+    throw new Error('Handler must be a function');
+  }
+  // Check if the handler is compatible with the RouteHandler type
+  if (typeof handler !== 'function' || handler.length < 1) {
+    throw new Error('Handler must be a function with at least one argument');
+  }
+  // Check if the options are valid
+  if (options && typeof options !== 'object') {
+    throw new Error('Options must be an object');
+  }
   
-  return async (request: NextRequest) => {
+  // Create an auth-enhanced handler that injects the auth info and includes error handling
+  const authEnhancedHandler: RouteHandler<T> = async (request: NextRequest, ...args: any[]) => {
     try {
-      // Authentication verification if required
-      if (options?.requiresAuth) {
-        // Get auth token from cookies or authorization header
-        const cookieStore = await cookies();
-        const authToken = cookieStore.get('auth_token')?.value || 
-                          request.headers.get('authorization')?.replace('Bearer ', '') || '';
-        
-        if (!authToken) {
-          logger.warn('Authentication required but no token provided');
-          return NextResponse.json(
-            {
-              success: false,
-              message: 'Authentication required',
-              timestamp: new Date().toISOString()
-            },
-            { status: 401 }
-          );
-        }
-        
-        // Verify the token
-        try {
-          const authService = getAuthService();
-          const verificationResult = await authService.verifyToken(authToken);
-          
-          if (!verificationResult.valid || !verificationResult.userId) {
-            logger.warn('Invalid authentication token');
-            return NextResponse.json(
-              {
-                success: false,
-                message: 'Invalid or expired authentication token',
-                timestamp: new Date().toISOString()
-              },
-              { status: 401 }
-            );
+      // Extract auth from request
+      const enhancedRequest = extractAuthFromRequest(request);
+      
+      // Check if authentication is required and not present
+      if (options.requiresAuth && !(enhancedRequest as any).auth?.userId) {
+        return new NextResponse(
+          JSON.stringify({
+            success: false,
+            message: 'Authentication required',
+            statusCode: 401,
+          }),
+          { 
+            status: 401, 
+            headers: { 'Content-Type': 'application/json' } 
           }
-          
-          // Role verification if required
-          if (options?.requiresRole && options.requiresRole.length > 0) {
-            const userId = verificationResult.userId;
-            const serviceOptions: ServiceOptions = { 
-              context: { 
-                requestUrl: request.url 
-              } 
-            };
-            
-            // Check if user has any of the required roles
-            let hasRequiredRole = false;
-            for (const role of options.requiresRole) {
-              const roleCheckResult = await authService.hasRole(userId, role, serviceOptions);
-              if (roleCheckResult) {
-                hasRequiredRole = true;
-                break;
-              }
-            }
-            
-            if (!hasRequiredRole) {
-              logger.warn(`User ${userId} does not have required roles [${options.requiresRole.join(', ')}]`);
-              return NextResponse.json(
-                {
-                  success: false,
-                  message: 'Insufficient permissions',
-                  timestamp: new Date().toISOString()
-                },
-                { status: 403 }
-              );
-            }
-          }
-          
-          // Attach the userId to the request for use in the handler
-          (request as any).userId = verificationResult.userId;
-        } catch (authError) {
-          logger.error('Error during authentication verification:', authError as Error);
-          return NextResponse.json(
-            {
+        );
+      }
+      
+      // Check if role requirements are met
+      if (options.requiredRoles && options.requiredRoles.length > 0 && (enhancedRequest as any).auth) {
+        const userRole = (enhancedRequest as any).auth.role;
+        if (!userRole || !options.requiredRoles.includes(userRole)) {
+          return new NextResponse(
+            JSON.stringify({
               success: false,
-              message: 'Authentication error',
-              timestamp: new Date().toISOString()
-            },
-            { status: 401 }
+              message: 'Insufficient permissions',
+              statusCode: 403,
+            }),
+            { 
+              status: 403, 
+              headers: { 'Content-Type': 'application/json' } 
+            }
           );
         }
       }
       
-      return await handler(request);
+      // Forward to the original handler with the enhanced request
+      return await handler(enhancedRequest, ...args);
     } catch (error) {
-      // Improved error logging with better serialization
-      let errorDetails = {};
+      // Log the error
+      logger.error('Error in route handler:', error as Error);
       
-      try {
-        if (error instanceof Error) {
-          errorDetails = {
-            message: error.message,
-            name: error.name,
-            stack: error.stack,
-            code: (error as any).code
-          };
-        } else if (error !== null && typeof error === 'object') {
-          errorDetails = Object.getOwnPropertyNames(error).reduce((acc, key) => {
-            try {
-              acc[key] = (error as any)[key];
-            } catch (e) {
-              acc[key] = 'Error accessing property';
-            }
-            return acc;
-          }, {} as Record<string, any>);
-        } else {
-          errorDetails = { rawError: String(error) };
-        }
-      } catch (loggingError) {
-        errorDetails = { serializationError: String(loggingError), originalError: String(error || 'Unknown error') };
-      }
-      
-      logger.error('API route error:', errorDetails);
-      
-      return NextResponse.json(
-        {
+      // Return a formatted error response
+      return new NextResponse(
+        JSON.stringify({
           success: false,
-          message: error instanceof Error ? error.message : 'An unexpected error occurred',
-          timestamp: new Date().toISOString()
-        },
-        { status: 500 }
+          message: error instanceof Error ? error.message : 'An unknown error occurred',
+          statusCode: 500,
+        }),
+        { 
+          status: 500, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
       );
     }
   };
+  
+  // Return the enhanced handler directly without using errorHandler
+  return authEnhancedHandler;
 }
-
-export default {
-  routeHandler
-};

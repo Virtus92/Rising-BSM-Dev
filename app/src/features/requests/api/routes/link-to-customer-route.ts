@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { apiAuth } from '@/features/auth/api/middleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { formatResponse } from '@/core/errors';
+import { routeHandler } from '@/core/api/route-handler';
 import { getServiceFactory } from '@/core/factories';
 import { IRequestService } from '@/domain/services/IRequestService';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
@@ -13,18 +14,19 @@ import { LinkRequestToCustomerRequest } from '../models/request-request-models';
  * @param params - Route parameters with request ID
  * @returns Response with updated request
  */
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export const POST = routeHandler(async (request: NextRequest) => {
+  // Extract ID from URL path segments
+  const urlParts = request.nextUrl.pathname.split('/');
+  const id = Number(urlParts[urlParts.length - 2]); // Take the second-to-last segment (the [id] part)
   try {
-    // Extract ID from route parameters
-    const id = Number(params.id);
     if (isNaN(id) || id <= 0) {
       return formatResponse.error('Invalid request ID', 400);
     }
 
     // Authenticate user
-    const auth = await apiAuth.auth(request);
-    if (!auth || !auth.success) {
-      return formatResponse.error(auth.message || 'Authentication required', auth.status || 401);
+    const auth = await apiAuth(request);
+    if (!auth) {
+      return formatResponse.error('Authentication required', 401);
     }
 
     // Verify permissions
@@ -47,7 +49,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     // Import proper auth middleware and get user details from JWT token
     const { extractAuthToken } = await import('@/features/auth/api/middleware/authMiddleware');
-    const token = extractAuthToken(request);
+    const token = await extractAuthToken(request);
     let userId = 0;
     
     if (token) {
@@ -73,4 +75,5 @@ export async function POST(request: Request, { params }: { params: { id: string 
   } catch (error) {
     return formatResponse.error('An error occurred while linking the request to a customer', 500);
   }
-}
+});
+

@@ -295,11 +295,32 @@ export abstract class BaseService<T, C extends Record<string, any>, U extends Re
       if (error instanceof AppError) {
         // Create validation errors in domain format
         const errorDtos = error instanceof ValidationError ? 
-          error.errors?.map(e => ({
-            type: ValidationErrorType.FORMAT,
-            field: e.split(':')[0]?.trim() || 'unknown',
-            message: e
-          })) : 
+          // Handle different formats of validation errors
+          (error.details?.errors ? 
+            // If errors are in details.errors
+            (Array.isArray(error.details.errors) ? 
+              error.details.errors.map((e: string | any) => ({
+                type: ValidationErrorType.FORMAT,
+                field: typeof e === 'string' ? e.split(':')[0]?.trim() || 'unknown' : 'unknown',
+                message: typeof e === 'string' ? e : String(e)
+              })) :
+              // Handle object with field keys
+              Object.entries(error.details.errors).flatMap(([field, msgs]) => 
+                (Array.isArray(msgs) ? msgs : [String(msgs)]).map(msg => ({
+                  type: ValidationErrorType.FORMAT,
+                  field,
+                  message: msg
+                }))
+              )
+            ) :
+            // Fallback to single error message
+            [{
+              type: ValidationErrorType.FORMAT,
+              field: 'general',
+              message: error.message
+            }]
+          ) : 
+          // Non-validation AppError
           [{
             type: ValidationErrorType.OTHER,
             field: 'general',
@@ -360,7 +381,7 @@ export abstract class BaseService<T, C extends Record<string, any>, U extends Re
         // Execute callback
         return await callback(this);
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error in ${this.constructor.name}.transaction`, { error });
       throw this.handleError(error);
     }

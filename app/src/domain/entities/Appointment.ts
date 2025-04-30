@@ -1,5 +1,6 @@
 import { BaseEntity } from './BaseEntity';
 import { AppointmentStatus } from '../enums/CommonEnums';
+import { AppointmentNote } from './AppointmentNote';
 
 /**
  * Termin-Entität
@@ -43,6 +44,11 @@ export class Appointment extends BaseEntity {
   status: AppointmentStatus;
   
   /**
+   * Notes for the appointment
+   */
+  notes?: AppointmentNote[];
+  
+  /**
    * Konstruktor
    * 
    * @param data - Initialisierungsdaten
@@ -57,6 +63,7 @@ export class Appointment extends BaseEntity {
     this.location = data.location;
     this.description = data.description;
     this.status = data.status || AppointmentStatus.PLANNED;
+    this.notes = data.notes || [];
   }
   
   /**
@@ -190,7 +197,8 @@ export class Appointment extends BaseEntity {
       duration: this.duration,
       location: this.location,
       description: this.description,
-      status: this.status
+      status: this.status,
+      notes: this.notes
     };
   }
 }

@@ -8,6 +8,21 @@ import { AppointmentFilterParamsDto } from '../dtos/AppointmentDtos';
  */
 export interface IAppointmentRepository extends IBaseRepository<Appointment> {
   /**
+   * Findet Termine basierend auf Kriterien
+   * 
+   * @param criteria - Suchkriterien
+   * @returns Array von Terminen, die den Kriterien entsprechen
+   */
+  find(criteria: Record<string, any>): Promise<Appointment[]>;
+  
+  /**
+   * Prüft, ob ein Termin existiert
+   * 
+   * @param id - Termin-ID
+   * @returns true, wenn der Termin existiert, sonst false
+   */
+  exists(id: number): Promise<boolean>;
+  /**
    * Findet Termine für einen Kunden
    * 
    * @param customerId - Kunden-ID
@@ -83,4 +98,13 @@ export interface IAppointmentRepository extends IBaseRepository<Appointment> {
    * @returns Notizen zum Termin
    */
   findNotes(appointmentId: number): Promise<AppointmentNote[]>;
+
+  /**
+   * Aktualisiert mehrere Termine auf einmal
+   * 
+   * @param ids - Array von Termin-IDs
+   * @param data - Zu aktualisierende Daten
+   * @returns Anzahl der aktualisierten Termine
+   */
+  bulkUpdate(ids: number[], data: Partial<Appointment>): Promise<number>;
 }

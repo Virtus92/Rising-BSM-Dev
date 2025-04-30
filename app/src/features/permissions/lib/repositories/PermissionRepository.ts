@@ -683,7 +683,7 @@ export class PermissionRepository implements IPermissionRepository {
   /**
    * Execute in transaction
    */
-  async transaction<T>(callback: () => Promise<T>): Promise<T> {
+  async transaction<T>(callback: (repo?: IPermissionRepository) => Promise<T>): Promise<T> {
     try {
       return await this.prisma.$transaction(async () => {
         return callback();

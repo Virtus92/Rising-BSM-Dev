@@ -28,10 +28,10 @@ import { RequestClient } from '@/features/requests/lib/clients/RequestClient';
 import { useToast } from '@/shared/hooks/useToast';
 import { Loader2 } from 'lucide-react';
 
-// Validierungsschema für das Formular
+// Form validation schema
 const formSchema = z.object({
-  name: z.string().min(2, 'Name muss mindestens 2 Zeichen haben'),
-  email: z.string().email('Gültige E-Mail-Adresse erforderlich'),
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Valid email address required'),
   phone: z.string().optional(),
   company: z.string().optional(),
   address: z.string().optional(),
@@ -58,7 +58,7 @@ interface ConvertToCustomerFormProps {
 }
 
 /**
- * Formular zur Konvertierung einer Kontaktanfrage in einen Kunden
+ * Form for converting a contact request to a customer
  */
 export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
   request,
@@ -68,17 +68,17 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
   const [showAppointmentFields, setShowAppointmentFields] = useState(false);
   const { toast } = useToast();
 
-  // Default-Werte aus der Anfrage
+  // Default values from the request
   const defaultValues: Partial<FormValues> = {
     name: request.name,
     email: request.email,
     phone: request.phone || '',
     company: '',
-    country: 'Deutschland',
+    country: 'Germany',
     type: 'private',
     newsletter: false,
     createAppointment: false,
-    appointmentTitle: `Termin mit ${request.name}`,
+    appointmentTitle: `Appointment with ${request.name}`,
     appointmentDescription: request.message,
   };
 
@@ -88,7 +88,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
   });
 
   const watchCreateAppointment = form.watch('createAppointment');
-  // Wenn sich createAppointment ändert, aktualisiere den State
+  // Update state when createAppointment changes
   React.useEffect(() => {
     setShowAppointmentFields(watchCreateAppointment);
   }, [watchCreateAppointment]);
@@ -172,7 +172,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
     <Form {...form as any}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-          {/* Kundendaten */}
+          {/* Customer Data */}
           <div className="space-y-3">
             <FormField
               control={form.control}
@@ -194,9 +194,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                 name="email"
                 render={({ field }: { field: ControllerRenderProps<FormValues, "email"> }) => (
                   <FormItem>
-                    <FormLabel>E-Mail *</FormLabel>
+                    <FormLabel>Email *</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="E-Mail" {...field} />
+                      <Input type="email" placeholder="Email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -208,9 +208,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                 name="phone"
                 render={({ field }: { field: ControllerRenderProps<FormValues, "phone"> }) => (
                   <FormItem>
-                    <FormLabel>Telefon</FormLabel>
+                    <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input placeholder="Telefon" {...field} />
+                      <Input placeholder="Phone" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -223,9 +223,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               name="company"
               render={({ field }: { field: ControllerRenderProps<FormValues, "company"> }) => (
                 <FormItem>
-                  <FormLabel>Firma</FormLabel>
+                  <FormLabel>Company</FormLabel>
                   <FormControl>
-                    <Input placeholder="Firma" {...field} />
+                    <Input placeholder="Company" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -237,9 +237,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               name="address"
               render={({ field }: { field: ControllerRenderProps<FormValues, "address"> }) => (
                 <FormItem>
-                  <FormLabel>Adresse</FormLabel>
+                  <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <Input placeholder="Adresse" {...field} />
+                    <Input placeholder="Address" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -252,9 +252,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                 name="postalCode"
                 render={({ field }: { field: ControllerRenderProps<FormValues, "postalCode"> }) => (
                   <FormItem>
-                    <FormLabel>PLZ</FormLabel>
+                    <FormLabel>Postal Code</FormLabel>
                     <FormControl>
-                      <Input placeholder="PLZ" {...field} />
+                      <Input placeholder="Postal Code" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -266,9 +266,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                 name="city"
                 render={({ field }: { field: ControllerRenderProps<FormValues, "city"> }) => (
                   <FormItem>
-                    <FormLabel>Stadt</FormLabel>
+                    <FormLabel>City</FormLabel>
                     <FormControl>
-                      <Input placeholder="Stadt" {...field} />
+                      <Input placeholder="City" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -281,9 +281,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               name="country"
               render={({ field }: { field: ControllerRenderProps<FormValues, "country"> }) => (
                 <FormItem>
-                  <FormLabel>Land</FormLabel>
+                  <FormLabel>Country</FormLabel>
                   <FormControl>
-                    <Input placeholder="Land" {...field} />
+                    <Input placeholder="Country" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -295,19 +295,19 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               name="type"
               render={({ field }: { field: ControllerRenderProps<FormValues, "type"> }) => (
                 <FormItem>
-                  <FormLabel>Kundentyp</FormLabel>
+                  <FormLabel>Customer Type</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Kundentyp auswählen" />
+                        <SelectValue placeholder="Select customer type" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="private">Privatkunde</SelectItem>
-                      <SelectItem value="business">Geschäftskunde</SelectItem>
+                      <SelectItem value="private">Private</SelectItem>
+                      <SelectItem value="business">Business</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -329,7 +329,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                   <div className="space-y-1 leading-none">
                     <FormLabel>Newsletter</FormLabel>
                     <FormDescription>
-                      Kunde erhält Newsletter und Angebote
+                      Customer receives newsletters and offers
                     </FormDescription>
                   </div>
                 </FormItem>
@@ -339,16 +339,16 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
 
           <Separator />
 
-          {/* Notiz */}
+          {/* Note */}
           <FormField
             control={form.control}
             name="note"
             render={({ field }: { field: ControllerRenderProps<FormValues, "note"> }) => (
               <FormItem>
-                <FormLabel>Notiz</FormLabel>
+                <FormLabel>Note</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="Notiz zur Konvertierung (optional)"
+                    placeholder="Note about conversion (optional)"
                     {...field}
                   />
                 </FormControl>
@@ -359,7 +359,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
 
           <Separator />
 
-          {/* Termin erstellen */}
+          {/* Create Appointment */}
           <FormField
             control={form.control}
             name="createAppointment"
@@ -372,16 +372,16 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                   />
                 </FormControl>
                 <div className="space-y-1 leading-none">
-                  <FormLabel>Termin erstellen</FormLabel>
+                  <FormLabel>Create Appointment</FormLabel>
                   <FormDescription>
-                    Erstellen Sie direkt einen Termin für diesen Kunden
+                    Create an appointment for this customer
                   </FormDescription>
                 </div>
               </FormItem>
             )}
           />
 
-          {/* Terminfelder (nur anzeigen, wenn Termin erstellt werden soll) */}
+          {/* Appointment fields (only show if appointment should be created) */}
           {showAppointmentFields && (
             <div className="space-y-3 mt-3 border p-3 rounded-md">
               <FormField
@@ -389,9 +389,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                 name="appointmentTitle"
                 render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentTitle"> }) => (
                   <FormItem>
-                    <FormLabel>Termintitel</FormLabel>
+                    <FormLabel>Appointment Title</FormLabel>
                     <FormControl>
-                      <Input placeholder="Termintitel" {...field} />
+                      <Input placeholder="Appointment title" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -404,7 +404,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                   name="appointmentDate"
                   render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentDate"> }) => (
                     <FormItem>
-                      <FormLabel>Datum</FormLabel>
+                      <FormLabel>Date</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
@@ -418,7 +418,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                   name="appointmentTime"
                   render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentTime"> }) => (
                     <FormItem>
-                      <FormLabel>Uhrzeit</FormLabel>
+                      <FormLabel>Time</FormLabel>
                       <FormControl>
                         <Input type="time" {...field} />
                       </FormControl>
@@ -434,7 +434,7 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                   name="appointmentDuration"
                   render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentDuration"> }) => (
                     <FormItem>
-                      <FormLabel>Dauer (Minuten)</FormLabel>
+                      <FormLabel>Duration (minutes)</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -452,9 +452,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                   name="appointmentLocation"
                   render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentLocation"> }) => (
                     <FormItem>
-                      <FormLabel>Ort</FormLabel>
+                      <FormLabel>Location</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ort" {...field} />
+                        <Input placeholder="Location" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -467,10 +467,10 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                 name="appointmentDescription"
                 render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentDescription"> }) => (
                   <FormItem>
-                    <FormLabel>Beschreibung</FormLabel>
+                    <FormLabel>Description</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Terminbeschreibung"
+                        placeholder="Appointment description"
                         {...field}
                       />
                     </FormControl>
@@ -484,11 +484,11 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" type="button" onClick={onClose}>
-            Abbrechen
+            Cancel
           </Button>
           <Button type="submit" disabled={isConverting}>
             {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            In Kunden konvertieren
+            Convert to Customer
           </Button>
         </div>
       </form>

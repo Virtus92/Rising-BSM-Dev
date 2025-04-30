@@ -272,7 +272,6 @@ export class RefreshTokenRepository extends PrismaRepository<RefreshToken, strin
     const result: Record<string, any> = {};
     
     Object.entries(domainEntity).forEach(([key, value]) => {
-      // Filter out updatedAt since it's not in the Prisma schema for RefreshToken
       if (value !== undefined && key !== 'updatedAt') {
         result[key] = value;
       }

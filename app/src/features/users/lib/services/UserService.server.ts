@@ -38,6 +38,194 @@ import { hashPassword, comparePasswords } from '@/core/security/password-utils';
  * Implements the IUserService interface by directly working with repositories
  */
 export class UserService implements IUserService {
+  /**
+   * Count users with optional filtering
+   */
+  async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
+    try {
+      return await this.userRepository.count(options?.filters);
+    } catch (error) {
+      this.logger.error('Error in UserService.count:', error as Error);
+      return 0;
+    }
+  }
+  
+  /**
+   * Find users by specific criteria
+   */
+  async findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<UserResponseDto[]> {
+    try {
+      const users = await this.userRepository.findByCriteria(criteria, options);
+      return users.map(user => this.mapToUserResponseDto(user));
+    } catch (error) {
+      this.logger.error('Error in UserService.findByCriteria:', error as Error);
+      return [];
+    }
+  }
+  
+  /**
+   * Validate data against schema
+   * 
+   * @param data - Data to validate
+   * @param isUpdate - Whether it's an update operation
+   * @param entityId - ID for update validation
+   * @returns Promise with validation result
+   */
+  async validate(data: CreateUserDto | UpdateUserDto, isUpdate?: boolean, entityId?: number): Promise<import('@/domain/dtos/ValidationDto').ValidationResultDto> {
+    try {
+      // For server-side validation, use validator with proper result format
+      let validationResult;
+      
+      // Call validator with the right number of arguments
+      if (isUpdate) {
+        // If entityId is provided, we only pass it if the method expects it
+        try {
+          validationResult = this.validator.validateUpdateUser(data);
+        } catch (error) {
+          this.logger.error('Error validating update user:', error as Error);
+        }
+      } else {
+        validationResult = this.validator.validateCreateUser(data);
+      }
+
+      // Import validation types
+      const { ValidationResult, ValidationErrorType } = require('@/domain/enums/ValidationResults');
+      
+      // Always create a proper ValidationResultDto to ensure type compatibility
+      return {
+        result: validationResult?.isValid ? ValidationResult.SUCCESS : ValidationResult.ERROR,
+        errors: validationResult?.isValid ? undefined : 
+          Array.isArray(validationResult?.errors) ? 
+            validationResult.errors.map((e: string | any) => {
+              // Handle both string errors and object errors
+              if (typeof e === 'string') {
+                return {
+                  type: ValidationErrorType.INVALID,
+                  field: 'general',
+                  message: e
+                };
+              } else {
+                return {
+                  type: e.type || ValidationErrorType.INVALID,
+                  field: e.field || 'general',
+                  message: e.message || String(e),
+                  data: e.data
+                };
+              }
+            }) : 
+            validationResult?.errors ? 
+              [{ 
+                type: ValidationErrorType.INVALID, 
+                field: 'general', 
+                message: String(validationResult.errors) 
+              }] : 
+              undefined
+      };
+    } catch (error) {
+      this.logger.error('Error in UserService.validate:', error as Error);
+      
+      // Import needed for proper error creation
+      const { ValidationResult, ValidationErrorType } = require('@/domain/enums/ValidationResults');
+      
+      return {
+        result: ValidationResult.ERROR,
+        errors: [{
+          type: ValidationErrorType.INTERNAL_ERROR,
+          field: 'global',
+          message: 'Validation failed due to internal error'
+        }]
+      };
+    }
+  }
+  
+  /**
+   * Execute a transaction
+   */
+  async transaction<r>(callback: (service: IUserService) => Promise<r>): Promise<r> {
+    try {
+      // Create a copy of this service to pass to the callback
+      const serviceForCallback: IUserService = {
+        ...this
+      } as IUserService;
+      
+      return await callback(serviceForCallback);
+    } catch (error) {
+      this.logger.error('Error in UserService.transaction:', error as Error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Perform bulk update
+   */
+  async bulkUpdate(ids: number[], data: UpdateUserDto, options?: ServiceOptions): Promise<number> {
+    try {
+      let successCount = 0;
+      
+      for (const id of ids) {
+        try {
+          await this.update(id, data, options);
+          successCount++;
+        } catch (error) {
+          this.logger.error(`Error updating user ${id} in bulkUpdate:`, error as Error);
+          // Continue with other updates despite error
+        }
+      }
+      
+      return successCount;
+    } catch (error) {
+      this.logger.error('Error in UserService.bulkUpdate:', error as Error);
+      return 0;
+    }
+  }
+  
+  /**
+   * Convert entity to DTO
+   */
+  toDTO(entity: User): UserResponseDto {
+    return this.mapToUserResponseDto(entity);
+  }
+  
+  /**
+   * Convert DTO to entity
+   */
+  fromDTO(dto: CreateUserDto | UpdateUserDto): Partial<User> {
+    return dto as Partial<User>;
+  }
+  
+  /**
+   * Search for users
+   */
+  async search(searchText: string, options?: ServiceOptions): Promise<UserResponseDto[]> {
+    return this.searchUsers(searchText, options);
+  }
+  
+  /**
+   * Check if a user exists
+   */
+  async exists(id: number, options?: ServiceOptions): Promise<boolean> {
+    try {
+      const user = await this.getById(id, options);
+      return !!user;
+    } catch (error) {
+      this.logger.error(`Error in UserService.exists(${id}):`, error as Error);
+      return false;
+    }
+  }
+  
+  /**
+   * Get repository instance
+   */
+  getRepository(): any {
+    return this.userRepository;
+  }
+  
+  /**
+   * Find all with pagination
+   */
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<UserResponseDto>> {
+    return this.getAll(options);
+  }
   private userRepository: IUserRepository;
   private logger: ILoggingService;
   private validator: IValidationService;
@@ -62,7 +250,7 @@ export class UserService implements IUserService {
         pagination: result.pagination
       };
     } catch (error) {
-      this.logger.error('Error in UserService.getAll:', error);
+      this.logger.error('Error in UserService.getAll:', error as Error);
       return {
         data: [],
         pagination: {
@@ -84,7 +272,7 @@ export class UserService implements IUserService {
       const user = await this.userRepository.findById(id);
       return user ? this.mapToUserResponseDto(user) : null;
     } catch (error) {
-      this.logger.error(`Error in UserService.getById(${id}):`, error);
+      this.logger.error(`Error in UserService.getById(${id}):`, error as Error);
       return null;
     }
   }
@@ -97,7 +285,7 @@ export class UserService implements IUserService {
       const user = await this.userRepository.findByEmail(email);
       return user ? this.mapToUserResponseDto(user) : null;
     } catch (error) {
-      this.logger.error(`Error in UserService.findByEmail(${email}):`, error);
+      this.logger.error(`Error in UserService.findByEmail(${email}):`, error as Error);
       return null;
     }
   }
@@ -110,7 +298,7 @@ export class UserService implements IUserService {
       const user = await this.userRepository.findByName(name);
       return user ? this.mapToUserResponseDto(user) : null;
     } catch (error) {
-      this.logger.error(`Error in UserService.findByName(${name}):`, error);
+      this.logger.error(`Error in UserService.findByName(${name}):`, error as Error);
       return null;
     }
   }
@@ -128,16 +316,31 @@ export class UserService implements IUserService {
       if (options?.includeActivity) {
         const activityLogRepo = getActivityLogRepository();
         const logs = await this.userRepository.getUserActivity(id, 10);
-        activityLogs = logs || [];
+        
+        // Convert raw activity logs to ActivityLogDto format
+        if (logs && logs.length > 0) {
+          activityLogs = logs.map(log => ({
+            id: log.id,
+            entityType: log.entityType,
+            entityId: log.entityId,
+            userId: log.userId,
+            action: log.action,
+            details: typeof log.details === 'string' 
+              ? JSON.parse(log.details)
+              : log.details,
+            createdAt: log.createdAt instanceof Date ? log.createdAt.toISOString() : String(log.createdAt),
+            updatedAt: log.updatedAt instanceof Date ? log.updatedAt.toISOString() : String(log.updatedAt)
+          }));
+        }
       }
 
       // Create detailed response
       return {
         ...this.mapToUserResponseDto(user),
-        activity: activityLogs
+        activities: activityLogs
       };
     } catch (error) {
-      this.logger.error(`Error in UserService.getUserDetails(${id}):`, error);
+      this.logger.error(`Error in UserService.getUserDetails(${id}):`, error as Error);
       return null;
     }
   }
@@ -181,8 +384,8 @@ export class UserService implements IUserService {
       const user = await this.userRepository.create(userData);
       return this.mapToUserResponseDto(user);
     } catch (error) {
-      this.logger.error('Error in UserService.create:', error);
-      throw this.errorHandler.handleError(error);
+      this.logger.error('Error in UserService.create:', error as Error);
+      throw this.errorHandler.handleApiError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -211,9 +414,13 @@ export class UserService implements IUserService {
         }
       }
 
+      // Clean up input data - remove fields that don't exist in the Prisma model
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, confirmPassword, ...cleanData } = data as any;
+      
       // Prepare update data
       const updateData: Partial<User> = {
-        ...data,
+        ...cleanData,
         updatedBy: options?.userId,
         updatedAt: new Date()
       };
@@ -222,8 +429,8 @@ export class UserService implements IUserService {
       const updatedUser = await this.userRepository.update(id, updateData);
       return this.mapToUserResponseDto(updatedUser);
     } catch (error) {
-      this.logger.error(`Error in UserService.update(${id}):`, error);
-      throw this.errorHandler.handleError(error);
+      this.logger.error(`Error in UserService.update(${id}):`, error as Error);
+      throw this.errorHandler.handleApiError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -240,8 +447,8 @@ export class UserService implements IUserService {
       // Otherwise perform soft delete
       return await this.softDelete(id, options);
     } catch (error) {
-      this.logger.error(`Error in UserService.delete(${id}):`, error);
-      throw this.errorHandler.handleError(error);
+      this.logger.error(`Error in UserService.delete(${id}):`, error as Error);
+      throw this.errorHandler.handleApiError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -256,7 +463,7 @@ export class UserService implements IUserService {
         pagination: result.pagination
       };
     } catch (error) {
-      this.logger.error('Error in UserService.findUsers:', error);
+      this.logger.error('Error in UserService.findUsers:', error as Error);
       return {
         data: [],
         pagination: {
@@ -278,6 +485,16 @@ export class UserService implements IUserService {
       const user = await this.userRepository.findById(userId);
       if (!user) {
         throw new Error('User not found');
+      }
+
+      // Ensure all passwords are provided
+      if (!data.currentPassword || !data.newPassword || !data.confirmPassword) {
+        throw new Error('Current password, new password, and confirm password are required');
+      }
+
+      // Ensure user password is defined
+      if (!user.password) {
+        throw new Error('User has no password set');
       }
 
       // Validate current password
@@ -308,13 +525,13 @@ export class UserService implements IUserService {
         userId,
         LogActionType.CHANGE_PASSWORD,
         'Password changed by user',
-        options?.ip
+        options?.ip ? options.ip : ''
       );
 
       return true;
     } catch (error) {
-      this.logger.error(`Error in UserService.changePassword(${userId}):`, error);
-      throw this.errorHandler.handleError(error);
+      this.logger.error(`Error in UserService.changePassword(${userId}):`, error as Error);
+      throw this.errorHandler.handleApiError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -339,15 +556,15 @@ export class UserService implements IUserService {
       // Log status change
       await this.userRepository.logActivity(
         userId,
-        LogActionType.UPDATE_STATUS,
+        LogActionType.CHANGE_STATUS,
         `User status changed to ${data.status}${data.reason ? `: ${data.reason}` : ''}`,
-        options?.ip
+        options?.ip || ''
       );
 
       return this.mapToUserResponseDto(updatedUser);
     } catch (error) {
-      this.logger.error(`Error in UserService.updateStatus(${userId}):`, error);
-      throw this.errorHandler.handleError(error);
+      this.logger.error(`Error in UserService.updateStatus(${userId}):`, error as Error);
+      throw this.errorHandler.handleApiError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -360,7 +577,7 @@ export class UserService implements IUserService {
       const users = await this.userRepository.searchUsers(searchText, limit);
       return users.map(user => this.mapToUserResponseDto(user));
     } catch (error) {
-      this.logger.error(`Error in UserService.searchUsers(${searchText}):`, error);
+      this.logger.error(`Error in UserService.searchUsers(${searchText}):`, error as Error);
       return [];
     }
   }
@@ -379,7 +596,7 @@ export class UserService implements IUserService {
         // Add more stats as needed
       };
     } catch (error) {
-      this.logger.error('Error in UserService.getUserStatistics:', error);
+      this.logger.error('Error in UserService.getUserStatistics:', error as Error);
       return {
         totalUsers: 0,
         activeUsers: 0,
@@ -394,18 +611,27 @@ export class UserService implements IUserService {
   async getUserActivity(userId: number, limit?: number, options?: ServiceOptions): Promise<ActivityLogDto[]> {
     try {
       const activities = await this.userRepository.getUserActivity(userId, limit || 10);
+      
+      // Map activity records to ActivityLogDto format
       return activities.map(activity => ({
         id: activity.id,
+        entityType: activity.entityType,
+        entityId: activity.entityId,
         userId: activity.userId,
-        timestamp: activity.createdAt,
-        activity: activity.action,
+        action: activity.action,
         details: typeof activity.details === 'string' 
-          ? activity.details 
-          : JSON.stringify(activity.details),
-        ipAddress: activity.ip
+          ? JSON.parse(activity.details) 
+          : activity.details,
+        createdAt: activity.createdAt instanceof Date ? activity.createdAt.toISOString() : String(activity.createdAt),
+        updatedAt: activity.updatedAt instanceof Date ? activity.updatedAt.toISOString() : String(activity.updatedAt),
+        // Include any other required fields from ActivityLogDto
+        userName: undefined, // Populate if available
+        formattedDate: activity.createdAt instanceof Date 
+          ? activity.createdAt.toLocaleDateString() + ' ' + activity.createdAt.toLocaleTimeString() 
+          : undefined
       }));
     } catch (error) {
-      this.logger.error(`Error in UserService.getUserActivity(${userId}):`, error);
+      this.logger.error(`Error in UserService.getUserActivity(${userId}):`, error as Error);
       return [];
     }
   }
@@ -427,13 +653,13 @@ export class UserService implements IUserService {
         userId,
         LogActionType.DELETE,
         'User soft deleted',
-        options?.ip
+        options?.ip || ''
       );
 
       return true;
     } catch (error) {
-      this.logger.error(`Error in UserService.softDelete(${userId}):`, error);
-      throw this.errorHandler.handleError(error);
+      this.logger.error(`Error in UserService.softDelete(${userId}):`, error as Error);
+      throw this.errorHandler.handleApiError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -447,14 +673,14 @@ export class UserService implements IUserService {
         userId,
         LogActionType.DELETE,
         'User permanently deleted',
-        options?.ip
+        options?.ip || ''
       );
 
       // Perform hard delete
       return await this.userRepository.hardDelete(userId);
     } catch (error) {
-      this.logger.error(`Error in UserService.hardDelete(${userId}):`, error);
-      throw this.errorHandler.handleError(error);
+      this.logger.error(`Error in UserService.hardDelete(${userId}):`, error as Error);
+      throw this.errorHandler.handleApiError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -474,18 +700,24 @@ export class UserService implements IUserService {
         throw new Error('User account is not active');
       }
 
+      // Ensure user password is defined
+      if (!user.password) {
+        throw new Error('User has no password set');
+      }
+
       // Verify password
       const isPasswordValid = await comparePasswords(password, user.password);
       if (!isPasswordValid) {
         return null;
       }
 
-      // Update last login
-      await this.userRepository.updateLastLogin(user.id, options?.ip);
+      // Update last login - make sure the IP is a string or empty string if undefined
+      const ipAddress = options?.ip || '';
+      await this.userRepository.updateLastLogin(user.id, ipAddress);
 
       return this.mapToUserResponseDto(user);
     } catch (error) {
-      this.logger.error(`Error in UserService.authenticate(${email}):`, error);
+      this.logger.error(`Error in UserService.authenticate(${email}):`, error as Error);
       return null;
     }
   }
@@ -513,12 +745,13 @@ export class UserService implements IUserService {
       // Update password
       await this.userRepository.updatePassword(userId, hashedPassword);
 
-      // Log password change
+      // Log password change - ensure IP is a string
+      const ipAddress = options?.ip || '';
       await this.userRepository.logActivity(
         userId,
         LogActionType.RESET_PASSWORD,
         'Password reset by administrator',
-        options?.ip
+        ipAddress
       );
 
       // Return updated user
@@ -529,8 +762,8 @@ export class UserService implements IUserService {
 
       return this.mapToUserResponseDto(updatedUser);
     } catch (error) {
-      this.logger.error(`Error in UserService.updatePassword(${userId}):`, error);
-      throw this.errorHandler.handleError(error);
+      this.logger.error(`Error in UserService.updatePassword(${userId}):`, error as Error);
+      throw this.errorHandler.handleApiError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -546,9 +779,9 @@ export class UserService implements IUserService {
       status: user.status,
       phone: user.phone,
       profilePicture: user.profilePicture,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      lastLoginAt: user.lastLoginAt
+      createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : String(user.createdAt),
+      updatedAt: user.updatedAt instanceof Date ? user.updatedAt.toISOString() : String(user.updatedAt),
+      lastLoginAt: user.lastLoginAt instanceof Date ? user.lastLoginAt.toISOString() : user.lastLoginAt
     };
   }
 }

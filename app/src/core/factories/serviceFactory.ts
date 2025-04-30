@@ -5,6 +5,7 @@ import { getLogger } from '@/core/logging';
 import { getErrorHandler } from '@/core/errors';
 import { getValidationService } from '@/core/validation';
 import { configService } from '@/core/config/ConfigService';
+import { SecurityConfig, securityConfig } from '@/core/config/SecurityConfig';
 
 // Repository factories
 import { 
@@ -19,8 +20,7 @@ import {
   getRequestDataRepository
 } from './repositoryFactory';
 import { AuthService } from '@/features/auth/lib/services/AuthService';
-
-// Import UserServiceAdapter dynamically to prevent circular dependencies
+import { UserService } from '@/features/users/lib/services/UserService';
 import { CustomerService } from '@/features/customers/lib/services/CustomerService';
 import { AppointmentService } from '@/features/appointments/lib/services/AppointmentService';
 import { RequestService } from '@/features/requests/lib/services/RequestService';
@@ -51,7 +51,7 @@ export class ServiceFactory {
   private static instance: ServiceFactory;
 
   // Singleton instances for services
-  private authService?: IAuthService;
+  private authService?: AuthService;
   private userService?: UserService;
   private customerService?: CustomerService;
   private appointmentService?: AppointmentService;
@@ -76,6 +76,15 @@ export class ServiceFactory {
       ServiceFactory.instance = new ServiceFactory();
     }
     return ServiceFactory.instance;
+  }
+
+  /**
+   * Creates a SecurityConfig instance
+   * @returns The security configuration
+   */
+  public createSecurityConfig(): SecurityConfig {
+    // Always return the singleton instance
+    return securityConfig;
   }
 
   /**
@@ -109,8 +118,7 @@ export class ServiceFactory {
         {
           jwtSecret: jwtConfig?.secret,
           accessTokenExpiry: jwtConfig?.accessTokenExpiry,
-          refreshTokenExpiry: jwtConfig?.refreshTokenExpiry,
-          useTokenRotation: jwtConfig?.useTokenRotation
+          refreshTokenExpiry: jwtConfig?.refreshTokenExpiry
         }
       );
       
@@ -152,41 +160,6 @@ export class ServiceFactory {
           isServer: typeof window === 'undefined'
         });
         
-        // Create a fallback service with minimal implementation
-        this.userService = {
-          getById: async (id: number) => {
-            getLogger().debug(`Fallback UserService.getById called with ID: ${id}`);
-            try {
-              if (typeof window === 'undefined') {
-                // Server-side fallback using repository directly
-                const userRepository = getUserRepository();
-                const user = await userRepository.findById(id);
-                if (!user) return null;
-                
-                return {
-                  id: user.id,
-                  name: user.name,
-                  email: user.email,
-                  role: user.role,
-                  status: user.status,
-                  phone: user.phone,
-                  profilePicture: user.profilePicture,
-                  createdAt: user.createdAt,
-                  updatedAt: user.updatedAt,
-                  lastLoginAt: user.lastLoginAt
-                };
-              } else {
-                // Client-side fallback using static UserService
-                const { UserService } = require('@/features/users/lib/services/UserService');
-                const response = await UserService.getUserById(id);
-                return response.success && response.data ? response.data : null;
-              }
-            } catch (err) {
-              getLogger().error(`Error in fallback getUserById(${id}):`, err instanceof Error ? err.message : String(err));
-              return null;
-            }
-          }
-        } as any;
       }
     }
     return this.userService as IUserService;
@@ -197,41 +170,35 @@ export class ServiceFactory {
    */
   public createCustomerService(): ICustomerService {
     if (!this.customerService) {
-      // Dynamic import to prevent bundling issues and allow for proper module resolution
       try {
-        // Try to use the features implementation
-        const importModule = async () => {
-          try {
-            const customerServiceModule = await import('@/features/customers/lib/services/CustomerService');
-            const CustomerService = customerServiceModule.CustomerService;
-            return new CustomerService();
-          } catch (error) {
-            // Fall back to infrastructure implementation
-            const { CustomerService } = await import('@/features/customers/lib/services/CustomerService');
-            return new CustomerService();
-          }
-        };
-        
-        // Execute the import but handle as a Promise
-        importModule().then(service => {
-          this.customerService = service;
-        }).catch(error => {
-          getLogger().error('Error creating CustomerService:', error instanceof Error ? error.message : String(error));
-        });
-        
-        // Create a temporary service while the import completes
-        this.customerService = {
-          // Implement minimal interface for temporary use
-          getAll: async () => ({ data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } }),
-          getById: async () => null,
-          create: async () => { throw new Error('CustomerService not yet initialized'); },
-          update: async () => { throw new Error('CustomerService not yet initialized'); },
-          delete: async () => false
-        } as any;
+        // Choose implementation based on environment
+        if (typeof window === 'undefined') {
+          // Server-side: use repository-based implementation
+          const { CustomerService } = require('@/features/customers/lib/services/CustomerService.server');
+          this.customerService = new CustomerService(
+            getCustomerRepository(),
+            getLogger(),
+            getValidationService(),
+            getErrorHandler()
+          );
+          getLogger().debug('Server-side CustomerService initialized');
+        } else {
+          // Client-side: use API-based implementation
+          const { CustomerService } = require('@/features/customers/lib/services/CustomerService');
+          // For client-side, we use the static methods directly
+          this.customerService = CustomerService;
+          console.debug('Client-side CustomerService initialized');
+        }
       } catch (error) {
-        getLogger().error('Error in createCustomerService:', error instanceof Error ? error.message : String(error));
-        // Create empty service to prevent crashes
-        this.customerService = {} as any;
+        // Detailed error logging for easier troubleshooting
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        
+        getLogger().error('Error initializing CustomerService:', {
+          message: errorMessage,
+          stack: errorStack,
+          isServer: typeof window === 'undefined'
+        });
       }
     }
     return this.customerService as ICustomerService;
@@ -242,33 +209,35 @@ export class ServiceFactory {
    */
   public createAppointmentService(): IAppointmentService {
     if (!this.appointmentService) {
-      // Try to use the features implementation first
       try {
-        // Dynamic import to prevent bundling issues
-        const importModule = async () => {
-          try {
-            const { AppointmentService } = await import('@/features/appointments/lib/services/AppointmentService');
-            return new AppointmentService();
-          } catch (error) {
-            // Fall back to infrastructure implementation
-            const { AppointmentService } = await import('@/features/appointments/lib/services/AppointmentService');
-            return new AppointmentService();
-          }
-        };
-        
-        // Execute the import but continue with a temporary service
-        importModule().then(service => {
-          this.appointmentService = service;
-        }).catch(error => {
-          getLogger().error('Error creating AppointmentService:', error instanceof Error ? error.message : String(error));
-        });
-        
-        // Create minimal temporary service
-        this.appointmentService = {} as any;
+        // Choose implementation based on environment
+        if (typeof window === 'undefined') {
+          // Server-side: use repository-based implementation
+          const { AppointmentService } = require('@/features/appointments/lib/services/AppointmentService.server');
+          this.appointmentService = new AppointmentService(
+            getAppointmentRepository(),
+            getLogger(),
+            getValidationService(),
+            getErrorHandler()
+          );
+          getLogger().debug('Server-side AppointmentService initialized');
+        } else {
+          // Client-side: use API-based implementation
+          const { AppointmentService } = require('@/features/appointments/lib/services/AppointmentService');
+          // For client-side, we use the static methods directly
+          this.appointmentService = AppointmentService;
+          console.debug('Client-side AppointmentService initialized');
+        }
       } catch (error) {
-        getLogger().error('Error in createAppointmentService:', error instanceof Error ? error.message : String(error));
-        // Create empty service to prevent crashes
-        this.appointmentService = {} as any;
+        // Detailed error logging for easier troubleshooting
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        
+        getLogger().error('Error initializing AppointmentService:', {
+          message: errorMessage,
+          stack: errorStack,
+          isServer: typeof window === 'undefined'
+        });
       }
     }
     return this.appointmentService as IAppointmentService;
@@ -279,51 +248,43 @@ export class ServiceFactory {
    */
   public createRequestService(): IRequestService {
     if (!this.requestService) {
-      // Try to use the features implementation first
       try {
-        // Dynamic import to prevent bundling issues
-        const importModule = async () => {
-          try {
-            const { RequestService } = await import('@/features/requests/lib/services/RequestService');
-            return new RequestService(
-              getRequestRepository(),
-              getCustomerRepository(),
-              getUserRepository(),
-              getAppointmentRepository(),
-              getRequestDataRepository(),
-              getLogger(),
-              getValidationService(),
-              getErrorHandler()
-            );
-          } catch (error) {
-            // Fall back to infrastructure implementation
-            const { RequestService } = await import('@/features/requests/lib/services/RequestService');
-            return new RequestService(
-              getRequestRepository(),
-              getCustomerRepository(),
-              getUserRepository(),
-              getAppointmentRepository(),
-              getRequestDataRepository(),
-              getLogger(),
-              getValidationService(),
-              getErrorHandler()
-            );
+        // Choose implementation based on environment
+        if (typeof window === 'undefined') {
+          // Server-side: use repository-based implementation
+          const { RequestService } = require('@/features/requests/lib/services/RequestService.server');
+          this.requestService = new RequestService(
+            getRequestRepository(),
+            getCustomerRepository(),
+            getUserRepository(),
+            getAppointmentRepository(),
+            getRequestDataRepository(),
+            getLogger(),
+            getValidationService(),
+            getErrorHandler()
+          );
+          getLogger().debug('Server-side RequestService initialized');
+        } else {
+          // Client-side: use API-based implementation
+          const { RequestService } = require('@/features/requests/lib/services/RequestService.client');
+          // For client-side, we use either an instance or static methods
+          if (typeof RequestService === 'function') {
+            this.requestService = new RequestService();
+          } else {
+            this.requestService = RequestService;
           }
-        };
-        
-        // Execute the import but continue with a temporary service
-        importModule().then(service => {
-          this.requestService = service;
-        }).catch(error => {
-          getLogger().error('Error creating RequestService:', error instanceof Error ? error.message : String(error));
-        });
-        
-        // Create minimal temporary service
-        this.requestService = {} as any;
+          console.debug('Client-side RequestService initialized');
+        }
       } catch (error) {
-        getLogger().error('Error in createRequestService:', error instanceof Error ? error.message : String(error));
-        // Create empty service to prevent crashes
-        this.requestService = {} as any;
+        // Detailed error logging for easier troubleshooting
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        
+        getLogger().error('Error initializing RequestService:', {
+          message: errorMessage,
+          stack: errorStack,
+          isServer: typeof window === 'undefined'
+        });
       }
     }
     return this.requestService!;
@@ -367,12 +328,8 @@ export class ServiceFactory {
           getLogger().error('Error creating RequestDataService:', error instanceof Error ? error.message : String(error));
         });
         
-        // Create minimal temporary service
-        this.requestDataService = {} as any;
       } catch (error) {
         getLogger().error('Error in createRequestDataService:', error instanceof Error ? error.message : String(error));
-        // Create empty service to prevent crashes
-        this.requestDataService = {} as any;
       }
     }
     return this.requestDataService!;
@@ -396,13 +353,9 @@ export class ServiceFactory {
         );
         } catch (error) {
         getLogger().error('Error creating N8NIntegrationService:', error instanceof Error ? error.message : String(error));
-          // Create minimal temporary service only if the above initialization failed
-        this.n8nIntegrationService = {} as any;
         }
       } catch (error) {
         getLogger().error('Error in createN8NIntegrationService:', error instanceof Error ? error.message : String(error));
-        // Create empty service to prevent crashes
-        this.n8nIntegrationService = {} as any;
       }
     }
     return this.n8nIntegrationService!;
@@ -426,14 +379,7 @@ export class ServiceFactory {
               getErrorHandler()
             );
           } catch (error) {
-            // Fall back to infrastructure implementation
-            const { ActivityLogService } = await import('@/features/activity/lib/services/ActivityLogService');
-            return new ActivityLogService(
-              getActivityLogRepository(),
-              getLogger(),
-              getValidationService(),
-              getErrorHandler()
-            );
+            throw new Error('Failed to import ActivityLogService');
           }
         };
         
@@ -444,12 +390,8 @@ export class ServiceFactory {
           getLogger().error('Error creating ActivityLogService:', error instanceof Error ? error.message : String(error));
         });
         
-        // Create minimal temporary service
-        this.activityLogService = {} as any;
       } catch (error) {
         getLogger().error('Error in createActivityLogService:', error instanceof Error ? error.message : String(error));
-        // Create empty service to prevent crashes
-        this.activityLogService = {} as any;
       }
     }
     return this.activityLogService!;
@@ -491,12 +433,8 @@ export class ServiceFactory {
           getLogger().error('Error creating NotificationService:', error instanceof Error ? error.message : String(error));
         });
         
-        // Create minimal temporary service
-        this.notificationService = {} as any;
       } catch (error) {
         getLogger().error('Error in createNotificationService:', error instanceof Error ? error.message : String(error));
-        // Create empty service to prevent crashes
-        this.notificationService = {} as any;
       }
     }
     return this.notificationService!;
@@ -520,14 +458,7 @@ export class ServiceFactory {
               getErrorHandler()
             );
           } catch (error) {
-            // Fall back to infrastructure implementation
-            const { RefreshTokenService } = await import('@/features/auth/lib/services/RefreshTokenService');
-            return new RefreshTokenService(
-              getRefreshTokenRepository(),
-              getLogger(),
-              getValidationService(),
-              getErrorHandler()
-            );
+            throw new Error('Failed to import RefreshTokenService');
           }
         };
         
@@ -538,12 +469,8 @@ export class ServiceFactory {
           getLogger().error('Error creating RefreshTokenService:', error instanceof Error ? error.message : String(error));
         });
         
-        // Create minimal temporary service
-        this.refreshTokenService = {} as any;
       } catch (error) {
         getLogger().error('Error in createRefreshTokenService:', error instanceof Error ? error.message : String(error));
-        // Create empty service to prevent crashes
-        this.refreshTokenService = {} as any;
       }
     }
     return this.refreshTokenService!;
@@ -554,46 +481,155 @@ export class ServiceFactory {
    */
   public createPermissionService(): IPermissionService {
     if (!this.permissionService) {
-      // Try to use the features implementation first
       try {
-        // Dynamic import to prevent bundling issues
-        const importModule = async () => {
-          try {
-            const { PermissionService } = await import('@/features/permissions/lib/services/PermissionService');
-            return new PermissionService(
-              getPermissionRepository(),
-              getLogger(),
-              getValidationService(),
-              getErrorHandler()
-            );
-          } catch (error) {
-            // Fall back to infrastructure implementation
-            const { PermissionService } = await import('@/features/permissions/lib/services/PermissionService');
-            return new PermissionService(
-              getPermissionRepository(),
-              getLogger(),
-              getValidationService(),
-              getErrorHandler()
-            );
-          }
-        };
-        
-        // Execute the import but continue with a temporary service
-        importModule().then(service => {
-          this.permissionService = service;
-        }).catch(error => {
-          getLogger().error('Error creating PermissionService:', error instanceof Error ? error.message : String(error));
-        });
-        
-        // Create minimal temporary service
-        this.permissionService = {} as any;
+        // Choose implementation based on environment
+        if (typeof window === 'undefined') {
+          // Server-side: use repository-based implementation
+          const { PermissionService } = require('@/features/permissions/lib/services/PermissionService');
+          this.permissionService = new PermissionService(
+            getPermissionRepository(),
+            getLogger(),
+            getValidationService(),
+            getErrorHandler()
+          );
+          getLogger().debug('Server-side PermissionService initialized');
+        } else {
+          // Client-side: create a properly implemented client version
+          // Use 'as any' to avoid TypeScript casting issues, since we're implementing a compatible interface but not the exact class
+          this.permissionService = {
+            // Required instance properties from PermissionService class
+            permissionRepository: this.createMinimalPermissionRepository(),
+            logger: getLogger(),
+            validator: getValidationService(),
+            errorHandler: getErrorHandler(),
+            
+            // Implement methods from IPermissionService
+            getUserPermissions: async (userId: number) => {
+              const { PermissionClient } = require('@/features/permissions/lib/clients/PermissionClient');
+              const response = await PermissionClient.getUserPermissions(userId);
+              return response.success && response.data ? response.data : { userId, permissions: [], role: 'user' };
+            },
+            hasPermission: async (userId: number, permissionCode: string) => {
+              const { PermissionClient } = require('@/features/permissions/lib/clients/PermissionClient');
+              const response = await PermissionClient.hasPermission(userId, permissionCode);
+              return response.success && response.data ? response.data : false;
+            },
+            updateUserPermissions: async (data: { userId: number; permissions: string[] }) => {
+              const { PermissionClient } = require('@/features/permissions/lib/clients/PermissionClient');
+              const response = await PermissionClient.updateUserPermissions(data);
+              return response.success && response.data ? response.data : false;
+            },
+            getDefaultPermissionsForRole: async (role: string) => {
+              const { PermissionClient } = require('@/features/permissions/lib/clients/PermissionClient');
+              const response = await PermissionClient.getDefaultPermissionsForRole(role);
+              return response.success && response.data ? response.data : [];
+            },
+            // Implement other required methods from IPermissionService
+            findByCode: async (code: string) => {
+              const { PermissionClient } = require('@/features/permissions/lib/clients/PermissionClient');
+              const response = await PermissionClient.getPermissionByCode(code);
+              return response.success && response.data ? response.data : null;
+            },
+            findPermissions: async (filters: Record<string, any>) => {
+              const { PermissionClient } = require('@/features/permissions/lib/clients/PermissionClient');
+              const response = await PermissionClient.getPermissions(filters);
+              return response.success && response.data ? response.data : { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } };
+            },
+            
+            // Required from PermissionService class implementation
+            findAll: async (options?: { filters?: Record<string, any> }) => {
+              const { PermissionClient } = require('@/features/permissions/lib/clients/PermissionClient');
+              const response = await PermissionClient.getAllPermissions(options?.filters);
+              return response.success && response.data 
+                ? response.data 
+                : { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } };
+            },
+            
+            // Base service methods
+            getAll: async () => ({ data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } }),
+            getById: async () => null,
+            create: async () => { throw new Error('Not implemented on client'); },
+            update: async () => { throw new Error('Not implemented on client'); },
+            delete: async () => false,
+            count: async () => 0,
+            exists: async () => false,
+            existsByCriteria: async () => false,
+            findByCriteria: async () => [],
+            search: async () => [],
+            validate: async (data: any, schema: any) => data,
+            transaction: async (callback: (service: any) => Promise<any>) => callback(null),
+            toDTO: (entity: any) => entity as any,
+            fromDTO: (dto: any) => dto as any,
+            getRepository: () => {
+                return this.createMinimalPermissionRepository();
+            },
+            bulkUpdate: async (ids: number[], data: any) => 0,
+            mapToResponseDto: (entity: any) => entity as any,
+            // Additional implementation for any private methods that might be used
+            isPermissionIncludedInRole: async (userId: number, permissionCode: string) => {
+              const { PermissionClient } = require('@/features/permissions/lib/clients/PermissionClient');
+              const response = await PermissionClient.isPermissionIncludedInRole(userId, permissionCode);
+              return response.success && response.data ? response.data : false;
+            },
+            getUserPermissionsByRole: async (userId: number, role: string) => {
+              const { PermissionClient } = require('@/features/permissions/lib/clients/PermissionClient');
+              const response = await PermissionClient.getUserPermissionsByRole(userId, role);
+              return response.success && response.data ? response.data : [];
+            },
+            invalidateUserPermissionCache: async (userId: number) => true,
+            validatePermissions: async (permissions: string[]) => [],
+            seedDefaultPermissions: async () => true
+          } as any; // Use 'as any' instead of 'as PermissionService' to avoid TypeScript errors
+          console.debug('Client-side PermissionService initialized');
+        }
       } catch (error) {
-        getLogger().error('Error in createPermissionService:', error instanceof Error ? error.message : String(error));
-        // Create empty service to prevent crashes
-        this.permissionService = {} as any;
+        // Detailed error logging for easier troubleshooting
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        
+        getLogger().error('Error initializing PermissionService:', {
+          message: errorMessage,
+          stack: errorStack,
+          isServer: typeof window === 'undefined'
+        });
       }
     }
     return this.permissionService!;
+  }
+
+  /**
+   * Creates a minimal implementation of IPermissionRepository for client-side use
+   * 
+   * @returns A minimal implementation of IPermissionRepository
+   */
+  private createMinimalPermissionRepository() {
+    return {
+      findByCode: async (code: string) => null,
+      findPermissions: async (filters: any) => ({ data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } }),
+      getUserPermissions: async (userId: number) => [],
+      updateUserPermissions: async (userId: number, permissions: string[], updatedBy?: number) => true,
+      addUserPermission: async (userId: number, permissionCode: string, grantedBy?: number) => ({ 
+        userId, 
+        permissionId: 0, 
+        grantedAt: new Date(), 
+        grantedBy, 
+        isDenied: false 
+      }),
+      removeUserPermission: async (userId: number, permissionCode: string) => true,
+      hasPermission: async (userId: number, permissionCode: string) => false,
+      seedDefaultPermissions: async () => {},
+      findById: async (id: number) => null,
+      findOneByCriteria: async (criteria: Record<string, any>) => null,
+      findByCriteria: async (criteria: Record<string, any>) => [],
+      create: async (data: any) => ({ id: 0, ...data }),
+      update: async (id: number, data: any) => ({ id, ...data }),
+      delete: async (id: number) => true,
+      findAll: async (options?: any) => ({ data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } }),
+      count: async (criteria?: Record<string, any>) => 0,
+      bulkUpdate: async (ids: number[], data: any) => 0,
+      transaction: async <T>(callback: (repo?: any) => Promise<T>) => callback(null),
+      logActivity: async (userId: number, action: string, details?: string) => null
+    };
   }
 
   /**
@@ -621,11 +657,12 @@ export function getServiceFactory(): ServiceFactory {
   return ServiceFactory.getInstance();
 }
 
-// Export individual service factory functions for backward compatibility
+/**
+ * Factory functions for service instances
+ */
 export function getAuthService(): IAuthService {
   return getServiceFactory().createAuthService();
 }
-
 export function getUserService(): IUserService {
   return getServiceFactory().createUserService();
 }

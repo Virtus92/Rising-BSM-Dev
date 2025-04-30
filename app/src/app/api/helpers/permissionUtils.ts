@@ -5,7 +5,7 @@
  */
 
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 

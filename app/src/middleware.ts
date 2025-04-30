@@ -1,239 +1,221 @@
+// Enhanced verification cache with user data
+const USER_VERIFICATION_CACHE: Record<string, { 
+  timestamp: number, 
+  isValid: boolean,
+  userData?: { id: number, role: string, status: string },
+  requestId?: string
+}> = {};
+
+// Standard cache TTL of 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as jose from 'jose';  // Using jose for Edge-compatible JWT validation
 import { tokenBlacklistServer } from '@/features/auth/lib/clients/token/blacklist/TokenBlacklistServer';
 import { securityConfigEdge } from '@/core/config/SecurityConfigEdge';
-import { TokenManager } from '@/features/auth/lib/clients/token/TokenManager';
-
-// Clear the verification cache completely on startup
-// This ensures we don't have stale verification results
-const USER_VERIFICATION_CACHE: Record<string, { timestamp: number, isValid: boolean }> = {};
-const CACHE_TTL = 30 * 1000; // Reduce to 30 seconds cache TTL for more frequent verification
 
 /**
- * Improved JWT verification for Edge Runtime
- * This performs proper cryptographic verification using jose library
- * which is compatible with Edge Runtime
+ * Token validation for Edge Runtime using jose library
  */
 async function isTokenValid(token: string): Promise<boolean> {
   try {
+    const requestId = `validate-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    console.log(`Token validation started with request ID: ${requestId}`);
+    
     // Initialize security config
     securityConfigEdge.initialize();
     
-    // First check if the token is blacklisted
+    // Check if the token is blacklisted
     if (tokenBlacklistServer.isBlacklisted(token)) {
-      console.log('Token is blacklisted');
+      console.log(`Token is blacklisted [${requestId}]`);
       return false;
     }
     
     // Get JWT secret from security config
     const jwtSecret = securityConfigEdge.getJwtSecret();
-    
-    // Create secret key for validation
     const secretKey = new TextEncoder().encode(jwtSecret);
     
-    try {
-      // First try to verify with required claims (for new tokens)
-      try {
-        const { payload } = await jose.jwtVerify(token, secretKey, {
-          issuer: 'rising-bsm',
-          audience: process.env.JWT_AUDIENCE || 'rising-bsm-app'
-        });
-        
-        if (!payload || !payload.sub) {
-          console.log('Token missing required fields');
-          return false;
-        }
-        
-        // Verify that the user referenced in the token still exists and is active
-        const userId = payload.sub;
-        const isUserValid = await verifyUserExists(userId.toString());
-        if (!isUserValid) {
-          console.log(`User ${userId} not found or inactive`);
-          return false;
-        }
-        
-        console.log('Token validation passed with all required claims and valid user');
-        return true;
-      } catch (claimError) {
-        // If it fails due to missing claims, try a more permissive verification
-        // This is for backward compatibility with existing tokens
-        console.log('Claim validation failed, trying legacy verification:', claimError);
-        
-        const { payload } = await jose.jwtVerify(token, secretKey, {
-          // No issuer or audience requirements for backward compatibility
-        });
-        
-        // Check for expiration
-        const exp = payload.exp;
-        if (!exp) {
-          console.log('Token missing expiration');
-          return false;
-        }
-        
-        // Check if token is expired
-        const now = Math.floor(Date.now() / 1000);
-        if (exp < now) {
-          console.log(`Token expired at ${new Date(exp * 1000).toISOString()}`);
-          return false;
-        }
-        
-        // Verify that the user referenced in the token still exists and is active
-        if (payload.sub) {
-          const isUserValid = await verifyUserExists(payload.sub.toString());
-          if (!isUserValid) {
-            console.log(`User ${payload.sub} not found or inactive`);
-            return false;
-          }
-        } else {
-          console.log('Legacy token missing user ID (sub claim)');
-          return false;
-        }
-        
-        // Basic validation passed for legacy token
-        console.log('Legacy token validation passed (no issuer/audience) with valid user');
-        return true;
-      }
-    } catch (verifyError) {
-      console.log('Token signature verification failed:', verifyError);
+    // Verify token with required claims
+    const { payload } = await jose.jwtVerify(token, secretKey, {
+      issuer: 'rising-bsm',
+      audience: process.env.JWT_AUDIENCE || 'rising-bsm-app'
+    });
+    
+    if (!payload || !payload.sub) {
+      console.log(`Token missing required fields [${requestId}]`);
       return false;
     }
+    
+    // Check token expiration with 5-minute grace period for clock skew
+    if (payload.exp) {
+      const now = Math.floor(Date.now() / 1000);
+      const expTime = payload.exp as number;
+      const hasExpired = expTime < (now - 300); // 5-minute grace period
+      
+      if (hasExpired) {
+        console.log(`Token expired at ${new Date(expTime * 1000).toISOString()} [${requestId}]`);
+        return false;
+      }
+    }
+    
+    // Verify that the user referenced in the token still exists and is active
+    const userId = payload.sub;
+    const isUserValid = await verifyUserExists(userId.toString());
+    if (!isUserValid) {
+      console.log(`User ${userId} not found or inactive [${requestId}]`);
+      return false;
+    }
+    
+    console.log(`Token validation passed [${requestId}]`);
+    return true;
   } catch (error) {
-    console.log('Token validation error:', error as Error);
+    console.log('Token validation error:', 
+               error instanceof Error ? {
+                 message: error.message,
+                 name: error.name,
+                 stack: error.stack
+               } : String(error));
     return false;
   }
 }
 
 /**
  * Verify that the user referenced in the token exists and is active
- * Uses an API endpoint to check user existence
  */
 async function verifyUserExists(userId: string): Promise<boolean> {
+  const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  
   try {
-    // Force a fresh verification for user 3 (the problematic user)
-    // This bypasses the cache for this specific user
-    const isUser3 = userId === '3';
-    
-    // Check cache first to reduce API calls (but skip for user 3)
+    // Check cache first to reduce API calls
     const cacheEntry = USER_VERIFICATION_CACHE[userId];
-    if (!isUser3 && cacheEntry && Date.now() - cacheEntry.timestamp < CACHE_TTL) {
-      console.log(`Using cached verification for user ${userId}: ${cacheEntry.isValid}`);
+    const now = Date.now();
+    
+    // If we have a recent cache hit, use it
+    if (cacheEntry && now - cacheEntry.timestamp < CACHE_TTL) {
+      console.log(`[${requestId}] Using cached verification for user ${userId} (valid: ${cacheEntry.isValid})`);
       return cacheEntry.isValid;
     }
     
-    console.log(`Verifying user ${userId} via API call`);
-    
-    // Add a timestamp to prevent any caching at the browser/network level
+    // Create URL for the verify-user endpoint
     const url = new URL('/api/auth/verify-user', 
-                        process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
-    url.searchParams.append('_', Date.now().toString());
-                        
+      process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
+    url.searchParams.append('userId', userId);
+    
     // Call the verify-user API endpoint
     const response = await fetch(url.toString(), {
-      method: 'POST',
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Auth-Skip': 'true', // Special header to prevent middleware recursion
-        'Cache-Control': 'no-cache, no-store' // Prevent caching at HTTP level
-      },
-      body: JSON.stringify({ userId })
+        'X-Auth-Skip': 'true', // Prevent middleware recursion
+        'Cache-Control': 'max-age=300',
+        'X-Request-ID': requestId,
+        'Accept': 'application/json'
+      }
     });
     
-    // Check if the fetch itself failed
+    // Check if the verification request succeeded
     if (!response) {
-      console.error(`User ${userId} verification failed: No response from API`);
+      console.error(`[${requestId}] User ${userId} verification failed: No response from API`);
       return false;
     }
     
-    // Parse response with detailed error reporting
+    // Get user data from headers if available
+    const userIdFromHeader = response.headers.get('X-User-Id');
+    const userRole = response.headers.get('X-User-Role');
+    const userStatus = response.headers.get('X-User-Status');
+    const isVerified = response.headers.get('X-User-Verified') === 'true';
+    
+    // If we have the verification data in headers, use it directly
+    if (isVerified && userIdFromHeader && userRole && userStatus) {
+      console.log(`[${requestId}] User ${userIdFromHeader} verified via headers`);
+      
+      // Store in cache
+      USER_VERIFICATION_CACHE[userIdFromHeader] = {
+        timestamp: now,
+        isValid: true,
+        userData: {
+          id: parseInt(userIdFromHeader, 10),
+          role: userRole,
+          status: userStatus
+        },
+        requestId
+      };
+      
+      return true;
+    }
+    
+    // Otherwise parse response body
     let responseData: any;
     try {
       responseData = await response.json();
-      console.debug(`Response data for user ${userId}:`, JSON.stringify(responseData, null, 2));
     } catch (jsonError) {
-      console.error(`User ${userId} verification failed: Invalid JSON response`);
-      console.error(`Response status: ${response.status} ${response.statusText}`);
+      console.error(`[${requestId}] User ${userId} verification failed: Invalid JSON response`);
       return false;
     }
     
-    // Check success flag in response data
-    // Properly handle API response structure from formatResponse.success()
-    const isValid = response.ok && responseData && responseData.success === true;
+    // Extract success flag
+    const isSuccess = responseData && typeof responseData.success === 'boolean' ? responseData.success : false;
+    const isValid = response.ok && isSuccess;
     
-    // Enhanced diagnostics
-    if (!isValid) {
-      // Extract error message if available
-      const errorMessage = responseData?.message || 'Unknown error';
-      const statusCode = response.status;
-      
-      if (statusCode === 404) {
-        console.error(`User ${userId} not found in database`);
-      } else if (statusCode === 403) {
-        console.error(`User ${userId} exists but has a non-active status (likely inactive, suspended, or deleted)`);
-      } else if (statusCode === 200 && (!responseData || !responseData.success)) {
-        console.error(`User ${userId} verification received 200 OK but response missing success flag`);
-        console.error(`Response structure issue - full response:`, JSON.stringify(responseData, null, 2));
-      } else {
-        console.error(`User ${userId} verification failed: ${errorMessage} (Status: ${statusCode})`);
-      }
-      
-      // For user 3, always dump additional diagnostic info
-      if (isUser3) {
-        console.error(`Detailed response for user 3:`, JSON.stringify(responseData, null, 2));
-        if (statusCode === 200) {
-          console.error(`User 3 verification received 200 OK but isValid=${isValid}, success flag=${responseData?.success}`);
-        }
-      }
+    // Extract user data if available
+    let userData = undefined;
+    if (isValid && responseData?.data?.user) {
+      userData = responseData.data.user;
     }
     
-    // Store result in cache
+    // Store verification result in cache
     USER_VERIFICATION_CACHE[userId] = {
-      timestamp: Date.now(),
-      isValid
+      timestamp: now,
+      isValid,
+      userData,
+      requestId
     };
     
-    console.log(`User ${userId} verification result: ${isValid}`);
+    if (!isValid) {
+      console.error(`[${requestId}] User ${userId} verification failed: ${responseData?.message || 'Unknown error'}`);
+    } else {
+      console.log(`[${requestId}] User ${userId} verified successfully`);
+    }
+    
     return isValid;
   } catch (error) {
-    console.error(`Error verifying user ${userId}:`, error as Error);
-    
-    // In production, fail closed (assume invalid) on errors
+    console.error(`[${requestId}] Error verifying user ${userId}:`, 
+      error instanceof Error ? error.message : String(error));
     return false;
   }
 }
 
 /**
+ * Clear the user verification cache - useful for testing
+ */
+function clearUserVerificationCache() {
+  Object.keys(USER_VERIFICATION_CACHE).forEach(key => {
+    delete USER_VERIFICATION_CACHE[key];
+  });
+}
+
+/**
  * Middleware for authentication and authorization
- * Uses HTTP-only cookies for secure authentication
  */
 export async function middleware(request: NextRequest) {
   // Initialize security config
   securityConfigEdge.initialize();
   
-  // USE CONSISTENT TOKEN NAMES
   const token = request.cookies.get('auth_token')?.value;
   const { pathname } = request.nextUrl;
 
-  // Special bypass for the verify-user endpoint when called from middleware
+  // Skip for verify-user endpoint when called from middleware
   if (pathname === '/api/auth/verify-user' && request.headers.get('X-Auth-Skip') === 'true') {
     console.log('Skipping auth check for verify-user API call from middleware');
     return NextResponse.next();
   }
 
-  // Debug log the token (for development only)
   console.log(`Middleware checking path: ${pathname}`);
-  if (token) {
-    console.log(`Token found, length: ${token.length}, prefix: ${token.substring(0, 10)}...`);
-  } else {
-    console.log(`No auth_token cookie found for path ${pathname}`);
-  }
   
-  // Skip middleware for all auth API routes to prevent redirect loops and allow proper authentication
+  // Skip middleware for all auth API routes
   if (pathname.startsWith('/api/auth/')) {
     console.log(`Skipping auth check for auth API route: ${pathname}`);
-    const response = NextResponse.next();
-    response.headers.set('X-Original-Path', pathname);
-    return response;
+    return NextResponse.next();
   }
   
   // Define public paths that don't require authentication
@@ -243,26 +225,20 @@ export async function middleware(request: NextRequest) {
     '/auth/forgot-password',
     '/auth/reset-password',
     '/',
-    '/api/auth/',  // All auth API endpoints
-    '/api/auth/verify-user', // Explicitly add the verify-user endpoint
-    '/api/requests/public',
-    // Add any other public API endpoints here
+    '/api/auth/',
+    '/api/requests/public'
   ];
   
   const isPublicPath = publicPaths.some(path => {
-    // Exact match or path prefix
     return pathname === path || 
            pathname.startsWith(path + '/') || 
-           // Special case for all auth API routes
            (path === '/api/auth/' && pathname.startsWith('/api/auth/'));
   });
   
   console.log(`Path ${pathname} is ${isPublicPath ? 'public' : 'protected'}`);
   
-  // Check for asset requests (images, css, etc.)
-  const isAssetRequest = /\.(jpg|jpeg|png|gif|svg|css|js)$/.test(pathname);
-  
   // Skip middleware for assets
+  const isAssetRequest = /\.(jpg|jpeg|png|gif|svg|css|js)$/.test(pathname);
   if (isAssetRequest) {
     return NextResponse.next();
   }
@@ -270,10 +246,12 @@ export async function middleware(request: NextRequest) {
   // If trying to access a protected route without a token, redirect to login
   if (!isPublicPath && !token) {
     console.log(`No token for protected path ${pathname}, redirecting to login`);
+    
     // For protected pages, redirect to login
     if (!pathname.startsWith('/api/')) {
+      const cleanPath = pathname.replace(/\/api\/api\//g, '/api/');
       const url = new URL('/auth/login', request.url);
-      url.searchParams.set('returnUrl', encodeURI(pathname));
+      url.searchParams.set('returnUrl', encodeURI(cleanPath));
       return NextResponse.redirect(url);
     } 
     // For API routes, return 401 Unauthorized
@@ -283,128 +261,108 @@ export async function middleware(request: NextRequest) {
         message: 'Authentication required' 
       }), { 
         status: 401, 
-        headers: { 
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store, no-cache'
-        }
+        headers: { 'Content-Type': 'application/json' }
       });
     }
   }
 
   // If logged in and trying to access login/register, redirect to dashboard
   if (isPublicPath && token && (pathname === '/auth/login' || pathname === '/auth/register')) {
-    console.log(`Already logged in, redirecting from ${pathname} to dashboard`);
-    // Don't redirect to dashboard while processing login - this can create redirect loops
-    // Only redirect if they're directly accessing these routes
-    if (!request.headers.get('referer')?.includes('/auth/login')) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
-    return NextResponse.next();
+    console.log(`Already logged in, redirecting to dashboard`);
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
   
-  // If we have a token, do validation
+  // If we have a token, validate it
   if (token) {
     try {
-      // First try proper cryptographic validation with jose
-      let isValid = false;
-      try {
-        isValid = await isTokenValid(token);
-      } catch (e) {
-        console.log('Token validation failed:', e);
-        throw new Error('Token validation failed - no fallback to less secure validation');
-      }
+      const isValid = await isTokenValid(token);
       
       if (isValid) {
-        // Log successful validation
         console.log(`Token validation passed for ${pathname}`);
         
-        // Token is valid, create response
         const response = NextResponse.next();
         
-        // CRITICAL FIX: Always add X-Auth-Token for API routes
-        // This ensures the token is available to API handlers
+        // Add token to headers for API routes
         if (pathname.startsWith('/api/')) {
           console.log(`Adding X-Auth-Token header for API route: ${pathname}`);
           response.headers.set('X-Auth-Token', token);
+          
+          // Add decoded JWT data to headers
+          try {
+            const jwtSecret = securityConfigEdge.getJwtSecret();
+            const secretKey = new TextEncoder().encode(jwtSecret);
+            const decoded = await jose.jwtVerify(token, secretKey);
+            
+            if (decoded && decoded.payload && decoded.payload.sub) {
+              response.headers.set('X-Auth-User-Id', decoded.payload.sub.toString());
+              if (decoded.payload.role) {
+                response.headers.set('X-Auth-User-Role', decoded.payload.role as string);
+              }
+              if (decoded.payload.name) {
+                response.headers.set('X-Auth-User-Name', decoded.payload.name as string);
+              }
+              if (decoded.payload.email) {
+                response.headers.set('X-Auth-User-Email', decoded.payload.email as string);
+              }
+            }
+          } catch (error) {
+            console.log('Could not decode token for headers', 
+                      error instanceof Error ? error.message : 'Unknown error');
+          }
         }
         
         return response;
       } else {
-        // Token is invalid or expired - handle appropriately
-        console.log(`Token appears invalid in middleware for ${pathname}`);
+        // Token is invalid - handle appropriately
+        console.log(`Token is invalid in middleware for ${pathname}`);
         
-        // For protected page routes: redirect to login
+        // For protected pages: redirect to login
         if (!isPublicPath && !pathname.startsWith('/api/')) {
-          // Clean the returnUrl to prevent loops
-          const cleanPath = pathname.replace(/\/api\/api\//, '/api/');
           const url = new URL('/auth/login', request.url);
-          url.searchParams.set('returnUrl', encodeURI(cleanPath));
-          
-          // Clear the invalid token
           const response = NextResponse.redirect(url);
           response.cookies.delete('auth_token');
-          response.cookies.delete('refresh_token');
           return response;
-        } 
-        // For API routes: return 401 JSON response
+        }
+        // For API routes: return 401
         else if (pathname.startsWith('/api/')) {
           return new NextResponse(JSON.stringify({ 
             success: false, 
-            message: 'Authentication required - Invalid or expired token' 
+            message: 'Invalid authentication token' 
           }), { 
             status: 401, 
-            headers: { 
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-store, no-cache'
-            }
+            headers: { 'Content-Type': 'application/json' }
           });
         }
       }
     } catch (error) {
-      // Token validation error
-      console.log(`Token validation error in middleware for ${pathname}:`, error as Error);
+      console.log(`Token validation error in middleware: ${error}`);
       
-      // For protected page routes: redirect to login
+      // For protected pages: redirect to login
       if (!isPublicPath && !pathname.startsWith('/api/')) {
         const url = new URL('/auth/login', request.url);
-        url.searchParams.set('returnUrl', encodeURI(pathname));
-        
-        // Clear the invalid token
         const response = NextResponse.redirect(url);
         response.cookies.delete('auth_token');
-        response.cookies.delete('refresh_token');
         return response;
       } 
-      // For API routes: return 401 JSON response
+      // For API routes: return 401
       else if (pathname.startsWith('/api/')) {
         return new NextResponse(JSON.stringify({ 
           success: false, 
           message: 'Authentication error' 
         }), { 
           status: 401, 
-          headers: { 
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-store, no-cache'
-          }
+          headers: { 'Content-Type': 'application/json' }
         });
       }
     }
   }
 
-  // Default behavior for routes that don't match any condition
-  console.log(`Default middleware behavior for ${pathname}`);
+  // Default behavior
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - Static files (_next/static)
-     * - Image optimization files (_next/image)
-     * - Favicon
-     * - Assets like fonts, icons, etc.
-     */
     '/((?!_next/static|_next/image|favicon\.ico|fonts|images|icons|assets).*)',
   ],
 };

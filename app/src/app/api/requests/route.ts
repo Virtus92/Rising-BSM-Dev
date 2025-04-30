@@ -7,7 +7,7 @@ import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { RequestFilterParamsDto } from '@/domain/dtos/RequestDtos';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
 
@@ -16,7 +16,7 @@ import { RequestStatus } from '@/domain/enums/CommonEnums';
  * Get requests with optional filtering
  */
 export const GET = routeHandler(
-  withPermission(
+  await permissionMiddleware.withPermission(
     async (req: NextRequest) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
@@ -91,7 +91,10 @@ export const GET = routeHandler(
  * POST /api/requests
  * Create a new request
  */
-export const POST = routeHandler(async (req: NextRequest) => {
+// Create a handler function that matches the expected signature
+const createRequestHandler = async (req: NextRequest) => {
+  // Handler implementation
+
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
   
@@ -151,7 +154,9 @@ export const POST = routeHandler(async (req: NextRequest) => {
       500
     );
   }
-}, {
+};
+
+export const POST = routeHandler(createRequestHandler, {
   // This endpoint is public for contact form submissions
   requiresAuth: false
 });

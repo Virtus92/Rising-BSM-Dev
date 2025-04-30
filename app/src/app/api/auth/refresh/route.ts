@@ -11,4 +11,6 @@ import { withRateLimit } from '@/core/api/middleware/rate-limit';
  * POST /api/auth/refresh
  * Refreshes access tokens using a valid refresh token
  */
-export const POST = withRateLimit(refreshHandler);
+export async function POST(request: NextRequest) {
+  return withRateLimit(refreshHandler)(request);
+}

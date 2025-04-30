@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/features/auth/api/middleware/authMiddleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { formatResponse } from '@/core/errors/formatting/response-formatter';
@@ -42,7 +42,7 @@ export async function PUT(
 
     // Check if the user has permission to update this notification
     const isOwner = existingNotification.userId === authResult.user?.id;
-    const hasPermission = await permissionMiddleware.checkPermission(request, [SystemPermission.NOTIFICATIONS_EDIT]);
+    const hasPermission = await permissionMiddleware.checkPermission(request as NextRequest, [SystemPermission.NOTIFICATIONS_EDIT]);
     
     if (!isOwner && !hasPermission.success) {
       return formatResponse.error('You do not have permission to update this notification', 403);

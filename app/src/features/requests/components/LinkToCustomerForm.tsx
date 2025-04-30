@@ -35,10 +35,10 @@ import {
 import { CheckIcon } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 
-// Validierungsschema für das Formular
+// Form validation schema
 const formSchema = z.object({
   customerId: z.number({
-    required_error: 'Sie müssen einen Kunden auswählen',
+    required_error: 'You must select a customer',
   }),
   note: z.string().optional(),
 });
@@ -51,7 +51,7 @@ interface LinkToCustomerFormProps {
 }
 
 /**
- * Formular zum Verknüpfen einer Kontaktanfrage mit einem bestehenden Kunden
+ * Form for linking a request to an existing customer
  */
 export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   requestId,
@@ -62,18 +62,20 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  // Kundensuche
-  // Use the static method directly
-  // const apiClient = new ApiClient();
-  // const customerClient = new CustomerClient(apiClient);
-  
+  // Customer search - Always enabled, search with empty string will return all customers
+  // limited by the limit parameter
   const { data: customers, isLoading: isLoadingCustomers } = useQuery({
     queryKey: ['customers', searchQuery],
-    queryFn: () => CustomerClient.getCustomers({ search: searchQuery, limit: 10 }),
-    enabled: searchQuery.length > 0,
+    queryFn: () => CustomerClient.getCustomers({ 
+      search: searchQuery, 
+      limit: 10,
+      sortBy: 'name',
+      sortDirection: 'asc'
+    }),
+    enabled: true, // Always enabled
   });
 
-  const form = useForm<FormValues, any, FormValues>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       note: '',
@@ -82,7 +84,7 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
 
   const selectedCustomerId = form.watch('customerId');
   
-  // Handle the new PaginationResult structure that has data array instead of direct access
+  // Handle the PaginationResult structure
   const selectedCustomer = customers?.data?.data?.find(
     (customer: any) => customer.id === selectedCustomerId
   );
@@ -119,14 +121,14 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   };
 
   return (
-    <Form {...form as any}>
-      <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="customerId"
           render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormLabel>Kunde</FormLabel>
+              <FormLabel>Customer</FormLabel>
               <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
                   <FormControl>
@@ -142,8 +144,8 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
                       {field.value
                         ? selectedCustomer
                           ? selectedCustomer.name
-                          : "Kunde auswählen"
-                        : "Kunde auswählen"}
+                          : "Select customer"
+                        : "Select customer"}
                       <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </FormControl>
@@ -151,7 +153,7 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
                 <PopoverContent className="w-full p-0">
                   <Command>
                     <CommandInput 
-                      placeholder="Kunden suchen..." 
+                      placeholder="Search customers..." 
                       onValueChange={setSearchQuery}
                       className="h-9"
                     />
@@ -160,10 +162,10 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
                         {isLoadingCustomers ? (
                           <div className="flex items-center justify-center p-2">
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            Suche...
+                            Searching...
                           </div>
                         ) : (
-                          "Keine Kunden gefunden."
+                          "No customers found."
                         )}
                       </CommandEmpty>
                       <CommandGroup>
@@ -209,10 +211,10 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
           name="note"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Notiz</FormLabel>
+              <FormLabel>Note</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Notiz zur Verknüpfung (optional)"
+                  placeholder="Note about linking (optional)"
                   {...field}
                 />
               </FormControl>
@@ -223,11 +225,11 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" type="button" onClick={onClose}>
-            Abbrechen
+            Cancel
           </Button>
           <Button type="submit" disabled={isLinking || !selectedCustomerId}>
             {isLinking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Mit Kunde verknüpfen
+            Link to Customer
           </Button>
         </div>
       </form>

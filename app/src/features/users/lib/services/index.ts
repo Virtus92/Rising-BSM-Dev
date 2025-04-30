@@ -8,6 +8,21 @@
 // Static helpers and utility methods
 export * from './UserService';
 
-// Environment-specific implementations
-export * from './UserService.server';
-export * from './UserService.client';
+// Server-specific implementation 
+export { UserService as UserServiceServer } from './UserService.server';
+
+// Client-specific implementation
+export { UserServiceClient } from './UserService.client';
+
+// Adapter implementation - Export adapter functions directly for easier access
+export { createUserService, getUserService, resetUserService } from './UserServiceAdapter';
+
+// Export the adapter class itself for direct use
+export { default as UserServiceAdapter } from './UserServiceAdapter';
+
+// Default export for convenience
+export { getUserService as default } from './UserServiceAdapter';
+
+// Re-export IUserService from domain for convenience
+export type { IUserService } from '@/domain/services/IUserService';
+

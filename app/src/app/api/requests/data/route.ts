@@ -4,14 +4,14 @@ import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { withPermission } from '@/app/api/helpers/apiPermissions';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
 
 /**
  * GET /api/requests/data
  * Get structured data for a request
  */
 export const GET = routeHandler(
-  withPermission(
+  await permissionMiddleware.withPermission(
     async (req: NextRequest) => {
       const { searchParams } = new URL(req.url);
       const requestId = searchParams.get('requestId');
@@ -51,8 +51,8 @@ export const GET = routeHandler(
         });
         
         return formatResponse.error(
-          'Failed to retrieve request data',
-          error instanceof Error ? error.message : String(error)
+          'Failed to retrieve request data: ' + (error instanceof Error ? error.message : String(error)),
+          500
         );
       }
     },
@@ -66,7 +66,7 @@ export const GET = routeHandler(
  * Create structured data for a request
  */
 export const POST = routeHandler(
-  withPermission(
+  await permissionMiddleware.withPermission(
     async (req: NextRequest) => {
       const data = await req.json();
       
@@ -112,8 +112,8 @@ export const POST = routeHandler(
         });
         
         return formatResponse.error(
-          'Failed to create request data',
-          error instanceof Error ? error.message : String(error)
+          'Failed to create request data: ' + (error instanceof Error ? error.message : String(error)),
+          500
         );
       }
     },
@@ -127,7 +127,7 @@ export const POST = routeHandler(
  * Update structured data for a request
  */
 export const PUT = routeHandler(
-  withPermission(
+  await permissionMiddleware.withPermission(
     async (req: NextRequest) => {
       const { searchParams } = new URL(req.url);
       const id = searchParams.get('id');
@@ -170,8 +170,8 @@ export const PUT = routeHandler(
         });
         
         return formatResponse.error(
-          'Failed to update request data',
-          error instanceof Error ? error.message : String(error)
+          'Failed to update request data: ' + (error instanceof Error ? error.message : String(error)),
+          500
         );
       }
     },

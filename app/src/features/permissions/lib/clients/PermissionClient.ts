@@ -1,5 +1,6 @@
 /**
  * API-Client for Permission Management
+ * This implementation removes all fallbacks and exposes errors directly
  */
 import { 
   CreatePermissionDto, 
@@ -8,107 +9,40 @@ import {
   UserPermissionsResponseDto,
   UpdateUserPermissionsDto
 } from '@/domain/dtos/PermissionDtos';
-import { ApiClient, ApiResponse, apiClient } from '@/core/api/ApiClient';
+import { ApiClient, ApiResponse, apiClient, ApiRequestError } from '@/core/api/ApiClient';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { getItem } from '@/shared/utils/storage/cookieStorage';
 
 // API-URL for permissions
 const PERMISSIONS_API_URL = '/permissions';
 const USER_PERMISSIONS_API_URL = '/users/permissions';
 
 /**
+ * Error class for permission-related API failures
+ */
+export class PermissionClientError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly details?: any,
+    public readonly statusCode?: number
+  ) {
+    super(message);
+    this.name = 'PermissionClientError';
+    Object.setPrototypeOf(this, PermissionClientError.prototype);
+  }
+}
+
+/**
  * Client for permission API requests
+ * This implementation exposes all errors directly without fallbacks
  */
 export class PermissionClient {
   /**
    * Singleton instance of the API client
    */
   private static apiClient = apiClient;
-
-  /**
-   * Maximum number of retries for API calls
-   */
-  private static MAX_RETRIES = 2;
-
-  /**
-   * Base timeout for API calls in milliseconds
-   */
-  private static BASE_TIMEOUT = 5000;
-
-  /**
-   * Helper method to handle API requests with retry logic
-   * 
-   * @param method - Request method (get, post, etc.)
-   * @param url - API endpoint URL
-   * @param data - Optional data for POST/PUT requests
-   * @returns API response
-   */
-  private static async apiRequest<T>(
-    method: 'get' | 'post' | 'put' | 'delete' | 'patch',
-    url: string, 
-    data?: any,
-    customParams?: { maxRetries?: number }
-  ): Promise<ApiResponse<T>> {
-    const maxRetries = customParams?.maxRetries ?? PermissionClient.MAX_RETRIES;
-    let attempts = 0;
-
-    // Implement retry logic for transient errors
-    while (attempts <= maxRetries) {
-      try {
-        // Use the appropriate method from the API client
-        if (method === 'get') {
-          return await PermissionClient.apiClient.get(url);
-        } else if (method === 'post') {
-          return await PermissionClient.apiClient.post(url, data);
-        } else if (method === 'put') {
-          return await PermissionClient.apiClient.put(url, data);
-        } else if (method === 'delete') {
-          return await PermissionClient.apiClient.delete(url);
-        } else if (method === 'patch') {
-          return await PermissionClient.apiClient.patch(url, data);
-        }
-
-        // If we get here, method was invalid (shouldn't happen due to TypeScript)
-        throw new Error(`Invalid API method: ${method}`);
-      } catch (error: any) {
-        attempts++;
-        
-        // Only retry for network or server errors (not validation or auth errors)
-        const isTransientError = (
-          !error.statusCode || // Network error
-          error.statusCode >= 500 || // Server error
-          error.statusCode === 429 // Rate limiting
-        );
-        
-        if (!isTransientError || attempts > maxRetries) {
-          // Don't retry client errors or if we've reached max retries
-          if (error.message) {
-            console.error(`API error (${method.toUpperCase()} ${url}):`, error.message);
-            return {
-              success: false,
-              message: error.message,
-              data: null,
-              statusCode: error.statusCode || 500
-            };
-          }
-          break;
-        }
-        
-        // Exponential backoff: wait longer between each retry
-        const delayMs = Math.pow(2, attempts) * 100;
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      }
-    }
-    
-    // If we get here, all retries failed or we had a non-retryable error
-    console.error(`All retries failed for ${method.toUpperCase()} ${url}`);
-    return {
-      success: false,
-      message: `Failed to ${method} data after multiple attempts`,
-      data: null,
-      statusCode: 500
-    };
-  }
 
   /**
    * Creates query parameters from an object
@@ -131,12 +65,31 @@ export class PermissionClient {
    * 
    * @param params - Optional filter parameters
    * @returns API response
+   * @throws PermissionClientError for any API or network failures
    */
   static async getPermissions(params: Record<string, any> = {}): Promise<ApiResponse<PaginationResult<PermissionResponseDto>>> {
-    const queryString = PermissionClient.createQueryParams(params);
-    const url = `${PERMISSIONS_API_URL}${queryString}`;
-    
-    return await PermissionClient.apiRequest<PaginationResult<PermissionResponseDto>>('get', url);
+    try {
+      const queryString = PermissionClient.createQueryParams(params);
+      const url = `${PERMISSIONS_API_URL}${queryString}`;
+      
+      return await PermissionClient.apiClient.get<PaginationResult<PermissionResponseDto>>(url);
+    } catch (error) {
+      // Enhance error with more details
+      if (error instanceof ApiRequestError) {
+        throw new PermissionClientError(
+          `Failed to get permissions: ${error.message}`,
+          'GET_PERMISSIONS_FAILED',
+          error,
+          error.statusCode
+        );
+      }
+      
+      throw new PermissionClientError(
+        `Failed to get permissions: ${error instanceof Error ? error.message : String(error)}`,
+        'GET_PERMISSIONS_FAILED',
+        error
+      );
+    }
   }
   
   /**
@@ -144,9 +97,28 @@ export class PermissionClient {
    * 
    * @param id - Permission ID
    * @returns API response
+   * @throws PermissionClientError for any API or network failures
    */
   static async getPermissionById(id: number | string): Promise<ApiResponse<PermissionResponseDto>> {
-    return await PermissionClient.apiRequest<PermissionResponseDto>('get', `${PERMISSIONS_API_URL}/${id}`);
+    try {
+      return await PermissionClient.apiClient.get<PermissionResponseDto>(`${PERMISSIONS_API_URL}/${id}`);
+    } catch (error) {
+      // Enhance error with more details
+      if (error instanceof ApiRequestError) {
+        throw new PermissionClientError(
+          `Failed to get permission by ID ${id}: ${error.message}`,
+          'GET_PERMISSION_BY_ID_FAILED',
+          error,
+          error.statusCode
+        );
+      }
+      
+      throw new PermissionClientError(
+        `Failed to get permission by ID ${id}: ${error instanceof Error ? error.message : String(error)}`,
+        'GET_PERMISSION_BY_ID_FAILED',
+        error
+      );
+    }
   }
   
   /**
@@ -154,9 +126,28 @@ export class PermissionClient {
    * 
    * @param code - Permission code
    * @returns API response
+   * @throws PermissionClientError for any API or network failures
    */
   static async getPermissionByCode(code: string): Promise<ApiResponse<PermissionResponseDto>> {
-    return await PermissionClient.apiRequest<PermissionResponseDto>('get', `${PERMISSIONS_API_URL}/by-code/${code}`);
+    try {
+      return await PermissionClient.apiClient.get<PermissionResponseDto>(`${PERMISSIONS_API_URL}/by-code/${code}`);
+    } catch (error) {
+      // Enhance error with more details
+      if (error instanceof ApiRequestError) {
+        throw new PermissionClientError(
+          `Failed to get permission by code '${code}': ${error.message}`,
+          'GET_PERMISSION_BY_CODE_FAILED',
+          error,
+          error.statusCode
+        );
+      }
+      
+      throw new PermissionClientError(
+        `Failed to get permission by code '${code}': ${error instanceof Error ? error.message : String(error)}`,
+        'GET_PERMISSION_BY_CODE_FAILED',
+        error
+      );
+    }
   }
   
   /**
@@ -164,9 +155,28 @@ export class PermissionClient {
    * 
    * @param data - Permission data
    * @returns API response
+   * @throws PermissionClientError for any API or network failures
    */
   static async createPermission(data: CreatePermissionDto): Promise<ApiResponse<PermissionResponseDto>> {
-    return await PermissionClient.apiRequest<PermissionResponseDto>('post', PERMISSIONS_API_URL, data);
+    try {
+      return await PermissionClient.apiClient.post<PermissionResponseDto>(PERMISSIONS_API_URL, data);
+    } catch (error) {
+      // Enhance error with more details
+      if (error instanceof ApiRequestError) {
+        throw new PermissionClientError(
+          `Failed to create permission: ${error.message}`,
+          'CREATE_PERMISSION_FAILED',
+          error,
+          error.statusCode
+        );
+      }
+      
+      throw new PermissionClientError(
+        `Failed to create permission: ${error instanceof Error ? error.message : String(error)}`,
+        'CREATE_PERMISSION_FAILED',
+        error
+      );
+    }
   }
   
   /**
@@ -175,9 +185,28 @@ export class PermissionClient {
    * @param id - Permission ID
    * @param data - Permission update data
    * @returns API response
+   * @throws PermissionClientError for any API or network failures
    */
   static async updatePermission(id: number | string, data: UpdatePermissionDto): Promise<ApiResponse<PermissionResponseDto>> {
-    return await PermissionClient.apiRequest<PermissionResponseDto>('put', `${PERMISSIONS_API_URL}/${id}`, data);
+    try {
+      return await PermissionClient.apiClient.put<PermissionResponseDto>(`${PERMISSIONS_API_URL}/${id}`, data);
+    } catch (error) {
+      // Enhance error with more details
+      if (error instanceof ApiRequestError) {
+        throw new PermissionClientError(
+          `Failed to update permission ${id}: ${error.message}`,
+          'UPDATE_PERMISSION_FAILED',
+          error,
+          error.statusCode
+        );
+      }
+      
+      throw new PermissionClientError(
+        `Failed to update permission ${id}: ${error instanceof Error ? error.message : String(error)}`,
+        'UPDATE_PERMISSION_FAILED',
+        error
+      );
+    }
   }
   
   /**
@@ -185,68 +214,139 @@ export class PermissionClient {
    * 
    * @param id - Permission ID
    * @returns API response
+   * @throws PermissionClientError for any API or network failures
    */
   static async deletePermission(id: number | string): Promise<ApiResponse<void>> {
-    return await PermissionClient.apiRequest<void>('delete', `${PERMISSIONS_API_URL}/${id}`);
+    try {
+      return await PermissionClient.apiClient.delete<void>(`${PERMISSIONS_API_URL}/${id}`);
+    } catch (error) {
+      // Enhance error with more details
+      if (error instanceof ApiRequestError) {
+        throw new PermissionClientError(
+          `Failed to delete permission ${id}: ${error.message}`,
+          'DELETE_PERMISSION_FAILED',
+          error,
+          error.statusCode
+        );
+      }
+      
+      throw new PermissionClientError(
+        `Failed to delete permission ${id}: ${error instanceof Error ? error.message : String(error)}`,
+        'DELETE_PERMISSION_FAILED',
+        error
+      );
+    }
   }
   
   /**
    * Ongoing permission requests cache by userId to prevent duplicates
+   * This is for tracking purposes only - we don't use it for caching results
    */
   private static permissionRequestsInProgress = new Map<string, Promise<ApiResponse<UserPermissionsResponseDto>>>();
 
   /**
-   * Gets permissions for a user with request deduplication
+   * Gets permissions for a user with request tracking
    * 
    * @param userId - User ID
    * @returns API response
+   * @throws PermissionClientError for any API or network failures
    */
   static async getUserPermissions(userId: number | string): Promise<ApiResponse<UserPermissionsResponseDto>> {
+    // Validate userId at API boundary - throw clear error instead of returning error object
+    if (!userId) {
+      throw new PermissionClientError(
+        'getUserPermissions called with invalid or missing userId',
+        'INVALID_USER_ID',
+        { userId }
+      );
+    }
+      
+    const cacheKey = `permissions_${userId}`;
+    
     try {
-      if (!userId) {
-        return {
-          success: false,
-          message: 'Invalid user ID provided',
-          data: null,
-          statusCode: 400
-        };
+      // Make the API call without error handling or caching
+      console.log(`Fetching permissions for user ID: ${userId}`);
+      
+      // Get auth token from localStorage to include explicitly
+      let authToken = null;
+      try {
+        authToken = getItem('auth_token_backup') || getItem('auth_token');
+      } catch (tokenError) {
+        console.warn('Error getting token from localStorage:', tokenError);
       }
       
-      const cacheKey = `permissions_${userId}`;
-      
-      // Check if a request for this user is already in progress
-      if (PermissionClient.permissionRequestsInProgress.has(cacheKey)) {
-        console.debug(`Using existing permissions request for user ID: ${userId}`);
-        return await PermissionClient.permissionRequestsInProgress.get(cacheKey)!;
+      // Create custom headers for better auth handling
+      const customHeaders: Record<string, string> = {};
+      if (authToken) {
+        customHeaders['Authorization'] = `Bearer ${authToken}`;
+        customHeaders['X-Auth-Token'] = authToken;
       }
       
-      // Create a new request and add it to the in-progress map
-      const requestPromise = PermissionClient.apiRequest<UserPermissionsResponseDto>(
-        'get', 
+      // Create the API call with explicit auth token and custom headers
+      const requestPromise = PermissionClient.apiClient.get<UserPermissionsResponseDto>(
         `${USER_PERMISSIONS_API_URL}?userId=${userId}`,
-        undefined,
-        { maxRetries: 2 } // Use 2 retries for permission requests
+        {
+          includeAuthToken: true, // Explicitly include auth token
+          requestId: `permissions-${userId}-${Date.now()}`, // Add request ID for tracking
+          headers: customHeaders,
+          skipCache: true // Don't use cache for permission requests
+        }
       );
       
-      // Store the promise in the in-progress map
+      // Store for tracking only
       PermissionClient.permissionRequestsInProgress.set(cacheKey, requestPromise);
       
-      // Clean up the cache after the request completes
-      requestPromise.finally(() => {
-        setTimeout(() => {
-          PermissionClient.permissionRequestsInProgress.delete(cacheKey);
-        }, 300); // Short delay to prevent rapid successive calls
+      // Wait for API response
+      const response = await requestPromise;
+      
+      // Check response for common problems
+      if (!response) {
+        throw new PermissionClientError(
+          `Empty response from permissions API for user ${userId}`,
+          'EMPTY_RESPONSE',
+          { userId }
+        );
+      }
+      
+      if (!response.success && response.statusCode === 401) {
+        throw new PermissionClientError(
+          `Authentication required to fetch permissions for user ${userId}`,
+          'AUTHENTICATION_REQUIRED',
+          response,
+          401
+        );
+      }
+      
+      // Return the raw response - no error handling
+      return response;
+    } catch (error) {
+      // Log the full error to help with debugging
+      console.error(`Error fetching permissions for user ${userId}:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        statusCode: error instanceof ApiRequestError ? error.statusCode : undefined
       });
       
-      return await requestPromise;
-    } catch (error) {
-      console.error('Error fetching user permissions:', error instanceof Error ? error.message : String(error));
-      return {
-        success: false,
-        message: 'Failed to fetch user permissions',
-        data: null,
-        statusCode: 500
-      };
+      // Enhance error with more details
+      if (error instanceof ApiRequestError) {
+        throw new PermissionClientError(
+          `Failed to get user permissions for user ${userId}: ${error.message}`,
+          'GET_USER_PERMISSIONS_FAILED',
+          error,
+          error.statusCode
+        );
+      }
+      
+      throw new PermissionClientError(
+        `Failed to get user permissions for user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+        'GET_USER_PERMISSIONS_FAILED',
+        error
+      );
+    } finally {
+      // Cleanup
+      setTimeout(() => {
+        PermissionClient.permissionRequestsInProgress.delete(cacheKey);
+      }, 300);
     }
   }
   
@@ -255,36 +355,43 @@ export class PermissionClient {
    * 
    * @param data - Update data
    * @returns API response
+   * @throws PermissionClientError for any API or network failures
    */
   static async updateUserPermissions(data: UpdateUserPermissionsDto): Promise<ApiResponse<boolean>> {
     try {
       if (!data.userId || !Array.isArray(data.permissions)) {
-        return {
-          success: false,
-          message: 'Invalid data: userId and permissions array are required',
-          data: null,
-          statusCode: 400
-        };
+        throw new PermissionClientError(
+          'Invalid data: userId and permissions array are required',
+          'INVALID_UPDATE_DATA',
+          data
+        );
       }
       
-      const response = await PermissionClient.apiRequest<boolean>('post', USER_PERMISSIONS_API_URL, data);
-      
-      // Log update for debugging purposes
-      if (response.success) {
-        console.debug(`Successfully updated permissions for user ${data.userId}: ${data.permissions.length} permissions`);
-      } else {
-        console.error(`Failed to update permissions for user ${data.userId}:`, response.message);
-      }
-      
-      return response;
+      return await PermissionClient.apiClient.post<boolean>(USER_PERMISSIONS_API_URL, data, {
+        includeAuthToken: true, // Explicitly include auth token
+        requestId: `update-permissions-${data.userId}-${Date.now()}` // Add request ID for tracking
+      });
     } catch (error) {
-      console.error('Error updating user permissions:', error instanceof Error ? error.message : String(error));
-      return {
-        success: false,
-        message: 'Failed to update user permissions',
-        data: null,
-        statusCode: 500
-      };
+      // Enhance error with more details
+      if (error instanceof ApiRequestError) {
+        throw new PermissionClientError(
+          `Failed to update user permissions for user ${data.userId}: ${error.message}`,
+          'UPDATE_USER_PERMISSIONS_FAILED',
+          error,
+          error.statusCode
+        );
+      }
+      
+      // If it's already our error type, just rethrow
+      if (error instanceof PermissionClientError) {
+        throw error;
+      }
+      
+      throw new PermissionClientError(
+        `Failed to update user permissions for user ${data.userId}: ${error instanceof Error ? error.message : String(error)}`,
+        'UPDATE_USER_PERMISSIONS_FAILED',
+        error
+      );
     }
   }
   
@@ -293,22 +400,120 @@ export class PermissionClient {
    * 
    * @param role - User role
    * @returns API response
+   * @throws PermissionClientError for any API or network failures
    */
   static async getDefaultPermissionsForRole(role: string): Promise<ApiResponse<string[]>> {
-    return await PermissionClient.apiRequest<string[]>('get', `${PERMISSIONS_API_URL}/role-defaults/${role}`);
+    try {
+      return await PermissionClient.apiClient.get<string[]>(`${PERMISSIONS_API_URL}/role-defaults/${role}`);
+    } catch (error) {
+      // Enhance error with more details
+      if (error instanceof ApiRequestError) {
+        throw new PermissionClientError(
+          `Failed to get default permissions for role '${role}': ${error.message}`,
+          'GET_DEFAULT_PERMISSIONS_FAILED',
+          error,
+          error.statusCode
+        );
+      }
+      
+      throw new PermissionClientError(
+        `Failed to get default permissions for role '${role}': ${error instanceof Error ? error.message : String(error)}`,
+        'GET_DEFAULT_PERMISSIONS_FAILED',
+        error
+      );
+    }
   }
-  
+
   /**
    * Checks if a user has a specific permission
+   * Enhanced implementation with better error handling and authentication
    * 
    * @param userId - User ID
    * @param permission - Permission to check
    * @returns API response indicating whether user has the permission
+   * @throws PermissionClientError for any API or network failures
    */
   static async hasPermission(userId: number | string, permission: SystemPermission | string): Promise<ApiResponse<boolean>> {
-    return await PermissionClient.apiRequest<boolean>(
-      'get',
-      `${USER_PERMISSIONS_API_URL}/check?userId=${userId}&permission=${encodeURIComponent(permission)}`
-    );
+    // Validate inputs
+    if (!userId) {
+      throw new PermissionClientError(
+        'hasPermission called with invalid or missing userId',
+        'INVALID_USER_ID',
+        { userId }
+      );
+    }
+
+    if (!permission) {
+      throw new PermissionClientError(
+        'hasPermission called with invalid or missing permission',
+        'INVALID_PERMISSION',
+        { permission }
+      );
+    }
+
+    try {
+      // Get auth token from localStorage to include explicitly
+      let authToken = null;
+      try {
+        authToken = getItem('auth_token_backup') || getItem('auth_token');
+      } catch (tokenError) {
+        console.warn('Error getting token from localStorage:', tokenError);
+      }
+      
+      // Create custom headers for better auth handling
+      const customHeaders: Record<string, string> = {};
+      if (authToken) {
+        customHeaders['Authorization'] = `Bearer ${authToken}`;
+        customHeaders['X-Auth-Token'] = authToken;
+      }
+      
+      console.log(`Checking permission '${permission}' for user ${userId}`);
+      
+      // Use the dedicated check endpoint - no fallbacks
+      const response = await PermissionClient.apiClient.get<boolean>(
+        `/users/permissions/check?userId=${userId}&permission=${encodeURIComponent(permission as string)}`,
+        {
+          includeAuthToken: true, // Explicitly include auth token
+          requestId: `permission-check-${userId}-${Date.now()}`, // Add request ID for tracking
+          headers: customHeaders,
+          skipCache: true // Don't use cache for permission checks
+        }
+      );
+      
+      // Check for authentication issues
+      if (!response.success && response.statusCode === 401) {
+        throw new PermissionClientError(
+          `Authentication required to check permission '${permission}' for user ${userId}`,
+          'AUTHENTICATION_REQUIRED',
+          response,
+          401
+        );
+      }
+      
+      return response;
+    } catch (error) {
+      // Log the full error to help with debugging
+      console.error(`Error checking permission '${permission}' for user ${userId}:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        statusCode: error instanceof ApiRequestError ? error.statusCode : undefined
+      });
+      
+      // Enhance error with more details
+      if (error instanceof ApiRequestError) {
+        throw new PermissionClientError(
+          `Failed to check permission '${permission}' for user ${userId}: ${error.message}`,
+          'PERMISSION_CHECK_FAILED',
+          error,
+          error.statusCode
+        );
+      }
+      
+      throw new PermissionClientError(
+        `Failed to check permission '${permission}' for user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+        'PERMISSION_CHECK_FAILED',
+        error
+      );
+    }
   }
 }

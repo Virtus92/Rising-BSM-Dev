@@ -152,11 +152,56 @@ export function validateUserData(userData: {
   };
 }
 
+/**
+ * Validates user data for updates
+ * Different from validateUserData as it doesn't require a password
+ * 
+ * @param userData - User data to validate
+ * @returns Validation result
+ */
+export function validateUserUpdateData(userData: { 
+  name?: string; 
+  email?: string; 
+  phone?: string;
+  password?: string;
+}): { valid: boolean; errors: Record<string, string> } {
+  const errors: Record<string, string> = {};
+  
+  // Validate name
+  if (userData.name !== undefined && !validateName(userData.name)) {
+    errors.name = 'Name must be at least 2 characters long';
+  }
+  
+  // Validate email
+  if (userData.email !== undefined && !validateEmail(userData.email)) {
+    errors.email = 'Please enter a valid email address';
+  }
+  
+  // Validate phone
+  if (userData.phone !== undefined && userData.phone && !validatePhone(userData.phone)) {
+    errors.phone = 'Please enter a valid phone number';
+  }
+  
+  // Validate password only if it's provided (optional for updates)
+  if (userData.password) {
+    const passwordResult = validatePassword(userData.password);
+    if (!passwordResult.valid) {
+      errors.password = passwordResult.errors.join('. ');
+    }
+  }
+  
+  return {
+    valid: Object.keys(errors).length === 0,
+    errors
+  };
+}
+
 export default {
   validateEmail,
   validatePassword,
   validatePhone,
   formatPhoneNumber,
   validateName,
-  validateUserData
+  validateUserData,
+  validateUserUpdateData
 };

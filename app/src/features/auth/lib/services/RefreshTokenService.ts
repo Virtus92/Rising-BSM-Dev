@@ -329,7 +329,6 @@ export class RefreshTokenService extends BaseService<
       revokedByIp: dto.revokedByIp,
       replacedByToken: dto.replacedByToken,
       isRevoked: dto.isRevoked || false
-      // Removed updatedAt as it's not in the RefreshToken schema
     };
   }
   
@@ -355,8 +354,6 @@ export class RefreshTokenService extends BaseService<
     existingEntity?: RefreshToken
   ): Partial<RefreshToken> {
     if (existingEntity) {
-      // Update case - tokens are typically not updated
-      // Note: RefreshToken model doesn't have an updatedAt field
       return {
         ...dto
       };
@@ -366,7 +363,6 @@ export class RefreshTokenService extends BaseService<
         ...dto,
         isRevoked: dto.isRevoked || false,
         createdAt: new Date()
-        // Removed updatedAt as it's not in the RefreshToken schema
       };
     }
   }
