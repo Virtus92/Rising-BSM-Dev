@@ -542,12 +542,13 @@ export class RequestService implements IRequestService {
     try {
       this.logger.debug(`Updating request status with data:`, { id, data, options });
       
-      // Validate status
-      if (!Object.values(RequestStatus).includes(data.status as RequestStatus)) {
+      // Validate status and ensure it exists in RequestStatus enum
+      const validStatus = Object.values(RequestStatus).includes(data.status as RequestStatus);
+      if (!validStatus) {
         throw new ServiceError(`Invalid status: ${data.status}`, 'INVALID_STATUS', 400);
       }
       
-      // Update status
+      // Update status with safe handling of parameters
       const updatedRequest = await this.updateStatus(id, data.status, data.note, options);
       
       return updatedRequest;
@@ -740,22 +741,35 @@ export class RequestService implements IRequestService {
         text = userIdOrText;
         options = userNameOrOptions as ServiceOptions;
         
-        // Get user from context
+        // Get user from context - use safe defaults if context is missing
         userId = options?.context?.userId || 0;
         userName = options?.context?.userName || 'System';
       }
       // Second overload (id, userId, userName, text, options)
       else {
         userId = userIdOrText;
-        userName = userNameOrOptions as string;
-        text = textOrUndefined as string;
-        options = optionsOrUndefined;
+        // Handle case where userName might be missing
+        if (typeof userNameOrOptions === 'string') {
+          userName = userNameOrOptions;
+          text = textOrUndefined || '';
+          options = optionsOrUndefined;
+        } else {
+          // In case userNameOrOptions is actually options
+          userName = 'System';
+          text = textOrUndefined || '';
+          options = userNameOrOptions as ServiceOptions;
+        }
+      }
+      
+      // Safety check for required parameters
+      if (!id || !text) {
+        throw new ServiceError('Request ID and note text are required', 'INVALID_PARAMETERS', 400);
       }
       
       this.logger.debug(`Adding note to request with ID ${id}`, { userId, userName, text, options });
       
-      // Add note
-      const createdNote = await this.repository.addNote(id, userId, userName, text);
+      // Add note with sanitized parameters
+      const createdNote = await this.repository.addNote(id, userId || 0, userName || 'System', text);
       
       if (!createdNote) {
         throw new ServiceError('Failed to add note', 'NOTE_CREATION_FAILED', 500);

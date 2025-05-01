@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, FormProvider } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
 import {
-  Form,
   FormControl,
   FormDescription,
   FormField,
@@ -21,9 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/components/ui/select';
-import { useRequest } from '../hooks/useRequest';
 import { RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
-import { AppointmentService } from '@/features/appointments/lib/services/AppointmentService';
 import { useToast } from '@/shared/hooks/useToast';
 import { format, addDays } from 'date-fns';
 import { Loader2 } from 'lucide-react';
@@ -70,38 +67,48 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
     note: '',
   };
 
-  const form = useForm<FormValues, any, FormValues>({
+  const methods = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues,
   });
 
   /**
-   * Direct approach to create the appointment through AppointmentService
-   * This avoids the nested form issue by keeping form handling in one place
+   * Create the appointment directly through the API using fetch
    */
   const onSubmit = async (data: FormValues) => {
     try {
       setIsSubmitting(true);
       
-      // Create appointment data object with proper date formatting
+      // Create appointment data object with the correct format expected by the API
       const appointmentData = {
         title: data.title,
+        // Pass date and time separately as expected by the backend
         appointmentDate: data.appointmentDate,
         appointmentTime: data.appointmentTime,
         duration: data.duration,
         location: data.location,
         description: data.description,
         status: data.status,
-        // Include request and customer relationships
-        requestId: request.id,
-        customerId: request.customerId, // Pass along the customer ID if the request has one
         note: data.note
       };
       
-      // Create appointment directly through AppointmentService
-      const response = await AppointmentService.create(appointmentData);
+      console.log("Creating appointment for request:", {
+        requestId: request.id,
+        appointmentData
+      });
       
-      if (response.success) {
+      // Make the API call directly with fetch
+      const response = await fetch(`/api/requests/${request.id}/appointment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appointmentData),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
         toast({
           title: 'Success',
           description: 'Appointment created successfully',
@@ -109,17 +116,18 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
         });
         onClose();
       } else {
+        console.error("API Error:", result);
         toast({
           title: 'Error',
-          description: response.message || 'Failed to create appointment',
+          description: result.message || 'Failed to create appointment',
           variant: 'error'
         });
       }
     } catch (error) {
-      console.error('Error creating appointment:', error as Error);
+      console.error('Error creating appointment:', error);
       toast({
         title: 'Error',
-        description: 'An unexpected error occurred',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
         variant: 'error'
       });
     } finally {
@@ -128,12 +136,12 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
   };
 
   return (
-    <Form {...form as any}>
-      <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
+    <FormProvider {...methods}>
+      <form onSubmit={methods.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
-          control={form.control}
+          control={methods.control}
           name="title"
-          render={({ field }: any) => (
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Title *</FormLabel>
               <FormControl>
@@ -146,9 +154,9 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField
-            control={form.control}
+            control={methods.control}
             name="appointmentDate"
-            render={({ field }: any) => (
+            render={({ field }) => (
               <FormItem>
                 <FormLabel>Date *</FormLabel>
                 <FormControl>
@@ -160,9 +168,9 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           />
 
           <FormField
-            control={form.control}
+            control={methods.control}
             name="appointmentTime"
-            render={({ field }: any) => (
+            render={({ field }) => (
               <FormItem>
                 <FormLabel>Time *</FormLabel>
                 <FormControl>
@@ -176,9 +184,9 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField
-            control={form.control}
+            control={methods.control}
             name="duration"
-            render={({ field }: any) => (
+            render={({ field }) => (
               <FormItem>
                 <FormLabel>Duration (minutes) *</FormLabel>
                 <FormControl>
@@ -190,9 +198,9 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           />
 
           <FormField
-            control={form.control}
+            control={methods.control}
             name="location"
-            render={({ field }: any) => (
+            render={({ field }) => (
               <FormItem>
                 <FormLabel>Location</FormLabel>
                 <FormControl>
@@ -205,9 +213,9 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
         </div>
 
         <FormField
-          control={form.control}
+          control={methods.control}
           name="description"
-          render={({ field }: any) => (
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Description</FormLabel>
               <FormControl>
@@ -223,9 +231,9 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
         />
 
         <FormField
-          control={form.control}
+          control={methods.control}
           name="status"
-          render={({ field }: any) => (
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Status</FormLabel>
               <Select
@@ -253,9 +261,9 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
         />
 
         <FormField
-          control={form.control}
+          control={methods.control}
           name="note"
-          render={({ field }: any) => (
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Note</FormLabel>
               <FormControl>
@@ -284,6 +292,6 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           </Button>
         </div>
       </form>
-    </Form>
+    </FormProvider>
   );
 };

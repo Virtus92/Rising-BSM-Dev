@@ -24,7 +24,6 @@ import {
 } from '@/shared/components/ui/select';
 import { Separator } from '@/shared/components/ui/separator';
 import { ConvertToCustomerDto, RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
-import { RequestClient } from '@/features/requests/lib/clients/RequestClient';
 import { useToast } from '@/shared/hooks/useToast';
 import { Loader2 } from 'lucide-react';
 
@@ -136,11 +135,21 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
           description: data.appointmentDescription,
         };
       }
+
+      console.log("Sending conversion request:", convertData);
       
-      // Call the service directly
-      const response = await RequestClient.convertToCustomer(request.id, convertData);
+      // Call the API endpoint explicitly
+      const response = await fetch(`/api/requests/${request.id}/convert`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(convertData),
+      });
+
+      const result = await response.json();
       
-      if (response.success) {
+      if (response.ok && result.success) {
         toast({
           title: "Success",
           description: data.createAppointment 
@@ -148,19 +157,21 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
             : "Customer created successfully",
           variant: "success"
         });
+        // Close dialog and trigger refresh
         onClose();
       } else {
+        console.error("API Error:", result);
         toast({
           title: "Error",
-          description: response.message || "Failed to convert request to customer",
+          description: result.message || "Failed to convert request to customer",
           variant: "error"
         });
       }
     } catch (error) {
-      console.error("Error converting to customer:", error as Error);
+      console.error("Error converting to customer:", error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "error"
       });
     } finally {

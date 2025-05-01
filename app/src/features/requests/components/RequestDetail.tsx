@@ -96,6 +96,9 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
 
   const [noteText, setNoteText] = useState('');
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [statusNote, setStatusNote] = useState('');
 
@@ -308,7 +311,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
 
           {/* Convert/Link/Appointment Buttons */}
           <TooltipProvider>
-            <Dialog>
+            <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DialogTrigger asChild>
@@ -332,17 +335,8 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                 <ConvertToCustomerForm
                   request={request}
                   onClose={() => {
-                    // Find and close the dialog without directly using a query selector
-                    const dialogs = document.getElementsByTagName('dialog');
-                    // Close the most recently opened dialog
-                    if (dialogs && dialogs.length > 0) {
-                      const currentDialog = dialogs[dialogs.length - 1];
-                      if (currentDialog) {
-                        if (typeof currentDialog.close === 'function') {
-                          currentDialog.close();
-                        }
-                      }
-                    }
+                    setConvertDialogOpen(false);
+                    router.refresh();
                   }}
                 />
               </DialogContent>
@@ -350,7 +344,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
           </TooltipProvider>
 
           <TooltipProvider>
-            <Dialog>
+            <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DialogTrigger asChild>
@@ -374,17 +368,8 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                 <LinkToCustomerForm
                   requestId={request.id}
                   onClose={() => {
-                    // Find and close the dialog without directly using a query selector
-                    const dialogs = document.getElementsByTagName('dialog');
-                    // Close the most recently opened dialog
-                    if (dialogs && dialogs.length > 0) {
-                      const currentDialog = dialogs[dialogs.length - 1];
-                      if (currentDialog) {
-                        if (typeof currentDialog.close === 'function') {
-                          currentDialog.close();
-                        }
-                      }
-                    }
+                    setLinkDialogOpen(false);
+                    router.refresh();
                   }}
                 />
               </DialogContent>
@@ -392,7 +377,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
           </TooltipProvider>
 
           <TooltipProvider>
-            <Dialog>
+            <Dialog open={appointmentDialogOpen} onOpenChange={setAppointmentDialogOpen}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DialogTrigger asChild>
@@ -416,18 +401,8 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                 <CreateAppointmentForm
                   request={request}
                   onClose={() => {
-                    // Find and close the dialog without directly using a query selector
-                    // This avoids React hydration mismatch issues
-                    const dialogs = document.getElementsByTagName('dialog');
-                    // Close the most recently opened dialog
-                    if (dialogs && dialogs.length > 0) {
-                      const currentDialog = dialogs[dialogs.length - 1];
-                      if (currentDialog) {
-                        if (typeof currentDialog.close === 'function') {
-                          currentDialog.close();
-                        }
-                      }
-                    }
+                    setAppointmentDialogOpen(false);
+                    router.refresh();
                   }}
                 />
               </DialogContent>
@@ -493,12 +468,12 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
             <CardContent>
               {/* Notes List */}
               <div className="space-y-4 mb-6">
-                {request.notes.length === 0 ? (
+                {request.notes?.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No notes available.
                   </p>
                 ) : (
-                  request.notes.map((note) => (
+                  request.notes?.map((note) => (
                     <div key={note.id} className="p-3 rounded-md bg-muted">
                       <div className="flex justify-between mb-2">
                         <div className="font-medium flex items-center">

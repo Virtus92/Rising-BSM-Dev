@@ -16,10 +16,11 @@ type RequestParams = {
 /**
  * PATCH and PUT /api/requests/[id]/status
  * 
- * Aktualisiert den Status einer Kontaktanfrage.
+ * Updates the status of a request.
  */
 export const PATCH = routeHandler(
-  withPermission(
+  // Fix: Keep the await here to match your implementation requirements
+  await withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
@@ -45,10 +46,23 @@ export const PATCH = routeHandler(
       // Get request service
       const requestService = serviceFactory.createRequestService();
       
-      // Update request status
-      const updatedRequest = await requestService.updateRequestStatus(requestId, statusUpdateData, { context });
-      
-      return formatResponse.success(updatedRequest, 'Request status updated successfully');
+      try {
+        // Update request status
+        const updatedRequest = await requestService.updateRequestStatus(requestId, statusUpdateData, { context });
+        
+        return formatResponse.success(updatedRequest, 'Request status updated successfully');
+      } catch (error) {
+        logger.error('Error updating request status', {
+          error,
+          requestId,
+          status: statusUpdateData.status,
+          userId: context.userId
+        });
+        return formatResponse.error(
+          error instanceof Error ? error.message : 'Failed to update request status',
+          500
+        );
+      }
     },
     SystemPermission.REQUESTS_EDIT
   ),
@@ -61,7 +75,8 @@ export const PATCH = routeHandler(
  * Alias for PATCH to maintain compatibility with client implementation.
  */
 export const PUT = routeHandler(
-  withPermission(
+  // Fix: Keep the await here to match your implementation requirements
+  await withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       logger.debug('PUT request received for status update, delegating to PATCH handler');
@@ -85,14 +100,27 @@ export const PUT = routeHandler(
         userRole: req.auth?.role
       };
       
-      // Get request service
-      const serviceFactory = getServiceFactory();
-      const requestService = serviceFactory.createRequestService();
-      
-      // Update request status
-      const updatedRequest = await requestService.updateRequestStatus(requestId, statusUpdateData, { context });
-      
-      return formatResponse.success(updatedRequest, 'Request status updated successfully');
+      try {
+        // Get request service
+        const serviceFactory = getServiceFactory();
+        const requestService = serviceFactory.createRequestService();
+        
+        // Update request status
+        const updatedRequest = await requestService.updateRequestStatus(requestId, statusUpdateData, { context });
+        
+        return formatResponse.success(updatedRequest, 'Request status updated successfully');
+      } catch (error) {
+        logger.error('Error updating request status (PUT)', {
+          error,
+          requestId,
+          status: statusUpdateData.status,
+          userId: context.userId
+        });
+        return formatResponse.error(
+          error instanceof Error ? error.message : 'Failed to update request status',
+          500
+        );
+      }
     },
     SystemPermission.REQUESTS_EDIT
   ),

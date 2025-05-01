@@ -15,10 +15,11 @@ type RequestParams = {
 /**
  * POST /api/requests/[id]/link-customer
  * 
- * Verknüpft eine Kontaktanfrage mit einem bestehenden Kunden.
+ * Links a request with an existing customer.
  */
 export const POST = routeHandler(
-  withPermission(
+  // Fix: Re-adding await here to match your implementation requirements
+  await withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
@@ -45,10 +46,23 @@ export const POST = routeHandler(
       // Get request service
       const requestService = serviceFactory.createRequestService();
       
-      // Link request to customer
-      const updatedRequest = await requestService.linkToCustomer(requestId, customerId, note, { context });
-      
-      return formatResponse.success(updatedRequest, 'Request successfully linked to customer');
+      try {
+        // Link request to customer
+        const updatedRequest = await requestService.linkToCustomer(requestId, customerId, note, { context });
+        
+        return formatResponse.success(updatedRequest, 'Request successfully linked to customer');
+      } catch (error) {
+        logger.error('Error linking request to customer', {
+          error,
+          requestId,
+          customerId,
+          userId: context.userId
+        });
+        return formatResponse.error(
+          error instanceof Error ? error.message : 'Failed to link request to customer',
+          500
+        );
+      }
     },
     SystemPermission.REQUESTS_EDIT
   ),

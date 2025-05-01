@@ -1,5 +1,8 @@
 // Re-export for backward compatibility
 import { UserServiceClient } from './UserService.client';
+
+// For proper import by default
+export * from './UserService.client';
 import { 
   UserDto, 
   CreateUserDto,
@@ -270,3 +273,6 @@ export class UserService {
     }
   }
 }
+
+// Default export for proper ServiceFactory integration
+export default UserService;

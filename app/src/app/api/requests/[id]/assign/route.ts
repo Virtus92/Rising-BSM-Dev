@@ -18,7 +18,7 @@ type RequestParams = {
  * Weist eine Kontaktanfrage einem Benutzer zu.
  */
 export const POST = routeHandler(
-  withPermission(
+  await withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();

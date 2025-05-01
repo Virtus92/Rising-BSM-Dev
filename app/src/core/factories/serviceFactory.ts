@@ -145,9 +145,17 @@ export class ServiceFactory {
           getLogger().debug('Server-side UserService initialized');
         } else {
           // Client-side: use API-based implementation
-          const { UserServiceClient } = require('@/features/users/lib/services/UserService.client');
-          this.userService = new UserServiceClient();
-          console.debug('Client-side UserService initialized');
+          try {
+            // First try importing the static service if available
+            const { default: UserService } = require('@/features/users/lib/services/UserService');
+            this.userService = UserService;
+            console.debug('Client-side static UserService initialized');
+          } catch (error) {
+            // Fall back to the client implementation if static service isn't available
+            const { UserServiceClient } = require('@/features/users/lib/services/UserService.client');
+            this.userService = new UserServiceClient();
+            console.debug('Client-side UserServiceClient initialized');
+          }
         }
       } catch (error) {
         // Detailed error logging for easier troubleshooting
@@ -184,7 +192,8 @@ export class ServiceFactory {
           getLogger().debug('Server-side CustomerService initialized');
         } else {
           // Client-side: use API-based implementation
-          const { CustomerService } = require('@/features/customers/lib/services/CustomerService');
+          // Import the service directly without instantiation
+          const { default: CustomerService } = require('@/features/customers/lib/services/CustomerService');
           // For client-side, we use the static methods directly
           this.customerService = CustomerService;
           console.debug('Client-side CustomerService initialized');
@@ -223,7 +232,8 @@ export class ServiceFactory {
           getLogger().debug('Server-side AppointmentService initialized');
         } else {
           // Client-side: use API-based implementation
-          const { AppointmentService } = require('@/features/appointments/lib/services/AppointmentService');
+          // Import the static class directly without instantiation
+          const { default: AppointmentService } = require('@/features/appointments/lib/services/AppointmentService');
           // For client-side, we use the static methods directly
           this.appointmentService = AppointmentService;
           console.debug('Client-side AppointmentService initialized');
@@ -266,13 +276,10 @@ export class ServiceFactory {
           getLogger().debug('Server-side RequestService initialized');
         } else {
           // Client-side: use API-based implementation
-          const { RequestService } = require('@/features/requests/lib/services/RequestService.client');
-          // For client-side, we use either an instance or static methods
-          if (typeof RequestService === 'function') {
-            this.requestService = new RequestService();
-          } else {
-            this.requestService = RequestService;
-          }
+          // Import the service directly
+          const { default: RequestService } = require('@/features/requests/lib/services/RequestService.client');
+          // Directly use the static methods
+          this.requestService = RequestService;
           console.debug('Client-side RequestService initialized');
         }
       } catch (error) {

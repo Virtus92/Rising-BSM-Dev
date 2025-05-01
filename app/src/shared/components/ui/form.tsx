@@ -52,14 +52,17 @@ const FormField = <
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext)
   const itemContext = React.useContext(FormItemContext)
-  const { formState, getFieldState } = useFormContext()
-
+  
+  // Add null checking to avoid "Cannot destructure property 'formState'" error
+  const formContext = useFormContext()
+  
   if (!fieldContext) {
     throw new Error("useFormField should be used within <FormField>")
   }
 
-  const fieldState = getFieldState ? 
-    getFieldState(fieldContext.name, formState) : 
+  // Safe access to formState and getFieldState
+  const fieldState = formContext && formContext.getFieldState ? 
+    formContext.getFieldState(fieldContext.name, formContext.formState) : 
     { invalid: false, isDirty: false, isTouched: false, error: undefined }
 
   const { id } = itemContext

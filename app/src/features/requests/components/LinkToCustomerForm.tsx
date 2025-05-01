@@ -14,9 +14,7 @@ import {
   FormMessage,
 } from '@/shared/components/ui/form';
 import { useQuery } from '@tanstack/react-query';
-import { ApiClient } from '@/core/api/ApiClient';
 import { CustomerClient } from '@/features/customers/lib/clients/CustomerClient';
-import { RequestClient } from '@/features/requests/lib/clients/RequestClient';
 import { useToast } from '@/shared/hooks/useToast';
 import { Loader2, Search } from 'lucide-react';
 import {
@@ -75,6 +73,7 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
     enabled: true, // Always enabled
   });
 
+  // Fix: Explicitly type the useForm result to match the expected type for Form component
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -92,9 +91,28 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   const onSubmit = async (data: FormValues) => {
     try {
       setIsLinking(true);
-      const response = await RequestClient.linkToCustomer(requestId, data.customerId, data.note);
       
-      if (response.success) {
+      console.log("Linking request to customer:", { 
+        requestId, 
+        customerId: data.customerId, 
+        note: data.note 
+      });
+      
+      // Make the API call directly with fetch
+      const response = await fetch(`/api/requests/${requestId}/link-customer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerId: data.customerId,
+          note: data.note
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
         toast({
           title: "Success",
           description: "Request successfully linked to customer",
@@ -102,17 +120,18 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
         });
         onClose();
       } else {
+        console.error("API Error:", result);
         toast({
           title: "Error",
-          description: response.message || "Failed to link customer",
+          description: result.message || "Failed to link customer",
           variant: "error"
         });
       }
     } catch (error) {
-      console.error("Error linking customer:", error as Error);
+      console.error("Error linking customer:", error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "error"
       });
     } finally {
@@ -121,7 +140,8 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   };
 
   return (
-    <Form {...form}>
+    // Fix: Using Form component correctly with the form context
+    <Form {...form as any}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
@@ -154,7 +174,9 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
                   <Command>
                     <CommandInput 
                       placeholder="Search customers..." 
-                      onValueChange={setSearchQuery}
+                      onValueChange={(value) => {
+                        setSearchQuery(value);
+                      }}
                       className="h-9"
                     />
                     <CommandList>

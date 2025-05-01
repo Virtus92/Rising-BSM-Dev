@@ -19,7 +19,7 @@ type RequestParams = {
  * Konvertiert eine Kontaktanfrage in einen Kunden.
  */
 export const POST = routeHandler(
-  withPermission(
+  await withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();

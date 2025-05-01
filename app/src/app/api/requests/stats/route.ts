@@ -12,7 +12,7 @@ import { withPermission } from '@/features/permissions/api/middleware/permission
  * Returns statistics about contact requests.
  */
 export const GET = routeHandler(
-  withPermission(
+  await withPermission(
     async (req: NextRequest) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
