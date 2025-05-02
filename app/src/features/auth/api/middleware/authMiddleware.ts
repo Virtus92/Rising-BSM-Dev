@@ -205,31 +205,35 @@ export async function extractAuthToken(request: NextRequest | Request): Promise<
  * @returns Wrapped handler with authentication
  */
 export async function withAuth(handler: Function, options: AuthOptions = {}) {
-  // Make this function explicitly async since it's being used as a Server Action
-  return async function authHandler(request: NextRequest, ...args: any[]): Promise<NextResponse> {
-    // Authenticate request
-    const authResult = await auth(request, options);
-    
-    if (!authResult.success) {
-      // Authentication failed
-      return formatResponse.error(
-        authResult.message || 'Authentication required',
-        authResult.status || 401,
-        'AUTHENTICATION_REQUIRED'
-      );
-    }
-    
-    // Attach user to request for downstream use
-    const req = request as NextRequest & { auth?: any };
-    req.auth = {
-      userId: authResult.user?.id,
-      email: authResult.user?.email,
-      role: authResult.user?.role,
-      name: authResult.user?.name
-    };
-    
-    // Call handler with authenticated request
-    return handler(req, ...args);
+  // For Server Actions, this function itself must be async
+  // But we need to return a function, not a Promise
+  return function authHandler(request: NextRequest, ...args: any[]): Promise<NextResponse> {
+    // Create the async logic in a separate function to avoid Promise wrapping issues
+    return (async () => {
+      // Authenticate request
+      const authResult = await auth(request, options);
+      
+      if (!authResult.success) {
+        // Authentication failed
+        return formatResponse.error(
+          authResult.message || 'Authentication required',
+          authResult.status || 401,
+          'AUTHENTICATION_REQUIRED'
+        );
+      }
+      
+      // Attach user to request for downstream use
+      const req = request as NextRequest & { auth?: any };
+      req.auth = {
+        userId: authResult.user?.id,
+        email: authResult.user?.email,
+        role: authResult.user?.role,
+        name: authResult.user?.name
+      };
+      
+      // Call handler with authenticated request
+      return handler(req, ...args);
+    })();
   };
 }
 
