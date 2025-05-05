@@ -44,13 +44,11 @@ export const createUserSchema: SchemaDefinition = {
   },
   phone: {
     type: 'string',
-    format: 'phone',
     required: false,
     maxLength: 20
   },
   profilePicture: {
     type: 'string',
-    format: 'url',
     required: false,
     maxLength: 2000
   }
@@ -84,7 +82,6 @@ export const updateUserSchema: SchemaDefinition = {
   },
   phone: {
     type: 'string',
-    format: 'phone',
     required: false,
     maxLength: 20
   },
