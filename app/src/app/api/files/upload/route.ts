@@ -14,6 +14,9 @@ import { prisma } from '@/core/db/index';
 // Configure upload directory
 const UPLOAD_DIR = process.env.UPLOAD_DIR || 'public/uploads';
 
+// Constants for path configuration
+const PUBLIC_PREFIX = '/uploads'; // This will be used for URLs returned to the client
+
 // Ensure path consistency for profile pictures
 const getUploadPath = (type: string) => {
   // Normalize the type name for consistency
@@ -82,7 +85,10 @@ export const POST = routeHandler(async (request: NextRequest) => {
     // Generate unique filename
     const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}${extension}`;
     const filepath = join(uploadPath, filename);
-    const relativePath = `/uploads/${uploadType}/${filename}`;
+    
+    // Construct the URL path for client - strip 'public/' prefix if present
+    // This ensures we return a path that starts with /uploads/ not /public/uploads/
+    const relativePath = `${PUBLIC_PREFIX}/${uploadType}/${filename}`;
 
     // Convert the file to an ArrayBuffer and then to a Buffer
     const buffer = Buffer.from(await file.arrayBuffer());

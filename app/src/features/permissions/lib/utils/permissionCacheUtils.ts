@@ -15,6 +15,32 @@ const logger = getLogger();
  * @param permission - Permission code
  * @returns Boolean from cache or undefined if not found
  */
+/**
+ * Lock mechanism to prevent race conditions
+ */
+const cacheLocks = new Map<string, boolean>();
+
+/**
+ * Get lock for a specific cache operation
+ * @param key - Cache operation key
+ * @returns Whether the lock was acquired
+ */
+function acquireLock(key: string): boolean {
+  if (cacheLocks.has(key)) {
+    return false;
+  }
+  cacheLocks.set(key, true);
+  return true;
+}
+
+/**
+ * Release lock for a specific cache operation
+ * @param key - Cache operation key
+ */
+function releaseLock(key: string): void {
+  cacheLocks.delete(key);
+}
+
 export function getPermissionFromCache(userId: number, permission: string): boolean | undefined {
   // Handle invalid inputs gracefully
   if (!userId || !permission) {
@@ -23,8 +49,23 @@ export function getPermissionFromCache(userId: number, permission: string): bool
   }
   
   try {
+    // Create a cache key that uniquely identifies this permission check
     const cacheKey = `${userId}:${permission}`;
-    return permissionCache.get(cacheKey);
+    
+    // Use lock to prevent race conditions when checking cache
+    const lockKey = `get:${cacheKey}`;
+    if (!acquireLock(lockKey)) {
+      // Another operation is already accessing this cache entry
+      logger.debug('Cache access already in progress for key', { cacheKey });
+      return undefined;
+    }
+    
+    try {
+      return permissionCache.get(cacheKey);
+    } finally {
+      // Always release the lock
+      releaseLock(lockKey);
+    }
   } catch (error) {
     logger.error('Error getting permission from cache', {
       userId,
@@ -56,11 +97,26 @@ export function setPermissionInCache(
   }
   
   try {
+    // Create a cache key that uniquely identifies this permission check
     const cacheKey = `${userId}:${permission}`;
-    permissionCache.set(cacheKey, value, ttlSeconds);
-    logger.debug(`Permission cached: ${permission} for user ${userId} = ${value}`, {
-      ttlSeconds: ttlSeconds || 'default'
-    });
+    
+    // Use lock to prevent race conditions
+    const lockKey = `set:${cacheKey}`;
+    if (!acquireLock(lockKey)) {
+      // Another operation is already updating this cache entry
+      logger.debug('Cache update already in progress for key', { cacheKey });
+      return;
+    }
+    
+    try {
+      permissionCache.set(cacheKey, value, ttlSeconds);
+      logger.debug(`Permission cached: ${permission} for user ${userId} = ${value}`, {
+        ttlSeconds: ttlSeconds || 'default'
+      });
+    } finally {
+      // Always release the lock
+      releaseLock(lockKey);
+    }
   } catch (error) {
     logger.error('Error setting permission in cache', {
       userId,
@@ -86,9 +142,23 @@ export function invalidateUserPermissionCache(userId: number): boolean {
   try {
     // Ensure userId is numeric
     const numericUserId = Number(userId);
-    permissionCache.clearForUser(numericUserId);
-    logger.debug(`Invalidated permission cache for user ${numericUserId}`);
-    return true;
+    
+    // Use lock to prevent race conditions
+    const lockKey = `invalidate:${numericUserId}`;
+    if (!acquireLock(lockKey)) {
+      // Another operation is already invalidating cache for this user
+      logger.debug('Cache invalidation already in progress for user', { userId });
+      return false;
+    }
+    
+    try {
+      permissionCache.clearForUser(numericUserId);
+      logger.debug(`Invalidated permission cache for user ${numericUserId}`);
+      return true;
+    } finally {
+      // Always release the lock
+      releaseLock(lockKey);
+    }
   } catch (error) {
     logger.error('Error invalidating user permission cache', {
       userId,

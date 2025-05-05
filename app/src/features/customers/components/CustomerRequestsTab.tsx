@@ -82,7 +82,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
   
   const { toast } = useToast();
   const router = useRouter();
-
+  
   // Fetch customer requests
   useEffect(() => {
     const fetchRequests = async () => {
@@ -93,7 +93,9 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         // Properly filter requests by customerId on the backend
         // Ensure the customerId is passed as a number to avoid type mismatches
         const response = await RequestService.findAll({
-          customerId: Number(customerId),  // Convert to number to ensure type consistency
+          filters: {
+            customerId: Number(customerId)  // Convert to number to ensure type consistency
+          },
           sortBy: 'createdAt',
           sortDirection: 'desc'
         });
@@ -204,7 +206,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
   const handleDelete = async (id: number) => {
     try {
       setIsDeleting(true);
-      const response = await RequestService.delete(id);
+      const response = await RequestService.deleteRequest(id);
       
       if (response.success) {
         // Remove deleted request from state
@@ -336,7 +338,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         customerId: customerId
       };
       
-      const response = await RequestService.create(formData);
+      const response = await RequestService.createRequest(formData);
       
       if (response.success && response.data) {
         toast({
@@ -413,7 +415,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
       
       // Update the basic request data first - without including status
       // Status will be updated separately
-      const response = await RequestService.update(currentEditRequest, formData);
+      const response = await RequestService.updateRequest(currentEditRequest, formData);
       
       if (response.success) {
         // If basic update succeeded, handle status update separately if needed
@@ -423,7 +425,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         if (originalRequest && originalRequest.status !== requestForm.status) {
           try {
             // Use the dedicated status update endpoint for status changes
-            const statusResponse = await RequestService.updateRequest(currentEditRequest, {
+            const statusResponse = await RequestService.updateRequestStatus(currentEditRequest, {
               status: requestForm.status,
               note: 'Status updated during request edit'
             });
@@ -494,7 +496,17 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
     }
   };
   
-  const handleOpenEditModal = (request: any) => {
+  const handleOpenEditModal = (request: {
+    id: number;
+    name?: string;
+    email?: string;
+    phone?: string;
+    service?: string;
+    message?: string;
+    status: string;
+    createdAt: string;
+    [key: string]: any; // For any additional properties
+  }) => {
     // Set the form data
     setRequestForm({
       name: request.name || '',
@@ -502,7 +514,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
       phone: request.phone || '',
       service: request.service || '',
       message: request.message || '',
-      status: request.status || RequestStatus.NEW,
+      status: request.status as RequestStatus || RequestStatus.NEW,
     });
     
     // Set the current request ID

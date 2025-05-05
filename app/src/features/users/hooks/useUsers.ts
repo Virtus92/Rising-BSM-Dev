@@ -101,7 +101,19 @@ export function useUsers(initialFilters?: Partial<UserFilterParamsDto>): UseUser
   // Create base list utility
   const baseList = createBaseListUtility<UserResponseDto, UserFilterParamsDto>({
     // Service function that fetches data
-    fetchFunction: UserService.getUsers,
+    fetchFunction: async (filters) => {
+      try {
+        // Create the API call promise first but don't await it yet
+        // This prevents Function.prototype.apply errors on Promise objects
+        const apiCall = UserService.getUsers(filters);
+        
+        // Now await the promise
+        return await apiCall;
+      } catch (err) {
+        console.error('Error in useUsers fetchFunction:', err);
+        throw err;
+      }
+    },
     
     // Initial filters with defaults
     initialFilters: {

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { getServiceFactory } from '@/core/factories';
 import { getLogger } from '@/core/logging';
+import { IUserService } from '@/domain/services/IUserService';
 
 /**
  * Handles password change requests
@@ -14,50 +15,33 @@ import { getLogger } from '@/core/logging';
 export async function changePasswordHandler(req: NextRequest): Promise<NextResponse> {
   const logger = getLogger();
   
-  // Parse the request body
-  const { currentPassword, newPassword, confirmPassword } = await req.json();
-  // For backward compatibility
-  const newPasswordConfirm = confirmPassword;
-  
-  // Validate inputs
-  if (!currentPassword) {
-    return NextResponse.json(
-      formatResponse.error('Current password is required', 400),
-      { status: 400 }
-    );
-  }
-  
-  if (!newPassword) {
-    return NextResponse.json(
-      formatResponse.error('New password is required', 400),
-      { status: 400 }
-    );
-  }
-  
-  if (newPassword !== confirmPassword) {
-    return NextResponse.json(
-      formatResponse.error('New passwords do not match', 400),
-      { status: 400 }
-    );
-  }
-  
   try {
-    // Ensure user is authenticated
-    // In the new structure, we'll need to get the userId from the token
-    // This might be handled by middleware in the actual route
-    // For now, let's extract it from the headers
-    const authHeader = req.headers.get('authorization');
-    let userId: number | null = null;
+    // Parse the request body
+    const { currentPassword, newPassword, confirmPassword } = await req.json();
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Validate inputs
+    if (!currentPassword) {
       return NextResponse.json(
-        formatResponse.error('Authentication required', 401),
-        { status: 401 }
+        formatResponse.error('Current password is required', 400),
+        { status: 400 }
       );
     }
     
-    // In a real implementation, we'd decode the token to get the userId
-    // For now, we'll assume the userId is passed as a header for simplicity
+    if (!newPassword) {
+      return NextResponse.json(
+        formatResponse.error('New password is required', 400),
+        { status: 400 }
+      );
+    }
+    
+    if (newPassword !== confirmPassword) {
+      return NextResponse.json(
+        formatResponse.error('New passwords do not match', 400),
+        { status: 400 }
+      );
+    }
+    
+    // Get user ID from the auth context
     const userIdHeader = req.headers.get('x-user-id');
     if (!userIdHeader) {
       return NextResponse.json(
@@ -66,23 +50,51 @@ export async function changePasswordHandler(req: NextRequest): Promise<NextRespo
       );
     }
     
-    userId = parseInt(userIdHeader, 10);
+    // Parse user ID and prepare options
+    const userId = parseInt(userIdHeader, 10);
+    const ipAddress = req.headers.get('x-forwarded-for') || 'unknown';
     
-    // Use the UserService to change the password
-    const serviceFactory = getServiceFactory();
-    const userService = serviceFactory.createUserService();
+    // Get the user service instance
+    let userService: IUserService | null = null;
+    try {
+      const serviceFactory = getServiceFactory();
+      userService = serviceFactory.createUserService();
+    } catch (serviceError) {
+      logger.error('Failed to create UserService', {
+        error: serviceError instanceof Error ? serviceError.message : String(serviceError),
+        stack: serviceError instanceof Error ? serviceError.stack : undefined
+      });
+      
+      return NextResponse.json(
+        formatResponse.error('Internal server error', 500),
+        { status: 500 }
+      );
+    }
     
-    // Change the password
-    const result = await userService.changePassword(userId, {
+    // Create change password data
+    const passwordData = {
       currentPassword,
       newPassword,
       confirmPassword
-    }, {
+    };
+    
+    // Create service options
+    const options = {
+      userId,
+      ip: ipAddress,
       context: {
         userId,
-        ipAddress: req.headers.get('x-forwarded-for') || 'unknown'
+        ipAddress
       }
-    });
+    };
+    
+    // Call the user service's changePassword method
+    const result = await userService.changePassword(userId, passwordData, options);
+    
+    // Check the result
+    if (result === false) {
+      throw new Error('Failed to change password');
+    }
     
     logger.info(`Password changed successfully for user ${userId}`);
     

@@ -20,7 +20,8 @@ const logger = getLogger();
  * GET /api/users/[id]
  * Get a specific user by ID
  */
-export const GET = routeHandler(async (req: NextRequest) => {
+export async function GET(req: NextRequest) {
+  const handler = routeHandler(async (req: NextRequest) => {
   logger.debug('GET /api/users/[id] handler called');
   
   try {
@@ -66,15 +67,18 @@ export const GET = routeHandler(async (req: NextRequest) => {
       500
     );
   }
-}, {
-  requiresAuth: true
-});
+  }, {
+    requiresAuth: true
+  });
+  return handler(req);
+}
 
 /**
  * PUT /api/users/[id]
  * Update a user
  */
-export const PUT = routeHandler(async (req: NextRequest) => {
+export async function PUT(req: NextRequest) {
+  const handler = routeHandler(async (req: NextRequest) => {
   try {
     // Get ID from params (provided by Next.js route handler)
     const id = req.nextUrl.pathname.split('/').pop() || '';
@@ -118,15 +122,18 @@ export const PUT = routeHandler(async (req: NextRequest) => {
       500
     );
   }
-}, {
-  requiresAuth: true
-});
+  }, {
+    requiresAuth: true
+  });
+  return handler(req);
+}
 
 /**
  * DELETE /api/users/[id]
  * Delete a user
  */
-export const DELETE = routeHandler(async (req: NextRequest) => {
+export async function DELETE(req: NextRequest) {
+  const handler = routeHandler(async (req: NextRequest) => {
   try {
     // Get ID from params (provided by Next.js route handler)
     const id = req.nextUrl.pathname.split('/').pop() || '';
@@ -170,6 +177,8 @@ export const DELETE = routeHandler(async (req: NextRequest) => {
       500
     );
   }
-}, {
-  requiresAuth: true
-});
+  }, {
+    requiresAuth: true
+  });
+  return handler(req);
+}

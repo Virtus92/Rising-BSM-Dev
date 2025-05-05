@@ -32,6 +32,6 @@ try {
   
   console.log('✅ Database seeding completed successfully');
 } catch (error) {
-  console.error('❌ Database seeding failed:', error as Error);
+  console.error('❌ Database seeding failed:', error);
   process.exit(1);
 }

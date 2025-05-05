@@ -63,7 +63,7 @@ export const useRequests = (initialFilters?: Partial<RequestFilterParamsDto>): U
       try {
         // Create the API call promise first but don't await it yet
         // This prevents Function.prototype.apply errors on Promise objects
-        const apiCall = RequestService.getAll(mappedFilters);
+        const apiCall = RequestService.findAll(mappedFilters);
         
         // Now await the promise
         return await apiCall;
@@ -90,7 +90,7 @@ export const useRequests = (initialFilters?: Partial<RequestFilterParamsDto>): U
    */
   const deleteRequest = useCallback(async (requestId: number) => {
     try {
-      const response = await RequestService.delete(requestId);
+      const response = await RequestService.deleteRequest(requestId);
       
       if (response.success) {
         toast?.({ 

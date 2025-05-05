@@ -131,9 +131,24 @@ export const GET = routeHandler(async (request: NextRequest) => {
       })
     ]);
 
+    // Extract count values, ensuring we handle both number and object return types
+    const extractCount = (countResult: number | { count: number }) => {
+      if (typeof countResult === 'number') {
+        return countResult;
+      } else if (countResult && typeof countResult === 'object' && 'count' in countResult) {
+        return countResult.count;
+      }
+      return 0;
+    };
+    
+    // Extract counts from results
+    const assignedCount = extractCount(assignedRequestsCount);
+    const completedCount = extractCount(completedRequestsCount);
+    const upcomingCount = extractCount(upcomingAppointmentsCount);
+
     // Calculate completion rate (avoid division by zero)
-    const completionRate = assignedRequestsCount > 0 
-      ? (completedRequestsCount / assignedRequestsCount) * 100 
+    const completionRate = assignedCount > 0 
+      ? (completedCount / assignedCount) * 100 
       : 0;
 
     // Organize user dashboard data
@@ -150,10 +165,10 @@ export const GET = routeHandler(async (request: NextRequest) => {
       },
       
       stats: {
-        assignedRequests: assignedRequestsCount,
-        completedRequests: completedRequestsCount,
+        assignedRequests: assignedCount,
+        completedRequests: completedCount,
         completionRate: Math.round(completionRate * 10) / 10, // Round to 1 decimal place
-        upcomingAppointments: upcomingAppointmentsCount
+        upcomingAppointments: upcomingCount
       },
       
       appointments: userAppointments.data || [],

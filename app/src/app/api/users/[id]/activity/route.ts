@@ -14,7 +14,8 @@ const logger = getLogger();
  * Gets activity logs for a user
  * Requires USERS_VIEW permission
  */
-export const GET = routeHandler(async (req: NextRequest) => {
+export async function GET(req: NextRequest) {
+  const handler = routeHandler(async (req: NextRequest) => {
   // Extract ID from URL path
   const userId = parseInt(req.nextUrl.pathname.split('/').pop() || '0');
   if (isNaN(userId)) {
@@ -87,8 +88,10 @@ export const GET = routeHandler(async (req: NextRequest) => {
     });
     return formatResponse.error('Failed to fetch user activity', 500);
   }
-}, {
-  requiresAuth: true
-});
+  }, {
+    requiresAuth: true
+  });
+  return handler(req);
+}
 
 export const dynamic = 'force-dynamic';

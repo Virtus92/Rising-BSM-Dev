@@ -872,7 +872,24 @@ export class ApiClient {
       
       // Handle JSON responses
       if (contentType && contentType.includes('application/json')) {
-        const json = await response.json();
+        let json;
+        
+        try {
+          // Use clone to avoid potential issues with double-reading the response
+          // This fixes the ReflectApply error by creating a new response object
+          const responseClone = response.clone();
+          json = await responseClone.json();
+        } catch (jsonError) {
+          console.error('Error parsing JSON response:', jsonError);
+          // Fallback to text if JSON parsing fails
+          const text = await response.text();
+          return {
+            success: false,
+            data: null as any,
+            message: `Error parsing response: ${text.substring(0, 100)}...`,
+            statusCode: response.status
+          };
+        }
         
         if (response.ok) {
           // Success with JSON response
@@ -885,30 +902,30 @@ export class ApiClient {
         } else {
           // Handle 401 (Unauthorized) - No automatic refresh or handling
           if (response.status === 401) {
-          const errorDetails = {
-          url: originalUrl,
-          isAuthEndpoint: originalUrl.includes('/api/auth/'),
-          responseMessage: json.message || json.error,
-            requestId: requestInfo?.requestId,
-            requestEndpoint: requestInfo?.endpoint
-          };
-          
-          console.error('401 Unauthorized error detected:', errorDetails);
-          
-          // Create a detailed error with all information
-          const error = new ApiRequestError(
+            const errorDetails = {
+              url: originalUrl,
+              isAuthEndpoint: originalUrl.includes('/api/auth/'),
+              responseMessage: json.message || json.error,
+              requestId: requestInfo?.requestId,
+              requestEndpoint: requestInfo?.endpoint
+            };
+            
+            console.error('401 Unauthorized error detected:', errorDetails);
+            
+            // Create a detailed error with all information
+            const error = new ApiRequestError(
               `Authentication error (401): ${json.message || json.error || 'Unauthorized'}`,
-          401,
-          json.errors || []
-        );
-        
-        // Add request details to the error
-        (error as any).requestDetails = errorDetails;
-        (error as any).responseData = json;
-        
-        // Throw directly - no refresh attempt
-        throw error;
-      }
+              401,
+              json.errors || []
+            );
+            
+            // Add request details to the error
+            (error as any).requestDetails = errorDetails;
+            (error as any).responseData = json;
+            
+            // Throw directly - no refresh attempt
+            throw error;
+          }
           
           // Check for permission errors (403 Forbidden)
           if (response.status === 403) {
@@ -946,7 +963,22 @@ export class ApiClient {
         }
       } else {
         // Handle text responses
-        const text = await response.text();
+        let text;
+        
+        try {
+          // Use clone to avoid potential issues with double-reading the response
+          // This fixes the ReflectApply error by creating a new response object
+          const responseClone = response.clone();
+          text = await responseClone.text();
+        } catch (textError) {
+          console.error('Error parsing text response:', textError);
+          return {
+            success: false,
+            data: null as any,
+            message: `Error reading response: ${response.statusText}`,
+            statusCode: response.status
+          };
+        }
         
         if (response.ok) {
           // Success with text response
@@ -1001,11 +1033,11 @@ export class ApiClient {
         }
       }
     } catch (error: unknown) {
-    // For development debugging
-    if (process.env.NODE_ENV === 'development') {
-    console.error('Error handling API response:', error as Error);
-    }
-    return this.handleError<T>(error);
+      // For development debugging
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error handling API response:', error as Error);
+      }
+      return this.handleError<T>(error);
     }
   }
 

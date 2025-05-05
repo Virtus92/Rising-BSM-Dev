@@ -11,14 +11,20 @@ import { withAuth } from '@/features/auth/api/middleware/authMiddleware';
  * GET /api/users
  * Get users with optional filtering and pagination
  */
-export const GET = withAuth(async (request: NextRequest) => {
-  return listUsersHandler(request);
-});
+export async function GET(request: NextRequest) {
+  const authHandler = await withAuth(async (req: NextRequest) => {
+    return listUsersHandler(req);
+  });
+  return authHandler(request);
+}
 
 /**
  * POST /api/users
  * Create a new user
  */
-export const POST = withAuth(async (request: NextRequest) => {
-  return createUserHandler(request);
-});
+export async function POST(request: NextRequest) {
+  const authHandler = await withAuth(async (req: NextRequest) => {
+    return createUserHandler(req);
+  });
+  return authHandler(request);
+}

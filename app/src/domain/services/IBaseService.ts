@@ -136,9 +136,9 @@ export interface IBaseService<T, C, U, R, ID = number> {
    * Count entities with optional filtering
    * 
    * @param options - Service options with filters
-   * @returns Number of entities matching criteria
+   * @returns Number of entities matching criteria or object with count property
    */
-  count(options?: { context?: any; filters?: Record<string, any> }): Promise<number>;
+  count(options?: { context?: any; filters?: Record<string, any> }): Promise<number | { count: number }>;
 
   /**
    * Get all entities

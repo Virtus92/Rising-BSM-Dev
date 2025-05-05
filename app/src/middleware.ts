@@ -12,7 +12,7 @@ const CACHE_TTL = 5 * 60 * 1000;
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as jose from 'jose';  // Using jose for Edge-compatible JWT validation
-import { tokenBlacklistServer } from '@/features/auth/lib/clients/token/blacklist/TokenBlacklistServer';
+import { isBlacklisted } from '@/features/auth/lib/clients/token/blacklist/TokenBlacklistServer';
 import { securityConfigEdge } from '@/core/config/SecurityConfigEdge';
 
 /**
@@ -26,8 +26,9 @@ async function isTokenValid(token: string): Promise<boolean> {
     // Initialize security config
     securityConfigEdge.initialize();
     
-    // Check if the token is blacklisted
-    if (tokenBlacklistServer.isBlacklisted(token)) {
+    // Check if the token is blacklisted - FIX: Properly await the async method
+    const blacklistCheck = await isBlacklisted(token);
+    if (blacklistCheck) {
       console.log(`Token is blacklisted [${requestId}]`);
       return false;
     }
@@ -204,19 +205,18 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value;
   const { pathname } = request.nextUrl;
 
-  // Skip for verify-user endpoint when called from middleware
-  if (pathname === '/api/auth/verify-user' && request.headers.get('X-Auth-Skip') === 'true') {
-    console.log('Skipping auth check for verify-user API call from middleware');
+  // More comprehensive checks for auth-related API routes
+  // Skip middleware for BOTH verify-user endpoint and ALL auth API routes
+  const isAuthApiRoute = pathname.startsWith('/api/auth/');
+  const isVerifyUserFromMiddleware = pathname === '/api/auth/verify-user' && request.headers.get('X-Auth-Skip') === 'true';
+  
+  // Skip for any auth API route or when verification is called from middleware itself
+  if (isAuthApiRoute || isVerifyUserFromMiddleware) {
+    console.log(`Skipping auth check for ${isVerifyUserFromMiddleware ? 'verify-user API call from middleware' : 'auth API route'}: ${pathname}`);
     return NextResponse.next();
   }
 
   console.log(`Middleware checking path: ${pathname}`);
-  
-  // Skip middleware for all auth API routes
-  if (pathname.startsWith('/api/auth/')) {
-    console.log(`Skipping auth check for auth API route: ${pathname}`);
-    return NextResponse.next();
-  }
   
   // Define public paths that don't require authentication
   const publicPaths = [
@@ -225,14 +225,12 @@ export async function middleware(request: NextRequest) {
     '/auth/forgot-password',
     '/auth/reset-password',
     '/',
-    '/api/auth/',
     '/api/requests/public'
   ];
   
   const isPublicPath = publicPaths.some(path => {
     return pathname === path || 
-           pathname.startsWith(path + '/') || 
-           (path === '/api/auth/' && pathname.startsWith('/api/auth/'));
+           pathname.startsWith(path + '/');
   });
   
   console.log(`Path ${pathname} is ${isPublicPath ? 'public' : 'protected'}`);

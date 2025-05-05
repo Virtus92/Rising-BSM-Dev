@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useNotifications } from '@/features/notifications/hooks/useNotifications';
+import { useNotifications, UseNotificationsResult } from '@/features/notifications/hooks/useNotifications';
 import { NotificationResponseDto } from '@/domain/dtos/NotificationDtos';
 import { formatRelativeTime } from '@/shared/utils/date-utils';
 import { Button } from '@/shared/components/ui/button';
@@ -16,31 +16,31 @@ import {
   Info
 } from 'lucide-react';
 
-/**
- * A simplified notification dropdown specifically for the header
- * Avoiding the use of BaseListComponent to prevent UI issues
- */
-export default function NotificationDropdown({ 
-  limit = 5,
-  onClose
-}: { 
+interface NotificationDropdownProps {
+  notifications: UseNotificationsResult; // Accept the shared notification state
   limit?: number;
   onClose: () => void;
-}) {
-  // Use the notifications hook with proper parameters - autoFetch:true will load data immediately
+}
+
+/**
+ * A simplified notification dropdown specifically for the header
+ * Using shared notification state to prevent duplicate API calls
+ */
+export default function NotificationDropdown({ 
+  notifications,
+  limit = 5,
+  onClose
+}: NotificationDropdownProps) {
+  // Extract all needed functions and state from the shared notifications instance
   const { 
-    notifications, 
+    notifications: notificationItems, 
     unreadCount, 
     markAsRead, 
     markAllAsRead, 
     deleteNotification,
     refetch,
     isLoading
-  } = useNotifications({
-    limit,
-    page: 1,
-    autoFetch: true // The fixed hook will now handle this correctly
-  });
+  } = notifications;
 
   // Get notification icon based on type
   const getNotificationIcon = (notification: NotificationResponseDto) => {
@@ -80,9 +80,9 @@ export default function NotificationDropdown({
           <div className="flex justify-center items-center h-[200px]">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
           </div>
-        ) : notifications.length > 0 ? (
+        ) : notificationItems.length > 0 ? (
           <div className="space-y-1 p-2">
-            {notifications.map((notification) => (
+            {notificationItems.map((notification) => (
               <div 
                 key={notification.id} 
                 className={`p-2 rounded-md hover:bg-muted flex ${!notification.isRead ? 'bg-primary/5' : ''}`}

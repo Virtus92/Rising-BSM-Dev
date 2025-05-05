@@ -116,7 +116,7 @@ class TokenBlacklistServer {
    * @param token JWT token to check
    * @returns true if blacklisted, false otherwise
    */
-  isBlacklisted(token: string): boolean {
+  async isBlacklisted(token: string): Promise<boolean> {
     try {
       // Extract parts of the token
       const [header, payload, signature] = token.split('.');
@@ -125,12 +125,17 @@ class TokenBlacklistServer {
         return false;
       }
       
+      // First, run cleanup to ensure expired tokens are removed
+      this.cleanupNow();
+      
       // Check if token is directly blacklisted
       const isDirectlyBlacklisted = this.blacklistedTokens.some(
         entry => entry.signature === signature
       );
       
       if (isDirectlyBlacklisted) {
+        // Log for debugging purposes which signatures are matching
+        console.log(`Token signature ${signature.substring(0, 8)}... is blacklisted`);
         return true;
       }
       
@@ -147,11 +152,16 @@ class TokenBlacklistServer {
         
         // If user has any blacklisted tokens, check if all tokens are blacklisted
         if (userBlacklist && userBlacklist.has('__ALL_TOKENS__')) {
+          console.log(`All tokens for user ${userId} are blacklisted`);
           return true;
         }
         
         // Or check if this specific token is blacklisted
-        return userBlacklist ? userBlacklist.has(signature) : false;
+        const isUserTokenBlacklisted = userBlacklist ? userBlacklist.has(signature) : false;
+        if (isUserTokenBlacklisted) {
+          console.log(`Specific token for user ${userId} is blacklisted`);
+        }
+        return isUserTokenBlacklisted;
       } catch (e) {
         console.error('Error decoding token for blacklist check:', e);
         return false;
@@ -159,6 +169,26 @@ class TokenBlacklistServer {
     } catch (error) {
       console.error('Error checking token blacklist:', error as Error);
       return false;
+    }
+  }
+  
+  /**
+   * Force cleanup expired tokens immediately
+   */
+  private cleanupNow(): void {
+    const now = Date.now();
+    this.lastCleanup = now;
+    
+    const beforeCount = this.blacklistedTokens.length;
+    
+    // Remove expired tokens
+    this.blacklistedTokens = this.blacklistedTokens.filter(
+      entry => entry.expires > now
+    );
+    
+    const removedCount = beforeCount - this.blacklistedTokens.length;
+    if (removedCount > 0) {
+      console.log(`Cleaned up token blacklist, removed ${removedCount} expired entries, remaining: ${this.blacklistedTokens.length}`);
     }
   }
   
@@ -173,17 +203,16 @@ class TokenBlacklistServer {
       return;
     }
     
-    this.lastCleanup = now;
-    
-    // Remove expired tokens
-    this.blacklistedTokens = this.blacklistedTokens.filter(
-      entry => entry.expires > now
-    );
-    
-    console.log(`Cleaned up token blacklist, remaining entries: ${this.blacklistedTokens.length}`);
+    this.cleanupNow();
   }
 }
 
 // Export as singleton
 export const tokenBlacklistServer = new TokenBlacklistServer();
+
+// Export individual functions for more convenient imports
+export const blacklistToken = (token: string): void => tokenBlacklistServer.blacklistToken(token);
+export const blacklistUser = (userId: string | number): void => tokenBlacklistServer.blacklistUser(userId);
+export const isBlacklisted = async (token: string): Promise<boolean> => tokenBlacklistServer.isBlacklisted(token);
+
 export default tokenBlacklistServer;

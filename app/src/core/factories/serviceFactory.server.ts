@@ -26,16 +26,16 @@ import {
 
 // Services
 import { AuthService } from '@/features/auth/lib/services/AuthService';
-import { UserService } from '@/features/users/lib/services/UserService';
 import { CustomerService } from '@/features/customers/lib/services/CustomerService';
 import { AppointmentService } from '@/features/appointments/lib/services/AppointmentService';
 import { RequestService } from '@/features/requests/lib/services/RequestService';
 import { ActivityLogService } from '@/features/activity/lib/services/ActivityLogService';
-import { NotificationService } from '@/features/notifications/lib/services/NotificationService';
 import { RefreshTokenService } from '@/features/auth/lib/services/RefreshTokenService';
 import { PermissionService } from '@/features/permissions/lib/services/PermissionService';
 import { RequestDataService } from '@/features/requests/lib/services/RequestDataService';
 import { N8NIntegrationService } from '@/features/requests/lib/n8n/N8NIntegrationService';
+import { UserService } from '@/features/users/lib/services/UserService.server';
+import { NotificationService } from '@/features/notifications/lib/services/NotificationService.server';
 
 // Interfaces
 import { IAuthService } from '@/domain/services/IAuthService';
@@ -109,8 +109,6 @@ export class ServiceFactory implements IServiceFactory {
    */
   public createUserService(): IUserService {
     if (!this.userService) {
-      // Import the server-side UserService implementation
-      const { UserService } = require('@/features/users/lib/services/UserService.server');
       // Create a properly initialized UserService instance
       this.userService = new UserService();
     }

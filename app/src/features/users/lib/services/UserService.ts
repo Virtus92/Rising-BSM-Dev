@@ -164,9 +164,12 @@ export class UserService {
    */
   static async changePassword(data: { oldPassword: string; newPassword: string; confirmPassword: string }) {
     try {
-      // Use the UserClient directly since the signature is different
+      // Import the UserClient first
       const { UserClient } = await import('../clients/UserClient');
-      return UserClient.changePassword(data); // Already returns API response format
+      // Then call the changePassword method and await the result
+      const response = await UserClient.changePassword(data);
+      // Return the response
+      return response;
     } catch (error) {
       return handleError(error, 'Failed to change password');
     }

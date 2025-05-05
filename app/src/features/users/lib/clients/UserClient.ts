@@ -36,7 +36,7 @@ export class UserClient {
    * @param data - Optional data for POST/PUT requests
    * @returns API response
    */
-  private static async apiRequest<T>(
+  private static apiRequest<T>(
     method: 'get' | 'post' | 'put' | 'delete' | 'patch',
     url: string, 
     data?: any,
@@ -45,62 +45,75 @@ export class UserClient {
     const maxRetries = customParams?.maxRetries ?? UserClient.MAX_RETRIES;
     let attempts = 0;
 
-    // Implement retry logic for transient errors
-    while (attempts <= maxRetries) {
-      try {
-        // Use the appropriate method from the API client
-        if (method === 'get') {
-          return await ApiClient.get(url);
-        } else if (method === 'post') {
-          return await ApiClient.post(url, data);
-        } else if (method === 'put') {
-          return await ApiClient.put(url, data);
-        } else if (method === 'delete') {
-          return await ApiClient.delete(url);
-        } else if (method === 'patch') {
-          return await ApiClient.patch(url, data);
-        }
-
-        // If we get here, method was invalid (shouldn't happen due to TypeScript)
-        throw new Error(`Invalid API method: ${method}`);
-      } catch (error: unknown) {
-        attempts++;
-        
-        // Only retry for network or server errors (not validation or auth errors)
-        const isTransientError = (
-          !(error as any)?.statusCode || // Network error
-          (error as any)?.statusCode >= 500 || // Server error
-          (error as any)?.statusCode === 429 // Rate limiting
-        );
-        
-        if (!isTransientError || attempts > maxRetries) {
-          // Don't retry client errors or if we've reached max retries
-          if ((error as any)?.message) {
-            console.error(`API error (${method.toUpperCase()} ${url}):`, (error as any).message);
-            return {
-              success: false,
-              message: (error as any).message,
-              data: null,
-              statusCode: (error as any)?.statusCode || 500
-            };
+    // Return a new Promise that will handle retries
+    return new Promise(async (resolve, reject) => {
+      // Implement retry logic for transient errors
+      while (attempts <= maxRetries) {
+        try {
+          let result: Promise<ApiResponse<T>>;
+          
+          // Use the appropriate method from the API client
+          // Important: DO NOT await these calls here!
+          if (method === 'get') {
+            result = ApiClient.get(url);
+          } else if (method === 'post') {
+            result = ApiClient.post(url, data);
+          } else if (method === 'put') {
+            result = ApiClient.put(url, data);
+          } else if (method === 'delete') {
+            result = ApiClient.delete(url);
+          } else if (method === 'patch') {
+            result = ApiClient.patch(url, data);
+          } else {
+            // If we get here, method was invalid (shouldn't happen due to TypeScript)
+            reject(new Error(`Invalid API method: ${method}`));
+            return;
           }
-          break;
+          
+          // Return the promise directly - don't await it here
+          // This allows the calling methods to use the two-step await pattern
+          resolve(result);
+          return;
+        } catch (error: unknown) {
+          attempts++;
+          
+          // Only retry for network or server errors (not validation or auth errors)
+          const isTransientError = (
+            !(error as any)?.statusCode || // Network error
+            (error as any)?.statusCode >= 500 || // Server error
+            (error as any)?.statusCode === 429 // Rate limiting
+          );
+          
+          if (!isTransientError || attempts > maxRetries) {
+            // Don't retry client errors or if we've reached max retries
+            if ((error as any)?.message) {
+              console.error(`API error (${method.toUpperCase()} ${url}):`, (error as any).message);
+              resolve({
+                success: false,
+                message: (error as any).message,
+                data: null,
+                statusCode: (error as any)?.statusCode || 500
+              });
+              return;
+            }
+            break;
+          }
+          
+          // Exponential backoff: wait longer between each retry
+          const delayMs = Math.pow(2, attempts) * 100;
+          await new Promise(resolve => setTimeout(resolve, delayMs));
         }
-        
-        // Exponential backoff: wait longer between each retry
-        const delayMs = Math.pow(2, attempts) * 100;
-        await new Promise(resolve => setTimeout(resolve, delayMs));
       }
-    }
-    
-    // If we get here, all retries failed or we had a non-retryable error
-    console.error(`All retries failed for ${method.toUpperCase()} ${url}`);
-    return {
-      success: false,
-      message: `Failed to ${method} data after multiple attempts`,
-      data: null,
-      statusCode: 500
-    };
+      
+      // If we get here, all retries failed or we had a non-retryable error
+      console.error(`All retries failed for ${method.toUpperCase()} ${url}`);
+      resolve({
+        success: false,
+        message: `Failed to ${method} data after multiple attempts`,
+        data: null,
+        statusCode: 500
+      });
+    });
   }
 
   /**
@@ -126,10 +139,23 @@ export class UserClient {
    * @returns API response
    */
   static async getUsers(params: Record<string, any> = {}): Promise<ApiResponse<PaginationResult<UserResponseDto>>> {
-    const queryString = UserClient.createQueryParams(params);
-    const url = `${USERS_API_URL}${queryString}`;
-    
-    return await UserClient.apiRequest<PaginationResult<UserResponseDto>>('get', url);
+    try {
+      // Process parameters first, before creating any Promises
+      const queryString = UserClient.createQueryParams(params);
+      const url = `${USERS_API_URL}${queryString}`;
+      
+      // Create the API request and return it directly without intermediate awaits
+      // This prevents Function.prototype.apply errors in the Promise chain
+      return ApiClient.get<PaginationResult<UserResponseDto>>(url);
+    } catch (error: unknown) {
+      console.error('Error in UserClient.getUsers:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to get users',
+        data: null,
+        statusCode: (error as any)?.statusCode || 500
+      };
+    }
   }
   
   /**
@@ -140,7 +166,12 @@ export class UserClient {
    */
   static async getUserById(id: number | string): Promise<ApiResponse<UserResponseDto>> {
     try {
-      return await UserClient.apiRequest<UserResponseDto>('get', `${USERS_API_URL}/${id}`);
+      // Create the API call first, but don't await it yet
+      // This prevents the Function.prototype.apply error
+      const apiCall = UserClient.apiRequest<UserResponseDto>('get', `${USERS_API_URL}/${id}`);
+      
+      // Now await the promise
+      return await apiCall;
     } catch (error: unknown) {
       console.error(`Error in UserClient.getUserById(${id}):`, error);
       return {
@@ -159,7 +190,12 @@ export class UserClient {
    */
   static async getCurrentUser(): Promise<ApiResponse<UserResponseDto>> {
     try {
-      return await UserClient.apiRequest<UserResponseDto>('get', `${USERS_API_URL}/me`);
+      // Create the API call first, but don't await it yet
+      // This prevents the Function.prototype.apply error
+      const apiCall = UserClient.apiRequest<UserResponseDto>('get', `${USERS_API_URL}/me`);
+      
+      // Now await the promise
+      return await apiCall;
     } catch (error: unknown) {
       console.error('Error in UserClient.getCurrentUser:', error);
       return {
@@ -338,8 +374,21 @@ export class UserClient {
    * @returns API response with user if found
    */
   static async findByEmail(email: string): Promise<ApiResponse<UserResponseDto | null>> {
-    const url = `${USERS_API_URL}/find-by-email?email=${encodeURIComponent(email)}`;
-    return await UserClient.apiRequest<UserResponseDto | null>('get', url);
+    try {
+      const url = `${USERS_API_URL}/find-by-email?email=${encodeURIComponent(email)}`;
+      
+      // Create the API request and return it directly without intermediate awaits
+      // This prevents Function.prototype.apply errors in the Promise chain
+      return ApiClient.get<UserResponseDto | null>(url);
+    } catch (error: unknown) {
+      console.error(`Error in UserClient.findByEmail(${email}):`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to find user by email',
+        data: null,
+        statusCode: (error as any)?.statusCode || 500
+      };
+    }
   }
 
   /**
@@ -375,7 +424,12 @@ export class UserClient {
    */
   static async getUserPermissions(userId: number | string): Promise<ApiResponse<{ permissions: string[], role?: string }>> {
     try {
-      return await UserClient.apiRequest<{ permissions: string[], role?: string }>('get', `${USERS_API_URL}/permissions?userId=${userId}`);
+      // Create the API call first, but don't await it yet
+      // This prevents the Function.prototype.apply error
+      const apiCall = UserClient.apiRequest<{ permissions: string[], role?: string }>('get', `${USERS_API_URL}/permissions?userId=${userId}`);
+      
+      // Now await the promise
+      return await apiCall;
     } catch (error: unknown) {
       console.error('Error in UserClient.getUserPermissions:', error as Error);
       return {
@@ -422,7 +476,12 @@ export class UserClient {
       const queryString = UserClient.createQueryParams(params);
       const url = `${USERS_API_URL}/${userId}/activity${queryString}`;
       
-      return await UserClient.apiRequest<ActivityLogDto[]>('get', url);
+      // Create the API call first, but don't await it yet
+      // This prevents the Function.prototype.apply error
+      const apiCall = UserClient.apiRequest<ActivityLogDto[]>('get', url);
+      
+      // Now await the promise
+      return await apiCall;
     } catch (error: unknown) {
       console.error(`Error in UserClient.getUserActivity(${userId}):`, error);
       return {
@@ -439,7 +498,12 @@ export class UserClient {
    */
   static async count(): Promise<ApiResponse<{ count: number }>> {
     try {
-      return await UserClient.apiRequest<{ count: number }>('get', `${USERS_API_URL}/count`);
+      // Create the API call first, but don't await it yet
+      // This prevents the Function.prototype.apply error
+      const apiCall = UserClient.apiRequest<{ count: number }>('get', `${USERS_API_URL}/count`);
+      
+      // Now await the promise
+      return await apiCall;
     } catch (error: unknown) {
       console.error('Error in UserService.count:', error as Error);
       return {

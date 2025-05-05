@@ -139,37 +139,75 @@ export class ServiceFactory {
       try {
         // Choose implementation based on environment
         if (typeof window === 'undefined') {
-          // Server-side: use repository-based implementation
-          const { UserService } = require('@/features/users/lib/services/UserService.server');
-          this.userService = new UserService();
-          getLogger().debug('Server-side UserService initialized');
-        } else {
-          // Client-side: use API-based implementation
+          // SERVER-SIDE IMPLEMENTATION
           try {
-            // First try importing the static service if available
-            const { default: UserService } = require('@/features/users/lib/services/UserService');
-            this.userService = UserService;
-            console.debug('Client-side static UserService initialized');
+            // Use direct import instead of require for better stability
+            const ServerUserService = require('@/features/users/lib/services/UserService.server').UserService;
+            if (!ServerUserService || typeof ServerUserService !== 'function') {
+              throw new Error('Invalid UserService.server implementation');
+            }
+            
+            // Create a new instance - ensure it's not a Promise
+            const serviceInstance = new ServerUserService();
+            
+            // Verify the critical methods exist and are functions
+            if (!serviceInstance.changePassword || typeof serviceInstance.changePassword !== 'function') {
+              throw new Error('Server UserService missing required changePassword method');
+            }
+            
+            this.userService = serviceInstance;
+            getLogger().debug('Server-side UserService initialized');
           } catch (error) {
-            // Fall back to the client implementation if static service isn't available
-            const { UserServiceClient } = require('@/features/users/lib/services/UserService.client');
-            this.userService = new UserServiceClient();
-            console.debug('Client-side UserServiceClient initialized');
+            getLogger().error('Failed to initialize server-side UserService:', error as Error);
+            throw error; // Re-throw to prevent using a broken service
+          }
+        } else {
+          // CLIENT-SIDE IMPLEMENTATION
+          try {
+            // Use direct import with better error handling
+            const UserServiceModule = require('@/features/users/lib/services/UserService');
+            
+            if (UserServiceModule.default) {
+              this.userService = UserServiceModule.default;
+            } else if (UserServiceModule.UserService) {
+              this.userService = UserServiceModule.UserService;
+            } else {
+              // Fall back to client implementation
+              const { UserServiceClient } = require('@/features/users/lib/services/UserService.client');
+              if (!UserServiceClient || typeof UserServiceClient !== 'function') {
+                throw new Error('Invalid UserServiceClient implementation');
+              }
+              
+              this.userService = new UserServiceClient();
+            }
+            
+            getLogger().debug('Client-side UserService initialized');
+          } catch (error) {
+            getLogger().error('Failed to initialize client-side UserService:', error as Error);
+            throw error; // Re-throw to prevent using a broken service
           }
         }
       } catch (error) {
-        // Detailed error logging for easier troubleshooting
+        // Log detailed error information
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : undefined;
         
-        getLogger().error('Error initializing UserService:', {
+        getLogger().error('Critical Error initializing UserService:', {
           message: errorMessage,
           stack: errorStack,
           isServer: typeof window === 'undefined'
         });
         
+        // Throw error to prevent proceeding with broken service
+        throw new Error(`Failed to initialize UserService: ${errorMessage}`);
       }
     }
+    
+    // Return a valid service or throw an error
+    if (!this.userService) {
+      throw new Error('UserService could not be initialized');
+    }
+    
     return this.userService as IUserService;
   }
 
@@ -192,10 +230,23 @@ export class ServiceFactory {
           getLogger().debug('Server-side CustomerService initialized');
         } else {
           // Client-side: use API-based implementation
-          // Import the service directly without instantiation
-          const { default: CustomerService } = require('@/features/customers/lib/services/CustomerService');
-          // For client-side, we use the static methods directly
-          this.customerService = CustomerService;
+          // Import the customer service module
+          const CustomerServiceModule = require('@/features/customers/lib/services/CustomerService');
+          // Check if it has a default export or a named export
+          if (CustomerServiceModule.default) {
+            this.customerService = CustomerServiceModule.default;
+          } else if (CustomerServiceModule.CustomerService) {
+            this.customerService = CustomerServiceModule.CustomerService;
+          } else {
+            // Create a fallback service
+            this.customerService = {} as Record<string, any>;
+            // Dynamically attach all methods from the module to the service
+            Object.keys(CustomerServiceModule).forEach(key => {
+              if (typeof CustomerServiceModule[key] === 'function') {
+                (this.customerService as Record<string, any>)[key] = CustomerServiceModule[key];
+              }
+            });
+          }
           console.debug('Client-side CustomerService initialized');
         }
       } catch (error) {
@@ -232,10 +283,23 @@ export class ServiceFactory {
           getLogger().debug('Server-side AppointmentService initialized');
         } else {
           // Client-side: use API-based implementation
-          // Import the static class directly without instantiation
-          const { default: AppointmentService } = require('@/features/appointments/lib/services/AppointmentService');
-          // For client-side, we use the static methods directly
-          this.appointmentService = AppointmentService;
+          // Import the appointment service module
+          const AppointmentServiceModule = require('@/features/appointments/lib/services/AppointmentService');
+          // Check if it has a default export or a named export
+          if (AppointmentServiceModule.default) {
+            this.appointmentService = AppointmentServiceModule.default;
+          } else if (AppointmentServiceModule.AppointmentService) {
+            this.appointmentService = AppointmentServiceModule.AppointmentService;
+          } else {
+            // Create a fallback service
+            this.appointmentService = {} as Record<string, any>;
+            // Dynamically attach all methods from the module to the service
+            Object.keys(AppointmentServiceModule).forEach(key => {
+              if (typeof AppointmentServiceModule[key] === 'function') {
+                (this.appointmentService as Record<string, any>)[key] = AppointmentServiceModule[key];
+              }
+            });
+          }
           console.debug('Client-side AppointmentService initialized');
         }
       } catch (error) {
@@ -276,10 +340,16 @@ export class ServiceFactory {
           getLogger().debug('Server-side RequestService initialized');
         } else {
           // Client-side: use API-based implementation
-          // Import the service directly
-          const { default: RequestService } = require('@/features/requests/lib/services/RequestService.client');
-          // Directly use the static methods
-          this.requestService = RequestService;
+          // Import the request service module
+          const RequestServiceModule = require('@/features/requests/lib/services/RequestService.client');
+          // Check if it has a default export or a named export
+          if (RequestServiceModule.default) {
+            this.requestService = RequestServiceModule.default;
+          } else if (RequestServiceModule.RequestService) {
+            this.requestService = RequestServiceModule.RequestService;
+          } else {
+            throw new Error('RequestService not found in client module');
+          }
           console.debug('Client-side RequestService initialized');
         }
       } catch (error) {
@@ -409,42 +479,73 @@ export class ServiceFactory {
    */
   public createNotificationService(): INotificationService {
     if (!this.notificationService) {
-      // Try to use the features implementation first
       try {
-        // Dynamic import to prevent bundling issues
-        const importModule = async () => {
+        // Choose implementation based on environment
+        if (typeof window === 'undefined') {
+          // Server-side: use server-side implementation
           try {
-            const { NotificationService } = await import('@/features/notifications/lib/services/NotificationService');
-            return new NotificationService(
+            const { NotificationService } = require('@/features/notifications/lib/services/NotificationService.server');
+            this.notificationService = new NotificationService(
               getNotificationRepository(),
               getLogger(),
               getValidationService(),
               getErrorHandler()
             );
+            getLogger().debug('Server-side NotificationService initialized');
           } catch (error) {
-            // Fall back to infrastructure implementation
-            const { NotificationService } = await import('@/features/notifications/lib/services/NotificationService');
-            return new NotificationService(
-              getNotificationRepository(),
-              getLogger(),
-              getValidationService(),
-              getErrorHandler()
-            );
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            getLogger().error('Error creating server-side NotificationService:', {
+              message: errorMessage,
+              stack: error instanceof Error ? error.stack : undefined
+            });
+            throw new Error(`Failed to initialize NotificationService: ${errorMessage}`);
           }
-        };
-        
-        // Execute the import but continue with a temporary service
-        importModule().then(service => {
-          this.notificationService = service;
-        }).catch(error => {
-          getLogger().error('Error creating NotificationService:', error instanceof Error ? error.message : String(error));
-        });
-        
+        } else {
+          // Client-side: use client-side implementation
+          try {
+            // Import the notification service module
+            const NotificationServiceModule = require('@/features/notifications/lib/services/NotificationService');
+            // Check if it has a default export or a named export
+            if (NotificationServiceModule.default) {
+              this.notificationService = NotificationServiceModule.default;
+            } else if (NotificationServiceModule.NotificationService) {
+              this.notificationService = NotificationServiceModule.NotificationService;
+            } else {
+              // Create a fallback service
+              const { NotificationService } = require('@/features/notifications/lib/services/NotificationService.client');
+              this.notificationService = new NotificationService(
+                getNotificationRepository(),
+                getLogger(),
+                getValidationService(),
+                getErrorHandler()
+              );
+            }
+            getLogger().debug('Client-side NotificationService initialized');
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            getLogger().error('Error creating client-side NotificationService:', {
+              message: errorMessage,
+              stack: error instanceof Error ? error.stack : undefined
+            });
+            throw new Error(`Failed to initialize NotificationService: ${errorMessage}`);
+          }
+        }
       } catch (error) {
-        getLogger().error('Error in createNotificationService:', error instanceof Error ? error.message : String(error));
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        getLogger().error('Error in createNotificationService:', {
+          message: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined,
+          isServer: typeof window === 'undefined'
+        });
+        throw error; // Re-throw to prevent using a broken service
       }
     }
-    return this.notificationService!;
+    
+    if (!this.notificationService) {
+      throw new Error('NotificationService could not be initialized');
+    }
+    
+    return this.notificationService as INotificationService;
   }
 
   /**

@@ -1000,3 +1000,5 @@ export class RequestService extends BaseService<
     };
   }
 }
+
+export default RequestService;

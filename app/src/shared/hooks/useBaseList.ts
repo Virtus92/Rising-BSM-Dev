@@ -531,29 +531,10 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
   
   // Check API initialization
   useEffect(() => {
-    const checkApiInitialization = () => {
-      const isInitialized = typeof window !== 'undefined' && 
-        (window as any).__API_CLIENT_INITIALIZED;
-      
-      if (isInitialized) {
-        setIsApiInitialized(true);
-        dispatch({ type: 'INITIALIZE' });
-        return true;
-      }
-      
-      return false;
-    };
-    
-    // Check immediately
-    if (!checkApiInitialization()) {
-      // If not initialized, poll until it is
-      const intervalId = setInterval(() => {
-        if (checkApiInitialization()) {
-          clearInterval(intervalId);
-        }
-      }, 200);
-      
-      return () => clearInterval(intervalId);
+    // Immediately initialize without waiting for a global flag
+    if (!isApiInitialized) {
+      setIsApiInitialized(true);
+      dispatch({ type: 'INITIALIZE' });
     }
   }, []);
   

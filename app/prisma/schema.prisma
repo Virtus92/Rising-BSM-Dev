@@ -1,11 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  output = "./node_modules/@prisma/client"
   binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres.qkhermeufcstwtlyttpo:postgres@aws-0-eu-central-1.pooler.supabase.com:5432/postgres"
+  url      = env("DATABASE_URL")
 }
 
 //==============================================================================

@@ -722,6 +722,25 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
             };
           }
           // If permissions is an empty array, don't include it at all
+        } 
+        // Special handling for profilePictureId - must be a number or null
+        else if (key === 'profilePictureId') {
+          if (value === null) {
+            result[key] = null;
+          }
+          else if (typeof value === 'string') {
+            // Try to convert to number if it's a numeric string
+            const numValue = parseInt(value, 10);
+            if (!isNaN(numValue)) {
+              result[key] = numValue;
+            } else {
+              // Skip this field if it's not a valid number
+              this.logger.warn(`Invalid profilePictureId format: ${value}. Expected an integer, skipping.`);
+            }
+          }
+          else if (typeof value === 'number') {
+            result[key] = value;
+          }
         } else {
           result[key] = value;
         }

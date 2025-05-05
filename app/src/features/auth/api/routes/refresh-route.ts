@@ -1,6 +1,7 @@
 /**
  * Token Refresh API Route Handler
  * Refreshes access tokens using a valid refresh token from HTTP-only cookie
+ * Updated with improved security and blacklist integration
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
@@ -8,7 +9,8 @@ import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
 import { v4 as uuidv4 } from 'uuid';
-import { ServerTokenManager } from '../../lib/clients/token/index.server';
+import { ServerTokenManager, setTokenCookie } from '../../lib/clients/token/server';
+import { blacklistToken } from '../../lib/clients/token/blacklist/TokenBlacklistServer';
 
 // Redis client would be imported here for distributed rate limiting
 // import { redisClient } from '@/core/redis';
@@ -79,26 +81,23 @@ export async function refreshHandler(req: NextRequest): Promise<NextResponse> {
       }
     });
     
-    // Set HTTP-only cookies
-    response.cookies.set({
-      name: 'auth_token',
-      value: accessToken,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: expiresIn,
+    // Set HTTP-only cookies with enhanced security
+    setTokenCookie(response, accessToken, 'auth_token', expiresIn, {
+      sameSite: 'strict',
       path: '/',
-      sameSite: 'lax'
+      priority: 'high'
     });
     
-    response.cookies.set({
-      name: 'refresh_token',
-      value: newRefreshToken,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: expiresIn * 5, // Longer expiry for refresh token
-      path: '/',
-      sameSite: 'lax'
+    setTokenCookie(response, newRefreshToken, 'refresh_token', expiresIn * 5, {
+      sameSite: 'strict',
+      path: '/api/auth/refresh', // Limit refresh token to the refresh endpoint only
+      priority: 'medium'
     });
+    
+    // Add security headers
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-XSS-Protection', '1; mode=block');
     
     // Add debug log showing what tokens are being returned
     logger.debug('Token refresh successful, returning new tokens', {
@@ -124,6 +123,17 @@ export async function refreshHandler(req: NextRequest): Promise<NextResponse> {
     // Clear cookies on error
     response.cookies.delete('auth_token');
     response.cookies.delete('refresh_token');
+    
+    // Blacklist the old token if we have it
+    const oldRefreshToken = await extractRefreshToken(req);
+    if (oldRefreshToken) {
+      try {
+        blacklistToken(oldRefreshToken);
+        logger.debug('Blacklisted invalid refresh token', { requestId });
+      } catch (e) {
+        logger.debug('Failed to blacklist invalid token', { requestId, error: e });
+      }
+    }
     
     return response;
   }

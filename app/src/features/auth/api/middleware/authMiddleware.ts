@@ -86,6 +86,15 @@ export async function auth(
         throw new AuthenticationError('Server configuration error', 'SERVER_CONFIG_ERROR');
       }
       
+      // Check for token in blacklist before validation
+      const { isBlacklisted } = await import('../../lib/clients/token/blacklist/TokenBlacklistServer');
+      const isTokenBlacklisted = await isBlacklisted(token);
+      
+      if (isTokenBlacklisted) {
+        logger.warn('Token is blacklisted');
+        throw new AuthenticationError('Invalid token', 'TOKEN_BLACKLISTED');
+      }
+      
       // Verify token using server-side function
       const isValidToken = await validateToken(token, jwtSecret);
       if (!isValidToken) {
@@ -188,7 +197,8 @@ export async function extractAuthToken(request: NextRequest | Request): Promise<
     // Try all possible cookie names for compatibility
     const cookieToken = cookieStore.get('auth_token')?.value || 
                        cookieStore.get('auth_token_access')?.value ||
-                       cookieStore.get('access_token')?.value;
+                       cookieStore.get('access_token')?.value ||
+                       cookieStore.get('token')?.value;
     
     return cookieToken || null;
   } catch (error) {
@@ -205,11 +215,12 @@ export async function extractAuthToken(request: NextRequest | Request): Promise<
  * @returns Wrapped handler with authentication
  */
 export async function withAuth(handler: Function, options: AuthOptions = {}) {
-  // For Server Actions, this function itself must be async
-  // But we need to return a function, not a Promise
-  return function authHandler(request: NextRequest, ...args: any[]): Promise<NextResponse> {
-    // Create the async logic in a separate function to avoid Promise wrapping issues
-    return (async () => {
+  // This function returns a promise that resolves to a route handler
+  // It should be awaited before being used
+  
+  // Return an async route handler function that Next.js can execute
+  return async function authHandler(request: NextRequest, ...args: any[]): Promise<NextResponse> {
+    try {
       // Authenticate request
       const authResult = await auth(request, options);
       
@@ -232,8 +243,15 @@ export async function withAuth(handler: Function, options: AuthOptions = {}) {
       };
       
       // Call handler with authenticated request
-      return handler(req, ...args);
-    })();
+      return await handler(req, ...args);
+    } catch (error) {
+      logger.error('Authentication middleware error:', error as Error);
+      return formatResponse.error(
+        'Authentication processing error',
+        500,
+        'AUTH_ERROR'
+      );
+    }
   };
 }
 

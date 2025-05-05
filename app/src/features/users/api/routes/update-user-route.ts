@@ -101,8 +101,23 @@ export async function updateUserHandler(
       ipAddress: request.headers.get('x-forwarded-for') || 'unknown'
     };
     
+    // Prepare data for update - handle profilePictureId type issue
+    const preparedData = { ...dataToUpdate };
+    
+    // If profilePictureId is a string but should be an integer or null
+    if (typeof preparedData.profilePictureId === 'string') {
+      // Convert to integer if it's a numeric string
+      if (/^\d+$/.test(preparedData.profilePictureId)) {
+        preparedData.profilePictureId = parseInt(preparedData.profilePictureId, 10);
+      } else {
+        // If it's a filename string and not a numeric ID, remove it
+        // We'll keep the profilePicture path instead
+        delete preparedData.profilePictureId;
+      }
+    }
+    
     // Update the user
-    const updatedUser = await userService.update(userId, dataToUpdate, { context });
+    const updatedUser = await userService.update(userId, preparedData, { context });
     
     return formatResponse.success(updatedUser, 'User updated successfully');
   } catch (error) {

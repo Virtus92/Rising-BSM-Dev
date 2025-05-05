@@ -82,6 +82,14 @@ export const API_PERMISSIONS = {
  * @returns Whether the user has the permission
  * @throws Error if permission check fails
  */
+import { getPermissionFromCache, setPermissionInCache } from '@/features/permissions/lib/utils/permissionCacheUtils';
+
+/**
+ * Cache configuration
+ */
+const CACHE_TTL_SECONDS = 300; // 5 minutes
+const CACHE_ENABLED = process.env.DISABLE_PERMISSION_CACHE !== 'true';
+
 export async function hasPermission(userId: number, permission: string): Promise<boolean> {
   if (!userId || isNaN(userId)) {
     throw authErrorHandler.createError(
@@ -102,7 +110,23 @@ export async function hasPermission(userId: number, permission: string): Promise
   }
   
   try {
-    // Check with service directly - no caching
+    // Try to get from cache first if enabled
+    if (CACHE_ENABLED) {
+      const cachedResult = getPermissionFromCache(userId, permission);
+      
+      if (cachedResult !== undefined) {
+        logger.debug('Permission check result from cache', { 
+          userId, 
+          permission,
+          hasPermission: cachedResult,
+          source: 'cache'
+        });
+        
+        return cachedResult;
+      }
+    }
+    
+    // Cache miss or disabled - check with service
     const serviceFactory = getServiceFactory();
     const permissionService = serviceFactory.createPermissionService();
     
@@ -117,11 +141,17 @@ export async function hasPermission(userId: number, permission: string): Promise
     
     const result = await permissionService.hasPermission(userId, permission);
     
+    // Store in cache if enabled
+    if (CACHE_ENABLED) {
+      setPermissionInCache(userId, permission, result, CACHE_TTL_SECONDS);
+    }
+    
     // Log for debugging
     logger.debug('Permission check result', { 
       userId, 
       permission,
-      hasPermission: result
+      hasPermission: result,
+      source: 'database'
     });
     
     return result;
@@ -296,7 +326,7 @@ export async function checkPermission(
  * @param permission Required permission or array of permissions
  * @returns Wrapped handler function with permission check
  */
-export async function withPermission(
+export function withPermission(
   handler: (request: NextRequest, ...args: any[]) => Promise<NextResponse>,
   permission: string | string[]
 ) {

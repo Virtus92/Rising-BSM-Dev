@@ -43,10 +43,19 @@ export async function getTokenFromRequest(req: NextRequest): Promise<string | nu
  * Validate token
  * This is a server-only function
  */
+import { isBlacklisted } from './blacklist/TokenBlacklistServer';
+
 export async function validateToken(token: string, jwtSecret: string): Promise<boolean> {
   try {
     if (!token) {
       logger.debug('No token provided to validateToken');
+      return false;
+    }
+    
+    // Check if token is blacklisted before verification
+    const blacklistCheck = await isBlacklisted(token);
+    if (blacklistCheck) {
+      logger.debug('Token is blacklisted');
       return false;
     }
     
@@ -166,17 +175,31 @@ export function setTokenCookie(
   res: NextResponse, 
   token: string, 
   cookieName: string = 'auth_token', 
-  maxAge: number = 3600
+  maxAge: number = 3600,
+  options: {
+    path?: string;
+    sameSite?: 'strict' | 'lax' | 'none';
+    priority?: 'low' | 'medium' | 'high';
+  } = {}
 ): NextResponse {
-  res.cookies.set({
-    name: cookieName,
-    value: token,
+  // Fix: Use the correct method signature for cookies.set()
+  res.cookies.set(cookieName, token, {
     maxAge,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/'
+    sameSite: options.sameSite || 'strict',
+    path: options.path || '/',
+    // You can set priority using the Cookies-* header manually if needed
   });
+  
+  // Set additional security headers
+  if (options.sameSite) {
+    res.headers.set('Set-Cookie-SameSite', options.sameSite);
+  }
+  
+  if (options.priority) {
+    res.headers.set('Set-Cookie-Priority', options.priority);
+  }
   
   return res;
 }

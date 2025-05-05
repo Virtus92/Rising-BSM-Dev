@@ -42,8 +42,13 @@ const extractCount = (response: ApiResponse<any>): number => {
     return 0;
   }
   
-  if (!response.success || !response.data) {
-    console.warn('Unsuccessful API response or missing data:', response.message);
+  if (!response.success) {
+    console.warn('Unsuccessful API response:', response.message);
+    return 0;
+  }
+  
+  if (!response.data) {
+    console.warn('Missing data in API response:', response.message);
     return 0;
   }
   
@@ -120,6 +125,7 @@ const extractCount = (response: ApiResponse<any>): number => {
  */
 export const useDashboardStats = (): UseDashboardStatsReturn => {
   // Initialize state with default values
+  console.log('using dashboardStats hook');
   const [state, setState] = useState<StatsState>({
     userCount: 0,
     customerCount: 0,
@@ -138,11 +144,9 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
   // Track last successful fetch time to prevent excessive refresh
   const lastFetchTimeRef = useRef(0);
 
-  // First mount flag to prevent duplicate fetches on initial mount
-  const isFirstMountRef = useRef(true);
-
   // Extract fetchStats as a separate callback with debounce protection
   const fetchStats = useCallback(async (showErrors = false) => {
+    console.log('Fetching dashboard stats...');
     // Don't allow multiple simultaneous fetches
     if (isFetchingRef.current) {
       console.log('Already fetching stats, skipping duplicate request');
@@ -151,7 +155,7 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     
     // Throttle refreshes (minimum 5 seconds between refreshes)
     const now = Date.now();
-    if (now - lastFetchTimeRef.current < 5000) {
+    if (now - lastFetchTimeRef.current < 5000 && lastFetchTimeRef.current !== 0) {
       console.log('Throttling stats fetch - too soon since last fetch');
       return;
     }
@@ -168,13 +172,21 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
       // Log fetch attempt for monitoring
       console.log('Fetching dashboard stats...');
       
-      // Use Promise.allSettled with dedicated count endpoints
+      // Safely get the service methods - use static methods correctly
+      const services = {
+        user: typeof UserService.count === 'function' ? () => UserService.count() : (() => Promise.resolve({ success: false, data: null })),
+        customer: typeof CustomerService.count === 'function' ? () => CustomerService.count() : (() => Promise.resolve({ success: false, data: null })),
+        request: typeof RequestService.count === 'function' ? () => RequestService.count() : (() => Promise.resolve({ success: false, data: null })),
+        appointment: typeof AppointmentService.count === 'function' ? () => AppointmentService.count() : (() => Promise.resolve({ success: false, data: null }))
+      };
+      
+      // Use Promise.allSettled with dedicated count endpoints with error catching for each call
       const [usersResponse, customersResponse, requestsResponse, appointmentsResponse] = 
         await Promise.allSettled([
-          UserService.count(),
-          CustomerService.count(),
-          RequestService.count(),
-          AppointmentService.count()
+          services.user().catch(err => ({ success: false, data: { count: 0 }, message: err.message })),
+          services.customer().catch(err => ({ success: false, data: { count: 0 }, message: err.message })),
+          services.request().catch(err => ({ success: false, data: { count: 0 }, message: err.message })),
+          services.appointment().catch(err => ({ success: false, data: { count: 0 }, message: err.message }))
         ]);
 
       // Log raw responses for debugging
@@ -191,7 +203,6 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
       lastFetchTimeRef.current = Date.now();
 
       if (isMountedRef.current) {
-        // Process the responses with enhanced error handling and fallbacks
         const processCountResponse = (response: PromiseSettledResult<any>, entityName: string): number => {
           if (response.status === 'rejected') {
             console.error(`Failed to fetch ${entityName} count:`, response.reason);
@@ -290,55 +301,52 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     }
   }, [fetchStats, toast]);
 
-  // Fetch stats on initial mount with duplicate request prevention
+  // Fetch stats on initial mount
   useEffect(() => {
     // Set mounted flag
     isMountedRef.current = true;
     
-    // Skip duplicate fetch on React Strict Mode double mount
-    if (isFirstMountRef.current) {
-      isFirstMountRef.current = false;
-      
-      // Delay initial fetch slightly to avoid race conditions
-      const initialFetchTimer = setTimeout(() => {
-        if (isMountedRef.current && !isFetchingRef.current) {
-          console.log('Performing initial stats fetch');
-          fetchStats();
-        }
-      }, 100);
-      
-      return () => {
-        clearTimeout(initialFetchTimer);
-        isMountedRef.current = false;
-      };
-    }
+    // Fetch stats immediately on mount - no delay
+    fetchStats();
     
     // Cleanup function
     return () => {
       isMountedRef.current = false;
     };
-  }, []); // Empty dependency array to run only once
+  }, [fetchStats]); // Include fetchStats in dependencies to ensure it's available
 
-  // Set up a refresh interval - using a stable interval reference
+  // Set up a refresh interval
   useEffect(() => {
     // Only set up interval if component is mounted
     if (!isMountedRef.current) return;
     
     console.log('Setting up dashboard stats refresh interval (5 minutes)');
-    const intervalId = setInterval(() => {
+    
+    // Create a reference to the fetch function that doesn't change between renders
+    const stableFetchStats = () => {
       // Only fetch if component is still mounted and not already fetching
       if (isMountedRef.current && !isFetchingRef.current) {
         console.log('Interval-triggered stats refresh');
-        fetchStats();
+        // Wrap in try-catch to ensure interval isn't broken by errors
+        try {
+          fetchStats().catch(err => {
+            console.error('Error in interval refresh:', err);
+          });
+        } catch (error) {
+          console.error('Error in interval refresh (caught):', error);
+        }
       }
-    }, 300000); // Refresh every 5 minutes
+    };
+    
+    // Set to 5 minutes (300000ms) instead of 10 seconds
+    const intervalId = setInterval(stableFetchStats, 300000); 
     
     // Clean up interval on unmount
     return () => {
       console.log('Clearing dashboard stats refresh interval');
       clearInterval(intervalId);
     }; 
-  }, []); // Empty dependency array for stable interval
+  }, [fetchStats]); // Include fetchStats in dependencies since it's memoized with useCallback
 
   // Return the state and the refresh function
   return { ...state, refreshStats };

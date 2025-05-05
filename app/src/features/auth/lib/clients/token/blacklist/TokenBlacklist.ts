@@ -46,6 +46,11 @@ class TokenBlacklist {
       const signature = token;
       const expires = expiry || (Date.now() + 3600 * 1000); // Default 1 hour if not specified
       
+      // Remove any existing entry with the same signature
+      this.blacklistedTokens = this.blacklistedTokens.filter(
+        entry => entry.signature !== signature
+      );
+      
       // Add to blacklisted tokens
       this.blacklistedTokens.push({
         signature,
@@ -84,6 +89,11 @@ class TokenBlacklist {
         console.warn('Token missing expiration, cannot blacklist properly');
         return;
       }
+      
+      // Remove any existing entry with the same signature
+      this.blacklistedTokens = this.blacklistedTokens.filter(
+        entry => entry.signature !== signature
+      );
       
       // Add to blacklisted tokens
       this.blacklistedTokens.push({
@@ -139,12 +149,19 @@ class TokenBlacklist {
         return false;
       }
       
+      // First, run cleanup to ensure expired tokens are removed
+      this.cleanupNow();
+      
       // Check if token is directly blacklisted
       const isDirectlyBlacklisted = this.blacklistedTokens.some(
         entry => entry.signature === signature
       );
       
       if (isDirectlyBlacklisted) {
+        // Log for debugging but only in development
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Token signature ${signature.substring(0, 8)}... is blacklisted`);
+        }
         return true;
       }
       
@@ -161,11 +178,18 @@ class TokenBlacklist {
         
         // If user has any blacklisted tokens, check if all tokens are blacklisted
         if (userBlacklist && userBlacklist.has('__ALL_TOKENS__')) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`All tokens for user ${userId} are blacklisted`);
+          }
           return true;
         }
         
         // Or check if this specific token is blacklisted
-        return userBlacklist ? userBlacklist.has(signature) : false;
+        const isUserTokenBlacklisted = userBlacklist ? userBlacklist.has(signature) : false;
+        if (isUserTokenBlacklisted && process.env.NODE_ENV === 'development') {
+          console.log(`Specific token for user ${userId} is blacklisted`);
+        }
+        return isUserTokenBlacklisted;
       } catch (e) {
         console.error('Error decoding token for blacklist check:', e);
         return false;
@@ -173,6 +197,26 @@ class TokenBlacklist {
     } catch (error) {
       console.error('Error checking token blacklist:', error as Error);
       return false;
+    }
+  }
+  
+  /**
+   * Force cleanup expired tokens immediately
+   */
+  private cleanupNow(): void {
+    const now = Date.now();
+    this.lastCleanup = now;
+    
+    const beforeCount = this.blacklistedTokens.length;
+    
+    // Remove expired tokens
+    this.blacklistedTokens = this.blacklistedTokens.filter(
+      entry => entry.expires > now
+    );
+    
+    const removedCount = beforeCount - this.blacklistedTokens.length;
+    if (removedCount > 0 && process.env.NODE_ENV === 'development') {
+      console.log(`Cleaned up token blacklist, removed ${removedCount} expired entries, remaining: ${this.blacklistedTokens.length}`);
     }
   }
   
@@ -187,14 +231,7 @@ class TokenBlacklist {
       return;
     }
     
-    this.lastCleanup = now;
-    
-    // Remove expired tokens
-    this.blacklistedTokens = this.blacklistedTokens.filter(
-      entry => entry.expires > now
-    );
-    
-    console.log(`Cleaned up token blacklist, remaining entries: ${this.blacklistedTokens.length}`);
+    this.cleanupNow();
   }
 }
 

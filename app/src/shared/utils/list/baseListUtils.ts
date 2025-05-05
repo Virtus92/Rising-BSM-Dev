@@ -2,7 +2,8 @@
  * Enhanced base list utilities for consistent list management across the application
  */
 import { BaseFilterParamsDto, PaginationMetaDto } from '@/domain/dtos/BaseDto';
-import { useBaseList } from '@/shared/hooks/useBaseList';
+// Import the actual hook now since we're reintroducing createBaseListUtility
+import { useBaseList, UseBaseListResult } from '@/shared/hooks/useBaseList';
 
 /**
  * Enhanced pagination metadata with filter information
@@ -78,6 +79,9 @@ export interface BaseListUtility<T, F extends BaseFilterParamsDto> {
   
   // Item management
   setItems: (items: T[]) => void; // Method to update items directly
+  
+  // Function setter to allow updating the fetch function
+  setFetchFunction?: (fn: (filters: F) => Promise<any>) => void;
 }
 
 /**
@@ -163,11 +167,12 @@ function defaultResponseAdapter<T>(response: any): {
 }
 
 /**
- * Creates a base list utility with standardized interface
+ * Creates a configuration object for base list utility
+ * This doesn't directly call hooks - it just prepares the config
  */
-export function createBaseListUtility<T, F extends BaseFilterParamsDto>(
+export function createBaseListUtilityConfig<T, F extends BaseFilterParamsDto>(
   config: CreateBaseListUtilityConfig<T, F>
-): BaseListUtility<T, F> {
+): CreateBaseListUtilityConfig<T, F> {
   // Extract configuration with defaults
   const { 
     fetchFunction, 
@@ -189,14 +194,22 @@ export function createBaseListUtility<T, F extends BaseFilterParamsDto>(
     return response;
   };
   
-  // Use the base list hook
-  const baseList = useBaseList<T, F>({
+  // Return the processed configuration
+  return {
     fetchFunction: wrappedFetchFunction,
-    responseAdapter,
     initialFilters: initialFilters as Partial<F>,
+    responseAdapter,
     ...restConfig
-  });
-  
+  };
+}
+
+/**
+ * Enhances a base list result with additional utility methods
+ * Takes the result from useBaseList and adds extra functionality
+ */
+export function enhanceBaseListResult<T, F extends BaseFilterParamsDto>(
+  baseList: UseBaseListResult<T, F>
+): BaseListUtility<T, F> {
   // Return an enhanced version of the base list
   return {
     ...baseList,
@@ -207,8 +220,42 @@ export function createBaseListUtility<T, F extends BaseFilterParamsDto>(
       filters: baseList.filters as any
     },
     // Include the setItems method
-    setItems: baseList.setItems
+    setItems: baseList.setItems,
+    // Include setFetchFunction if baseList has it
+    setFetchFunction: (baseList as any).setFetchFunction
   };
+}
+
+/**
+ * Creates a base list utility using the useBaseList hook
+ * 
+ * NOTE: This function must be called inside a React function component or custom hook
+ * to comply with the Rules of Hooks.
+ * 
+ * This function exists for backward compatibility. For new code, prefer the newer
+ * pattern of calling useBaseList directly and then enhancing the result.
+ */
+export function createBaseListUtility<T, F extends BaseFilterParamsDto>(
+  config: CreateBaseListUtilityConfig<T, F>
+): BaseListUtility<T, F> {
+  // Prepare the configuration
+  const processedConfig = createBaseListUtilityConfig(config);
+  
+  // Use the base list hook properly
+  const baseList = useBaseList<T, F>({
+    fetchFunction: processedConfig.fetchFunction,
+    initialFilters: processedConfig.initialFilters,
+    responseAdapter: processedConfig.responseAdapter,
+    syncWithUrl: processedConfig.syncWithUrl,
+    autoFetch: processedConfig.autoFetch,
+    defaultSortField: processedConfig.defaultSortField,
+    defaultSortDirection: processedConfig.defaultSortDirection,
+    resetPageOnFilterChange: processedConfig.resetPageOnFilterChange,
+    urlFilterConfig: processedConfig.urlFilterConfig
+  });
+  
+  // Enhance the result with additional functionality
+  return enhanceBaseListResult(baseList);
 }
 
 /**

@@ -13,6 +13,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import Link from 'next/link';
 
 export default function NotificationsPage() {
+  // Initialize with empty array to ensure we always have a valid array
   const [notifications, setNotifications] = useState<NotificationResponseDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,16 +32,22 @@ export default function NotificationsPage() {
       });
 
       if (response.success && response.data) {
-        // Extract the actual notifications array from the response structure
-        const notificationsData = response.data || [];
+        // Ensure we always have an array
+        const notificationsData = Array.isArray(response.data) 
+          ? response.data 
+          : (Array.isArray(response.data.items) ? response.data.items : []);
+          
         setNotifications(notificationsData);
       } else {
         setError(response.message || 'Fehler beim Laden der Benachrichtigungen');
+        // Reset to empty array to prevent errors
         setNotifications([]);
       }
     } catch (error) {
       console.error('Failed to fetch notifications:', error as Error);
       setError('Fehler beim Laden der Benachrichtigungen. Bitte versuchen Sie es später erneut.');
+      // Reset to empty array to prevent errors
+      setNotifications([]);
     } finally {
       setIsLoading(false);
     }
@@ -93,12 +100,15 @@ export default function NotificationsPage() {
       const response = await NotificationClient.markAsRead(notificationId);
       
       if (response.success) {
+        // Ensure we're working with an array before mapping
         setNotifications(prev => 
-          prev.map(notification => 
-            notification.id === notificationId 
-              ? { ...notification, isRead: true } 
-              : notification
-          )
+          Array.isArray(prev) 
+            ? prev.map(notification => 
+                notification.id === notificationId 
+                  ? { ...notification, isRead: true } 
+                  : notification
+              )
+            : [] // Return empty array if prev is not an array
         );
         
         toast({
@@ -125,8 +135,11 @@ export default function NotificationsPage() {
       const response = await NotificationClient.markAllAsRead();
       
       if (response.success) {
+        // Ensure we're working with an array before mapping
         setNotifications(prev => 
-          prev.map(notification => ({ ...notification, isRead: true }))
+          Array.isArray(prev) 
+            ? prev.map(notification => ({ ...notification, isRead: true }))
+            : [] // Return empty array if prev is not an array
         );
         
         toast({
@@ -160,8 +173,10 @@ export default function NotificationsPage() {
     });
   };
 
-  // Get unread count
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // Get unread count - ensure we're working with an array
+  const unreadCount = Array.isArray(notifications) 
+    ? notifications.filter(n => !n.isRead).length 
+    : 0;
 
   return (
     <div className="container py-6">
@@ -239,7 +254,7 @@ export default function NotificationsPage() {
                     Erneut versuchen
                   </Button>
                 </div>
-              ) : notifications.length === 0 ? (
+              ) : !Array.isArray(notifications) || notifications.length === 0 ? (
                 // Empty state
                 <div className="text-center py-8">
                   <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -337,7 +352,7 @@ export default function NotificationsPage() {
                     Erneut versuchen
                   </Button>
                 </div>
-              ) : unreadCount === 0 ? (
+              ) : !Array.isArray(notifications) || unreadCount === 0 ? (
                 <div className="text-center py-8">
                   <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
                   <p className="text-lg font-medium mb-2">Alles gelesen!</p>
@@ -347,7 +362,7 @@ export default function NotificationsPage() {
                 </div>
               ) : (
                 <div className="space-y-1 divide-y">
-                  {notifications
+                  {Array.isArray(notifications) && notifications
                     .filter(notification => !notification.isRead)
                     .map(notification => (
                       <div 

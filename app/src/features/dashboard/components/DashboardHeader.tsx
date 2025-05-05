@@ -255,16 +255,29 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
                 aria-orientation="vertical"
                 aria-labelledby="profile-menu"
               >
-                <div className="px-4 py-3 border-b">
-                  <p className="text-sm font-semibold">
-                    {user?.name || 'Benutzer'}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {user?.email || 'user@example.com'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Mitarbeiter'}
-                  </p>
+                <div className="px-4 py-3 border-b flex items-center">
+                  {user?.profilePicture ? (
+                    <img 
+                      src={user.profilePicture} 
+                      alt={user?.name || 'Profile'} 
+                      className="h-10 w-10 rounded-full object-cover mr-3" 
+                    />
+                  ) : (
+                    <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center mr-3">
+                      <span className="text-sm font-medium" aria-hidden="true">{userInitials}</span>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm font-semibold">
+                      {user?.name || 'Benutzer'}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {user?.email || 'user@example.com'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Mitarbeiter'}
+                    </p>
+                  </div>
                 </div>
                 
                 <ul role="none" className="py-1">

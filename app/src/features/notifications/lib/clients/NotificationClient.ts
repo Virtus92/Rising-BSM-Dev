@@ -20,12 +20,33 @@ export class NotificationClient {
    * Gets all notifications with optional filtering
    * 
    * @param params - Optional filter parameters
+   * @param options - Request options like signal for AbortController
    * @returns API response
    */
-  static async getNotifications(params: NotificationFilterParamsDto = {}): Promise<ApiResponse<NotificationResponseDto[]>> {
+  static async getNotifications(
+    params: NotificationFilterParamsDto = {}, 
+    options: { signal?: AbortSignal } = {}
+  ): Promise<ApiResponse<NotificationResponseDto[]>> {
     try {
-      return await ApiClient.get(NOTIFICATIONS_API_URL, { params });
+      // Pass both params and any options (like AbortController signal) to the API Client
+      return await ApiClient.get(NOTIFICATIONS_API_URL, { 
+        params, 
+        headers: options.signal ? { 'X-Request-ID': `notifications-${Date.now()}` } : undefined,
+        requestId: options.signal ? `notifications-${Date.now()}` : undefined
+        // Note: The signal property isn't supported by ApiClient.get, using requestId instead
+      });
     } catch (error: unknown) {
+      // Don't throw for aborted requests
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        console.log('Notification request was aborted intentionally');
+        return {
+          success: false,
+          data: [],
+          message: 'Request aborted',
+          statusCode: 499 // Nginx's status code for client closed request
+        };
+      }
+      
       console.error('Failed to fetch notifications:', error as Error);
       throw new ApiRequestError(
         error instanceof Error ? error.message : 'Failed to fetch notifications',

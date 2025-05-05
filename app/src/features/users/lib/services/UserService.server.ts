@@ -31,7 +31,6 @@ import { IValidationService } from '@/core/validation';
 import { ILoggingService } from '@/core/logging';
 import { LogActionType } from '@/domain/enums/CommonEnums';
 import { hashPassword, comparePasswords } from '@/core/security/password-utils';
-
 /**
  * User Service - Server-side implementation
  * 
@@ -41,12 +40,27 @@ export class UserService implements IUserService {
   /**
    * Count users with optional filtering
    */
-  async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
+  async count(options?: { context?: any; filters?: Record<string, any> }): Promise<{ count: number }> {
     try {
-      return await this.userRepository.count(options?.filters);
+      // Convert options.filters to criteria if present
+      const criteria: Record<string, any> = options?.filters || {};
+      
+      const count = await this.userRepository.count(criteria);
+      
+      // Ensure consistent response format with count property
+      if (typeof count === 'number') {
+        return { count };
+      } else if (count && typeof count === 'object' && 'count' in count) {
+        return count as { count: number };
+      } else if (count && typeof count === 'object' && 'total' in count) {
+        return { count: (count as { total: number }).total };
+      }
+      
+      // Default to zero if no valid count format is found
+      return { count: 0 };
     } catch (error) {
       this.logger.error('Error in UserService.count:', error as Error);
-      return 0;
+      return { count: 0 };
     }
   }
   
@@ -400,8 +414,16 @@ export class UserService implements IUserService {
         throw new Error('User not found');
       }
 
-      // Validate input
-      const validationResult = this.validator.validateUpdateUser(data);
+      // Prepare update data
+      const updateData = { ...data };
+      
+      // Handle optional fields
+      // Don't validate optional empty fields
+      if (!updateData.phone) delete updateData.phone;
+      if (!updateData.profilePicture) delete updateData.profilePicture;
+      
+      // Validate input - only for non-empty fields
+      const validationResult = this.validator.validateUpdateUser(updateData);
       if (!validationResult.isValid) {
         throw new Error(validationResult.errors?.join(', ') || 'Invalid user data');
       }
@@ -418,15 +440,29 @@ export class UserService implements IUserService {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, confirmPassword, ...cleanData } = data as any;
       
+      // Normalize profilePicture path if present
+      if (cleanData.profilePicture) {
+        // Ensure the path starts with /uploads/ not /public/uploads/
+        if (cleanData.profilePicture.includes('/public/uploads/')) {
+          cleanData.profilePicture = cleanData.profilePicture.replace('/public/uploads/', '/uploads/');
+        }
+        
+        // If no profilePictureId is provided but there's a profile picture,
+        // set profilePictureId to null to avoid type mismatch errors
+        if (cleanData.profilePictureId === undefined) {
+          cleanData.profilePictureId = null;
+        }
+      }
+      
       // Prepare update data
-      const updateData: Partial<User> = {
+      const updatedData: Partial<User> = {
         ...cleanData,
         updatedBy: options?.userId,
         updatedAt: new Date()
       };
 
       // Update user
-      const updatedUser = await this.userRepository.update(id, updateData);
+      const updatedUser = await this.userRepository.update(id, updatedData);
       return this.mapToUserResponseDto(updatedUser);
     } catch (error) {
       this.logger.error(`Error in UserService.update(${id}):`, error as Error);

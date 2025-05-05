@@ -8,9 +8,12 @@ import {
   CreateRequestDto, 
   UpdateRequestDto,
   RequestFilterParamsDto,
-  RequestNoteDto
+  RequestNoteDto,
+  RequestStatusUpdateDto,
+  ConvertToCustomerDto
 } from '@/domain/dtos/RequestDtos';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 
 // Define interface for API responses
 interface ApiResponse<T = any> {
@@ -84,8 +87,45 @@ export class RequestService {
   /**
    * Alias method for getRequests to maintain consistency with server implementation
    */
-  static async findAll(filters?: RequestFilterParamsDto): Promise<ApiResponse<PaginatedResponse<RequestResponseDto>>> {
-    return this.getRequests(filters);
+  static async findAll(filters?: any): Promise<ApiResponse<PaginationResult<RequestResponseDto>>> {
+    try {
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            if (key === 'filters' && typeof value === 'object') {
+              // Handle nested filters object
+              Object.entries(value).forEach(([filterKey, filterValue]) => {
+                if (filterValue !== undefined && filterValue !== null && filterValue !== '') {
+                  queryParams.append(filterKey, String(filterValue));
+                }
+              });
+            } else {
+              queryParams.append(key, String(value));
+            }
+          }
+        });
+      }
+      
+      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      return await ApiClient.get(`${this.basePath}${query}`);
+    } catch (error) {
+      console.error('Error in RequestService.findAll:', error as Error);
+      return {
+        success: false,
+        data: { 
+          data: [], 
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 0,
+            totalPages: 0
+          }
+        },
+        message: error instanceof Error ? error.message : 'Error fetching requests'
+      };
+    }
   }
 
   /**
@@ -200,6 +240,9 @@ export class RequestService {
    */
   static async count(filters?: Record<string, any>): Promise<ApiResponse<{ count: number }>> {
     try {
+      // Log when this method is called
+      console.log('RequestService.client.ts count method called with filters:', filters);
+      
       // Build query parameters
       const queryParams = new URLSearchParams();
       if (filters) {
@@ -211,7 +254,15 @@ export class RequestService {
       }
       
       const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      const response = await ApiClient.get(`${this.basePath}/count${query}`);
+      const url = `/api${this.basePath}/count${query}`;
+      
+      // Log the URL being requested
+      console.log('Making API request to:', url);
+      
+      const response = await ApiClient.get(url);
+      
+      // Log response
+      console.log('Count API response:', response);
       
       // Ensure consistent response format
       if (response.success) {
@@ -362,6 +413,25 @@ export class RequestService {
   }
   
   /**
+   * Update request status - dedicated method
+   */
+  static async updateRequestStatus(
+    id: number, 
+    data: RequestStatusUpdateDto
+  ): Promise<ApiResponse<RequestResponseDto>> {
+    try {
+      return await ApiClient.patch(`${this.basePath}/${id}/status`, data);
+    } catch (error) {
+      console.error('Error in RequestService.updateRequestStatus:', error as Error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : `Error updating request status`
+      };
+    }
+  }
+  
+  /**
    * Assign request to a user
    * @param id Request ID
    * @param userId User ID
@@ -442,24 +512,18 @@ export class RequestService {
   /**
    * Convert request to customer
    * @param id Request ID
-   * @param customerData Customer data
+   * @param data Customer conversion data
    */
   static async convertToCustomer(
     id: number, 
-    customerData: { 
-      name: string; 
-      email?: string; 
-      phone?: string; 
-      note?: string;
-      company?: string;
-    }
-  ): Promise<ApiResponse<{ success: boolean; customerId?: number }>> {
+    data: ConvertToCustomerDto
+  ): Promise<ApiResponse<{ success: boolean; customerId?: number; customer?: any; request?: any }>> {
     try {
       if (process.env.NODE_ENV === 'development') {
-        console.log(`Converting request ${id} to customer:`, customerData);
+        console.log(`Converting request ${id} to customer:`, data);
       }
       
-      return await ApiClient.post(`${this.basePath}/${id}/convert`, customerData);
+      return await ApiClient.post(`${this.basePath}/${id}/convert`, data);
     } catch (error) {
       console.error('Error in RequestService.convertToCustomer:', error as Error);
       return {

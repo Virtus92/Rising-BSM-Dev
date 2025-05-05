@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
-import { tokenBlacklist } from '@/features/auth/lib/clients/token/blacklist';
+import { blacklistToken, blacklistUser } from '@/features/auth/lib/clients/token/blacklist/TokenBlacklistServer';
 
 export async function logoutHandler(req: NextRequest): Promise<NextResponse> {
   const logger = getLogger();
@@ -56,18 +56,16 @@ export async function logoutHandler(req: NextRequest): Promise<NextResponse> {
             userId = parseInt(decodedToken.sub, 10);
           }
           
-          // Add to blacklist with token ID if available
-          if (decodedToken.jti) {
-            tokenBlacklist.add(decodedToken.jti, expiryMs, 'logout');
-            logger.info('Auth token added to blacklist', { 
-              tokenId: decodedToken.jti.substring(0, 8) + '...',
-              userId: decodedToken.sub 
-            });
-          } else {
-            // Fallback to using the token itself
-            tokenBlacklist.add(authToken, expiryMs, 'logout');
-            logger.info('Auth token added to blacklist', { userId: decodedToken.sub });
+          // Add to blacklist using our improved implementation
+          blacklistToken(authToken);
+          
+          // If we have a user ID, also blacklist all tokens for this user
+          if (userId) {
+            blacklistUser(userId);
+            logger.info('User tokens blacklisted for logout', { userId });
           }
+          
+          logger.info('Auth token added to blacklist', { userId: decodedToken.sub });
         }
       } catch (error) {
         logger.warn('Failed to decode auth token during logout', { error });
@@ -92,7 +90,7 @@ export async function logoutHandler(req: NextRequest): Promise<NextResponse> {
     else if (refreshToken) {
       try {
         // Use token blacklist as fallback
-        tokenBlacklist.add(refreshToken, Date.now() + (7 * 24 * 60 * 60 * 1000), 'logout-refresh');
+        blacklistToken(refreshToken);
         logger.info('Refresh token added to blacklist');
       } catch (error) {
         logger.warn('Failed to blacklist refresh token during logout', { error });

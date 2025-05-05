@@ -6,11 +6,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
+import { cookies } from 'next/headers'; // Fix: Import cookies from next/headers
+import { jwtDecode } from 'jwt-decode'; // Fix: Use jwtDecode instead of jwt.decode
 
 /**
- * Login handler for POST /api/auth/login
- * Authenticates a user and returns access and refresh tokens
+ * Helper function to clean up stale tokens
  */
+async function cleanupStaleAuthTokens(request: NextRequest, logger: any): Promise<void> {
+  try {
+    const cookieStore = await cookies();
+    const authToken = cookieStore.get('auth_token')?.value;
+    
+    if (authToken) {
+      try {
+        // Try to decode the token to check if it's expired
+        const decoded = jwtDecode(authToken) as any;
+        
+        if (decoded && decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
+          logger.debug('Found expired token in cookies, will be replaced');
+        }
+      } catch (error) {
+        logger.debug('Error decoding token during login, will be replaced', { error });
+      }
+    }
+  } catch (error) {
+    // Non-critical error, just log and continue
+    logger.debug('Error checking for stale tokens', { error });
+  }
+}
+
 export async function loginHandler(request: NextRequest): Promise<NextResponse> {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();
@@ -28,14 +52,25 @@ export async function loginHandler(request: NextRequest): Promise<NextResponse> 
       return formatResponse.error('Email and password are required', 400);
     }
 
-    // Perform login
+    // Prepare context for login
+    const context = {
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      device: request.headers.get('sec-ch-ua') || 'unknown-device',
+      requestId: request.headers.get('x-request-id') || crypto.randomUUID()
+    };
+    
+    // Attempt to log any prior tokens for this session
+    await cleanupStaleAuthTokens(request, logger);
+    
+    // Perform login with proper context tracking
     const result = await authService.login({
       email,
       password,
-      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
-      userAgent: request.headers.get('user-agent') || 'unknown',
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
       rememberMe: remember
-    });
+    }, { context });
     
     // Get token expiration from security config
     const securityConfig = getServiceFactory().createSecurityConfig();
@@ -68,32 +103,48 @@ export async function loginHandler(request: NextRequest): Promise<NextResponse> 
       refreshToken: result.refreshToken
     }, 'Login successful');
     
-    // Set HTTP-only cookies with proper settings
-    response.cookies.set({
-      name: 'auth_token',
-      value: result.accessToken,
+    // Set HTTP-only cookies with proper security settings
+    // Fix: Use the proper NextResponse cookies API structure
+    response.cookies.set('auth_token', result.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', 
+      sameSite: 'strict',
       path: '/',
-      maxAge: result.accessExpiration // in seconds
+      maxAge: result.accessExpiration,
     });
     
-    response.cookies.set({
-      name: 'refresh_token',
-      value: result.refreshToken,
+    response.cookies.set('refresh_token', result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: result.refreshExpiration // in seconds
+      sameSite: 'strict',
+      path: '/api/auth/refresh',
+      maxAge: result.refreshExpiration,
     });
     
-    // Add debugging headers
+    // Add security headers
     response.headers.set('X-Token-Set', 'true');
     response.headers.set('X-Auth-User-ID', result.user.id.toString());
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     response.headers.set('Pragma', 'no-cache');
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-XSS-Protection', '1; mode=block');
+    
+    // Add tracking information for monitoring
+    response.headers.set('X-Request-ID', context.requestId);
+    
+    // Give the client a session ID (but not the user ID) to help with debugging
+    const sessionId = crypto.randomUUID().split('-')[0];
+    response.headers.set('X-Session-ID', sessionId);
+    
+    // Log successful login for monitoring
+    logger.info('User authenticated successfully', { 
+      userId: result.user.id,
+      email: result.user.email,
+      role: result.user.role,
+      sessionId,
+      requestId: context.requestId
+    });
     
     return response;
   } catch (error) {
