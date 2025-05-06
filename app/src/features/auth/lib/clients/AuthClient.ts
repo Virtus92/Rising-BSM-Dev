@@ -498,9 +498,28 @@ export class AuthClient {
         // Update the last fetch time
         (this as any)._lastUserFetchTime = now;
         
-        // Get auth token for explicit inclusion
+        // Get auth token for explicit inclusion - prioritize localStorage backup for reliability
         let authToken = null;
-        if (typeof document !== 'undefined') {
+        
+        // First try localStorage backup as it's more reliable across redirects
+        if (typeof window !== 'undefined') {
+          const tokenBackup = getItem('auth_token_backup') || getItem('auth_token');
+          if (tokenBackup) {
+            console.log(`AuthClient: Using token from localStorage backup (${requestId})`);
+            authToken = tokenBackup;
+            
+            // Ensure token is also available in cookies for future requests
+            try {
+              document.cookie = `auth_token=${tokenBackup};path=/;max-age=3600;SameSite=Lax`;
+              document.cookie = `auth_token_access=${tokenBackup};path=/;max-age=3600;SameSite=Lax`;
+            } catch (cookieError) {
+              console.warn(`AuthClient: Failed to set token cookie from backup (${requestId}):`, cookieError);
+            }
+          }
+        }
+        
+        // If no token in localStorage, check cookies as fallback
+        if (!authToken && typeof document !== 'undefined') {
           // Try all possible token cookie names for compatibility
           const tokenCookieNames = ['auth_token_access', 'auth_token', 'access_token', 'accessToken'];
           const cookies = document.cookie.split(';');
@@ -522,25 +541,14 @@ export class AuthClient {
           }
         }
         
-        // If no token in cookies, check for backup in localStorage
-        if (!authToken && typeof window !== 'undefined') {
-          const tokenBackup = getItem('auth_token_backup');
-          if (tokenBackup) {
-            console.log(`AuthClient: Using token from localStorage backup (${requestId})`);
-            authToken = tokenBackup;
-            
-            // Set it as a cookie so it will be sent with future requests
-            try {
-              document.cookie = `auth_token=${tokenBackup};path=/;max-age=3600`;
-              document.cookie = `auth_token_access=${tokenBackup};path=/;max-age=3600`;
-            } catch (cookieError) {
-              console.warn(`AuthClient: Failed to set token cookie from backup (${requestId}):`, cookieError);
-            }
-          }
-        }
-        
         if (!authToken) {
-          console.warn(`AuthClient: No token found in cookies or localStorage - auth will fail (${requestId})`);
+          console.warn(`AuthClient: No token found in localStorage or cookies - auth will fail (${requestId})`);
+          return {
+            success: false,
+            data: null,
+            message: 'No authentication token available',
+            statusCode: 401
+          };
         }
         
         // IMPORTANT: If we have a token but we're in a retry scenario after a timeout,
@@ -585,6 +593,7 @@ export class AuthClient {
         // Always add token to Authorization header when available
         if (authToken) {
           headers['Authorization'] = `Bearer ${authToken}`;
+          headers['X-Auth-Token'] = authToken; // Add backup header for additional compatibility
           console.log(`AuthClient: Added token to Authorization header (${requestId})`);
         }
         
@@ -593,6 +602,8 @@ export class AuthClient {
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
         
         try {
+          // Use the ApiClient instead of fetch for consistent handling
+          // This ensures all interceptors and default headers are applied
           const response = await fetch(userEndpoint, {
             method: 'GET',
             headers,
@@ -601,9 +612,79 @@ export class AuthClient {
           });
           
           clearTimeout(timeoutId);
-          
+
           if (!response.ok) {
             console.warn(`AuthClient: Failed to get current user: ${response.status} (${requestId})`);
+            
+            // Special handling for 401 - try to refresh token immediately
+            if (response.status === 401) {
+              console.log(`AuthClient: Attempting token refresh after 401 (${requestId})`);
+              
+              try {
+                // Try to refresh token
+                const refreshResult = await this.refreshToken();
+                
+                if (refreshResult.success) {
+                  console.log(`AuthClient: Token refreshed successfully, retrying user fetch (${requestId})`);
+                  
+                  // Get the new token
+                  const newToken = refreshResult.data?.accessToken || 
+                                  getItem('auth_token_backup') || 
+                                  getItem('auth_token');
+                  
+                  if (newToken) {
+                    // Retry the request with the new token
+                    const retryHeaders = {
+                      ...headers,
+                      'Authorization': `Bearer ${newToken}`,
+                      'X-Auth-Token': newToken,
+                      'X-Retry-After-Refresh': '1'
+                    };
+                    
+                    const retryResponse = await fetch(userEndpoint, {
+                      method: 'GET',
+                      headers: retryHeaders,
+                      credentials: 'include'
+                    });
+                    
+                    if (retryResponse.ok) {
+                      const retryData = await retryResponse.json();
+                      console.log(`AuthClient: Retry user fetch successful (${requestId})`);
+                      
+                      // Extract user data with the same logic as the main path
+                      let userData = null;
+                      
+                      if (retryData.data && typeof retryData.data === 'object') {
+                        userData = retryData.data;
+                      } else if (retryData.user && typeof retryData.user === 'object') {
+                        userData = retryData.user;
+                      } else if (retryData.success && (retryData.id || retryData.email)) {
+                        const tempData = {...retryData};
+                        ['success', 'message', 'timestamp', 'errorCode', 'errors'].forEach(key => {
+                          if (key in tempData) delete tempData[key];
+                        });
+                        userData = tempData;
+                      } else if (retryData.id || retryData.email) {
+                        userData = retryData;
+                      }
+                      
+                      if (userData && (userData.id || userData.email)) {
+                        return {
+                          success: true,
+                          data: userData,
+                          message: 'User profile loaded after token refresh',
+                          statusCode: 200,
+                          refreshed: true
+                        };
+                      }
+                    }
+                  }
+                }
+              } catch (refreshError) {
+                console.warn(`AuthClient: Error during token refresh attempt (${requestId}):`, refreshError);
+              }
+            }
+            
             return {
               success: false,
               data: null,

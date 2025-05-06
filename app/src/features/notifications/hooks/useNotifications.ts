@@ -306,7 +306,7 @@ export const useNotifications = ({
       return;
     }
     
-    // Check if we should auto-fetch on mount
+    /* Check if we should auto-fetch on mount
     if (autoFetch && !didInitialFetchRef.current) {
       // Delay initial fetch to avoid too many simultaneous requests
       const offset = 1000 + Math.random() * 2000; // Random delay between 1-3 seconds
@@ -324,7 +324,7 @@ export const useNotifications = ({
       }, offset);
       
       return () => clearTimeout(timer);
-    }
+    }*/
     
     // Set up polling if requested
     if (pollInterval && pollInterval > 0) {

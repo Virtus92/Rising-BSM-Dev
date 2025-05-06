@@ -8,6 +8,7 @@ CREATE TABLE "User" (
     "phone" VARCHAR(30),
     "status" TEXT NOT NULL DEFAULT 'active',
     "profilePicture" VARCHAR(255),
+    "profilePictureId" INTEGER,
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(6) NOT NULL,
     "createdBy" INTEGER,
@@ -56,6 +57,32 @@ CREATE TABLE "UserSession" (
 );
 
 -- CreateTable
+CREATE TABLE "Permission" (
+    "id" SERIAL NOT NULL,
+    "code" VARCHAR(100) NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "description" TEXT NOT NULL,
+    "category" VARCHAR(50) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" INTEGER,
+    "updatedBy" INTEGER,
+
+    CONSTRAINT "Permission_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "UserPermission" (
+    "id" SERIAL NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "permissionId" INTEGER NOT NULL,
+    "grantedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "grantedBy" INTEGER,
+
+    CONSTRAINT "UserPermission_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "RefreshToken" (
     "token" TEXT NOT NULL,
     "userId" INTEGER NOT NULL,
@@ -93,6 +120,7 @@ CREATE TABLE "Customer" (
     "postalCode" VARCHAR(10),
     "city" VARCHAR(100),
     "country" VARCHAR(100) NOT NULL DEFAULT 'Deutschland',
+    "vatNumber" VARCHAR(50),
     "notes" TEXT,
     "newsletter" BOOLEAN NOT NULL DEFAULT false,
     "status" VARCHAR(20) NOT NULL DEFAULT 'active',
@@ -173,7 +201,9 @@ CREATE TABLE "ContactRequest" (
     "customerId" INTEGER,
     "appointmentId" INTEGER,
     "ipAddress" VARCHAR(255),
-    "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "source" VARCHAR(50),
+    "metadata" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(6) NOT NULL,
 
     CONSTRAINT "ContactRequest_pkey" PRIMARY KEY ("id")
@@ -199,9 +229,57 @@ CREATE TABLE "RequestLog" (
     "userName" VARCHAR(255) NOT NULL,
     "action" VARCHAR(255) NOT NULL,
     "details" TEXT,
-    "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "RequestLog_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RequestData" (
+    "id" SERIAL NOT NULL,
+    "requestId" INTEGER NOT NULL,
+    "category" VARCHAR(50) NOT NULL,
+    "label" VARCHAR(100) NOT NULL,
+    "order" INTEGER NOT NULL DEFAULT 0,
+    "dataType" VARCHAR(50) NOT NULL,
+    "data" JSONB NOT NULL,
+    "isValid" BOOLEAN NOT NULL DEFAULT true,
+    "processedBy" VARCHAR(50),
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdById" INTEGER,
+
+    CONSTRAINT "RequestData_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RequestDataHistory" (
+    "id" SERIAL NOT NULL,
+    "requestDataId" INTEGER NOT NULL,
+    "data" JSONB NOT NULL,
+    "changedBy" VARCHAR(100),
+    "changeReason" TEXT,
+    "version" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" INTEGER,
+
+    CONSTRAINT "RequestDataHistory_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "N8NWebhook" (
+    "id" SERIAL NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "description" TEXT,
+    "url" VARCHAR(255) NOT NULL,
+    "workflowId" VARCHAR(100),
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "category" VARCHAR(50) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "N8NWebhook_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -223,6 +301,24 @@ CREATE TABLE "Notification" (
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "File" (
+    "id" SERIAL NOT NULL,
+    "filename" VARCHAR(255) NOT NULL,
+    "originalName" VARCHAR(255) NOT NULL,
+    "mimeType" VARCHAR(100) NOT NULL,
+    "path" VARCHAR(255) NOT NULL,
+    "size" INTEGER NOT NULL,
+    "type" VARCHAR(50) NOT NULL DEFAULT 'general',
+    "uploadedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "uploadedBy" INTEGER,
+    "description" TEXT,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "File_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -233,7 +329,28 @@ CREATE INDEX "User_email_idx" ON "User"("email");
 CREATE INDEX "User_name_idx" ON "User"("name");
 
 -- CreateIndex
+CREATE INDEX "User_profilePictureId_idx" ON "User"("profilePictureId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "UserSettings_userId_key" ON "UserSettings"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Permission_code_key" ON "Permission"("code");
+
+-- CreateIndex
+CREATE INDEX "Permission_code_idx" ON "Permission"("code");
+
+-- CreateIndex
+CREATE INDEX "Permission_category_idx" ON "Permission"("category");
+
+-- CreateIndex
+CREATE INDEX "UserPermission_userId_idx" ON "UserPermission"("userId");
+
+-- CreateIndex
+CREATE INDEX "UserPermission_permissionId_idx" ON "UserPermission"("permissionId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "UserPermission_userId_permissionId_key" ON "UserPermission"("userId", "permissionId");
 
 -- CreateIndex
 CREATE INDEX "RefreshToken_userId_idx" ON "RefreshToken"("userId");
@@ -265,11 +382,53 @@ CREATE INDEX "ContactRequest_status_idx" ON "ContactRequest"("status");
 -- CreateIndex
 CREATE INDEX "ContactRequest_createdAt_idx" ON "ContactRequest"("createdAt");
 
+-- CreateIndex
+CREATE INDEX "ContactRequest_source_idx" ON "ContactRequest"("source");
+
+-- CreateIndex
+CREATE INDEX "RequestData_requestId_idx" ON "RequestData"("requestId");
+
+-- CreateIndex
+CREATE INDEX "RequestData_category_idx" ON "RequestData"("category");
+
+-- CreateIndex
+CREATE INDEX "RequestData_createdById_idx" ON "RequestData"("createdById");
+
+-- CreateIndex
+CREATE INDEX "RequestDataHistory_requestDataId_idx" ON "RequestDataHistory"("requestDataId");
+
+-- CreateIndex
+CREATE INDEX "RequestDataHistory_userId_idx" ON "RequestDataHistory"("userId");
+
+-- CreateIndex
+CREATE INDEX "N8NWebhook_category_idx" ON "N8NWebhook"("category");
+
+-- CreateIndex
+CREATE INDEX "N8NWebhook_active_idx" ON "N8NWebhook"("active");
+
+-- CreateIndex
+CREATE INDEX "File_type_idx" ON "File"("type");
+
+-- CreateIndex
+CREATE INDEX "File_uploadedBy_idx" ON "File"("uploadedBy");
+
+-- CreateIndex
+CREATE INDEX "File_path_idx" ON "File"("path");
+
+-- AddForeignKey
+ALTER TABLE "User" ADD CONSTRAINT "User_profilePictureId_fkey" FOREIGN KEY ("profilePictureId") REFERENCES "File"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
 -- AddForeignKey
 ALTER TABLE "UserSettings" ADD CONSTRAINT "UserSettings_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "UserActivity" ADD CONSTRAINT "UserActivity_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UserPermission" ADD CONSTRAINT "UserPermission_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UserPermission" ADD CONSTRAINT "UserPermission_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "Permission"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -296,6 +455,9 @@ ALTER TABLE "AppointmentNote" ADD CONSTRAINT "AppointmentNote_userId_fkey" FOREI
 ALTER TABLE "AppointmentLog" ADD CONSTRAINT "AppointmentLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "AppointmentLog" ADD CONSTRAINT "AppointmentLog_appointmentId_fkey" FOREIGN KEY ("appointmentId") REFERENCES "Appointment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "ContactRequest" ADD CONSTRAINT "ContactRequest_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -315,3 +477,15 @@ ALTER TABLE "RequestLog" ADD CONSTRAINT "RequestLog_userId_fkey" FOREIGN KEY ("u
 
 -- AddForeignKey
 ALTER TABLE "RequestLog" ADD CONSTRAINT "RequestLog_requestId_fkey" FOREIGN KEY ("requestId") REFERENCES "ContactRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RequestData" ADD CONSTRAINT "RequestData_requestId_fkey" FOREIGN KEY ("requestId") REFERENCES "ContactRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RequestData" ADD CONSTRAINT "RequestData_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RequestDataHistory" ADD CONSTRAINT "RequestDataHistory_requestDataId_fkey" FOREIGN KEY ("requestDataId") REFERENCES "RequestData"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RequestDataHistory" ADD CONSTRAINT "RequestDataHistory_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
