@@ -20,7 +20,13 @@ export async function getRoleDefaultsHandler(
   try {
     if (!role) {
       return NextResponse.json(
-        formatResponse.error('Invalid or missing role', 400),
+        { 
+          success: false, 
+          message: 'Invalid or missing role', 
+          data: null,
+          error: { code: 'VALIDATION_ERROR' },
+          timestamp: new Date().toISOString()
+        },
         { status: 400 }
       );
     }
@@ -33,7 +39,13 @@ export async function getRoleDefaultsHandler(
     const validRoles = Object.values(UserRole).map(r => r.toLowerCase());
     if (!validRoles.includes(normalizedRole)) {
       return NextResponse.json(
-        formatResponse.error(`Invalid role: ${role}. Valid roles are: ${Object.values(UserRole).join(', ')}`, 400),
+        { 
+          success: false, 
+          message: `Invalid role: ${role}. Valid roles are: ${Object.values(UserRole).join(', ')}`, 
+          data: null,
+          error: { code: 'VALIDATION_ERROR' },
+          timestamp: new Date().toISOString()
+        },
         { status: 400 }
       );
     }
@@ -44,10 +56,15 @@ export async function getRoleDefaultsHandler(
     // Get default permissions for the role
     const permissions = await permissionService.getDefaultPermissionsForRole(normalizedRole);
     
-    return formatResponse.success({
-      role: normalizedRole,
-      permissions
-    }, 'Default permissions retrieved successfully');
+    return NextResponse.json({
+      success: true,
+      data: {
+        role: normalizedRole,
+        permissions
+      },
+      message: 'Default permissions retrieved successfully',
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
     logger.error('Error fetching default permissions for role:', {
       error: error instanceof Error ? error.message : String(error),
@@ -55,9 +72,12 @@ export async function getRoleDefaultsHandler(
       role
     });
     
-    return formatResponse.error(
-      error instanceof Error ? error.message : 'Failed to fetch default permissions',
-      500
-    );
+    return NextResponse.json({
+      success: false,
+      data: null,
+      message: error instanceof Error ? error.message : 'Failed to fetch default permissions',
+      error: { code: 'INTERNAL_ERROR' },
+      timestamp: new Date().toISOString()
+    }, { status: 500 });
   }
 }

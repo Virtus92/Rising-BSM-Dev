@@ -92,12 +92,17 @@ export enum SystemPermission {
   // System permissions
   SYSTEM_ADMIN = "system.admin",
   SYSTEM_LOGS = "system.logs",
+  
+  // Permission management
+  PERMISSIONS_VIEW = "permissions.view",
+  PERMISSIONS_MANAGE = "permissions.manage",
 }
 
 // Role-based permission presets
 export const RolePermissions: Record<string, SystemPermission[]> = {
   "admin": [
     SystemPermission.SYSTEM_ACCESS,
+    SystemPermission.SYSTEM_ADMIN, // Added SYSTEM_ADMIN permission for admin role
     SystemPermission.USERS_VIEW,
     SystemPermission.USERS_CREATE,
     SystemPermission.USERS_EDIT,
@@ -126,6 +131,8 @@ export const RolePermissions: Record<string, SystemPermission[]> = {
     SystemPermission.APPOINTMENTS_DELETE,
     SystemPermission.SETTINGS_VIEW,
     SystemPermission.SETTINGS_EDIT,
+    SystemPermission.PERMISSIONS_VIEW,
+    SystemPermission.PERMISSIONS_MANAGE,
     SystemPermission.PROFILE_VIEW,
     SystemPermission.PROFILE_EDIT
   ],
@@ -148,6 +155,7 @@ export const RolePermissions: Record<string, SystemPermission[]> = {
     SystemPermission.APPOINTMENTS_EDIT,
     SystemPermission.APPOINTMENTS_DELETE,
     SystemPermission.SETTINGS_VIEW,
+    SystemPermission.PERMISSIONS_VIEW,
     SystemPermission.PROFILE_VIEW,
     SystemPermission.PROFILE_EDIT
   ],

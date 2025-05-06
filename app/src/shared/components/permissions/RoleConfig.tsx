@@ -93,6 +93,12 @@ export const dashboardNavigation: Record<UserRole, MenuSection[]> = {
           permission: SystemPermission.SETTINGS_VIEW,
         },
         {
+          name: 'Permissions',
+          path: '/dashboard/permissions',
+          icon: 'Shield',
+          permission: SystemPermission.PERMISSIONS_MANAGE,
+        },
+        {
           name: 'Profile',
           path: '/dashboard/profile',
           icon: 'User',

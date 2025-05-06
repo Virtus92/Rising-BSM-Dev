@@ -33,7 +33,8 @@ import {
 } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/shared/components/ui/breadcrumb";
 import { UserForm } from '@/features/users/components/UserForm';
-import { UserPermissions } from '@/features/users/components/UserPermissions';
+// Import the enhanced UserPermissions component for better error handling
+import UserPermissionsEnhanced from '@/features/users/components/UserPermissionsEnhanced';
 import { UserDto } from '@/domain/dtos/UserDtos';
 import { UserRole, UserStatus } from '@/domain/entities/User';
 import { UserService } from '@/features/users/lib/services/UserService';
@@ -636,7 +637,7 @@ export default function EditUserPage() {
             </DialogDescription>
           </DialogHeader>
           {user && (
-            <UserPermissions 
+            <UserPermissionsEnhanced 
               user={user}
               onSave={handleUpdatePermissions}
               onCancel={() => setShowPermissionsDialog(false)}

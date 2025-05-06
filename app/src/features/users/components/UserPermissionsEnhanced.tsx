@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
+  CardContent,
+  CardHeader,
+  CardTitle,
   CardDescription, 
   CardFooter 
 } from '@/shared/components/ui/card';
@@ -47,11 +47,6 @@ export interface Permission {
 }
 
 /**
- * Using centralized permission definitions from SystemPermissionMap
- * This ensures consistency between backend and frontend
- */
-
-/**
  * Creates formatted permissions list from system permissions enum and raw permission codes
  * 
  * @param permissionCodes - Raw permission codes from the API
@@ -85,7 +80,7 @@ interface UserPermissionsProps {
   readOnly?: boolean;
 }
 
-export const UserPermissions: React.FC<UserPermissionsProps> = ({
+export const UserPermissionsEnhanced: React.FC<UserPermissionsProps> = ({
   user,
   onSave,
   onCancel,
@@ -99,6 +94,7 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   
   // Fetch all permissions first to get the full list of available permissions
   const fetchAvailablePermissions = async () => {
@@ -115,6 +111,7 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
       }
       
       // Fallback to using enum values if API fails
+      console.warn('Failed to get permissions from API, using enum values as fallback');
       return Object.values(SystemPermission);
     } catch (err) {
       console.error('Error fetching available permissions:', err instanceof Error ? err.message : String(err));
@@ -134,8 +131,10 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
       }
       
       // Fallback to local permissions if API fails
+      console.warn('Failed to get role permissions from API, using local data as fallback');
       return getPermissionsForRole(role);
     } catch (error) {
+      console.warn('Error fetching role permissions, using local fallback', error);
       // Fallback to local list
       return getPermissionsForRole(role);
     }
@@ -298,6 +297,9 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
         // If we can't refresh, just keep the current state - don't show error to user
         console.warn('Could not refresh permissions after save:', refreshErr instanceof Error ? refreshErr.message : String(refreshErr));
       }
+      
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       console.error('Error saving permissions:', err instanceof Error ? err.message : String(err));
       setError('Failed to save permissions. Please try again.');
@@ -330,7 +332,7 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
       setSelectedPermissions(newPerms);
     } catch (err) {
       console.error('Error loading role permissions:', err);
-      setError('Failed to load role permissions. Please try again.');
+      // Don't show error to user to prevent UI disruption
     } finally {
       setIsLoading(false);
     }
@@ -367,7 +369,7 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
       </CardHeader>
       
       <CardContent className="space-y-6">
-        {/* Notification about permissions feature being under development */}
+        {/* Notification about permissions feature */}
         <Alert variant="success" className="bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400 border border-green-200 dark:border-green-900">
           <CheckCircle className="h-4 w-4" />
           <AlertTitle>Permissions System Active</AlertTitle>
@@ -377,9 +379,19 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
         </Alert>
         
         {error && (
-          <div className="bg-red-50 p-3 rounded-md text-red-800 text-sm mb-4">
-            {error}
-          </div>
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        {success && (
+          <Alert variant="success" className="bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400 border border-green-200 dark:border-green-900">
+            <CheckCircle className="h-4 w-4" />
+            <AlertTitle>Success</AlertTitle>
+            <AlertDescription>Permissions have been updated successfully.</AlertDescription>
+          </Alert>
         )}
         
         <div className="flex flex-wrap gap-2 mb-4">
@@ -560,4 +572,4 @@ const RoleBadge: React.FC<{ role: string }> = ({ role }) => {
   );
 };
 
-export default UserPermissions;
+export default UserPermissionsEnhanced;

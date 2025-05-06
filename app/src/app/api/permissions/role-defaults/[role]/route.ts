@@ -11,9 +11,15 @@ import { withAuth } from '@/features/auth/api/middleware/authMiddleware';
  * GET /api/permissions/role-defaults/[role]
  * Get default permissions for a specific role
  */
-export const GET = withAuth(async (
+export async function GET(
   request: NextRequest,
-  { params }: { params: { role: string } }
-) => {
-  return getRoleDefaultsHandler(request, params.role);
-});
+  context: { params: Promise<{ role: string }> }
+) {
+  // Await the params before accessing properties
+  const params = await context.params;
+  
+  const authHandler = await withAuth(async (req: NextRequest) => {
+    return getRoleDefaultsHandler(req, params.role);
+  });
+  return authHandler(request);
+}
