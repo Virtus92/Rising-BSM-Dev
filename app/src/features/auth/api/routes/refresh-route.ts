@@ -124,15 +124,44 @@ export async function refreshHandler(req: NextRequest): Promise<NextResponse> {
     response.cookies.delete('auth_token');
     response.cookies.delete('refresh_token');
     
-    // Blacklist the old token if we have it
-    const oldRefreshToken = await extractRefreshToken(req);
-    if (oldRefreshToken) {
-      try {
-        blacklistToken(oldRefreshToken);
-        logger.debug('Blacklisted invalid refresh token', { requestId });
-      } catch (e) {
-        logger.debug('Failed to blacklist invalid token', { requestId, error: e });
+    // Only blacklist the old token if it's a proper authentication error
+    // This prevents unnecessary blacklisting when there are other issues
+    if (error instanceof Error && 
+        (error.message.includes('revoked') || 
+         error.message.includes('expired') || 
+         error.message.includes('Invalid refresh token'))) {
+      
+      const oldRefreshToken = await extractRefreshToken(req);
+      
+      if (oldRefreshToken) {
+        try {
+          // Add strict validation before blacklisting
+          if (typeof oldRefreshToken === 'string' && oldRefreshToken.length > 30) {
+            logger.debug('Blacklisting invalid refresh token', { 
+              requestId,
+              reason: error.message,
+              tokenFirstChars: oldRefreshToken.substring(0, 8)
+            });
+            await blacklistToken(oldRefreshToken);
+          } else {
+            logger.debug('Skipped blacklisting due to invalid token format', { 
+              requestId, 
+              tokenLength: oldRefreshToken?.length 
+            });
+          }
+        } catch (e) {
+          logger.debug('Failed to blacklist token', { 
+            requestId, 
+            error: e instanceof Error ? e.message : String(e)
+          });
+        }
       }
+    } else {
+      // Log other types of errors without blacklisting
+      logger.debug('Skipped token blacklisting for non-auth error', { 
+        requestId,
+        errorType: error instanceof Error ? error.constructor.name : typeof error
+      });
     }
     
     return response;

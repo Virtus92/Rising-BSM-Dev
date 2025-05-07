@@ -1037,6 +1037,11 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
     if (dto.country !== undefined) entity.country = dto.country;
     if (dto.status !== undefined) entity.status = dto.status as CommonStatus;
     
+    // Fix: Add missing fields
+    if (dto.newsletter !== undefined) entity.newsletter = Boolean(dto.newsletter);
+    if (dto.type !== undefined) entity.type = dto.type as CustomerType;
+    if (dto.vatNumber !== undefined) entity.vatNumber = dto.vatNumber;
+    
     // Handle both postalCode and zipCode (normalize to postalCode)
     if (dto.postalCode !== undefined) {
       entity.postalCode = dto.postalCode;

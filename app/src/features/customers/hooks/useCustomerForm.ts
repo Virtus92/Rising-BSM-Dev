@@ -10,7 +10,7 @@ type FormErrors = {
   phone?: string;
   address?: string;
   city?: string;
-  postalCode?: string; // Changed from zipCode to postalCode
+  postalCode?: string;
   country?: string;
   [key: string]: string | undefined;
 };
@@ -32,16 +32,20 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
   const [phone, setPhone] = useState(initialData.phone ? formatPhoneNumber(initialData.phone) : '');
   const [address, setAddress] = useState(initialData.address || '');
   const [city, setCity] = useState(initialData.city || '');
-  const [postalCode, setPostalCode] = useState(initialData.postalCode || ''); // Changed from zipCode to postalCode
+  const [postalCode, setPostalCode] = useState(initialData.postalCode || '');
   const [country, setCountry] = useState(initialData.country || '');
-  const [company, setCompany] = useState(initialData.company || ''); // Changed from companyName to company
+  const [company, setCompany] = useState(initialData.company || '');
   const [vatNumber, setVatNumber] = useState(initialData.vatNumber || '');
-  // Notes removed from form - now managed exclusively via the Notes tab
   
-  // Adding the missing fields
+  // Ensure we use type from initialData, not customerType
   const [customerType, setCustomerType] = useState(initialData.type || CustomerType.PRIVATE);
   const [status, setStatus] = useState(initialData.status || CommonStatus.ACTIVE);
-  const [newsletter, setNewsletter] = useState(initialData.newsletter || false);
+  
+  // Ensure newsletter is properly initialized as a boolean
+  const [newsletter, setNewsletter] = useState(() => {
+    // Make sure to convert to boolean regardless of the type in initialData
+    return initialData.newsletter === true ;
+  });
   
   // Formularstatus
   const [errors, setErrors] = useState<FormErrors>({});
@@ -76,6 +80,15 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
   
   // Erstelle das Formularobjekt
   const getFormData = useCallback((): CreateCustomerDto | UpdateCustomerDto => {
+    // Debug log for development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Form data before submission:', {
+        type: customerType,
+        newsletter: newsletter,
+        vatNumber: vatNumber
+      });
+    }
+    
     return {
       name,
       email: email || undefined,
@@ -86,16 +99,16 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
       country: country || undefined,
       company: company || undefined,
       vatNumber: vatNumber || undefined,
-      // notes field removed from form
-      // Add the missing fields to the form data
+      // The corrected fields:
       type: customerType,
       status: status,
-      newsletter: newsletter
+      // Ensure newsletter is always a boolean
+      newsletter: newsletter === true
     };
   }, [
     name, email, phone, address, 
     city, postalCode, country, company,
-    vatNumber, customerType, status, newsletter // notes removed
+    vatNumber, customerType, status, newsletter
   ]);
   
   // Formular absenden
@@ -114,6 +127,11 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
     setSuccess(false);
     
     try {
+      // Log data pre-submission for debugging in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Submitting customer form with data:', getFormData());
+      }
+      
       // Wenn eine onSubmit-Funktion übergeben wurde, rufe sie auf
       if (onSubmit) {
         const result = await onSubmit(getFormData());
@@ -153,12 +171,13 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
     setCountry(initialData.country || '');
     setCompany(initialData.company || '');
     setVatNumber(initialData.vatNumber || '');
-    // Notes field removed from form
     
-    // Reset the new fields
+    // Reset the type field to the correct value
     setCustomerType(initialData.type || CustomerType.PRIVATE);
     setStatus(initialData.status || CommonStatus.ACTIVE);
-    setNewsletter(initialData.newsletter || false);
+    
+    // Make sure we reset newsletter to a proper boolean
+    setNewsletter(initialData.newsletter === true );
     
     setErrors({});
     setSuccess(false);
@@ -172,21 +191,27 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
       phone: (value) => setPhone(value),
       address: setAddress,
       city: setCity,
-      postalCode: setPostalCode, // Changed from zipCode to postalCode
+      postalCode: setPostalCode,
       country: setCountry,
-      company: setCompany, // Changed from companyName to company
+      company: setCompany,
       vatNumber: setVatNumber,
-      // notes field removed from form
-      // Add the new fields
+      // Ensure both 'type' and 'customerType' map to the same setter
       customerType: setCustomerType,
-      type: setCustomerType, // Support both 'type' and 'customerType'
+      type: setCustomerType,
       status: setStatus,
-      newsletter: setNewsletter
+      // Ensure newsletter is stored as a boolean
+      newsletter: (value) => setNewsletter(value === true || value === 'true')
     };
     
     const setter = setters[field];
     if (setter) {
       setter(value);
+      
+      // Debug log for development
+      if (process.env.NODE_ENV === 'development' && 
+          (field === 'type' || field === 'customerType' || field === 'newsletter' || field === 'vatNumber')) {
+        console.log(`Field ${field} updated:`, value);
+      }
       
       // Lösche Fehler für dieses Feld
       if (errors[field]) {
@@ -212,16 +237,15 @@ export function useCustomerForm({ initialData = {}, onSubmit }: UseCustomerFormO
     city,
     setCity,
     postalCode,
-    setPostalCode, // Changed from zipCode to postalCode
+    setPostalCode,
     country,
     setCountry,
     company,
-    setCompany, // Changed from companyName to company
+    setCompany,
     vatNumber,
     setVatNumber,
-    // Notes field removed from form
     
-    // Add the new fields to the return object
+    // Properly expose all fields
     customerType,
     setCustomerType,
     status,

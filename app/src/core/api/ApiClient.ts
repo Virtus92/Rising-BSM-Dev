@@ -89,6 +89,68 @@ export interface ApiResponse<T = any> {
 }
 
 export class ApiClient {
+  private initialized = false;
+  private initializing = false;
+  private initPromise: Promise<void> | null = null;
+
+  /**
+   * Ensures the API client is initialized before making requests
+   * Modified to handle initialization better and avoid race conditions
+   * 
+   * @param force Whether to force reinitialization
+   * @returns Promise resolving when initialization is complete
+   */
+  private async ensureInitialized(force = false): Promise<void> {
+    // If already initialized and not forcing reinitialization, return immediately
+    if (this.initialized && !force) {
+      return;
+    }
+
+    // Check if there's an initialization in progress
+    if (this.initializing) {
+      // Wait for the existing initialization to complete instead of starting a new one
+      if (this.initPromise) {
+        try {
+          await this.initPromise;
+          return;
+        } catch (error) {
+          // If previous initialization failed, we'll try again
+          console.error('Previous API client initialization failed, retrying', error);
+        }
+      }
+    }
+
+    // Start initialization
+    this.initializing = true;
+    
+    // Create a new initialization promise
+    this.initPromise = (async () => {
+      try {
+        // Set default headers
+        this.setDefaultHeaders();
+        
+        // Initialize token manager
+        await this.setupTokenManager();
+        
+        // Mark as initialized
+        this.initialized = true;
+        this.initializing = false;
+        
+        return;
+      } catch (error) {
+        // Reset initialization state on failure
+        this.initializing = false;
+        this.initialized = false;
+        
+        console.error('Failed to initialize API client', error);
+        throw error;
+      }
+    })();
+    
+    // Wait for initialization to complete
+    await this.initPromise;
+  }
+
   /**
    * Get the current base URL
    * @returns Current base URL

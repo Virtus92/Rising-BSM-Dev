@@ -17,6 +17,107 @@ getUserFromToken
 import { getItem } from '@/shared/utils/storage';
 
 /**
+ * Event system for authentication status
+ */
+type AuthEventType = 'init_start' | 'init_complete' | 'init_failed' | 'auth_change';
+type AuthEventCallback = (status: AuthEventData) => void;
+type AuthEventData = {
+  isInitialized: boolean;
+  isAuthenticated: boolean;
+  userId?: number | null;
+  timestamp: number;
+  source?: string;
+};
+
+// Event listeners storage
+const authEventListeners: Record<AuthEventType, AuthEventCallback[]> = {
+  init_start: [],
+  init_complete: [],
+  init_failed: [],
+  auth_change: []
+};
+
+/**
+ * Subscribe to auth events
+ * @param eventType The type of auth event to listen for
+ * @param callback Function to call when the event occurs
+ * @returns Function to unsubscribe
+ */
+export function subscribeToAuthEvent(
+  eventType: AuthEventType, 
+  callback: AuthEventCallback
+): () => void {
+  if (!authEventListeners[eventType]) {
+    authEventListeners[eventType] = [];
+  }
+  
+  // Add the listener
+  authEventListeners[eventType].push(callback);
+  
+  // If subscribing to init_complete and auth is already initialized, 
+  // immediately invoke callback with current state
+  if (eventType === 'init_complete' && isAuthInitialized()) {
+    const currentState = {
+      isInitialized: true,
+      isAuthenticated: isAuthenticated(),
+      userId: getUserFromTokenSync()?.id || null,
+      timestamp: Date.now(),
+      source: 'immediate_subscription'
+    };
+    
+    // Use setTimeout to ensure this runs after current execution
+    setTimeout(() => {
+      try {
+        callback(currentState);
+      } catch (error) {
+        console.error('Error in immediate auth event callback:', error);
+      }
+    }, 0);
+  }
+  
+  // Return function to unsubscribe
+  return () => {
+    const index = authEventListeners[eventType].indexOf(callback);
+    if (index !== -1) {
+      authEventListeners[eventType].splice(index, 1);
+    }
+  };
+}
+
+/**
+ * Emit an auth event to all subscribers
+ */
+function emitAuthEvent(
+  eventType: AuthEventType, 
+  data: Partial<AuthEventData> = {}
+): void {
+  if (!authEventListeners[eventType]) return;
+  
+  const eventData: AuthEventData = {
+    isInitialized: isAuthInitialized(),
+    isAuthenticated: isAuthenticated(),
+    userId: getUserFromTokenSync()?.id || null,
+    timestamp: Date.now(),
+    ...data
+  };
+  
+  // Log the event (except auth_change which can be frequent)
+  if (eventType !== 'auth_change' || process.env.NODE_ENV === 'development') {
+    console.log(`AuthInitializer: Emitting ${eventType} event`, 
+      { ...eventData, listeners: authEventListeners[eventType].length });
+  }
+  
+  // Notify all listeners
+  authEventListeners[eventType].forEach(callback => {
+    try {
+      callback(eventData);
+    } catch (error) {
+      console.error(`Error in auth event listener for ${eventType}:`, error);
+    }
+  });
+}
+
+/**
  * Global state for auth initialization (for backward compatibility)
  */
 const AUTH_INITIALIZER_KEY = '__AUTH_INITIALIZER_STATE';
@@ -78,20 +179,142 @@ export async function initializeAuth(config: AuthInitConfig = {}): Promise<void>
   const globalState = typeof window !== 'undefined' ? (window as any)[AUTH_INITIALIZER_KEY] : null;
   const now = Date.now();
   
+  // Check if already initialized and return early if so
+  if (globalState?.isInitialized && !config.forceApi && !config.forceTokenSync) {
+    console.log(`AuthInitializer: Already initialized, skipping (${instanceId})`);
+    return;
+  }
+  
+  // If initialization is already in progress, don't start a new one
+  if (globalState?.isInitializing && globalState.initPromise) {
+    console.log(`AuthInitializer: Initialization already in progress, waiting (${instanceId})`);
+    return await globalState.initPromise;
+  }
+  
   // Update source for debugging
   if (globalState) {
     globalState.initializationCount = (globalState.initializationCount || 0) + 1;
     globalState.lastInitSource = config.source || instanceId;
+    globalState.isInitializing = true;
+    
+    // Create a promise for this initialization
+    const initPromise = new Promise<void>(async (resolve, reject) => {
+      try {
+        // Emit initialization start event
+        emitAuthEvent('init_start', { source: config.source });
+        
+        // Log initialization attempt
+        console.log(`AuthInitializer: Starting initialization (${instanceId})`, {
+          source: config.source,
+          forceApi: config.forceApi,
+          forceTokenSync: config.forceTokenSync
+        });
+        
+        // Initialize API client
+        await ApiClient.initialize({
+          force: config.forceApi, 
+          autoRefreshToken: true,
+          headers: {
+            'X-Initialization-Source': `auth-initializer-${instanceId}`
+          }
+        });
+        
+        // Synchronize tokens if forced
+        if (config.forceTokenSync) {
+          await synchronizeTokens(true);
+        }
+        
+        // Validate token to ensure authentication state is accurate
+        let isValid = false;
+        let userId = null;
+        try {
+          // Import getToken as well
+          const { getToken } = await import('../clients/token');
+          const token = await getToken();
+          if (token) {
+            const user = getUserFromToken(token);
+            isValid = !!user;
+            userId = user?.id;
+          }
+        } catch (error) {
+          console.warn('Error validating token during initialization', error);
+        }
+        
+        // Update global state
+        if (globalState) {
+          globalState.isInitialized = true;
+          globalState.isInitializing = false;
+          globalState.lastInitTime = Date.now();
+          
+          // Update token status
+          if (isValid && typeof localStorage !== 'undefined') {
+            const hasAuthToken = !!getItem('auth_token_backup');
+            const hasRefreshToken = !!getItem('refresh_token_backup');
+            const expiresAt = getItem('auth_expires_at');
+            
+            if (globalState.tokens) {
+              globalState.tokens.status = {
+                hasAuthToken,
+                hasRefreshToken,
+                authExpiration: expiresAt
+              };
+            }
+          }
+        }
+        
+        console.log('AuthInitializer: Authentication initialized successfully');
+        
+        // Emit initialization complete event
+        emitAuthEvent('init_complete', { 
+          source: config.source,
+          userId,
+          isAuthenticated: isValid
+        });
+        
+        resolve();
+      } catch (error) {
+        // Update state on failure
+        if (globalState) {
+          globalState.isInitialized = false;
+          globalState.isInitializing = false;
+          globalState.lastError = error instanceof Error ? 
+            error.message : 'Unknown error during auth initialization';
+        }
+        
+        // Emit initialization failed event
+        emitAuthEvent('init_failed', { 
+          source: config.source,
+          isAuthenticated: false
+        });
+        
+        console.error('AuthInitializer: Error during initialization', 
+          error instanceof Error ? error.message : 'Unknown error');
+        reject(error);
+      } finally {
+        if (globalState) {
+          globalState.initPromise = null;
+        }
+      }
+    });
+    
+    // Store the promise
+    globalState.initPromise = initPromise;
+    
+    // Return the promise
+    return await initPromise;
   }
   
-  // Log initialization attempt
-  console.log(`AuthInitializer: Starting initialization (${instanceId})`, {
-    source: config.source,
-    forceApi: config.forceApi,
-    forceTokenSync: config.forceTokenSync
-  });
-  
   try {
+    // Emit initialization start event
+    emitAuthEvent('init_start', { source: config.source });
+    
+    // Log initialization attempt
+    console.log(`AuthInitializer: Starting initialization (${instanceId})`, {
+      source: config.source,
+      forceApi: config.forceApi,
+      forceTokenSync: config.forceTokenSync
+    });
+    
     // Initialize API client
     await ApiClient.initialize({
       force: config.forceApi, 
@@ -108,6 +331,7 @@ export async function initializeAuth(config: AuthInitConfig = {}): Promise<void>
     
     // Validate token to ensure authentication state is accurate
     let isValid = false;
+    let userId = null;
     try {
       // Import getToken as well
       const { getToken } = await import('../clients/token');
@@ -115,6 +339,7 @@ export async function initializeAuth(config: AuthInitConfig = {}): Promise<void>
       if (token) {
         const user = getUserFromToken(token);
         isValid = !!user;
+        userId = user?.id;
       }
     } catch (error) {
       console.warn('Error validating token during initialization', error);
@@ -143,6 +368,13 @@ export async function initializeAuth(config: AuthInitConfig = {}): Promise<void>
     }
     
     console.log('AuthInitializer: Authentication initialized successfully');
+    
+    // Emit initialization complete event
+    emitAuthEvent('init_complete', { 
+      source: config.source,
+      userId,
+      isAuthenticated: isValid
+    });
   } catch (error) {
     // Update state on failure
     if (globalState) {
@@ -151,6 +383,12 @@ export async function initializeAuth(config: AuthInitConfig = {}): Promise<void>
       globalState.lastError = error instanceof Error ? 
         error.message : 'Unknown error during auth initialization';
     }
+    
+    // Emit initialization failed event
+    emitAuthEvent('init_failed', { 
+      source: config.source,
+      isAuthenticated: false
+    });
     
     console.error('AuthInitializer: Error during initialization', 
       error instanceof Error ? error.message : 'Unknown error');
@@ -215,6 +453,9 @@ export async function clearAuthState(): Promise<void> {
     await notifyLogout();
     
     console.log('AuthInitializer: Auth state cleared successfully');
+    
+    // Emit auth change event
+    emitAuthEvent('auth_change', { isAuthenticated: false });
   } catch (error) {
     console.error('AuthInitializer: Error clearing auth state:', 
       error instanceof Error ? error.message : 'Unknown error');

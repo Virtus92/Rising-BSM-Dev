@@ -71,6 +71,11 @@ export class Customer extends BaseEntity {
   country: string;
   
   /**
+   * Umsatzsteuer-ID
+   */
+  vatNumber?: string;
+  
+  /**
    * Zusätzliche Notizen
    */
   notes?: string;
@@ -107,6 +112,7 @@ export class Customer extends BaseEntity {
     this.city = data.city;
     this.state = data.state;
     this.country = data.country || 'Deutschland';
+    this.vatNumber = data.vatNumber;
     this.notes = data.notes;
     this.newsletter = data.newsletter || false;
     this.status = data.status || CommonStatus.ACTIVE;
@@ -205,6 +211,7 @@ export class Customer extends BaseEntity {
     if (data.postalCode !== undefined) this.postalCode = data.postalCode;
     if (data.city !== undefined) this.city = data.city;
     if (data.country !== undefined) this.country = data.country;
+    if (data.vatNumber !== undefined) this.vatNumber = data.vatNumber;
     if (data.notes !== undefined) this.notes = data.notes;
     if (data.newsletter !== undefined) this.newsletter = data.newsletter;
     if (data.type !== undefined) this.type = data.type;
@@ -253,6 +260,7 @@ export class Customer extends BaseEntity {
       city: this.city,
       state: this.state,
       country: this.country,
+      vatNumber: this.vatNumber,
       notes: this.notes,
       newsletter: this.newsletter,
       status: this.status,

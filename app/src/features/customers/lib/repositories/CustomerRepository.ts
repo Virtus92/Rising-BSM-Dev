@@ -607,6 +607,7 @@ export class CustomerRepository extends PrismaRepository<Customer> implements IC
       postalCode: ormEntity.postalCode,
       city: ormEntity.city,
       country: ormEntity.country,
+      vatNumber: ormEntity.vatNumber, // Added missing vatNumber field
       notes: ormEntity.notes,
       newsletter: ormEntity.newsletter,
       status: ormEntity.status,

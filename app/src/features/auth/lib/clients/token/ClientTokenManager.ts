@@ -506,7 +506,7 @@ export class ClientTokenManager {
   
   /**
    * Refresh the access token through the API
-   * Simplified implementation with minimal API calls
+   * Improved implementation with better error handling and retry logic
    * 
    * @returns Promise resolving to true if refresh was successful
    * @throws TokenError with detailed information if refresh fails
@@ -535,81 +535,112 @@ export class ClientTokenManager {
       const refreshToken = getItem('refresh_token') || getItem('refresh_token_backup');
       
       if (!refreshToken) {
-        throw new TokenError(
-          'No refresh token available for token refresh',
-          'MISSING_REFRESH_TOKEN'
-        );
-      }
-      
-      // Simple API call with minimal headers
-      const response = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        credentials: 'include', // Include cookies
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-        body: JSON.stringify({ refreshToken }),
-        signal: AbortSignal.timeout(15000) // 15 second timeout
-      });
-      
-      // Handle non-OK response
-      if (!response.ok) {
-        if (response.status === 401) {
-          // Clear tokens on auth error
-          await this.clearTokens();
-          throw new TokenError(
-            `Token refresh failed with status 401: Unauthorized`,
-            'REFRESH_TOKEN_EXPIRED'
-          );
-        } else {
-          throw new TokenError(
-            `Token refresh failed with status ${response.status}`,
-            'REFRESH_API_ERROR'
-          );
-        }
-      }
-      
-      // Parse response data
-      const data = await response.json();
-      
-      if (!data.success || !data.data) {
-        throw new TokenError(
-          'Token refresh API returned invalid response',
-          'INVALID_RESPONSE_FORMAT'
-        );
-      }
-      
-      // Extract tokens with standardized property names
-      const accessToken = data.data.token || data.data.accessToken;
-      const newRefreshToken = data.data.refreshToken;
-      const expiresIn = data.data.expiresIn || 3600;
-      
-      if (!accessToken) {
-        throw new TokenError(
-          'Token refresh API returned no access token',
-          'NO_ACCESS_TOKEN_RETURNED'
-        );
-      }
-      
-      // Log success and set tokens
-      console.log('Token refresh successful, setting new tokens');
-      
-      // Use new refresh token or keep existing one
-      const refreshTokenToUse = newRefreshToken || refreshToken;
-      
-      // Store both tokens
-      this.setTokens(accessToken, refreshTokenToUse, expiresIn);
-      
-      return true;
-    } catch (error) {
-      // Specific handling for network errors
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.error('Network error during token refresh:', error.message);
-        // Don't clear tokens on network errors
+        console.warn('No refresh token available for token refresh');
+        
+        // Don't throw an error, just return false to indicate refresh failed
+        // This prevents needless error cascading
         return false;
       }
       
+      // Validate token format before sending to avoid server errors
+      if (typeof refreshToken !== 'string' || refreshToken.length < 20) {
+        console.warn('Invalid refresh token format', { 
+          tokenLength: refreshToken?.length 
+        });
+        return false;
+      }
+      
+      // Simple API call with minimal headers
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      try {
+        const response = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include', // Include cookies
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'X-Client-Time': new Date().toISOString(),
+            'X-Refresh-Source': 'client-token-manager'
+          },
+          body: JSON.stringify({ refreshToken }),
+          signal: controller.signal
+        });
+        
+        // Clear timeout
+        clearTimeout(timeoutId);
+        
+        // Handle non-OK response
+        if (!response.ok) {
+          if (response.status === 401) {
+            console.warn('Refresh token invalid or expired');
+            // Clear tokens on auth error but don't throw - let the app redirect naturally
+            await this.clearTokens();
+            
+            // Return false instead of throwing to prevent error cascades
+            return false;
+          } else {
+            console.error(`Token refresh failed with status ${response.status}`);
+            
+            // Return false to indicate failure without throwing
+            return false;
+          }
+        }
+        
+        // Parse response data
+        const data = await response.json();
+        
+        if (!data.success || !data.data) {
+          console.warn('Token refresh API returned invalid response', {
+            success: data.success,
+            hasData: !!data.data
+          });
+          return false;
+        }
+        
+        // Extract tokens with standardized property names
+        const accessToken = data.data.token || data.data.accessToken;
+        const newRefreshToken = data.data.refreshToken;
+        const expiresIn = data.data.expiresIn || 3600;
+        
+        if (!accessToken) {
+          console.warn('Token refresh API returned no access token');
+          return false;
+        }
+        
+        // Log success and set tokens
+        console.log('Token refresh successful, setting new tokens');
+        
+        // Use new refresh token or keep existing one
+        const refreshTokenToUse = newRefreshToken || refreshToken;
+        
+        // Store both tokens
+        this.setTokens(accessToken, refreshTokenToUse, expiresIn);
+        
+        return true;
+      } catch (fetchError) {
+        // Always clear timeout to prevent memory leaks
+        clearTimeout(timeoutId);
+        
+        // Handle abort/timeout gracefully
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+          console.warn('Token refresh request timed out');
+          return false;
+        }
+        
+        // Handle network errors separately
+        if (fetchError instanceof TypeError && fetchError.message.includes('fetch')) {
+          console.error('Network error during token refresh:', fetchError.message);
+          // Don't clear tokens on network errors
+          return false;
+        }
+        
+        // Log other unexpected errors
+        console.error('Error during token refresh:', fetchError);
+        return false;
+      }
+    } catch (error) {
       // If it's already a TokenError, just rethrow
       if (error instanceof TokenError) {
         throw error;

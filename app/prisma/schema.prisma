@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres.qkhermeufcstwtlyttpo:postgres@aws-0-eu-central-1.pooler.supabase.com:5432/postgres"
 }
 
 //==============================================================================
@@ -48,6 +48,7 @@ model User {
   @@index([email])
   @@index([name])
   @@index([profilePictureId])
+  @@index([id]) // Add index on id for faster lookups
 }
 
 model UserSettings {

@@ -5,6 +5,8 @@ import { RequestService } from '@/features/requests/lib/services/RequestService'
 import { AppointmentService } from '@/features/appointments/lib/services/AppointmentService';
 import { CustomerService } from '@/features/customers/lib/services/CustomerService';
 import { ApiResponse } from '@/core/api/ApiClient';
+import { useAuth } from '@/features/auth/providers/AuthProvider';
+import { subscribeToAuthEvent } from '@/features/auth/lib/initialization/AuthInitializer';
 
 // Define API response types for count endpoints
 interface CountResponse {
@@ -124,6 +126,9 @@ const extractCount = (response: ApiResponse<any>): number => {
  * Uses service layer to fetch data from API endpoints
  */
 export const useDashboardStats = (): UseDashboardStatsReturn => {
+  // Get auth context to check authentication status
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  
   // Initialize state with default values
   console.log('using dashboardStats hook');
   const [state, setState] = useState<StatsState>({
@@ -146,6 +151,19 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
 
   // Extract fetchStats as a separate callback with debounce protection
   const fetchStats = useCallback(async (showErrors = false) => {
+    // Don't attempt to fetch if not authenticated
+    if (!isAuthenticated) {
+      console.log('User is not authenticated, skipping dashboard stats fetch');
+      if (isMountedRef.current) {
+        setState(prev => ({ 
+          ...prev, 
+          loading: false,
+          error: new Error('Authentication required to view statistics') 
+        }));
+      }
+      return;
+    }
+    
     console.log('Fetching dashboard stats...');
     // Don't allow multiple simultaneous fetches
     if (isFetchingRef.current) {
@@ -169,8 +187,12 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     }
     
     try {
-      // Log fetch attempt for monitoring
-      console.log('Fetching dashboard stats...');
+      // Ensure API client is initialized before making requests
+      const { ApiClient } = await import('@/core/api/ApiClient');
+      await ApiClient.initialize({ 
+        source: 'dashboard-stats',
+        autoRefreshToken: true 
+      }).catch(err => console.warn('API init warning:', err));
       
       // Safely get the service methods - use static methods correctly
       const services = {
@@ -284,7 +306,7 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
       // Clear fetching flag
       isFetchingRef.current = false;
     }
-  }, [toast]); // Only depends on toast
+  }, [toast, isAuthenticated]); // No need for isAuthLoading in dependencies
 
   // Function to manually refresh stats with visible feedback
   const refreshStats = useCallback(async () => {
@@ -301,31 +323,71 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     }
   }, [fetchStats, toast]);
 
-  // Fetch stats on initial mount
+  // Subscribe to auth initialization events
   useEffect(() => {
     // Set mounted flag
     isMountedRef.current = true;
     
-    // Fetch stats immediately on mount - no delay
-    fetchStats();
+    // If already authenticated, fetch stats immediately with a small delay
+    if (isAuthenticated && !isAuthLoading) {
+      const initialFetchTimeout = setTimeout(() => {
+        if (isMountedRef.current) {
+          fetchStats();
+        }
+      }, 500);
+      
+      return () => {
+        clearTimeout(initialFetchTimeout);
+        isMountedRef.current = false;
+      };
+    }
     
-    // Cleanup function
+    // Subscribe to auth initialization to trigger fetch when auth is ready
+    console.log('Dashboard stats: Subscribing to auth initialization events');
+    
+    // Function to handle authentication initialization completion
+    const handleAuthInit = (status: any) => {
+      console.log('Dashboard stats: Auth initialization completed', status);
+      
+      if (status.isAuthenticated && isMountedRef.current) {
+        console.log('Dashboard stats: Auth ready and user authenticated, fetching stats');
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            fetchStats();
+          }
+        }, 500);
+      } else if (isMountedRef.current) {
+        // No authentication, set not loading but with error
+        console.log('Dashboard stats: Auth ready but user not authenticated');
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: new Error('Authentication required to view statistics')
+        }));
+      }
+    };
+    
+    // Subscribe to the initialization complete event
+    const unsubscribe = subscribeToAuthEvent('init_complete', handleAuthInit);
+    
+    // Clean up subscription on unmount
     return () => {
+      unsubscribe();
       isMountedRef.current = false;
     };
-  }, [fetchStats]); // Include fetchStats in dependencies to ensure it's available
+  }, [fetchStats, isAuthenticated, isAuthLoading]);
 
-  // Set up a refresh interval
+  // Set up a refresh interval - only when authenticated
   useEffect(() => {
-    // Only set up interval if component is mounted
-    if (!isMountedRef.current) return;
+    // Only set up interval if component is mounted and user is authenticated
+    if (!isMountedRef.current || !isAuthenticated) return;
     
     console.log('Setting up dashboard stats refresh interval (5 minutes)');
     
     // Create a reference to the fetch function that doesn't change between renders
     const stableFetchStats = () => {
       // Only fetch if component is still mounted and not already fetching
-      if (isMountedRef.current && !isFetchingRef.current) {
+      if (isMountedRef.current && !isFetchingRef.current && isAuthenticated) {
         console.log('Interval-triggered stats refresh');
         // Wrap in try-catch to ensure interval isn't broken by errors
         try {
@@ -346,7 +408,7 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
       console.log('Clearing dashboard stats refresh interval');
       clearInterval(intervalId);
     }; 
-  }, [fetchStats]); // Include fetchStats in dependencies since it's memoized with useCallback
+  }, [fetchStats, isAuthenticated]); // Add auth dependency
 
   // Return the state and the refresh function
   return { ...state, refreshStats };

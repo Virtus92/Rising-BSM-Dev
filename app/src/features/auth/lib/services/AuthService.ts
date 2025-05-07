@@ -208,8 +208,36 @@ export class AuthService implements IAuthService {
         throw this.errorHandler.createUnauthorizedError('Refresh token has expired');
       }
       
-      // Find the user
-      const user = await this.userRepository.findById(refreshToken.userId);
+      const requestId = options?.context?.requestId || crypto.randomUUID();
+
+      // Find the user with timeout handling
+      let user;
+      try {
+        // Add timeout for the user query to prevent hanging
+        const userPromise = this.userRepository.findById(refreshToken.userId);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('User lookup timed out')), 5000); // 5 second timeout
+        });
+        
+        user = await Promise.race([userPromise, timeoutPromise]);
+        
+        // Add detailed logging for debugging
+        if (!user) {
+          this.logger.error('User not found during token refresh', { 
+            userId: refreshToken.userId,
+            tokenId: refreshToken.token.substring(0, 8),
+            requestId
+          });
+        }
+      } catch (userError) {
+        this.logger.error('Error finding user during token refresh', { 
+          error: userError,
+          userId: refreshToken.userId,
+          tokenId: refreshToken.token.substring(0, 8),
+          requestId
+        });
+        throw this.errorHandler.createUnauthorizedError(`User lookup failed: ${userError.message}`);
+      }
       
       // If no user was found
       if (!user) {
@@ -264,7 +292,12 @@ export class AuthService implements IAuthService {
         updatedAt: new Date().toISOString()
       };
     } catch (error) {
-      this.logger.error('Error in AuthService.refreshToken', { error });
+      this.logger.error('Error in AuthService.refreshToken', { 
+        error,
+        refreshToken: refreshTokenDto?.refreshToken ? refreshTokenDto.refreshToken.substring(0, 8) + '...' : 'undefined',
+        ipAddress: options?.context?.ipAddress,
+        requestId: options?.context?.requestId
+      });
       throw error;
     }
   }

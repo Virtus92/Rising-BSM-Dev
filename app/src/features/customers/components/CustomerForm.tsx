@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/card';
 import { Save, ArrowLeft, Loader2, User, Mail, Phone, Building, FileText, MapPin, Globe, Tag, AlertCircle, Mail as Newsletter } from 'lucide-react';
@@ -51,6 +51,17 @@ export default function CustomerForm({
   const [showConfirmLeave, setShowConfirmLeave] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
 
+  // Log initialData for debugging in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('CustomerForm initialData:', {
+        vatNumber: initialData.vatNumber,
+        type: initialData.type,
+        newsletter: initialData.newsletter,
+      });
+    }
+  }, [initialData]);
+
   const {
     name, setName,
     email, setEmail,
@@ -61,7 +72,6 @@ export default function CustomerForm({
     country, setCountry,
     company, setCompany,
     vatNumber, setVatNumber,
-    // Notes removed - now managed in customer detail page
     customerType, setCustomerType,
     status, setStatus,
     newsletter, setNewsletter,
@@ -74,13 +84,18 @@ export default function CustomerForm({
     onSubmit: async (data) => {
       try {
         // Log the data being submitted for debugging purposes
-        console.log('Submitting customer data:', data);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Submitting customer data:', {
+            ...data,
+            // Highlight the fields we're focusing on
+            vatNumber: data.vatNumber,
+            type: data.type,
+            newsletter: data.newsletter
+          });
+        }
         
         const result = await onSubmit(data);
         if (result) {
-          // German toast notification removed - keeping only the English message
-          // that will show in the form UI
-          
           // Only navigate if we're not in a modal
           if (!onCancel) {
             // Nach dem Speichern zur Detailseite oder Liste navigieren
@@ -97,8 +112,6 @@ export default function CustomerForm({
         return null;
       } catch (error) {
         console.error('Form submission error:', error as Error);
-        
-        // Error handling is managed by the parent component
         
         toast({
           title: 'Error',
@@ -129,7 +142,6 @@ export default function CustomerForm({
     const hasCountryChanged = country !== (initialData.country || '');
     const hasCompanyChanged = company !== (initialData.company || '');
     const hasVatNumberChanged = vatNumber !== (initialData.vatNumber || '');
-    // Notes field removed from form
     const hasTypeChanged = customerType !== (initialData.type || CustomerType.PRIVATE);
     const hasStatusChanged = status !== (initialData.status || CommonStatus.ACTIVE);
     const hasNewsletterChanged = newsletter !== (initialData.newsletter || false);
@@ -138,17 +150,21 @@ export default function CustomerForm({
       hasAddressChanged || hasCityChanged || hasPostalCodeChanged || 
       hasCountryChanged || hasCompanyChanged || hasVatNumberChanged || 
       hasTypeChanged || hasStatusChanged || hasNewsletterChanged;
-      // Notes field removed from changes detection
     
     setHasChanges(changes);
   }, [
     name, email, phone, address, city, postalCode, country,
     company, vatNumber, customerType, status, newsletter, initialData
-    // notes dependency removed
   ]);
 
   // Die checkForChanges-Funktion bei jeder Änderung aufrufen
-  const handleFieldChange = (field: string, value: string) => {
+  const handleFieldChange = (field: string, value: string | boolean) => {
+    if (process.env.NODE_ENV === 'development') {
+      if (field === 'type' || field === 'customerType' || field === 'newsletter' || field === 'vatNumber') {
+        console.log(`CustomerForm updating ${field}:`, value);
+      }
+    }
+    
     updateField(field, value);
     checkForChanges();
   };
@@ -287,15 +303,16 @@ export default function CustomerForm({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="customerType" className="flex items-center gap-1.5">
+                <Label htmlFor="type" className="flex items-center gap-1.5">
                   <Tag className="h-3.5 w-3.5 text-blue-600" />
                   Customer Type
                 </Label>
                 <Select
                   value={customerType}
                   onValueChange={(value) => handleFieldChange('type', value)}
+                  name="type"
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="type">
                     <SelectValue placeholder="Select customer type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -316,8 +333,9 @@ export default function CustomerForm({
                 <Select
                   value={status}
                   onValueChange={(value) => handleFieldChange('status', value)}
+                  name="status"
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="status">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -328,17 +346,23 @@ export default function CustomerForm({
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="newsletter" className="flex items-center gap-1.5">
+              <div className="space-y-2 flex items-center gap-3">
+                <Label htmlFor="newsletter" className="flex items-center gap-1.5 cursor-pointer">
                   <Newsletter className="h-3.5 w-3.5 text-blue-600" />
-                  Newsletter
+                  Newsletter Subscription
                 </Label>
                 <Switch
                   id="newsletter"
                   name="newsletter"
                   checked={newsletter}
-                  onCheckedChange={(checked) => updateField('newsletter', checked)}
+                  onCheckedChange={(checked) => {
+                    // Explicitly ensure we're passing a boolean
+                    handleFieldChange('newsletter', Boolean(checked));
+                  }}
                 />
+                <span className="text-xs text-muted-foreground">
+                  {newsletter ? 'Subscribed' : 'Not subscribed'}
+                </span>
               </div>
             </TabsContent>
             
@@ -400,8 +424,6 @@ export default function CustomerForm({
                   />
                 </div>
               </div>
-              
-              {/* Notes field removed - now managed exclusively in the customer detail page's Notes tab */}
             </TabsContent>
           </Tabs>
         </CardContent>

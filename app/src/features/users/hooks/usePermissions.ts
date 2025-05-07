@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PermissionClient } from '@/features/permissions/lib/clients/PermissionClient';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { UserRole } from '@/domain/entities/User';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
+import { subscribeToAuthEvent } from '@/features/auth/lib/initialization/AuthInitializer';
 
 // Error class for permission-related failures
 export class PermissionError extends Error {
@@ -24,53 +25,71 @@ const ongoingPermissionsFetches = new Map<number, Promise<any>>();
 
 /**
  * Hook for managing and checking user permissions
- * This implementation exposes all errors directly without fallbacks
+ * This implementation includes enhanced authentication state handling to prevent
+ * premature permission requests before the auth system is ready
  * 
  * @param userId - User ID to get permissions for (defaults to current user)
  * @returns Permission-related state and utility functions
  */
 export const usePermissions = (userId?: number) => {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const effectiveUserId = userId || user?.id;
   
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const permissionFetchAttempts = useRef(0);
   
   // Check if user is admin for optimizations
   const isAdmin = useMemo(() => {
     return userRole === UserRole.ADMIN || user?.role === UserRole.ADMIN;
   }, [userRole, user?.role]);
 
-  // Fetch user permissions with improved error handling
+  // Set auth ready status when authentication loading completes
+  useEffect(() => {
+    if (!isAuthLoading) {
+      // Auth loading is complete, whether successful or not
+      setAuthReady(true);
+    }
+  }, [isAuthLoading]);
+
+  // Fetch user permissions with improved error handling and auth awareness
   const fetchPermissions = useCallback(async (force: boolean = false) => {
-    // No userId means no permissions - log warning but don't throw error
+    // Increment fetch attempt counter
+    permissionFetchAttempts.current += 1;
+    const currentAttempt = permissionFetchAttempts.current;
+    
+    // No userId means no permissions - handle gracefully with awareness of auth state
     if (!effectiveUserId) {
+      // If auth is ready but no user ID, then the user is likely not authenticated
       const noUserError = new PermissionError(
         'No user ID available for permission check',
         'NO_USER_ID',
-        { userId, userFromAuth: user?.id }
+        { userId, userFromAuth: user?.id, authReady, attempt: currentAttempt }
       );
       
-      console.warn('Unable to fetch permissions: No user ID available', {
+      // Log at debug level instead of warning to reduce noise for expected states
+      console.debug('Unable to fetch permissions: No user ID available', {
         userId, 
-        userFromAuth: user?.id
+        userFromAuth: user?.id,
+        authReady
       });
-      
-      // Set minimum permissions based on user role from auth context
-      if (user?.role) {
-        setUserRole(user.role);
-      }
       
       // Only set permissions if they aren't already empty - prevents infinite render loop
       if (permissions.length > 0) {
         setPermissions([]);
       }
       
+      // Set minimum permissions based on user role from auth context
+      if (user?.role) {
+        setUserRole(user.role);
+      }
+      
       setIsLoading(false);
       setError(noUserError);
-      return; // Return early instead of throwing
+      return; // Return early without throwing
     }
 
     try {
@@ -130,7 +149,7 @@ export const usePermissions = (userId?: number) => {
       }
       
       // Make a fresh API call for permissions
-      console.log(`Fetching permissions for user ID: ${effectiveUserId}`);
+      console.log(`Fetching permissions for user ID: ${effectiveUserId} (attempt: ${currentAttempt})`);
       
       try {
         // Create the API call and store the promise - BUT DON'T AWAIT IT YET
@@ -256,26 +275,64 @@ export const usePermissions = (userId?: number) => {
       // Rethrow the error
       throw permissionError;
     }
-  }, [effectiveUserId, user, permissions.length]);
+  }, [effectiveUserId, user, permissions.length, authReady]);
 
-  // Load permissions on component mount or userId change
+  // Subscribe to auth events instead of using a polling mechanism
   useEffect(() => {
-    // Create an effect that doesn't swallow errors
-    const loadPermissions = async () => {
-      try {
-        await fetchPermissions();
-      } catch (error) {
-        // Explicitly log the error for tracking
-        console.error('Error loading permissions in effect:', error);
-        // We're not swallowing errors here - they will propagate to error boundaries
+    // If already authenticated and we have a user ID, fetch permissions immediately
+    if (authReady && effectiveUserId) {
+      // Use a small delay to ensure all systems are ready
+      const initialFetchTimeout = setTimeout(() => {
+        if (effectiveUserId) {
+          fetchPermissions().catch(err => {
+            console.error('Error loading permissions on initial fetch:', err);
+          });
+        }
+      }, 500);
+      
+      return () => {
+        clearTimeout(initialFetchTimeout);
+      };
+    }
+    
+    // If the auth system is still initializing, subscribe to the auth events
+    console.log('Permissions system: Subscribing to auth initialization events');
+    
+    // Handler for authentication initialization completion
+    const handleAuthInit = (status: any) => {
+      console.log('Permissions system: Auth initialization completed', status);
+      
+      // Check if component is still mounted (through effectiveUserId dependency)
+      if (status.isAuthenticated && status.userId) {
+        console.log(`Permissions system: Auth ready and user authenticated (${status.userId}), fetching permissions`);
+        // Small delay to ensure all systems are ready
+        setTimeout(() => {
+          if (effectiveUserId) {
+            fetchPermissions().catch(err => {
+              console.error('Error loading permissions after auth init:', err);
+            });
+          }
+        }, 500);
+      } else {
+        // No authentication, set proper state
+        console.log('Permissions system: Auth ready but user not authenticated');
+        setIsLoading(false);
+        setError(new PermissionError(
+          'Authentication required for permissions',
+          'AUTH_REQUIRED',
+          { authStatus: status }
+        ));
       }
     };
     
-    loadPermissions();
+    // Subscribe to the initialization complete event
+    const unsubscribe = subscribeToAuthEvent('init_complete', handleAuthInit);
     
-    // No automatic refresh interval - require explicit refresh calls
-    // This makes errors more visible
-  }, [effectiveUserId, fetchPermissions]);
+    // Clean up subscription on unmount
+    return () => {
+      unsubscribe();
+    };
+  }, [effectiveUserId, authReady, fetchPermissions]);
 
   /**
    * Checks if the user has a specific permission

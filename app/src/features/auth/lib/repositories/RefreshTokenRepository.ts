@@ -31,18 +31,43 @@ export class RefreshTokenRepository extends PrismaRepository<RefreshToken, strin
   /**
    * Find a token by its string value
    * 
-   * @param token - Token string
+   * @param token - Token to find
    * @returns Promise with token or null
    */
   async findByToken(token: string): Promise<RefreshToken | null> {
     try {
-      const refreshToken = await this.prisma.refreshToken.findUnique({
+      // Validate token before any database operations
+      if (!token || typeof token !== 'string' || token.length < 20) {
+        this.logger.warn('Invalid refresh token format in findByToken', { 
+          tokenFormat: typeof token, 
+          tokenLength: token?.length 
+        });
+        return null;
+      }
+
+      // Use Promise.race with timeout to prevent hanging queries
+      const queryPromise = this.prisma.refreshToken.findUnique({
         where: { token }
       });
       
-      return refreshToken ? this.mapToDomainEntity(refreshToken) : null;
+      // Add a timeout to prevent hanging queries
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => {
+          this.logger.warn('Timeout in RefreshTokenRepository.findByToken', { tokenPrefix: token.substring(0, 8) });
+          resolve(null);
+        }, 5000); // 5 second timeout
+      });
+      
+      const result = await Promise.race([queryPromise, timeoutPromise]);
+      
+      if (!result) return null;
+      
+      return this.mapToDomainEntity(result);
     } catch (error) {
-      this.logger.error('Error in RefreshTokenRepository.findByToken', { error });
+      this.logger.error('Error in RefreshTokenRepository.findByToken', { 
+        error, 
+        tokenPart: token ? token.substring(0, 8) + '...' : 'null'
+      });
       throw this.handleError(error);
     }
   }

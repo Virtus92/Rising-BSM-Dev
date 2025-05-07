@@ -1,10 +1,13 @@
 import React from 'react';
 import { usePermissions } from '@/features/users/hooks/usePermissions';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { LockIcon, AlertCircle } from 'lucide-react';
+import { LockIcon, AlertCircle, ShieldAlert, ChevronLeft, Mail } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { UserRole } from '@/domain/entities/User';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
+import { Button } from '@/shared/components/ui/button';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type PermissionIndicatorProps = {
   /**
@@ -136,28 +139,80 @@ export const PermissionIndicator: React.FC<PermissionIndicatorProps> = ({
 };
 
 /**
- * Component to display a friendly message when user doesn't have permission
+ * Enhanced component to display a friendly and helpful message when user doesn't have permission
  */
 export const PermissionDeniedMessage: React.FC<{
   title?: string;
   message?: string;
   showIcon?: boolean;
   className?: string;
+  permissionName?: string;
+  showContactLink?: boolean;
+  showBackButton?: boolean;
+  contactEmail?: string;
+  customAction?: React.ReactNode;
 }> = ({
   title = "Access Restricted",
   message = "You don't have permission to access this feature.",
   showIcon = true,
-  className
+  className,
+  permissionName,
+  showContactLink = true,
+  showBackButton = true,
+  contactEmail = "support@rising-bsm.com",
+  customAction
 }) => {
+  const router = useRouter();
+  const { user } = useAuth();
+  
+  const goBack = () => {
+    router.back();
+  };
+
   return (
-    <div className={cn("p-6 bg-yellow-50 dark:bg-yellow-900/10 rounded-md border border-yellow-200 dark:border-yellow-800", className)}>
-      <div className="flex items-start">
+    <div className={cn("p-8 max-w-3xl mx-auto", className)}>
+      <div className="flex flex-col items-center text-center space-y-6">
         {showIcon && (
-          <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5 mr-3 flex-shrink-0" />
+          <div className="w-16 h-16 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+            <ShieldAlert className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+          </div>
         )}
-        <div>
-          <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-400">{title}</h3>
-          <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">{message}</p>
+        
+        <div className="space-y-3">
+          <h2 className="text-2xl font-bold text-foreground">{title}</h2>
+          <p className="text-muted-foreground max-w-md">{message}</p>
+          
+          {permissionName && (
+            <div className="mt-2 inline-block bg-muted px-2 py-1 rounded-md text-sm">
+              <code>{permissionName}</code>
+            </div>
+          )}
+        </div>
+        
+        <div className="border-t border-border w-full max-w-xs my-2 pt-6"> </div>
+        
+        <div className="flex flex-col sm:flex-row gap-4">
+          {showBackButton && (
+            <Button variant="outline" onClick={goBack}>
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Go Back
+            </Button>
+          )}
+          
+          {customAction}
+          
+          {showContactLink && (
+            <Button asChild>
+              <Link href={`mailto:${contactEmail}?subject=Permission request: ${permissionName || 'Additional access'}&body=Hello,%0D%0A%0D%0AI need access to the following feature: ${permissionName || 'Restricted feature'}%0D%0A%0D%0AUser details:%0D%0A- Name: ${user?.name || 'Not available'}%0D%0A- Email: ${user?.email || 'Not available'}%0D%0A- ID: ${user?.id || 'Not available'}%0D%0A%0D%0AThank you.`}>
+                <Mail className="mr-1 h-4 w-4" />
+                Request Access
+              </Link>
+            </Button>
+          )}
+        </div>
+        
+        <div className="text-sm text-muted-foreground mt-4">
+          If you believe this is a mistake, please contact your system administrator.
         </div>
       </div>
     </div>
