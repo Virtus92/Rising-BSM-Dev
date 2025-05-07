@@ -35,7 +35,7 @@ export default function NotificationsPage() {
         // Ensure we always have an array
         const notificationsData = Array.isArray(response.data) 
           ? response.data 
-          : (Array.isArray(response.data.items) ? response.data.items : []);
+          : (Array.isArray((response.data as any).items) ? (response.data as any).items : []);
           
         setNotifications(notificationsData);
       } else {

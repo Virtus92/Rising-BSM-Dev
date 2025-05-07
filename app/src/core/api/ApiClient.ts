@@ -94,6 +94,28 @@ export class ApiClient {
   private initPromise: Promise<void> | null = null;
 
   /**
+   * Set default headers for API requests
+   */
+  private setDefaultHeaders(): void {
+    // Set Content-Type header as application/json by default
+    GLOBAL_API_HEADERS = { ...GLOBAL_API_HEADERS, 'Content-Type': 'application/json' };
+  }
+  
+  /**
+   * Sets up the token manager
+   */
+  private async setupTokenManager(): Promise<void> {
+    // Initialize token manager for authentication
+    if (typeof window !== 'undefined') {
+      try {
+        await ClientTokenManager.refreshAccessToken();
+      } catch (error) {
+        console.warn('Error refreshing token during API initialization:', error);
+      }
+    }
+  }
+
+  /**
    * Ensures the API client is initialized before making requests
    * Modified to handle initialization better and avoid race conditions
    * 

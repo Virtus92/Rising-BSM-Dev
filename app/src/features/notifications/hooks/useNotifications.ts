@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
 import { NotificationClient } from '@/features/notifications/lib/clients';
 import { NotificationResponseDto, NotificationFilterParamsDto } from '@/domain/dtos/NotificationDtos';
-import { createBaseListUtilityConfig, BaseListUtility } from '@/shared/utils/list/baseListUtils';
+import { createBaseListUtility, BaseListUtility } from '@/shared/utils/list/baseListUtils';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 
 /**
@@ -244,50 +244,43 @@ export const useNotifications = ({
     }
   }, [toast]); // Only depend on toast, auth state is accessed via ref
   
-  // Create the BaseListUtility outside of useEffect to avoid React hooks violations
-  const createList = useMemo(() => {
-    return () => createBaseListUtilityConfig<NotificationResponseDto, NotificationFilterParamsDto>({
-      fetchFunction: fetchNotifications,
-      initialFilters: {
-        page,
-        limit,
-        unreadOnly,
-        sortBy: 'createdAt',
-        sortDirection: 'desc'
-      },
-      defaultSortField: 'createdAt' as string,
-      defaultSortDirection: 'desc',
-      syncWithUrl: false,
-      autoFetch: false // Never start with autoFetch enabled, we'll control this manually
-    });
-  }, [fetchNotifications, limit, page, unreadOnly]);
+  // Create the list configuration
+  const listConfig = useMemo(() => ({
+    fetchFunction: fetchNotifications,
+    initialFilters: {
+      page,
+      limit,
+      unreadOnly,
+      sortBy: 'createdAt',
+      sortDirection: 'desc' as 'desc' | 'asc'
+    },
+    defaultSortField: 'createdAt' as string,
+    defaultSortDirection: 'desc' as 'desc' | 'asc',
+    syncWithUrl: false,
+    autoFetch: false // We'll control fetching manually
+  }), [fetchNotifications, limit, page, unreadOnly]);
   
-  // Initialize baseListRef during first render
-  useEffect(() => {
-    if (!baseListRef.current) {
-      baseListRef.current = createList();
-    }
-  }, [createList]);
+  // Directly create the BaseListUtility in the main body of the hook
+  // This follows React's Rules of Hooks
+  const baseList = createBaseListUtility<NotificationResponseDto, NotificationFilterParamsDto>(listConfig);
   
-  // Always ensure we use the current fetch function
+  // Store the list reference for other functions to use
   useEffect(() => {
-    if (baseListRef.current && typeof (baseListRef.current as any).setFetchFunction === 'function') {
-      (baseListRef.current as any).setFetchFunction(fetchNotifications);
-    }
-  }, [fetchNotifications]);
+    baseListRef.current = baseList;
+  }, [baseList]);
   
   // Calculate unread count using useMemo to avoid direct property access
   const unreadCount = useMemo(() => {
-    if (!baseListRef.current?.items) {
+    if (!baseList?.items) {
       return NOTIFICATIONS_STATE.cachedUnreadCount;
     }
     
-    const count = baseListRef.current.items
+    const count = baseList.items
       .filter(notification => !notification.isRead)
       .length;
       
     return count || NOTIFICATIONS_STATE.cachedUnreadCount;
-  }, [baseListRef.current?.items]);
+  }, [baseList?.items]);
   
   // Handle auto-fetch based on authentication status
   useEffect(() => {

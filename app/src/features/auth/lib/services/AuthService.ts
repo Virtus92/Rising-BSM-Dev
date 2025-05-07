@@ -211,7 +211,11 @@ export class AuthService implements IAuthService {
       const requestId = options?.context?.requestId || crypto.randomUUID();
 
       // Find the user with timeout handling
-      let user;
+      let user: { 
+        id: number;
+        isActive: () => boolean;
+        role?: string;
+      } | null;
       try {
         // Add timeout for the user query to prevent hanging
         const userPromise = this.userRepository.findById(refreshToken.userId);
@@ -219,7 +223,7 @@ export class AuthService implements IAuthService {
           setTimeout(() => reject(new Error('User lookup timed out')), 5000); // 5 second timeout
         });
         
-        user = await Promise.race([userPromise, timeoutPromise]);
+        user = await Promise.race([userPromise, timeoutPromise]) as typeof user;
         
         // Add detailed logging for debugging
         if (!user) {
@@ -236,7 +240,7 @@ export class AuthService implements IAuthService {
           tokenId: refreshToken.token.substring(0, 8),
           requestId
         });
-        throw this.errorHandler.createUnauthorizedError(`User lookup failed: ${userError.message}`);
+        throw this.errorHandler.createUnauthorizedError(`User lookup failed: ${(userError as Error).message}`);
       }
       
       // If no user was found
