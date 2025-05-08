@@ -1,8 +1,12 @@
+import { PrismaClient } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { PrismaRepository } from '@/core/repositories/PrismaRepository';
 import { RequestData } from '@/domain/entities/RequestData';
 import { RequestDataHistory } from '@/domain/entities/RequestDataHistory';
 import { IRequestDataRepository } from '@/domain/repositories/IRequestDataRepository';
 import { PaginationResult, QueryOptions } from '@/domain/repositories/IBaseRepository';
+import { ILoggingService } from '@/core/logging/ILoggingService';
+import { IErrorHandler } from '@/core/errors';
 
 /**
  * Repository implementation for RequestData entities
@@ -15,7 +19,11 @@ export class RequestDataRepository extends PrismaRepository<RequestData> impleme
    * @param logger - Logger service
    * @param errorHandler - Error handler
    */
-  constructor(prisma: any, logger: any, errorHandler: any) {
+  constructor(
+    prisma: PrismaClient,
+    logger: ILoggingService,
+    errorHandler: IErrorHandler
+  ) {
     // Pass 'requestData' as the model name to ensure Prisma can find it
     super(prisma, 'requestData', logger, errorHandler);
   }
@@ -414,9 +422,9 @@ export class RequestDataRepository extends PrismaRepository<RequestData> impleme
    * @param callback - Transaction callback
    * @returns Transaction result
    */
-  async transaction<R>(callback: (repo?: IRequestDataRepository) => Promise<R>): Promise<R> {
+  async transaction<R>(callback: (repo: this) => Promise<R>): Promise<R> {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         try {
           // Create a new repository with the transaction client
           const repoWithTx = new RequestDataRepository(
@@ -426,7 +434,7 @@ export class RequestDataRepository extends PrismaRepository<RequestData> impleme
           );
           
           // Execute the callback with the transaction repository
-          return await callback();
+          return await callback(this);
         } catch (error) {
           throw error;
         }

@@ -235,7 +235,7 @@ export class RefreshTokenRepository extends PrismaRepository<RefreshToken, strin
   async createWithRotation(token: RefreshToken, oldToken?: string, ipAddress?: string): Promise<RefreshToken> {
     try {
       // Start a transaction to ensure both operations complete
-      return await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         // If there's an old token, revoke it first
         if (oldToken) {
           await tx.refreshToken.update({

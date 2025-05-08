@@ -1,4 +1,7 @@
 import { PrismaClient } from '@prisma/client';
+import * as fs from 'fs';
+import * as path from 'path';
+import { exec } from 'child_process';
 
 /**
  * Prisma Client Singleton
@@ -19,7 +22,7 @@ let initializationAttempted = false;
 /**
  * Create and configure PrismaClient with proper error handling
  */
-const createPrismaClient = () => {
+const createPrismaClient = async (): Promise<PrismaClient> => {
   try {
     // Add validation to ensure Prisma client is actually available
     if (!PrismaClient) {
@@ -44,11 +47,40 @@ const createPrismaClient = () => {
     
     // This is a last-resort attempt to regenerate the client at runtime
     try {
-      const { execSync } = require('child_process');
-      execSync('npx prisma generate', { stdio: 'inherit' });
+      console.log('Attempting to regenerate Prisma client...');
+      
+      // Get the project root directory
+      const projectDir = path.resolve(process.cwd());
+      console.log('Project directory:', projectDir);
+      
+      // Check if prisma schema exists
+      const schemaPath = path.join(projectDir, 'prisma', 'schema.prisma');
+      if (!fs.existsSync(schemaPath)) {
+        throw new Error(`Prisma schema not found at ${schemaPath}`);
+      }
+      console.log('Found Prisma schema at:', schemaPath);
+      
+      // Create a promise-based exec function
+      const execPromise = (cmd: string) => new Promise<string>((resolve, reject) => {
+        exec(cmd, { cwd: projectDir }, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Exec error: ${error.message}`);
+            return reject(error);
+          }
+          if (stderr) {
+            console.log(`Command stderr: ${stderr}`);
+          }
+          resolve(stdout);
+        });
+      });
+      
+      // Execute prisma generate
+      console.log('Executing npx prisma generate...');
+      const output = await execPromise('npx prisma generate');
+      console.log('Prisma generate output:', output);
       console.log('Prisma client regenerated successfully');
       
-      // Try to clear require cache for @prisma/client
+      // Clear module cache for @prisma/client
       Object.keys(require.cache).forEach(key => {
         if (key.includes('@prisma/client')) {
           delete require.cache[key];
@@ -56,7 +88,10 @@ const createPrismaClient = () => {
       });
       
       // Re-require PrismaClient
+      console.log('Re-requiring PrismaClient...');
       const { PrismaClient: RegeneratedPrismaClient } = require('@prisma/client');
+      
+      // Create new instance with logging
       return new RegeneratedPrismaClient({
         log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
       });
@@ -71,11 +106,29 @@ const createPrismaClient = () => {
 let prismaInstance: PrismaClient;
 
 try {
-  prismaInstance = global.prisma || createPrismaClient();
-  
-  // In development, save the instance in the global object
-  if (process.env.NODE_ENV !== 'production') {
-    global.prisma = prismaInstance;
+  // Use global instance if available or initialize async
+  if (global.prisma) {
+    prismaInstance = global.prisma;
+  } else {
+    // For async initialization, we need to create a placeholder that will be populated later
+    prismaInstance = new PrismaClient();
+    
+    // Immediately start the initialization process
+    createPrismaClient()
+      .then(client => {
+        // Replace the placeholder with the real client
+        Object.assign(prismaInstance, client);
+        
+        // Save the instance in the global object in development
+        if (process.env.NODE_ENV !== 'production') {
+          global.prisma = prismaInstance;
+        }
+        
+        console.log('Prisma Client initialized successfully');
+      })
+      .catch(error => {
+        console.error('Failed to initialize Prisma client:', error);
+      });
   }
 } catch (error) {
   console.error('Failed to initialize Prisma client:', error);

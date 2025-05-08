@@ -6,6 +6,7 @@ import { ILoggingService } from '@/core/logging/ILoggingService';
 import { IErrorHandler } from '@/core/errors/';
 import { getPermissionsForRole } from '@/domain/enums/PermissionEnums';
 import { SystemPermissionMap, getAllPermissionCodes } from '@/domain/permissions/SystemPermissionMap';
+import { IBaseRepository } from '@/domain/repositories/IBaseRepository';
 import { UserRole } from '@/domain/entities/User';
 import { QueryOptions } from '@/core/repositories/PrismaRepository';
 
@@ -683,10 +684,10 @@ export class PermissionRepository implements IPermissionRepository {
   /**
    * Execute in transaction
    */
-  async transaction<T>(callback: (repo?: IPermissionRepository) => Promise<T>): Promise<T> {
+  async transaction<R>(callback: (repo: IBaseRepository<Permission, number>) => Promise<R>): Promise<R> {
     try {
       return await this.prisma.$transaction(async () => {
-        return callback();
+        return callback(this);
       });
     } catch (error) {
       this.logger.error('Error in PermissionRepository.transaction', { error });

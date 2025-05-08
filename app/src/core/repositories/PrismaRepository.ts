@@ -1,4 +1,6 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError, PrismaClientUnknownRequestError, PrismaClientRustPanicError, PrismaClientInitializationError, PrismaClientValidationError } from '@prisma/client/runtime/library';
 import { BaseRepository } from './BaseRepository';
 import { ILoggingService } from '@/core/logging/ILoggingService';
 import { IErrorHandler } from '@/core/errors/';
@@ -344,7 +346,7 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
    * @param callback - Callback function that accepts a repository instance
    * @returns Promise with transaction result
    */
-  async transaction<R>(callback: (repo: any) => Promise<R>): Promise<R> {
+  async transaction<R>(callback: (repo: this) => Promise<R>): Promise<R> {
     try {
       const timeout = configService.isDevelopment() ? 30000 : 10000;
       
@@ -449,7 +451,7 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
    * @returns Whether the error violates a uniqueness constraint
    */
   protected isUniqueConstraintError(error: any): boolean {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+    return error instanceof PrismaClientKnownRequestError && error.code === 'P2002';
   }
 
   /**
@@ -459,7 +461,7 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
    * @returns Whether the error violates a foreign key constraint
    */
   protected isForeignKeyConstraintError(error: any): boolean {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
+    return error instanceof PrismaClientKnownRequestError && error.code === 'P2003';
   }
 
   /**
@@ -469,7 +471,7 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
    * @returns The transformed error
    */
   protected handleDatabaseError(error: any): Error {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       // Known Prisma errors with detailed error messages
       switch (error.code) {
         case 'P2002': // Unique constraint violated
@@ -504,21 +506,21 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
         default:
           return this.errorHandler.handleDatabaseError(error);
       }
-    } else if (error instanceof Prisma.PrismaClientValidationError) {
+    } else if (error instanceof PrismaClientValidationError) {
       // Validation error
       return this.errorHandler.createValidationError(
         'Database validation error', 
         [error.message.split('\n').pop() || error.message]
       );
-    } else if (error instanceof Prisma.PrismaClientRustPanicError) {
+    } else if (error instanceof PrismaClientRustPanicError) {
       // Critical error in Prisma Engine
       this.logger.error('Critical Prisma Engine error occurred', { error });
       return this.errorHandler.handleDatabaseError(error);
-    } else if (error instanceof Prisma.PrismaClientInitializationError) {
+    } else if (error instanceof PrismaClientInitializationError) {
       // Initialization error
       this.logger.error('Prisma initialization error', { error });
       return this.errorHandler.handleDatabaseError(error);
-    } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+    } else if (error instanceof PrismaClientUnknownRequestError) {
       // Unknown request error
       return this.errorHandler.handleDatabaseError(error);
     }

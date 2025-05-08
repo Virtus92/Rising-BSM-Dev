@@ -175,5 +175,5 @@ export interface IBaseRepository<T, ID = number> {
    * @param callback - Callback-Funktion, die das Repository als Parameter erhält
    * @returns Ergebnis der Transaktion
    */
-  transaction<R>(callback: (repo: any) => Promise<R>): Promise<R>;
+  transaction<R>(callback: (repo: IBaseRepository<T, ID>) => Promise<R>): Promise<R>;
 }

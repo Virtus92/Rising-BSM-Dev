@@ -15,6 +15,7 @@
     "db:seed": "node scripts/seed.js",
     "db:studio": "npx prisma studio",
     "prisma:generate": "npx prisma generate",
+    "prisma:fix": "node scripts/fix-prisma.js",
     "format": "prettier --write ."
   },
   "prisma": {
