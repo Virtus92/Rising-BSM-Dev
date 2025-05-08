@@ -17,7 +17,7 @@ import {
   TooltipTrigger 
 } from '@/shared/components/ui/tooltip';
 import { RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
-import { useN8NWorkflows } from '../../hooks/n8n/useN8NWorkflows';
+import { useN8NWorkflows } from '@/features/n8n/hooks/useN8NWorkflows';
 import { PlayCircle, RotateCw, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 
 interface N8NWorkflowControlsProps {

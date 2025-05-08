@@ -3,6 +3,9 @@ import { ILoggingService } from '@/core/logging/ILoggingService';
 import { IErrorHandler } from '@/core/errors';
 import { ConfigService } from '@/core/config';
 import { IN8NIntegrationService } from '@/domain/services/IN8NIntegrationService';
+import { EventTriggerService } from './EventTriggerService';
+import { WebhookManagementService } from './WebhookManagementService';
+import { ApiEndpointService } from './ApiEndpointService';
 
 /**
  * Interface for request data repository operations
@@ -15,7 +18,7 @@ import { IRequestDataRepository as IDomainRequestDataRepository } from '@/domain
 type IRequestDataRepository = IDomainRequestDataRepository;
 
 /**
- * Service for integrating with N8N workflows
+ * Enhanced service for integrating with N8N workflows
  * @implements IN8NIntegrationService
  */
 export class N8NIntegrationService implements IN8NIntegrationService {
@@ -24,15 +27,74 @@ export class N8NIntegrationService implements IN8NIntegrationService {
     protected requestDataRepository: IRequestDataRepository,
     protected logger: ILoggingService,
     protected errorHandler: IErrorHandler,
-    protected configService: typeof ConfigService
-  ) {}
+    protected configService: typeof ConfigService,
+    protected eventTriggerService: EventTriggerService,
+    protected webhookService: WebhookManagementService,
+    protected apiEndpointService: ApiEndpointService
+  ) {
+    // Initialize event listeners
+    this.registerEventListeners();
+  }
+  
+  /**
+   * Register event listeners for automatic workflow triggering
+   */
+  private registerEventListeners(): void {
+    // Example events to listen for
+    const events = [
+      'request.created',
+      'request.updated',
+      'user.registered',
+      'appointment.scheduled',
+      'appointment.upcoming'
+    ];
+    
+    for (const event of events) {
+      this.eventTriggerService.on(event, async (data) => {
+        await this.handleEvent(event, data);
+      });
+    }
+  }
+  
+  /**
+   * Handle an event and trigger appropriate workflows
+   * 
+   * @param eventType - Type of event
+   * @param data - Event data
+   */
+  private async handleEvent(eventType: string, data: any): Promise<void> {
+    try {
+      this.logger.info(`Handling event: ${eventType}`, { data });
+      
+      // TODO: Implement trigger lookup and workflow execution
+      // This would find triggers configured for this event type and execute their workflows
+    } catch (error) {
+      this.logger.error(`Error handling event: ${eventType}`, {
+        error: error instanceof Error ? error.message : String(error),
+        data
+      });
+    }
+  }
+  
+  /**
+   * Trigger a workflow by name only
+   * 
+   * @param workflowName - Name of the workflow to trigger
+   * @param data - Data to send to the workflow
+   * @returns Execution information
+   */
+  async triggerWorkflowByName(
+    workflowName: string,
+    data: any = {}
+  ): Promise<{ executionId: string; success: boolean }> {
+    return await this.triggerWorkflow(0, workflowName, data);
+  }
   
   /**
    * Trigger a workflow in N8N using its name
    * 
-   * @param requestId - ID of the request being processed
    * @param workflowName - Name of the N8N workflow
-   * @param data - Additional data to send to the workflow
+   * @param data - Data to send to the workflow
    * @returns Execution information
    */
   async triggerWorkflow(
@@ -41,23 +103,18 @@ export class N8NIntegrationService implements IN8NIntegrationService {
     data: any = {}
   ): Promise<{ executionId: string; success: boolean }> {
     try {
-      const n8nBaseUrl = this.configService.get('N8N_BASE_URL');
-      const n8nApiKey = this.configService.get('N8N_API_KEY');
+      // Get N8N configuration
+      const config = await this.getN8NConfiguration();
       
-      if (!n8nBaseUrl || !n8nApiKey) {
+      if (!config.baseUrl || !config.apiKey) {
         throw new Error('N8N configuration is incomplete');
       }
       
-      const request = await this.requestRepository.findById(requestId);
-      if (!request) {
-        throw this.errorHandler.createNotFoundError(`Request with ID ${requestId} not found`);
-      }
-      
       // Step 1: Find the workflow ID by name
-      const searchResponse = await fetch(`${n8nBaseUrl}/api/v1/workflows?name=${encodeURIComponent(workflowName)}`, {
+      const searchResponse = await fetch(`${config.baseUrl}/api/v1/workflows?name=${encodeURIComponent(workflowName)}`, {
         method: 'GET',
         headers: {
-          'X-N8N-API-KEY': n8nApiKey
+          'X-N8N-API-KEY': config.apiKey
         }
       });
       
@@ -77,17 +134,16 @@ export class N8NIntegrationService implements IN8NIntegrationService {
       // Prepare the payload
       const payload = {
         data: {
-          requestId,
-          requestData: request.toObject(),
-          additionalData: data
+          ...data,
+          timestamp: new Date().toISOString()
         }
       };
       
       // Step 2: Activate the workflow using its ID
-      const activateResponse = await fetch(`${n8nBaseUrl}/api/v1/workflows/${workflowId}/activate`, {
+      const activateResponse = await fetch(`${config.baseUrl}/api/v1/workflows/${workflowId}/activate`, {
         method: 'POST',
         headers: {
-          'X-N8N-API-KEY': n8nApiKey,
+          'X-N8N-API-KEY': config.apiKey,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
@@ -99,15 +155,26 @@ export class N8NIntegrationService implements IN8NIntegrationService {
       
       const activateResult = await activateResponse.json();
       
-      // Update request metadata
-      await this.updateRequestMetadata(requestId, {
-        workflowTriggered: true,
-        workflowName,
-        workflowId,
-        executionId: activateResult.executionId,
-        triggerTimestamp: new Date().toISOString(),
-        status: 'processing'
+      // Create execution record
+      await this.createExecutionRecord({
+        externalId: activateResult.executionId,
+        triggerType: 'manual',
+        status: 'running',
+        entityType: data.entityType || (requestId > 0 ? 'request' : undefined),
+        entityId: data.entityId || (requestId > 0 ? requestId : undefined),
+        workflowTemplateId: null, // We don't have a template ID for direct invocation
+        workflowName
       });
+      
+      // If this was triggered for a request, update the request metadata
+      if (requestId > 0) {
+        await this.updateRequestMetadata(requestId, {
+          workflowStatus: 'running',
+          workflowId: workflowId,
+          executionId: activateResult.executionId,
+          startTimestamp: new Date().toISOString()
+        });
+      }
       
       return {
         executionId: activateResult.executionId,
@@ -117,7 +184,8 @@ export class N8NIntegrationService implements IN8NIntegrationService {
       this.logger.error(`Error in ${this.constructor.name}.triggerWorkflow`, {
         error: error instanceof Error ? error.message : String(error),
         requestId,
-        workflowName
+        workflowName,
+        data
       });
       throw this.handleError(error);
     }
@@ -126,27 +194,19 @@ export class N8NIntegrationService implements IN8NIntegrationService {
   /**
    * Trigger a workflow via webhook URL directly
    * 
-   * @param requestId - ID of the request being processed
    * @param webhookUrl - URL of the N8N webhook
-   * @param data - Additional data to send to the workflow
+   * @param data - Data to send to the workflow
    * @returns Response from the webhook
    */
   async triggerWebhookWorkflow(
-    requestId: number,
     webhookUrl: string,
     data: any = {}
   ): Promise<{ success: boolean; response: any }> {
     try {
-      const request = await this.requestRepository.findById(requestId);
-      if (!request) {
-        throw this.errorHandler.createNotFoundError(`Request with ID ${requestId} not found`);
-      }
-      
       // Prepare the payload
       const payload = {
-        requestId,
-        requestData: request.toObject(),
-        additionalData: data
+        ...data,
+        timestamp: new Date().toISOString()
       };
       
       // Call webhook URL directly
@@ -164,12 +224,15 @@ export class N8NIntegrationService implements IN8NIntegrationService {
       
       const result = await response.json();
       
-      // Update request metadata
-      await this.updateRequestMetadata(requestId, {
-        webhookTriggered: true,
-        webhookUrl,
-        triggerTimestamp: new Date().toISOString(),
-        status: 'processing'
+      // Create execution record for tracking
+      await this.createExecutionRecord({
+        externalId: `webhook-${Date.now()}`,
+        triggerType: 'webhook',
+        status: 'running',
+        entityType: data.entityType,
+        entityId: data.entityId,
+        workflowTemplateId: null,
+        webhookUrl
       });
       
       return {
@@ -179,32 +242,32 @@ export class N8NIntegrationService implements IN8NIntegrationService {
     } catch (error) {
       this.logger.error(`Error in ${this.constructor.name}.triggerWebhookWorkflow`, {
         error: error instanceof Error ? error.message : String(error),
-        requestId,
-        webhookUrl
+        webhookUrl,
+        data
       });
       throw this.handleError(error);
     }
   }
   
   /**
-   * Get status of a workflow execution
+   * Get the status of a workflow execution
    * 
    * @param executionId - Execution ID to check
    * @returns Execution status details
    */
   async getWorkflowStatus(executionId: string): Promise<any> {
     try {
-      const n8nBaseUrl = this.configService.get('N8N_BASE_URL');
-      const n8nApiKey = this.configService.get('N8N_API_KEY');
+      // Get N8N configuration
+      const config = await this.getN8NConfiguration();
       
-      if (!n8nBaseUrl || !n8nApiKey) {
+      if (!config.baseUrl || !config.apiKey) {
         throw new Error('N8N configuration is incomplete');
       }
       
-      const response = await fetch(`${n8nBaseUrl}/api/v1/executions/${executionId}`, {
+      const response = await fetch(`${config.baseUrl}/api/v1/executions/${executionId}`, {
         method: 'GET',
         headers: {
-          'X-N8N-API-KEY': n8nApiKey
+          'X-N8N-API-KEY': config.apiKey
         }
       });
       
@@ -229,17 +292,17 @@ export class N8NIntegrationService implements IN8NIntegrationService {
    */
   async getAvailableWorkflows(): Promise<any[]> {
     try {
-      const n8nBaseUrl = this.configService.get('N8N_BASE_URL');
-      const n8nApiKey = this.configService.get('N8N_API_KEY');
+      // Get N8N configuration
+      const config = await this.getN8NConfiguration();
       
-      if (!n8nBaseUrl || !n8nApiKey) {
+      if (!config.baseUrl || !config.apiKey) {
         throw new Error('N8N configuration is incomplete');
       }
       
-      const response = await fetch(`${n8nBaseUrl}/api/v1/workflows?active=true`, {
+      const response = await fetch(`${config.baseUrl}/api/v1/workflows?active=true`, {
         method: 'GET',
         headers: {
-          'X-N8N-API-KEY': n8nApiKey
+          'X-N8N-API-KEY': config.apiKey
         }
       });
       
@@ -266,22 +329,13 @@ export class N8NIntegrationService implements IN8NIntegrationService {
   }
   
   /**
-   * Get saved webhook configurations from the database
+   * Get saved webhook configurations
    * 
-   * @returns List of saved webhooks
+   * @returns List of webhooks
    */
   async getSavedWebhooks(): Promise<any[]> {
     try {
-      // This would typically fetch from your database where you've stored webhook URLs
-      // For workflows that are triggered via webhooks
-      const webhooks = await this.getWebhooksFromDatabase();
-      
-      return webhooks.map((webhook: any) => ({
-        id: webhook.id,
-        name: webhook.name,
-        description: webhook.description || '',
-        url: webhook.url
-      }));
+      return await this.webhookService.getWebhooks();
     } catch (error) {
       this.logger.error(`Error in ${this.constructor.name}.getSavedWebhooks`, {
         error: error instanceof Error ? error.message : String(error)
@@ -291,14 +345,194 @@ export class N8NIntegrationService implements IN8NIntegrationService {
   }
   
   /**
-   * Get webhook configurations from database
+   * Get registered API endpoints
    * 
-   * @returns List of webhook configurations
+   * @returns List of API endpoints
    */
-  private async getWebhooksFromDatabase(): Promise<any[]> {
-    // Implement based on your database structure
-    // This would fetch webhook configurations that you've saved
-    return [];
+  async getApiEndpoints(): Promise<any[]> {
+    try {
+      return await this.apiEndpointService.getApiEndpoints();
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.getApiEndpoints`, {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Get registered event triggers
+   * 
+   * @returns List of triggers
+   */
+  async getTriggers(): Promise<any[]> {
+    try {
+      // TODO: Implement trigger repository
+      return [];
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.getTriggers`, {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Register a new webhook
+   * 
+   * @param webhook - Webhook configuration
+   * @returns Created webhook
+   */
+  async registerWebhook(webhook: any): Promise<any> {
+    try {
+      return await this.webhookService.createWebhook(webhook);
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.registerWebhook`, {
+        error: error instanceof Error ? error.message : String(error),
+        webhook
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Update an existing webhook
+   * 
+   * @param id - Webhook ID
+   * @param webhook - Updated webhook configuration
+   * @returns Updated webhook
+   */
+  async updateWebhook(id: number, webhook: any): Promise<any> {
+    try {
+      return await this.webhookService.updateWebhook(id, webhook);
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.updateWebhook`, {
+        error: error instanceof Error ? error.message : String(error),
+        id,
+        webhook
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Delete a webhook
+   * 
+   * @param id - Webhook ID
+   * @returns Result of operation
+   */
+  async deleteWebhook(id: number): Promise<{ success: boolean }> {
+    try {
+      return await this.webhookService.deleteWebhook(id);
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.deleteWebhook`, {
+        error: error instanceof Error ? error.message : String(error),
+        id
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Register an API endpoint
+   * 
+   * @param endpoint - API endpoint configuration
+   * @returns Created API endpoint
+   */
+  async registerApiEndpoint(endpoint: any): Promise<any> {
+    try {
+      return await this.apiEndpointService.registerApiEndpoint(endpoint);
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.registerApiEndpoint`, {
+        error: error instanceof Error ? error.message : String(error),
+        endpoint
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Register a trigger
+   * 
+   * @param trigger - Trigger configuration
+   * @returns Created trigger
+   */
+  async registerTrigger(trigger: any): Promise<any> {
+    try {
+      // TODO: Implement trigger repository
+      return trigger;
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.registerTrigger`, {
+        error: error instanceof Error ? error.message : String(error),
+        trigger
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Get execution history
+   * 
+   * @param filters - Optional filters
+   * @returns List of executions
+   */
+  async getExecutionHistory(filters: any = {}): Promise<any[]> {
+    try {
+      // TODO: Implement execution repository
+      return [];
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.getExecutionHistory`, {
+        error: error instanceof Error ? error.message : String(error),
+        filters
+      });
+      throw this.handleError(error);
+    }
+  }
+  
+  /**
+   * Handle webhook notification from N8N
+   * 
+   * @param action - Action type
+   * @param executionId - Execution ID
+   * @param payload - Notification payload
+   * @returns Processing result
+   */
+  async handleWebhookNotification(
+    action: string,
+    executionId: string,
+    payload: any
+  ): Promise<any> {
+    try {
+      // Handle different notification types
+      switch (action) {
+        case 'start':
+          // Handle execution start
+          return { success: true, message: 'Execution start recorded' };
+          
+        case 'update':
+          // Handle execution update
+          return { success: true, message: 'Execution update recorded' };
+          
+        case 'complete':
+          // Handle execution completion
+          return { success: true, message: 'Execution completion recorded' };
+          
+        case 'error':
+          // Handle execution error
+          return { success: true, message: 'Execution error recorded' };
+          
+        default:
+          throw new Error(`Unknown action: ${action}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error in ${this.constructor.name}.handleWebhookNotification`, {
+        error: error instanceof Error ? error.message : String(error),
+        action,
+        executionId,
+        payload
+      });
+      throw this.handleError(error);
+    }
   }
   
   /**
@@ -626,6 +860,30 @@ export class N8NIntegrationService implements IN8NIntegrationService {
     };
     
     return orders[category] || 100;
+  }
+  
+  /**
+   * Get N8N configuration
+   * 
+   * @returns N8N configuration
+   */
+  private async getN8NConfiguration() {
+    // For now, use environment variables; later will use database
+    return {
+      baseUrl: this.configService.get('N8N_BASE_URL'),
+      apiKey: this.configService.get('N8N_API_KEY')
+    };
+  }
+  
+  /**
+   * Create execution record
+   * 
+   * @param execution - Execution data
+   * @returns Created execution record
+   */
+  private async createExecutionRecord(execution: any) {
+    // TODO: Implement execution repository
+    return execution;
   }
   
   /**

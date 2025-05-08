@@ -26,7 +26,7 @@ import { AppointmentService } from '@/features/appointments/lib/services/Appoint
 import { RequestService } from '@/features/requests/lib/services/RequestService';
 import { ActivityLogService } from '@/features/activity/lib/services/ActivityLogService';
 import { NotificationService } from '@/features/notifications/lib/services/NotificationService';
-import { N8NIntegrationService } from '@/features/requests/lib/n8n/N8NIntegrationService';
+import { N8NIntegrationService } from '@/features/n8n/lib/services/N8NIntegrationService';
 import { RefreshTokenService } from '@/features/auth/lib/services/RefreshTokenService';
 import { PermissionService } from '@/features/permissions/lib/services/PermissionService';
 import { RequestDataService } from '@/features/requests/lib/services/RequestDataService';
@@ -417,22 +417,31 @@ export class ServiceFactory {
    */
   public createN8NIntegrationService(): IN8NIntegrationService {
     if (!this.n8nIntegrationService) {
-      // Try to use the features implementation first
-      try {
-        // Create service directly since we've already imported the class
+      // For client-side, we'll need to check if we're in the browser
+      if (typeof window !== 'undefined') {
+        // We're in the browser, so try to dynamically import the client version
         try {
-        this.n8nIntegrationService = new N8NIntegrationService(
-        getRequestRepository(),
-        getRequestDataRepository(),
-        getLogger(),
-        getErrorHandler(),
-        configService
-        );
+          const clientModule = require('@/features/n8n/lib/clients/N8NClient');
+          if (clientModule && clientModule.N8NClientService) {
+            this.n8nIntegrationService = clientModule.N8NClientService;
+          } else {
+            console.warn('N8NClientService not found, using server implementation in client context');
+          }
         } catch (error) {
-        getLogger().error('Error creating N8NIntegrationService:', error instanceof Error ? error.message : String(error));
+          console.warn('Could not load N8NClientService, falling back to server implementation');
         }
-      } catch (error) {
-        getLogger().error('Error in createN8NIntegrationService:', error instanceof Error ? error.message : String(error));
+      }
+      
+      // If we still don't have a service (or we're on the server), create the server implementation
+      if (!this.n8nIntegrationService) {
+        try {
+          // For server-side, we'll use the server factory
+          const { getServiceFactory } = require('./serviceFactory.server');
+          this.n8nIntegrationService = getServiceFactory().createN8NIntegrationService();
+        } catch (error) {
+          getLogger().error('Error creating N8NIntegrationService:', error instanceof Error ? error.message : String(error));
+          throw new Error(`Failed to initialize N8NIntegrationService: ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
     }
     return this.n8nIntegrationService!;

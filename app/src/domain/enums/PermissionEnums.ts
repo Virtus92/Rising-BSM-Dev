@@ -9,7 +9,8 @@ export enum PermissionCategory {
   REQUESTS = "Requests",
   APPOINTMENTS = "Appointments",
   SETTINGS = "Settings",
-  PROFILE = "Profile"
+  PROFILE = "Profile",
+  AUTOMATION = "Automation"
 }
 
 /**
@@ -36,6 +37,7 @@ export enum SystemPermission {
   // System permissions
   SYSTEM_ACCESS = "system.access",
   DASHBOARD_VIEW = "dashboard.view",
+  DIAGNOSTICS_VIEW = "diagnostics.view",
   
   // User permissions
   USERS_VIEW = "users.view",
@@ -84,6 +86,7 @@ export enum SystemPermission {
   // Settings permissions
   SETTINGS_VIEW = "settings.view",
   SETTINGS_EDIT = "settings.edit",
+  SETTINGS_MANAGE = "settings.manage",
   
   // Profile permissions
   PROFILE_VIEW = "profile.view",
@@ -96,6 +99,11 @@ export enum SystemPermission {
   // Permission management
   PERMISSIONS_VIEW = "permissions.view",
   PERMISSIONS_MANAGE = "permissions.manage",
+  
+  // Automation permissions
+  AUTOMATION_VIEW = "automation.view",
+  AUTOMATION_MANAGE = "automation.manage",
+  AUTOMATION_EXECUTE = "automation.execute",
 }
 
 // Role-based permission presets
@@ -103,6 +111,8 @@ export const RolePermissions: Record<string, SystemPermission[]> = {
   "admin": [
     SystemPermission.SYSTEM_ACCESS,
     SystemPermission.SYSTEM_ADMIN, // Added SYSTEM_ADMIN permission for admin role
+    SystemPermission.DASHBOARD_VIEW,
+    SystemPermission.DIAGNOSTICS_VIEW,
     SystemPermission.USERS_VIEW,
     SystemPermission.USERS_CREATE,
     SystemPermission.USERS_EDIT,
@@ -131,10 +141,14 @@ export const RolePermissions: Record<string, SystemPermission[]> = {
     SystemPermission.APPOINTMENTS_DELETE,
     SystemPermission.SETTINGS_VIEW,
     SystemPermission.SETTINGS_EDIT,
+    SystemPermission.SETTINGS_MANAGE,
     SystemPermission.PERMISSIONS_VIEW,
     SystemPermission.PERMISSIONS_MANAGE,
     SystemPermission.PROFILE_VIEW,
-    SystemPermission.PROFILE_EDIT
+    SystemPermission.PROFILE_EDIT,
+    SystemPermission.AUTOMATION_VIEW,
+    SystemPermission.AUTOMATION_MANAGE,
+    SystemPermission.AUTOMATION_EXECUTE
   ],
   "manager": [
     SystemPermission.SYSTEM_ACCESS,
@@ -157,7 +171,9 @@ export const RolePermissions: Record<string, SystemPermission[]> = {
     SystemPermission.SETTINGS_VIEW,
     SystemPermission.PERMISSIONS_VIEW,
     SystemPermission.PROFILE_VIEW,
-    SystemPermission.PROFILE_EDIT
+    SystemPermission.PROFILE_EDIT,
+    SystemPermission.AUTOMATION_VIEW,
+    SystemPermission.AUTOMATION_EXECUTE
   ],
   "employee": [
     SystemPermission.SYSTEM_ACCESS,

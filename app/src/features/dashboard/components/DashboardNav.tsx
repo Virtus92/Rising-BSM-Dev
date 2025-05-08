@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/shared/utils/cn';
-import { MenuSection, dashboardNavigation } from '@/shared/components/permissions/RoleConfig';
+import { MenuSection, dashboardNavigation } from '@/shared/navigation/DashboardConfig';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { PermissionIndicator } from '@/shared/components/permissions/PermissionIndicator';
 import * as Icons from 'lucide-react';

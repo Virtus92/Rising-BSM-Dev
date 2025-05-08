@@ -33,7 +33,10 @@ import { ActivityLogService } from '@/features/activity/lib/services/ActivityLog
 import { RefreshTokenService } from '@/features/auth/lib/services/RefreshTokenService';
 import { PermissionService } from '@/features/permissions/lib/services/PermissionService';
 import { RequestDataService } from '@/features/requests/lib/services/RequestDataService';
-import { N8NIntegrationService } from '@/features/requests/lib/n8n/N8NIntegrationService';
+import { N8NIntegrationService } from '@/features/n8n/lib/services/N8NIntegrationService';
+import { EventTriggerService } from '@/features/n8n/lib/services/EventTriggerService';
+import { WebhookManagementService } from '@/features/n8n/lib/services/WebhookManagementService';
+import { ApiEndpointService } from '@/features/n8n/lib/services/ApiEndpointService';
 import { UserService } from '@/features/users/lib/services/UserService.server';
 import { NotificationService } from '@/features/notifications/lib/services/NotificationService.server';
 
@@ -67,6 +70,11 @@ export class ServiceFactory implements IServiceFactory {
   private refreshTokenService?: RefreshTokenService;
   private permissionService?: PermissionService;
   private requestDataService?: RequestDataService;
+  
+  // N8N related services
+  private eventTriggerService?: EventTriggerService;
+  private webhookManagementService?: WebhookManagementService;
+  private apiEndpointService?: ApiEndpointService;
   private n8nIntegrationService?: N8NIntegrationService;
 
   /**
@@ -180,16 +188,66 @@ export class ServiceFactory implements IServiceFactory {
   }
 
   /**
+   * Creates an EventTriggerService instance
+   */
+  public createEventTriggerService(): EventTriggerService {
+    if (!this.eventTriggerService) {
+      this.eventTriggerService = new EventTriggerService(
+        getLogger()
+      );
+    }
+    return this.eventTriggerService!;
+  }
+
+  /**
+   * Creates a WebhookManagementService instance
+   */
+  public createWebhookManagementService(): WebhookManagementService {
+    if (!this.webhookManagementService) {
+      // TODO: Add webhook repository when available
+      this.webhookManagementService = new WebhookManagementService(
+        null as any, // Temporary placeholder for repository
+        getLogger(),
+        getErrorHandler(),
+        configService
+      );
+    }
+    return this.webhookManagementService!;
+  }
+
+  /**
+   * Creates an ApiEndpointService instance
+   */
+  public createApiEndpointService(): ApiEndpointService {
+    if (!this.apiEndpointService) {
+      // TODO: Add API endpoint repository when available
+      this.apiEndpointService = new ApiEndpointService(
+        null as any, // Temporary placeholder for repository
+        getLogger(),
+        getErrorHandler()
+      );
+    }
+    return this.apiEndpointService!;
+  }
+
+  /**
    * Creates an N8NIntegrationService instance
    */
   public createN8NIntegrationService(): IN8NIntegrationService {
     if (!this.n8nIntegrationService) {
+      const eventTriggerService = this.createEventTriggerService();
+      const webhookManagementService = this.createWebhookManagementService();
+      const apiEndpointService = this.createApiEndpointService();
+      
       this.n8nIntegrationService = new N8NIntegrationService(
         getRequestRepository(),
         getRequestDataRepository(),
         getLogger(),
         getErrorHandler(),
-        configService
+        configService,
+        eventTriggerService,
+        webhookManagementService,
+        apiEndpointService
       );
     }
     return this.n8nIntegrationService!;
@@ -269,6 +327,9 @@ export class ServiceFactory implements IServiceFactory {
     this.refreshTokenService = undefined;
     this.permissionService = undefined;
     this.requestDataService = undefined;
+    this.eventTriggerService = undefined;
+    this.webhookManagementService = undefined;
+    this.apiEndpointService = undefined;
     this.n8nIntegrationService = undefined;
   }
 }

@@ -1,0 +1,98 @@
+// N8N Integration Schema
+
+// Configuration for N8N server connection
+model N8NConfiguration {
+  id                Int      @id @default(autoincrement())
+  baseUrl           String
+  apiKey            String?  @db.Text
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Webhook configuration
+model N8NWebhook {
+  id                Int      @id @default(autoincrement())
+  name              String
+  description       String?  @db.Text
+  path              String   // relative path
+  secret            String?  // for verification
+  events            String[] // array of events this webhook responds to
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  executions        N8NExecution[]
+}
+
+// Workflow template
+model N8NWorkflowTemplate {
+  id                Int      @id @default(autoincrement())
+  name              String
+  description       String?  @db.Text
+  n8nWorkflowId     String?  // External ID in N8N
+  configuration     Json?    // Default configuration
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  triggers          N8NTrigger[]
+  executions        N8NExecution[]
+}
+
+// Trigger configuration
+model N8NTrigger {
+  id                Int      @id @default(autoincrement())
+  name              String
+  eventType         String   // e.g., "request.created", "appointment.upcoming"
+  entityType        String?  // e.g., "request", "appointment", "user"
+  configuration     Json?    // Trigger-specific configuration
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  workflowTemplate  N8NWorkflowTemplate @relation(fields: [workflowTemplateId], references: [id])
+  workflowTemplateId Int
+}
+
+// Execution record
+model N8NExecution {
+  id                Int      @id @default(autoincrement())
+  externalId        String   // Execution ID in N8N
+  triggerType       String   // How it was triggered (manual, event, etc.)
+  status            String   // "pending", "running", "completed", "failed"
+  startedAt         DateTime @default(now())
+  completedAt       DateTime?
+  result            Json?    // Execution result
+  error             String?  @db.Text
+  
+  // Relations
+  workflowTemplate  N8NWorkflowTemplate? @relation(fields: [workflowTemplateId], references: [id])
+  workflowTemplateId Int?
+  webhook           N8NWebhook? @relation(fields: [webhookId], references: [id])
+  webhookId         Int?
+  
+  // Polymorphic relation to the entity that triggered this
+  entityType        String?
+  entityId          Int?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// API endpoint registry
+model N8NAPIEndpoint {
+  id                Int      @id @default(autoincrement())
+  path              String
+  method            String
+  description       String?  @db.Text
+  parameters        Json?    // Expected parameters
+  responseFormat    Json?    // Expected response format
+  isPublic          Boolean  @default(false)
+  isDeprecated      Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
