@@ -1,0 +1,26 @@
+For a complete implementation, the following images should be placed in the public/images directory:
+
+1. dashboard-preview.jpg - A screenshot of the application dashboard
+2. ai-assistant.jpg - An image showing the AI assistant functionality
+3. customer-management.jpg - An image showing the customer management interface
+4. appointment-scheduling.jpg - An image showing the appointment scheduling interface
+5. analytics-dashboard.jpg - An image showing analytics and reporting features
+
+6. testimonial-1.jpg - Profile photo for the first testimonial
+7. testimonial-2.jpg - Profile photo for the second testimonial
+8. testimonial-3.jpg - Profile photo for the third testimonial
+
+9. company-logo-1.svg - Logo for the first testimonial company
+10. company-logo-2.svg - Logo for the second testimonial company
+11. company-logo-3.svg - Logo for the third testimonial company
+
+You can:
+1. Use actual screenshots of your application if available
+2. Create mockups using design tools
+3. Use stock photos with appropriate licensing
+4. Replace them with placeholder images for development
+
+Example image sources:
+- Unsplash.com - Free stock photos
+- Pexels.com - Free stock photos
+- Undraw.co - Free illustrations

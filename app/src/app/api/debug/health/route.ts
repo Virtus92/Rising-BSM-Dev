@@ -48,7 +48,8 @@ export async function GET(request: NextRequest) {
       authService: { available: !!serviceFactory.createAuthService() },
       customerService: { available: !!serviceFactory.createCustomerService() },
       appointmentService: { available: !!serviceFactory.createAppointmentService() },
-      notificationService: { available: !!serviceFactory.createNotificationService() }
+      notificationService: { available: !!serviceFactory.createNotificationService() },
+      n8nIntegrationService: { available: !!serviceFactory.createN8NIntegrationService() }
     };
     
     // Check auth middleware
