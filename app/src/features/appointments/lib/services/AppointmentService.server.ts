@@ -99,17 +99,22 @@ export class AppointmentService implements IAppointmentService {
     try {
       this.logger.debug('Getting all appointments with options:', { options });
       
-      // Use the repository's findAll method
-      // Create proper QueryOptions object
+      // Process filters separately
+      const criteria = this.mapFiltersToRepositoryCriteria(options?.filters);
+      
+      this.logger.debug('Mapped filters to criteria:', { 
+        originalFilters: options?.filters, 
+        mappedCriteria: criteria 
+      });
+      
+      // Create proper QueryOptions object - make sure to include criteria
       const queryOptions = {
         page: options?.page || 1,
         limit: options?.limit || 10,
         relations: options?.relations || ['customer'],
-        sort: options?.sort
+        sort: options?.sort,
+        criteria: criteria // Include the criteria object with filters like customerId
       };
-      
-      // Process filters separately
-      const criteria = this.mapFiltersToRepositoryCriteria(options?.filters);
       
       // Get appointments with criteria and options
       const result = await this.repository.findAll(queryOptions);

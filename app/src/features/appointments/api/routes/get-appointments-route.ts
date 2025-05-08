@@ -44,17 +44,27 @@ export async function getAppointmentsHandler(
     const sortBy = request.nextUrl.searchParams.get('sortBy') || undefined;
     const sortDirection = (request.nextUrl.searchParams.get('sortDirection') as 'asc' | 'desc') || undefined;
     
+    // Get customer ID filter if provided
+    const customerIdParam = request.nextUrl.searchParams.get('customerId');
+    const customerId = customerIdParam ? parseInt(customerIdParam, 10) : undefined;
+    
+    // Log filter parameters for debugging
+    logger.debug('Appointment filter parameters:', { 
+      page, limit, search, sortBy, sortDirection, customerId 
+    });
+    
     // Get appointment service
     const appointmentService = serviceFactory.createAppointmentService();
     
-    // Get appointments list
+    // Get appointments list with all filters including customerId
     const result = await appointmentService.getAll({
       page,
       limit,
       filters: {
         search,
         sortBy,
-        sortDirection
+        sortDirection,
+        customerId // Pass the customer ID to filter appointments by customer
       }
     });
     

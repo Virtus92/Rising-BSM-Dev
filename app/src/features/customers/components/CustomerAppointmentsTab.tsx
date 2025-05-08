@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 import { formatDate } from '@/features/notifications/utils/date-utils';
 import { AppointmentService } from '@/features/appointments/lib/services';
+import { AppointmentClient } from '@/features/appointments/lib/clients';
 import { useToast } from '@/shared/hooks/useToast';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
@@ -92,22 +93,15 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         setIsLoading(true);
         setError(null);
         
-        // Store the API call in a variable first before awaiting it
-        // This prevents issues with Function.prototype.apply on Promise objects
-        const apiCall = AppointmentService.getAll({
-          customerId: customerId,
-          limit: 100 // Get a larger number to show all appointments
-        });
-        
-        // Now await the promise
-        const response = await apiCall;
+        // Use the more specific getAppointmentsByCustomer method for direct filtering
+        const response = await AppointmentClient.getAppointmentsByCustomer(customerId);
         
         if (response.success && response.data) {
-          // Ensure we're handling the data structure correctly
-          if ('data' in response.data && Array.isArray(response.data.data)) {
-            setAppointments(response.data.data);
-          } else if (Array.isArray(response.data)) {
+          // Process and set appointments
+          if (Array.isArray(response.data)) {
             setAppointments(response.data);
+          } else if (response.data && typeof response.data === 'object' && 'data' in response.data && Array.isArray((response.data as any).data)) {
+            setAppointments((response.data as any).data);
           } else {
             console.error('Unexpected data structure:', response.data);
             setAppointments([]);
