@@ -17,7 +17,7 @@ import {
   TooltipTrigger 
 } from '@/shared/components/ui/tooltip';
 import { RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
-import { useN8NWorkflows } from '../../hooks/n8n/useN8NWorkflows';
+import { useN8NWorkflows, WorkflowStatus } from '@/features/requests/hooks/useN8NWorkflows';
 import { PlayCircle, RotateCw, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 
 interface N8NWorkflowControlsProps {
@@ -32,18 +32,18 @@ export const N8NWorkflowControls: React.FC<N8NWorkflowControlsProps> = ({
   request, 
   onComplete 
 }) => {
-  const n8nHook = useN8NWorkflows();
+  const n8nHook = useN8NWorkflows(request.id);
   const { 
     workflows, 
-    loading, 
-    currentExecutionId,
-    executionStatus,
-    triggerWorkflow 
+    isLoading, 
+    isProcessing,
+    triggerWorkflow,
+    getWorkflowStatus
   } = n8nHook;
   
-  // Derive processing state from execution status
-  const isLoading = loading;
-  const isProcessing = currentExecutionId !== null && executionStatus?.status === 'running';
+  // State for tracking current execution
+  const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null);
+  const [executionStatus, setExecutionStatus] = useState<WorkflowStatus | null>(null);
   
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>('');
   const [workflowStatus, setWorkflowStatus] = useState<string | null>(
@@ -92,12 +92,15 @@ export const N8NWorkflowControls: React.FC<N8NWorkflowControlsProps> = ({
     if (!selectedWorkflow) return;
     
     const result = await triggerWorkflow(selectedWorkflow, {
-      requestId: request.id,
-      requestData: request
+      additionalData: {
+        requestId: request.id,
+        requestData: request
+      }
     });
     
     // Assuming result being truthy indicates success
     if (result && result.success) {
+      setCurrentExecutionId(result.executionId);
       setWorkflowStatus('started');
       
       // This is where you would set up polling for status updates
