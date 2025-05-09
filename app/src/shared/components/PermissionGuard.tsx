@@ -100,7 +100,7 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = React.memo(functi
   const { hasPermission, hasAnyPermission, hasAllPermissions, isLoading, error, userRole } = usePermissions(userId);
   const { user } = useAuth();
   
-  // Only log in development mode
+  /* Only log in development mode
   if (process.env.NODE_ENV === 'development') {
     console.debug(`PermissionGuard[${componentId}]:`, {
       permission,
@@ -111,7 +111,7 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = React.memo(functi
       isLoading,
       hasError: !!error
     });
-  }
+  }*/
   
   // Handle errors in permission checking
   if (error) {

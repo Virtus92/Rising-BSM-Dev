@@ -3,6 +3,7 @@ import { routeHandler } from '@/core/api/server/route-handler';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories';
+import { filterDataByUserRole } from '@/app/api/helpers/permissionUtils';
 
 /**
  * GET /api/appointments/upcoming
@@ -25,10 +26,25 @@ export const GET = routeHandler(async (request: NextRequest) => {
     const context = { userId: request.auth?.userId };
     
     // Use service method to get upcoming appointments
-    const appointments = await appointmentService.getUpcoming(limit, {
+    let appointments = await appointmentService.getUpcoming(limit, {
       context,
       days
     });
+    
+    // Apply role-based filtering
+    if (request.auth?.userId) {
+      appointments = await filterDataByUserRole(
+        request.auth.userId,
+        appointments,
+        // Function to get the owner ID from an appointment
+        (appointment) => appointment.createdBy
+      );
+    }
+    
+    // If no appointments are accessible based on permissions, return empty array
+    if (!appointments || appointments.length === 0) {
+      return formatResponse.success([], `No upcoming appointments found for user`);
+    }
     
     // Get customer service for enriching customer data
     const customerService = serviceFactory.createCustomerService();

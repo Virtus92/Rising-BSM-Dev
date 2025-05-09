@@ -153,6 +153,34 @@ export const UpcomingAppointments = () => {
 
   // Error state with detailed information and retry functionality
   if (error) {
+    // Check if the error message indicates a permissions issue
+    const isPermissionError = typeof error === 'string' && (
+      error.toLowerCase().includes('permission') || 
+      error.toLowerCase().includes('access denied') ||
+      error.toLowerCase().includes('not authorized')
+    );
+    
+    if (isPermissionError) {
+      // Handle permission error more gracefully
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Calendar className="mr-2 h-5 w-5 text-blue-500" />
+              Upcoming Appointments
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-4">
+              <p className="text-amber-500 mb-2">Appointments not available for your role</p>
+              <p className="text-muted-foreground text-sm">You don't have permission to view appointments data.</p>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+    
+    // Standard error display for non-permission errors
     return (
       <Card>
         <CardHeader>
@@ -182,7 +210,44 @@ export const UpcomingAppointments = () => {
       </Card>
     );
   }
+  
+  // Empty state when no appointments are available
+  if (appointments.length === 0) {
+    return (
+      <Card className="h-full">
+        <CardHeader className="flex justify-between items-center pb-2">
+          <CardTitle className="flex items-center">
+            <Calendar className="mr-2 h-5 w-5 text-blue-500" />
+            Upcoming Appointments
+          </CardTitle>
+          <div className="flex space-x-2">
+            <Button variant="ghost" size="sm" onClick={handleRefresh} title="Refresh">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <PermissionGuard permission={SystemPermission.APPOINTMENTS_CREATE}>
+              <Button variant="ghost" size="sm" onClick={handleAddAppointment} title="Add Appointment">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </PermissionGuard>
+          </div>
+        </CardHeader>
+        <CardContent className="text-center py-6 px-4">
+          <p className="text-muted-foreground mb-4">No upcoming appointments</p>
+          <PermissionGuard 
+            permission={SystemPermission.APPOINTMENTS_CREATE}
+            fallback={<p className="text-xs text-muted-foreground">You don't have permission to create appointments</p>}
+          >
+            <Button onClick={handleAddAppointment} variant="outline" size="sm">
+              <Plus className="mr-2 h-4 w-4" />
+              Schedule Appointment
+            </Button>
+          </PermissionGuard>
+        </CardContent>
+      </Card>
+    );
+  }
 
+  // Normal state with appointments data
   return (
     <Card className="h-full">
       <CardHeader className="flex justify-between items-center pb-2">
@@ -202,222 +267,205 @@ export const UpcomingAppointments = () => {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        {appointments.length === 0 ? (
-          <div className="text-center py-6 px-4">
-            <p className="text-muted-foreground mb-4">No upcoming appointments</p>
-            <PermissionGuard 
-              permission={SystemPermission.APPOINTMENTS_CREATE}
-              fallback={<p className="text-xs text-muted-foreground">You don't have permission to create appointments</p>}
+        <div className="divide-y">
+          {appointments.map((appointment) => (
+            <div 
+              key={appointment.id} 
+              onClick={() => handleViewDetail(appointment.id)}
+              className="hover:bg-muted/30 p-4 cursor-pointer transition-colors"
             >
-              <Button onClick={handleAddAppointment} variant="outline" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Schedule Appointment
-              </Button>
-            </PermissionGuard>
-          </div>
-        ) : (
-          <>
-            <div className="divide-y">
-              {appointments.map((appointment) => (
-                <div 
-                  key={appointment.id} 
-                  onClick={() => handleViewDetail(appointment.id)}
-                  className="hover:bg-muted/30 p-4 cursor-pointer transition-colors"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-medium text-sm flex items-center gap-1">
-                        {appointment.customerName || appointment.customerData?.name || 'Unnamed Customer'}
-                        {getStatusBadge(appointment.status)}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {appointment.title || appointment.service || 'Appointment'}
-                      </p>
-                    </div>
-                    <div className="text-xs text-right">
-                      <div className="font-medium flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(appointment.appointmentDate)}
-                      </div>
-                      <div className="text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatTime(appointment)}
-                      </div>
-                    </div>
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h3 className="font-medium text-sm flex items-center gap-1">
+                    {appointment.customerName || appointment.customerData?.name || 'Unnamed Customer'}
+                    {getStatusBadge(appointment.status)}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {appointment.title || appointment.service || 'Appointment'}
+                  </p>
+                </div>
+                <div className="text-xs text-right">
+                  <div className="font-medium flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {formatDate(appointment.appointmentDate)}
                   </div>
-                  
-                  {/* Quick action buttons */}
-                  <div className="flex justify-end gap-1 mt-2">
-                    {isActionLoading === appointment.id ? (
-                      <div className="text-xs italic text-muted-foreground">Processing...</div>
-                    ) : (
-                      <TooltipProvider>
-                        {appointment.status !== AppointmentStatus.COMPLETED && (
-                          <PermissionGuard 
-                            permission={SystemPermission.APPOINTMENTS_EDIT}
-                            fallback={
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-block p-1">
-                                    <Check className="h-3 w-3 text-gray-300" />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>You don't have permission to complete appointments</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            }
-                          >
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="p-1 h-7"
-                                  onClick={(e) => handleUpdateStatus(appointment.id, AppointmentStatus.COMPLETED, e)}
-                                >
-                                  <Check className="h-3 w-3 text-green-500" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Mark as completed</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </PermissionGuard>
-                        )}
-                        
-                        {appointment.status !== AppointmentStatus.CANCELLED && (
-                          <PermissionGuard 
-                            permission={SystemPermission.APPOINTMENTS_EDIT}
-                            fallback={
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-block p-1">
-                                    <X className="h-3 w-3 text-gray-300" />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>You don't have permission to cancel appointments</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            }
-                          >
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="p-1 h-7"
-                                  onClick={(e) => handleUpdateStatus(appointment.id, AppointmentStatus.CANCELLED, e)}
-                                >
-                                  <X className="h-3 w-3 text-red-500" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Cancel appointment</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </PermissionGuard>
-                        )}
-                        
-                        <PermissionGuard 
-                          permission={SystemPermission.APPOINTMENTS_EDIT}
-                          fallback={
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="inline-block p-1">
-                                  <MessageSquare className="h-3 w-3 text-gray-300" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>You don't have permission to add notes</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          }
-                        >
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="p-1 h-7"
-                                onClick={(e) => handleAddNote(appointment.id, e)}
-                              >
-                                <MessageSquare className="h-3 w-3 text-blue-500" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Add note</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </PermissionGuard>
-                        
-                        <PermissionGuard 
-                          permission={SystemPermission.APPOINTMENTS_EDIT}
-                          fallback={
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="inline-block p-1">
-                                  <Edit className="h-3 w-3 text-gray-300" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>You don't have permission to edit appointments</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          }
-                        >
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="p-1 h-7"
-                                onClick={(e) => handleEditAppointment(appointment.id, e)}
-                              >
-                                <Edit className="h-3 w-3 text-purple-500" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Edit appointment</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </PermissionGuard>
-                        
-                        {appointment.customerData?.phone && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="p-1 h-7"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.location.href = `tel:${appointment.customerData?.phone}`;
-                                }}
-                              >
-                                <PhoneCall className="h-3 w-3 text-green-600" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Call customer</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </TooltipProvider>
-                    )}
+                  <div className="text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatTime(appointment)}
                   </div>
                 </div>
-              ))}
+              </div>
+              
+              {/* Quick action buttons */}
+              <div className="flex justify-end gap-1 mt-2">
+                {isActionLoading === appointment.id ? (
+                  <div className="text-xs italic text-muted-foreground">Processing...</div>
+                ) : (
+                  <TooltipProvider>
+                    {appointment.status !== AppointmentStatus.COMPLETED && (
+                      <PermissionGuard 
+                        permission={SystemPermission.APPOINTMENTS_EDIT}
+                        fallback={
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-block p-1">
+                                <Check className="h-3 w-3 text-gray-300" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>You don't have permission to complete appointments</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        }
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="p-1 h-7"
+                              onClick={(e) => handleUpdateStatus(appointment.id, AppointmentStatus.COMPLETED, e)}
+                            >
+                              <Check className="h-3 w-3 text-green-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Mark as completed</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </PermissionGuard>
+                    )}
+                    
+                    {appointment.status !== AppointmentStatus.CANCELLED && (
+                      <PermissionGuard 
+                        permission={SystemPermission.APPOINTMENTS_EDIT}
+                        fallback={
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-block p-1">
+                                <X className="h-3 w-3 text-gray-300" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>You don't have permission to cancel appointments</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        }
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="p-1 h-7"
+                              onClick={(e) => handleUpdateStatus(appointment.id, AppointmentStatus.CANCELLED, e)}
+                            >
+                              <X className="h-3 w-3 text-red-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Cancel appointment</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </PermissionGuard>
+                    )}
+                    
+                    <PermissionGuard 
+                      permission={SystemPermission.APPOINTMENTS_EDIT}
+                      fallback={
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-block p-1">
+                              <MessageSquare className="h-3 w-3 text-gray-300" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>You don't have permission to add notes</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      }
+                    >
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="p-1 h-7"
+                            onClick={(e) => handleAddNote(appointment.id, e)}
+                          >
+                            <MessageSquare className="h-3 w-3 text-blue-500" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Add note</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </PermissionGuard>
+                    
+                    <PermissionGuard 
+                      permission={SystemPermission.APPOINTMENTS_EDIT}
+                      fallback={
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-block p-1">
+                              <Edit className="h-3 w-3 text-gray-300" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>You don't have permission to edit appointments</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      }
+                    >
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="p-1 h-7"
+                            onClick={(e) => handleEditAppointment(appointment.id, e)}
+                          >
+                            <Edit className="h-3 w-3 text-purple-500" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Edit appointment</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </PermissionGuard>
+                    
+                    {appointment.customerData?.phone && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="p-1 h-7"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.location.href = `tel:${appointment.customerData?.phone}`;
+                            }}
+                          >
+                            <PhoneCall className="h-3 w-3 text-green-600" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Call customer</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </TooltipProvider>
+                )}
+              </div>
             </div>
-            
-            <div className="p-4 text-center">
-              <Button variant="link" size="sm" onClick={handleViewAll}>
-                View all appointments →
-              </Button>
-            </div>
-          </>
-        )}
+          ))}
+        </div>
+        
+        <div className="p-4 text-center">
+          <Button variant="link" size="sm" onClick={handleViewAll}>
+            View all appointments →
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

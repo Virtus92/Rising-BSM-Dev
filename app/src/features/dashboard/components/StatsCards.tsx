@@ -78,6 +78,52 @@ export const StatsCards = () => {
       </div>
     );
   }
+  
+  // Check if all stats are zero/null, which likely means no permissions
+  const hasNoData = [
+    userCount, 
+    customerCount, 
+    requestCount, 
+    appointmentCount
+  ].every(count => count === 0 || count === null);
+  
+  if (hasNoData && !error) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center text-amber-500">
+            <AlertCircle className="h-5 w-5 mr-2" />
+            <p>No statistics available for your current role</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={refreshStats}
+            className="flex items-center"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {statsItems.map((item) => (
+            <Card key={item.title} className={`border ${item.borderColor}`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
+                <div className={`p-2 rounded-full ${item.bgColor}`}>
+                  <item.icon className={`h-5 w-5 ${item.color}`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-muted-foreground">--</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // Error state with retry button
   if (error) {

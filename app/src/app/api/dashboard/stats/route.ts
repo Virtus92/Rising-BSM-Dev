@@ -9,6 +9,8 @@ import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
 import { RequestResponseDto } from '@/domain/dtos/RequestDtos';
 import { UserResponseDto } from '@/domain/dtos/UserDtos';
 import { AppointmentStatus, CommonStatus, RequestStatus } from '@/domain/enums/CommonEnums';
+import { UserRole } from '@/domain/enums/UserEnums';
+import { filterDataByUserRole } from '@/app/api/helpers/permissionUtils';
 
 /**
  * GET /api/dashboard/stats
@@ -91,10 +93,44 @@ export const GET = routeHandler(async (request: NextRequest) => {
       return [];
     };
     
-    const users = extractData<UserResponseDto>(usersResponse);
-    const customers = extractData<CustomerResponseDto>(customersResponse);
-    const requests = extractData<RequestResponseDto>(requestsResponse);
-    const appointments = extractData<AppointmentResponseDto>(appointmentsResponse);
+    let users = extractData<UserResponseDto>(usersResponse);
+    let customers = extractData<CustomerResponseDto>(customersResponse);
+    let requests = extractData<RequestResponseDto>(requestsResponse);
+    let appointments = extractData<AppointmentResponseDto>(appointmentsResponse);
+    
+    // Apply role-based filtering based on current user
+    if (request.auth?.userId) {
+      // Get current user to determine role
+      const currentUser = await userService.getById(request.auth.userId);
+      
+      // Skip filtering for admins - they can see all data
+      if (currentUser && currentUser.role !== UserRole.ADMIN) {
+        // Users can only see their own created data
+        users = await filterDataByUserRole(
+          request.auth.userId,
+          users,
+          user => user.createdBy
+        );
+        
+        customers = await filterDataByUserRole(
+          request.auth.userId,
+          customers,
+          customer => customer.createdBy
+        );
+        
+        requests = await filterDataByUserRole(
+          request.auth.userId,
+          requests,
+          request => request.createdBy || request.assignedToId
+        );
+        
+        appointments = await filterDataByUserRole(
+          request.auth.userId,
+          appointments,
+          appointment => appointment.createdBy
+        );
+      }
+    }
     
     // Filter by date range
     const filterByDateRange = <T extends { createdAt?: string, appointmentDate?: string }>(

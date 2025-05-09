@@ -99,8 +99,8 @@ export const usePermissions = (userId?: number) => {
       // Check if there's already an ongoing fetch for this user
       const existingFetch = ongoingPermissionsFetches.get(effectiveUserId);
       if (existingFetch && !force) {
-        console.log(`Using existing permission fetch for user ID: ${effectiveUserId}`);
-        
+        /*console.log(`Using existing permission fetch for user ID: ${effectiveUserId}`);
+        */
         try {
           // Wait for existing fetch
           const response = await existingFetch;

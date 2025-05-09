@@ -2,11 +2,13 @@
  * Permission Utilities for API Routes
  * 
  * Provides consistent permission checking methods to be used across API routes
+ * Includes role-based data filtering for statistics and dashboard data
  */
 
 import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { UserRole } from '@/domain/enums/UserEnums';
 import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 
 /**
@@ -142,12 +144,125 @@ export async function checkUserHasAllPermissions(
 }
 
 /**
- * Permission utilities export
+ * Filter data based on user role and context
+ * 
+ * @param userId - User ID requesting the data
+ * @param dataItems - Array of data items to filter
+ * @param getOwnerId - Function to extract owner ID from a data item
+ * @returns Filtered array of data items
  */
+export async function filterDataByUserRole<T>(
+  userId: number,
+  dataItems: T[],
+  getOwnerId: (item: T) => number | undefined
+): Promise<T[]> {
+  try {
+    const logger = getLogger();
+    
+    // Handle undefined or null data
+    if (!dataItems || dataItems.length === 0) {
+      return [];
+    }
+    
+    if (!userId) {
+      logger.warn('Missing userId in filterDataByUserRole');
+      return [];
+    }
+    
+    // Get user info including role
+    const serviceFactory = getServiceFactory();
+    const userService = serviceFactory.createUserService();
+    const user = await userService.getById(userId);
+    
+    if (!user) {
+      logger.warn(`User not found with ID ${userId} in filterDataByUserRole`);
+      return [];
+    }
+    
+    // Admin role can see all data
+    if (user.role === UserRole.ADMIN) {
+      return dataItems;
+    }
+    
+    // Manager role can see their own and subordinate employees' data
+    if (user.role === UserRole.MANAGER) {
+      // Get all users to find subordinate employees
+      const usersResponse = await userService.findUsers({
+        limit: 1000 // High limit to get all users
+      });
+      
+      const users = usersResponse && usersResponse.data ? usersResponse.data : [];
+      
+      // Create a set for faster lookup when checking permissions
+      const subordinateIdsSet = new Set<number>();
+      
+      // Add the manager's own ID
+      subordinateIdsSet.add(userId);
+      
+      // Find all employees created by this manager
+      users.forEach(employee => {
+        // Include if manager created this employee
+        if (employee.createdBy === userId) {
+          subordinateIdsSet.add(employee.id);
+        }
+        
+        // Check for extended properties (using type assertion safely)
+        const extendedEmployee = employee as Record<string, any>;
+        
+        // Check supervisor relationship if that property exists
+        if (extendedEmployee.supervisorId === userId) {
+          subordinateIdsSet.add(employee.id);
+        }
+        
+        // Check team relationship
+        // Try to get teamId from user properties
+        const employeeTeamId = 
+          extendedEmployee.teamId || // Direct teamId property
+          (extendedEmployee.team?.id) || // Team object reference
+          (extendedEmployee.metadata && extendedEmployee.metadata.teamId); // Metadata
+        
+        // Try to get the manager's teamId
+        const managerTeamId = 
+          (user as any).teamId || // Direct teamId property
+          ((user as any).team?.id) || // Team object reference
+          ((user as any).metadata && (user as any).metadata.teamId); // Metadata
+          
+        // If both have team IDs and they match, add to subordinates
+        if (employeeTeamId && managerTeamId && employeeTeamId === managerTeamId) {
+          subordinateIdsSet.add(employee.id);
+        }
+      });
+      
+      // Return data items owned by the manager or their subordinates
+      return dataItems.filter(item => {
+        const ownerId = getOwnerId(item);
+        return ownerId !== undefined && subordinateIdsSet.has(ownerId);
+      });
+    }
+    
+    // Regular employees can only see their own data
+    return dataItems.filter(item => {
+      const ownerId = getOwnerId(item);
+      return ownerId === userId;
+    });
+  } catch (error) {
+    const logger = getLogger();
+    logger.error('Error in filterDataByUserRole:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId
+    });
+    
+    // In case of error, return empty array for safety
+    return [];
+  }
+}
+
 export const permissionUtils = {
   checkUserPermission,
   checkUserHasAnyPermission,
-  checkUserHasAllPermissions
+  checkUserHasAllPermissions,
+  filterDataByUserRole
 };
 
 export default permissionUtils;

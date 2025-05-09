@@ -145,7 +145,7 @@ export const DashboardCharts = () => {
     );
   }
 
-  // Empty state
+  // Empty state from no data or permissions
   if (mergedData.length === 0) {
     return (
       <Card>
@@ -166,8 +166,10 @@ export const DashboardCharts = () => {
         <CardContent>
           <div className="flex items-center justify-center flex-col h-[350px] w-full">
             <AlertCircle className="h-12 w-12 mb-4 text-amber-500" />
-            <p className="text-lg font-medium">No data available</p>
-            <p className="text-muted-foreground mb-4">There is no data available for the selected time period.</p>
+            <p className="text-lg font-medium">No statistics data available</p>
+            <p className="text-muted-foreground text-center mb-4">
+              {error ? error : "You don't have access to statistics data for the selected time period."}
+            </p>
             <Button 
               variant="outline" 
               onClick={handleRefresh}

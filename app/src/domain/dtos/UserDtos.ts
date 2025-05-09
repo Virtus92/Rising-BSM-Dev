@@ -69,7 +69,6 @@ export interface UpdateUserStatusDto {
 export interface UserFilterParamsDto extends BaseFilterParamsDto {
   role?: UserRole;
   status?: UserStatus;
-  // FIXED: Using sortDirection consistently with the rest of the application
   sortDirection?: 'asc' | 'desc';
 }
 

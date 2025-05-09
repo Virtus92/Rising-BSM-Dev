@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ApiResponse } from '@/core/api/ApiClient';
 import { useToast } from '@/shared/hooks/useToast';
 
 export type TimeFrame = 'weekly' | 'monthly' | 'yearly';
@@ -48,7 +47,7 @@ function generateDefaultPeriods(timeFrame: TimeFrame): string[] {
 
   if (timeFrame === 'weekly') {
     // Generate periods for the last 12 weeks
-    for (let i = 0; i < 12; i++) {
+    for (let i = 11; i >= 0; i--) {
       const weekDate = new Date(now);
       weekDate.setDate(now.getDate() - (i * 7));
       const weekNumber = getWeekNumber(weekDate);
@@ -57,7 +56,7 @@ function generateDefaultPeriods(timeFrame: TimeFrame): string[] {
   } else if (timeFrame === 'monthly') {
     // Generate periods for the last 12 months
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    for (let i = 0; i < 12; i++) {
+    for (let i = 11; i >= 0; i--) {
       const month = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthName = months[month.getMonth()];
       const year = month.getFullYear();
@@ -65,7 +64,7 @@ function generateDefaultPeriods(timeFrame: TimeFrame): string[] {
     }
   } else if (timeFrame === 'yearly') {
     // Generate periods for the last 5 years
-    for (let i = 0; i < 5; i++) {
+    for (let i = 4; i >= 0; i--) {
       periods.push(`${now.getFullYear() - i}`);
     }
   }
@@ -129,7 +128,7 @@ export const useDashboardCharts = (): DashboardChartState => {
     timeFrameValue: TimeFrame
   ): Promise<{ success: boolean; data: StatsData }> => {
     try {
-      console.log(`Fetching ${timeFrameValue} stats for ${entityType}`);
+      console.log(`Starting fetch for ${entityType} ${timeFrameValue} stats`);
       
       // Construct the API URL based on entity type and time frame
       const apiUrl = `/api/${entityType}/stats/${timeFrameValue}`;
@@ -147,38 +146,30 @@ export const useDashboardCharts = (): DashboardChartState => {
         return { success: false, data: {} };
       }
       
-      const data = await response.json();
+      const responseData = await response.json();
       
-      // Log raw data for debugging
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Raw ${entityType} ${timeFrameValue} stats data:`, data);
-      }
-      
-      if (!data.success || !data.data) {
-        console.error(`API returned unsuccessful response for ${entityType} ${timeFrameValue} stats:`, data.message);
+      if (!responseData.success || !responseData.data) {
+        console.error(`API returned unsuccessful response for ${entityType} ${timeFrameValue} stats:`, responseData.message);
         return { success: false, data: {} };
       }
       
       const result: StatsData = {};
-      const statsArray = data.data;
+      const statsArray = responseData.data;
       
-      if (Array.isArray(statsArray)) {
-        // Log exact structure of the first item if available
-        if (statsArray.length > 0 && process.env.NODE_ENV === 'development') {
-          console.log(`Example ${entityType} stat item:`, statsArray[0]);
-        }
-        
-        statsArray.forEach(item => {
-          let period: string;
-          let value: number;
+      if (Array.isArray(statsArray) && statsArray.length > 0) {
+        statsArray.forEach((item) => {
+          // Extract the period key that we'll use to organize data
+          let period: string = '';
           
-          // Extract period based on time frame
           if (timeFrameValue === 'weekly') {
-            period = item.week || `Week ${item.weekNumber}` || item.period;
+            // Weekly stats typically have period format "Week X"
+            period = item.period || `Week ${item.week || item.weekNumber}`;
           } else if (timeFrameValue === 'monthly') {
-            period = item.month || item.period;
+            // Monthly stats typically have format "Jan 2023" or separate month/year fields
+            period = item.period || (item.month && item.year ? `${item.month} ${item.year}` : item.month);
           } else {
-            period = item.year?.toString() || item.period;
+            // Yearly stats are just the year
+            period = item.period || String(item.year);
           }
           
           if (!period) {
@@ -186,37 +177,29 @@ export const useDashboardCharts = (): DashboardChartState => {
             return; // Skip this item
           }
           
-          // More robust value extraction
-          try {
-            // Extract the value with more comprehensive approach
-            if (entityType === 'users') {
-              value = item.users || item.user || item.userCount || item.count || item.total || 0;
-            } else if (entityType === 'customers') {
-              value = item.customers || item.customer || item.customerCount || item.count || item.total || 0;
-            } else if (entityType === 'appointments') {
-              value = item.appointments || item.appointment || item.appointmentCount || item.count || item.total || 0;
-            } else if (entityType === 'requests') {
-              value = item.requests || item.request || item.requestCount || item.count || item.total || 0;
-            } else {
-              // Fallback to generic extraction
-              value = item.count || item.total || item.value || 0;
-            }
-            
-            result[period] = value;
-          } catch (err) {
-            console.error(`Error extracting value for ${entityType} in period ${period}:`, err);
+          // Extract the value based on the entity type
+          let value = 0;
+          
+          if (entityType === 'users') {
+            value = typeof item.users === 'number' ? item.users : item.count;
+          } else if (entityType === 'customers') {
+            value = typeof item.customers === 'number' ? item.customers : item.count;
+          } else if (entityType === 'appointments') {
+            value = typeof item.appointments === 'number' ? item.appointments : item.count;
+          } else if (entityType === 'requests') {
+            value = typeof item.requests === 'number' ? item.requests : 
+                   typeof item.total === 'number' ? item.total : item.count;
           }
+          
+          result[period] = value;
         });
       } else {
-        console.warn(`Stats array for ${entityType} is not an array:`, statsArray);
+        console.warn(`Empty stats array received for ${entityType} ${timeFrameValue}`);
       }
-      
-      // Log the processed result
-      console.log(`Processed ${entityType} ${timeFrameValue} stats:`, result);
       
       return { success: true, data: result };
     } catch (error) {
-      console.error(`Error fetching ${entityType} ${timeFrameValue} stats:`, error as Error);
+      console.error(`Error fetching ${entityType} ${timeFrameValue} stats:`, error);
       return { success: false, data: {} };
     }
   }, []);
@@ -228,19 +211,16 @@ export const useDashboardCharts = (): DashboardChartState => {
   ): Promise<void> => {
     // Prevent duplicate fetches
     if (isFetchingRef.current) {
-      console.log('Already fetching data, skipping this request');
       return;
     }
     
     // Throttle refreshes
     const now = Date.now();
-    if (now - lastFetchTimeRef.current < 5000) {
-      console.log('Too many refresh attempts, throttling');
+    if (now - lastFetchTimeRef.current < 5000 && lastFetchTimeRef.current !== 0) {
       return;
     }
     
     try {
-      console.log(`Fetching statistics for ${selectedTimeFrame} timeframe`);
       isFetchingRef.current = true;
       
       if (isMountedRef.current) {
@@ -272,33 +252,50 @@ export const useDashboardCharts = (): DashboardChartState => {
       
       // Track which datasets succeeded and failed
       const failedDatasets: string[] = [];
+      const emptyDatasets: string[] = [];
       let successfulDatasets = 0;
       
       // Process results and update the newStatsData
       if (results[0].status === 'fulfilled' && results[0].value.success) {
         newStatsData.requests = results[0].value.data;
-        successfulDatasets++;
+        if (Object.keys(results[0].value.data).length === 0) {
+          emptyDatasets.push('requests');
+        } else {
+          successfulDatasets++;
+        }
       } else {
         failedDatasets.push('requests');
       }
       
       if (results[1].status === 'fulfilled' && results[1].value.success) {
         newStatsData.appointments = results[1].value.data;
-        successfulDatasets++;
+        if (Object.keys(results[1].value.data).length === 0) {
+          emptyDatasets.push('appointments');
+        } else {
+          successfulDatasets++;
+        }
       } else {
         failedDatasets.push('appointments');
       }
       
       if (results[2].status === 'fulfilled' && results[2].value.success) {
         newStatsData.customers = results[2].value.data;
-        successfulDatasets++;
+        if (Object.keys(results[2].value.data).length === 0) {
+          emptyDatasets.push('customers');
+        } else {
+          successfulDatasets++;
+        }
       } else {
         failedDatasets.push('customers');
       }
       
       if (results[3].status === 'fulfilled' && results[3].value.success) {
         newStatsData.users = results[3].value.data;
-        successfulDatasets++;
+        if (Object.keys(results[3].value.data).length === 0) {
+          emptyDatasets.push('users');
+        } else {
+          successfulDatasets++;
+        }
       } else {
         failedDatasets.push('users');
       }
@@ -324,8 +321,6 @@ export const useDashboardCharts = (): DashboardChartState => {
           categoryData => Object.keys(categoryData).length > 0
         );
         
-        console.log(`Data received: ${anyDataReceived}, Successful datasets: ${successfulDatasets}`);
-        
         // Set appropriate error message based on results
         if (failedDatasets.length === 4) {
           setError('Failed to load all chart data. Please try again later.');
@@ -337,25 +332,21 @@ export const useDashboardCharts = (): DashboardChartState => {
               variant: 'error'
             });
           }
-        } else if (failedDatasets.length > 0) {
-          setError(`Some data could not be loaded: ${failedDatasets.join(', ')}.`);
-          
-          if (showErrors && failedDatasets.length > 0) {
-            toast({
-              title: 'Partial data loaded',
-              description: `Some datasets could not be retrieved: ${failedDatasets.join(', ')}.`,
-              variant: 'warning'
-            });
-          }
         } else if (!anyDataReceived) {
-          setError('No data available for the selected time period.');
-          
-          if (showErrors) {
-            toast({
-              title: 'No data available',
-              description: 'No data is available for the selected time period.',
-              variant: 'warning'
-            });
+          // If all datasets are empty (possibly due to permissions), don't show as an error
+          if (emptyDatasets.length === 4 && failedDatasets.length === 0) {
+            // All datasets are empty but API calls succeeded - likely permission restrictions
+            setError(null);
+          } else {
+            setError('No data available for the selected time period.');
+            
+            if (showErrors) {
+              toast({
+                title: 'No data available',
+                description: 'No data is available for the selected time period.',
+                variant: 'warning'
+              });
+            }
           }
         } else {
           // Clear error if we have data
@@ -363,7 +354,7 @@ export const useDashboardCharts = (): DashboardChartState => {
         }
       }
     } catch (error) {
-      console.error(`Failed to fetch ${selectedTimeFrame} stats:`, error as Error);
+      console.error(`Failed to fetch ${selectedTimeFrame} stats:`, error);
       
       if (isMountedRef.current) {
         setError(`Failed to load ${selectedTimeFrame} chart data. Please try again later.`);
@@ -382,8 +373,9 @@ export const useDashboardCharts = (): DashboardChartState => {
         setIsLoading(false);
       }
       
-      isFetchingRef.current = false;
-      console.log('Fetch statistics completed');
+      setTimeout(() => {
+        isFetchingRef.current = false;
+      }, 200);
     }
   }, [fetchStatsFromApi, toast]);
 
@@ -395,40 +387,19 @@ export const useDashboardCharts = (): DashboardChartState => {
     // Set mounted flag for lifecycle management
     isMountedRef.current = true;
     
-    // Don't fetch data on mount if we're already loading or have fetched data before
-    const hasExistingData = Object.keys(statsData.requests).length > 0 || 
-                          Object.keys(statsData.appointments).length > 0 || 
-                          Object.keys(statsData.customers).length > 0 || 
-                          Object.keys(statsData.users).length > 0;
-    
     // Avoid duplicate fetch on React Strict Mode double mount
     if (isFirstMountRef.current) {
       isFirstMountRef.current = false;
-      
-      // Check if we already have data in state
-      if (hasExistingData) {
-        console.log('Already have stats data, skipping initial fetch');
-        return;
-      }
-    }
-    
-    // Only fetch new data if the time frame changed or we have no data and are not already fetching
-    if (
-      !isFetchingRef.current && 
-      (lastTimeFrameRef.current !== timeFrame || !hasExistingData)
-    ) {
-      // Prevent duplicate requests with a small delay
+      fetchStatistics(timeFrame);
+    } else if (lastTimeFrameRef.current !== timeFrame) {
+      // Only fetch new data if the time frame changed
       const fetchId = setTimeout(() => {
-        console.log(`Time frame changed to ${timeFrame}, fetching new data`);
         lastTimeFrameRef.current = timeFrame;
         fetchStatistics(timeFrame);
       }, 50);
       
       // Clear timeout on cleanup
-      return () => {
-        clearTimeout(fetchId);
-        isMountedRef.current = false;
-      };
+      return () => clearTimeout(fetchId);
     }
     
     // Clean up function to prevent updates after unmount
@@ -439,13 +410,11 @@ export const useDashboardCharts = (): DashboardChartState => {
 
   // Change time frame function
   const changeTimeFrame = useCallback((newTimeFrame: TimeFrame) => {
-    console.log(`Changing time frame from ${timeFrame} to ${newTimeFrame}`);
     setTimeFrame(newTimeFrame);
-  }, [timeFrame]);
+  }, []);
 
   // Refresh data function with visible feedback
   const refreshData = useCallback(async () => {
-    console.log('Manual refresh requested');
     try {
       await fetchStatistics(timeFrame, true);
       
@@ -457,24 +426,12 @@ export const useDashboardCharts = (): DashboardChartState => {
         });
       }
     } catch (error) {
-      console.error('Error refreshing chart data:', error as Error);
-      // Error handling is already in fetchStatistics
+      console.error('Error refreshing chart data:', error);
     }
   }, [timeFrame, fetchStatistics, toast]);
 
   // Memoize the merged data to avoid recalculating on every render
   const mergedData = useMemo(() => {
-    // Log the stats data for debugging purposes
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Chart data being processed:', {
-        timeFrame, 
-        requests: Object.keys(statsData.requests).length,
-        appointments: Object.keys(statsData.appointments).length,
-        customers: Object.keys(statsData.customers).length,
-        users: Object.keys(statsData.users).length
-      });
-    }
-    
     // Create a set of all unique periods from all datasets
     const periodsSet = new Set<string>(
       [...Object.keys(statsData.requests),
@@ -483,70 +440,64 @@ export const useDashboardCharts = (): DashboardChartState => {
        ...Object.keys(statsData.users)]
     );
     
-    // Handle empty data case
-    if (periodsSet.size === 0) {
-      // Generate default periods based on timeFrame for better visual
-      const defaultPeriods = generateDefaultPeriods(timeFrame);
-      defaultPeriods.forEach(period => periodsSet.add(period));
-      
-      // If still empty (shouldn't happen), add a dummy period
-      if (periodsSet.size === 0) {
-        periodsSet.add('No Data');
-      }
-    }
+    // Handle empty data case by generating default periods
+    let sortedPeriods: string[];
     
-    // Sort periods based on time frame
-    const sortedPeriods = Array.from(periodsSet).sort((a, b) => {
-      // For monthly data (format: 'Jan', 'Feb', etc.)
-      if (timeFrame === 'monthly') {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const aMonth = months.findIndex(month => a.startsWith(month));
-        const bMonth = months.findIndex(month => b.startsWith(month));
+    if (periodsSet.size === 0) {
+      sortedPeriods = generateDefaultPeriods(timeFrame);
+    } else {
+      // Sort periods based on time frame
+      sortedPeriods = Array.from(periodsSet).sort((a, b) => {
+        // For monthly data (format: 'Jan', 'Feb', etc.)
+        if (timeFrame === 'monthly') {
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const aMonth = months.findIndex(month => a.startsWith(month));
+          const bMonth = months.findIndex(month => b.startsWith(month));
+          
+          if (aMonth !== -1 && bMonth !== -1) {
+            // If same month, compare years
+            if (aMonth === bMonth) {
+              const aYear = parseInt(a.split(' ')[1], 10);
+              const bYear = parseInt(b.split(' ')[1], 10);
+              if (!isNaN(aYear) && !isNaN(bYear)) {
+                return aYear - bYear;
+              }
+            }
+            return aMonth - bMonth;
+          }
+        }
         
-        if (aMonth !== -1 && bMonth !== -1) {
-          // If same month, compare years
-          if (aMonth === bMonth) {
-            const aYear = parseInt(a.split(' ')[1], 10);
-            const bYear = parseInt(b.split(' ')[1], 10);
-            if (!isNaN(aYear) && !isNaN(bYear)) {
-              return aYear - bYear;
+        // For weekly data (format: 'Week X')
+        if (timeFrame === 'weekly') {
+          const aMatch = a.match(/Week\s+(\d+)/i);
+          const bMatch = b.match(/Week\s+(\d+)/i);
+          
+          if (aMatch && bMatch) {
+            const aWeek = parseInt(aMatch[1], 10);
+            const bWeek = parseInt(bMatch[1], 10);
+            
+            if (!isNaN(aWeek) && !isNaN(bWeek)) {
+              return aWeek - bWeek;
             }
           }
-          return aMonth - bMonth;
         }
-      }
-      
-      // For weekly data (format: 'Week X')
-      if (timeFrame === 'weekly') {
-        const aMatch = a.match(/Week\s+(\d+)/i);
-        const bMatch = b.match(/Week\s+(\d+)/i);
         
-        if (aMatch && bMatch) {
-          const aWeek = parseInt(aMatch[1], 10);
-          const bWeek = parseInt(bMatch[1], 10);
+        // For yearly data (format: '2023', '2024', etc.)
+        if (timeFrame === 'yearly') {
+          const aYear = parseInt(a, 10);
+          const bYear = parseInt(b, 10);
           
-          if (!isNaN(aWeek) && !isNaN(bWeek)) {
-            return aWeek - bWeek;
+          if (!isNaN(aYear) && !isNaN(bYear)) {
+            return aYear - bYear;
           }
         }
-      }
-      
-      // For yearly data (format: '2023', '2024', etc.)
-      if (timeFrame === 'yearly') {
-        const aYear = parseInt(a, 10);
-        const bYear = parseInt(b, 10);
         
-        if (!isNaN(aYear) && !isNaN(bYear)) {
-          return aYear - bYear;
-        }
-      }
-      
-      // Default: alphabetical sort
-      return a.localeCompare(b);
-    });
+        // Default: alphabetical sort
+        return a.localeCompare(b);
+      });
+    }
     
     // Create a merged dataset with all statistics
-    // Use a more unique key pattern that includes index to avoid duplicates
     return sortedPeriods.map((period, index) => ({
       period,
       requests: statsData.requests[period] || 0,
@@ -567,3 +518,4 @@ export const useDashboardCharts = (): DashboardChartState => {
     refreshData
   };
 };
+

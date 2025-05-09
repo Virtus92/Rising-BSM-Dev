@@ -6,8 +6,8 @@ import { UpcomingAppointments } from '@/features/dashboard/components/UpcomingAp
 import { DashboardCharts } from '@/features/dashboard/components/DashboardCharts';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { BarChart2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/card';
+import { BarChart2, AlertCircle } from 'lucide-react';
 
 export default function DashboardPage() {
   return (
@@ -19,7 +19,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <UpcomingAppointments />
         <PermissionGuard
-          allPermissions={[
+          anyPermission={[
             SystemPermission.REQUESTS_VIEW, 
             SystemPermission.APPOINTMENTS_VIEW,
             SystemPermission.USERS_VIEW,
@@ -30,13 +30,19 @@ export default function DashboardPage() {
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div>
                   <CardTitle>Analytics Dashboard</CardTitle>
+                  <CardDescription>Charts and statistics</CardDescription>
                 </div>
                 <BarChart2 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-center h-[350px]">
-                  <p className="text-muted-foreground">
-                    You don't have permission to view analytics data
+                <div className="flex flex-col items-center justify-center h-[350px] text-center">
+                  <AlertCircle className="h-12 w-12 text-amber-500 mb-4" />
+                  <p className="text-lg font-medium mb-2">
+                    Limited Permissions
+                  </p>
+                  <p className="text-muted-foreground max-w-md">
+                    You don't have permissions to view analytics data. 
+                    Please contact your manager if you need access to these statistics.
                   </p>
                 </div>
               </CardContent>
