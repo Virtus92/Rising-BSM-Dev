@@ -289,7 +289,7 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
             
             {/* Quick actions dropdown */}
             <Popover className="relative">
-              {({ open }) => (
+              {({ open }: { open: boolean }) => (
                 <>
                   <Popover.Button 
                     className={`${
@@ -482,7 +482,7 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
       
       {/* Command palette / search dialog */}
       <Transition appear show={isSearchOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={() => setIsSearchOpen(false)}>
+        <Dialog className="relative z-50" onClose={() => setIsSearchOpen(false)}>
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-300"

@@ -163,7 +163,7 @@ export default function StatisticsPage() {
               </Card>
             </div>
             
-            <DashboardCharts entityType="customers" chartType={chartType} period={timeframe} />
+            <DashboardCharts />
           </TabsContent>
           
           <TabsContent value="requests" className="space-y-4">
@@ -217,7 +217,7 @@ export default function StatisticsPage() {
               </Card>
             </div>
             
-            <DashboardCharts entityType="requests" chartType={chartType} period={timeframe} />
+            <DashboardCharts />
           </TabsContent>
           
           <TabsContent value="appointments" className="space-y-4">
@@ -271,7 +271,7 @@ export default function StatisticsPage() {
               </Card>
             </div>
             
-            <DashboardCharts entityType="appointments" chartType={chartType} period={timeframe} />
+            <DashboardCharts />
           </TabsContent>
           
           <TabsContent value="users" className="space-y-4">
@@ -325,7 +325,7 @@ export default function StatisticsPage() {
               </Card>
             </div>
             
-            <DashboardCharts entityType="users" chartType={chartType} period={timeframe} />
+            <DashboardCharts />
           </TabsContent>
         </Tabs>
       </div>
