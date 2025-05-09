@@ -93,9 +93,7 @@ export const CustomerRequestsTab: React.FC<CustomerRequestsTabProps> = ({ custom
         // Properly filter requests by customerId on the backend
         // Ensure the customerId is passed as a number to avoid type mismatches
         const response = await RequestService.findAll({
-          filters: {
-            customerId: Number(customerId)  // Convert to number to ensure type consistency
-          },
+          customerId: Number(customerId),  // Convert to number to ensure type consistency
           sortBy: 'createdAt',
           sortDirection: 'desc'
         });

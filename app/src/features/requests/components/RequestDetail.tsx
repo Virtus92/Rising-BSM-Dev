@@ -336,7 +336,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                   request={request}
                   onClose={() => {
                     setConvertDialogOpen(false);
-                    router.refresh();
+                    // Router refresh is now handled in component
                   }}
                 />
               </DialogContent>
@@ -369,7 +369,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                   requestId={request.id}
                   onClose={() => {
                     setLinkDialogOpen(false);
-                    router.refresh();
+                    // Router refresh is now handled in component
                   }}
                 />
               </DialogContent>
@@ -402,7 +402,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                   request={request}
                   onClose={() => {
                     setAppointmentDialogOpen(false);
-                    router.refresh();
+                    // Router refresh is now handled in component
                   }}
                 />
               </DialogContent>

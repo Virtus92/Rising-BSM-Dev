@@ -2,10 +2,10 @@
 
 import { ReactNode, useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import DashboardHeader from '@/features/dashboard/components/DashboardHeader';
 import { DashboardSidebar } from '@/features/dashboard/components/DashboardSidebar';
-import { Menu, X } from 'lucide-react';
-import { Button } from '@/shared/components/ui/button';
+import { X } from 'lucide-react';
 
 /**
  * Props for the Dashboard Layout
@@ -18,10 +18,10 @@ interface DashboardLayoutProps {
 }
 
 /**
- * Dashboard Layout Component
+ * Modern Dashboard Layout Component
  * 
  * Provides a layout with header and sidebar for the dashboard.
- * Protects dashboard pages from unauthorized access.
+ * Features responsive design, animations, and modern styling.
  */
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const router = useRouter();
@@ -43,7 +43,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   useEffect(() => {
     const handleResize = () => {
       // Close sidebar on small screens when window is resized
-      if (window.innerWidth >= 768 && sidebarOpen) {
+      if (window.innerWidth >= 1024 && sidebarOpen) {
         setSidebarOpen(false);
       }
     };
@@ -55,60 +55,88 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   // Show loading indicator during mounting
   if (!isMounted) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-950">
         <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
+          <div className="w-16 h-16 relative">
+            <div className="w-16 h-16 rounded-full border-4 border-indigo-200 dark:border-indigo-900"></div>
+            <div className="w-16 h-16 rounded-full border-4 border-transparent border-t-indigo-600 dark:border-t-indigo-400 animate-spin absolute inset-0"></div>
+          </div>
+          <p className="mt-4 text-slate-600 dark:text-slate-400 font-medium">Loading dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* Header */}
       <DashboardHeader setSidebarOpen={setSidebarOpen} />
       
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar for desktop - always visible */}
-        <div className="hidden md:block md:w-64 md:flex-shrink-0">
+        <div className="hidden lg:block lg:w-64 lg:flex-shrink-0 h-[calc(100vh-4rem)] sticky top-16">
           <DashboardSidebar />
         </div>
         
         {/* Mobile Sidebar - Only visible when toggled */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-50 md:hidden">
-            {/* Backdrop */}
-            <div 
-              className="fixed inset-0 bg-black/50" 
-              onClick={() => setSidebarOpen(false)}
-              aria-hidden="true"
-            />
-            
-            {/* Sidebar */}
-            <div className="fixed inset-y-0 left-0 w-80 max-w-[80%] flex flex-col bg-card shadow-lg">
-              <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="text-xl font-bold">Rising BSM</h2>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setSidebarOpen(false)}
-                  aria-label="Close menu"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
+        <AnimatePresence>
+          {sidebarOpen && (
+            <>
+              {/* Backdrop */}
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+                onClick={() => setSidebarOpen(false)}
+                aria-hidden="true"
+              />
               
-              <div className="flex-1 overflow-y-auto">
-                <DashboardSidebar />
-              </div>
-            </div>
-          </div>
-        )}
+              {/* Sidebar */}
+              <motion.div 
+                initial={{ x: -320 }}
+                animate={{ x: 0 }}
+                exit={{ x: -320 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="fixed inset-y-0 left-0 z-50 w-72 max-w-[90vw] h-screen lg:hidden"
+              >
+                <div className="flex h-full flex-col bg-white dark:bg-slate-900 shadow-xl">
+                  <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Dashboard</h2>
+                    <button 
+                      type="button"
+                      className="p-2 rounded-md text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      onClick={() => setSidebarOpen(false)}
+                      aria-label="Close sidebar"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto">
+                    <DashboardSidebar />
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
         
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-          {children}
+        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
+          {/* Page content wrapper */}
+          <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.2 }}
+            >
+              {children}
+            </motion.div>
+          </div>
         </main>
       </div>
     </div>

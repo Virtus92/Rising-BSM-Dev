@@ -43,6 +43,11 @@ export async function getAppointmentsHandler(
     const search = request.nextUrl.searchParams.get('search') || undefined;
     const sortBy = request.nextUrl.searchParams.get('sortBy') || undefined;
     const sortDirection = (request.nextUrl.searchParams.get('sortDirection') as 'asc' | 'desc') || undefined;
+  
+  // Extract customerId parameter if present
+  const customerId = request.nextUrl.searchParams.get('customerId') 
+    ? parseInt(request.nextUrl.searchParams.get('customerId') || '0', 10) 
+    : undefined;
     
     // Get appointment service
     const appointmentService = serviceFactory.createAppointmentService();
@@ -54,7 +59,8 @@ export async function getAppointmentsHandler(
       filters: {
         search,
         sortBy,
-        sortDirection
+        sortDirection,
+        customerId // Add customerId to filters
       }
     });
     

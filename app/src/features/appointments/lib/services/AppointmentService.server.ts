@@ -111,8 +111,21 @@ export class AppointmentService implements IAppointmentService {
       // Process filters separately
       const criteria = this.mapFiltersToRepositoryCriteria(options?.filters);
       
+      // Create repository query parameters
+      // We need to work around the TypeScript error by using a more compatible approach
+      const queryParams: any = {
+        ...queryOptions
+      };
+      
+      // Instead of directly adding 'criteria', we'll add the individual criteria properties
+      if (criteria) {
+        Object.keys(criteria).forEach(key => {
+          queryParams[key] = criteria[key];
+        });
+      }
+      
       // Get appointments with criteria and options
-      const result = await this.repository.findAll(queryOptions);
+      const result = await this.repository.findAll(queryParams);
       
       // Map entities to DTOs
       return {
@@ -808,6 +821,33 @@ export class AppointmentService implements IAppointmentService {
     try {
       this.logger.debug('Finding all appointments with options:', { options });
       
+      // There are two ways to get appointments: either using findAppointments with filter params
+      // or using findAll with criteria. Let's use both approaches based on what's provided.
+      
+      // If customerId is provided in filters, we want to make sure it's properly used
+      if (options?.filters?.customerId) {
+        this.logger.debug('Using findAll with criteria for customer-specific appointments');
+        
+        // Create query options with criteria
+        const queryOptions = {
+          page: options?.page || 1,
+          limit: options?.limit || 10,
+          relations: options?.relations || ['customer'],
+          sort: options?.sort,
+          criteria: this.mapFiltersToRepositoryCriteria(options?.filters)
+        };
+        
+        // Use the findAll method with criteria
+        const result = await this.repository.findAll(queryOptions);
+        
+        // Map entities to DTOs
+        return {
+          data: result.data.map(appointment => this.toDTO(appointment)),
+          pagination: result.pagination
+        };
+      }
+      
+      // If no customerId specified, use the findAppointments approach
       // Convert to AppointmentFilterParamsDto format
       const filterParams: AppointmentFilterParamsDto = {
         page: options?.page || 1,

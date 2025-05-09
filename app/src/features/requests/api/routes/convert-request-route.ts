@@ -15,13 +15,16 @@ import { ConvertRequestToCustomerRequest } from '../models/request-request-model
  */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    // Extract ID from route parameters
+    // Extract ID from route parameters - properly access params in App Router
     const id = Number(params.id);
     if (isNaN(id) || id <= 0) {
       return formatResponse.error('Invalid request ID', 400);
     }
 
-    // Authenticate user
+    // Debug the request to see what we're receiving
+    console.log(`Converting request ID ${id} to customer`);
+
+    // Authenticate user - check if we have a valid session
     const session = await authMiddleware(request);
     if (!session) {
       return formatResponse.error('Authentication required', 401);
@@ -33,6 +36,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     
     // Access user info from session
     const userId = session.user.id;
+    console.log(`User ID from session: ${userId}`);
 
     // Verify permissions
     const permissionCheck = await permissionMiddleware.checkPermission(request, [SystemPermission.CUSTOMERS_CREATE]);
@@ -42,6 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     // Parse request body
     const data: ConvertRequestToCustomerRequest = await request.json();
+    console.log('Request data:', JSON.stringify(data));
 
     // Validate customer data
     if (!data.customerData || !data.customerData.name || !data.customerData.email) {
@@ -51,22 +56,40 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Get request service
     const serviceFactory = getServiceFactory();
     const requestService = serviceFactory.createRequestService();
+    console.log('Request service initialized');
 
     // User ID is already obtained from the auth session above
-    
-    const result = await requestService.convertToCustomer({
-      requestId: id,
-      customerData: data.customerData,
-      createAppointment: data.createAppointment,
-      appointmentData: data.appointmentData
-    }, {
-      context: {
-        userId
-      }
-    });
+    try {
+      console.log('Converting request to customer with data:', {
+        requestId: id,
+        customerData: {
+          name: data.customerData.name,
+          email: data.customerData.email,
+          // Other fields omitted for brevity
+        },
+        createAppointment: data.createAppointment,
+        hasAppointmentData: data.appointmentData ? true : false
+      });
+      
+      const result = await requestService.convertToCustomer({
+        requestId: id,
+        customerData: data.customerData,
+        createAppointment: data.createAppointment,
+        appointmentData: data.appointmentData
+      }, {
+        context: {
+          userId
+        }
+      });
+      
+      console.log('Conversion result:', result ? 'Success' : 'Failure', result);
 
     // Return formatted response
     return formatResponse.success(result, 'Request converted to customer successfully', 200);
+    } catch (conversionError) {
+      console.error('Error during conversion:', conversionError);
+      return formatResponse.error(`Conversion error: ${(conversionError as Error).message || 'Unknown error'}`, 500);
+    }
   } catch (error) {
     return formatResponse.error('An error occurred while converting the request to a customer', 500);
   }

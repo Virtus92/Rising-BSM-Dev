@@ -4,7 +4,7 @@ import Footer from '@/shared/components/layout/Footer';
 import Hero from '@/features/home/components/Hero';
 import Features from '@/features/home/components/Features';
 import About from '@/features/home/components/About';
-import Testimonials from '@/features/home/components/Testimonials';
+import RequestShowcase from '@/features/home/components/RequestShowcase';
 import CTA from '@/features/home/components/CTA';
 import FAQ from '@/features/home/components/FAQ';
 
@@ -27,7 +27,7 @@ export default function Home() {
       <Hero />
       <Features />
       <About />
-      <Testimonials />
+      <RequestShowcase />
       <FAQ />
       <CTA />
       <Footer />

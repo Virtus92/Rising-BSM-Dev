@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "framer-motion": "^12.10.5"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.2.2"
+  }
+}

@@ -3,7 +3,20 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Calendar, RefreshCw, Plus, Check, X, Clock, PhoneCall, MessageSquare, Edit } from 'lucide-react';
+import { 
+  Calendar, 
+  RefreshCw, 
+  Plus, 
+  Check, 
+  X,
+  Clock, 
+  PhoneCall, 
+  MessageSquare, 
+  Edit,
+  ChevronRight,
+  Loader2,
+  AlertCircle
+} from 'lucide-react';
 import { useUpcomingAppointments } from '../hooks/useUpcomingAppointments';
 import { Button } from '@/shared/components/ui/button';
 import { AppointmentDto } from '@/domain/dtos/AppointmentDtos';
@@ -13,9 +26,11 @@ import { Badge } from '@/shared/components/ui/badge';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { useToast } from '@/shared/hooks/useToast';
 
 export const UpcomingAppointments = () => {
   const router = useRouter();
+  const { toast } = useToast();
   const { appointments, isLoading, error, refreshAppointments } = useUpcomingAppointments();
   const [isActionLoading, setIsActionLoading] = useState<number | null>(null);
   
@@ -59,13 +74,25 @@ export const UpcomingAppointments = () => {
         const response = await AppointmentClient.addAppointmentNote(appointmentId, note);
         if (response.success) {
           refreshAppointments();
-          alert('Note added successfully');
+          toast({
+            title: 'Success',
+            description: 'Note added successfully',
+            variant: 'success'
+          });
         } else {
-          alert(`Failed to add note: ${response.message || 'Unknown error'}`);
+          toast({
+            title: 'Error',
+            description: `Failed to add note: ${response.message || 'Unknown error'}`,
+            variant: 'destructive'
+          });
         }
       } catch (error) {
-        console.error('Error adding note:', error as Error);
-        alert('Failed to add note. Please try again.');
+        console.error('Error adding note:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to add note. Please try again.',
+          variant: 'destructive'
+        });
       } finally {
         setIsActionLoading(null);
       }
@@ -74,18 +101,35 @@ export const UpcomingAppointments = () => {
 
   const handleUpdateStatus = async (appointmentId: number | string, status: AppointmentStatus, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Are you sure you want to mark this appointment as ${status.toLowerCase()}?`)) {
+    
+    const statusLabel = status === AppointmentStatus.COMPLETED ? 'completed' : 
+                        status === AppointmentStatus.CANCELLED ? 'cancelled' : status.toLowerCase();
+                        
+    if (confirm(`Are you sure you want to mark this appointment as ${statusLabel}?`)) {
       setIsActionLoading(Number(appointmentId));
       try {
         const response = await AppointmentClient.updateAppointmentStatus(appointmentId, { status });
         if (response.success) {
           refreshAppointments();
+          toast({
+            title: 'Status updated',
+            description: `Appointment marked as ${statusLabel}`,
+            variant: 'success'
+          });
         } else {
-          alert(`Failed to update status: ${response.message || 'Unknown error'}`);
+          toast({
+            title: 'Error',
+            description: `Failed to update status: ${response.message || 'Unknown error'}`,
+            variant: 'destructive'
+          });
         }
       } catch (error) {
-        console.error('Error updating status:', error as Error);
-        alert('Failed to update status. Please try again.');
+        console.error('Error updating status:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to update status. Please try again.',
+          variant: 'destructive'
+        });
       } finally {
         setIsActionLoading(null);
       }
@@ -95,15 +139,15 @@ export const UpcomingAppointments = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case AppointmentStatus.CONFIRMED:
-        return <Badge className="bg-green-100 text-green-800">Confirmed</Badge>;
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">Confirmed</Badge>;
       case AppointmentStatus.COMPLETED:
-        return <Badge className="bg-purple-100 text-purple-800">Completed</Badge>;
+        return <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">Completed</Badge>;
       case AppointmentStatus.CANCELLED:
-        return <Badge className="bg-red-100 text-red-800">Cancelled</Badge>;
+        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Cancelled</Badge>;
       case AppointmentStatus.RESCHEDULED:
-        return <Badge className="bg-yellow-100 text-yellow-800">Rescheduled</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300">Rescheduled</Badge>;
       default:
-        return <Badge className="bg-blue-100 text-blue-800">Planned</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Planned</Badge>;
     }
   };
 
@@ -141,10 +185,10 @@ export const UpcomingAppointments = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            <div className="h-16 bg-gray-100 animate-pulse rounded"></div>
-            <div className="h-16 bg-gray-100 animate-pulse rounded"></div>
-            <div className="h-16 bg-gray-100 animate-pulse rounded"></div>
+          <div className="space-y-4">
+            <div className="h-16 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
+            <div className="h-16 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
+            <div className="h-16 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
           </div>
         </CardContent>
       </Card>
@@ -190,20 +234,22 @@ export const UpcomingAppointments = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
-            <h4 className="text-red-800 text-sm font-medium mb-2">Error loading appointments</h4>
-            <p className="text-red-700 text-xs mb-3">{error}</p>
-            <p className="text-red-600 text-xs mb-2">The API endpoint might be unavailable or experiencing issues.</p>
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+              <h4 className="text-red-800 dark:text-red-300 font-medium">Error loading appointments</h4>
+            </div>
+            <p className="text-red-600 dark:text-red-400 text-sm mt-2">{error}</p>
           </div>
-          <div className="flex justify-center">
+          
+          <div className="flex justify-center mt-4">
             <Button 
               variant="outline" 
-              size="sm" 
               onClick={handleRefresh}
-              className="mx-auto"
+              className="flex items-center"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              Retry Loading Data
+              Retry
             </Button>
           </div>
         </CardContent>
@@ -221,23 +267,41 @@ export const UpcomingAppointments = () => {
             Upcoming Appointments
           </CardTitle>
           <div className="flex space-x-2">
-            <Button variant="ghost" size="sm" onClick={handleRefresh} title="Refresh">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleRefresh}
+              className="h-9 w-9 p-0 flex items-center justify-center"
+              title="Refresh"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
             <PermissionGuard permission={SystemPermission.APPOINTMENTS_CREATE}>
-              <Button variant="ghost" size="sm" onClick={handleAddAppointment} title="Add Appointment">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleAddAppointment}
+                className="h-9 w-9 p-0 flex items-center justify-center"
+                title="Add Appointment"
+              >
                 <Plus className="h-4 w-4" />
               </Button>
             </PermissionGuard>
           </div>
         </CardHeader>
-        <CardContent className="text-center py-6 px-4">
-          <p className="text-muted-foreground mb-4">No upcoming appointments</p>
+        <CardContent className="flex flex-col items-center justify-center py-10 px-4 text-center">
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-full mb-3">
+            <Calendar className="h-6 w-6 text-blue-500" />
+          </div>
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">No upcoming appointments</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-md">
+            You don't have any appointments scheduled in the near future.
+          </p>
           <PermissionGuard 
             permission={SystemPermission.APPOINTMENTS_CREATE}
-            fallback={<p className="text-xs text-muted-foreground">You don't have permission to create appointments</p>}
+            fallback={<Button variant="outline" onClick={handleViewAll}>View All Appointments</Button>}
           >
-            <Button onClick={handleAddAppointment} variant="outline" size="sm">
+            <Button onClick={handleAddAppointment} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="mr-2 h-4 w-4" />
               Schedule Appointment
             </Button>
@@ -256,77 +320,83 @@ export const UpcomingAppointments = () => {
           Upcoming Appointments
         </CardTitle>
         <div className="flex space-x-2">
-          <Button variant="ghost" size="sm" onClick={handleRefresh} title="Refresh">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleRefresh}
+            className="h-9 w-9 p-0 flex items-center justify-center"
+            title="Refresh"
+          >
             <RefreshCw className="h-4 w-4" />
           </Button>
           <PermissionGuard permission={SystemPermission.APPOINTMENTS_CREATE}>
-            <Button variant="ghost" size="sm" onClick={handleAddAppointment} title="Add Appointment">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleAddAppointment}
+              className="h-9 w-9 p-0 flex items-center justify-center"
+              title="Add Appointment"
+            >
               <Plus className="h-4 w-4" />
             </Button>
           </PermissionGuard>
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="divide-y">
+        <div className="divide-y divide-slate-200 dark:divide-slate-700">
           {appointments.map((appointment) => (
             <div 
               key={appointment.id} 
               onClick={() => handleViewDetail(appointment.id)}
-              className="hover:bg-muted/30 p-4 cursor-pointer transition-colors"
+              className="hover:bg-slate-50 dark:hover:bg-slate-800/50 p-4 cursor-pointer transition-colors"
             >
-              <div className="flex justify-between items-start mb-2">
+              {/* Appointment info */}
+              <div className="flex justify-between items-start mb-3">
                 <div>
-                  <h3 className="font-medium text-sm flex items-center gap-1">
+                  <h3 className="font-medium text-sm md:text-base text-slate-900 dark:text-white flex items-center gap-2">
                     {appointment.customerName || appointment.customerData?.name || 'Unnamed Customer'}
                     {getStatusBadge(appointment.status)}
                   </h3>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
                     {appointment.title || appointment.service || 'Appointment'}
                   </p>
                 </div>
                 <div className="text-xs text-right">
-                  <div className="font-medium flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
+                  <div className="font-medium text-slate-700 dark:text-slate-300 flex items-center justify-end gap-1">
+                    <Calendar className="h-3.5 w-3.5 text-blue-500" />
                     {formatDate(appointment.appointmentDate)}
                   </div>
-                  <div className="text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
+                  <div className="text-slate-500 dark:text-slate-400 flex items-center justify-end gap-1">
+                    <Clock className="h-3.5 w-3.5 text-slate-400" />
                     {formatTime(appointment)}
                   </div>
                 </div>
               </div>
               
-              {/* Quick action buttons */}
-              <div className="flex justify-end gap-1 mt-2">
+              {/* Quick action buttons - larger and more user-friendly */}
+              <div className="flex flex-wrap gap-2 mt-3">
                 {isActionLoading === appointment.id ? (
-                  <div className="text-xs italic text-muted-foreground">Processing...</div>
+                  <div className="w-full flex items-center justify-center py-2">
+                    <Loader2 className="h-5 w-5 text-blue-500 animate-spin mr-2" />
+                    <span className="text-sm text-slate-600 dark:text-slate-400">Processing...</span>
+                  </div>
                 ) : (
                   <TooltipProvider>
                     {appointment.status !== AppointmentStatus.COMPLETED && (
                       <PermissionGuard 
                         permission={SystemPermission.APPOINTMENTS_EDIT}
-                        fallback={
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="inline-block p-1">
-                                <Check className="h-3 w-3 text-gray-300" />
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>You don't have permission to complete appointments</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        }
+                        fallback={null}
                       >
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              className="p-1 h-7"
+                              className="h-9 px-3 border-green-200 hover:border-green-300 dark:border-green-800 dark:hover:border-green-700"
                               onClick={(e) => handleUpdateStatus(appointment.id, AppointmentStatus.COMPLETED, e)}
                             >
-                              <Check className="h-3 w-3 text-green-500" />
+                              <Check className="h-4 w-4 text-green-600 dark:text-green-400 mr-1.5" />
+                              <span className="text-green-600 dark:text-green-400">Complete</span>
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -339,28 +409,18 @@ export const UpcomingAppointments = () => {
                     {appointment.status !== AppointmentStatus.CANCELLED && (
                       <PermissionGuard 
                         permission={SystemPermission.APPOINTMENTS_EDIT}
-                        fallback={
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="inline-block p-1">
-                                <X className="h-3 w-3 text-gray-300" />
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>You don't have permission to cancel appointments</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        }
+                        fallback={null}
                       >
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              className="p-1 h-7"
+                              className="h-9 px-3 border-red-200 hover:border-red-300 dark:border-red-800 dark:hover:border-red-700"
                               onClick={(e) => handleUpdateStatus(appointment.id, AppointmentStatus.CANCELLED, e)}
                             >
-                              <X className="h-3 w-3 text-red-500" />
+                              <X className="h-4 w-4 text-red-600 dark:text-red-400 mr-1.5" />
+                              <span className="text-red-600 dark:text-red-400">Cancel</span>
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -372,28 +432,18 @@ export const UpcomingAppointments = () => {
                     
                     <PermissionGuard 
                       permission={SystemPermission.APPOINTMENTS_EDIT}
-                      fallback={
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-block p-1">
-                              <MessageSquare className="h-3 w-3 text-gray-300" />
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>You don't have permission to add notes</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      }
+                      fallback={null}
                     >
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            className="p-1 h-7"
+                            className="h-9 px-3 border-amber-200 hover:border-amber-300 dark:border-amber-800 dark:hover:border-amber-700"
                             onClick={(e) => handleAddNote(appointment.id, e)}
                           >
-                            <MessageSquare className="h-3 w-3 text-blue-500" />
+                            <MessageSquare className="h-4 w-4 text-amber-600 dark:text-amber-400 mr-1.5" />
+                            <span className="text-amber-600 dark:text-amber-400">Note</span>
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -402,30 +452,22 @@ export const UpcomingAppointments = () => {
                       </Tooltip>
                     </PermissionGuard>
                     
+                    <div className="grow"></div> {/* Spacer */}
+                    
                     <PermissionGuard 
                       permission={SystemPermission.APPOINTMENTS_EDIT}
-                      fallback={
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-block p-1">
-                              <Edit className="h-3 w-3 text-gray-300" />
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>You don't have permission to edit appointments</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      }
+                      fallback={null}
                     >
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            className="p-1 h-7"
+                            className="h-9 px-3 border-purple-200 hover:border-purple-300 dark:border-purple-800 dark:hover:border-purple-700"
                             onClick={(e) => handleEditAppointment(appointment.id, e)}
                           >
-                            <Edit className="h-3 w-3 text-purple-500" />
+                            <Edit className="h-4 w-4 text-purple-600 dark:text-purple-400 mr-1.5" />
+                            <span className="text-purple-600 dark:text-purple-400">Edit</span>
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -440,13 +482,14 @@ export const UpcomingAppointments = () => {
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            className="p-1 h-7"
+                            className="h-9 px-3 border-blue-200 hover:border-blue-300 dark:border-blue-800 dark:hover:border-blue-700"
                             onClick={(e) => {
                               e.stopPropagation();
                               window.location.href = `tel:${appointment.customerData?.phone}`;
                             }}
                           >
-                            <PhoneCall className="h-3 w-3 text-green-600" />
+                            <PhoneCall className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-1.5" />
+                            <span className="text-blue-600 dark:text-blue-400">Call</span>
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -461,12 +504,19 @@ export const UpcomingAppointments = () => {
           ))}
         </div>
         
-        <div className="p-4 text-center">
-          <Button variant="link" size="sm" onClick={handleViewAll}>
-            View all appointments →
+        <div className="p-4 text-center border-t border-slate-200 dark:border-slate-700">
+          <Button 
+            variant="link"
+            onClick={handleViewAll}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center mx-auto"
+          >
+            View all appointments
+            <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
       </CardContent>
     </Card>
   );
 };
+
+export default UpcomingAppointments;

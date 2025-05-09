@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useRouter } from 'next/navigation';
+import { useForm, FormProvider } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/shared/components/ui/button';
@@ -31,6 +32,7 @@ import {
   PopoverTrigger,
 } from '@/shared/components/ui/popover';
 import { CheckIcon } from 'lucide-react';
+import { RequestService } from '@/features/requests/lib/services';
 import { cn } from '@/shared/utils/cn';
 
 // Form validation schema
@@ -51,6 +53,9 @@ interface LinkToCustomerFormProps {
 /**
  * Form for linking a request to an existing customer
  */
+/**
+ * Form for linking a request to an existing customer
+ */
 export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   requestId,
   onClose,
@@ -59,6 +64,7 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   // Customer search - Always enabled, search with empty string will return all customers
   // limited by the limit parameter
@@ -84,9 +90,27 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   const selectedCustomerId = form.watch('customerId');
   
   // Handle the PaginationResult structure
-  const selectedCustomer = customers?.data?.data?.find(
-    (customer: any) => customer.id === selectedCustomerId
-  );
+  // Helper function to safely find customer by ID
+  const findCustomerById = (id: number): any => {
+    if (!id) return null;
+    
+    // Try the nested data structure first
+    if (customers?.data?.data && Array.isArray(customers.data.data)) {
+      const found = customers.data.data.find((c: any) => c.id === id);
+      if (found) return found;
+    }
+    
+    // Try the direct data array next
+    if (customers?.data && Array.isArray(customers.data)) {
+      const found = customers.data.find((c: any) => c.id === id);
+      if (found) return found;
+    }
+    
+    return null;
+  };
+  
+  // Use our safer helper function
+  const selectedCustomer = findCustomerById(selectedCustomerId);
 
   const onSubmit = async (data: FormValues) => {
     try {
@@ -98,32 +122,29 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
         note: data.note 
       });
       
-      // Make the API call directly with fetch
-      const response = await fetch(`/api/requests/${requestId}/link-customer`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customerId: data.customerId,
-          note: data.note
-        }),
-      });
+      // Use the RequestService to link the request to a customer
+      const response = await RequestService.linkToCustomer(
+        requestId,
+        data.customerId,
+        data.note
+      );
       
-      const result = await response.json();
+      console.log("Link response:", response);
       
-      if (response.ok && result.success) {
+      if (response.success) {
         toast({
           title: "Success",
           description: "Request successfully linked to customer",
           variant: "success"
         });
         onClose();
+        // Force a router refresh to show the updated data
+        router.refresh();
       } else {
-        console.error("API Error:", result);
+        console.error("API Error:", response);
         toast({
           title: "Error",
-          description: result.message || "Failed to link customer",
+          description: response.message || "Failed to link customer",
           variant: "error"
         });
       }
@@ -140,9 +161,9 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   };
 
   return (
-    // Fix: Using Form component correctly with the form context
-    <Form {...form as any}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    // Use FormProvider instead of the Form component with form tag nesting
+    <FormProvider {...form}>
+      <div className="space-y-4">
         <FormField
           control={form.control}
           name="customerId"
@@ -191,7 +212,8 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
                         )}
                       </CommandEmpty>
                       <CommandGroup>
-                        {customers?.data?.data?.map((customer: any) => (
+                        {Array.isArray(customers?.data?.data) 
+                        ? customers.data.data.map((customer: any) => (
                           <CommandItem
                             value={customer.name || `customer-${customer.id}`}
                             key={customer.id}
@@ -217,7 +239,37 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
                               )}
                             />
                           </CommandItem>
-                        ))}
+                        ))
+                        : Array.isArray(customers?.data)
+                          ? customers.data.map((customer: any) => (
+                            <CommandItem
+                              value={customer.name || `customer-${customer.id}`}
+                              key={customer.id}
+                              onSelect={() => {
+                                form.setValue("customerId", customer.id);
+                                setOpen(false);
+                              }}
+                            >
+                              <div className="flex flex-col">
+                                <span>{customer.name}</span>
+                                {customer.email && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {customer.email}
+                                  </span>
+                                )}
+                              </div>
+                              <CheckIcon
+                                className={cn(
+                                  "ml-auto h-4 w-4",
+                                  customer.id === field.value
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          ))
+                          : null
+                      }
                       </CommandGroup>
                     </CommandList>
                   </Command>
@@ -249,12 +301,16 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
           <Button variant="outline" type="button" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isLinking || !selectedCustomerId}>
+          <Button 
+            type="button" 
+            onClick={form.handleSubmit(onSubmit)} 
+            disabled={isLinking || !selectedCustomerId}
+          >
             {isLinking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Link to Customer
           </Button>
         </div>
-      </form>
-    </Form>
+      </div>
+    </FormProvider>
   );
 };

@@ -143,6 +143,32 @@ export class AppointmentService {
   }
 
   /**
+   * Create an appointment from a request
+   */
+  static async createFromRequest(requestId: number, data: {
+    title: string;
+    appointmentDate: string;
+    duration?: number;
+    location?: string;
+    description?: string;
+    status?: string;
+    customerId?: number;
+    note?: string;
+  }): Promise<ApiResponse<AppointmentResponseDto>> {
+    try {
+      console.log(`Creating appointment for request ${requestId}:`, data);
+      return ApiClient.post(`/requests/${requestId}/appointment`, data);
+    } catch (error) {
+      console.error('Error in AppointmentService.createFromRequest:', error as Error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error creating appointment from request'
+      };
+    }
+  }
+
+  /**
    * Update an appointment
    */
   static async update(id: number, data: {

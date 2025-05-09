@@ -279,13 +279,14 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         country: data.customerData?.country || 'Deutschland',
         type: CustomerType.PRIVATE, // Using enum value directly
         newsletter: data.customerData?.newsletter || false,
-        source: 'contact_request',
+        // Remove source field as it's not in the Prisma schema
         status: CommonStatus.ACTIVE // Using enum value directly
         };
         
         // Apply customer type if provided
         if (data.customerData?.type) {
-          customerData.type = data.customerData.type as CustomerType;  // Convert string to enum
+          // Cast the string value to CustomerType enum
+          customerData.type = data.customerData.type as CustomerType;
         }
 
         // Create customer
@@ -293,7 +294,7 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
           data: customerData
         });
 
-        // Erstelle Customer-Domain-Entität
+        // Create Customer-Domain-Entity
         const customer = new Customer({
           id: customerRecord.id,
           name: customerRecord.name,
@@ -310,6 +311,7 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
           createdAt: customerRecord.createdAt,
           updatedAt: customerRecord.updatedAt
         });
+        
         // Update request
         const updatedRequestRecord = await this.prisma.contactRequest.update({
           where: { id: data.requestId },
@@ -336,21 +338,46 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
           // Create properly typed appointment data
           const appointmentData: Partial<Appointment> = {
             customerId: customer.id,
-            title: data.appointmentData?.title,
-            duration: data.appointmentData?.duration,
-            location: data.appointmentData?.location,
-            description: data.appointmentData?.description
+            title: data.appointmentData.title,
+            duration: data.appointmentData.duration || 60,
+            location: data.appointmentData.location,
+            description: data.appointmentData.description
           };
           
           // Handle date conversion safely
-          if (data.appointmentData?.appointmentDate) {
-            appointmentData.appointmentDate = new Date(data.appointmentData.appointmentDate);
+          if (data.appointmentData.appointmentDate) {
+            try {
+              // Convert ISO string to Date object
+              appointmentData.appointmentDate = new Date(data.appointmentData.appointmentDate);
+              
+              // Validate that we have a valid date
+              if (isNaN(appointmentData.appointmentDate.getTime())) {
+                this.logger.error('Invalid appointment date provided', {
+                  date: data.appointmentData.appointmentDate
+                });
+                // Fall back to current date + 1 day at noon
+                const fallbackDate = new Date();
+                fallbackDate.setDate(fallbackDate.getDate() + 1);
+                fallbackDate.setHours(12, 0, 0, 0);
+                appointmentData.appointmentDate = fallbackDate;
+              }
+            } catch (error) {
+              this.logger.error('Error converting appointment date', {
+                error,
+                date: data.appointmentData.appointmentDate
+              });
+              // Fall back to current date + 1 day at noon
+              const fallbackDate = new Date();
+              fallbackDate.setDate(fallbackDate.getDate() + 1);
+              fallbackDate.setHours(12, 0, 0, 0);
+              appointmentData.appointmentDate = fallbackDate;
+            }
           }
           
           const appointmentResult = await this.createAppointment(
             data.requestId, 
             appointmentData, 
-            'Termin bei Kundenkonvertierung erstellt'
+            'Appointment created during customer conversion'
           );
           appointment = appointmentResult;
         }

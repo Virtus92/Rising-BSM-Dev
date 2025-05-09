@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm, FormProvider } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,6 +25,8 @@ import { RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
 import { useToast } from '@/shared/hooks/useToast';
 import { format, addDays } from 'date-fns';
 import { Loader2 } from 'lucide-react';
+import { AppointmentService } from '@/features/appointments/lib/services';
+import { RequestService } from '@/features/requests/lib/services';
 
 // Form validation schema
 const formSchema = z.object({
@@ -47,12 +50,16 @@ interface CreateAppointmentFormProps {
 /**
  * Form for creating an appointment from a request
  */
+/**
+ * Form for creating an appointment from a request
+ */
 export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
   request,
   onClose,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   // Default values
   const tomorrow = addDays(new Date(), 1);
@@ -66,6 +73,9 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
     status: 'planned',
     note: '',
   };
+  
+  // Debug default values
+  console.log('Default values:', defaultValues);
 
   const methods = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -78,13 +88,10 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
   const onSubmit = async (data: FormValues) => {
     try {
       setIsSubmitting(true);
-      
+
       // Create appointment data object with the correct format expected by the API
       const appointmentData = {
         title: data.title,
-        // Pass date and time separately as expected by the backend
-        appointmentDate: data.appointmentDate,
-        appointmentTime: data.appointmentTime,
         duration: data.duration,
         location: data.location,
         description: data.description,
@@ -97,30 +104,88 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
         appointmentData
       });
       
-      // Make the API call directly with fetch
-      const response = await fetch(`/api/requests/${request.id}/appointment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(appointmentData),
-      });
+      // Format the date and time correctly
+      try {
+        const dateObj = new Date(`${data.appointmentDate}T${data.appointmentTime}`);
+        // Validate the date object
+        if (isNaN(dateObj.getTime())) {
+          console.error('Invalid date:', {
+            date: data.appointmentDate,
+            time: data.appointmentTime,
+            combined: `${data.appointmentDate}T${data.appointmentTime}`
+          });
+          toast({
+            title: "Error",
+            description: `Invalid date or time format. Date: ${data.appointmentDate}, Time: ${data.appointmentTime}. Expected YYYY-MM-DD for date and HH:MM for time.`,
+            variant: "error"
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Additional safety check for date format
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        const timeRegex = /^\d{2}:\d{2}$/;
+        
+        if (!dateRegex.test(data.appointmentDate) || !timeRegex.test(data.appointmentTime)) {
+          console.error('Format validation failed:', {
+            date: data.appointmentDate,
+            time: data.appointmentTime,
+            dateValid: dateRegex.test(data.appointmentDate),
+            timeValid: timeRegex.test(data.appointmentTime)
+          });
+          
+          toast({
+            title: "Error",
+            description: "Please ensure the date is in YYYY-MM-DD format and time is in HH:MM format",
+            variant: "error"
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        
+        console.log("Combined date and time:", dateObj.toISOString());
+        
+        // Create a properly formatted appointment data object
+        const formattedAppointmentData = {
+          ...appointmentData,
+          appointmentDate: dateObj.toISOString(), // Use ISO string format for the API
+          customerId: request.customerId // Include customer ID if available
+        };
+        
+        console.log("Sending appointment data:", formattedAppointmentData);
       
-      const result = await response.json();
+        // Use RequestService to create an appointment from a request
+        const response = await RequestService.createAppointment(
+          request.id,
+          formattedAppointmentData
+        );
+        
+        console.log("Appointment creation response:", response);
       
-      if (response.ok && result.success) {
+        if (response.success) {
+          toast({
+            title: 'Success',
+            description: 'Appointment created successfully',
+            variant: 'success'
+          });
+          onClose();
+          // Force a router refresh to show the updated data
+          router.refresh();
+        } else {
+          console.error("API Error:", response);
+          toast({
+            title: 'Error',
+            description: response.message || 'Failed to create appointment',
+            variant: 'error'
+          });
+        }
+      } catch (dateError) {
+        console.error("Error with date formatting:", dateError);
         toast({
-          title: 'Success',
-          description: 'Appointment created successfully',
-          variant: 'success'
-        });
-        onClose();
-      } else {
-        console.error("API Error:", result);
-        toast({
-          title: 'Error',
-          description: result.message || 'Failed to create appointment',
-          variant: 'error'
+          title: "Error",
+          description: "Invalid date format: " + (dateError instanceof Error ? dateError.message : "Unknown error"),
+          variant: "error"
         });
       }
     } catch (error) {
@@ -137,7 +202,7 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
 
   return (
     <FormProvider {...methods}>
-      <form onSubmit={methods.handleSubmit(onSubmit)} className="space-y-4">
+      <div className="space-y-4">
         <FormField
           control={methods.control}
           name="title"
@@ -284,14 +349,18 @@ export const CreateAppointmentForm: React.FC<CreateAppointmentFormProps> = ({
           <Button variant="outline" type="button" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button 
+            type="button"
+            onClick={methods.handleSubmit(onSubmit)}
+            disabled={isSubmitting}
+          >
             {isSubmitting && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
             Create Appointment
           </Button>
         </div>
-      </form>
+      </div>
     </FormProvider>
   );
 };

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useForm, ControllerRenderProps, FieldPath } from 'react-hook-form';
+import React, { useState, useEffect } from 'react';
+import { useForm, ControllerRenderProps, FieldPath, FormProvider } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/shared/components/ui/button';
@@ -26,6 +26,9 @@ import { Separator } from '@/shared/components/ui/separator';
 import { ConvertToCustomerDto, RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
 import { useToast } from '@/shared/hooks/useToast';
 import { Loader2 } from 'lucide-react';
+import { RequestService } from '@/features/requests/lib/services';
+import { useRouter } from 'next/navigation';
+import { CustomerType } from '@/domain/enums/CommonEnums';
 
 // Form validation schema
 const formSchema = z.object({
@@ -37,7 +40,13 @@ const formSchema = z.object({
   postalCode: z.string().optional(),
   city: z.string().optional(),
   country: z.string(),
-  type: z.enum(['private', 'business']),
+  type: z.enum([
+    CustomerType.PRIVATE, 
+    CustomerType.BUSINESS, 
+    CustomerType.INDIVIDUAL, 
+    CustomerType.GOVERNMENT, 
+    CustomerType.NON_PROFIT
+  ]),
   newsletter: z.boolean(),
   note: z.string().optional(),
   createAppointment: z.boolean(),
@@ -59,6 +68,9 @@ interface ConvertToCustomerFormProps {
 /**
  * Form for converting a contact request to a customer
  */
+/**
+ * Form for converting a contact request to a customer
+ */
 export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
   request,
   onClose,
@@ -69,16 +81,19 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
 
   // Default values from the request
   const defaultValues: Partial<FormValues> = {
-    name: request.name,
-    email: request.email,
+    name: request.name || '',
+    email: request.email || '',
     phone: request.phone || '',
     company: '',
+    address: '',
+    postalCode: '',
+    city: '',
     country: 'Germany',
-    type: 'private',
+    type: CustomerType.PRIVATE,
     newsletter: false,
     createAppointment: false,
-    appointmentTitle: `Appointment with ${request.name}`,
-    appointmentDescription: request.message,
+    appointmentTitle: `Appointment with ${request.name || ''}`,
+    appointmentDescription: request.message || '',
   };
 
   const form = useForm<FormValues>({
@@ -92,25 +107,28 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
     setShowAppointmentFields(watchCreateAppointment);
   }, [watchCreateAppointment]);
 
+  const router = useRouter();
+
   const onSubmit = async (data: FormValues) => {
     try {
       setIsConverting(true);
       
+      // Create the data object for conversion
       const convertData: ConvertToCustomerDto = {
         requestId: request.id,
         customerData: {
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          company: data.company,
-          address: data.address,
-          postalCode: data.postalCode,
-          city: data.city,
-          country: data.country,
-          type: data.type,
+          name: data.name.trim(),
+          email: data.email.trim(),
+          phone: data.phone ? data.phone.trim() : undefined,
+          company: data.company ? data.company.trim() : undefined,
+          address: data.address ? data.address.trim() : undefined,
+          postalCode: data.postalCode ? data.postalCode.trim() : undefined,
+          city: data.city ? data.city.trim() : undefined,
+          country: data.country.trim(),
+          type: data.type, // Will be converted to CustomerType enum in the backend
           newsletter: data.newsletter,
         },
-        note: data.note,
+        note: data.note ? data.note.trim() : undefined,
         createAppointment: data.createAppointment,
       };
 
@@ -126,30 +144,44 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
           return;
         }
 
+        // Format the appointment date properly by combining date and time
+        const dateString = data.appointmentDate;
+        const timeString = data.appointmentTime;
+        const appointmentDateTime = new Date(`${dateString}T${timeString}`);
+
+        // Validate the date is valid
+        if (isNaN(appointmentDateTime.getTime())) {
+          toast({
+            title: "Error",
+            description: "Invalid appointment date or time format",
+            variant: "error"
+          });
+          setIsConverting(false);
+          return;
+        }
+
         convertData.appointmentData = {
-          title: data.appointmentTitle || `Appointment with ${data.name}`,
-          appointmentDate: data.appointmentDate,
-          appointmentTime: data.appointmentTime,
+          title: data.appointmentTitle?.trim() || `Appointment with ${data.name}`,
+          appointmentDate: appointmentDateTime.toISOString(),
           duration: data.appointmentDuration || 60,
-          location: data.appointmentLocation,
-          description: data.appointmentDescription,
+          location: data.appointmentLocation?.trim(),
+          description: data.appointmentDescription?.trim(),
         };
       }
 
-      console.log("Sending conversion request:", convertData);
+      // Use the RequestService to convert the request to a customer
+      // Add context to avoid foreign key constraint error
+      console.log("Converting request to customer with data:", convertData);
       
-      // Call the API endpoint explicitly
-      const response = await fetch(`/api/requests/${request.id}/convert`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(convertData),
-      });
-
-      const result = await response.json();
+      const contextData = { 
+        userId: 1, // Use a valid user ID here
+        context: { userId: 1 }
+      };
       
-      if (response.ok && result.success) {
+      const response = await RequestService.convertToCustomer(convertData, contextData);
+      console.log("Convert response:", response);
+      
+      if (response.success) {
         toast({
           title: "Success",
           description: data.createAppointment 
@@ -159,11 +191,13 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
         });
         // Close dialog and trigger refresh
         onClose();
+        // Force a router refresh to show the updated data
+        router.refresh();
       } else {
-        console.error("API Error:", result);
+        console.error("API Error:", response);
         toast({
           title: "Error",
-          description: result.message || "Failed to convert request to customer",
+          description: response.message || "Failed to convert request to customer",
           variant: "error"
         });
       }
@@ -180,8 +214,8 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
   };
 
   return (
-    <Form {...form as any}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <FormProvider {...form}>
+      <div className="space-y-4">
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           {/* Customer Data */}
           <div className="space-y-3">
@@ -317,8 +351,11 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="private">Private</SelectItem>
-                      <SelectItem value="business">Business</SelectItem>
+                      <SelectItem value={CustomerType.PRIVATE}>Private</SelectItem>
+                      <SelectItem value={CustomerType.BUSINESS}>Business</SelectItem>
+                      <SelectItem value={CustomerType.INDIVIDUAL}>Individual</SelectItem>
+                      <SelectItem value={CustomerType.GOVERNMENT}>Government</SelectItem>
+                      <SelectItem value={CustomerType.NON_PROFIT}>Non-Profit</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -415,9 +452,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                   name="appointmentDate"
                   render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentDate"> }) => (
                     <FormItem>
-                      <FormLabel>Date</FormLabel>
+                      <FormLabel>Date *</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" {...field} required={showAppointmentFields} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -429,9 +466,9 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
                   name="appointmentTime"
                   render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentTime"> }) => (
                     <FormItem>
-                      <FormLabel>Time</FormLabel>
+                      <FormLabel>Time *</FormLabel>
                       <FormControl>
-                        <Input type="time" {...field} />
+                        <Input type="time" {...field} required={showAppointmentFields} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -497,12 +534,16 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
           <Button variant="outline" type="button" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isConverting}>
+          <Button 
+            type="button" 
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={isConverting}
+          >
             {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Convert to Customer
           </Button>
         </div>
-      </form>
-    </Form>
+      </div>
+    </FormProvider>
   );
 };

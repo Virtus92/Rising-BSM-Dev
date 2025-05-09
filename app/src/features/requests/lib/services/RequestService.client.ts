@@ -2,18 +2,15 @@
  * Client service for request-related API calls
  */
 import { ApiClient } from '@/core/api/ApiClient';
-import { 
-  RequestResponseDto, 
-  RequestDetailResponseDto, 
-  CreateRequestDto, 
-  UpdateRequestDto,
-  RequestFilterParamsDto,
-  RequestNoteDto,
-  RequestStatusUpdateDto,
-  ConvertToCustomerDto
-} from '@/domain/dtos/RequestDtos';
-import { RequestStatus } from '@/domain/enums/CommonEnums';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
+import { 
+  RequestResponseDto,
+  RequestDetailResponseDto,
+  RequestFilterParamsDto,
+  ConvertToCustomerDto,
+  RequestNoteDto,
+  RequestStatusUpdateDto
+} from '@/domain/dtos/RequestDtos';
 
 // Define interface for API responses
 interface ApiResponse<T = any> {
@@ -22,7 +19,6 @@ interface ApiResponse<T = any> {
   message?: string;
   errors?: string[];
   statusCode?: number;
-  errorType?: string;
 }
 
 // Define interface for paginated responses
@@ -51,20 +47,20 @@ export class RequestService {
       const queryParams = new URLSearchParams();
       if (filters) {
         Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
+          if (value !== undefined && value !== null) {
             queryParams.append(key, String(value));
           }
         });
       }
       
       const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      return await ApiClient.get(`${this.basePath}${query}`);
+      return ApiClient.get(`${this.basePath}${query}`);
     } catch (error) {
-      console.error('Error in RequestService.getRequests:', error as Error);
+      console.error('Error in RequestService.getRequests:', error);
       return {
         success: false,
-        data: { 
-          data: [], 
+        data: {
+          data: [],
           pagination: {
             page: filters?.page || 1,
             limit: filters?.limit || 10,
@@ -76,100 +72,38 @@ export class RequestService {
       };
     }
   }
-  
+
   /**
-   * Alias method for getRequests to maintain consistency with server implementation
+   * Get a request by ID
    */
-  static async getAll(filters?: RequestFilterParamsDto): Promise<ApiResponse<PaginatedResponse<RequestResponseDto>>> {
-    return this.getRequests(filters);
-  }
-  
-  /**
-   * Alias method for getRequests to maintain consistency with server implementation
-   */
-  static async findAll(filters?: any): Promise<ApiResponse<PaginationResult<RequestResponseDto>>> {
+  static async getById(id: number): Promise<ApiResponse<RequestDetailResponseDto>> {
     try {
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            if (key === 'filters' && typeof value === 'object') {
-              // Handle nested filters object
-              Object.entries(value).forEach(([filterKey, filterValue]) => {
-                if (filterValue !== undefined && filterValue !== null && filterValue !== '') {
-                  queryParams.append(filterKey, String(filterValue));
-                }
-              });
-            } else {
-              queryParams.append(key, String(value));
-            }
-          }
-        });
-      }
-      
-      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      return await ApiClient.get(`${this.basePath}${query}`);
+      return ApiClient.get(`${this.basePath}/${id}`);
     } catch (error) {
-      console.error('Error in RequestService.findAll:', error as Error);
+      console.error('Error in RequestService.getById:', error);
       return {
         success: false,
-        data: { 
-          data: [], 
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: 0,
-            totalPages: 0
-          }
-        },
-        message: error instanceof Error ? error.message : 'Error fetching requests'
+        data: null,
+        message: error instanceof Error ? error.message : 'Error fetching request'
       };
     }
   }
 
   /**
-   * Get a specific request by ID
-   */
-  static async getRequestById(id: number): Promise<ApiResponse<RequestDetailResponseDto>> {
-    try {
-      return await ApiClient.get(`${this.basePath}/${id}`);
-    } catch (error) {
-      console.error('Error in RequestService.getRequestById:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : `Error fetching request with ID ${id}`
-      };
-    }
-  }
-  
-  /**
-   * Alias method for getRequestById to maintain consistency with server implementation
-   */
-  static async getById(id: number): Promise<ApiResponse<RequestDetailResponseDto>> {
-    return this.getRequestById(id);
-  }
-  
-  /**
-   * Find a request by ID - implementation of the interface method
+   * Alias for getById to maintain compatibility
    */
   static async findRequestById(id: number): Promise<ApiResponse<RequestDetailResponseDto>> {
-    return this.getRequestById(id);
+    return this.getById(id);
   }
 
   /**
    * Create a new request
    */
-  static async createRequest(data: CreateRequestDto): Promise<ApiResponse<RequestResponseDto>> {
+  static async create(data: any): Promise<ApiResponse<RequestResponseDto>> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Creating request with data:', data);
-      }
-      
-      return await ApiClient.post(this.basePath, data);
+      return ApiClient.post(this.basePath, data);
     } catch (error) {
-      console.error('Error in RequestService.createRequest:', error as Error);
+      console.error('Error in RequestService.create:', error);
       return {
         success: false,
         data: null,
@@ -177,359 +111,169 @@ export class RequestService {
       };
     }
   }
-  
-  /**
-   * Alias method for createRequest to maintain consistency with server implementation
-   */
-  static async create(data: CreateRequestDto): Promise<ApiResponse<RequestResponseDto>> {
-    return this.createRequest(data);
-  }
 
   /**
-   * Update an existing request
+   * Update a request
    */
-  static async updateRequest(id: number, data: UpdateRequestDto): Promise<ApiResponse<RequestResponseDto>> {
+  static async update(id: number, data: any): Promise<ApiResponse<RequestResponseDto>> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Updating request with data:', data);
-      }
-      
-      return await ApiClient.put(`${this.basePath}/${id}`, data);
+      return ApiClient.put(`${this.basePath}/${id}`, data);
     } catch (error) {
-      console.error('Error in RequestService.updateRequest:', error as Error);
+      console.error('Error in RequestService.update:', error);
       return {
         success: false,
         data: null,
-        message: error instanceof Error ? error.message : `Error updating request with ID ${id}`
+        message: error instanceof Error ? error.message : 'Error updating request'
       };
     }
   }
   
   /**
-   * Alias method for updateRequest to maintain consistency with server implementation
+   * Alias for update to maintain compatibility
    */
-  static async update(id: number, data: UpdateRequestDto): Promise<ApiResponse<RequestResponseDto>> {
-    return this.updateRequest(id, data);
+  static async updateRequest(id: number, data: any): Promise<ApiResponse<RequestResponseDto>> {
+    return this.update(id, data);
+  }
+
+  /**
+   * Update a request's status
+   */
+  static async updateStatus(id: number, statusData: RequestStatusUpdateDto): Promise<ApiResponse<RequestResponseDto>> {
+    try {
+      return ApiClient.put(`${this.basePath}/${id}/status`, statusData);
+    } catch (error) {
+      console.error('Error in RequestService.updateStatus:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error updating request status'
+      };
+    }
   }
 
   /**
    * Delete a request
    */
-  static async deleteRequest(id: number): Promise<ApiResponse<void>> {
+  static async delete(id: number): Promise<ApiResponse<void>> {
     try {
-      return await ApiClient.delete(`${this.basePath}/${id}`);
+      return ApiClient.delete(`${this.basePath}/${id}`);
     } catch (error) {
-      console.error('Error in RequestService.deleteRequest:', error as Error);
+      console.error('Error in RequestService.delete:', error);
       return {
         success: false,
         data: null,
-        message: error instanceof Error ? error.message : `Error deleting request with ID ${id}`
+        message: error instanceof Error ? error.message : 'Error deleting request'
       };
     }
   }
   
   /**
-   * Alias method for deleteRequest to maintain consistency with server implementation
+   * Alias for delete to maintain compatibility
    */
-  static async delete(id: number): Promise<ApiResponse<void>> {
-    return this.deleteRequest(id);
+  static async deleteRequest(id: number): Promise<ApiResponse<void>> {
+    return this.delete(id);
   }
 
-  /**
-   * Get request count
-   */
-  static async count(filters?: Record<string, any>): Promise<ApiResponse<{ count: number }>> {
-    try {
-      // Log when this method is called
-      console.log('RequestService.client.ts count method called with filters:', filters);
-      
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            queryParams.append(key, String(value));
-          }
-        });
-      }
-      
-      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      const url = `/api${this.basePath}/count${query}`;
-      
-      // Log the URL being requested
-      console.log('Making API request to:', url);
-      
-      const response = await ApiClient.get(url);
-      
-      // Log response
-      console.log('Count API response:', response);
-      
-      // Ensure consistent response format
-      if (response.success) {
-        // If response.data is directly a number, wrap it in a count object
-        if (typeof response.data === 'number') {
-          return {
-            ...response,
-            data: { count: response.data }
-          };
-        }
-        
-        // If response.data is an object with a count property, use it
-        if (response.data && typeof response.data === 'object' && 'count' in response.data) {
-          return response;
-        }
-        
-        // If response.data is an object with a total property, normalize it
-        if (response.data && typeof response.data === 'object' && 'total' in response.data) {
-          return {
-            ...response,
-            data: { count: response.data.total as number }
-          };
-        }
-        
-        // If we can't determine the count format, assume 0
-        console.warn('Unknown count response format:', response.data);
-        return {
-          ...response,
-          data: { count: 0 }
-        };
-      }
-      
-      // Return the original response for error cases
-      return response as ApiResponse<{ count: number }>;
-    } catch (error) {
-      console.error('Error in RequestService.count:', error as Error);
-      return {
-        success: false,
-        data: { count: 0 },
-        message: error instanceof Error ? error.message : 'Error counting requests'
-      };
-    }
-  }
-  
-  /**
-   * Get monthly request statistics
-   */
-  static async getMonthlyStats(months?: number): Promise<ApiResponse<any>> {
-    try {
-      const query = months ? `?months=${months}` : '';
-      return await ApiClient.get(`${this.basePath}/stats/monthly${query}`);
-    } catch (error) {
-      console.error('Error in RequestService.getMonthlyStats:', error as Error);
-      return {
-        success: false,
-        data: [],
-        message: error instanceof Error ? error.message : 'Error fetching monthly request statistics'
-      };
-    }
-  }
-  
-  /**
-   * Get weekly request statistics
-   */
-  static async getWeeklyStats(): Promise<ApiResponse<any>> {
-    try {
-      return await ApiClient.get(`${this.basePath}/stats/weekly`);
-    } catch (error) {
-      console.error('Error in RequestService.getWeeklyStats:', error as Error);
-      return {
-        success: false,
-        data: [],
-        message: error instanceof Error ? error.message : 'Error fetching weekly request statistics'
-      };
-    }
-  }
-  
   /**
    * Add a note to a request
    */
   static async addNote(id: number, note: string): Promise<ApiResponse<RequestNoteDto>> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Adding note to request ${id}:`, note);
-      }
-      
-      return await ApiClient.post(`${this.basePath}/${id}/notes`, { text: note, note });
+      return ApiClient.post(`${this.basePath}/${id}/notes`, { text: note });
     } catch (error) {
-      console.error('Error in RequestService.addNote:', error as Error);
+      console.error('Error in RequestService.addNote:', error);
       return {
         success: false,
         data: null,
-        message: error instanceof Error ? error.message : 'Error adding request note'
+        message: error instanceof Error ? error.message : 'Error adding note'
+      };
+    }
+  }
+  
+  /**
+   * Get all requests with filtering (alias for getRequests)
+   */
+  static async findAll(filters?: RequestFilterParamsDto): Promise<ApiResponse<PaginationResult<RequestResponseDto>>> {
+    return this.getRequests(filters);
+  }
+
+  /**
+   * Create a new request (alias for create)
+   */
+  static async createRequest(data: any): Promise<ApiResponse<RequestResponseDto>> {
+    return this.create(data);
+  }
+  
+  /**
+   * Update a request's status with dedicated endpoint
+   */
+  static async updateRequestStatus(id: number, statusData: RequestStatusUpdateDto): Promise<ApiResponse<RequestResponseDto>> {
+    return this.updateStatus(id, statusData);
+  }
+
+  /**
+   * Convert a request to a customer
+   */
+  static async convertToCustomer(data: ConvertToCustomerDto, context?: any): Promise<ApiResponse<any>> {
+    try {
+      console.log("Converting request to customer:", data);
+      return ApiClient.post(`${this.basePath}/${data.requestId}/convert`, data);
+    } catch (error) {
+      console.error('Error in RequestService.convertToCustomer:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error converting request to customer'
       };
     }
   }
 
   /**
-   * Get notes for a request
+   * Link a request to an existing customer
    */
-  static async getNotes(id: number, forceFresh = false): Promise<ApiResponse<RequestNoteDto[]>> {
+  static async linkToCustomer(requestId: number, customerId: number, note?: string): Promise<ApiResponse<any>> {
     try {
-      // Add cache busting parameter if needed
-      const cacheBuster = forceFresh ? `?_t=${Date.now()}` : '';
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Fetching notes for request ${id}${forceFresh ? ' with cache busting' : ''}`);
-      }
-      
-      return await ApiClient.get(`${this.basePath}/${id}/notes${cacheBuster}`);
+      console.log("Linking request to customer:", { requestId, customerId, note });
+      return ApiClient.post(`${this.basePath}/${requestId}/link-customer`, { customerId, note });
     } catch (error) {
-      console.error('Error in RequestService.getNotes:', error as Error);
+      console.error('Error in RequestService.linkToCustomer:', error);
       return {
         success: false,
-        data: [],
-        message: error instanceof Error ? error.message : 'Error fetching request notes'
+        data: null,
+        message: error instanceof Error ? error.message : 'Error linking request to customer'
       };
     }
   }
-  
-  /**
-   * Update request status
-   * @param id Request ID
-   * @param status Status string that will be converted to RequestStatus enum
-   * @param note Optional note about the status change
-   */
-  static async updateStatus(id: number, status: string, note?: string): Promise<ApiResponse<RequestResponseDto>> {
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Updating request ${id} status to ${status}`);
-      }
 
-      // Validate that the status is a valid RequestStatus enum value
-      if (!Object.values(RequestStatus).includes(status as RequestStatus)) {
-        throw new Error(`Invalid status value: ${status}`);
-      }
-      
-      // Use the dedicated status endpoint
-      return await ApiClient.patch(`${this.basePath}/${id}/status`, { status, note });
-    } catch (error) {
-      console.error('Error in RequestService.updateStatus:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : `Error updating request status to ${status}`
-      };
-    }
-  }
-  
-  /**
-   * Update request status - dedicated method
-   */
-  static async updateRequestStatus(
-    id: number, 
-    data: RequestStatusUpdateDto
-  ): Promise<ApiResponse<RequestResponseDto>> {
-    try {
-      return await ApiClient.patch(`${this.basePath}/${id}/status`, data);
-    } catch (error) {
-      console.error('Error in RequestService.updateRequestStatus:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : `Error updating request status`
-      };
-    }
-  }
-  
-  /**
-   * Assign request to a user
-   * @param id Request ID
-   * @param userId User ID
-   * @param note Optional note about the assignment
-   */
-  static async assignTo(id: number, userId: number, note?: string): Promise<ApiResponse<RequestResponseDto>> {
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Assigning request ${id} to user ${userId}`);
-      }
-      
-      return await ApiClient.post(`${this.basePath}/${id}/assign`, { userId, note });
-    } catch (error) {
-      console.error('Error in RequestService.assignTo:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : `Error assigning request to user ${userId}`
-      };
-    }
-  }
-  
-  /**
-   * Link request to a customer
-   * @param id Request ID
-   * @param customerId Customer ID
-   * @param note Optional note about the linking
-   */
-  static async linkToCustomer(id: number, customerId: number, note?: string): Promise<ApiResponse<RequestResponseDto>> {
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Linking request ${id} to customer ${customerId}`);
-      }
-      
-      return await ApiClient.post(`${this.basePath}/${id}/link-customer`, { customerId, note });
-    } catch (error) {
-      console.error('Error in RequestService.linkToCustomer:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : `Error linking request to customer ${customerId}`
-      };
-    }
-  }
-  
   /**
    * Create an appointment from a request
-   * @param id Request ID
-   * @param appointmentData Appointment data
    */
-  static async createAppointment(
-    id: number, 
-    appointmentData: { 
-      title: string; 
-      appointmentDate: string; 
-      duration?: number; 
-      note?: string; 
-      location?: string; 
-      description?: string;
-    }
-  ): Promise<ApiResponse<boolean>> {
+  static async createAppointment(requestId: number, appointmentData: any): Promise<ApiResponse<any>> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Creating appointment from request ${id}:`, appointmentData);
-      }
-      
-      return await ApiClient.post(`${this.basePath}/${id}/appointment`, appointmentData);
+      console.log("Creating appointment for request:", { requestId, appointmentData });
+      return ApiClient.post(`${this.basePath}/${requestId}/appointment`, appointmentData);
     } catch (error) {
-      console.error('Error in RequestService.createAppointment:', error as Error);
+      console.error('Error in RequestService.createAppointment:', error);
       return {
         success: false,
-        data: false,
+        data: null,
         message: error instanceof Error ? error.message : 'Error creating appointment'
       };
     }
   }
-  
+
   /**
-   * Convert request to customer
-   * @param id Request ID
-   * @param data Customer conversion data
+   * Assign a request to a user
    */
-  static async convertToCustomer(
-    id: number, 
-    data: ConvertToCustomerDto
-  ): Promise<ApiResponse<{ success: boolean; customerId?: number; customer?: any; request?: any }>> {
+  static async assignTo(requestId: number, userId: number, note?: string): Promise<ApiResponse<RequestResponseDto>> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Converting request ${id} to customer:`, data);
-      }
-      
-      return await ApiClient.post(`${this.basePath}/${id}/convert`, data);
+      return ApiClient.post(`${this.basePath}/${requestId}/assign`, { userId, note });
     } catch (error) {
-      console.error('Error in RequestService.convertToCustomer:', error as Error);
+      console.error('Error in RequestService.assignTo:', error);
       return {
         success: false,
-        data: { success: false },
-        message: error instanceof Error ? error.message : 'Error converting request to customer'
+        data: null,
+        message: error instanceof Error ? error.message : 'Error assigning request'
       };
     }
   }
