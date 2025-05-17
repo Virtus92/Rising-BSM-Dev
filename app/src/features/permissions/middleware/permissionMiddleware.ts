@@ -1,0 +1,131 @@
+/**
+ * Clean Permission Middleware
+ * 
+ * Design principles:
+ * 1. Direct permission checks - no cache
+ * 2. Clear error responses
+ * 3. Integration with auth middleware
+ * 4. Type-safe permission checks
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { getLogger } from '@/core/logging';
+import { permissionService } from '../lib/services/PermissionService';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { getUserFromRequest } from '@/features/auth/api/middleware/authMiddleware';
+import AuthService from '@/features/auth/core/AuthService';
+
+const logger = getLogger();
+
+/**
+ * Permission middleware options
+ */
+export interface PermissionOptions {
+  permissions: SystemPermission[];
+  requireAll?: boolean; // If true, user must have ALL permissions. If false, ANY permission.
+}
+
+/**
+ * Permission middleware
+ */
+export function withPermission(
+  handler: (request: NextRequest, context?: any) => Promise<NextResponse>,
+  options: PermissionOptions
+) {
+  return async (request: NextRequest, context?: any) => {
+    try {
+      // Get authenticated user - try both methods for compatibility
+      let user = await getUserFromRequest(request);
+      
+      // If not found via request, try AuthService
+      if (!user) {
+        const isAuthenticated = await AuthService.isAuthenticated();
+        if (isAuthenticated) {
+          user = AuthService.getUser();
+        }
+      }
+      
+      if (!user) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Authentication required',
+          },
+          { status: 401 }
+        );
+      }
+      
+      // Check permissions
+      const hasPermission = options.requireAll
+        ? await permissionService.hasAllPermissions(user.id, options.permissions)
+        : await permissionService.hasAnyPermission(user.id, options.permissions);
+      
+      if (!hasPermission) {
+        const permissionList = options.permissions.join(', ');
+        const requirement = options.requireAll ? 'all' : 'any';
+        
+        logger.warn('Permission denied', {
+          userId: user.id,
+          permissions: options.permissions,
+          requireAll: options.requireAll,
+        });
+        
+        return NextResponse.json(
+          {
+            success: false,
+            message: `You need ${requirement} of the following permissions: ${permissionList}`,
+          },
+          { status: 403 }
+        );
+      }
+      
+      // Permission granted, continue to handler
+      return handler(request, context);
+    } catch (error) {
+      logger.error('Permission middleware error:', error as Error);
+      
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Permission check failed',
+        },
+        { status: 500 }
+      );
+    }
+  };
+}
+
+/**
+ * Create permission guard for specific permission
+ */
+export function requirePermission(permission: SystemPermission) {
+  return (handler: (request: NextRequest, context?: any) => Promise<NextResponse>) => {
+    return withPermission(handler, {
+      permissions: [permission],
+      requireAll: true,
+    });
+  };
+}
+
+/**
+ * Create permission guard for any of multiple permissions
+ */
+export function requireAnyPermission(...permissions: SystemPermission[]) {
+  return (handler: (request: NextRequest, context?: any) => Promise<NextResponse>) => {
+    return withPermission(handler, {
+      permissions,
+      requireAll: false,
+    });
+  };
+}
+
+/**
+ * Create permission guard for all of multiple permissions
+ */
+export function requireAllPermissions(...permissions: SystemPermission[]) {
+  return (handler: (request: NextRequest, context?: any) => Promise<NextResponse>) => {
+    return withPermission(handler, {
+      permissions,
+      requireAll: true,
+    });
+  };
+}

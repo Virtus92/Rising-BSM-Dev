@@ -1,8 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { authMiddleware } from '@/features/auth/api/middleware';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { auth } from '@/features/auth/api/middleware/authMiddleware';
 import { formatResponse } from '@/core/errors';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { IRequestService } from '@/domain/services/IRequestService';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { ConvertRequestToCustomerRequest } from '../models/request-request-models';
@@ -10,39 +10,26 @@ import { ConvertRequestToCustomerRequest } from '../models/request-request-model
 /**
  * POST handler for converting a request to a customer
  * @param request - Next.js request object
- * @param params - Route parameters with request ID
  * @returns Response with conversion result
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    // Extract ID from route parameters - properly access params in App Router
-    const id = Number(params.id);
-    if (isNaN(id) || id <= 0) {
-      return formatResponse.error('Invalid request ID', 400);
-    }
-
-    // Debug the request to see what we're receiving
-    console.log(`Converting request ID ${id} to customer`);
-
-    // Authenticate user - check if we have a valid session
-    const session = await authMiddleware(request);
-    if (!session) {
-      return formatResponse.error('Authentication required', 401);
-    }
-    // Check if user is authenticated
-    if (!session.user) {
-      return formatResponse.error('User not authenticated', 401);
-    }
-    
-    // Access user info from session
-    const userId = session.user.id;
-    console.log(`User ID from session: ${userId}`);
-
-    // Verify permissions
-    const permissionCheck = await permissionMiddleware.checkPermission(request, [SystemPermission.CUSTOMERS_CREATE]);
-    if (!permissionCheck.success) {
-      return formatResponse.error(permissionCheck.message || 'Permission denied', permissionCheck.status || 403);
-    }
+export const POST = auth(
+  async (request: NextRequest, user: any) => {
+    try {
+      // Extract ID from URL
+      const urlParts = request.url.split('/');
+      const idStr = urlParts[urlParts.length - 2]; // Get the ID from the URL path
+      const id = Number(idStr);
+      
+      if (isNaN(id) || id <= 0) {
+        return formatResponse.error('Invalid request ID', 400);
+      }
+      
+      // Debug the request to see what we're receiving
+      console.log(`Converting request ID ${id} to customer`);
+      
+      // Access user info from auth middleware
+      const userId = user.id;
+      console.log(`User ID from session: ${userId}`);
 
     // Parse request body
     const data: ConvertRequestToCustomerRequest = await request.json();
@@ -93,4 +80,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   } catch (error) {
     return formatResponse.error('An error occurred while converting the request to a customer', 500);
   }
-}
+  },
+  {
+    requireAuth: true,
+    requiredPermission: [SystemPermission.CUSTOMERS_CREATE]
+  }
+);

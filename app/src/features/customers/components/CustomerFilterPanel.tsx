@@ -68,7 +68,8 @@ export const CustomerFilterPanel = ({
     // Clean up empty values
     const cleanedFilters = Object.entries(filters).reduce((acc, [key, value]) => {
       if (value !== '' && value !== undefined) {
-        (acc as any)[key as keyof CustomerFilterParamsDto] = value;
+        // Explicitly type the accumulator object and apply type-safe assignment
+        (acc as Record<string, string | number | boolean | string[] | Date | undefined>)[key] = value;
       }
       return acc;
     }, {} as Partial<CustomerFilterParamsDto>);

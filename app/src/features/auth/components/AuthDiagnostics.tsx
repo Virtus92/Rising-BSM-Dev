@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
-import { usePermissions } from '@/features/users/hooks/usePermissions';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { ApiClient } from '@/core/api/ApiClient';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { UserRole } from '@/domain/entities/User';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { getItem } from '@/shared/utils/storage/cookieStorage';
 
@@ -22,7 +23,9 @@ import { getItem } from '@/shared/utils/storage/cookieStorage';
  */
 export const AuthDiagnostics: React.FC = () => {
   const { user, isAuthenticated, isLoading: authLoading, logout, refreshAuth } = useAuth();
-  const { permissions, userRole, isLoading: permissionLoading, error: permissionError, refetch: refetchPermissions } = usePermissions();
+  const { permissions, isLoading: permissionLoading, error: permissionError, loadPermissions } = usePermissions();
+  // Retrieve role directly from user object for compatibility
+  const userRole = user?.role;
   
   const [diagnosticData, setDiagnosticData] = useState<any>(null);
   const [isLoadingDiagnostics, setIsLoadingDiagnostics] = useState(false);
@@ -136,7 +139,7 @@ export const AuthDiagnostics: React.FC = () => {
           Refresh Auth
         </button>
         <button
-          onClick={() => refetchPermissions(true)}
+          onClick={() => loadPermissions()}
           className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
         >
           Refresh Permissions
@@ -209,8 +212,8 @@ export const AuthDiagnostics: React.FC = () => {
         ) : permissionError ? (
           <div className="bg-red-100 border border-red-300 text-red-700 p-3 rounded">
             <p className="font-semibold">Error loading permissions:</p>
-            <p>{permissionError.message}</p>
-            <pre className="mt-2 text-xs overflow-auto max-h-40">{JSON.stringify(permissionError, null, 2)}</pre>
+            <p>{permissionError}</p>
+            <pre className="mt-2 text-xs overflow-auto max-h-40">{JSON.stringify({ error: permissionError }, null, 2)}</pre>
           </div>
         ) : (
           <div className="space-y-2">
@@ -222,27 +225,27 @@ export const AuthDiagnostics: React.FC = () => {
               {permissions.length > 0 ? (
                 <ul className="list-disc list-inside">
                   {permissions.map((perm, index) => (
-                    <li key={index} className="text-sm">{perm}</li>
+                    <li key={index} className="text-sm">{perm.code}</li>
                   ))}
                 </ul>
               ) : (
                 <p className="italic text-gray-500">No permissions found</p>
               )}
             </div>
-            
+
             <h4 className="font-semibold mt-4 mb-2">Critical Permission Check</h4>
             <div className="grid grid-cols-2 gap-2 max-w-md">
               <div className="font-medium">Admin Access:</div>
-              <div className={permissions.includes(SystemPermission.SYSTEM_ADMIN) ? "text-green-600" : "text-red-600"}>
-                {permissions.includes(SystemPermission.SYSTEM_ADMIN) ? "Yes" : "No"}
+              <div className={permissions.some(p => p.code === SystemPermission.SYSTEM_ADMIN) ? "text-green-600" : "text-red-600"}>
+                {permissions.some(p => p.code === SystemPermission.SYSTEM_ADMIN) ? "Yes" : "No"}
               </div>
               <div className="font-medium">User Management:</div>
-              <div className={permissions.includes(SystemPermission.USERS_VIEW) ? "text-green-600" : "text-red-600"}>
-                {permissions.includes(SystemPermission.USERS_VIEW) ? "Yes" : "No"}
+              <div className={permissions.some(p => p.code === SystemPermission.USERS_VIEW) ? "text-green-600" : "text-red-600"}>
+                {permissions.some(p => p.code === SystemPermission.USERS_VIEW) ? "Yes" : "No"}
               </div>
               <div className="font-medium">Profile Access:</div>
-              <div className={permissions.includes('user.profile.view') || permissions.includes('profile.view') ? "text-green-600" : "text-red-600"}>
-                {permissions.includes('user.profile.view') || permissions.includes('profile.view') ? "Yes" : "No"}
+              <div className={permissions.some(p => p.code === SystemPermission.PROFILE_VIEW) ? "text-green-600" : "text-red-600"}>
+                {permissions.some(p => p.code === SystemPermission.PROFILE_VIEW) ? "Yes" : "No"}
               </div>
             </div>
           </div>

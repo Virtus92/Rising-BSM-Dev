@@ -13,6 +13,7 @@ import { getLogger } from '@/core/logging';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
+import { AuthErrorType } from '@/types/types/auth';
 
 const logger = getLogger();
 
@@ -28,16 +29,32 @@ export async function GET(req: NextRequest) {
     // Get ID from params (provided by Next.js route handler)
     const id = req.nextUrl.pathname.split('/').pop() || '';
     
-    // Check permission using consistent pattern
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.USERS_VIEW
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.USERS_VIEW}`);
-      return formatError(
-        `You don't have permission to view user details`, 
-        403
+    // No need to check auth.userId explicitly - permissionMiddleware will handle this properly
+    // and throw appropriate error that will be caught and formatted consistently
+
+    // Check permission using improved error-throwing pattern
+    try {
+      const hasViewPermission = await permissionMiddleware.hasPermission(
+        req.auth?.userId,  // Let permissionMiddleware handle undefined/null checks
+        SystemPermission.USERS_VIEW
       );
+      
+      if (!hasViewPermission) {
+        logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.USERS_VIEW}`);
+        return formatError(
+          `You don't have permission to view user details`, 
+          403
+        );
+      }
+    } catch (permError) {
+      // If this is an auth error, return 401
+      if (permError instanceof Error && 
+          'type' in permError && 
+          permError.type === AuthErrorType.AUTH_REQUIRED) {
+        return formatError('Authentication required', 401);
+      }
+      // Otherwise re-throw for the outer catch block
+      throw permError;
     }
     
     if (!id) {
@@ -83,16 +100,29 @@ export async function PUT(req: NextRequest) {
     // Get ID from params (provided by Next.js route handler)
     const id = req.nextUrl.pathname.split('/').pop() || '';
     
-    // Check permission using consistent pattern
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.USERS_EDIT
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.USERS_EDIT}`);
-      return formatError(
-        `You don't have permission to edit user information`, 
-        403
+    // Check permission using improved error-throwing pattern
+    try {
+      const hasEditPermission = await permissionMiddleware.hasPermission(
+        req.auth?.userId, 
+        SystemPermission.USERS_EDIT
       );
+      
+      if (!hasEditPermission) {
+        logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.USERS_EDIT}`);
+        return formatError(
+          `You don't have permission to edit user information`, 
+          403
+        );
+      }
+    } catch (permError) {
+      // If this is an auth error, return 401
+      if (permError instanceof Error && 
+          'type' in permError && 
+          permError.type === AuthErrorType.AUTH_REQUIRED) {
+        return formatError('Authentication required', 401);
+      }
+      // Otherwise re-throw for the outer catch block
+      throw permError;
     }
     
     if (!id) {
@@ -138,16 +168,29 @@ export async function DELETE(req: NextRequest) {
     // Get ID from params (provided by Next.js route handler)
     const id = req.nextUrl.pathname.split('/').pop() || '';
     
-    // Check permission using consistent pattern
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.USERS_DELETE
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.USERS_DELETE}`);
-      return formatError(
-        `You don't have permission to delete users`, 
-        403
+    // Check permission using improved error-throwing pattern
+    try {
+      const hasDeletePermission = await permissionMiddleware.hasPermission(
+        req.auth?.userId, 
+        SystemPermission.USERS_DELETE
       );
+      
+      if (!hasDeletePermission) {
+        logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.USERS_DELETE}`);
+        return formatError(
+          `You don't have permission to delete users`, 
+          403
+        );
+      }
+    } catch (permError) {
+      // If this is an auth error, return 401
+      if (permError instanceof Error && 
+          'type' in permError && 
+          permError.type === AuthErrorType.AUTH_REQUIRED) {
+        return formatError('Authentication required', 401);
+      }
+      // Otherwise re-throw for the outer catch block
+      throw permError;
     }
     
     if (!id) {

@@ -195,6 +195,35 @@ export const UpcomingAppointments = () => {
     );
   }
 
+  // Check for authentication errors first
+  if (error && (error.toLowerCase().includes('authentication') || error.toLowerCase().includes('login'))) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Calendar className="mr-2 h-5 w-5 text-blue-500" />
+            Upcoming Appointments
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4">
+            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-full flex items-center justify-center mb-4 mx-auto w-16 h-16">
+              <AlertCircle className="h-8 w-8 text-red-500" />
+            </div>
+            <h4 className="text-xl font-medium text-red-800 dark:text-red-300 mb-2">Authentication Required</h4>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">Your session has expired or you need to log in again.</p>
+            <Button 
+              onClick={() => window.location.href = '/auth/login?returnUrl=/dashboard'}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Log In Again
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   // Error state with detailed information and retry functionality
   if (error) {
     // Check if the error message indicates a permissions issue

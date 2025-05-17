@@ -3,20 +3,22 @@ import { routeHandler } from '@/core/api/route-handler';
 import { apiAuth } from '@/features/auth/api/middleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { formatResponse } from '@/core/errors';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { IRequestService } from '@/domain/services/IRequestService';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 
 /**
  * POST handler for creating an appointment from a request
  * @param request - Next.js request object
- * @param params - Route parameters with request ID
  * @returns Response with created appointment
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export const POST = apiAuth(async (request: NextRequest, user: any) => {
   try {
-    // Extract ID from route parameters - properly access params in App Router
-    const id = Number(params.id);
+    // Extract ID from URL
+    const segments = request.nextUrl.pathname.split('/');
+    const idIdx = segments.findIndex(s => s === 'appointment') - 1;
+    const id = Number(idIdx >= 0 ? segments[idIdx] : 0);
     console.log(`Request URL: ${request.nextUrl.pathname}`);
     console.log(`Request ID from params: ${id}`);
     
@@ -24,12 +26,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return formatResponse.error('Invalid request ID', 400);
     }
 
-    // Authenticate user
-    console.log('Authenticating user');
-    const auth = await apiAuth(request);
-    if (!auth) {
-      return formatResponse.error('Authentication required', 401);
-    }
+    // User is already authenticated by apiAuth middleware
     console.log('Authentication successful');
 
     // Verify permissions
@@ -54,25 +51,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const requestService = serviceFactory.createRequestService();
     console.log('Request service initialized');
 
-    // Import proper auth middleware and get user details from JWT token
-    const { extractAuthToken } = await import('@/features/auth/api/middleware/authMiddleware');
-    const token = await extractAuthToken(request);
-    let userId = 0;
-    
-    if (token) {
-      try {
-        const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-me';
-        const jwt = await import('jsonwebtoken');
-        const decoded = jwt.verify(token, jwtSecret) as any;
-        userId = Number(decoded.sub) || 0;
-        console.log(`User ID from token: ${userId}`);
-      } catch (e) {
-        console.error('Error decoding token:', e);
-        // Continue with defaults if token decoding fails
-      }
-    } else {
-      console.log('No token found, using default user ID');
-    }
+    // Get user ID from the authenticated user object
+    const userId = user?.id || 0;
+    console.log(`User ID: ${userId}`);
     
     try {
       // Parse the appointment date
@@ -146,5 +127,4 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     console.error('Error in create-appointment route:', error);
     return formatResponse.error('An error occurred while creating the appointment', 500);
   }
-}
-
+});

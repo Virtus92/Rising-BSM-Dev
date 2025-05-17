@@ -4,7 +4,8 @@
 import { 
   NotificationResponseDto, 
   NotificationFilterParamsDto, 
-  CreateNotificationDto
+  CreateNotificationDto,
+  UpdateNotificationDto
 } from '@/domain/dtos/NotificationDtos';
 import ApiClient, { ApiResponse, ApiRequestError } from '@/core/api/ApiClient';
 import { validateId } from '@/shared/utils/validation-utils';
@@ -24,16 +25,15 @@ export class NotificationClient {
    * @returns API response
    */
   static async getNotifications(
-    params: NotificationFilterParamsDto = {}, 
+    params: Record<string, any> = {}, 
     options: { signal?: AbortSignal } = {}
-  ): Promise<ApiResponse<NotificationResponseDto[]>> {
+  ): Promise<ApiResponse<any>> {
     try {
       // Pass both params and any options (like AbortController signal) to the API Client
       return await ApiClient.get(NOTIFICATIONS_API_URL, { 
         params, 
         headers: options.signal ? { 'X-Request-ID': `notifications-${Date.now()}` } : undefined,
-        requestId: options.signal ? `notifications-${Date.now()}` : undefined
-        // Note: The signal property isn't supported by ApiClient.get, using requestId instead
+        signal: options.signal
       });
     } catch (error: unknown) {
       // Don't throw for aborted requests
@@ -42,6 +42,7 @@ export class NotificationClient {
         return {
           success: false,
           data: [],
+          error: error instanceof Error ? error.message : 'Request aborted',
           message: 'Request aborted',
           statusCode: 499 // Nginx's status code for client closed request
         };
@@ -174,6 +175,62 @@ export class NotificationClient {
     } catch (error: unknown) {
       throw new ApiRequestError(
         error instanceof Error ? error.message : 'Failed to get unread notification count',
+        500
+      );
+    }
+  }
+
+  /**
+   * Gets unread notification count for a specific user
+   * 
+   * @param userId - User ID
+   * @returns API response
+   */
+  static async getUnreadCountForUser(userId: number): Promise<ApiResponse<number>> {
+    try {
+      return await ApiClient.get(`${NOTIFICATIONS_API_URL}/unread-count`, { params: { userId } });
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : 'Failed to get unread notification count',
+        500
+      );
+    }
+  }
+
+  /**
+   * Updates a notification
+   * 
+   * @param id - Notification ID
+   * @param data - Update data
+   * @returns API response
+   */
+  static async updateNotification(id: number | string, data: UpdateNotificationDto): Promise<ApiResponse<NotificationResponseDto>> {
+    try {
+      const validatedId = validateId(id);
+      if (validatedId === null) {
+        throw new ApiRequestError('Invalid notification ID format', 400);
+      }
+      return await ApiClient.put(`${NOTIFICATIONS_API_URL}/${validatedId}`, data);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to update notification with ID ${id}`,
+        500
+      );
+    }
+  }
+
+  /**
+   * Marks all notifications as read for a specific user
+   * 
+   * @param userId - User ID
+   * @returns API response
+   */
+  static async markAllAsReadForUser(userId: number): Promise<ApiResponse<{ count: number }>> {
+    try {
+      return await ApiClient.post(`${NOTIFICATIONS_API_URL}/read-all`, { userId });
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : 'Failed to mark all notifications as read',
         500
       );
     }

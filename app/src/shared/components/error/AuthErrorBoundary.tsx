@@ -142,9 +142,7 @@ export class AuthErrorBoundary extends Component<AuthErrorBoundaryProps, AuthErr
       }
       
       // Convert to AuthError for consistent display
-      const authError = authErrorHandler.normalizeError(error, {
-        component: componentName
-      });
+      const authError = authErrorHandler.normalizeError(error);
       
       // Default error display
       return (

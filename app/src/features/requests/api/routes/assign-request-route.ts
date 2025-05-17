@@ -1,8 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { apiAuth } from '@/features/auth/api/middleware';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { auth } from '@/features/auth/api/middleware/authMiddleware';
 import { formatResponse } from '@/core/errors';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { IRequestService } from '@/domain/services/IRequestService';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { AssignRequestRequest } from '../models/request-request-models';
@@ -13,57 +13,49 @@ import { AssignRequestRequest } from '../models/request-request-models';
  * @param params - Route parameters with request ID
  * @returns Response with updated request
  */
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    // Extract ID from route parameters
-    const id = Number(params.id);
-    if (isNaN(id) || id <= 0) {
-      return formatResponse.error('Invalid request ID', 400);
-    }
-
-    // Authenticate user
-    const session = await apiAuth(request);
-    if (!session) {
-      return formatResponse.error('Authentication required', 401);
-    }
-    // Check if user is authenticated
-    if (!session.user) {
-      return formatResponse.error('User not authenticated', 401);
-    }
-    
-    // Access user info from either session or request.auth
-    const userId = (request as any).auth?.userId || session.user.id;
-
-    // Verify permissions
-    const permissionCheck = await permissionMiddleware.checkPermission(request, [SystemPermission.REQUESTS_ASSIGN]);
-    if (!permissionCheck.success) {
-      return formatResponse.error(permissionCheck.message || 'Permission denied', permissionCheck.status || 403);
-    }
-
-    // Parse request body
-    const data: AssignRequestRequest = await request.json();
-
-    // Validate processor ID
-    if (!data.processorId || isNaN(data.processorId) || data.processorId <= 0) {
-      return formatResponse.error('Invalid processor ID', 400);
-    }
-
-    // Get request service
-    const serviceFactory = getServiceFactory();
-    const requestService = serviceFactory.createRequestService();
-
-    // User ID is already obtained from the auth session above
-    
-    // Assign request
-    const result = await requestService.assignRequest(id, data.processorId, data.note, {
-      context: {
-        userId
+export const PATCH = auth(
+  async (request: NextRequest, user: any) => {
+    try {
+      // Extract ID from URL
+      const urlParts = request.url.split('/');
+      const idStr = urlParts[urlParts.length - 2]; // Get the ID from the URL path
+      const id = Number(idStr);
+      
+      if (isNaN(id) || id <= 0) {
+        return formatResponse.error('Invalid request ID', 400);
       }
-    });
 
-    // Return formatted response
-    return formatResponse.success(result, 'Request assigned successfully');
-  } catch (error) {
-    return formatResponse.error('An error occurred while assigning the request', 500);
+      // Parse request body
+      const data: AssignRequestRequest = await request.json();
+
+      // Validate processor ID
+      if (!data.processorId || isNaN(data.processorId) || data.processorId <= 0) {
+        return formatResponse.error('Invalid processor ID', 400);
+      }
+
+      // Get request service
+      const serviceFactory = getServiceFactory();
+      const requestService = serviceFactory.createRequestService();
+      
+      // Assign request
+      const result = await requestService.assignRequest(id, data.processorId, data.note, {
+        context: {
+          userId: user.id // Use the user from auth middleware
+        }
+      });
+
+      // Return formatted response
+      return formatResponse.success(result, 'Request assigned successfully');
+    } catch (error) {
+      console.error('Error assigning request:', error);
+      return formatResponse.error(
+        error instanceof Error ? error.message : 'An error occurred while assigning the request', 
+        500
+      );
+    }
+  },
+  {
+    requireAuth: true,
+    requiredPermission: [SystemPermission.REQUESTS_ASSIGN]
   }
-}
+);

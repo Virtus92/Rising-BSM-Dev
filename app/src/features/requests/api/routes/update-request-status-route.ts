@@ -5,12 +5,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { NotFoundError, ValidationError } from '@/core/errors/types/AppError';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
 import { routeHandler } from '@/core/api/route-handler';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
-import { apiAuth } from '@/features/auth/api/middleware';
+import { authenticateRequest } from '@/features/auth/api/middleware/authMiddleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 
 const logger = getLogger();
@@ -114,8 +115,7 @@ export const updateRequestStatusHandler = async (
 /**
  * PATCH /api/requests/:id/status route
  */
-export const PATCH = routeHandler(
-  async (request: NextRequest) => {
+export const PATCH = routeHandler(async (request: NextRequest) => {
     try {
       // Parse the request body
       const data = await request.json() as UpdateStatusRequest;
@@ -131,14 +131,14 @@ export const PATCH = routeHandler(
       };
       
       // Authenticate user
-      const auth = await apiAuth(request);
-      if (!auth) {
-        return formatResponse.error('Authentication required', 401);
+      const authResult = await authenticateRequest(request);
+      if (!authResult.success) {
+        return formatResponse.error(authResult.message || 'Authentication required', authResult.statusCode || 401);
       }
       
       // Set userId in context if authenticated
-      if (auth.user?.id) {
-        context.auth.userId = auth.user.id;
+      if (authResult.user?.id) {
+        context.auth.userId = authResult.user.id;
       }
       
       // Verify permissions

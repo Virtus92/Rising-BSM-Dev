@@ -1,1307 +1,784 @@
 'use client';
 
 /**
- * Client-side API client for making HTTP requests
- * Uses cookies for authentication instead of localStorage
- * This is explicitly marked as a client component and should not be used directly in server components
+ * ApiClient.ts
+ * 
+ * Complete rewrite to fix authentication and token handling issues.
+ * This implementation eliminates all workarounds and properly handles
+ * API requests with clean error boundaries and token management.
  */
-import { permissionErrorHandler, formatPermissionDeniedMessage } from '@/shared/utils/permission-error-handler';
-// Only import ClientTokenManager - avoid importing TokenManager directly
-import { ClientTokenManager } from '@/features/auth/lib/clients/token/ClientTokenManager';
-import { getItem } from '@/shared/utils/storage/cookieStorage';
 
-// GLOBAL INITIALIZATION FLAG - outside the class to ensure it's truly a singleton across all imports
-// This is critically important - React may import this file multiple times
-let GLOBAL_API_INITIALIZED = false;
-let GLOBAL_INIT_PROMISE: Promise<void> | null = null;
-let GLOBAL_API_BASE_URL = '/api'; // Set default API base URL
-let GLOBAL_API_HEADERS: Record<string, string> = { 'Content-Type': 'application/json' };
+import { getLogger } from '@/core/logging';
+import AuthService from '@/features/auth/core/AuthService';
+import { TokenManager } from '@/core/initialization';
 
-// Global request tracking for diagnostic purposes only
-let GLOBAL_REQUEST_COUNT = 0;
-let GLOBAL_REQUEST_HISTORY: Array<{url: string, method: string, timestamp: number, error?: Error}> = [];
-const MAX_REQUEST_HISTORY = 50; // Keep track of more requests for debugging
+// Logger
+const logger = getLogger();
 
-// Expose window-level flags we can check for debugging and synchronization
-if (typeof window !== 'undefined') {
-  // Initialize the global flag object if it doesn't exist
-  if (!(window as any).__API_CLIENT_STATE) {
-    (window as any).__API_CLIENT_STATE = {
-      initialized: false,
-      initPromise: null,
-      lastInitTime: 0,
-      pendingRequests: 0,
-      requestCache: {},
-      tokens: {
-        lastSync: 0,
-        hasAuth: false,
-        hasRefresh: false
-      }
-    };
-  }
-}
-
-// Add global error handler for uncaught API errors
-if (typeof window !== 'undefined') {
-  window.addEventListener('unhandledrejection', (event) => {
-    // Only handle API-related errors
-    if (event.reason && event.reason.message && 
-        (event.reason.message.includes('API') || 
-         event.reason.message.includes('fetch'))) {
-      console.error('Unhandled API error:', event.reason);
-    }
-  });
-  
-  // Set up periodic cleanup to prevent memory leaks
-  setInterval(() => {
-    if ((window as any).__API_CLIENT_STATE) {
-      // Clean up request cache older than 5 minutes
-      const now = Date.now();
-      const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-      
-      Object.keys((window as any).__API_CLIENT_STATE.requestCache || {}).forEach(key => {
-        const entry = (window as any).__API_CLIENT_STATE.requestCache[key];
-        if (entry && entry.timestamp && now - entry.timestamp > CACHE_TTL) {
-          delete (window as any).__API_CLIENT_STATE.requestCache[key];
-        }
-      });
-      
-      // Trim request history if needed
-      if (GLOBAL_REQUEST_HISTORY.length > MAX_REQUEST_HISTORY) {
-        GLOBAL_REQUEST_HISTORY = GLOBAL_REQUEST_HISTORY.slice(-MAX_REQUEST_HISTORY);
-      }
-    }
-  }, 60000); // Run every minute
-}
-export interface ApiError {
-  message: string;
-  errors?: string[];
-  statusCode?: number;
+// Types
+export interface ApiOptions {
+  method?: string;
+  headers?: Record<string, string>;
+  params?: Record<string, string | number | boolean | undefined>;
+  withAuth?: boolean;
+  signal?: AbortSignal;
+  cache?: RequestCache;
+  retry?: number;
 }
 
 export interface ApiResponse<T = any> {
+  /**
+   * Whether the request was successful
+   */
   success: boolean;
+  
+  /**
+   * Response data (only present on success)
+   */
   data: T | null;
-  message?: string;
-  errors?: string[];
+  
+  /**
+   * Error information (only present on failure)
+   */
+  error: string | null;
+  
+  /**
+   * HTTP status code
+   */
   statusCode?: number;
-  errorType?: 'permission' | 'validation' | 'network' | 'unknown';
+  
+  /**
+   * Error code if available
+   */
+  code?: string;
+  
+  /**
+   * @deprecated Use error property instead
+   */
+  message?: string;
 }
 
-export class ApiClient {
-  private initialized = false;
-  private initializing = false;
-  private initPromise: Promise<void> | null = null;
+// Create a named ApiRequestError class for typed errors
+export class ApiRequestError extends Error {
+  public statusCode: number;
+  public data: any;
+  
+  constructor(message: string, statusCode: number = 500, data: any = null) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.statusCode = statusCode;
+    this.data = data;
+  }
+}
 
+// API client class
+class ApiClientClass {
+  private baseUrl: string = '';
+  private initialized: boolean = false;
+  private initializationPromise: Promise<boolean> | null = null;
+  
   /**
-   * Set default headers for API requests
+   * Check if API client is initialized
    */
-  private setDefaultHeaders(): void {
-    // Set Content-Type header as application/json by default
-    GLOBAL_API_HEADERS = { ...GLOBAL_API_HEADERS, 'Content-Type': 'application/json' };
+  public isInitialized(): boolean {
+    return this.initialized;
   }
   
   /**
-   * Sets up the token manager
+   * Initialize API client
    */
-  private async setupTokenManager(): Promise<void> {
-    // Initialize token manager for authentication
-    if (typeof window !== 'undefined') {
+  async initialize(options?: { forceAuth?: boolean }): Promise<boolean> {
+    // If already initialized, return true
+    if (this.initialized) {
+      return true;
+    }
+    
+    // If initialization is already in progress, wait for it
+    if (this.initializationPromise) {
       try {
-        await ClientTokenManager.refreshAccessToken();
+        return await this.initializationPromise;
       } catch (error) {
-        console.warn('Error refreshing token during API initialization:', error);
-      }
-    }
-  }
-
-  /**
-   * Ensures the API client is initialized before making requests
-   * Modified to handle initialization better and avoid race conditions
-   * 
-   * @param force Whether to force reinitialization
-   * @returns Promise resolving when initialization is complete
-   */
-  private async ensureInitialized(force = false): Promise<void> {
-    // If already initialized and not forcing reinitialization, return immediately
-    if (this.initialized && !force) {
-      return;
-    }
-
-    // Check if there's an initialization in progress
-    if (this.initializing) {
-      // Wait for the existing initialization to complete instead of starting a new one
-      if (this.initPromise) {
-        try {
-          await this.initPromise;
-          return;
-        } catch (error) {
-          // If previous initialization failed, we'll try again
-          console.error('Previous API client initialization failed, retrying', error);
-        }
-      }
-    }
-
-    // Start initialization
-    this.initializing = true;
-    
-    // Create a new initialization promise
-    this.initPromise = (async () => {
-      try {
-        // Set default headers
-        this.setDefaultHeaders();
-        
-        // Initialize token manager
-        await this.setupTokenManager();
-        
-        // Mark as initialized
-        this.initialized = true;
-        this.initializing = false;
-        
-        return;
-      } catch (error) {
-        // Reset initialization state on failure
-        this.initializing = false;
-        this.initialized = false;
-        
-        console.error('Failed to initialize API client', error);
-        throw error;
-      }
-    })();
-    
-    // Wait for initialization to complete
-    await this.initPromise;
-  }
-
-  /**
-   * Get the current base URL
-   * @returns Current base URL
-   */
-  static getBaseUrl(): string {
-    return GLOBAL_API_BASE_URL;
-  }
-
-  /**
-   * Initialize the API client
-   * @param config Configuration options
-   */
-  static initialize(config: { 
-    baseUrl?: string; 
-    headers?: Record<string, string>;
-    autoRefreshToken?: boolean;
-    force?: boolean; // Added force option to reinitialize if needed
-    source?: string; // Added source for tracking initialization origins
-  } = {}): Promise<void> {
-    // Access to global state for synchronization
-    const globalState = typeof window !== 'undefined' ? (window as any).__API_CLIENT_STATE : null;
-    const now = Date.now();
-    
-    // Rate limit initialization requests to prevent storms (unless forced)
-    if (!config.force && globalState && now - globalState.lastInitTime < 2000) {
-      console.log('ApiClient: Initialization throttled, reusing existing state');
-      return globalState.initPromise || Promise.resolve();
-    }
-    
-    // If already initialized with the same base URL, return immediately unless force=true
-    if (!config.force && GLOBAL_API_INITIALIZED && GLOBAL_API_BASE_URL === (config.baseUrl || GLOBAL_API_BASE_URL)) {
-      console.log('ApiClient: Already initialized, reusing existing instance');
-      return Promise.resolve();
-    }
-    
-    // Return existing promise if initialization is in progress
-    if (GLOBAL_INIT_PROMISE && !config.force) {
-      console.log('ApiClient: Initialization already in progress, waiting...');
-      return GLOBAL_INIT_PROMISE;
-    }
-    
-    // If forced, clear any existing promise
-    if (config.force && GLOBAL_INIT_PROMISE) {
-      console.log('ApiClient: Force reinitializing');
-      GLOBAL_INIT_PROMISE = null;
-    }
-    
-    // Update global state tracking
-    if (globalState) {
-      globalState.lastInitTime = now;
-    }
-    
-    // Create a new initialization promise
-    GLOBAL_INIT_PROMISE = new Promise<void>((resolve) => {
-      try {
-        // Update configuration
-        GLOBAL_API_BASE_URL = config.baseUrl || GLOBAL_API_BASE_URL;
-        if (config.headers) {
-          GLOBAL_API_HEADERS = { ...GLOBAL_API_HEADERS, ...config.headers };
-        }
-        
-        // Token synchronization in client environment
-        const tokenPromise = typeof window !== 'undefined' && config.autoRefreshToken !== false
-          ? ClientTokenManager.refreshAccessToken().catch((err: Error) => {
-              console.warn('Error refreshing token during API initialization:', err);
-              return false;
-            })
-          : Promise.resolve(false);
-        
-        // Wait for token synchronization to complete
-        tokenPromise.then((syncResult: boolean | unknown) => {
-          // Mark as initialized - globally
-          GLOBAL_API_INITIALIZED = true;
-          
-          // Update window global state
-          if (globalState) {
-            globalState.initialized = true;
-            globalState.initPromise = GLOBAL_INIT_PROMISE;
-            
-            // Update token status if the synchronization was performed
-            if (syncResult !== false) {
-              globalState.tokens.lastSync = Date.now();
-              
-              // Check cookies for token status
-              if (typeof document !== 'undefined') {
-                const cookies = document.cookie.split(';').map(c => c.trim());
-                globalState.tokens.hasAuth = cookies.some(c => c.startsWith('auth_token='));
-                globalState.tokens.hasRefresh = cookies.some(c => c.startsWith('refresh_token='));
-              }
-            }
-          }
-          
-          // Log initialization status
-          console.log('API Client initialized with base URL:', GLOBAL_API_BASE_URL);
-          
-          // Initialize complete
-          resolve();
-          
-          // Clear the promise reference with a delay to avoid race conditions
-          setTimeout(() => {
-            if (GLOBAL_INIT_PROMISE === GLOBAL_INIT_PROMISE) {
-              GLOBAL_INIT_PROMISE = null;
-              
-              if (globalState) {
-                globalState.initPromise = null;
-              }
-            }
-          }, 1000);
+        logger.error('Error waiting for initialization:', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
         });
-      } catch (error) {
-        console.error('API Client initialization error:', error as Error);
-        GLOBAL_API_INITIALIZED = false;
-        
-        if (globalState) {
-          globalState.initialized = false;
-          globalState.initPromise = null;
-        }
-        
-        resolve(); // Still resolve to prevent hanging promises
-      }
-    });
-    
-    // Update the global promise reference
-    if (globalState) {
-      globalState.initPromise = GLOBAL_INIT_PROMISE;
-    }
-    
-    return GLOBAL_INIT_PROMISE;
-  }
-
-  /**
-   * Set CSRF token for security
-   * @param token CSRF token
-   */
-  static setCsrfToken(token: string) {
-    GLOBAL_API_HEADERS['X-CSRF-Token'] = token;
-  }
-
-  /**
-   * Generate request options with appropriate credentials
-   * @param method HTTP method
-   * @param data Request data
-   * @returns Request options
-   */
-  private static getRequestOptions(method: string, data?: any): RequestInit {
-    // Get auth token for every request by default
-    let headersToUse = {...GLOBAL_API_HEADERS};
-    
-    // Always include auth token by default for all requests
-    try {
-      const authToken = getItem('auth_token_backup') || getItem('auth_token');
-      if (authToken) {
-        headersToUse['Authorization'] = `Bearer ${authToken}`;
-        headersToUse['X-Auth-Token'] = authToken;
-      }
-    } catch (tokenError) {
-      console.warn('Error getting auth token for request:', tokenError);
-    }
-    
-    return {
-      method,
-      headers: headersToUse,
-      credentials: 'include', // Always include cookies for authentication
-      body: data ? JSON.stringify(data) : undefined
-    };
-  }
-
-  /**
-   * Create a request URL with query parameters
-   * @param endpoint API endpoint
-   * @param params Query parameters
-   * @returns URL with query parameters
-   */
-  static createUrl(endpoint: string, params?: Record<string, any>): string {
-    // Normalize endpoint path
-    if (!endpoint.startsWith('/')) {
-      endpoint = '/' + endpoint;
-    }
-    
-    // Fix potential double /api/ prefix issue
-    const normalizedEndpoint = endpoint.replace(/^\/api\/api\//g, '/api/');
-    
-    // If base URL already has '/api' and endpoint also starts with '/api', fix it
-    let finalEndpoint = normalizedEndpoint;
-    if (GLOBAL_API_BASE_URL.endsWith('/api') && normalizedEndpoint.startsWith('/api/')) {
-      finalEndpoint = normalizedEndpoint.substring(4); // Remove leading '/api'
-    }
-    
-    // If there are no params, return simple URL
-    if (!params || Object.keys(params).length === 0) {
-      return `${GLOBAL_API_BASE_URL}${finalEndpoint}`;
-    }
-    
-    // Create URL with query parameters
-    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
-    const url = new URL(`${GLOBAL_API_BASE_URL}${finalEndpoint}`, baseOrigin);
-    
-    // Process params for URL
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        if (Array.isArray(value)) {
-          // Handle array parameters
-          value.forEach(item => {
-            if (item !== undefined && item !== null) {
-              url.searchParams.append(`${key}[]`, String(item));
-            }
-          });
-        } else if (typeof value === 'object' && value instanceof Date) {
-          // Handle Date objects
-          url.searchParams.append(key, value.toISOString());
-        } else if (typeof value === 'object') {
-          // Handle object parameters
-          url.searchParams.append(key, JSON.stringify(value));
-        } else {
-          // Handle primitive values
-          url.searchParams.append(key, String(value));
-        }
-      }
-    });
-    
-    // Remove origin from URL string
-    return url.toString().replace(baseOrigin, '');
-  }
-
-  /**
-   * Make a GET request
-   * @param endpoint API endpoint
-   * @param options Request options
-   * @returns API response
-   */
-  static async get<T = any>(
-    endpoint: string, 
-    options: { 
-      params?: Record<string, any>; 
-      headers?: Record<string, string>;
-      skipInitCheck?: boolean; // Skip initialization check for internal calls
-      requestId?: string; // Optional request ID for tracking
-      skipCache?: boolean; // Skip cache for this request
-      cacheTime?: number; // Cache time in milliseconds (default: 30000 ms = 30 seconds)
-      includeAuthToken?: boolean; // Whether to explicitly include auth token in headers
-    } = {}
-  ): Promise<ApiResponse<T>> {
-    // Generate request ID for tracking if not provided
-    const requestId = options.requestId || `get-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    
-    // Normalize the endpoint path and fix potential /api/api/ duplication
-    endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    endpoint = endpoint.replace(/^\/api\/api\//g, '/api/');
-    
-    // Check if initialized - unless explicitly skipped
-    if (!options.skipInitCheck && !GLOBAL_API_INITIALIZED) {
-      console.warn(`API Client not initialized on GET to ${endpoint}. Initializing with defaults... (requestId: ${requestId})`);
-      // We'll initialize it with defaults, but log a warning
-      try {
-        await ApiClient.initialize({
-          source: `auto-init-get-${requestId}`,
-          autoRefreshToken: true
-        });
-      } catch (initError) {
-        console.error(`API Client initialization failed during GET (requestId: ${requestId}):`, initError);
-        // Continue anyway - we'll try to make the request
-      }
-    }
-
-    try {
-      // Process the parameters to remove undefined values to prevent URL issues
-      const cleanParams = options.params ? Object.fromEntries(
-        Object.entries(options.params)
-          .filter(([_, value]) => value !== undefined && value !== null)
-      ) : undefined;
-
-      // Create URL with query parameters
-      const url = cleanParams 
-        ? this.createUrl(endpoint, cleanParams)
-        : `${GLOBAL_API_BASE_URL}${endpoint}`;
-      
-      // Only log in development mode
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`API GET: ${url}`, { initialized: GLOBAL_API_INITIALIZED });
-      }
-
-      // Merge headers and other options
-      const headersToUse = { ...GLOBAL_API_HEADERS, ...(options.headers || {}) };
-      
-      // Explicitly include auth token if requested or for permission/user endpoints
-      if (options.includeAuthToken !== false && 
-          (endpoint.includes('/permissions') || endpoint.includes('/users') || options.includeAuthToken)) {
-        try {
-          // Get token from localStorage
-          const authToken = getItem('auth_token_backup') || getItem('auth_token');
-          if (authToken) {
-            headersToUse['Authorization'] = `Bearer ${authToken}`;
-            headersToUse['X-Auth-Token'] = authToken;
-          } else {
-            console.warn(`No auth token available for request to ${endpoint}`);
-          }
-        } catch (tokenError) {
-          console.warn(`Error getting auth token for request to ${endpoint}:`, tokenError);
-        }
-      }
-      
-      const requestOptions: RequestInit = {
-        method: 'GET',
-        headers: headersToUse,
-        credentials: 'include', // Include cookies
-        // Add cache control to prevent browser caching
-        cache: 'no-cache',
-      };
-
-      // Use direct request execution - no retries
-      return await this.executeRequest<ApiResponse<T>>(
-        async () => {
-          // Create a stable controller that won't be garbage collected during the request
-          const controller = new AbortController();
-          let timeoutId: any = null;
-          
-          try {
-            // Set timeout with safety checks
-            if (typeof window !== 'undefined') {
-              timeoutId = window.setTimeout(() => {
-                try {
-                  // Only abort if the controller is still valid
-                  if (controller && controller.signal && !controller.signal.aborted) {
-                    controller.abort(new DOMException('Request timed out', 'TimeoutError'));
-                  }
-                } catch (abortError) {
-                  console.error('Error during abort:', abortError);
-                }
-              }, 30000); // Increase timeout to 30 seconds for more reliability
-            }
-            
-            // Make the request with the signal
-            const response = await fetch(url, {
-              ...requestOptions,
-              signal: controller.signal
-            });
-            
-            // Clear timeout once response received
-            if (timeoutId !== null && typeof window !== 'undefined') {
-              window.clearTimeout(timeoutId);
-              timeoutId = null;
-            }
-            
-            // Process the response
-            return this.handleResponse<T>(response, { endpoint, requestId });
-          } catch (error) {
-            // Always clear timeout to prevent memory leaks
-            if (timeoutId !== null && typeof window !== 'undefined') {
-              window.clearTimeout(timeoutId);
-              timeoutId = null;
-            }
-            
-            // Handle abort errors with better messaging
-            if (error instanceof DOMException && error.name === 'AbortError') {
-              if (error.message === 'Request timed out') {
-                throw new Error(`Request to ${endpoint} timed out after 30 seconds`);
-              } else {
-                throw new Error(`Request to ${endpoint} was aborted: ${error.message}`);
-              }
-            }
-            
-            // Re-throw other errors
-            throw error;
-          }
-        },
-        { endpoint, method: 'GET', requestId, error: null}
-      );
-    } catch (error) {
-      // Log the error but don't handle it specially - just rethrow
-      console.error(`GET request failed for ${endpoint}:`, error);
-      
-      // Return formatted error response instead of throwing
-      return this.handleError<T>(error, { endpoint, method: 'GET', requestId });
-    }
-  }
-
-  /**
-   * Make a POST request
-   * @param endpoint API endpoint
-   * @param data Request data
-   * @param options Request options
-   * @returns API response
-   */
-  static async post<T = any>(
-    endpoint: string, 
-    data?: any, 
-    options: { 
-      headers?: Record<string, string>;
-      skipInitCheck?: boolean; // Skip initialization check for internal calls
-      requestId?: string; // Optional request ID for tracking
-      includeAuthToken?: boolean; // Whether to explicitly include auth token in headers
-    } = {}
-  ): Promise<ApiResponse<T>> {
-    // Generate request ID for tracking if not provided
-    const requestId = options.requestId || `post-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    
-    // Normalize the endpoint path and fix potential /api/api/ duplication
-    endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    endpoint = endpoint.replace(/^\/api\/api\//g, '/api/');
-    
-    // Handle common API endpoint path issue
-    if (GLOBAL_API_BASE_URL.endsWith('/api') && endpoint.startsWith('/api/')) {
-      endpoint = endpoint.substring(4); // Remove duplicated '/api'
-    }
-    
-    // Check if initialized - unless explicitly skipped
-    if (!options.skipInitCheck && !GLOBAL_API_INITIALIZED) {
-      console.warn(`API Client not initialized on POST to ${endpoint}. Initializing with defaults... (requestId: ${requestId})`);
-      // We'll initialize it with defaults, but log a warning
-      try {
-        await ApiClient.initialize({
-          source: `auto-init-post-${requestId}`,
-          autoRefreshToken: true
-        });
-      } catch (initError) {
-        console.error(`API Client initialization failed during POST (requestId: ${requestId}):`, initError);
-        // Continue anyway - we'll try to make the request
-      }
-    }
-
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`API POST: ${endpoint}`, { data });
-      }
-
-      // Merge headers
-      const headersToUse = { ...GLOBAL_API_HEADERS, ...(options.headers || {}) };
-      
-      // Explicitly include auth token if requested or for permission/user endpoints
-      if (options.includeAuthToken !== false && 
-          (endpoint.includes('/permissions') || endpoint.includes('/users') || options.includeAuthToken)) {
-        try {
-          // Get token from localStorage
-          const authToken = getItem('auth_token_backup') || getItem('auth_token');
-          if (authToken) {
-            headersToUse['Authorization'] = `Bearer ${authToken}`;
-            headersToUse['X-Auth-Token'] = authToken;
-          } else {
-            console.warn(`No auth token available for request to ${endpoint}`);
-          }
-        } catch (tokenError) {
-          console.warn(`Error getting auth token for request to ${endpoint}:`, tokenError);
-        }
-      }
-      
-      const requestOptions: RequestInit = {
-        method: 'POST',
-        headers: headersToUse,
-        credentials: 'include', // Include cookies
-        body: data ? JSON.stringify(data) : undefined,
-      };
-
-      const response = await fetch(`${GLOBAL_API_BASE_URL}${endpoint}`, requestOptions);
-
-      return this.handleResponse<T>(response);
-    } catch (error) {
-      return this.handleError<T>(error);
-    }
-  }
-
-  /**
-   * Make a PUT request
-   * @param endpoint API endpoint
-   * @param data Request data
-   * @param options Request options
-   * @returns API response
-   */
-  static async put<T = any>(
-    endpoint: string, 
-    data: any, 
-    options: { 
-      headers?: Record<string, string>;
-      skipInitCheck?: boolean; // Skip initialization check for internal calls
-      requestId?: string; // Optional request ID for tracking
-      includeAuthToken?: boolean; // Whether to explicitly include auth token in headers
-    } = {}
-  ): Promise<ApiResponse<T>> {
-    // Generate request ID for tracking if not provided
-    const requestId = options.requestId || `put-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    
-    // Normalize the endpoint path and fix potential /api/api/ duplication
-    endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    endpoint = endpoint.replace(/^\/api\/api\//g, '/api/');
-    
-    // Handle common API endpoint path issue
-    if (GLOBAL_API_BASE_URL.endsWith('/api') && endpoint.startsWith('/api/')) {
-      endpoint = endpoint.substring(4); // Remove duplicated '/api'
-    }
-    
-    // Check if initialized - unless explicitly skipped
-    if (!options.skipInitCheck && !GLOBAL_API_INITIALIZED) {
-      console.warn(`API Client not initialized on PUT to ${endpoint}. Initializing with defaults... (requestId: ${requestId})`);
-      try {
-        await ApiClient.initialize({
-          source: `auto-init-put-${requestId}`,
-          autoRefreshToken: true
-        });
-      } catch (initError) {
-        console.error(`API Client initialization failed during PUT (requestId: ${requestId}):`, initError);
-        // Continue anyway - we'll try to make the request
-      }
-    }
-
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`API PUT: ${endpoint}`, { data });
-      }
-
-      // Merge headers
-      const headersToUse = { ...GLOBAL_API_HEADERS, ...(options.headers || {}) };
-      
-      // Explicitly include auth token if requested or for permission/user endpoints
-      if (options.includeAuthToken !== false && 
-          (endpoint.includes('/permissions') || endpoint.includes('/users') || options.includeAuthToken)) {
-        try {
-          // Get token from localStorage
-          const authToken = getItem('auth_token_backup') || getItem('auth_token');
-          if (authToken) {
-            headersToUse['Authorization'] = `Bearer ${authToken}`;
-            headersToUse['X-Auth-Token'] = authToken;
-          } else {
-            console.warn(`No auth token available for request to ${endpoint}`);
-          }
-        } catch (tokenError) {
-          console.warn(`Error getting auth token for request to ${endpoint}:`, tokenError);
-        }
-      }
-      
-      const requestOptions: RequestInit = {
-        method: 'PUT',
-        headers: headersToUse,
-        credentials: 'include', // Include cookies
-        body: JSON.stringify(data),
-      };
-
-      const response = await fetch(`${GLOBAL_API_BASE_URL}${endpoint}`, requestOptions);
-
-      return this.handleResponse<T>(response);
-    } catch (error) {
-      return this.handleError<T>(error);
-    }
-  }
-  
-  /**
-   * Make a PATCH request
-   * @param endpoint API endpoint
-   * @param data Request data
-   * @param options Request options
-   * @returns API response
-   */
-  static async patch<T = any>(
-    endpoint: string, 
-    data: any, 
-    options: { 
-      headers?: Record<string, string>;
-      skipInitCheck?: boolean; // Skip initialization check for internal calls
-      requestId?: string; // Optional request ID for tracking
-      includeAuthToken?: boolean; // Whether to explicitly include auth token in headers
-    } = {}
-  ): Promise<ApiResponse<T>> {
-    // Generate request ID for tracking if not provided
-    const requestId = options.requestId || `patch-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    
-    // Normalize the endpoint path and fix potential /api/api/ duplication
-    endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    endpoint = endpoint.replace(/^\/api\/api\//g, '/api/');
-    
-    // Handle common API endpoint path issue
-    if (GLOBAL_API_BASE_URL.endsWith('/api') && endpoint.startsWith('/api/')) {
-      endpoint = endpoint.substring(4); // Remove duplicated '/api'
-    }
-    
-    // Check if initialized - unless explicitly skipped
-    if (!options.skipInitCheck && !GLOBAL_API_INITIALIZED) {
-      console.warn(`API Client not initialized on PATCH to ${endpoint}. Initializing with defaults... (requestId: ${requestId})`);
-      try {
-        await ApiClient.initialize({
-          source: `auto-init-patch-${requestId}`,
-          autoRefreshToken: true
-        });
-      } catch (initError) {
-        console.error(`API Client initialization failed during PATCH (requestId: ${requestId}):`, initError);
-        // Continue anyway - we'll try to make the request
-      }
-    }
-
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`API PATCH: ${endpoint}`, { data });
-      }
-
-      // Merge headers
-      const headersToUse = { ...GLOBAL_API_HEADERS, ...(options.headers || {}) };
-      
-      // Explicitly include auth token if requested or for permission/user endpoints
-      if (options.includeAuthToken !== false && 
-          (endpoint.includes('/permissions') || endpoint.includes('/users') || options.includeAuthToken)) {
-        try {
-          // Get token from localStorage
-          const authToken = getItem('auth_token_backup') || getItem('auth_token');
-          if (authToken) {
-            headersToUse['Authorization'] = `Bearer ${authToken}`;
-            headersToUse['X-Auth-Token'] = authToken;
-          } else {
-            console.warn(`No auth token available for request to ${endpoint}`);
-          }
-        } catch (tokenError) {
-          console.warn(`Error getting auth token for request to ${endpoint}:`, tokenError);
-        }
-      }
-      
-      const requestOptions: RequestInit = {
-        method: 'PATCH',
-        headers: headersToUse,
-        credentials: 'include', // Include cookies
-        body: JSON.stringify(data),
-      };
-
-      const response = await fetch(`${GLOBAL_API_BASE_URL}${endpoint}`, requestOptions);
-
-      return this.handleResponse<T>(response);
-    } catch (error) {
-      return this.handleError<T>(error);
-    }
-  }
-
-  /**
-   * Make a DELETE request
-   * @param endpoint API endpoint
-   * @param options Request options
-   * @returns API response
-   */
-  static async delete<T = any>(
-    endpoint: string, 
-    options: { 
-      headers?: Record<string, string>;
-      skipInitCheck?: boolean; // Skip initialization check for internal calls
-      requestId?: string; // Optional request ID for tracking
-      includeAuthToken?: boolean; // Whether to explicitly include auth token in headers
-    } = {}
-  ): Promise<ApiResponse<T>> {
-    // Generate request ID for tracking if not provided
-    const requestId = options.requestId || `delete-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    
-    // Normalize the endpoint path and fix potential /api/api/ duplication
-    endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    endpoint = endpoint.replace(/^\/api\/api\//g, '/api/');
-    
-    // Handle common API endpoint path issue
-    if (GLOBAL_API_BASE_URL.endsWith('/api') && endpoint.startsWith('/api/')) {
-      endpoint = endpoint.substring(4); // Remove duplicated '/api'
-    }
-    
-    // Check if initialized - unless explicitly skipped
-    if (!options.skipInitCheck && !GLOBAL_API_INITIALIZED) {
-      console.warn(`API Client not initialized on DELETE to ${endpoint}. Initializing with defaults... (requestId: ${requestId})`);
-      try {
-        await ApiClient.initialize({
-          source: `auto-init-delete-${requestId}`,
-          autoRefreshToken: true
-        });
-      } catch (initError) {
-        console.error(`API Client initialization failed during DELETE (requestId: ${requestId}):`, initError);
-        // Continue anyway - we'll try to make the request
-      }
-    }
-
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`API DELETE: ${endpoint}`);
-      }
-
-      // Merge headers
-      const headersToUse = { ...GLOBAL_API_HEADERS, ...(options.headers || {}) };
-      
-      // Explicitly include auth token if requested or for permission/user endpoints
-      if (options.includeAuthToken !== false && 
-          (endpoint.includes('/permissions') || endpoint.includes('/users') || options.includeAuthToken)) {
-        try {
-          // Get token from localStorage
-          const authToken = getItem('auth_token_backup') || getItem('auth_token');
-          if (authToken) {
-            headersToUse['Authorization'] = `Bearer ${authToken}`;
-            headersToUse['X-Auth-Token'] = authToken;
-          } else {
-            console.warn(`No auth token available for request to ${endpoint}`);
-          }
-        } catch (tokenError) {
-          console.warn(`Error getting auth token for request to ${endpoint}:`, tokenError);
-        }
-      }
-      
-      const requestOptions: RequestInit = {
-        method: 'DELETE',
-        headers: headersToUse,
-        credentials: 'include', // Include cookies
-      };
-
-      const response = await fetch(`${GLOBAL_API_BASE_URL}${endpoint}`, requestOptions);
-
-      return this.handleResponse<T>(response);
-    } catch (error) {
-      return this.handleError<T>(error);
-    }
-  }
-
-  /**
-   * Handle permission errors
-   * @param status HTTP status code
-   * @param message Error message
-   * @returns API response with permission error details
-   */
-  private static handlePermissionError<T>(status: number, message: string): ApiResponse<T> {
-    // Use the permission error handler to format a friendly message
-    const formattedMessage = formatPermissionDeniedMessage(message);
-    
-    // Format a user-friendly permission error message
-    const permissionMessage = message?.includes('permission') 
-      ? formattedMessage || message
-      : 'You do not have permission to perform this action';
-    
-    // Log the permission error for debugging
-    console.error('Permission error:', { status, message, formattedMessage });
-    
-    // Call the permission error handler to show appropriate UI feedback
-    permissionErrorHandler.handle(permissionMessage);
-    
-    // Include error type for better client-side handling
-    return {
-      success: false,
-      data: null as any,
-      message: permissionMessage,
-      errors: [permissionMessage],
-      statusCode: status,
-      errorType: 'permission'
-    };
-  }
-
-  /**
-   * Handle API response - directly expose all errors
-   * @param response Fetch API response
-   * @param requestInfo Request information for better error messages
-   * @returns API response
-   * @throws Detailed errors for all API issues
-   */
-  private static async handleResponse<T>(
-    response: Response, 
-    requestInfo?: { endpoint?: string; method?: string; requestId?: string }
-  ): Promise<ApiResponse<T>> {
-    try {
-      const contentType = response.headers.get('content-type');
-      
-      // Special handling for the login endpoint - don't treat redirects as errors
-      // This prevents false-positive detection of redirects during login
-      const isLoginRequest = response.url.includes('/api/auth/login');
-      const isRefreshRequest = response.url.includes('/api/auth/refresh');
-      
-      // Store the original response URL to handle retries correctly
-      const originalUrl = response.url;
-      
-      if (response.redirected && !isLoginRequest) {
-        console.log('API response redirected, but not a login request');
-        return {
-          success: false,
-          data: null as any,
-          message: 'Session expired. Please log in again.',
-          statusCode: 401
-        };
-      }
-      
-      // For development debugging
-      if (process.env.NODE_ENV === 'development' && !response.ok) {
-        console.error(`API Error: ${response.status} ${response.statusText}`, {
-          url: response.url,
-          status: response.status,
-          statusText: response.statusText,
-        });
-      }
-      
-      // No 401 auto-handling - let errors propagate directly
-      
-      // Handle JSON responses
-      if (contentType && contentType.includes('application/json')) {
-        let json;
-        
-        try {
-          // Use clone to avoid potential issues with double-reading the response
-          // This fixes the ReflectApply error by creating a new response object
-          const responseClone = response.clone();
-          json = await responseClone.json();
-        } catch (jsonError) {
-          console.error('Error parsing JSON response:', jsonError);
-          // Fallback to text if JSON parsing fails
-          const text = await response.text();
-          return {
-            success: false,
-            data: null as any,
-            message: `Error parsing response: ${text.substring(0, 100)}...`,
-            statusCode: response.status
-          };
-        }
-        
-        if (response.ok) {
-          // Success with JSON response
-          return {
-            success: true,
-            data: json.data || json,
-            message: json.message,
-            statusCode: response.status
-          };
-        } else {
-          // Handle 401 (Unauthorized) - No automatic refresh or handling
-          if (response.status === 401) {
-            const errorDetails = {
-              url: originalUrl,
-              isAuthEndpoint: originalUrl.includes('/api/auth/'),
-              responseMessage: json.message || json.error,
-              requestId: requestInfo?.requestId,
-              requestEndpoint: requestInfo?.endpoint
-            };
-            
-            console.error('401 Unauthorized error detected:', errorDetails);
-            
-            // Create a detailed error with all information
-            const error = new ApiRequestError(
-              `Authentication error (401): ${json.message || json.error || 'Unauthorized'}`,
-              401,
-              json.errors || []
-            );
-            
-            // Add request details to the error
-            (error as any).requestDetails = errorDetails;
-            (error as any).responseData = json;
-            
-            // Throw directly - no refresh attempt
-            throw error;
-          }
-          
-          // Check for permission errors (403 Forbidden)
-          if (response.status === 403) {
-            // Check for specific error types in the response
-            const isPermissionError = 
-              (json.message && json.message.toLowerCase().includes('permission')) ||
-              (json.error && json.error.toLowerCase().includes('permission')) ||
-              (json.errorType && json.errorType === 'permission');
-              
-            if (isPermissionError) {
-              return this.handlePermissionError<T>(
-                response.status, 
-                json.message || json.error || response.statusText
-              );
-            } else {
-              // Generic 403 without specific permission message
-              return {
-                success: false,
-                data: null as any,
-                message: json.message || json.error || 'Access denied',
-                statusCode: 403,
-                errorType: 'permission'
-              };
-            }
-          }
-          
-          // Error with JSON details
-          return {
-            success: false,
-            data: null as any,
-            message: json.message || json.error || response.statusText,
-            errors: json.errors || (json.message ? [json.message] : undefined),
-            statusCode: response.status
-          };
-        }
-      } else {
-        // Handle text responses
-        let text;
-        
-        try {
-          // Use clone to avoid potential issues with double-reading the response
-          // This fixes the ReflectApply error by creating a new response object
-          const responseClone = response.clone();
-          text = await responseClone.text();
-        } catch (textError) {
-          console.error('Error parsing text response:', textError);
-          return {
-            success: false,
-            data: null as any,
-            message: `Error reading response: ${response.statusText}`,
-            statusCode: response.status
-          };
-        }
-        
-        if (response.ok) {
-          // Success with text response
-          return {
-            success: true,
-            data: text as any,
-            statusCode: response.status
-          };
-        } else {
-          // Handle 401 (Unauthorized) - No automatic handling
-          if (response.status === 401) {
-            const errorDetails = {
-              url: response.url,
-              isAuthEndpoint: response.url.includes('/api/auth/'),
-              statusText: response.statusText,
-              responseText: text,
-              requestId: requestInfo?.requestId,
-              requestEndpoint: requestInfo?.endpoint
-            };
-            
-            console.error('401 Unauthorized error detected (text response):', errorDetails);
-            
-            // Create detailed error
-            const error = new ApiRequestError(
-              `Authentication error (401): ${text || response.statusText || 'Unauthorized'}`,
-              401,
-              []
-            );
-            
-            // Add request details to the error
-            (error as any).requestDetails = errorDetails;
-            
-            // Throw directly - no refresh attempt
-            throw error;
-          }
-          
-          // Check for permission errors (403 Forbidden)
-          if (response.status === 403) {
-            return this.handlePermissionError<T>(
-              response.status, 
-              text || response.statusText
-            );
-          }
-          
-          // Error with text details
-          return {
-            success: false,
-            data: null as any,
-            message: text || response.statusText,
-            statusCode: response.status
-          };
-        }
-      }
-    } catch (error: unknown) {
-      // For development debugging
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Error handling API response:', error as Error);
-      }
-      return this.handleError<T>(error);
-    }
-  }
-
-  /**
-   * Handle error
-   * @param error Error object
-   * @returns API response with error details
-   */
-  private static handleError<T>(error: any, requestInfo?: { endpoint?: string; method?: string; requestId?: string }): ApiResponse<T> {
-    // More structured error handling with request information
-    const requestId = requestInfo?.requestId || `error-${Date.now()}`;
-    const endpoint = requestInfo?.endpoint || 'unknown';
-    const method = requestInfo?.method || 'unknown';
-    
-    // Log errors with proper context
-    console.error(`API Error (${method} ${endpoint}, requestId: ${requestId}):`, error as Error);
-    
-    let errorMessage = 'Unknown error occurred';
-    let errorType: 'network' | 'validation' | 'permission' | 'unknown' = 'unknown';
-    let errors: string[] | undefined;
-    let statusCode = 500;
-    
-    if (error instanceof Error) {
-      errorMessage = error.message;
-      
-      // Extract additional error information if available
-      if ((error as any).errors) {
-        errors = (error as any).errors;
-      }
-      
-      if ((error as any).statusCode) {
-        statusCode = (error as any).statusCode;
-      }
-      
-      // Determine error type from message
-      if (error.message.includes('network') || error.message.includes('fetch') || 
-          error.message.includes('abort') || error.message.includes('timeout')) {
-        errorType = 'network';
-      } else if (error.message.includes('permission') || error.message.includes('forbidden') || 
-                error.message.includes('unauthorized') || error.message.includes('not allowed')) {
-        errorType = 'permission';
-      } else if (error.message.includes('validation') || error.message.includes('invalid')) {
-        errorType = 'validation';
-      }
-      
-      // Special handling for network errors
-      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-        errorMessage = 'Network connection error. Please check your internet connection.';
-        errorType = 'network';
-      }
-      
-      // Special handling for timeout errors
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        errorMessage = 'Request timed out. Please try again later.';
-        errorType = 'network';
-        statusCode = 408; // Request Timeout
-      }
-    } else if (typeof error === 'string') {
-      errorMessage = error;
-    } else if (error && error.message) {
-      errorMessage = error.message;
-      
-      // Try to extract status code if available
-      if (error.status || error.statusCode) {
-        statusCode = error.status || error.statusCode;
-      }
-      
-      // Try to extract errors array if available
-      if (error.errors) {
-        errors = error.errors;
+        return false;
       }
     }
     
-    // Check for offline status
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      errorMessage = 'You are currently offline. Please check your internet connection.';
-      errorType = 'network';
-      statusCode = 0; // Special status code for offline
-    }
-    
-    return {
-      success: false,
-      data: null,
-      message: errorMessage,
-      errors,
-      statusCode,
-      errorType
-    };
-  }
-
-  /**
-   * Execute function without any retries to expose raw errors
-   * 
-   * @param fn Function to execute
-   * @returns Promise with the raw result or error
-   */
-  /**
-   * Execute API request without any retries
-   * This method exposes all errors directly for proper debugging
-   * 
-   * @param fn Function to execute the API request
-   * @param requestInfo Request information for tracking
-   * @returns Promise with the direct result
-   * @throws Original errors without any handling
-   */
-  private static async executeRequest<T>(
-    fn: () => Promise<T>,
-    requestInfo: { endpoint: string; method: string; requestId: string; error: any }
-  ): Promise<T> {
-    // Track pending request for analytics only
-    if (typeof window !== 'undefined' && (window as any).__API_CLIENT_STATE) {
-      (window as any).__API_CLIENT_STATE.pendingRequests++;
-    }
-    
-    // Add to request history for diagnostics
-    const historyEntry = {
-      url: requestInfo.endpoint,
-      method: requestInfo.method,
-      error: requestInfo.error,
-      timestamp: Date.now()
-    };
-    GLOBAL_REQUEST_HISTORY.push(historyEntry);
+    // Create and store initialization promise
+    this.initializationPromise = this.performInitialization(options);
     
     try {
-      // Execute function directly - no retry logic
-      const result = await fn();
+      // Wait for initialization
+      const result = await this.initializationPromise;
+      
+      // Update initialization state
+      this.initialized = result;
+      
+      // Notify about completion
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('api-client-initialized', {
+          detail: { timestamp: Date.now(), success: result }
+        }));
+      }
+      
       return result;
     } catch (error) {
-      // Add error to history entry for diagnostics
-      historyEntry.error = error instanceof Error ? error : new Error(String(error));
-      
-      // Log detailed error information
-      console.error(`API request failed [${requestInfo.method} ${requestInfo.endpoint}]:`, {
-        requestId: requestInfo.requestId,
+      logger.error('API client initialization error:', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
       });
       
-      // Throw the original error directly - no swallowing
-      throw error;
+      return false;
     } finally {
-      // Track pending request completion
-      if (typeof window !== 'undefined' && (window as any).__API_CLIENT_STATE) {
-        (window as any).__API_CLIENT_STATE.pendingRequests = 
-          Math.max(0, ((window as any).__API_CLIENT_STATE.pendingRequests || 0) - 1);
-      }
-      
-      // Trim request history if needed
-      if (GLOBAL_REQUEST_HISTORY.length > MAX_REQUEST_HISTORY) {
-        GLOBAL_REQUEST_HISTORY = GLOBAL_REQUEST_HISTORY.slice(-MAX_REQUEST_HISTORY);
-      }
+      this.initializationPromise = null;
     }
   }
-}
+  
+  /**
+   * Perform API client initialization
+   */
+  private async performInitialization(options?: { forceAuth?: boolean }): Promise<boolean> {
+    try {
+      logger.info('Initializing API client');
+      
+      // Set base URL
+      this.baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      
+      // Initialize TokenManager correctly
+      try {
+        await TokenManager.initialize();
+      } catch (error) {
+        logger.warn('TokenManager initialization failed, continuing with API client initialization', {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+      
+      // Initialize AuthService if required
+      if (options?.forceAuth) {
+        try {
+          await AuthService.initialize();
+        } catch (error) {
+          logger.warn('AuthService initialization failed, continuing with API client initialization', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+      
+      // Mark as initialized
+      this.initialized = true;
+      
+      logger.info('API client initialized successfully');
+      return true;
+    } catch (error) {
+      logger.error('Failed to initialize API client:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      return false;
+    }
+  }
+  
+  /**
+   * Format URL with query parameters
+   */
+  private formatUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
+    // Format URL based on path
+    let url: string;
+    
+    // Handle absolute URLs
+    if (path.startsWith('http')) {
+      url = path;
+    }
+    // Handle paths that already include /api prefix
+    else if (path.startsWith('/api/')) {
+      url = path;
+    }
+    // Add baseUrl to other paths
+    else {
+      url = `${this.baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+    }
+    
+    // Return URL if no params
+    if (!params) {
+      return url;
+    }
+    
+    // Filter out undefined values
+    const filteredParams = Object.entries(params)
+      .filter(([_, value]) => value !== undefined)
+      .reduce((acc, [key, value]) => {
+        acc[key] = String(value);
+        return acc;
+      }, {} as Record<string, string>);
+    
+    // Add query parameters
+    const searchParams = new URLSearchParams(filteredParams);
+    return `${url}${url.includes('?') ? '&' : '?'}${searchParams.toString()}`;
+  }
+  
+  /**
+   * Get headers including authentication
+   */
+  private async getHeaders(options?: ApiOptions): Promise<Headers> {
+    const headers = new Headers();
+    
+    // Set content type
+    headers.set('Content-Type', 'application/json');
+    
+    // Generate request ID for tracing
+    const requestId = crypto.randomUUID();
+    headers.set('X-Request-ID', requestId);
+    
+    // Add cache control headers
+    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    headers.set('Pragma', 'no-cache');
+    
+    // Add custom headers
+    if (options?.headers) {
+      Object.entries(options.headers).forEach(([key, value]) => {
+        headers.set(key, value);
+      });
+    }
+    
+    // Add authentication header if required
+    if (options?.withAuth !== false) {
+      try {
+        // Ensure token manager is initialized
+        await TokenManager.initialize();
+        
+        // Force refresh token if it's a post-401 retry to ensure it's valid
+        if (options?.retry === 401) {
+          await TokenManager.refreshToken({ force: true });
+        }
+        
+        // Get token from TokenManager
+        const token = await TokenManager.getToken();
+        
+        if (token) {
+          // Make sure Authorization header is formatted exactly as expected by the server
+          headers.set('Authorization', `Bearer ${token}`);
+          logger.debug('Attached auth token to request', { 
+            requestId, 
+            tokenLength: token.length
+          });
+          
+          // Also extract user ID from token and add as a redundant header
+          // This ensures the user ID is available even if the auth property isn't correctly attached
+          try {
+            const { jwtDecode } = await import('jwt-decode');
+            const decoded = jwtDecode<{sub: string | number}>(token);
+            const userId = typeof decoded.sub === 'number' ? decoded.sub : parseInt(decoded.sub, 10);
+            
+            if (!isNaN(userId)) {
+              // Add user ID as a separate header for extra reliability
+              headers.set('X-Auth-User-ID', userId.toString());
+            }
+          } catch (decodeError) {
+            logger.warn('Failed to decode user ID from token', {
+              error: decodeError instanceof Error ? decodeError.message : String(decodeError),
+              requestId
+            });
+          }
+        } else {
+          logger.debug('No auth token available for request', { requestId });
+          
+          // Try to refresh token and attach if needed
+          const refreshed = await TokenManager.refreshToken({ force: true });
+          if (refreshed) {
+            const newToken = await TokenManager.getToken();
+            if (newToken) {
+              headers.set('Authorization', `Bearer ${newToken}`);
+              logger.debug('Attached refreshed auth token to request', { 
+                requestId, 
+                tokenLength: newToken.length
+              });
+              
+              // Also add user ID header from refreshed token
+              try {
+                const { jwtDecode } = await import('jwt-decode');
+                const decoded = jwtDecode<{sub: string | number}>(newToken);
+                const userId = typeof decoded.sub === 'number' ? decoded.sub : parseInt(decoded.sub, 10);
+                
+                if (!isNaN(userId)) {
+                  headers.set('X-Auth-User-ID', userId.toString());
+                }
+              } catch (decodeError) {
+                logger.warn('Failed to decode user ID from refreshed token', {
+                  error: decodeError instanceof Error ? decodeError.message : String(decodeError),
+                  requestId
+                });
+              }
+            }
+          }
+        }
+        
+        // Fall back to Auth Service if still no user ID header
+        if (!headers.has('X-Auth-User-ID')) {
+          try {
+            const user = AuthService.getUser();
+            if (user?.id) {
+              headers.set('X-Auth-User-ID', user.id.toString());
+            }
+          } catch (userError) {
+            logger.warn('Failed to get user ID from AuthService', {
+              error: userError instanceof Error ? userError.message : String(userError),
+              requestId
+            });
+          }
+        }
+      } catch (error) {
+        logger.warn('Failed to get auth token for API request:', {
+          error: error instanceof Error ? error.message : String(error),
+          requestId
+        });
+      }
+    }
+    
+    return headers;
+  }
+  
+  /**
+   * Make API request with proper error handling
+   */
+  private async fetchWithRetry(
+    url: string,
+    config: RequestInit,
+    options?: ApiOptions
+  ): Promise<Response> {
+    const requestId = crypto.randomUUID().slice(0, 8);
+    const maxRetries = options?.retry ?? 0; // Default to NO retries for auth errors
+    let retries = 0;
+    
+    // Log request details
+    logger.debug(`API request ${requestId} initiated`, {
+      url: url.replace(/\?.*$/, ''), // Strip query params for logging
+      method: config.method,
+      timestamp: Date.now()
+    });
+    
+    // Only retry for network errors, not authentication errors
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Make the request
+        const response = await fetch(url, config);
+        
+        // For auth errors, don't retry - immediately return the response
+        // Let higher-level code handle auth errors properly
+        if (response.status === 401 || response.status === 403) {
+          return response;
+        }
+        
+        // For server errors, we might retry if configured
+        if (response.status >= 500 && attempt < maxRetries) {
+          // Wait a bit before retrying (exponential backoff)
+          const backoffMs = Math.min(100 * Math.pow(2, attempt), 2000);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+          continue;
+        }
+        
+        // Otherwise, return the response
+        return response;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        // Only retry for network errors, not for other types
+        if (attempt < maxRetries) {
+          // Wait before retrying (exponential backoff)
+          const backoffMs = Math.min(100 * Math.pow(2, attempt), 2000);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+          
+          logger.warn(`Network error, retrying request (${attempt + 1}/${maxRetries + 1})`, {
+            error: lastError.message,
+            requestId
+          });
+        } else {
+          // No more retries, throw the last error
+          throw lastError;
+        }
+      }
+    }
+    
+    // This should not happen, but TypeScript requires a return
+    throw lastError || new Error('Unknown error in fetch');
+  }
+  
+  /**
+   * Process API response with clear error handling and standardized format
+   */
+  private async processResponse<T>(response: Response): Promise<ApiResponse<T>> {
+    const contentType = response.headers.get('content-type');
+    const isJson = contentType?.includes('application/json');
+    
+    try {
+      // For auth errors, try to parse response body first to get more detailed error message if available
+      if (response.status === 401) {
+        // Try to parse JSON response for more info
+        try {
+          const clonedResponse = response.clone();
+          const errorData = await clonedResponse.json();
+          
+          return {
+            success: false,
+            data: null,
+            error: errorData.error || errorData.message || 'Authentication required',
+            message: errorData.message || errorData.error || 'Authentication required',
+            statusCode: 401,
+            code: errorData.code || 'AUTHENTICATION_REQUIRED'
+          };
+        } catch (parseError) {
+          // Fall back to default response if parsing fails
+          return {
+            success: false,
+            data: null,
+            error: 'Authentication required',
+            message: 'Authentication required',
+            statusCode: 401,
+            code: 'AUTHENTICATION_REQUIRED'
+          };
+        }
+      }
+      
+      if (response.status === 403) {
+        // Try to parse JSON response for more info
+        try {
+          const clonedResponse = response.clone();
+          const errorData = await clonedResponse.json();
+          
+          return {
+            success: false,
+            data: null,
+            error: errorData.error || errorData.message || 'Permission denied',
+            message: errorData.message || errorData.error || 'You do not have permission to access this resource',
+            statusCode: 403,
+            code: errorData.code || 'PERMISSION_DENIED'
+          };
+        } catch (parseError) {
+          // Fall back to default response if parsing fails
+          return {
+            success: false,
+            data: null,
+            error: 'Permission denied',
+            message: 'You do not have permission to access this resource',
+            statusCode: 403,
+            code: 'PERMISSION_DENIED'
+          };
+        }
+      }
+      
+      // Process based on content type
+      if (isJson) {
+        // Parse JSON response
+        const body = await response.json();
+        
+        // Check for API-formatted response
+        if ('success' in body) {
+          // If already in correct format, use it directly with code if available
+          return {
+            success: body.success,
+            data: body.data,
+            error: body.error || body.message || null,
+            message: body.message || body.error || null,
+            statusCode: response.status,
+            code: body.code || (body.error && body.error.code ? body.error.code : undefined)
+          };
+        }
+        
+        // Format regular JSON response
+        return {
+          success: response.ok,
+          data: response.ok ? body : null,
+          error: !response.ok ? (body.error || body.message || response.statusText) : null,
+          message: !response.ok ? (body.message || body.error || response.statusText) : null, 
+          statusCode: response.status,
+          code: body.code || (body.error && body.error.code ? body.error.code : undefined)
+        };
+      } else {
+        // Handle non-JSON responses
+        const text = await response.text();
+        
+        return {
+          success: response.ok,
+          data: response.ok ? text as any : null,
+          error: !response.ok ? text || response.statusText : null,
+          message: !response.ok ? text || response.statusText : undefined, 
+          statusCode: response.status
+        };
+      }
+    } catch (error) {
+      logger.error('Error processing API response:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        status: response.status,
+        url: response.url
+      });
+      
+      return {
+        success: false,
+        data: null,
+        error: error instanceof Error ? error.message : String(error),
+        message: error instanceof Error ? error.message : String(error), 
+        statusCode: response.status
+      };
+    }
+  }
+  
+  /**
+   * Make API request with proper authentication and error handling
+   */
+  async request<T = any>(
+    method: string,
+    path: string,
+    data?: any,
+    options?: ApiOptions
+  ): Promise<ApiResponse<T>> {
+    // Ensure client is initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
+    // Format URL with query parameters
+    const url = this.formatUrl(path, options?.params);
+    
+    // Get headers
+    const headers = await this.getHeaders(options);
+    
+    // Create request config
+    const config: RequestInit = {
+      method,
+      headers,
+      cache: options?.cache || 'no-cache',
+      credentials: 'include', // Include cookies
+      signal: options?.signal,
+    };
+    
+    // Add request body for non-GET requests
+    if (method !== 'GET' && data !== undefined) {
+      config.body = JSON.stringify(data);
+    }
+    
+    try {
+      logger.debug(`API ${method} request: ${url}`);
+      
+      // Make request with retry logic
+      const response = await this.fetchWithRetry(url, config, options);
+      
+      // Process response
+      const result = await this.processResponse<T>(response);
+      
+      // Log result
+      if (!result.success) {
+        logger.warn(`API ${method} request failed: ${url}`, {
+          status: result.statusCode,
+          error: result.error,
+          code: result.code
+        });
+        
+        // Handle 401 errors with automatic token refresh
+        if (result.statusCode === 401 && options?.withAuth !== false) {
+          logger.info('API Request returned 401, attempting token refresh');
+          
+          // Log the response
+          logger.debug('API Response:', {
+            success: result.success,
+            data: result.data,
+            error: result.error,
+            message: result.message,
+            statusCode: result.statusCode,
+            code: result.code
+          });
+          
+          // Clear token cache and try to refresh
+          TokenManager.clearTokens();
+          
+          try {
+            logger.debug('Starting token refresh');
+            const refreshResult = await TokenManager.refreshToken({
+              force: true,
+              retry: 0 // No retries for refresh to prevent loops
+            });
+            
+            if (refreshResult) {
+              logger.info('Token refreshed, retrying request');
+              
+              // Wait a short time to ensure token is fully propagated
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              // Get new headers with fresh token and explicitly mark as post-401 retry
+              const retryOptions = { ...options, withAuth: true, retry: 401 };
+              const newHeaders = await this.getHeaders(retryOptions);
+              
+              // Update config with new headers
+              config.headers = newHeaders;
+              
+              // Make sure the Authorization header is properly set
+              const token = await TokenManager.getToken();
+              if (token) {
+                // Log token info for debugging
+                logger.debug('Using token for retry', {
+                  tokenLength: token.length,
+                  tokenPrefix: token.substring(0, 10) + '...',
+                  hasAuthHeader: newHeaders.has('Authorization'),
+                  authHeader: newHeaders.get('Authorization')?.substring(0, 15) + '...'
+                });
+              }
+              
+              // Retry the request with new token
+              try {
+                const newResponse = await fetch(url, config);
+                return await this.processResponse<T>(newResponse);
+              } catch (retryError) {
+                // Log error and continue to return original error
+                logger.error('Retry request after token refresh failed:', {
+                  error: retryError instanceof Error ? retryError.message : String(retryError),
+                  stack: retryError instanceof Error ? retryError.stack : undefined
+                });
+              }
+            } else {
+              logger.warn('Token refresh failed, not retrying request');
+              
+              // Try to initialize auth service as a last resort
+              try {
+                const { default: AuthService } = await import('@/features/auth/core/AuthService');
+                await AuthService.initialize({ force: true });
+                
+                // Get a fresh token after full initialization
+                const token = await TokenManager.getToken();
+                if (token) {
+                  // If we have a token now, retry with it
+                  const retryOptions = { ...options, withAuth: true, retry: 401 };
+                  const newHeaders = await this.getHeaders(retryOptions);
+                  config.headers = newHeaders;
+                  
+                  const newResponse = await fetch(url, config);
+                  return await this.processResponse<T>(newResponse);
+                }
+              } catch (authInitError) {
+                logger.error('Auth service initialization failed:', {
+                  error: authInitError instanceof Error ? authInitError.message : String(authInitError)
+                });
+              }
+              
+              // Notify app about authentication issue
+              logger.warn('API Client Error', {
+                message: result.error || result.message,
+                code: result.statusCode,
+                status: result.statusCode
+              });
+              
+              // Only emit event for auth required errors
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('auth-required', {
+                  detail: { 
+                    path, 
+                    method, 
+                    timestamp: Date.now(),
+                    statusCode: result.statusCode
+                  }
+                }));
+              }
+            }
+          } catch (refreshError) {
+            // Log refresh error
+            logger.error('Error refreshing token during API request:', {
+              error: refreshError instanceof Error ? refreshError.message : String(refreshError),
+              stack: refreshError instanceof Error ? refreshError.stack : undefined
+            });
+          }
+        }
+        // Handle 403 errors (permission issue)
+        else if (result.statusCode === 403 && options?.withAuth !== false) {
+          // Just notify the app about the permission failure
+          logger.warn('API Client Error - Permission denied', {
+            message: result.error || result.message,
+            code: result.statusCode,
+            status: result.statusCode
+          });
+          
+          // Emit event for permission denied errors
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('permission-denied', {
+              detail: { 
+                path, 
+                method, 
+                timestamp: Date.now(),
+                statusCode: result.statusCode
+              }
+            }));
+          }
+        }
+      } else {
+        logger.debug(`API ${method} request succeeded: ${url}`, {
+          status: result.statusCode
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      logger.error(`API ${method} request error: ${url}`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      return {
+        success: false,
+        data: null,
+        error: error instanceof Error ? error.message : String(error),
+        message: error instanceof Error ? error.message : String(error),
+        statusCode: 500
+      };
+    }
+  }
+  
+  /**
+   * GET request
+   */
+  async get<T = any>(path: string, options?: ApiOptions): Promise<ApiResponse<T>> {
+    return this.request<T>('GET', path, undefined, options);
+  }
+  
+  /**
+   * POST request
+   */
+  async post<T = any>(path: string, data?: any, options?: ApiOptions): Promise<ApiResponse<T>> {
+    return this.request<T>('POST', path, data, options);
+  }
+  
+  /**
+   * PUT request
+   */
+  async put<T = any>(path: string, data?: any, options?: ApiOptions): Promise<ApiResponse<T>> {
+    return this.request<T>('PUT', path, data, options);
+  }
+  
+  /**
+   * PATCH request
+   */
+  async patch<T = any>(path: string, data?: any, options?: ApiOptions): Promise<ApiResponse<T>> {
+    return this.request<T>('PATCH', path, data, options);
+  }
+  
+  /**
+   * DELETE request
+   */
+  async delete<T = any>(path: string, data?: any, options?: ApiOptions): Promise<ApiResponse<T>> {
+    return this.request<T>('DELETE', path, data, options);
+  }
 
-/**
- * Custom error class for API request errors
- */
-export class ApiRequestError extends Error {
-  constructor(
-    public message: string,
-    public statusCode: number = 500,
-    public errors: string[] = []
-  ) {
-    super(message);
-    this.name = 'ApiRequestError';
-    // This is needed to properly extend Error in TypeScript
-    Object.setPrototypeOf(this, ApiRequestError.prototype);
+  /**
+   * Get base URL
+   */
+  getBaseUrl(): string {
+    return this.baseUrl;
   }
 }
 
-export const apiClient = ApiClient;
+// Create singleton instance
+export const ApiClient = new ApiClientClass();
+
+// Default export
 export default ApiClient;
-/**
- * Function stub kept for reference - disabled
- * This function has been disabled to expose all authentication errors directly
- * We no longer attempt to automatically refresh tokens when 401 errors occur
- */
-async function disabledHandle401Response<T>(): Promise<ApiResponse<T> | undefined> {
-  // This function is intentionally disabled to force proper error handling
-  console.error('Token refresh on 401 has been disabled to expose authentication errors');
-  return undefined;
-}

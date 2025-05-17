@@ -37,13 +37,13 @@ export function handleError(error: unknown, defaultMessage: string = 'An error o
   // Handle API error responses
   if (typeof error === 'object' && error !== null) {
     // Check for standard API error response
-    if ('message' in error && typeof (error as any).message === 'string') {
-      return (error as any).message;
+    if ('message' in error && typeof (error).message === 'string') {
+      return (error).message;
     }
     
     // Check for errors array/object
     if ('errors' in error) {
-      const errors = (error as any).errors;
+      const errors = (error).errors;
       
       // Handle array of error messages
       if (Array.isArray(errors)) {
@@ -104,7 +104,8 @@ export function extractValidationErrors(error: unknown): Record<string, string> 
   
   // Handle API error with validation errors
   if ('errors' in error) {
-    const errors = (error as any).errors;
+    const errorObj = error as Record<string, any>;
+    const errors = errorObj.errors;
     
     // Handle object with field-specific errors
     if (typeof errors === 'object' && errors !== null && !Array.isArray(errors)) {
@@ -118,12 +119,14 @@ export function extractValidationErrors(error: unknown): Record<string, string> 
     }
     
     // Handle validationErrors property
-    if ('validationErrors' in error && typeof (error as any).validationErrors === 'object') {
-      const validationErrors = (error as any).validationErrors;
+    if ('validationErrors' in errorObj && typeof errorObj.validationErrors === 'object') {
+      const validationErrors = errorObj.validationErrors as Record<string, string | string[]>;
       
-      Object.entries(validationErrors).forEach(([field, message]) => {
-        result[field] = Array.isArray(message) ? message.join(', ') : String(message);
-      });
+      if (validationErrors) {
+        Object.entries(validationErrors).forEach(([field, message]) => {
+          result[field] = Array.isArray(message) ? message.join(', ') : String(message);
+        });
+      }
     }
   }
   

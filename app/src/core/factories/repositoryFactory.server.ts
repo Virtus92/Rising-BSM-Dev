@@ -17,7 +17,7 @@ import { CustomerRepository } from '@/features/customers/lib/repositories/Custom
 import { AppointmentRepository } from '@/features/appointments/lib/repositories/AppointmentRepository';
 import { RequestRepository } from '@/features/requests/lib/repositories/RequestRepository';
 import { ActivityLogRepository } from '@/features/activity/lib/repositories/ActivityLogRepository';
-import { NotificationRepository } from '@/features/notifications/lib/repositories/NotificationRepository';
+import { NotificationRepository } from '@/features/notifications/lib/repositories/NotificationRepository.server';
 import { RefreshTokenRepository } from '@/features/auth/lib/repositories/RefreshTokenRepository';
 import { PermissionRepository } from '@/features/permissions/lib/repositories/PermissionRepository';
 import { RequestDataRepository } from '@/features/requests/lib/repositories/RequestDataRepository';

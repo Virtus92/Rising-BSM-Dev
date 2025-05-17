@@ -17,6 +17,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 import { formatDate } from '@/features/notifications/utils/date-utils';
 import { AppointmentService } from '@/features/appointments/lib/services';
+
+// Create an instance of AppointmentService
+const appointmentService = new AppointmentService();
 import { useToast } from '@/shared/hooks/useToast';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
@@ -94,28 +97,13 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         
         // Store the API call in a variable first before awaiting it
         // This prevents issues with Function.prototype.apply on Promise objects
-        const apiCall = AppointmentService.getAll({
-          customerId: customerId,
-          limit: 100 // Get a larger number to show all appointments
+        const apiCall = appointmentService.findByCriteria({
+          customerId: customerId
         });
         
         // Now await the promise
-        const response = await apiCall;
-        
-        if (response.success && response.data) {
-          // Ensure we're handling the data structure correctly
-          if ('data' in response.data && Array.isArray(response.data.data)) {
-            setAppointments(response.data.data);
-          } else if (Array.isArray(response.data)) {
-            setAppointments(response.data);
-          } else {
-            console.error('Unexpected data structure:', response.data);
-            setAppointments([]);
-          }
-        } else {
-          setError('Failed to load appointments');
-          console.error('Error fetching appointments:', response.message || 'Unknown error');
-        }
+        const appointments = await apiCall;
+        setAppointments(appointments || []);
       } catch (err) {
         setError('Failed to load appointments');
         console.error('Error fetching appointments:', err);
@@ -130,15 +118,15 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
   }, [customerId]);
 
   // Handle appointment status change
-  const handleStatusChange = async (id: number, newStatus: string) => {
+  const handleStatusChange = async (id: number, newStatus: AppointmentStatus) => {
     try {
       setChangingStatusId(id);
       
       // First try using updateStatus with more appropriate endpoint
       try {
-        const response = await AppointmentService.updateStatus(id, newStatus);
+        const response = await appointmentService.updateStatus(id, newStatus);
         
-        if (response.success) {
+        if (response) {
           // Update local state
           setAppointments(appointments.map(appointment => 
             appointment.id === id 
@@ -159,9 +147,9 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
       }
       
       // Fall back to regular update method if updateStatus fails
-      const response = await AppointmentService.update(id, { status: newStatus });
+      const response = await appointmentService.update(id, { status: newStatus as AppointmentStatus });
       
-      if (response.success) {
+      if (response) {
         // Update local state
         setAppointments(appointments.map(appointment => 
           appointment.id === id 
@@ -177,7 +165,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
       } else {
         toast({
           title: 'Update failed',
-          description: response.message || 'Failed to update status',
+          description: 'Failed to update status',
           variant: 'error'
         });
       }
@@ -197,9 +185,9 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
   const handleDelete = async (id: number) => {
     try {
       setIsDeleting(true);
-      const response = await AppointmentService.delete(id);
+      const response = await appointmentService.delete(id);
       
-      if (response.success) {
+      if (response) {
         // Remove deleted appointment from state
         setAppointments(appointments.filter(appointment => appointment.id !== id));
         
@@ -211,7 +199,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
       } else {
         toast({
           title: 'Delete failed',
-          description: response.message || 'Failed to delete appointment',
+          description: 'Failed to delete appointment',
           variant: 'error'
         });
       }
@@ -408,9 +396,9 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         customerId: customerId
       };
       
-      const response = await AppointmentService.create(formData);
+      const response = await appointmentService.create(formData);
       
-      if (response.success && response.data) {
+      if (response) {
         toast({
           title: 'Success',
           description: 'Appointment created successfully',
@@ -418,7 +406,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         });
         
         // Add the new appointment to the list
-        setAppointments([response.data, ...appointments]);
+        setAppointments([response, ...appointments]);
         
         // Close the modal and reset form
         setIsAppointmentModalOpen(false);
@@ -434,7 +422,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
       } else {
         toast({
           title: 'Error',
-          description: response.message || 'Failed to create appointment',
+          description: 'Failed to create appointment',
           variant: 'error'
         });
       }
@@ -471,9 +459,9 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         customerId: customerId
       };
       
-      const response = await AppointmentService.update(currentEditAppointment, formData);
+      const response = await appointmentService.update(currentEditAppointment, formData);
       
-      if (response.success && response.data) {
+      if (response) {
         toast({
           title: 'Success',
           description: 'Appointment updated successfully',
@@ -483,7 +471,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         // Update the appointment in the list
         setAppointments(appointments.map(appointment => 
           appointment.id === currentEditAppointment 
-            ? response.data
+            ? response
             : appointment
         ));
         
@@ -493,7 +481,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
       } else {
         toast({
           title: 'Error',
-          description: response.message || 'Failed to update appointment',
+          description: 'Failed to update appointment',
           variant: 'error'
         });
       }

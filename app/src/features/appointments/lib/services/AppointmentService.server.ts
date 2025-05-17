@@ -1,3 +1,6 @@
+// Mark as server-only to prevent client-side imports
+import 'server-only';
+
 import { Appointment } from '@/domain/entities/Appointment';
 import { 
   CreateAppointmentDto, 
@@ -41,12 +44,26 @@ export class AppointmentService implements IAppointmentService {
     errorHandler?: IErrorHandler
   ) {
     // Dependencies are injected, but we'll get them from factories if not provided
-    this.repository = repository || require('@/core/factories').getAppointmentRepository();
-    this.logger = logger || require('@/core/logging').getLogger();
-    this.validationService = validationService || require('@/core/validation').getValidationService();
-    this.errorHandler = errorHandler || require('@/core/errors').getErrorHandler();
-    
-    this.logger.debug('Server-side AppointmentService initialized');
+    try {
+      if (repository) {
+      this.repository = repository;
+      } else {
+      const { getAppointmentRepository } = require('@/core/factories/repositoryFactory.server');
+      this.repository = getAppointmentRepository();
+      }
+      
+      // Use injected dependencies or get from appropriate modules
+      this.logger = logger || require('@/core/logging').getLogger();
+      this.validationService = validationService || require('@/core/validation').getValidationService();
+      this.errorHandler = errorHandler || require('@/core/errors').getErrorHandler();
+      
+      this.logger.debug('Server-side AppointmentService initialized');
+    } catch (error) {
+      // Log error but continue - useful for debugging initialization issues
+      console.error('Error initializing AppointmentService:', error);
+      // Rethrow with more context to make debugging easier
+      throw new Error(`Failed to initialize AppointmentService: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
@@ -911,7 +928,7 @@ export class AppointmentService implements IAppointmentService {
    */
   toDTO(entity: Appointment): AppointmentResponseDto {
     if (!entity) {
-      return null as any;
+      throw new Error('Cannot convert null or undefined Appointment to DTO');
     }
     
     const appointmentDate = new Date(entity.appointmentDate);
@@ -938,16 +955,16 @@ export class AppointmentService implements IAppointmentService {
     };
     
     // Add customer information if available
-    if ((entity as any).customer) {
-      dto.customerName = (entity as any).customer.name;
+    if ((entity).customer) {
+      dto.customerName = (entity).customer.name;
       dto.customerData = {
-        id: (entity as any).customer.id,
-        name: (entity as any).customer.name,
-        email: (entity as any).customer.email,
-        phone: (entity as any).customer.phone
+        id: (entity).customer.id,
+        name: (entity).customer.name,
+        email: (entity).customer.email,
+        phone: (entity).customer.phone
       };
-    } else if ((entity as any).customerName) {
-      dto.customerName = (entity as any).customerName;
+    } else if ((entity).customerName) {
+      dto.customerName = (entity).customerName;
     }
     
     return dto;

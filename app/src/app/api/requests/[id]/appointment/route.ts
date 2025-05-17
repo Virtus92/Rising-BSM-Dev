@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 

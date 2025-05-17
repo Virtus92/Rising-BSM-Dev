@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AuthErrorType } from '@/features/auth/utils/AuthErrorHandler';
+import { AuthErrorType } from '@/types/types/auth';
 
 interface AuthErrorDisplayProps {
   /**
@@ -57,8 +57,8 @@ function getErrorType(error: any): AuthErrorType | string {
   
   // Extract from error object
   if (error.type) return error.type;
-  if ((error as any).errorType) return (error as any).errorType;
-  if ((error as any).code) return (error as any).code;
+  if ((error).errorType) return (error).errorType;
+  if ((error).code) return (error).code;
   
   // Check error message for keywords
   if (error.message) {
@@ -154,7 +154,7 @@ function getErrorDetails(error: any): any {
   if (!error) return null;
   
   if (error.details) return error.details;
-  if ((error as any).errorDetails) return (error as any).errorDetails;
+  if ((error).errorDetails) return (error).errorDetails;
   
   // For standard errors, create details object
   if (error instanceof Error) {

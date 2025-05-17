@@ -22,9 +22,41 @@ export class RequestClient {
    * @returns Response with paginated requests
    */
   static async getAll(params?: RequestFilterParams) {
-    return ApiClient.get(this.BASE_PATH, { params });
+    // Convert RequestFilterParams to Record<string, string | number | boolean | undefined>
+    const queryParams: Record<string, string | number | boolean | undefined> = {};
+    
+    if (params) {
+      // Extract known properties and convert them to appropriate format
+      if (params.status) {
+        if (Array.isArray(params.status)) {
+          queryParams.status = params.status.join(',');
+        } else {
+          queryParams.status = params.status;
+        }
+      }
+      if (params.type) {
+        if (Array.isArray(params.type)) {
+          queryParams.type = params.type.join(',');
+        } else {
+          queryParams.type = params.type;
+        }
+      }
+      if (params.source) queryParams.source = params.source;
+      if (params.processorId) queryParams.processorId = params.processorId;
+      if (params.customerId) queryParams.customerId = params.customerId;
+      if (params.priority) queryParams.priority = params.priority;
+      if (params.startDate) queryParams.startDate = typeof params.startDate === 'string' ? params.startDate : params.startDate.toISOString();
+      if (params.endDate) queryParams.endDate = typeof params.endDate === 'string' ? params.endDate : params.endDate.toISOString();
+      if (params.search) queryParams.search = params.search;
+      if (params.page) queryParams.page = params.page;
+      if (params.limit) queryParams.limit = params.limit;
+      if (params.sortBy) queryParams.sortBy = params.sortBy;
+      if (params.sortOrder) queryParams.sortOrder = params.sortOrder;
+    }
+    
+    return ApiClient.get(this.BASE_PATH, queryParams);
   }
-
+ 
   /**
    * Get a request by ID
    * @param id Request ID

@@ -176,8 +176,21 @@ export class CustomerRepository extends PrismaRepository<Customer> implements IC
       // Map to domain entity
       const customerEntity = this.mapToDomainEntity(customer);
       
-      // Add relationships (later we would use the domain types here)
-      (customerEntity as any).appointments = customer.appointments;
+      // Add appointments directly to the customer entity instance
+      // This maintains the class prototype chain and all methods
+      customerEntity.appointments = customer.appointments.map(appt => ({
+        id: appt.id,
+        title: appt.title || '',
+        appointmentDate: appt.appointmentDate,
+        status: appt.status,
+        duration: appt.duration,
+        location: appt.location || '',
+        description: appt.description || '',
+        customerId: appt.customerId,
+        createdAt: appt.createdAt,
+        updatedAt: appt.updatedAt,
+        createdBy: appt.createdBy
+      }));
       
       return customerEntity;
     } catch (error) {
@@ -581,8 +594,8 @@ export class CustomerRepository extends PrismaRepository<Customer> implements IC
         userId, 
         actionType 
       });
-      // Activity logging should not affect the main operation
-      return null;
+      // Return an empty object instead of null
+      return {};
     }
   }
 
@@ -594,7 +607,7 @@ export class CustomerRepository extends PrismaRepository<Customer> implements IC
    */
   protected mapToDomainEntity(ormEntity: any): Customer {
     if (!ormEntity) {
-      return null as any;
+      throw new Error('Cannot map null or undefined ORM entity to Customer');
     }
     
     return new Customer({
@@ -777,6 +790,90 @@ export class CustomerRepository extends PrismaRepository<Customer> implements IC
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
       });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Gets activity logs for a customer
+   * 
+   * @param id - Customer ID
+   * @returns Activity logs
+   */
+  async getActivityLogs(id: number): Promise<any[]> {
+    try {
+      this.logger.debug(`Getting activity logs for customer: ${id}`);
+      
+      const activityLogs = await this.prisma.userActivity.findMany({
+        where: {
+          details: {
+            contains: `"entityId":${id}`,
+            mode: 'insensitive'
+          }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: { timestamp: 'desc' }
+      });
+      
+      return activityLogs.map(log => ({
+        id: log.id,
+        userId: log.userId,
+        userName: log.user?.name || 'System',
+        activity: log.activity,
+        details: log.details ? JSON.parse(log.details) : {},
+        timestamp: log.timestamp
+      }));
+    } catch (error) {
+      this.logger.error('Error in CustomerRepository.getActivityLogs', { error, id });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Gets all logs for a customer (both direct logs and activity logs)
+   * 
+   * @param id - Customer ID
+   * @returns Customer logs
+   */
+  async getLogs(id: number): Promise<any[]> {
+    try {
+      this.logger.debug(`Getting all logs for customer: ${id}`);
+      
+      // Get both types of logs in parallel
+      const [customerLogs, activityLogs] = await Promise.all([
+        this.getCustomerLogs(id),
+        this.getActivityLogs(id)
+      ]);
+      
+      // Combine both types of logs
+      const allLogs = [
+        ...customerLogs.map(log => ({
+          ...log,
+          source: 'customer_log',
+          timestamp: log.createdAt
+        })),
+        ...activityLogs.map(log => ({
+          ...log,
+          source: 'activity_log'
+        }))
+      ];
+      
+      // Sort by timestamp descending
+      return allLogs.sort((a, b) => {
+        const dateA = new Date(a.timestamp || a.createdAt);
+        const dateB = new Date(b.timestamp || b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
+    } catch (error) {
+      this.logger.error('Error in CustomerRepository.getLogs', { error, id });
       throw this.handleError(error);
     }
   }

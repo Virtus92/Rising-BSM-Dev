@@ -1,7 +1,18 @@
-'use client';
+/**
+ * Unified export for NotificationService that works on both client and server
+ */
 
-// Export client-side service by default
-export * from './NotificationService';
+import { INotificationService } from '@/domain/services/INotificationService';
 
-// Export server-side service
-export { NotificationService as NotificationServiceServer } from './NotificationService.server';
+// Determine if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
+/**
+ * Get the appropriate implementation of NotificationService based on environment
+ */
+export const NotificationService = isBrowser
+  ? require('./NotificationService.client').NotificationService
+  : require('./NotificationService.server').NotificationService;
+
+// Re-export for convenience
+export default NotificationService;

@@ -5,7 +5,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
 import { IUserService } from '@/domain/services/IUserService';
 

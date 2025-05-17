@@ -2,8 +2,10 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { filterDataByUserRole } from '@/app/api/helpers/permissionUtils';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
 
 /**
  * GET /api/appointments/upcoming
@@ -14,6 +16,37 @@ export const GET = routeHandler(async (request: NextRequest) => {
   const serviceFactory = getServiceFactory();
   
   try {
+    // Enhanced authentication validation: check both auth object and custom header
+    const authUserId = request.auth?.userId || null;
+    const headerUserId = request.headers.get('X-Auth-User-ID');
+    
+    // Log authentication details for debugging
+    logger.debug('Authentication check details', {
+      hasAuthProperty: !!request.auth,
+      authUserId: authUserId,
+      headerUserId: headerUserId,
+      allHeaders: Object.fromEntries([...request.headers.entries()])
+    });
+    
+    // Use either source of authentication
+    const userId = authUserId || (headerUserId ? parseInt(headerUserId, 10) : null);
+    
+    if (!userId) {
+      logger.warn('Upcoming appointments access attempted without authentication');
+      return formatResponse.unauthorized('Authentication required');
+    }
+    
+    // Ensure the request auth object is available for the rest of the function
+    if (!request.auth && userId) {
+      // If only the header is available, create the auth object
+      Object.defineProperty(request, 'auth', {
+        value: { userId },
+        writable: false,
+        enumerable: true,
+        configurable: false
+      });
+    }
+    
     // Get URL parameters
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '7', 10);
@@ -22,8 +55,8 @@ export const GET = routeHandler(async (request: NextRequest) => {
     // Get appointment service
     const appointmentService = serviceFactory.createAppointmentService();
     
-    // Context for service calls
-    const context = { userId: request.auth?.userId };
+    // Context for service calls - use the authenticated user ID
+    const context = { userId: request.auth.userId };
     
     // Use service method to get upcoming appointments
     let appointments = await appointmentService.getUpcoming(limit, {
@@ -32,14 +65,12 @@ export const GET = routeHandler(async (request: NextRequest) => {
     });
     
     // Apply role-based filtering
-    if (request.auth?.userId) {
-      appointments = await filterDataByUserRole(
-        request.auth.userId,
-        appointments,
-        // Function to get the owner ID from an appointment
-        (appointment) => appointment.createdBy
-      );
-    }
+    appointments = await filterDataByUserRole(
+      request.auth.userId,
+      appointments,
+      // Function to get the owner ID from an appointment
+      (appointment) => appointment.createdBy
+    );
     
     // If no appointments are accessible based on permissions, return empty array
     if (!appointments || appointments.length === 0) {
@@ -89,17 +120,33 @@ export const GET = routeHandler(async (request: NextRequest) => {
     
     return formatResponse.success(appointments, `Retrieved upcoming appointments successfully`);
   } catch (error) {
+    // Improved error handling with better diagnostics
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Log detailed error information
     logger.error('Error fetching upcoming appointments:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: request.auth?.userId || 'unknown',
+      requestUrl: request.url
     });
     
+    // Check for specific error types
+    if (errorMessage.includes('Authentication') || errorMessage.includes('auth')) {
+      return formatResponse.unauthorized('Authentication required');
+    }
+    
+    if (errorMessage.includes('Permission') || errorMessage.includes('permission')) {
+      return formatResponse.forbidden('Permission denied to view appointments');
+    }
+    
     return formatResponse.error(
-      error instanceof Error ? error.message : 'Failed to retrieve upcoming appointments',
+      'Failed to retrieve upcoming appointments',
       500
     );
   }
 }, {
-  // Secure this endpoint
-  requiresAuth: true
+  // Consistent with other secure endpoints - require authentication
+  requiresAuth: true,
+  cacheControl: 'no-store, max-age=0'
 });

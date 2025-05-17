@@ -99,7 +99,7 @@ function ensureFullImplementation(service: IUserService): IUserService {
   let missingMethods = false;
   
   methodsToCheck.forEach(method => {
-    if (typeof (service as any)[method] !== 'function') {
+    if (typeof service[method as keyof IUserService] !== 'function') {
       logger.warn(`UserServiceAdapter: Missing implementation for ${method}. Adding stub.`);
       missingMethods = true;
       
@@ -154,6 +154,18 @@ function ensureFullImplementation(service: IUserService): IUserService {
       };
     }
   });
+
+  // Ensure findById is implemented (required by IUserService)
+  if (typeof service['findById'] !== 'function') {
+    logger.warn(`UserServiceAdapter: Missing implementation for findById. Adding implementation.`);
+    missingMethods = true;
+    
+    // Add implementation that uses getById
+    service['findById'] = async (id: number, options?: ServiceOptions) => {
+      logger.debug(`UserServiceAdapter: Using getById as implementation for findById(${id}).`);
+      return service.getById(id, options);
+    };
+  }
   
   if (missingMethods) {
     logger.warn('UserServiceAdapter: Some methods were missing and replaced with stubs. Check implementation.');
@@ -173,6 +185,7 @@ function createEmptyImplementation(): IUserService {
     count: async () => 0,
     getAll: async () => ({ data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } }),
     getById: async () => null,
+    findById: async () => null,
     create: async (data) => { throw new Error('UserService not properly initialized'); },
     update: async (id, data) => { throw new Error('UserService not properly initialized'); },
     delete: async () => false,

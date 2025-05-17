@@ -427,7 +427,7 @@ export class ActivityLogService extends BaseService<
    */
   toDTO(entity: ActivityLog): ActivityLogDto {
     if (!entity) {
-      return null as any;
+      throw new Error('Cannot convert null or undefined ActivityLog to DTO');
     }
     
     return {
@@ -452,7 +452,7 @@ export class ActivityLogService extends BaseService<
    */
   fromDTO(dto: Partial<ActivityLog>): Partial<ActivityLog> {
     if (!dto) {
-      return null as any;
+      throw new Error('Cannot convert null or undefined DTO to ActivityLog');
     }
     
     return {

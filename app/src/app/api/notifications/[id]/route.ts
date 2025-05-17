@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { authMiddleware } from '@/features/auth/api/middleware';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatResponse } from '@/core/errors';

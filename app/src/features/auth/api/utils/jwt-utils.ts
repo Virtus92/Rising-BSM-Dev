@@ -51,9 +51,11 @@ export function verifyToken<T = any>(token: string, secret?: string, options?: j
   try {
     const jwtSecret = secret || getJwtSecret();
     const defaultOptions: jwt.VerifyOptions = {
-      issuer: 'rising-bsm',
+      issuer: process.env.JWT_ISSUER || 'rising-bsm',
       audience: process.env.JWT_AUDIENCE || 'rising-bsm-app'
     };
+    
+    getLogger().debug('JWT verification options:', { defaultOptions });
     
     try {
       // First try with standard JWT claims

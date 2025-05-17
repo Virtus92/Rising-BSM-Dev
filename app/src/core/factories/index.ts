@@ -1,26 +1,25 @@
 /**
  * Central export file for factory functions
  * 
- * This file exports all factory functions and classes
- * for easy import in other parts of the application.
+ * This re-exports both client and server factories based on context.
+ * The appropriate implementation will be selected automatically based on
+ * where this module is imported.
  */
 
-// Import factory functions first to ensure they're defined
-import { getDatabaseFactory, DatabaseFactory } from './databaseFactory';
-import { getRepositoryFactory, RepositoryFactory } from './repositoryFactory';
-import { getServiceFactory, ServiceFactory } from './serviceFactory';
+// Import and re-export from client factory implementation
+export * from './databaseFactory.client';
+export * from './repositoryFactory.client';
 
-// Database factory
-export * from './databaseFactory';
+// IMPORTANT: Direct imports to serviceFactory should NOT be used, as they will
+// cause errors in server contexts. Instead, import from either:
+// - './serviceFactory' for client contexts
+// - './serviceFactory.server' for server contexts
 
-// Repository factories 
-export * from './repositoryFactory';
+// Named exports for convenience and backwards compatibility
+export { getDatabaseFactory, DatabaseFactory } from './databaseFactory.client';
+export { getRepositoryFactory, RepositoryFactory } from './repositoryFactory.client';
 
-// Service factories
-export * from './serviceFactory';
-
-// Add explicit exports for factory functions and classes
-// These are the primary exports used by bootstrap.server.ts
-export { getServiceFactory, ServiceFactory };
-export { getDatabaseFactory, DatabaseFactory };
-export { getRepositoryFactory, RepositoryFactory };
+// Do NOT export serviceFactory here as it will cause server/client conflicts
+// Use direct imports instead:
+// import { getServiceFactory } from '@/core/factories/serviceFactory';
+// import { getServiceFactory } from '@/core/factories/serviceFactory.server';

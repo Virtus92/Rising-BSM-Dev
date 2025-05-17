@@ -14,6 +14,19 @@ import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { getIconComponent } from '@/shared/utils/icon-utils';
 
+// Interface for navigation item
+interface NavigationItemProps {
+  name: string;
+  path: string;
+  icon?: string; // Make icon optional to match MenuItem
+  badge?: {
+    text: string;
+    variant: 'default' | 'secondary' | 'destructive' | 'outline';
+  };
+  permission?: string | string[];
+  children?: NavigationItemProps[];
+}
+
 /**
  * Main dashboard navigation that displays menu items based on user role and permissions
  */
@@ -26,13 +39,17 @@ export function DashboardNav() {
   // Default to user role if somehow the user object doesn't have a role
   const userRole = user.role || UserRole.USER;
   
-  // Get navigation config for the user's role
-  const navigation = dashboardNavigation[userRole] || dashboardNavigation[UserRole.USER];
+  // Get navigation config for the user's role - ensuring we have a valid UserRole
+  const userRoleEnum = Object.values(UserRole).includes(userRole as UserRole) ? 
+    userRole as UserRole : 
+    UserRole.USER;
+    
+  const navigation = dashboardNavigation[userRoleEnum] || dashboardNavigation[UserRole.USER];
   
   return (
     <ScrollArea className="h-[calc(100vh-14rem)] px-1">
       <div className="space-y-6 py-2">
-        {navigation.map((section, i) => (
+        {navigation.map((section: MenuSection, i: number) => (
           <NavigationSection key={i} section={section} pathname={pathname} />
         ))}
       </div>
@@ -63,7 +80,7 @@ function NavigationSection({ section, pathname }: { section: MenuSection; pathna
   );
 }
 
-function NavigationItem({ item, pathname }: { item: any; pathname: string }) {
+function NavigationItem({ item, pathname }: { item: NavigationItemProps; pathname: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const isActive = pathname === item.path || pathname?.startsWith(item.path + '/');
   
@@ -98,7 +115,7 @@ function NavigationItem({ item, pathname }: { item: any; pathname: string }) {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="pl-6 pt-1">
-          {item.children.map((child: any, index: number) => (
+          {item.children.map((child: NavigationItemProps, index: number) => (
             <PermissionIndicator
               key={index}
               permission={typeof child.permission === 'string' ? child.permission : ''}

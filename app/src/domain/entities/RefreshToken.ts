@@ -62,6 +62,10 @@ export class RefreshToken extends BaseEntity {
     this.revokedByIp = data.revokedByIp;
     this.isRevoked = data.isRevoked || false;
     this.replacedByToken = data.replacedByToken;
+    
+    // For RefreshToken, the token string is the primary key, not the numeric id
+    // We'll set id to 0 as it's not used in Prisma operations for this entity
+    this.id = 0;
   }
   
   /**
@@ -96,18 +100,26 @@ export class RefreshToken extends BaseEntity {
    * Konvertiert die Entität in ein einfaches Objekt
    */
   override toObject(): Record<string, any> {
-    const baseObject = super.toObject();
-    
+    // Don't include the base object properties that aren't in the Prisma schema
+    // Only include the fields that are actually in the RefreshToken model
     return {
-      ...baseObject,
       token: this.token,
       userId: this.userId,
       expiresAt: this.expiresAt,
+      createdAt: this.createdAt,
       createdByIp: this.createdByIp,
       revokedAt: this.revokedAt,
       revokedByIp: this.revokedByIp,
       isRevoked: this.isRevoked,
       replacedByToken: this.replacedByToken
     };
+  }
+  
+  /**
+   * Gets the actual primary key value for database operations
+   * This method should be used by repositories to get the correct ID for database operations
+   */
+  getPrimaryKey(): string {
+    return this.token;
   }
 }

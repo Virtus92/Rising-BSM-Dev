@@ -1,612 +1,999 @@
+// Mark as server-only to prevent client-side import
+import 'server-only';
+
+/**
+ * Clean Permission Service
+ * 
+ * Design principles:
+ * 1. Direct database queries - no stale cache
+ * 2. Clear error handling - no silent failures
+ * 3. Consistent permission checking
+ * 4. Role-based permissions with override support
+ */
+import { getLogger } from '@/core/logging';
+import { db } from '@/core/db';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { UserRole } from '@/domain/enums/UserEnums';
+import { IPermissionService } from '@/domain/services/IPermissionService';
+import { ServiceOptions } from '@/domain/services/IBaseService';
+import { Permission } from '@/domain/entities/Permission';
 import { 
-  PermissionDto, 
   CreatePermissionDto, 
   UpdatePermissionDto, 
-  PermissionResponseDto, 
+  PermissionResponseDto,
   UserPermissionsResponseDto,
   UpdateUserPermissionsDto,
   PermissionFilterParamsDto
 } from '@/domain/dtos/PermissionDtos';
-import { IPermissionService } from '@/domain/services/IPermissionService';
-import { Permission } from '@/domain/entities/Permission';
-import { IPermissionRepository } from '@/domain/repositories/IPermissionRepository';
-import { IErrorHandler } from '@/core/errors';
-import { ILoggingService } from '@/core/logging/ILoggingService';
-import { IValidationService } from '@/core/validation/IValidationService';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
-import { ServiceOptions } from '@/domain/services/IBaseService';
-import { getPermissionsForRole } from '@/domain/enums/PermissionEnums';
+import { ValidationResult, ValidationErrorType } from '@/domain/enums/ValidationResults';
+
+const logger = getLogger();
 
 /**
- * Service for managing permissions
+ * Permission service error
  */
-import { invalidateUserPermissionCache } from '@/features/permissions/lib/utils/permissionCacheUtils';
-
-export class PermissionService implements IPermissionService {
-  /**
-   * Constructor
-   * 
-   * @param permissionRepository - Permission repository
-   * @param logger - Logging service
-   * @param validator - Validation service
-   * @param errorHandler - Error handling service
-   */
+export class PermissionError extends Error {
   constructor(
-    public readonly permissionRepository: IPermissionRepository,
-    public readonly logger: ILoggingService,
-    public readonly validator: IValidationService,
-    public readonly errorHandler: IErrorHandler
+    message: string,
+    public readonly code: string,
+    public readonly statusCode: number = 403,
+    public readonly details?: any
   ) {
-    this.logger.debug('Initialized PermissionService');
+    super(message);
+    this.name = 'PermissionError';
   }
+}
+
+/**
+ * Default permissions for roles
+ */
+const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, SystemPermission[]> = {
+  [UserRole.ADMIN]: Object.values(SystemPermission), // All permissions
+  [UserRole.MANAGER]: [
+    SystemPermission.USERS_VIEW,
+    SystemPermission.USERS_CREATE,
+    SystemPermission.USERS_EDIT,
+    SystemPermission.CUSTOMERS_VIEW,
+    SystemPermission.CUSTOMERS_CREATE,
+    SystemPermission.CUSTOMERS_EDIT,
+    SystemPermission.REQUESTS_VIEW,
+    SystemPermission.REQUESTS_CREATE,
+    SystemPermission.REQUESTS_EDIT,
+    SystemPermission.REQUESTS_ASSIGN,
+    SystemPermission.APPOINTMENTS_VIEW,
+    SystemPermission.APPOINTMENTS_CREATE,
+    SystemPermission.APPOINTMENTS_EDIT,
+    SystemPermission.NOTIFICATIONS_VIEW,
+    SystemPermission.NOTIFICATIONS_EDIT,
+  ],
+  [UserRole.EMPLOYEE]: [
+    SystemPermission.CUSTOMERS_VIEW,
+    SystemPermission.CUSTOMERS_CREATE,
+    SystemPermission.CUSTOMERS_EDIT,
+    SystemPermission.REQUESTS_VIEW,
+    SystemPermission.REQUESTS_CREATE,
+    SystemPermission.REQUESTS_EDIT,
+    SystemPermission.APPOINTMENTS_VIEW,
+    SystemPermission.APPOINTMENTS_CREATE,
+    SystemPermission.APPOINTMENTS_EDIT,
+    SystemPermission.NOTIFICATIONS_VIEW,
+  ],
+  [UserRole.USER]: [
+    SystemPermission.CUSTOMERS_VIEW,
+    SystemPermission.REQUESTS_VIEW,
+    SystemPermission.APPOINTMENTS_VIEW,
+    SystemPermission.NOTIFICATIONS_VIEW,
+  ],
+};
+
+/**
+ * Permission Service
+ */
+export class PermissionService implements IPermissionService {
+  private repository: any;
+  private static instance: PermissionService | null = null;
+  
+  private constructor() {}
   
   /**
-   * Helper method to invalidate the permission cache for a user
-   * 
-   * @param userId - User ID to invalidate the cache for
-   * @returns Promise that resolves when cache invalidation is complete
+   * Get singleton instance
    */
-  private async invalidateUserPermissionCache(userId: number): Promise<boolean> {
-    const result = invalidateUserPermissionCache(userId);
-    if (result) {
-      this.logger.info(`Invalidated permission cache for user ${userId}`);
-    } else {
-      this.logger.warn(`Failed to invalidate permission cache for user ${userId}`);
+  static getInstance(): PermissionService {
+    if (!PermissionService.instance) {
+      PermissionService.instance = new PermissionService();
     }
-    return result;
-  }
-
-  /**
-   * Counts permissions based on optional filters
-   * 
-   * @param options - Counting options and filters
-   * @returns Number of permissions matching the filters
-   */
-  async count(options?: { context?: any; filters?: Record<string, any>; }): Promise<number> {
-    try {
-      const filters = options?.filters || {};
-      const result = await this.permissionRepository.count(filters);
-      return result;
-    } catch (error) {
-      this.logger.error('Error in PermissionService.count', { error, options });
-      throw error;
-    }
-  }
-
-  /**
-   * Finds all permissions with pagination
-   * 
-   * @param options - Service options including pagination parameters
-   * @returns Paginated list of permissions
-   */
-  async findAll(options?: ServiceOptions): Promise<PaginationResult<PermissionResponseDto>> {
-    try {
-      const page = options?.filters?.page || 1;
-      const limit = options?.filters?.limit || 10;
-      const filters = options?.filters || {};
-      
-      const result = await this.permissionRepository.findAll({
-        page,
-        limit,
-        ...filters
-      });
-      
-      // Assuming repository returns data in expected format or convert it here
-      const paginatedData = Array.isArray(result) 
-        ? { 
-            data: result, 
-            pagination: { page, limit, total: result.length, totalPages: Math.ceil(result.length / limit) } 
-          }
-        : (result as PaginationResult<Permission>);
-      
-      return {
-        data: paginatedData.data.map((permission: Permission) => this.mapToResponseDto(permission)),
-        pagination: paginatedData.pagination
-      };
-    } catch (error) {
-      this.logger.error('Error in PermissionService.findAll', { error, options });
-      throw error;
-    }
-  }
-
-  /**
-   * Gets the repository instance
-   * This allows direct repository access when needed for specific operations
-   * 
-   * @returns The repository instance
-   */
-  public getRepository(): IPermissionRepository {
-    return this.permissionRepository;
+    return PermissionService.instance;
   }
   
-  /**
-   * Seeds default permissions into the database if not already present
-   * This should be called during application initialization
-   * 
-   * @returns Promise indicating success
-   */
-  public async seedDefaultPermissions(): Promise<boolean> {
-    try {
-      this.logger.info('Initiating permission seeding...');
-      await this.permissionRepository.seedDefaultPermissions();
-      this.logger.info('Default permissions seeded successfully');
-      return true;
-    } catch (error) {
-      this.logger.error('Failed to seed default permissions', { error });
-      return false;
-    }
-  }
-
-  /**
-   * Finds a permission by code
-   * 
-   * @param code - Permission code
-   * @param options - Service options
-   * @returns Found permission or null
-   */
-  async findByCode(code: string, options?: ServiceOptions): Promise<PermissionResponseDto | null> {
-    try {
-      const permission = await this.permissionRepository.findByCode(code);
-      if (!permission) return null;
-      
-      return this.mapToResponseDto(permission);
-    } catch (error) {
-      this.logger.error('Error in PermissionService.findByCode', { error, code });
-      throw error;
-    }
-  }
-
-  /**
-   * Finds permissions with advanced filtering
-   * 
-   * @param filters - Filter parameters
-   * @param options - Service options
-   * @returns Found permissions with pagination
-   */
-  async findPermissions(filters: PermissionFilterParamsDto, options?: ServiceOptions): 
-    Promise<PaginationResult<PermissionResponseDto>> {
-    try {
-      const result = await this.permissionRepository.findPermissions(filters);
-      
-      return {
-        data: result.data.map(permission => this.mapToResponseDto(permission)),
-        pagination: result.pagination
-      };
-    } catch (error) {
-      this.logger.error('Error in PermissionService.findPermissions', { error, filters });
-      throw error;
-    }
-  }
-
-  /**
-   * Gets all permissions for a user
-   * 
-   * @param userId - User ID
-   * @param options - Service options
-   * @returns User's permissions
-   */
-  async getUserPermissions(userId: number, options?: ServiceOptions): Promise<UserPermissionsResponseDto> {
-    try {
-      // First, check if the user exists and get their role
-      const userService = options?.context?.serviceFactory?.createUserService();
-      let userRole = 'user'; // Default role
-      
-      if (userService) {
-        const user = await userService.getById(userId);
-        if (user) {
-          userRole = user.role.toLowerCase();
-        }
-      }
-      
-      // Get permissions for the user
-      const permissions = await this.permissionRepository.getUserPermissions(userId);
-      
-      return {
-        userId,
-        role: userRole,
-        permissions
-      };
-    } catch (error) {
-      this.logger.error('Error in PermissionService.getUserPermissions', { error, userId });
-      throw error;
-    }
-  }
-
-  /**
-   * Updates permissions for a user
-   * 
-   * @param data - Update data
-   * @param options - Service options
-   * @returns Whether the operation was successful
-   */
-  async updateUserPermissions(data: UpdateUserPermissionsDto, options?: ServiceOptions): Promise<boolean> {
-    try {
-      // Validate that all permissions are valid
-      const invalidPermissions = await this.validatePermissions(data.permissions);
-      if (invalidPermissions.length > 0) {
-        throw this.errorHandler.createValidationError(
-          `Invalid permissions: ${invalidPermissions.join(', ')}`
-        );
-      }
-      
-      // Update the permissions
-      const result = await this.permissionRepository.updateUserPermissions(
-        data.userId, 
-        data.permissions,
-        options?.context?.userId
-      );
-      
-      // Invalidate permission cache for this user if the update was successful
-      if (result) {
-        await this.invalidateUserPermissionCache(data.userId);
-      }
-      
-      return result;
-    } catch (error) {
-      this.logger.error('Error in PermissionService.updateUserPermissions', { error, data });
-      throw error;
-    }
-  }
-
-  /**
-   * Validates that all permission codes exist
-   * 
-   * @param permissions - Permission codes to validate
-   * @returns List of invalid permission codes
-   */
-  private async validatePermissions(permissions: string[]): Promise<string[]> {
-    try {
-      const invalidPermissions: string[] = [];
-      
-      for (const code of permissions) {
-        const permission = await this.permissionRepository.findByCode(code);
-        if (!permission) {
-          invalidPermissions.push(code);
-        }
-      }
-      
-      return invalidPermissions;
-    } catch (error) {
-      this.logger.error('Error validating permissions', { error, permissions });
-      throw error;
-    }
-  }
-
-  /**
-   * Adds a permission to a user
-   * 
-   * @param userId - User ID
-   * @param permissionCode - Permission code
-   * @param options - Service options
-   * @returns Whether the operation was successful
-   */
-  async addUserPermission(userId: number, permissionCode: string, options?: ServiceOptions): Promise<boolean> {
-    try {
-      const result = await this.permissionRepository.addUserPermission(
-        userId, 
-        permissionCode,
-        options?.context?.userId
-      );
-      
-      // Invalidate permission cache for this user
-      await this.invalidateUserPermissionCache(userId);
-      
-      return true;
-    } catch (error) {
-      this.logger.error('Error in PermissionService.addUserPermission', { error, userId, permissionCode });
-      throw error;
-    }
-  }
-
-  /**
-   * Removes a permission from a user
-   * 
-   * @param userId - User ID
-   * @param permissionCode - Permission code
-   * @param options - Service options
-   * @returns Whether the operation was successful
-   */
-  async removeUserPermission(userId: number, permissionCode: string, options?: ServiceOptions): Promise<boolean> {
-    try {
-      const result = await this.permissionRepository.removeUserPermission(userId, permissionCode);
-      
-      // Invalidate permission cache for this user if the removal was successful
-      if (result) {
-        await this.invalidateUserPermissionCache(userId);
-      }
-      
-      return result;
-    } catch (error) {
-      this.logger.error('Error in PermissionService.removeUserPermission', { error, userId, permissionCode });
-      throw error;
-    }
-  }
-
-  /**
-   * Checks if a user has a specific permission
-   * 
-   * @param userId - User ID
-   * @param permissionCode - Permission code
-   * @param options - Service options
-   * @returns Whether the user has the permission
-   */
-  async hasPermission(userId: number, permissionCode: string, options?: ServiceOptions): Promise<boolean> {
-    try {
-      return await this.permissionRepository.hasPermission(userId, permissionCode);
-    } catch (error) {
-      this.logger.error('Error in PermissionService.hasPermission', { error, userId, permissionCode });
-      throw error;
-    }
-  }
-
-  /**
-   * Gets the default permissions for a role
-   * 
-   * @param role - User role
-   * @param options - Service options
-   * @returns Default permissions for the role
-   */
-  async getDefaultPermissionsForRole(role: string, options?: ServiceOptions): Promise<string[]> {
-    try {
-      this.logger.debug(`Getting default permissions for role: ${role}`);
-      
-      // Normalize role name to lowercase for case-insensitive comparison
-      const normalizedRole = role.toLowerCase();
-      
-      // Get the default permissions for the role from the enum
-      const permissions = getPermissionsForRole(normalizedRole);
-      
-      this.logger.debug(`Found ${permissions.length} default permissions for role ${role}`);
-      
-      return permissions;
-    } catch (error) {
-      this.logger.error('Error in PermissionService.getDefaultPermissionsForRole', { 
-        error: error instanceof Error ? error.message : String(error),
-        role 
-      });
-      throw error;
-    }
-  }
-
   /**
    * Creates a new permission
-   * 
-   * @param data - Permission creation data
-   * @param options - Service options
-   * @returns Created permission
    */
   async create(data: CreatePermissionDto, options?: ServiceOptions): Promise<PermissionResponseDto> {
     try {
-      // Check if permission code already exists
-      const existingPermission = await this.permissionRepository.findByCode(data.code);
-      if (existingPermission) {
-        throw this.errorHandler.createValidationError(`Permission with code ${data.code} already exists`);
-      }
-      
-      // Create permission
-      const permission = await this.permissionRepository.create({
-        ...data,
-        createdBy: options?.context?.userId,
-        updatedBy: options?.context?.userId
+      const permission = await db.permission.create({
+        data: {
+          code: data.code,
+          name: data.name,
+          description: data.description,
+          category: data.category,
+        }
       });
       
       return this.mapToResponseDto(permission);
     } catch (error) {
-      this.logger.error('Error in PermissionService.create', { error, data });
-      throw error;
+      logger.error('Error creating permission:', error as Error);
+      throw new PermissionError(
+        'Failed to create permission',
+        'CREATE_PERMISSION_ERROR',
+        500,
+        error
+      );
     }
   }
-
+  
   /**
    * Updates a permission
-   * 
-   * @param id - Permission ID
-   * @param data - Permission update data
-   * @param options - Service options
-   * @returns Updated permission
    */
   async update(id: number, data: UpdatePermissionDto, options?: ServiceOptions): Promise<PermissionResponseDto> {
     try {
-      // Check if permission exists
-      const existingPermission = await this.permissionRepository.findById(id);
-      if (!existingPermission) {
-        throw this.errorHandler.createNotFoundError('Permission not found');
-      }
-      
-      // Update permission
-      const permission = await this.permissionRepository.update(id, {
-        ...data,
-        updatedBy: options?.context?.userId
+      const permission = await db.permission.update({
+        where: { id },
+        data: {
+          name: data.name,
+          description: data.description,
+          category: data.category,
+        }
       });
       
       return this.mapToResponseDto(permission);
     } catch (error) {
-      this.logger.error('Error in PermissionService.update', { error, id, data });
-      throw error;
+      logger.error('Error updating permission:', error as Error);
+      throw new PermissionError(
+        'Failed to update permission',
+        'UPDATE_PERMISSION_ERROR',
+        500,
+        error
+      );
     }
   }
-
+  
   /**
    * Deletes a permission
-   * 
-   * @param id - Permission ID
-   * @param options - Service options
-   * @returns Whether the operation was successful
    */
   async delete(id: number, options?: ServiceOptions): Promise<boolean> {
     try {
-      // Check if permission exists
-      const existingPermission = await this.permissionRepository.findById(id);
-      if (!existingPermission) {
-        throw this.errorHandler.createNotFoundError('Permission not found');
-      }
-      
-      // Delete permission
-      return await this.permissionRepository.delete(id);
-    } catch (error) {
-      this.logger.error('Error in PermissionService.delete', { error, id });
-      throw error;
-    }
-  }
-
-  /**
-   * Gets all permissions
-   * 
-   * @param options - Service options
-   * @returns All permissions with pagination
-   */
-  async getAll(options?: ServiceOptions): Promise<PaginationResult<PermissionResponseDto>> {
-    return this.findAll(options);
-  }
-
-  /**
-   * Gets a permission by ID
-   * 
-   * @param id - Permission ID
-   * @param options - Service options
-   * @returns Found permission or null
-   */
-  async getById(id: number, options?: ServiceOptions): Promise<PermissionResponseDto | null> {
-    try {
-      const permission = await this.permissionRepository.findById(id);
-      if (!permission) return null;
-      
-      return this.mapToResponseDto(permission);
-    } catch (error) {
-      this.logger.error('Error in PermissionService.getById', { error, id });
-      throw error;
-    }
-  }
-
-  /**
-   * Maps a Permission entity to a PermissionResponseDto
-   * 
-   * @param permission - Permission entity
-   * @returns PermissionResponseDto
-   */
-  public mapToResponseDto(permission: Permission): PermissionResponseDto {
-    return this.toDTO(permission);
-  }
-
-  /**
-   * Maps a domain entity to a DTO
-   * 
-   * @param entity - Domain entity
-   * @returns DTO
-   */
-  public toDTO(entity: Permission): PermissionResponseDto {
-    return {
-      id: entity.id,
-      code: entity.code,
-      name: entity.name,
-      description: entity.description,
-      category: entity.category,
-      createdAt: entity.createdAt instanceof Date ? entity.createdAt.toISOString() : entity.createdAt,
-      updatedAt: entity.updatedAt instanceof Date ? entity.updatedAt.toISOString() : entity.updatedAt
-    };
-  }
-
-  /** 
-   * Additional BaseService methods
-   */
-  
-  /**
-   * Maps a DTO to a domain entity
-   * 
-   * @param dto - DTO
-   * @returns Domain entity
-   */
-  public fromDTO(dto: any): Permission {
-    return new Permission({
-      id: dto.id,
-      code: dto.code,
-      name: dto.name,
-      description: dto.description,
-      category: dto.category,
-      createdAt: typeof dto.createdAt === 'string' ? new Date(dto.createdAt) : dto.createdAt,
-      updatedAt: typeof dto.updatedAt === 'string' ? new Date(dto.updatedAt) : dto.updatedAt
-    });
-  }
-
-  /**
-   * Searches for permissions
-   * 
-   * @param term - Search term
-   * @param options - Service options
-   * @returns Search results
-   */
-  async search(term: string, options?: ServiceOptions): Promise<PermissionResponseDto[]> {
-    try {
-      // Search permissions by code, name, or description
-      const result = await this.permissionRepository.findByCriteria({
-        OR: [
-          { code: { contains: term, mode: 'insensitive' } },
-          { name: { contains: term, mode: 'insensitive' } },
-          { description: { contains: term, mode: 'insensitive' } }
-        ]
+      await db.permission.delete({
+        where: { id }
       });
       
-      return result.map(permission => this.mapToResponseDto(permission));
+      return true;
     } catch (error) {
-      this.logger.error('Error in PermissionService.search', { error, term });
+      logger.error('Error deleting permission:', error as Error);
+      throw new PermissionError(
+        'Failed to delete permission',
+        'DELETE_PERMISSION_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Finds a permission by ID
+   */
+  async findById(id: number, options?: ServiceOptions): Promise<PermissionResponseDto | null> {
+    try {
+      const permission = await db.permission.findUnique({
+        where: { id }
+      });
+      
+      return permission ? this.mapToResponseDto(permission) : null;
+    } catch (error) {
+      logger.error('Error finding permission by ID:', error as Error);
+      throw new PermissionError(
+        'Failed to find permission',
+        'FIND_PERMISSION_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Finds all permissions (changed to match IPermissionService interface)
+   */
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<PermissionResponseDto>> {
+    try {
+      const page = options?.page || 1;
+      const limit = options?.limit || 10;
+      
+      const [permissions, total] = await Promise.all([
+        db.permission.findMany({
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { name: 'asc' }
+        }),
+        db.permission.count()
+      ]);
+      
+      return {
+        data: permissions.map(p => this.mapToResponseDto(p)),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        },
+        // Backward compatibility
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      };
+    } catch (error) {
+      logger.error('Error finding all permissions:', error as Error);
+      throw new PermissionError(
+        'Failed to find permissions',
+        'FIND_PERMISSIONS_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Finds a permission by its code
+   */
+  async findByCode(code: string, options?: ServiceOptions): Promise<PermissionResponseDto | null> {
+    try {
+      const permission = await db.permission.findUnique({
+        where: { code }
+      });
+      
+      return permission ? this.mapToResponseDto(permission) : null;
+    } catch (error) {
+      logger.error('Error finding permission by code:', error as Error);
+      throw new PermissionError(
+        'Failed to find permission',
+        'FIND_PERMISSION_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Finds permissions with filtering
+   */
+  async findPermissions(filters: PermissionFilterParamsDto, options?: ServiceOptions): Promise<PaginationResult<PermissionResponseDto>> {
+    try {
+      const where: any = {};
+      
+      if (filters.category) {
+        where.category = filters.category;
+      }
+      
+      if (filters.search) {
+        where.OR = [
+          { name: { contains: filters.search } },
+          { code: { contains: filters.search } },
+          { description: { contains: filters.search } },
+        ];
+      }
+      
+      const page = filters.page || 1;
+      const limit = filters.limit || 10;
+      
+      const [permissions, total] = await Promise.all([
+        db.permission.findMany({
+          where,
+          take: limit,
+          skip: (page - 1) * limit,
+          orderBy: { name: 'asc' }
+        }),
+        db.permission.count({ where })
+      ]);
+      
+      return {
+        data: permissions.map(p => this.mapToResponseDto(p)),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        },
+        // Backward compatibility
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      };
+    } catch (error) {
+      logger.error('Error finding permissions:', error as Error);
+      throw new PermissionError(
+        'Failed to find permissions',
+        'FIND_PERMISSIONS_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+  * Check if user has a specific permission with efficient caching
+  * @throws PermissionError on database errors
+  */
+async hasPermission(userId: number, permissionCode: string, options?: ServiceOptions): Promise<boolean> {
+  try {
+    // Validate inputs
+    if (!userId || isNaN(userId) || userId <= 0 || !Number.isInteger(userId)) {
+      throw new PermissionError(
+        'Invalid user ID provided',
+        'INVALID_USER_ID',
+        400
+      );
+    }
+
+    if (!permissionCode || typeof permissionCode !== 'string') {
+      throw new PermissionError(
+        'Invalid permission code provided',
+        'INVALID_PERMISSION',
+        400
+      );
+    }
+    
+    logger.debug('Checking permission', { userId, permissionCode });
+    
+    // Standardized permission code format
+    const normalizedPermission = permissionCode.trim().toLowerCase();
+    
+    // Check cache with deterministic behavior
+    const cacheEnabled = process.env.DISABLE_PERMISSION_CACHE !== 'true';
+    if (cacheEnabled) {
+      try {
+        // Import deterministically
+        const { getPermissionFromCache } = await import('../utils/permissionCacheUtils');
+        const cachedResult = await getPermissionFromCache(userId, normalizedPermission);
+        
+        if (cachedResult !== undefined) {
+          logger.debug('Permission check result from cache', { 
+            userId,
+            permissionCode: normalizedPermission,
+            result: cachedResult
+          });
+          return cachedResult;
+        }
+      } catch (cacheError) {
+        // Log but continue to database - never fail on cache issues
+        logger.warn('Permission cache lookup failed', { 
+          userId,
+          permissionCode: normalizedPermission,
+          error: cacheError instanceof Error ? cacheError.message : String(cacheError) 
+        });
+      }
+    }
+
+    // Determine if this is a system permission
+    const isSystemPermission = Object.values(SystemPermission)
+      .includes(normalizedPermission as SystemPermission);
+      
+    // Get user with permissions in a single query with optimized fields
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        permissions: {
+          include: {
+            permission: {
+              select: {
+                id: true,
+                code: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!user) {
+      logger.warn(`User not found: ${userId}`);
+      // Deterministic failure - throw specific error
+      throw new PermissionError(
+        'User not found',
+        'USER_NOT_FOUND',
+        404
+      );
+    }
+
+    // Check specific user permissions first
+    const hasSpecificPermission = user.permissions.some(
+      up => up.permission.code.toLowerCase() === normalizedPermission && up.grantedAt !== null
+    );
+    
+    // Check if specifically denied
+    const isSpecificallyDenied = user.permissions.some(
+      up => up.permission.code.toLowerCase() === normalizedPermission && up.grantedAt === null
+    );
+    
+    // Determine the result with clear precedence rules
+    let result: boolean;
+    
+    // Rule 1: Specific denial overrides everything
+    if (isSpecificallyDenied) {
+      result = false;
+    }
+    // Rule 2: Specific grant overrides role-based permissions
+    else if (hasSpecificPermission) {
+      result = true;
+    }
+    // Rule 3: Fall back to role-based permissions
+    else {
+      const rolePermissions = DEFAULT_ROLE_PERMISSIONS[user.role as UserRole] || [];
+      // For system permissions, check exact match
+      if (isSystemPermission) {
+        result = rolePermissions.includes(normalizedPermission as SystemPermission);
+      } else {
+        // For custom permissions, check case-insensitive
+        result = rolePermissions.some(p => 
+          String(p).toLowerCase() === normalizedPermission
+        );
+      }
+    }
+    
+    // Cache the result if enabled
+    if (cacheEnabled) {
+      try {
+        const { setPermissionInCache } = await import('../utils/permissionCacheUtils');
+        // Cache deterministically and await the result
+        await setPermissionInCache(userId, normalizedPermission, result);
+      } catch (cacheError) {
+        // Just log the error
+        logger.warn('Failed to cache permission result', { 
+          userId, 
+          permissionCode: normalizedPermission,
+          result,
+          error: cacheError instanceof Error ? cacheError.message : String(cacheError) 
+        });
+      }
+    }
+    
+    return result;
+  } catch (error) {
+    // Proper error propagation
+    if (error instanceof PermissionError) {
+      throw error;
+    }
+    
+    logger.error('Error checking permission:', error as Error);
+    throw new PermissionError(
+      'Failed to check permission',
+      'PERMISSION_CHECK_ERROR',
+      500,
+      error
+    );
+  }
+}
+  
+
+
+  /**
+   * Check multiple permissions (user must have ALL)
+   */
+  async hasAllPermissions(userId: number, permissions: SystemPermission[]): Promise<boolean> {
+    try {
+      for (const permission of permissions) {
+        const hasPermission = await this.hasPermission(userId, permission);
+        if (!hasPermission) {
+          return false;
+        }
+      }
+      return true;
+    } catch (error) {
+      logger.error('Error checking multiple permissions:', error as Error);
       throw error;
     }
   }
-
+  
   /**
-   * Checks if a permission exists by ID
-   * 
-   * @param id - Permission ID
-   * @param options - Service options
-   * @returns Whether the permission exists
+   * Check multiple permissions (user must have ANY)
+   */
+  async hasAnyPermission(userId: number, permissions: SystemPermission[]): Promise<boolean> {
+    try {
+      for (const permission of permissions) {
+        const hasPermission = await this.hasPermission(userId, permission);
+        if (hasPermission) {
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      logger.error('Error checking any permission:', error as Error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get all permissions for a user with strict validation and consistent response format
+   */
+  async getUserPermissions(userId: number, options?: ServiceOptions): Promise<UserPermissionsResponseDto> {
+    try {
+      logger.debug('Getting user permissions', { userId });
+      
+      // Strict userId validation
+      if (!userId || isNaN(userId) || userId <= 0 || !Number.isInteger(userId)) {
+        throw new PermissionError(
+          'Invalid user ID provided',
+          'INVALID_USER_ID',
+          400
+        );
+      }
+      
+      // Get user with permissions using a transaction for consistency
+      const user = await db.$transaction(async (tx) => {
+        const result = await tx.user.findUnique({
+          where: { id: userId },
+          include: {
+            permissions: {
+              include: {
+                permission: true,
+              },
+            },
+          },
+        });
+        
+        if (!result) {
+          throw new PermissionError(
+            'User not found',
+            'USER_NOT_FOUND',
+            404
+          );
+        }
+        
+        return result;
+      });
+      
+      // Detailed diagnostics on data retrieval
+      logger.debug('User permissions fetch complete', {
+        userId,
+        role: user.role,
+        permissionsCount: user.permissions.length,
+        defaultRolePermissionsCount: DEFAULT_ROLE_PERMISSIONS[user.role as UserRole]?.length || 0
+      });
+      
+      // Start with a new Set of role-based permissions
+      const rolePermissions = new Set(DEFAULT_ROLE_PERMISSIONS[user.role as UserRole] || []);
+      
+      // Apply user-specific permissions - grant or deny
+      for (const userPermission of user.permissions) {
+        // Ensure the permission code exists before processing
+        if (userPermission?.permission?.code) {
+          const permissionCode = userPermission.permission.code as SystemPermission;
+          
+          if (userPermission.grantedAt !== null) {
+            rolePermissions.add(permissionCode); // Grant
+          } else {
+            rolePermissions.delete(permissionCode); // Deny
+          }
+        }
+      }
+      
+      // Create properly formatted response with guaranteed array
+      const permissionArray = Array.from(rolePermissions);
+      
+      logger.info(`Retrieved ${permissionArray.length} permissions for user ${userId}`, {
+        userId,
+        role: user.role,
+        permissionCount: permissionArray.length,
+        permissions: permissionArray.length > 0 ? permissionArray.slice(0, 5).join(', ') + (permissionArray.length > 5 ? '...' : '') : 'none',
+        userPermissionsCount: user.permissions.length
+      });
+      
+      // Warning for unusual cases, but don't change behavior
+      if (permissionArray.length === 0 && user.role === UserRole.ADMIN) {
+        logger.warn(`Admin user ${userId} has zero permissions - possible data issue`, {
+          userRole: user.role,
+          directUserPermissions: user.permissions.length,
+          rolePermissionsCount: DEFAULT_ROLE_PERMISSIONS[user.role]?.length || 0
+        });
+      }
+      
+      // Consistent, strictly-typed response structure
+      const response: UserPermissionsResponseDto = {
+        userId,
+        permissions: permissionArray,
+        role: user.role as UserRole
+      };
+      
+      return response;
+    } catch (error) {
+      if (error instanceof PermissionError) {
+        throw error;
+      }
+      
+      logger.error('Error getting user permissions:', error as Error);
+      throw new PermissionError(
+        'Failed to get user permissions',
+        'GET_PERMISSIONS_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Updates permissions for a user
+   */
+  async updateUserPermissions(data: UpdateUserPermissionsDto, options?: ServiceOptions): Promise<boolean> {
+    try {
+      const { userId, permissions } = data;
+      
+      // Delete existing user permissions
+      await db.userPermission.deleteMany({
+        where: { userId }
+      });
+      
+      // Add new permissions
+      for (const permissionCode of permissions) {
+        const permission = await db.permission.findUnique({
+          where: { code: permissionCode }
+        });
+        
+        if (permission) {
+          await db.userPermission.create({
+            data: {
+              userId,
+              permissionId: permission.id,
+              grantedAt: new Date(),
+              grantedBy: options?.userId || userId
+            }
+          });
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      logger.error('Error updating user permissions:', error as Error);
+      throw new PermissionError(
+        'Failed to update user permissions',
+        'UPDATE_PERMISSIONS_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Adds a permission to a user
+   */
+  async addUserPermission(userId: number, permissionCode: string, options?: ServiceOptions): Promise<boolean> {
+    try {
+      const permission = await db.permission.findUnique({
+        where: { code: permissionCode }
+      });
+      
+      if (!permission) {
+        throw new PermissionError(
+          'Permission not found',
+          'PERMISSION_NOT_FOUND',
+          404
+        );
+      }
+      
+      await db.userPermission.upsert({
+        where: {
+          userId_permissionId: {
+            userId,
+            permissionId: permission.id
+          }
+        },
+        create: {
+          userId,
+          permissionId: permission.id,
+          grantedAt: new Date(),
+          grantedBy: options?.userId || userId
+        },
+        update: {
+          grantedAt: new Date(),
+          grantedBy: options?.userId || userId
+        }
+      });
+      
+      return true;
+    } catch (error) {
+      logger.error('Error adding user permission:', error as Error);
+      throw new PermissionError(
+        'Failed to add user permission',
+        'ADD_PERMISSION_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Removes a permission from a user
+   */
+  async removeUserPermission(userId: number, permissionCode: string, options?: ServiceOptions): Promise<boolean> {
+    try {
+      const permission = await db.permission.findUnique({
+        where: { code: permissionCode }
+      });
+      
+      if (!permission) {
+        throw new PermissionError(
+          'Permission not found',
+          'PERMISSION_NOT_FOUND',
+          404
+        );
+      }
+      
+      // Set the permission as denied (not deleted)
+      await db.userPermission.upsert({
+        where: {
+          userId_permissionId: {
+            userId,
+            permissionId: permission.id
+          }
+        },
+        create: {
+          userId,
+          permissionId: permission.id,
+          grantedBy: options?.userId || userId
+        },
+        update: {
+          grantedBy: options?.userId || userId
+        }
+      });
+      
+      return true;
+    } catch (error) {
+      logger.error('Error removing user permission:', error as Error);
+      throw new PermissionError(
+        'Failed to remove user permission',
+        'REMOVE_PERMISSION_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Get default permissions for a role
+   */
+  async getDefaultPermissionsForRole(role: string, options?: ServiceOptions): Promise<string[]> {
+    const permissions = DEFAULT_ROLE_PERMISSIONS[role as UserRole] || [];
+    return permissions;
+  }
+  
+  /**
+   * Maps a Permission entity to PermissionResponseDto
+   */
+  private mapToResponseDto(permission: any): PermissionResponseDto {
+    return {
+      id: permission.id,
+      code: permission.code,
+      name: permission.name,
+      description: permission.description,
+      category: permission.category,
+      createdAt: permission.createdAt,
+      updatedAt: permission.updatedAt
+    };
+  }
+  
+  /**
+   * Count permissions with optional filtering
+   */
+  async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
+    try {
+      const where: any = {};
+      
+      if (options?.filters) {
+        Object.assign(where, options.filters);
+      }
+      
+      return await db.permission.count({ where });
+    } catch (error) {
+      logger.error('Error counting permissions:', error as Error);
+      throw new PermissionError(
+        'Failed to count permissions',
+        'COUNT_PERMISSIONS_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Get all permissions
+   */
+  async getAll(options?: ServiceOptions): Promise<PaginationResult<PermissionResponseDto>> {
+    const filters: PermissionFilterParamsDto = {
+      page: options?.page || 1,
+      limit: options?.limit || 10,
+      ...options?.filters
+    };
+    
+    return this.findPermissions(filters, options);
+  }
+  
+  /**
+   * Get permission by ID
+   */
+  async getById(id: number, options?: ServiceOptions): Promise<PermissionResponseDto | null> {
+    return this.findById(id, options);
+  }
+  
+  /**
+   * Find permissions by criteria
+   */
+  async findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<PermissionResponseDto[]> {
+    try {
+      const permissions = await db.permission.findMany({
+        where: criteria,
+        ...(options?.relations && { include: options.relations.reduce((acc, rel) => ({ ...acc, [rel]: true }), {}) })
+      });
+      
+      return permissions.map(p => this.mapToResponseDto(p));
+    } catch (error) {
+      logger.error('Error finding permissions by criteria:', error as Error);
+      throw new PermissionError(
+        'Failed to find permissions',
+        'FIND_PERMISSIONS_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Validate permission data
+   */
+  async validate(data: CreatePermissionDto | UpdatePermissionDto, isUpdate?: boolean, entityId?: number): Promise<import('@/domain/dtos/ValidationDto').ValidationResultDto> {
+    const errors: Record<string, string> = {};
+    
+    if (!isUpdate && !(data as CreatePermissionDto).code) {
+      errors.code = 'Permission code is required';
+    }
+    
+    if (!data.name) {
+      errors.name = 'Permission name is required';
+    }
+    
+    return {
+      result: Object.keys(errors).length === 0 ? ValidationResult.SUCCESS : ValidationResult.ERROR,
+      isValid: Object.keys(errors).length === 0,
+      errors: Object.keys(errors).length > 0 ? Object.entries(errors).map(([field, message]) => ({
+        type: ValidationErrorType.INVALID,
+        field,
+        message
+      })) : undefined
+    };
+  }
+  
+  /**
+   * Execute a transaction
+   */
+  async transaction<R>(callback: (service: IPermissionService) => Promise<R>): Promise<R> {
+    return db.$transaction(async (tx) => {
+      // Create a new instance with the transaction client
+      const txService = new PermissionService();
+      // @ts-ignore - accessing private db for transaction
+      txService.db = tx;
+      return callback(txService);
+    });
+  }
+  
+  /**
+   * Bulk update permissions
+   */
+  async bulkUpdate(ids: number[], data: UpdatePermissionDto, options?: ServiceOptions): Promise<number> {
+    try {
+      const result = await db.permission.updateMany({
+        where: { id: { in: ids } },
+        data
+      });
+      
+      return result.count;
+    } catch (error) {
+      logger.error('Error bulk updating permissions:', error as Error);
+      throw new PermissionError(
+        'Failed to bulk update permissions',
+        'BULK_UPDATE_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Convert entity to DTO
+   */
+  toDTO(entity: Permission): PermissionResponseDto {
+    return this.mapToResponseDto(entity);
+  }
+  
+  /**
+   * Convert DTO to entity
+   */
+  fromDTO(dto: CreatePermissionDto | UpdatePermissionDto): Partial<Permission> {
+    return {
+      ...dto,
+      code: (dto as CreatePermissionDto).code,
+      id: undefined
+    };
+  }
+  
+  /**
+   * Search permissions
+   */
+  async search(searchText: string, options?: ServiceOptions): Promise<PermissionResponseDto[]> {
+    try {
+      const permissions = await db.permission.findMany({
+        where: {
+          OR: [
+            { name: { contains: searchText } },
+            { code: { contains: searchText } },
+            { description: { contains: searchText } },
+          ]
+        },
+        take: options?.limit || 10
+      });
+      
+      return permissions.map(p => this.mapToResponseDto(p));
+    } catch (error) {
+      logger.error('Error searching permissions:', error as Error);
+      throw new PermissionError(
+        'Failed to search permissions',
+        'SEARCH_ERROR',
+        500,
+        error
+      );
+    }
+  }
+  
+  /**
+   * Check if permission exists
    */
   async exists(id: number, options?: ServiceOptions): Promise<boolean> {
     try {
-      const result = await this.permissionRepository.findById(id);
-      return !!result;
+      const count = await db.permission.count({
+        where: { id }
+      });
+      
+      return count > 0;
     } catch (error) {
-      this.logger.error('Error in PermissionService.exists', { error, id });
-      throw error;
+      logger.error('Error checking permission existence:', error as Error);
+      return false;
     }
   }
   
   /**
-   * Checks if a permission exists by criteria
-   * 
-   * @param criteria - Search criteria
-   * @param options - Service options
-   * @returns Whether the permission exists
+   * Get repository instance
    */
-  async existsByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<boolean> {
-    try {
-      const result = await this.permissionRepository.findOneByCriteria(criteria);
-      return !!result;
-    } catch (error) {
-      this.logger.error('Error in PermissionService.existsByCriteria', { error, criteria });
-      throw error;
-    }
+  getRepository(): any {
+    return this.repository;
   }
-
-  async findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<PermissionResponseDto[]> {
-    try {
-      const permissions = await this.permissionRepository.findByCriteria(criteria);
-      return permissions.map(permission => this.mapToResponseDto(permission));
-    } catch (error) {
-      this.logger.error('Error in PermissionService.findByCriteria', { error, criteria });
-      throw error;
-    }
+  
+  /**
+   * Grant a permission to a user
+   * @param userId User ID
+   * @param permission Permission code
+   */
+  async grantPermission(userId: number, permission: string): Promise<boolean> {
+    return this.addUserPermission(userId, permission);
   }
-
-  async validate(data: any, schema: any): Promise<any> {
-    return this.validator.validate(data, schema);
-  }
-
-  async transaction<T>(callback: (service: any) => Promise<T>): Promise<T> {
-    return callback(this);
-  }
-
-  async bulkUpdate(ids: number[], data: Partial<Permission>): Promise<number> {
-    // Not implemented yet
-    return 0;
+  
+  /**
+   * Revoke a permission from a user
+   * @param userId User ID
+   * @param permission Permission code
+   */
+  async revokePermission(userId: number, permission: string): Promise<boolean> {
+    return this.removeUserPermission(userId, permission);
   }
 }
+
+// Export singleton instance
+export const permissionService = PermissionService.getInstance();

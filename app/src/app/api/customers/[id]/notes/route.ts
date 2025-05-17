@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
 import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';

@@ -1,19 +1,19 @@
 'use client';
 
-import { usePermissions } from '@/features/users/hooks/usePermissions';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 
 /**
  * Hook for customer-related permissions
- * Leverages the standard permission system
+ * Leverages the centralized permission provider system
  */
 export const useCustomerPermissions = () => {
   const { user } = useAuth();
-  // Use the standard permission system
-  const permissionsHook = usePermissions(user?.id);
-  
+  // Use the centralized permission provider
+  const permissions = usePermissions();
+
   return {
-    ...permissionsHook,
+    ...permissions,
     userRole: user?.role
   };
 };

@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
-import { apiAuth } from '@/features/auth/api/middleware';
+import { authenticateRequest } from '@/features/auth/api/middleware/authMiddleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { formatResponse } from '@/core/errors';
 import { routeHandler } from '@/core/api/route-handler';
@@ -23,9 +24,9 @@ export const DELETE = routeHandler(async (request: NextRequest) => {
     }
 
     // Authenticate user
-    const auth = await apiAuth(request);
-    if (!auth) {
-      return formatResponse.error('Authentication required', 401);
+    const authResult = await authenticateRequest(request);
+    if (!authResult.success) {
+      return formatResponse.error(authResult.message || 'Authentication required', authResult.statusCode || 401);
     }
 
     // Check permission
@@ -50,7 +51,7 @@ export const DELETE = routeHandler(async (request: NextRequest) => {
       try {
         const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-me';
         const jwt = await import('jsonwebtoken');
-        const decoded = jwt.verify(token, jwtSecret) as any;
+        const decoded = jwt.verify(token, jwtSecret);
         userId = Number(decoded.sub) || 0;
       } catch (e) {
         // Continue with defaults if token decoding fails

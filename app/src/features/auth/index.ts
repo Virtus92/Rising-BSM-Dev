@@ -1,27 +1,33 @@
 /**
  * Authentication Module
  * 
- * This file exports all authentication-related functionality for easy imports
+ * This file exports all authentication-related functionality for easy imports.
+ * Uses the centralized AuthService for auth operations.
  */
 
-// Auth Middleware
-export * from './api/middleware';
-
-// Auth API Routes
-export * from './api/routes';
-
-// Auth Initialization
-export * from './lib/initialization/AuthInitializer';
-
-// Token Management
-export * from './lib/clients/token';
+// Core Auth Service
+export { default as AuthService } from './core/AuthService';
+export * from './core/AuthService';
 
 // Auth Provider
-export * from './providers/AuthProvider';
+export { AuthProvider, useAuth } from './providers/AuthProvider';
 
-// Re-export AuthClient for API access
-export { AuthClient } from './lib/clients/AuthClient';
+// Auth Middleware
+export { 
+  auth,
+  auth as authMiddleware, 
+  withAuth, 
+  getUserFromRequest,
+  extractAuthToken 
+} from './api/middleware/authMiddleware';
+export type { AuthOptions, AuthResult } from './api/middleware/authMiddleware';
 
-// Default export for backward compatibility
-import * as AuthModule from './api/middleware';
-export default AuthModule;
+// Auth Handlers
+export { loginHandler } from './api/handlers/loginHandler';
+export { logoutHandler } from './api/handlers/logoutHandler';
+export { refreshHandler } from './api/handlers/refreshHandler';
+
+// Types
+export * from './types';
+export type { LoginDto, RegisterDto, TokenResponseDto } from '@/domain/dtos/AuthDtos';
+export type { UserDto } from '@/domain/dtos/UserDtos';

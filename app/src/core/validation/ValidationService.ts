@@ -1,136 +1,95 @@
 /**
- * Validation Service Implementation
- * Provides data validation against schemas
+ * Validation Service
+ * Provides centralized validation functionality
  */
+import { 
+  IValidationService, 
+  ValidationResult, 
+  SchemaDefinition, 
+  SchemaDefinitionInput 
+} from './IValidationService';
+import { 
+  ValidationResultDto, 
+  ValidationErrorDto,
+  createErrorValidation,
+  createSuccessValidation 
+} from '@/domain/dtos/ValidationDto';
+import { ValidationResult as ValidationResultEnum, ValidationErrorType } from '@/domain/enums/ValidationResults';
+import { getLogger } from '../logging';
 
-import { IValidationService, ValidationResult, SchemaDefinition } from './IValidationService';
-import { ILoggingService } from '../logging';
-
-/**
- * ValidationService class
- * Implements IValidationService interface
- */
 export class ValidationService implements IValidationService {
-  // Import validation schemas
-  private userValidationSchemas: any;
-  private passwordValidation: any;
-  /**
-   * Constructor
-   * 
-   * @param logger Optional logger service
-   */
-  constructor(private readonly logger?: ILoggingService) {
-    if (this.logger) {
-      this.logger.debug('ValidationService initialized');
-    } else {
-      // Create a simple console logger if none provided
-      this.logger = {
-        debug: (message: string, ...args: any[]) => console.debug(message, ...args),
-        info: (message: string, ...args: any[]) => console.info(message, ...args),
-        warn: (message: string, ...args: any[]) => console.warn(message, ...args),
-        error: (message: string, ...args: any[]) => console.error(message, ...args)
-      } as ILoggingService;
-      
-      this.logger.debug('ValidationService initialized with default console logger');
-    }
-    
-    // Import validation schemas dynamically to avoid circular dependencies
-    try {
-      this.userValidationSchemas = require('./validators/userValidation');
-      this.passwordValidation = require('./userValidation');
-      this.logger.debug('Validation schemas loaded successfully');
-    } catch (error) {
-      this.logger.error('Failed to load validation schemas', { error });
-    }
-  }
+  private readonly logger = getLogger();
   
   /**
-   * Validate data against a schema
-   * 
-   * @param data Data to validate
-   * @param schema Schema to validate against
-   * @returns Validation result with isValid flag and errors array
+   * Validates data against a schema
    */
-  validate(data: any, schema: SchemaDefinition): ValidationResult {
+  validate(schemaNameOrData: string | any, data?: SchemaDefinitionInput | any): ValidationResult {
+    let actualData: any;
+    let actualSchema: any;
+    
+    // Handle overloaded parameters
+    if (typeof schemaNameOrData === 'string') {
+      // First param is schema name, second is data
+      actualSchema = this.getSchemaByName(schemaNameOrData);
+      actualData = data;
+    } else {
+      // First param is data, second is schema
+      actualData = schemaNameOrData;
+      actualSchema = data;
+    }
+    
     const errors: string[] = [];
     
-    // Validate each field in the schema
-    Object.entries(schema).forEach(([field, fieldSchema]) => {
-      // Check if the field is required
-      if (fieldSchema.required && (data[field] === undefined || data[field] === null)) {
-        errors.push(`${field} is required`);
-        return;
-      }
-      
-      // Skip validation if field is not present and not required
-      if (data[field] === undefined || data[field] === null) {
-        return;
-      }
-      
-      // Type validation
-      if (fieldSchema.type) {
-        const typeResult = this.validateType(data[field], fieldSchema.type, field);
-        if (!typeResult.isValid) {
-          errors.push(...typeResult.errors);
+    // Basic validation implementation
+    if (actualSchema && actualSchema.required) {
+      for (const field of actualSchema.required) {
+        if (!actualData || actualData[field] === undefined || actualData[field] === null || actualData[field] === '') {
+          errors.push(`${field} is required`);
         }
       }
-      
-      // Format validation
-      if (fieldSchema.format) {
-        const formatResult = this.validateFormat(data[field], fieldSchema.format, field);
-        if (!formatResult.isValid) {
-          errors.push(...formatResult.errors);
+    }
+    
+    if (actualSchema && actualSchema.properties) {
+      for (const [field, fieldRule] of Object.entries(actualSchema.properties)) {
+        const value = actualData ? actualData[field] : undefined;
+        
+        if (value !== undefined && value !== null) {
+          // Type validation
+          if (fieldRule && typeof fieldRule === 'object' && 'type' in fieldRule) {
+            const type = fieldRule.type as string;
+            const actualType = Array.isArray(value) ? 'array' : typeof value;
+            if (actualType !== type) {
+              errors.push(`${field} must be of type ${type}`);
+            }
+          }
+          
+          // String length validation
+          if (fieldRule && typeof fieldRule === 'object' && 'type' in fieldRule && fieldRule.type === 'string' && typeof value === 'string') {
+            if ('minLength' in fieldRule && typeof fieldRule.minLength === 'number' && value.length < fieldRule.minLength) {
+              errors.push(`${field} must be at least ${fieldRule.minLength} characters`);
+            }
+            if ('maxLength' in fieldRule && typeof fieldRule.maxLength === 'number' && value.length > fieldRule.maxLength) {
+              errors.push(`${field} must not exceed ${fieldRule.maxLength} characters`);
+            }
+          }
+          
+          // Number range validation
+          if (fieldRule && typeof fieldRule === 'object' && 'type' in fieldRule && fieldRule.type === 'number' && typeof value === 'number') {
+            if ('minimum' in fieldRule && typeof fieldRule.minimum === 'number' && value < fieldRule.minimum) {
+              errors.push(`${field} must be at least ${fieldRule.minimum}`);
+            }
+            if ('maximum' in fieldRule && typeof fieldRule.maximum === 'number' && value > fieldRule.maximum) {
+              errors.push(`${field} must not exceed ${fieldRule.maximum}`);
+            }
+          }
+          
+          // Enum validation
+          if (fieldRule && typeof fieldRule === 'object' && 'enum' in fieldRule && Array.isArray(fieldRule.enum) && !fieldRule.enum.includes(value)) {
+            errors.push(`${field} must be one of: ${fieldRule.enum.join(', ')}`);
+          }
         }
       }
-      
-      // Length validation for strings
-      if (typeof data[field] === 'string') {
-        const lengthResult = this.validateLength(data[field], fieldSchema, field);
-        if (!lengthResult.isValid) {
-          errors.push(...lengthResult.errors);
-        }
-      }
-      
-      // Range validation for numbers
-      if (typeof data[field] === 'number') {
-        const rangeResult = this.validateRange(data[field], fieldSchema, field);
-        if (!rangeResult.isValid) {
-          errors.push(...rangeResult.errors);
-        }
-      }
-      
-      // Pattern validation for strings
-      if (typeof data[field] === 'string' && fieldSchema.pattern) {
-        const patternResult = this.validatePattern(data[field], fieldSchema.pattern, field);
-        if (!patternResult.isValid) {
-          errors.push(...patternResult.errors);
-        }
-      }
-      
-      // Enum validation
-      if (fieldSchema.enum) {
-        const enumResult = this.validateEnum(data[field], fieldSchema.enum, field);
-        if (!enumResult.isValid) {
-          errors.push(...enumResult.errors);
-        }
-      }
-      
-      // Array validation
-      if (Array.isArray(data[field]) && fieldSchema.items) {
-        const arrayResult = this.validateArray(data[field], fieldSchema.items, field);
-        if (!arrayResult.isValid) {
-          errors.push(...arrayResult.errors);
-        }
-      }
-      
-      // Object validation
-      if (typeof data[field] === 'object' && data[field] !== null && !Array.isArray(data[field]) && fieldSchema.properties) {
-        const objectResult = this.validate(data[field], fieldSchema.properties);
-        if (!objectResult.isValid) {
-          errors.push(...objectResult.errors.map(error => `${field}.${error}`));
-        }
-      }
-    });
+    }
     
     return {
       isValid: errors.length === 0,
@@ -139,27 +98,83 @@ export class ValidationService implements IValidationService {
   }
   
   /**
-   * Validate a specific field against a schema
-   * 
-   * @param field Field name
-   * @param value Field value
-   * @param schema Schema for the field
-   * @returns Validation result with isValid flag and errors array
+   * Validate a specific field
    */
-  validateField(field: string, value: any, schema: SchemaDefinition[string]): ValidationResult {
-    const data = { [field]: value };
-    const fieldSchema = { [field]: schema };
-    return this.validate(data, fieldSchema);
+  validateField(field: string, value: any, schema: Record<string, unknown>): ValidationResult {
+    const errors: string[] = [];
+    
+    // Ensure schema is an object
+    if (!schema || typeof schema !== 'object') {
+      errors.push(`Invalid schema for field ${field}`);
+      return { isValid: false, errors };
+    }
+    
+    // Required check
+    const isRequired = 'required' in schema && schema.required === true;
+    if (isRequired && (value === undefined || value === null || value === '')) {
+      errors.push(`${field} is required`);
+      return { isValid: false, errors };
+    }
+    
+    // Type validation
+    const schemaType = 'type' in schema ? schema.type as string : undefined;
+    if (schemaType && value !== undefined && value !== null) {
+      const actualType = Array.isArray(value) ? 'array' : typeof value;
+      if (actualType !== schemaType) {
+        errors.push(`${field} must be of type ${schemaType}`);
+      }
+    }
+    
+    // Additional validations based on type
+    if (schemaType === 'string' && typeof value === 'string') {
+      const minLength = 'minLength' in schema ? schema.minLength as number : undefined;
+      const maxLength = 'maxLength' in schema ? schema.maxLength as number : undefined;
+      const pattern = 'pattern' in schema ? schema.pattern as string : undefined;
+      
+      if (minLength !== undefined && value.length < minLength) {
+        errors.push(`${field} must be at least ${minLength} characters`);
+      }
+      if (maxLength !== undefined && value.length > maxLength) {
+        errors.push(`${field} must not exceed ${maxLength} characters`);
+      }
+      if (pattern && !new RegExp(pattern).test(value)) {
+        errors.push(`${field} has invalid format`);
+      }
+    }
+    
+    if (schemaType === 'number' && typeof value === 'number') {
+      const min = 'min' in schema ? schema.min as number : undefined;
+      const max = 'max' in schema ? schema.max as number : undefined;
+      
+      if (min !== undefined && value < min) {
+        errors.push(`${field} must be at least ${min}`);
+      }
+      if (max !== undefined && value > max) {
+        errors.push(`${field} must not exceed ${max}`);
+      }
+    }
+    
+    // Enum validation
+    if ('enum' in schema && Array.isArray(schema.enum)) {
+      if (!schema.enum.includes(value)) {
+        errors.push(`${field} must be one of: ${schema.enum.join(', ')}`);
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   }
   
   /**
    * Cast a value to the specified type
-   * 
-   * @param value Value to cast
-   * @param type Target type
-   * @returns Cast value
    */
   cast(value: any, type: string): any {
+    if (value === null || value === undefined) {
+      return value;
+    }
+    
     switch (type) {
       case 'string':
         return String(value);
@@ -167,324 +182,241 @@ export class ValidationService implements IValidationService {
         return Number(value);
       case 'boolean':
         return Boolean(value);
-      case 'integer':
-        return parseInt(value, 10);
-      case 'float':
-        return parseFloat(value);
       case 'date':
         return new Date(value);
+      case 'array':
+        return Array.isArray(value) ? value : [value];
       default:
         return value;
     }
   }
   
   /**
-   * Validate type of a value
-   * 
-   * @param value Value to validate
-   * @param type Expected type
-   * @param field Field name
-   * @returns Validation result
-   */
-  private validateType(value: any, type: string, field: string): ValidationResult {
-    const errors: string[] = [];
-    
-    switch (type) {
-      case 'string':
-        if (typeof value !== 'string') {
-          errors.push(`${field} must be a string`);
-        }
-        break;
-      case 'number':
-      case 'integer':
-      case 'float':
-        if (typeof value !== 'number') {
-          errors.push(`${field} must be a number`);
-        }
-        if (type === 'integer' && !Number.isInteger(value)) {
-          errors.push(`${field} must be an integer`);
-        }
-        break;
-      case 'boolean':
-        if (typeof value !== 'boolean') {
-          errors.push(`${field} must be a boolean`);
-        }
-        break;
-      case 'array':
-        if (!Array.isArray(value)) {
-          errors.push(`${field} must be an array`);
-        }
-        break;
-      case 'object':
-        if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-          errors.push(`${field} must be an object`);
-        }
-        break;
-      case 'date':
-        if (!(value instanceof Date) && isNaN(Date.parse(value))) {
-          errors.push(`${field} must be a valid date`);
-        }
-        break;
-      default:
-        errors.push(`Unknown type: ${type}`);
-    }
-    
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
-  }
-  
-  /**
-   * Validate format of a value
-   * 
-   * @param value Value to validate
-   * @param format Expected format
-   * @param field Field name
-   * @returns Validation result
-   */
-  private validateFormat(value: any, format: string, field: string): ValidationResult {
-    const errors: string[] = [];
-    
-    switch (format) {
-      case 'email':
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-          errors.push(`${field} must be a valid email address`);
-        }
-        break;
-      case 'url':
-        try {
-          new URL(value);
-        } catch {
-          errors.push(`${field} must be a valid URL`);
-        }
-        break;
-      case 'date-time':
-        if (isNaN(Date.parse(value))) {
-          errors.push(`${field} must be a valid date-time`);
-        }
-        break;
-      case 'uuid':
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
-          errors.push(`${field} must be a valid UUID`);
-        }
-        break;
-      case 'phone':
-        if (!/^\+?[0-9\-\(\)\s]+$/.test(value)) {
-          errors.push(`${field} must be a valid phone number`);
-        }
-        break;
-      default:
-        errors.push(`Unknown format: ${format}`);
-        this.logger?.warn(`Unknown format: ${format}`);
-    }
-    
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
-  }
-  
-  /**
-   * Validate length of a string
-   * 
-   * @param value String to validate
-   * @param schema Schema for the field
-   * @param field Field name
-   * @returns Validation result
-   */
-  private validateLength(value: string, schema: SchemaDefinition[string], field: string): ValidationResult {
-    const errors: string[] = [];
-    
-    if (schema.minLength !== undefined && value.length < schema.minLength) {
-      errors.push(`${field} must be at least ${schema.minLength} characters long`);
-    }
-    
-    if (schema.maxLength !== undefined && value.length > schema.maxLength) {
-      errors.push(`${field} must be at most ${schema.maxLength} characters long`);
-    }
-    
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
-  }
-  
-  /**
-   * Validate range of a number
-   * 
-   * @param value Number to validate
-   * @param schema Schema for the field
-   * @param field Field name
-   * @returns Validation result
-   */
-  private validateRange(value: number, schema: SchemaDefinition[string], field: string): ValidationResult {
-    const errors: string[] = [];
-    
-    if (schema.min !== undefined && value < schema.min) {
-      errors.push(`${field} must be at least ${schema.min}`);
-    }
-    
-    if (schema.max !== undefined && value > schema.max) {
-      errors.push(`${field} must be at most ${schema.max}`);
-    }
-    
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
-  }
-  
-  /**
-   * Validate pattern of a string
-   * 
-   * @param value String to validate
-   * @param pattern Pattern to match
-   * @param field Field name
-   * @returns Validation result
-   */
-  private validatePattern(value: string, pattern: string | RegExp, field: string): ValidationResult {
-    const errors: string[] = [];
-    
-    const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
-    
-    if (!regex.test(value)) {
-      errors.push(`${field} does not match the required pattern`);
-    }
-    
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
-  }
-  
-  /**
-   * Validate enum value
-   * 
-   * @param value Value to validate
-   * @param enumValues Allowed values
-   * @param field Field name
-   * @returns Validation result
-   */
-  private validateEnum(value: any, enumValues: (string | number)[], field: string): ValidationResult {
-    const errors: string[] = [];
-    
-    if (!enumValues.includes(value as string | number)) {
-      errors.push(`${field} must be one of: ${enumValues.join(', ')}`);
-    }
-    
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
-  }
-  
-  /**
-   * Validate array items
-   * 
-   * @param value Array to validate
-   * @param itemSchema Schema for array items
-   * @param field Field name
-   * @returns Validation result
-   */
-  private validateArray(value: any[], itemSchema: SchemaDefinition, field: string): ValidationResult {
-    const errors: string[] = [];
-    
-    value.forEach((item, index) => {
-      const itemData = { item };
-      const itemFieldSchema = { item: itemSchema };
-      const itemResult = this.validate(itemData, itemFieldSchema);
-      
-      if (!itemResult.isValid) {
-        itemResult.errors.forEach(error => {
-          errors.push(`${field}[${index}] ${error.replace('item ', '')}`);
-        });
-      }
-    });
-    
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
-  }
-  
-  /**
    * Validate user creation data
-   * 
-   * @param data User creation data
-   * @returns Validation result
    */
   validateCreateUser(data: any): ValidationResult {
-    try {
-      // Get schema from imported modules
-      const schema = this.userValidationSchemas?.createUserSchema || 
-        require('./validators/userValidation').createUserSchema;
-      
-      // Perform basic schema validation
-      const result = this.validate(data, schema);
-      
-      // Additional validation for password confirmation
-      if (data.password !== data.confirmPassword) {
-        result.errors.push('Password and confirmation password do not match');
-        result.isValid = false;
-      }
-      
-      return result;
-    } catch (error) {
-      this.logger?.error('Error in validateCreateUser', { error });
-      return {
-        isValid: false,
-        errors: ['Failed to validate user data']
-      };
+    const schema: SchemaDefinition = {
+      name: { type: 'string', required: true, minLength: 1, maxLength: 255 },
+      email: { type: 'string', required: true, format: 'email' },
+      password: { type: 'string', required: true, minLength: 8 },
+      role: { type: 'string', enum: ['admin', 'manager', 'employee', 'user'] },
+      status: { type: 'string', enum: ['active', 'inactive', 'suspended', 'deleted'] }
+    };
+    
+    const result = this.validate(data, { properties: schema, required: ['name', 'email', 'password'] });
+    
+    // Additional email validation
+    if (data.email && !this.validateEmail(data.email)) {
+      result.errors.push('Invalid email format');
+      result.isValid = false;
     }
+    
+    // Additional password validation
+    if (data.password) {
+      const passwordResult = this.validatePassword(data.password);
+      result.errors.push(...passwordResult.errors);
+      result.isValid = result.isValid && passwordResult.isValid;
+    }
+    
+    return result;
   }
   
   /**
    * Validate user update data
-   * 
-   * @param data User update data
-   * @returns Validation result
    */
   validateUpdateUser(data: any): ValidationResult {
-    try {
-      // Get schema from imported modules
-      const schema = this.userValidationSchemas?.updateUserSchema || 
-        require('./validators/userValidation').updateUserSchema;
-      
-      return this.validate(data, schema);
-    } catch (error) {
-      this.logger?.error('Error in validateUpdateUser', { error });
-      return {
-        isValid: false,
-        errors: ['Failed to validate user data']
-      };
+    const schema: SchemaDefinition = {
+      name: { type: 'string', minLength: 1, maxLength: 255 },
+      email: { type: 'string', format: 'email' },
+      role: { type: 'string', enum: ['admin', 'manager', 'employee', 'user'] },
+      status: { type: 'string', enum: ['active', 'inactive', 'suspended', 'deleted'] }
+    };
+    
+    const result = this.validate(data, { properties: schema });
+    
+    // Additional email validation if email is provided
+    if (data.email && !this.validateEmail(data.email)) {
+      result.errors.push('Invalid email format');
+      result.isValid = false;
     }
+    
+    return result;
   }
   
   /**
-   * Validate password against security requirements
-   * 
-   * @param password Password to validate
-   * @returns Validation result
+   * Validates an email address
+   */
+  validateEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+  
+  /**
+   * Validates a phone number
+   */
+  validatePhoneNumber(phone: string): boolean {
+    // Basic phone validation (can be customized for specific formats)
+    const phoneRegex = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
+    return phoneRegex.test(phone);
+  }
+  
+  /**
+   * Validates a password
    */
   validatePassword(password: string): ValidationResult {
-    try {
-      // Get validation function from imported modules
-      const validatePasswordStrength = this.passwordValidation?.validatePassword || 
-        require('./userValidation').validatePassword;
-      
-      const result = validatePasswordStrength(password);
-      
-      return {
-        isValid: result.valid || false,
-        errors: result.errors || []
-      };
-    } catch (error) {
-      this.logger?.error('Error in validatePassword', { error });
-      return {
-        isValid: false,
-        errors: ['Failed to validate password']
-      };
+    const errors: string[] = [];
+    
+    if (!password) {
+      errors.push('Password is required');
+    } else {
+      if (password.length < 8) {
+        errors.push('Password must be at least 8 characters');
+      }
+      if (!/[A-Z]/.test(password)) {
+        errors.push('Password must contain at least one uppercase letter');
+      }
+      if (!/[a-z]/.test(password)) {
+        errors.push('Password must contain at least one lowercase letter');
+      }
+      if (!/[0-9]/.test(password)) {
+        errors.push('Password must contain at least one number');
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+  
+  /**
+   * Sanitizes HTML input
+   */
+  sanitizeHtml(html: string): string {
+    // Basic HTML sanitization (in production, use a library like DOMPurify)
+    return html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+      .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+      .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '');
+  }
+  
+  /**
+   * Validates a date
+   */
+  validateDate(date: string | Date): boolean {
+    if (date instanceof Date) {
+      return !isNaN(date.getTime());
+    }
+    
+    const parsedDate = new Date(date);
+    return !isNaN(parsedDate.getTime());
+  }
+  
+  /**
+   * Validates if a value is empty
+   */
+  isEmpty(value: any): boolean {
+    if (value === null || value === undefined) {
+      return true;
+    }
+    
+    if (typeof value === 'string') {
+      return value.trim().length === 0;
+    }
+    
+    if (Array.isArray(value)) {
+      return value.length === 0;
+    }
+    
+    if (typeof value === 'object') {
+      return Object.keys(value).length === 0;
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Get schema by name
+   */
+  private getSchemaByName(schemaName: string): any {
+    // This could be extended to load schemas from files or a registry
+    switch (schemaName) {
+      case 'createUser':
+        return this.getUserCreateSchema();
+      case 'updateUser':
+        return this.getUserUpdateSchema();
+      case 'createCustomer':
+        return this.getCustomerCreateSchema();
+      case 'updateCustomer':
+        return this.getCustomerUpdateSchema();
+      default:
+        return {};
     }
   }
+  
+  private getUserCreateSchema(): any {
+    return {
+      properties: {
+        name: { type: 'string', required: true, minLength: 1, maxLength: 255 },
+        email: { type: 'string', required: true, format: 'email' },
+        password: { type: 'string', required: true, minLength: 8 },
+        role: { type: 'string', enum: ['admin', 'manager', 'employee', 'user'] },
+        status: { type: 'string', enum: ['active', 'inactive', 'suspended', 'deleted'] }
+      },
+      required: ['name', 'email', 'password']
+    };
+  }
+  
+  private getUserUpdateSchema(): any {
+    return {
+      properties: {
+        name: { type: 'string', minLength: 1, maxLength: 255 },
+        email: { type: 'string', format: 'email' },
+        role: { type: 'string', enum: ['admin', 'manager', 'employee', 'user'] },
+        status: { type: 'string', enum: ['active', 'inactive', 'suspended', 'deleted'] }
+      }
+    };
+  }
+  
+  private getCustomerCreateSchema(): any {
+    return {
+      properties: {
+        name: { type: 'string', required: true, minLength: 1, maxLength: 255 },
+        email: { type: 'string', format: 'email' },
+        phone: { type: 'string' },
+        address: { type: 'string' },
+        city: { type: 'string' },
+        state: { type: 'string' },
+        country: { type: 'string' },
+        postalCode: { type: 'string' },
+        company: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'inactive', 'deleted'] }
+      },
+      required: ['name']
+    };
+  }
+  
+  private getCustomerUpdateSchema(): any {
+    return {
+      properties: {
+        name: { type: 'string', minLength: 1, maxLength: 255 },
+        email: { type: 'string', format: 'email' },
+        phone: { type: 'string' },
+        address: { type: 'string' },
+        city: { type: 'string' },
+        state: { type: 'string' },
+        country: { type: 'string' },
+        postalCode: { type: 'string' },
+        company: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'inactive', 'deleted'] }
+      }
+    };
+  }
 }
+
+// Export singleton instance
+export const validationService = new ValidationService();
+
+// Also export the class for dependency injection
+export default ValidationService;

@@ -6,10 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
-import { CommonStatus } from '@/domain/enums/CommonEnums';
+import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
 
 /**
  * Gets a list of customers with filtering and pagination
@@ -54,7 +55,7 @@ export async function getCustomersHandler(request: NextRequest): Promise<NextRes
       limit: searchParams.has('limit') ? parseInt(searchParams.get('limit')!, 10) : 10,
       search: searchParams.get('search') || undefined,
       status: searchParams.get('status') as CommonStatus | undefined,
-      type: searchParams.get('type') as any || undefined,
+      type: searchParams.get('type') as CustomerType || undefined,
       city: searchParams.get('city') || undefined,
       country: searchParams.get('country') || undefined,
       postalCode: searchParams.get('postalCode') || undefined,

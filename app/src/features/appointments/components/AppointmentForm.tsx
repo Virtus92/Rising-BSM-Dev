@@ -143,7 +143,7 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({
       
       try {
         setIsLoading(true);
-        const response = await AppointmentClient.getAppointmentById(numericId);
+        const response = await AppointmentClient.getAppointment(numericId);
         
         if (response.success && response.data) {
           const { data } = response;
@@ -336,10 +336,10 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({
         setError(response.message || 'Failed to save appointment');
         
         // Handle validation errors from API
-        if (response.errors && Object.keys(response.errors).length > 0) {
+        if (response.error && typeof response.error === 'object') {
           // Convert errors to Record<string, string> format
           const formattedErrors: Record<string, string> = {};
-          Object.entries(response.errors).forEach(([key, value]) => {
+          Object.entries(response.error).forEach(([key, value]) => {
             formattedErrors[key] = Array.isArray(value) ? value.join(', ') : String(value);
           });
           setValidationErrors(formattedErrors);

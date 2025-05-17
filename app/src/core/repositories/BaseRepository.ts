@@ -234,7 +234,7 @@ export abstract class BaseRepository<T, ID = number> implements IBaseRepository<
       
       const entityData = this.mapToORMEntity(data);
       const result = await this.executeQuery('bulkUpdate', ids, entityData);
-      return typeof result === 'number' ? result : (result as any).count || 0;
+      return typeof result === 'number' ? result : (result).count || 0;
     } catch (error) {
       this.logger.error('Error in bulkUpdate', { error, ids, data });
       throw this.handleError(error);

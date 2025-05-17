@@ -82,6 +82,19 @@ export class UserServiceClient implements IUserService {
   }
 
   /**
+   * Find a user by ID (implements IUserService.findById)
+   */
+  async findById(id: number, options?: ServiceOptions): Promise<UserResponseDto | null> {
+    try {
+      const response = await UserClient.getUserById(id);
+      return response.success && response.data ? response.data : null;
+    } catch (error) {
+      console.error(`Error in UserServiceClient.findById(${id}):`, error);
+      return null;
+    }
+  }
+
+  /**
    * Get a user by ID
    */
   async getById(id: number, options?: ServiceOptions): Promise<UserResponseDto | null> {

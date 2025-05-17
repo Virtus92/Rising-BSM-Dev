@@ -1,213 +1,252 @@
 /**
- * Route Handler
+ * Route Handler - Standardized Route Handler for Next.js App Router
  * 
- * Provides a wrapper for Next.js API route handlers
- * that ensures consistent response types and error handling
+ * Provides consistent error handling, authentication, and logging
+ * for all API routes with the standardized ApiResponse structure.
  */
-import { NextRequest, NextResponse } from 'next/server';
-import { 
-  ErrorResponse, 
-  SuccessResponse 
-} from '@/core/errors/types/ApiTypes';
-import { getLogger } from '@/core/logging';
-import jwt from 'jsonwebtoken';
 
-// Logger for debugging auth issues
+import { NextRequest, NextResponse } from 'next/server';
+import { getLogger } from '@/core/logging';
+import { ApiResponse } from '@/core/api/types';
+import { auth } from '@/features/auth/api/middleware/authMiddleware';
+import { AppError } from '@/core/errors/types/AppError';
+import { UserRole } from '@/domain';
+
 const logger = getLogger();
 
-/**
- * Options for route handlers
- */
+// Handler types
+export type RouteHandler = (
+  req: NextRequest,
+  context?: any
+) => Promise<NextResponse | Response | any>;
+
+export type MiddlewareFunction = (
+  req: NextRequest,
+  next: () => Promise<NextResponse>
+) => Promise<NextResponse>;
+
+// Route handler options
 export interface RouteHandlerOptions {
-  /**
-   * Whether the route requires authentication
-   */
+  // Authentication options
   requiresAuth?: boolean;
+  requiredRole?: UserRole | UserRole[];
+  requiredPermission?: string | string[];
   
-  /**
-   * Required roles for accessing this route
-   */
-  requiredRoles?: string[];
+  // Cache control
+  cacheControl?: string;
   
-  /**
-   * Whether to skip the default error handler
-   */
-  skipErrorHandler?: boolean;
-
-  detailedErrors?: boolean;
+  // Middleware
+  middleware?: MiddlewareFunction[];
 }
 
 /**
- * Use auth information interface from route-handler.ts to avoid duplication
+ * Format error to standardized ApiResponse structure
  */
-import { AuthInfo } from '../route-handler';
-export type { AuthInfo };
-
-/**
- * Route handler type
- * Ensures consistent response types
- * Must match the type definition in the main route-handler.ts
- */
-export type RouteHandler<T = any> = (request: NextRequest, ...args: any[]) => Promise<NextResponse>;
-
-// Import the RouteHandler type from the main route-handler.ts to ensure compatibility
-import { RouteHandler as BaseRouteHandler } from '../route-handler';
-// Ensure our RouteHandler type is compatible with the base RouteHandler type
-type _EnsureTypeCompatibility<T> = RouteHandler<T> extends BaseRouteHandler<T> ? true : false;
-
-/**
- * Helper function to extract auth information from a request
- * Parses the token from authorization headers and attaches user info to the request
- * 
- * @param request NextRequest object
- * @returns The request with auth information attached
- */
-function extractAuthFromRequest(request: NextRequest): NextRequest {
-  try {
-    // Check if auth is already attached - don't process twice
-    if ((request as any).auth) {
-      return request;
-    }
-    
-    // Get token from authorization header or X-Auth-Token header
-    let token: string | null = null;
-    
-    // Check Authorization header first (Bearer token)
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    }
-    
-    // If no token in Authorization header, check X-Auth-Token
-    if (!token) {
-      token = request.headers.get('X-Auth-Token');
-    }
-    
-    // If no token in headers, check cookies
-    if (!token) {
-      const authCookie = request.cookies.get('auth_token');
-      if (authCookie) {
-        token = authCookie.value;
-      }
-    }
-    
-    // If no token found, return request as is
-    if (!token) {
-      return request;
-    }
-    
-    // Decode the token without verification (verification was done by middleware)
-    const decoded = jwt.decode(token) as any;
-    
-    // If token is invalid or has no subject, return request as is
-    if (!decoded || !decoded.sub) {
-      return request;
-    }
-    
-    // Create auth information
-    const auth: AuthInfo = {
-      userId: parseInt(decoded.sub, 10),
-      role: decoded.role,
-      name: decoded.name,
-      email: decoded.email
-    };
-    
-    // Attach auth to request
-    (request as any).auth = auth;
-    
-    // Return the modified request
-    return request;
-  } catch (error) {
-    // Log error but don't break the request
-    logger.error('Error extracting auth from request:', error as Error);
-    return request;
+function formatErrorResponse(error: unknown): ApiResponse<null> {
+  let errorMessage = 'An unexpected error occurred';
+  let statusCode = 500;
+  
+  if (error instanceof AppError) {
+    errorMessage = error.message;
+    statusCode = error.statusCode || 500;
+  } else if (error instanceof Error) {
+    errorMessage = error.message;
+  } else if (typeof error === 'string') {
+    errorMessage = error;
   }
+  
+  return {
+    success: false,
+    data: null,
+    error: errorMessage,
+    statusCode
+  };
 }
 
 /**
- * Create a route handler with error handling
+ * Standard route handler with proper error handling, authentication, and logging
  * 
- * @param handler Handler function
- * @param options Route handler options
- * @returns Wrapped handler with error handling
+ * @param handler Route handler function
+ * @param options Options for authentication and middleware
  */
-export function routeHandler<T>(
-  handler: RouteHandler<T>,
-  options: RouteHandlerOptions = {}
-): RouteHandler<T> {
-  // Check if the handler is a function
-  if (typeof handler !== 'function') {
-    throw new Error('Handler must be a function');
-  }
-  // Check if the handler is compatible with the RouteHandler type
-  if (typeof handler !== 'function' || handler.length < 1) {
-    throw new Error('Handler must be a function with at least one argument');
-  }
-  // Check if the options are valid
-  if (options && typeof options !== 'object') {
-    throw new Error('Options must be an object');
-  }
-  
-  // Create an auth-enhanced handler that injects the auth info and includes error handling
-  const authEnhancedHandler: RouteHandler<T> = async (request: NextRequest, ...args: any[]) => {
+export function routeHandler(
+  handler: RouteHandler,
+  options: RouteHandlerOptions = { requiresAuth: true }
+) {
+  return async (request: NextRequest, context?: any): Promise<NextResponse> => {
+    const startTime = Date.now();
+    const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
+    const method = request.method;
+    const url = request.url;
+    
+    logger.info(`API Request started: ${method} ${url}`, { requestId, method, url });
+    
     try {
-      // Extract auth from request
-      const enhancedRequest = extractAuthFromRequest(request);
-      
-      // Check if authentication is required and not present
-      if (options.requiresAuth && !(enhancedRequest as any).auth?.userId) {
-        return new NextResponse(
-          JSON.stringify({
-            success: false,
-            message: 'Authentication required',
-            statusCode: 401,
-          }),
-          { 
-            status: 401, 
-            headers: { 'Content-Type': 'application/json' } 
+      // Apply auth middleware if required
+      if (options.requiresAuth !== false) {
+        // Create auth handler with correct options
+        const authHandler = auth(
+          async (req, user) => {
+            // This handler is only used internally for auth verification
+            return NextResponse.json({ success: true });
+          },
+          {
+            requireAuth: true,
+            requiredRole: options.requiredRole,
+            requiredPermission: options.requiredPermission 
+              ? Array.isArray(options.requiredPermission)
+                ? options.requiredPermission 
+                : [options.requiredPermission]
+              : undefined
           }
         );
+        
+        // Apply auth middleware
+        const authResult = await authHandler(request, context);
+        
+        // If auth failed (status is not 200), return the error response
+        if (authResult.status !== 200) {
+          const duration = Date.now() - startTime;
+          logger.info(`API Auth rejected: ${method} ${url}`, {
+            requestId,
+            method,
+            url,
+            status: authResult.status,
+            duration: `${duration}ms`
+          });
+          
+          // Return consistent error response
+          return NextResponse.json({
+            success: false,
+            error: 'Authentication required',
+            code: 'AUTHENTICATION_REQUIRED',
+            message: 'Authentication required',
+            statusCode: 401
+          }, { status: 401 });
+        }
       }
       
-      // Check if role requirements are met
-      if (options.requiredRoles && options.requiredRoles.length > 0 && (enhancedRequest as any).auth) {
-        const userRole = (enhancedRequest as any).auth.role;
-        if (!userRole || !options.requiredRoles.includes(userRole)) {
-          return new NextResponse(
-            JSON.stringify({
-              success: false,
-              message: 'Insufficient permissions',
-              statusCode: 403,
-            }),
-            { 
-              status: 403, 
-              headers: { 'Content-Type': 'application/json' } 
-            }
+      // Apply custom middleware if provided
+      if (options.middleware && options.middleware.length > 0) {
+        // Chain middleware
+        const executeMiddleware = async (index: number): Promise<NextResponse> => {
+          if (index >= (options.middleware?.length || 0)) {
+            // All middleware executed, call handler
+            return executeHandler(request, context);
+          }
+          
+          // Execute middleware
+          const middleware = options.middleware![index];
+          return middleware(request, async () => {
+            return executeMiddleware(index + 1);
+          });
+        };
+        
+        // Start middleware chain
+        return executeMiddleware(0);
+      }
+      
+      // No middleware, just execute handler
+      return executeHandler(request, context);
+      
+      // Helper function to execute the main handler with proper response formatting
+      async function executeHandler(req: NextRequest, ctx: any): Promise<NextResponse> {
+        try {
+          const result = await handler(req, ctx);
+          
+          // Handle different return types
+          if (result instanceof NextResponse) {
+            // Already a NextResponse, return it
+            const duration = Date.now() - startTime;
+            logger.info(`API Request completed: ${method} ${url}`, {
+              requestId,
+              method,
+              url,
+              status: result.status,
+              duration: `${duration}ms`
+            });
+            return result;
+          }
+          
+          if (result instanceof Response) {
+            // Convert Response to NextResponse
+            const nextResponse = NextResponse.json(
+              await result.json(),
+              { status: result.status, headers: result.headers }
+            );
+            
+            const duration = Date.now() - startTime;
+            logger.info(`API Request completed: ${method} ${url}`, {
+              requestId,
+              method,
+              url,
+              status: nextResponse.status,
+              duration: `${duration}ms`
+            });
+            
+            return nextResponse;
+          }
+          
+          // Format direct return values in ApiResponse format
+          const response = NextResponse.json(
+            { success: true, data: result, error: null },
+            { status: 200 }
+          );
+          
+          const duration = Date.now() - startTime;
+          logger.info(`API Request completed: ${method} ${url}`, {
+            requestId,
+            method,
+            url,
+            status: response.status,
+            duration: `${duration}ms`
+          });
+          
+          return response;
+        } catch (error) {
+          logger.error(`API Error in route handler: ${method} ${url}`, {
+            error: error instanceof Error ? {
+              name: error.name,
+              message: error.message,
+              stack: error.stack
+            } : String(error),
+            requestId,
+            method,
+            url
+          });
+          
+          // Format error in standardized ApiResponse structure
+          const errorResponse = formatErrorResponse(error);
+          
+          return NextResponse.json(
+            errorResponse,
+            { status: errorResponse.statusCode || 500 }
           );
         }
       }
-      
-      // Forward to the original handler with the enhanced request
-      return await handler(enhancedRequest, ...args);
     } catch (error) {
-      // Log the error
-      logger.error('Error in route handler:', error as Error);
+      // Log error
+      logger.error(`API Request failed: ${method} ${url}`, {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : String(error),
+        requestId,
+        method,
+        url
+      });
       
-      // Return a formatted error response
-      return new NextResponse(
-        JSON.stringify({
-          success: false,
-          message: error instanceof Error ? error.message : 'An unknown error occurred',
-          statusCode: 500,
-        }),
-        { 
-          status: 500, 
-          headers: { 'Content-Type': 'application/json' } 
-        }
+      // Format error in standardized ApiResponse structure
+      const errorResponse = formatErrorResponse(error);
+      
+      return NextResponse.json(
+        errorResponse,
+        { status: errorResponse.statusCode || 500 }
       );
     }
   };
-  
-  // Return the enhanced handler directly without using errorHandler
-  return authEnhancedHandler;
 }
+
+// Export for use in API routes
+export default routeHandler;

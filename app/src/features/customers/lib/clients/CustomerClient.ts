@@ -6,7 +6,9 @@ import {
   CustomerFilterParamsDto, 
   CreateCustomerDto, 
   UpdateCustomerDto,
-  CustomerDetailResponseDto
+  CustomerDetailResponseDto,
+  UpdateCustomerStatusDto,
+  CustomerLogDto
 } from '@/domain/dtos/CustomerDtos';
 import ApiClient, { ApiResponse, ApiRequestError } from '@/core/api/ApiClient';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
@@ -19,6 +21,12 @@ const CUSTOMERS_API_URL = '/customers';
  * Client for customer API requests
  */
 export class CustomerClient {
+  /**
+   * Find a customer by email
+   */
+  static async findCustomerByEmail(email: string): Promise<ApiResponse<CustomerResponseDto>> {
+    return await ApiClient.get(`/customers`, { params: { email } });
+  }
   /**
    * Gets all customers with optional filtering
    * 
@@ -193,6 +201,124 @@ export class CustomerClient {
     } catch (error: unknown) {
       throw new ApiRequestError(
         error instanceof Error ? error.message : `Failed to get ${period} customer statistics`,
+        500
+      );
+    }
+  }
+
+  /**
+   * Alias for getCustomerById
+   * 
+   * @param id - Customer ID
+   * @returns API response
+   */
+  static async getCustomer(id: number | string): Promise<ApiResponse<CustomerResponseDto>> {
+    return this.getCustomerById(id);
+  }
+
+  /**
+   * Updates customer status
+   * 
+   * @param id - Customer ID
+   * @param data - Status update data
+   * @returns API response
+   */
+  static async updateCustomerStatus(id: number | string, data: UpdateCustomerStatusDto): Promise<ApiResponse<CustomerResponseDto>> {
+    try {
+      const validatedId = validateId(id);
+      if (validatedId === null) {
+        throw new ApiRequestError('Invalid customer ID format', 400);
+      }
+      return await ApiClient.put(`${CUSTOMERS_API_URL}/${validatedId}/status`, data);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to update customer status`,
+        500
+      );
+    }
+  }
+
+  /**
+   * Gets customer logs
+   * 
+   * @param customerId - Customer ID
+   * @returns API response
+   */
+  static async getCustomerLogs(customerId: number | string): Promise<ApiResponse<CustomerLogDto[]>> {
+    try {
+      const validatedId = validateId(customerId);
+      if (validatedId === null) {
+        throw new ApiRequestError('Invalid customer ID format', 400);
+      }
+      return await ApiClient.get(`${CUSTOMERS_API_URL}/${validatedId}/logs`);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to get customer logs`,
+        500
+      );
+    }
+  }
+
+  /**
+   * Creates a customer log
+   * 
+   * @param customerId - Customer ID
+   * @param data - Log data
+   * @returns API response
+   */
+  static async createCustomerLog(customerId: number | string, data: { action: string; details?: string }): Promise<ApiResponse<CustomerLogDto>> {
+    try {
+      const validatedId = validateId(customerId);
+      if (validatedId === null) {
+        throw new ApiRequestError('Invalid customer ID format', 400);
+      }
+      return await ApiClient.post(`${CUSTOMERS_API_URL}/${validatedId}/logs`, data);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to create customer log`,
+        500
+      );
+    }
+  }
+
+  /**
+   * Add a note to a customer
+   * 
+   * @param customerId - Customer ID
+   * @param data - Note data
+   * @returns API response
+   */
+  static async addCustomerNote(customerId: number | string, data: { note: string }): Promise<ApiResponse<CustomerLogDto>> {
+    try {
+      const validatedId = validateId(customerId);
+      if (validatedId === null) {
+        throw new ApiRequestError('Invalid customer ID format', 400);
+      }
+      return await ApiClient.post(`${CUSTOMERS_API_URL}/${validatedId}/notes`, data);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to add customer note`,
+        500
+      );
+    }
+  }
+
+  /**
+   * Get customer notes
+   * 
+   * @param customerId - Customer ID
+   * @returns API response
+   */
+  static async getCustomerNotes(customerId: number | string): Promise<ApiResponse<CustomerLogDto[]>> {
+    try {
+      const validatedId = validateId(customerId);
+      if (validatedId === null) {
+        throw new ApiRequestError('Invalid customer ID format', 400);
+      }
+      return await ApiClient.get(`${CUSTOMERS_API_URL}/${validatedId}/notes`);
+    } catch (error: unknown) {
+      throw new ApiRequestError(
+        error instanceof Error ? error.message : `Failed to get customer notes`,
         500
       );
     }

@@ -7,7 +7,7 @@ import { formatResponse } from './formatting/response-formatter';
 import { AppError, NotFoundError, ValidationError, AuthenticationError, PermissionError, ConflictError, BadRequestError } from './types/AppError';
 import { getLogger } from '@/core/logging';
 import { IErrorHandler } from './types/IErrorHandler';
-import { authErrorHandler, AuthErrorType } from '@/features/auth/utils/AuthErrorHandler';
+import { AuthErrorType } from '@/types/types/auth';
 
 const logger = getLogger();
 
@@ -33,6 +33,33 @@ export interface SuccessResponse<T> {
 }
 
 /**
+ * Auth error interface
+ */
+export interface AuthError {
+  type: AuthErrorType;
+  message: string;
+  code?: string;
+  details?: Record<string, any>;
+}
+
+/**
+ * Convert any value to a string representation for error details
+ * @param value Any value to stringify
+ * @returns String representation
+ */
+function stringifyErrorDetails(value: any): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  
+  try {
+    return JSON.stringify(value);
+  } catch (e) {
+    return String(value);
+  }
+}
+
+/**
 * Error handler middleware for route handlers
 * Wraps a route handler with standardized error handling
 * 
@@ -40,68 +67,76 @@ export interface SuccessResponse<T> {
 * @returns Wrapped handler with error handling
 */
 export function errorHandler<T>(
-handler: (request: NextRequest, ...args: any[]) => Promise<NextResponse>
+  handler: (request: NextRequest, ...args: any[]) => Promise<NextResponse>
 ) {
-return async (request: NextRequest, ...args: any[]): Promise<NextResponse> => {
-try {
-// Execute the original handler
-return await handler(request, ...args);
-} catch (error) {
-// Log the error with detailed information
-logger.error('Unhandled error in route handler', {
-path: request.nextUrl.pathname,
-method: request.method,
-error: error instanceof Error ? {
-name: error.name,
-message: error.message,
-stack: error.stack
-} : String(error)
-});
-
-// Handle authentication errors from AuthErrorHandler
-if (error && (error as any).type === AuthErrorType.AUTH_REQUIRED) {
-return formatResponse.unauthorized(
-    error instanceof Error ? error.message : 'Authentication required',
-    {
-      details: (error as any).details || {
+  return async (request: NextRequest, ...args: any[]): Promise<NextResponse> => {
+    try {
+      // Execute the original handler
+      return await handler(request, ...args);
+    } catch (error) {
+      // Log the error with detailed information
+      logger.error('Unhandled error in route handler', {
         path: request.nextUrl.pathname,
-      requiredAuth: true
-    }
-}.toString()
-);
-}
+        method: request.method,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : String(error)
+      });
 
-// Handle permission errors from AuthErrorHandler
-if (error && (error as any).type === AuthErrorType.PERMISSION_DENIED) {
-return formatResponse.forbidden(
-  error instanceof Error ? error.message : 'Permission denied',
-    {
-      details: (error as any).details || {
-        path: request.nextUrl.pathname,
-          permissionRequired: true
-          }
-          }.toString()
+      // Handle authentication errors
+      if (error && typeof error === 'object' && 'type' in error) {
+        const authError = error as AuthError;
+
+        if (authError.type === AuthErrorType.AUTH_REQUIRED) {
+          const details = authError.details 
+            ? stringifyErrorDetails(authError.details) 
+            : stringifyErrorDetails({
+                path: request.nextUrl.pathname,
+                requiredAuth: true
+              });
+              
+          return formatResponse.unauthorized(
+            authError.message || 'Authentication required',
+            details
           );
         }
-        
-        // Format the error response based on error type
-        if (error instanceof AppError) {
-          return formatResponse.error(error) as NextResponse<ErrorResponse>;
+
+        // Handle permission errors
+        if (authError.type === AuthErrorType.PERMISSION_DENIED) {
+          const details = authError.details 
+            ? stringifyErrorDetails(authError.details) 
+            : stringifyErrorDetails({
+                path: request.nextUrl.pathname,
+                permissionRequired: true
+              });
+              
+          return formatResponse.forbidden(
+            authError.message || 'Permission denied',
+            details
+          );
         }
-        
-        // Generic error handling
-        return formatResponse.error(
-          error instanceof Error ? error.message : 'An unexpected error occurred',
-          500,
-          'INTERNAL_SERVER_ERROR',
-          {
-            path: request.nextUrl.pathname,
-            timestamp: new Date().toISOString()
-          }
-        ) as NextResponse<ErrorResponse>;
       }
-    };
-  }
+        
+      // Format the error response based on error type
+      if (error instanceof AppError) {
+        return formatResponse.error(error) as NextResponse<ErrorResponse>;
+      }
+        
+      // Generic error handling
+      return formatResponse.error(
+        error instanceof Error ? error.message : 'An unexpected error occurred',
+        500,
+        'INTERNAL_SERVER_ERROR',
+        stringifyErrorDetails({
+          path: request.nextUrl.pathname,
+          timestamp: new Date().toISOString()
+        })
+      ) as NextResponse<ErrorResponse>;
+    }
+  };
+}
 
 /**
  * Context for request tracking and error information
@@ -204,27 +239,31 @@ const errorHandlerImplementation: IErrorHandler = {
       method: request?.method
     });
     
-    // Handle authentication and permission errors from AuthErrorHandler
-    if (error && (error as any).type === AuthErrorType.AUTH_REQUIRED) {
-      return formatResponse.unauthorized(
-        error instanceof Error ? error.message : 'Authentication required',
-        {
-          details: (error as any).details || {
-            requiredAuth: true
-          }
-        }.toString()
-      );
-    }
-    
-    if (error && (error as any).type === AuthErrorType.PERMISSION_DENIED) {
-      return formatResponse.forbidden(
-        error instanceof Error ? error.message : 'Permission denied',
-        {
-          details: (error as any).details || {
-            permissionRequired: true
-          }
-        }.toString()
-      );
+    // Handle authentication and permission errors
+    if (error && typeof error === 'object' && 'type' in error) {
+      const authError = error as AuthError;
+      
+      if (authError.type === AuthErrorType.AUTH_REQUIRED) {
+        const details = authError.details 
+          ? stringifyErrorDetails(authError.details) 
+          : stringifyErrorDetails({ requiredAuth: true });
+          
+        return formatResponse.unauthorized(
+          authError.message || 'Authentication required',
+          details
+        );
+      }
+      
+      if (authError.type === AuthErrorType.PERMISSION_DENIED) {
+        const details = authError.details 
+          ? stringifyErrorDetails(authError.details) 
+          : stringifyErrorDetails({ permissionRequired: true });
+          
+        return formatResponse.forbidden(
+          authError.message || 'Permission denied',
+          details
+        );
+      }
     }
     
     // Format the error response based on error type
@@ -255,7 +294,7 @@ const errorHandlerImplementation: IErrorHandler = {
     // Map database-specific errors
     if (error && typeof error === 'object') {
       // Handle based on error codes or types
-      if ('code' in error) {
+      if ('code' in error && typeof (error as any).code === 'string') {
         const code = (error as any).code;
         
         if (code === 'P2025') { // Prisma not found
@@ -302,9 +341,9 @@ const errorHandlerImplementation: IErrorHandler = {
       return error;
     }
     
-    // If it's an auth error from AuthErrorHandler, convert appropriately
-    if (error && (error as any).type) {
-      const authError = error as any;
+    // If it's an auth error, convert appropriately
+    if (error && typeof error === 'object' && 'type' in error) {
+      const authError = error as AuthError;
       
       if (authError.type === AuthErrorType.AUTH_REQUIRED) {
         return new AuthenticationError(

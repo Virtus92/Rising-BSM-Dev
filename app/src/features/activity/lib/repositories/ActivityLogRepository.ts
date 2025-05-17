@@ -529,7 +529,7 @@ export class ActivityLogRepository extends PrismaRepository<ActivityLog, number>
 
   protected mapToDomainEntity(ormEntity: any): ActivityLog {
     if (!ormEntity) {
-      return null as any;
+      throw new Error('Cannot map null or undefined ORM entity to ActivityLog');
     }
     
     // Parse details from JSON string if available

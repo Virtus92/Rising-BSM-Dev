@@ -21,6 +21,8 @@ import { IN8NIntegrationService } from '@/domain/services/IN8NIntegrationService
  * Interface for the ServiceFactory class
  * This allows references to the factory without importing server-only code
  */
+import { SecurityConfig } from '@/core/config/SecurityConfig';
+
 export interface IServiceFactory {
   createAuthService(): IAuthService;
   createUserService(): IUserService;
@@ -33,6 +35,7 @@ export interface IServiceFactory {
   createPermissionService(): IPermissionService;
   createRequestDataService(): IRequestDataService;
   createN8NIntegrationService(): IN8NIntegrationService;
+  createSecurityConfig(): SecurityConfig;
   resetServices(): void;
 }
 

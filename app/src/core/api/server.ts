@@ -12,8 +12,8 @@ export * from './route-handler';
 // Type definitions from route-handler
 import { 
   RouteHandler, 
-  RouteHandlerOptions, 
-  AuthInfo 
+  RouteHandlerOptions,
+  AuthInfo
 } from './route-handler';
 
 // Re-export types for use in server components

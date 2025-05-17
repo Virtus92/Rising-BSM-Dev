@@ -1,13 +1,7 @@
 /**
- * Authentication Middleware Exports
- * Provides a clean public API for auth middleware
+ * Auth middleware index
  */
 
-// Export everything from authMiddleware
-export * from './authMiddleware';
-
-// Export default for convenience
-export { default } from './authMiddleware';
-
-// Export auth middleware function directly
-export { authMiddleware as apiAuth } from './authMiddleware';
+// Export auth middleware functions with different names for backward compatibility
+export { auth, auth as authMiddleware, auth as apiAuth } from './authMiddleware';
+export type { AuthOptions, AuthResult } from './authMiddleware';

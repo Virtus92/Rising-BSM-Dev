@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../providers/AuthProvider';
+import AuthService from '@/features/auth/core';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -18,9 +19,6 @@ const LoginForm: React.FC = () => {
   const { toast } = useToast();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  
-  // We're using the toast hook directly for notifications
-  // No need for a separate showToast function that would cause duplicates
   
   // Reset the error message when inputs change
   useEffect(() => {
@@ -58,34 +56,42 @@ const LoginForm: React.FC = () => {
         passwordLength: password.length 
       });
       
-      // Add additional debugging
       console.log(`LoginForm: Before login call (${loginId})`);
       
       // Wait for login to complete with timeout protection
-      const loginPromise = login({ email, password });
+      const loginPromise = AuthService.signIn(email, password);
+      
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Login timeout')), 15000); // 15 second timeout
       });
       
       try {
-        await Promise.race([loginPromise, timeoutPromise]);
+        // Use type assertion to tell TypeScript what we expect from Promise.race
+        const loginResult = await Promise.race([loginPromise, timeoutPromise]) as { success: boolean; data?: any };
         console.log(`LoginForm: Login completed successfully (${loginId})`);
-      
-        // Display success toast
-        toast({
-          title: 'Anmeldung erfolgreich',
-          description: 'Sie werden zum Dashboard weitergeleitet...',
-          variant: 'success',
-          dedupeKey: 'login-success',
-          dedupeStrategy: 'replace'
-        });
         
-        // Reset form
-        setTimeout(() => {
-          setEmail('');
-          setPassword('');
-          formRef.current?.reset();
-        }, 100);
+        if (loginResult.success && loginResult.data) {
+          // Update auth context with login function
+          await login(email, password);
+          
+          // Display success toast
+          toast({
+            title: 'Anmeldung erfolgreich',
+            description: 'Sie werden zum Dashboard weitergeleitet...',
+            variant: 'success',
+            dedupeKey: 'login-success',
+            dedupeStrategy: 'replace'
+          });
+          
+          // Reset form
+          setTimeout(() => {
+            setEmail('');
+            setPassword('');
+            formRef.current?.reset();
+          }, 100);
+        } else {
+          throw new Error('Login failed: Invalid response from server');
+        }
       } catch (error) {
         // Handle the timeout specifically
         if (error instanceof Error && error.message === 'Login timeout') {
@@ -99,11 +105,11 @@ const LoginForm: React.FC = () => {
             dedupeKey: 'login-timeout',
             dedupeStrategy: 'replace'
           });
-        } else if (error instanceof Error && error.message.includes('TokenManager')) {
-          // Handle TokenManager initialization errors specifically
-          console.error(`LoginForm: TokenManager initialization error (${loginId})`, error as Error);
+        } else if (error instanceof Error && (error.message.includes('TokenManager') || error.message.includes('TokenService'))) {
+          // Handle token service initialization errors specifically
+          console.error(`LoginForm: Token service initialization error (${loginId})`, error as Error);
           setErrorMessage('System-Initialisierungsfehler. Bitte aktualisieren Sie die Seite und versuchen Sie es erneut.');
-          
+
           toast({
             title: 'System-Initialisierungsfehler',
             description: 'Bitte aktualisieren Sie die Seite und versuchen Sie es erneut.',
@@ -170,6 +176,17 @@ const LoginForm: React.FC = () => {
             dedupeKey: 'login-network-error',
             dedupeStrategy: 'replace'
           });
+        } else if (error.message.includes('AUTH')) {
+          // Specific error for auth service errors
+          setErrorMessage('Anmeldefehler: ' + error.message);
+          
+          toast({
+            title: 'Anmeldefehler',
+            description: error.message || 'Ein Fehler ist bei der Anmeldung aufgetreten',
+            variant: 'destructive',
+            dedupeKey: 'login-auth-error',
+            dedupeStrategy: 'replace'
+          });
         } else {
           // Set regular error message display in the form
           setErrorMessage(error.message || 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
@@ -203,6 +220,12 @@ const LoginForm: React.FC = () => {
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+      {errorMessage && (
+        <div className="bg-destructive/15 text-destructive p-3 rounded-md flex items-start mb-4">
+          <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+          <div>{errorMessage}</div>
+        </div>
+      )}
       
       <div>
         <Label htmlFor="email">Email</Label>

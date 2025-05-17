@@ -49,6 +49,9 @@ export class Permission extends BaseEntity {
     const codeRegex = /^[a-z]+\.[a-z]+$/;
     return codeRegex.test(this.code);
   }
+
+  
+
 }
 
 /**
@@ -129,4 +132,5 @@ export class UserPermission {
       isDenied: true
     });
   }
+
 }

@@ -6,8 +6,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
-import { blacklistToken, blacklistUser } from '@/features/auth/lib/clients/token/blacklist/TokenBlacklistServer';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
+import AuthService from '@/features/auth/core';
 
 export async function logoutHandler(req: NextRequest): Promise<NextResponse> {
   const logger = getLogger();
@@ -45,25 +46,22 @@ export async function logoutHandler(req: NextRequest): Promise<NextResponse> {
     if (authToken) {
       try {
         // Add auth token to blacklist until it expires
-        const decodedToken = jwt.decode(authToken) as any;
+        const decodedToken = jwt.decode(authToken);
         
-        if (decodedToken && decodedToken.exp) {
+        if (decodedToken && typeof decodedToken !== 'string' && decodedToken.exp) {
           // Convert exp (in seconds) to milliseconds
           const expiryMs = decodedToken.exp * 1000;
           
           // Extract user ID if available
           if (decodedToken.sub) {
-            userId = parseInt(decodedToken.sub, 10);
+            // Handle potential function return for sub
+            const sub = typeof decodedToken.sub;
+            userId = parseInt(sub, 10);
           }
           
-          // Add to blacklist using our improved implementation
-          blacklistToken(authToken);
-          
-          // If we have a user ID, also blacklist all tokens for this user
-          if (userId) {
-            blacklistUser(userId);
-            logger.info('User tokens blacklisted for logout', { userId });
-          }
+          // Use centralized AuthService to handle token invalidation
+          await AuthService.signOut();
+          logger.info('User logged out via centralized AuthService', { userId });
           
           logger.info('Auth token added to blacklist', { userId: decodedToken.sub });
         }
@@ -89,11 +87,11 @@ export async function logoutHandler(req: NextRequest): Promise<NextResponse> {
     // If we have only a refresh token but no user ID
     else if (refreshToken) {
       try {
-        // Use token blacklist as fallback
-        blacklistToken(refreshToken);
-        logger.info('Refresh token added to blacklist');
+        // Use centralized AuthService to handle token invalidation
+        await AuthService.signOut();
+        logger.info('Session terminated via AuthService');
       } catch (error) {
-        logger.warn('Failed to blacklist refresh token during logout', { error });
+        logger.warn('Failed to terminate session during logout', { error });
       }
     }
     

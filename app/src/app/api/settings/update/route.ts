@@ -6,6 +6,7 @@
 import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError } from '@/core/errors/index';
+import { UserRole } from '@/domain/entities/User';
 import { getLogger } from '@/core/logging';
 
 /**
@@ -66,6 +67,6 @@ export const PUT = routeHandler(
     // Require authentication for updating settings
     requiresAuth: true,
     // Only administrators can update settings
-    requiredRoles: ['admin']
+    requiredRole: UserRole.ADMIN
   }
 );

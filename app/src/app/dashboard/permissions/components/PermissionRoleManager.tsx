@@ -22,7 +22,7 @@ import { PermissionClient } from '@/features/permissions/lib/clients/PermissionC
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { UserRole } from '@/domain/enums/UserEnums';
 import { getRoleInfo } from '@/shared/components/permissions/RoleConfig';
-import { usePermissions } from '@/features/users/hooks/usePermissions';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { getIconComponent } from '@/shared/utils/icon-utils';
 import * as Icons from 'lucide-react';
 

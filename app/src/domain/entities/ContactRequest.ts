@@ -2,6 +2,10 @@ import { BaseEntity } from './BaseEntity';
 import { RequestStatus } from '../enums/CommonEnums';
 import { RequestData } from './RequestData';
 import { RequestSource, RequestMetadata } from '../dtos/RequestDtos';
+import { Customer } from './Customer';
+import { User } from './User';
+import { Appointment } from './Appointment';
+import { RequestNote } from '@prisma/client';
 
 // Import types from RequestDtos.ts to prevent circular dependency
 
@@ -75,6 +79,31 @@ export class ContactRequest extends BaseEntity {
    * Associated structured data
    */
   requestData?: RequestData[];
+  
+  /**
+   * Notes associated with this request
+   */
+  notes?: RequestNote[];
+  
+  /**
+   * Customer relationship object
+   */
+  customer?: Customer;
+  
+  /**
+   * Processor (user) relationship object
+   */
+  processor?: User;
+  
+  /**
+   * User assigned to handle this request
+   */
+  assignedTo?: User;
+  
+  /**
+   * Associated appointment
+   */
+  appointment?: Appointment;
   
   /**
    * Konstruktor

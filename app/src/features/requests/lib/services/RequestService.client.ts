@@ -54,7 +54,7 @@ export class RequestService {
       }
       
       const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      return ApiClient.get(`${this.basePath}${query}`);
+      return ApiClient.get(`${this.basePath}${query}`) as Promise<ApiResponse<PaginatedResponse<RequestResponseDto>>>;
     } catch (error) {
       console.error('Error in RequestService.getRequests:', error);
       return {
@@ -78,7 +78,7 @@ export class RequestService {
    */
   static async getById(id: number): Promise<ApiResponse<RequestDetailResponseDto>> {
     try {
-      return ApiClient.get(`${this.basePath}/${id}`);
+      return ApiClient.get(`${this.basePath}/${id}`) as Promise<ApiResponse<RequestDetailResponseDto>>;
     } catch (error) {
       console.error('Error in RequestService.getById:', error);
       return {
@@ -101,7 +101,7 @@ export class RequestService {
    */
   static async create(data: any): Promise<ApiResponse<RequestResponseDto>> {
     try {
-      return ApiClient.post(this.basePath, data);
+      return ApiClient.post(this.basePath, data) as Promise<ApiResponse<RequestResponseDto>>;
     } catch (error) {
       console.error('Error in RequestService.create:', error);
       return {
@@ -117,7 +117,7 @@ export class RequestService {
    */
   static async update(id: number, data: any): Promise<ApiResponse<RequestResponseDto>> {
     try {
-      return ApiClient.put(`${this.basePath}/${id}`, data);
+      return ApiClient.put(`${this.basePath}/${id}`, data) as Promise<ApiResponse<RequestResponseDto>>;
     } catch (error) {
       console.error('Error in RequestService.update:', error);
       return {
@@ -140,7 +140,7 @@ export class RequestService {
    */
   static async updateStatus(id: number, statusData: RequestStatusUpdateDto): Promise<ApiResponse<RequestResponseDto>> {
     try {
-      return ApiClient.put(`${this.basePath}/${id}/status`, statusData);
+      return ApiClient.put(`${this.basePath}/${id}/status`, statusData) as Promise<ApiResponse<RequestResponseDto>>;
     } catch (error) {
       console.error('Error in RequestService.updateStatus:', error);
       return {
@@ -156,7 +156,7 @@ export class RequestService {
    */
   static async delete(id: number): Promise<ApiResponse<void>> {
     try {
-      return ApiClient.delete(`${this.basePath}/${id}`);
+      return ApiClient.delete(`${this.basePath}/${id}`) as Promise<ApiResponse<void>>;
     } catch (error) {
       console.error('Error in RequestService.delete:', error);
       return {
@@ -179,7 +179,7 @@ export class RequestService {
    */
   static async addNote(id: number, note: string): Promise<ApiResponse<RequestNoteDto>> {
     try {
-      return ApiClient.post(`${this.basePath}/${id}/notes`, { text: note });
+      return ApiClient.post(`${this.basePath}/${id}/notes`, { text: note }) as Promise<ApiResponse<RequestNoteDto>>;
     } catch (error) {
       console.error('Error in RequestService.addNote:', error);
       return {
@@ -217,7 +217,7 @@ export class RequestService {
   static async convertToCustomer(data: ConvertToCustomerDto, context?: any): Promise<ApiResponse<any>> {
     try {
       console.log("Converting request to customer:", data);
-      return ApiClient.post(`${this.basePath}/${data.requestId}/convert`, data);
+      return ApiClient.post(`${this.basePath}/${data.requestId}/convert`, data) as Promise<ApiResponse<any>>;
     } catch (error) {
       console.error('Error in RequestService.convertToCustomer:', error);
       return {
@@ -234,7 +234,7 @@ export class RequestService {
   static async linkToCustomer(requestId: number, customerId: number, note?: string): Promise<ApiResponse<any>> {
     try {
       console.log("Linking request to customer:", { requestId, customerId, note });
-      return ApiClient.post(`${this.basePath}/${requestId}/link-customer`, { customerId, note });
+      return ApiClient.post(`${this.basePath}/${requestId}/link-customer`, { customerId, note }) as Promise<ApiResponse<any>>;
     } catch (error) {
       console.error('Error in RequestService.linkToCustomer:', error);
       return {
@@ -251,7 +251,7 @@ export class RequestService {
   static async createAppointment(requestId: number, appointmentData: any): Promise<ApiResponse<any>> {
     try {
       console.log("Creating appointment for request:", { requestId, appointmentData });
-      return ApiClient.post(`${this.basePath}/${requestId}/appointment`, appointmentData);
+      return ApiClient.post(`${this.basePath}/${requestId}/appointment`, appointmentData) as Promise<ApiResponse<any>>;
     } catch (error) {
       console.error('Error in RequestService.createAppointment:', error);
       return {
@@ -267,7 +267,7 @@ export class RequestService {
    */
   static async assignTo(requestId: number, userId: number, note?: string): Promise<ApiResponse<RequestResponseDto>> {
     try {
-      return ApiClient.post(`${this.basePath}/${requestId}/assign`, { userId, note });
+      return ApiClient.post(`${this.basePath}/${requestId}/assign`, { userId, note }) as Promise<ApiResponse<RequestResponseDto>>;
     } catch (error) {
       console.error('Error in RequestService.assignTo:', error);
       return {

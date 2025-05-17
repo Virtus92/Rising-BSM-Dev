@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
         decoded = jwt.verify(token, jwtSecret, {
           issuer: 'rising-bsm',
           audience: process.env.JWT_AUDIENCE || 'rising-bsm-app'
-        }) as any;
+        });
         
         logger.debug('Token validation passed with standard JWT claims');
       } catch (claimError) {
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
           error: claimError instanceof Error ? claimError.message : String(claimError) 
         });
         
-        decoded = jwt.verify(token, jwtSecret) as any;
+        decoded = jwt.verify(token, jwtSecret);
         logger.debug('Legacy token validation passed (no issuer/audience)');
       }
       
@@ -83,11 +83,13 @@ export async function GET(req: NextRequest) {
       // Log successful token verification
       logger.debug('Token verification successful', {
         sub: decoded.sub,
-        exp: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : 'none'
+        exp: typeof decoded === 'object' && 'exp' in decoded && typeof decoded.exp === 'number' 
+          ? new Date(decoded.exp * 1000).toISOString() 
+          : 'none'
       });
       
       // Get user from database
-      const userId = parseInt(decoded.sub, 10);
+      const userId = parseInt(decoded.sub.toString(), 10);
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: {

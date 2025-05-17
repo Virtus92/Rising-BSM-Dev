@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthManagement } from '@/features/auth/hooks/useAuthManagement';
 import { useToast } from '@/shared/hooks/useToast';
-import { RegisterFormData } from '@/features/auth/providers/AuthProvider';
+import { RegisterData } from '@/features/auth/providers/AuthProvider';
 
 /**
  * Typdefinition für die Formularfelder und Fehler
@@ -132,12 +132,11 @@ export default function RegisterForm() {
     setIsSubmitting(true);
     try {
       // Register-Funktion aus dem AuthManagement-Hook verwenden
-      const registerData: RegisterFormData = {
+      const registerData: RegisterData = {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        confirmPassword: formData.passwordConfirm,
-        terms: formData.acceptTerms
+        confirmPassword: formData.passwordConfirm
       };
       
       const success = await register(registerData);

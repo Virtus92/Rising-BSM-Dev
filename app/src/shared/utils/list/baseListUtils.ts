@@ -187,7 +187,7 @@ export function createBaseListUtilityConfig<T, F extends BaseFilterParamsDto>(
     // Map sort field if needed
     const mappedFilters = { ...filters };
     if (mapSortField && filters.sortBy) {
-      mappedFilters.sortBy = mapSortField(filters.sortBy) as any;
+      mappedFilters.sortBy = mapSortField(filters.sortBy);
     }
     
     const response = await fetchFunction(mappedFilters);
@@ -217,12 +217,12 @@ export function enhanceBaseListResult<T, F extends BaseFilterParamsDto>(
     data: baseList.items,
     pagination: {
       ...baseList.pagination,
-      filters: baseList.filters as any
+      filters: baseList.filters
     },
     // Include the setItems method
     setItems: baseList.setItems,
     // Include setFetchFunction if baseList has it
-    setFetchFunction: (baseList as any).setFetchFunction
+    setFetchFunction: (baseList).setFetchFunction
   };
 }
 

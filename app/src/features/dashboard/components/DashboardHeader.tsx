@@ -45,7 +45,7 @@ interface QuickAction {
  * Header for the dashboard with navigation, user profile, and quick actions
  */
 const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const { settings } = useSettings();
   const router = useRouter();
   const pathname = usePathname();
@@ -130,7 +130,7 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
     
     try {
       logger.debug('User initiating logout');
-      await logout();
+      await signOut();
       
       router.push('/auth/login');
       toast({
@@ -149,7 +149,7 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
         variant: 'destructive'
       });
     }
-  }, [logout, router, toast]);
+  }, [signOut, router, toast]);
 
   // Get user initials for avatar (memoized)
   const userInitials = useMemo(() => {

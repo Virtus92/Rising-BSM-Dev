@@ -8,7 +8,8 @@ import {
   Calendar, RefreshCw, Tag, Bell, Globe, CreditCard, MessageSquare, User, Loader2,
   ChevronDown, CheckCircle2
 } from 'lucide-react';
-import { CustomerService } from '@/features/customers/lib/services/CustomerService';
+// Make sure we're using the client-side service
+import { CustomerService } from '@/features/customers/lib/services/CustomerService.client';
 import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
 import { Button } from '@/shared/components/ui/button';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
@@ -96,20 +97,20 @@ export default function CustomerDetailsPage() {
   const { toast } = useToast();
   
   // Debug permissions loading state and get permission functions
-  const { hasPermission, isLoading: permissionsLoading, permissions, refetch } = usePermissions();
+  const { hasPermission, isLoading: permissionsLoading, permissions, refetch } = usePermissions() ?? { hasPermission: () => false, isLoading: true, permissions: [], refetch: () => {} };
   
   // Log permissions debugging info
   useEffect(() => {
     console.log('Permissions state:', { 
       permissionsLoading, 
       permissions, 
-      hasCustomersView: permissions.includes(SystemPermission.CUSTOMERS_VIEW.toString()),
-      hasCustomersEdit: permissions.includes(SystemPermission.CUSTOMERS_EDIT.toString())
+      hasCustomersView: permissions.includes(SystemPermission.CUSTOMERS_VIEW),
+      hasCustomersEdit: permissions.includes(SystemPermission.CUSTOMERS_EDIT)
     });
     
     // If permissions aren't loaded yet, try to fetch them explicitly
     if (permissionsLoading || permissions.length === 0) {
-      refetch(true); // Force refresh permissions
+      refetch(); // Force refresh permissions
     }
   }, [permissionsLoading, permissions, refetch]);
   

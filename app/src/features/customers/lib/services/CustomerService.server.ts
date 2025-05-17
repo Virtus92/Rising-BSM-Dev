@@ -1,3 +1,6 @@
+// This file should only be imported server-side
+// We enforce this via the index.ts dynamic import pattern
+
 import { Customer } from '@/domain/entities/Customer';
 import { 
   CreateCustomerDto, 
@@ -19,6 +22,7 @@ import { ValidationResult, ValidationErrorType } from '@/domain/enums/Validation
 import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
 import { LogActionType } from '@/domain/enums/CommonEnums';
 import { EntityType } from '@/domain/enums/EntityTypes';
+import { createCustomerResponseDto } from '@/domain/utils/dtoFactory';
 
 /**
  * Server-side implementation of the CustomerService
@@ -113,12 +117,22 @@ export class CustomerService implements ICustomerService {
       
       // Get related data
       const notes = await this.repository.findNotes(id);
-      // Use getCustomerLogs method instead as findLogs doesn't exist on ICustomerRepository
-const logs = await this.repository.getCustomerLogs?.(id) || [];
+      
+      // Try different method names for logs
+      let logs: any[] = [];
+      if (typeof this.repository.getCustomerLogs === 'function') {
+        logs = await this.repository.getCustomerLogs(id);
+      } else if (typeof this.repository.getActivityLogs === 'function') {
+        logs = await this.repository.getActivityLogs(id);
+      } else if (typeof this.repository.getLogs === 'function') {
+        logs = await this.repository.getLogs(id);
+      }
       
       // Convert to detailed DTO
       const baseDTO = this.toDTO(customer);
-      return {
+      
+      // Create customer detail response with proper typing
+      const detailDTO: CustomerDetailResponseDto = {
         ...baseDTO,
         notes: notes?.map(note => ({
           id: note.id,
@@ -128,29 +142,31 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
           userName: note.userName,
           customerId: id,
           customerName: note.customerName || '',
-          entityType: EntityType.CUSTOMER as any,
+          entityType: EntityType.CUSTOMER,
           entityId: id,
           logType: LogActionType.NOTE,
-          details: note.text || {} as any,
+          details: note.text,
           action: LogActionType.NOTE,
           updatedAt: note.createdAt.toISOString()
         })) || [],
         logs: logs?.map((log: any) => ({
           id: log.id,
           action: log.action,
-          details: log.details,
-          text: log.details,
+          details: typeof log.details === 'string' ? { text: log.details } : (log.details || {}),
+          text: typeof log.details === 'string' ? log.details : JSON.stringify(log.details),
           createdAt: log.createdAt.toISOString(),
           userId: log.userId,
           userName: log.userName,
           customerId: id,
           customerName: log.customerName || '',
-          entityType: EntityType.CUSTOMER as any,
+          entityType: EntityType.CUSTOMER,
           entityId: id,
           logType: LogActionType.NOTE,
           updatedAt: log.updatedAt ? log.updatedAt.toISOString() : log.createdAt.toISOString()
-        }) as CustomerLogDto) as CustomerLogDto[] || []
+        })) || []
       };
+      
+      return detailDTO;
     } catch (error) {
       this.logger.error(`Error getting details for customer with ID ${id}:`, {
         error: error instanceof Error ? error.message : String(error),
@@ -211,16 +227,19 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
     try {
       this.logger.debug('Getting all customers with options:', { options });
       
-      // Use the repository's findAll method
-      const queryOptions = {
+      // Use the repository's findAll method with a properly typed QueryOptions object
+      const queryOptions: QueryOptions & { criteria?: Record<string, any> } = {
         page: options?.page || 1,
         limit: options?.limit || 10,
         relations: options?.relations || [],
-        sort: options?.sort
+        sort: options?.sort,
+        criteria: {} // Initialize with empty criteria
       };
       
-      // Process filters separately
-      const criteria = this.mapFiltersToRepositoryCriteria(options?.filters);
+      // Process and add filters to criteria if they exist
+      if (options?.filters) {
+        queryOptions.criteria = this.mapFiltersToRepositoryCriteria(options.filters);
+      }
       
       // Get customers with options
       const result = await this.repository.findAll(queryOptions);
@@ -268,7 +287,9 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
       
       // Convert to detailed DTO
       const baseDTO = this.toDTO(customer);
-      return {
+      
+      // Create properly typed customer detail response
+      const detailDTO: CustomerDetailResponseDto = {
         ...baseDTO,
         notes: notes?.map(note => ({
           id: note.id,
@@ -278,14 +299,16 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
           userName: note.userName,
           customerId: id,
           customerName: note.customerName || '',
-          entityType: EntityType.CUSTOMER as any,
+          entityType: EntityType.CUSTOMER,
           entityId: id,
           logType: LogActionType.NOTE,
-          details: note.text || {} as any,
+          details: note.text,
           action: LogActionType.NOTE,
           updatedAt: note.createdAt.toISOString()
-        })) as CustomerLogDto[] || []
+        })) || []
       };
+      
+      return detailDTO;
     } catch (error) {
       this.logger.error(`Error getting customer with ID ${id}:`, {
         error: error instanceof Error ? error.message : String(error),
@@ -539,8 +562,8 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
         throw new ServiceError('Failed to add note', 'NOTE_CREATION_FAILED', 500);
       }
 
-      // Convert Note to Record<string, any>
-      const noteRecord: Record<string, any> = {
+      // Create properly typed CustomerLogDto
+      const logDto: CustomerLogDto = {
         id: createdNote.id,
         text: createdNote.text,
         createdAt: createdNote.createdAt.toISOString(),
@@ -548,27 +571,14 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
         userName: createdNote.userName,
         customerId: id,
         customerName: (createdNote as any).customerName || '',
-        entityType: EntityType.CUSTOMER as any,
-        entityId: id,
-        logType: LogActionType.NOTE,
-        details: note
-      };
-      
-      // Convert to DTO
-      return {
-        id: createdNote.id,
-        text: createdNote.text,
-        createdAt: createdNote.createdAt.toISOString(),
-        userId: createdNote.userId,
-        userName: createdNote.userName,
-        customerId: id,
-        customerName: (createdNote as any).customerName || '',
-        entityType: EntityType.CUSTOMER as any,
+        entityType: EntityType.CUSTOMER,
         entityId: id,
         action: LogActionType.NOTE,
         updatedAt: createdNote.createdAt.toISOString(),
-        details: noteRecord
+        details: {typeof: note === 'string' ? { note: note } : JSON.stringify(note)},
       };
+      
+      return logDto;
     } catch (error) {
       this.logger.error(`Error adding note to customer with ID ${id}:`, {
         error: error instanceof Error ? error.message : String(error),
@@ -600,16 +610,16 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
         text: note.text,
         createdAt: note.createdAt.toISOString(),
         updatedAt: note.updatedAt ? note.updatedAt.toISOString() : note.createdAt.toISOString(),
-        action: note.action,
+        action: LogActionType.NOTE,
         userId: note.userId,
         userName: note.userName,
         customerId: id,
         customerName: (note as any).customerName || '',
-        entityType: EntityType.CUSTOMER as any,
+        entityType: EntityType.CUSTOMER,
         entityId: id,
         logType: LogActionType.NOTE,
         details: note.text
-      }) as CustomerLogDto);
+      } as CustomerLogDto));
     } catch (error) {
       this.logger.error(`Error getting notes for customer with ID ${id}:`, {
         error: error instanceof Error ? error.message : String(error),
@@ -980,11 +990,11 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
    */
   toDTO(entity: Customer): CustomerResponseDto {
     if (!entity) {
-      return null as any;
+      return createCustomerResponseDto();
     }
     
-    // Basic customer data
-    const dto: CustomerResponseDto = {
+    // Use our DTO factory to ensure all properties exist
+    return createCustomerResponseDto({
       id: entity.id,
       name: entity.name,
       email: entity.email,
@@ -992,25 +1002,18 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
       address: entity.address,
       city: entity.city,
       state: entity.state,
-      postalCode: entity.postalCode,
+      zipCode: entity.postalCode, // Map postalCode to zipCode for compatibility
       country: entity.country,
       company: entity.company,
+      companyName: entity.company, // Map company to companyName for compatibility
       status: entity.status,
-      createdAt: entity.createdAt.toISOString(),
-      updatedAt: entity.updatedAt.toISOString(),
+      createdAt: entity.createdAt instanceof Date ? entity.createdAt.toISOString() : String(entity.createdAt),
+      updatedAt: entity.updatedAt instanceof Date ? entity.updatedAt.toISOString() : String(entity.updatedAt),
       createdBy: entity.createdBy,
       updatedBy: entity.updatedBy,
       newsletter: entity.newsletter,
       type: entity.type
-    };
-    
-    // Add legacy zipCode for backward compatibility
-    (dto as any).zipCode = entity.postalCode;
-    
-    // Add legacy companyName for backward compatibility
-    (dto as any).companyName = entity.company;
-    
-    return dto;
+    });
   }
 
   /**
@@ -1035,12 +1038,12 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
     if (dto.city !== undefined) entity.city = dto.city;
     if (dto.state !== undefined) entity.state = dto.state;
     if (dto.country !== undefined) entity.country = dto.country;
-    if (dto.status !== undefined) entity.status = dto.status as CommonStatus;
+    if ((dto as any).status !== undefined) entity.status = (dto as any).status as CommonStatus;
     
     // Fix: Add missing fields
     if (dto.newsletter !== undefined) entity.newsletter = Boolean(dto.newsletter);
-    if (dto.type !== undefined) entity.type = dto.type as CustomerType;
-    if (dto.vatNumber !== undefined) entity.vatNumber = dto.vatNumber;
+    if ((dto as any).type !== undefined) entity.type = (dto as any).type as CustomerType;
+    if ((dto as any).vatNumber !== undefined) entity.vatNumber = (dto as any).vatNumber;
     
     // Handle both postalCode and zipCode (normalize to postalCode)
     if (dto.postalCode !== undefined) {
@@ -1112,482 +1115,488 @@ const logs = await this.repository.getCustomerLogs?.(id) || [];
     );
   }
 
+  // Implement remaining ICustomerService methods
 
-// Implement missing ICustomerService methods
-
-/**
- * Find customers with advanced filtering options
- */
-async findCustomers(filters: CustomerFilterParamsDto, options?: ServiceOptions): Promise<PaginationResult<CustomerResponseDto>> {
-  try {
-    this.logger.debug('Finding customers with filters:', { filters, options });
-    
-    // Use repository's findCustomers method if available
-    if (typeof this.repository.findCustomers === 'function') {
-      const result = await this.repository.findCustomers(filters);
+  /**
+   * Find customers with advanced filtering options
+   */
+  async findCustomers(filters: CustomerFilterParamsDto, options?: ServiceOptions): Promise<PaginationResult<CustomerResponseDto>> {
+    try {
+      this.logger.debug('Finding customers with filters:', { filters, options });
       
-      // Map entities to DTOs
-      return {
-        data: result.data.map(customer => this.toDTO(customer)),
-        pagination: result.pagination
-      };
-    }
-    
-    // Fall back to findAll with filters
-    const queryOptions: QueryOptions = {
-      page: filters.page || 1,
-      limit: filters.limit || 10
-    };
-    
-    if (filters.sortBy) {
-      queryOptions.sort = {
-        field: filters.sortBy,
-        direction: filters.sortDirection || 'desc'
-      };
-    }
-    
-    // Create criteria from filters
-    const criteria: Record<string, any> = {};
-    if (filters.status) criteria.status = filters.status;
-    if (filters.type) criteria.type = filters.type;
-    if (filters.search) criteria.search = filters.search;
-    if (filters.city) criteria.city = filters.city;
-    if (filters.country) criteria.country = filters.country;
-    if (filters.newsletter !== undefined) criteria.newsletter = filters.newsletter;
-    
-    // Get customers matching criteria
-    const customers = await this.repository.findByCriteria(criteria, queryOptions);
-    const total = await this.repository.count(criteria);
-    
-    return {
-      data: customers.map(customer => this.toDTO(customer)),
-      pagination: {
-        page: queryOptions.page || 1,
-        limit: queryOptions.limit || 10,
-        total,
-        totalPages: Math.ceil(total / (queryOptions.limit || 10))
+      // Use repository's findCustomers method if available
+      if (typeof this.repository.findCustomers === 'function') {
+        const result = await this.repository.findCustomers(filters);
+        
+        // Map entities to DTOs
+        return {
+          data: result.data.map(customer => this.toDTO(customer)),
+          pagination: result.pagination
+        };
       }
-    };
-  } catch (error) {
-    this.logger.error('Error finding customers with filters:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      filters,
-      options
-    });
-    throw this.handleError(error);
-  }
-}
-
-/**
- * Search customers by a search term
- */
-async searchCustomers(searchText: string, options?: ServiceOptions): Promise<CustomerResponseDto[]> {
-  try {
-    this.logger.debug('Searching customers:', { searchText, options });
-    
-    // Use repository's searchCustomers method if available
-    if (typeof this.repository.searchCustomers === 'function') {
-      const limit = options?.limit || 10;
-      const customers = await this.repository.searchCustomers(searchText, limit);
-      return customers.map(customer => this.toDTO(customer));
-    }
-    
-    // Fall back to findByCriteria with search in name, email, etc.
-    const criteria = {
-      search: searchText
-    };
-    
-    const queryOptions: QueryOptions = {
-      limit: options?.limit || 10
-    };
-    
-    const customers = await this.repository.findByCriteria(criteria, queryOptions);
-    return customers.map(customer => this.toDTO(customer));
-  } catch (error) {
-    this.logger.error('Error searching customers:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      searchText,
-      options
-    });
-    throw this.handleError(error);
-  }
-}
-
-/**
- * Get similar customers based on criteria
- */
-async getSimilarCustomers(customerId: number, options?: ServiceOptions): Promise<CustomerResponseDto[]> {
-  try {
-    this.logger.debug('Finding similar customers:', { customerId, options });
-    
-    // Use repository's findSimilarCustomers method if available
-    if (typeof this.repository.findSimilarCustomers === 'function') {
-      const limit = options?.limit || 5;
-      const customers = await this.repository.findSimilarCustomers(customerId, limit);
-      return customers.map(customer => this.toDTO(customer));
-    }
-    
-    // Fall back to getting the customer and finding others with similar attributes
-    const customer = await this.repository.findById(customerId);
-    if (!customer) {
-      return [];
-    }
-    
-    // Find customers with similar city or type
-    const criteria: Record<string, any> = {};
-    if (customer.city) criteria.city = customer.city;
-    if (customer.type) criteria.type = customer.type;
-    
-    const queryOptions: QueryOptions = {
-      limit: options?.limit || 5
-    };
-    
-    const customers = await this.repository.findByCriteria(criteria, queryOptions);
-    
-    // Filter out the original customer
-    return customers
-      .filter(c => c.id !== customerId)
-      .map(customer => this.toDTO(customer));
-  } catch (error) {
-    this.logger.error('Error finding similar customers:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      customerId,
-      options
-    });
-    throw this.handleError(error);
-  }
-}
-
-/**
- * Get customer statistics
- */
-async getCustomerStatistics(options?: ServiceOptions): Promise<any> {
-  try {
-    this.logger.debug('Getting customer statistics', { options });
-    
-    // Get total count
-    const totalCount = await this.repository.count();
-    
-    // Get counts by status
-    const statusCounts: Record<string, number> = {};
-    for (const status of Object.values(CommonStatus)) {
-      const count = await this.repository.count({ status });
-      statusCounts[status] = count;
-    }
-    
-    // Get counts by type
-    const typeCounts: Record<string, number> = {};
-    for (const type of Object.values(CustomerType)) {
-      const count = await this.repository.count({ type });
-      typeCounts[type as string] = count;
-    }
-    
-    // Get recent customers
-    const recentCustomers = await this.repository.findByCriteria({}, {
-      limit: 5,
-      sort: { field: 'createdAt', direction: 'desc' }
-    });
-    
-    return {
-      totalCount,
-      statusCounts,
-      typeCounts,
-      recentCustomers: recentCustomers.map(customer => this.toDTO(customer))
-    };
-  } catch (error) {
-    this.logger.error('Error getting customer statistics:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      options
-    });
-    throw this.handleError(error);
-  }
-}
-
-/**
- * Get customer logs
- */
-async getCustomerLogs(customerId: number, options?: ServiceOptions): Promise<CustomerLogDto[]> {
-  try {
-    this.logger.debug('Getting customer logs:', { customerId, options });
-    
-    // Use repository's getCustomerLogs method if available
-    if (typeof this.repository.getCustomerLogs === 'function') {
-      const logs = await this.repository.getCustomerLogs(customerId);
       
-      // Map to DTOs with required properties
-      return logs.map((log: any) => ({
-        id: log.id,
-        action: log.action,
-        details: log.details,
-        text: log.details, // For backwards compatibility
-        createdAt: log.createdAt instanceof Date ? log.createdAt.toISOString() : log.createdAt,
-        updatedAt: log.updatedAt instanceof Date ? log.updatedAt.toISOString() : log.updatedAt || log.createdAt,
-        userId: log.userId,
-        userName: log.userName,
+      // Fall back to findAll with filters
+      const queryOptions: QueryOptions = {
+        page: filters.page || 1,
+        limit: filters.limit || 10
+      };
+      
+      if (filters.sortBy) {
+        queryOptions.sort = {
+          field: filters.sortBy,
+          direction: filters.sortDirection || 'desc'
+        };
+      }
+      
+      // Create criteria from filters
+      const criteria: Record<string, any> = {};
+      if (filters.status) criteria.status = filters.status;
+      if (filters.type) criteria.type = filters.type;
+      if (filters.search) criteria.search = filters.search;
+      if (filters.city) criteria.city = filters.city;
+      if (filters.country) criteria.country = filters.country;
+      if (filters.newsletter !== undefined) criteria.newsletter = filters.newsletter;
+      
+      // Get customers matching criteria
+      const customers = await this.repository.findByCriteria(criteria, queryOptions);
+      const total = await this.repository.count(criteria);
+      
+      return {
+        data: customers.map(customer => this.toDTO(customer)),
+        pagination: {
+          page: queryOptions.page || 1,
+          limit: queryOptions.limit || 10,
+          total,
+          totalPages: Math.ceil(total / (queryOptions.limit || 10))
+        }
+      };
+    } catch (error) {
+      this.logger.error('Error finding customers with filters:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        filters,
+        options
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Search customers by a search term
+   */
+  async searchCustomers(searchText: string, options?: ServiceOptions): Promise<CustomerResponseDto[]> {
+    try {
+      this.logger.debug('Searching customers:', { searchText, options });
+      
+      // Use repository's searchCustomers method if available
+      if (typeof this.repository.searchCustomers === 'function') {
+        const limit = options?.limit || 10;
+        const customers = await this.repository.searchCustomers(searchText, limit);
+        return customers.map(customer => this.toDTO(customer));
+      }
+      
+      // Fall back to findByCriteria with search in name, email, etc.
+      const criteria = {
+        search: searchText
+      };
+      
+      const queryOptions: QueryOptions = {
+        limit: options?.limit || 10
+      };
+      
+      const customers = await this.repository.findByCriteria(criteria, queryOptions);
+      return customers.map(customer => this.toDTO(customer));
+    } catch (error) {
+      this.logger.error('Error searching customers:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        searchText,
+        options
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get similar customers based on criteria
+   */
+  async getSimilarCustomers(customerId: number, options?: ServiceOptions): Promise<CustomerResponseDto[]> {
+    try {
+      this.logger.debug('Finding similar customers:', { customerId, options });
+      
+      // Use repository's findSimilarCustomers method if available
+      if (typeof this.repository.findSimilarCustomers === 'function') {
+        const limit = options?.limit || 5;
+        const customers = await this.repository.findSimilarCustomers(customerId, limit);
+        return customers.map(customer => this.toDTO(customer));
+      }
+      
+      // Fall back to getting the customer and finding others with similar attributes
+      const customer = await this.repository.findById(customerId);
+      if (!customer) {
+        return [];
+      }
+      
+      // Find customers with similar city or type
+      const criteria: Record<string, any> = {};
+      if (customer.city) criteria.city = customer.city;
+      if (customer.type) criteria.type = customer.type;
+      
+      const queryOptions: QueryOptions = {
+        limit: options?.limit || 5
+      };
+      
+      const customers = await this.repository.findByCriteria(criteria, queryOptions);
+      
+      // Filter out the original customer
+      return customers
+        .filter(c => c.id !== customerId)
+        .map(customer => this.toDTO(customer));
+    } catch (error) {
+      this.logger.error('Error finding similar customers:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        customerId,
+        options
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get customer statistics
+   */
+  async getCustomerStatistics(options?: ServiceOptions): Promise<any> {
+    try {
+      this.logger.debug('Getting customer statistics', { options });
+      
+      // Get total count
+      const totalCount = await this.repository.count();
+      
+      // Get counts by status
+      const statusCounts: Record<string, number> = {};
+      for (const status of Object.values(CommonStatus)) {
+        const count = await this.repository.count({ status });
+        statusCounts[status] = count;
+      }
+      
+      // Get counts by type
+      const typeCounts: Record<string, number> = {};
+      for (const type of Object.values(CustomerType)) {
+        const count = await this.repository.count({ type });
+        typeCounts[type as string] = count;
+      }
+      
+      // Get recent customers
+      const recentCustomers = await this.repository.findByCriteria({}, {
+        limit: 5,
+        sort: { field: 'createdAt', direction: 'desc' }
+      });
+      
+      return {
+        totalCount,
+        statusCounts,
+        typeCounts,
+        recentCustomers: recentCustomers.map(customer => this.toDTO(customer))
+      };
+    } catch (error) {
+      this.logger.error('Error getting customer statistics:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        options
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get customer logs
+   */
+  async getCustomerLogs(customerId: number, options?: ServiceOptions): Promise<CustomerLogDto[]> {
+    try {
+      this.logger.debug('Getting customer logs:', { customerId, options });
+      
+      // Use repository's getCustomerLogs method if available
+      if (typeof this.repository.getCustomerLogs === 'function') {
+        const logs = await this.repository.getCustomerLogs(customerId);
+        
+        // Map to DTOs with required properties
+        return logs.map((log: any) => ({
+          id: log.id,
+          action: log.action,
+          details: log.details,
+          text: typeof log.details === 'string' ? log.details : JSON.stringify(log.details),
+          createdAt: log.createdAt instanceof Date ? log.createdAt.toISOString() : log.createdAt,
+          updatedAt: log.updatedAt instanceof Date ? log.updatedAt.toISOString() : 
+                   (log.updatedAt || (log.createdAt instanceof Date ? log.createdAt.toISOString() : log.createdAt)),
+          userId: log.userId,
+          userName: log.userName,
+          customerId: customerId,
+          customerName: log.customerName || '',
+          entityType: EntityType.CUSTOMER,
+          entityId: customerId,
+          logType: log.action === LogActionType.NOTE ? LogActionType.NOTE : log.action
+        } as CustomerLogDto));
+      }
+      
+      // Fall back to finding notes
+      const notes = await this.repository.findNotes(customerId);
+      
+      // Convert notes to log format
+      return notes.map(note => ({
+        id: note.id,
+        action: LogActionType.NOTE,
+        details: note.text,
+        text: note.text,
+        createdAt: note.createdAt instanceof Date ? note.createdAt.toISOString() : note.createdAt,
+        updatedAt: note.createdAt instanceof Date ? note.createdAt.toISOString() : note.createdAt,
+        userId: note.userId,
+        userName: note.userName,
         customerId: customerId,
-        customerName: log.customerName || '',
+        customerName: (note as any).customerName || '',
         entityType: EntityType.CUSTOMER,
         entityId: customerId,
-        logType: log.action === LogActionType.NOTE ? LogActionType.NOTE : log.action
-      }));
-    }
-    
-    // Fall back to finding notes
-    const notes = await this.repository.findNotes(customerId);
-    
-    // Convert notes to log format
-    return notes.map(note => ({
-      id: note.id,
-      action: LogActionType.NOTE,
-      details: note.text,
-      text: note.text,
-      createdAt: note.createdAt instanceof Date ? note.createdAt.toISOString() : note.createdAt,
-      updatedAt: note.createdAt instanceof Date ? note.createdAt.toISOString() : note.createdAt, // Notes don't have updatedAt
-      userId: note.userId,
-      userName: note.userName,
-      customerId: customerId,
-      customerName: (note as any).customerName || '',
-      entityType: EntityType.CUSTOMER,
-      entityId: customerId,
-      logType: LogActionType.NOTE
-    }));
-  } catch (error) {
-    this.logger.error('Error getting customer logs:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      customerId,
-      options
-    });
-    throw this.handleError(error);
-  }
-}
-
-/**
- * Create a customer log
- */
-async createCustomerLog(
-  customerId: number,
-  action: string,
-  details?: string,
-  options?: ServiceOptions
-): Promise<CustomerLogDto> {
-  try {
-    this.logger.debug('Creating customer log:', { customerId, action, details, options });
-    
-    // Get user information from options
-    const userId = options?.context?.userId || 0;
-    let userName = 'System';
-    
-    // Find the customer
-    const customer = await this.repository.findById(customerId);
-    if (!customer) {
-      throw new ServiceError('Customer not found', 'NOT_FOUND', 404);
-    }
-    
-    // Create log entry - use repository's createCustomerLog if available
-    let logEntry;
-    if (typeof this.repository.createCustomerLog === 'function') {
-      logEntry = await this.repository.createCustomerLog({
+        logType: LogActionType.NOTE
+      } as CustomerLogDto));
+    } catch (error) {
+      this.logger.error('Error getting customer logs:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         customerId,
-        userId,
-        action,
-        details
+        options
       });
-    } else {
-      // Fall back to adding a note
-      logEntry = await this.repository.addNote(customerId, userId, details || action);
+      throw this.handleError(error);
     }
-    
-    // Convert to DTO
-    return {
-      id: logEntry.id,
-      action: action,
-      details: details ? details : {} as any,
-      text: details || '',
-      createdAt: logEntry.createdAt instanceof Date ? logEntry.createdAt.toISOString() : logEntry.createdAt,
-      updatedAt: logEntry.createdAt instanceof Date ? logEntry.createdAt.toISOString() : logEntry.createdAt,
-      userId: userId,
-      userName: logEntry.userName || userName,
-      customerId: customerId,
-      customerName: customer.name || '',
-      entityType: EntityType.CUSTOMER,
-      entityId: customerId
-    };
-  } catch (error) {
-    this.logger.error('Error creating customer log:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      customerId,
-      action,
-      details,
-      options
-    });
-    throw this.handleError(error);
   }
-}
 
-/**
- * Soft delete a customer
- */
-async softDelete(customerId: number, options?: ServiceOptions): Promise<boolean> {
-  try {
-    this.logger.debug('Soft deleting customer:', { customerId, options });
-    
-    // Check if customer exists
-    const customer = await this.repository.findById(customerId);
-    if (!customer) {
-      throw new ServiceError('Customer not found', 'NOT_FOUND', 404);
-    }
-    
-    // Use repository's softDelete method if available
-    if (typeof this.repository.softDelete === 'function') {
-      return await this.repository.softDelete(customerId, options?.context?.userId);
-    }
-    
-    // Fall back to updating status to DELETED
-    await this.repository.update(customerId, {
-      status: CommonStatus.DELETED,
-      updatedBy: options?.context?.userId
-    } as Partial<Customer>);
-    
-    return true;
-  } catch (error) {
-    this.logger.error('Error soft deleting customer:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      customerId,
-      options
-    });
-    throw this.handleError(error);
-  }
-}
-
-/**
- * Hard delete a customer (permanent)
- */
-async hardDelete(customerId: number, options?: ServiceOptions): Promise<boolean> {
-  try {
-    this.logger.debug('Hard deleting customer:', { customerId, options });
-    
-    // Check if customer exists
-    const customer = await this.repository.findById(customerId);
-    if (!customer) {
-      throw new ServiceError('Customer not found', 'NOT_FOUND', 404);
-    }
-    
-    // Delete the customer
-    return await this.repository.delete(customerId);
-  } catch (error) {
-    this.logger.error('Error hard deleting customer:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      customerId,
-      options
-    });
-    throw this.handleError(error);
-  }
-}
-
-/**
- * Export customers
- */
-async exportCustomers(filters: CustomerFilterParamsDto, format: string, options?: ServiceOptions): Promise<Buffer> {
-  try {
-    this.logger.debug('Exporting customers:', { filters, format, options });
-    
-    // Find customers matching filters
-    const result = await this.findCustomers(filters, options);
-    const customers = result.data;
-    
-    // Create CSV or other format data
-    if (format === 'csv') {
-      // Create CSV
-      const headers = ['ID', 'Name', 'Company', 'Email', 'Phone', 'Address', 'City', 'Country', 'Status', 'Type', 'Created At'];
-      const rows = customers.map(customer => [
-        customer.id,
-        customer.name,
-        customer.company || '',
-        customer.email || '',
-        customer.phone || '',
-        customer.address || '',
-        customer.city || '',
-        customer.country || '',
-        customer.status,
-        customer.type,
-        customer.createdAt
-      ]);
+  /**
+   * Create a customer log
+   */
+  async createCustomerLog(
+    customerId: number,
+    action: string,
+    details?: string | Record<string, any>,
+    options?: ServiceOptions
+  ): Promise<CustomerLogDto> {
+    try {
+      this.logger.debug('Creating customer log:', { customerId, action, details, options });
       
-      // Create CSV content
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.map(cell => 
-          typeof cell === 'string' && cell.includes(',') ? `"${cell}"` : cell
-        ).join(','))
-      ].join('\n');
+      // Get user information from options
+      const userId = options?.context?.userId || 0;
+      let userName = 'System';
       
-      return Buffer.from(csvContent, 'utf-8');
-    }
-    
-    // For other formats
-    throw new ServiceError(`Export format '${format}' not supported`, 'UNSUPPORTED_FORMAT', 400);
-  } catch (error) {
-    this.logger.error('Error exporting customers:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      filters,
-      format,
-      options
-    });
-    throw this.handleError(error);
-  }
-}
-
-/**
- * Update newsletter subscription
- */
-async updateNewsletterSubscription(customerId: number, subscribe: boolean, options?: ServiceOptions): Promise<CustomerResponseDto> {
-  try {
-    this.logger.debug('Updating newsletter subscription:', { customerId, subscribe, options });
-    
-    // Check if customer exists
-    const customer = await this.repository.findById(customerId);
-    if (!customer) {
-      throw new ServiceError('Customer not found', 'NOT_FOUND', 404);
-    }
-    
-    // Use repository's updateNewsletterSubscription method if available
-    if (typeof this.repository.updateNewsletterSubscription === 'function') {
-      const updatedCustomer = await this.repository.updateNewsletterSubscription(
+      // Find the customer
+      const customer = await this.repository.findById(customerId);
+      if (!customer) {
+        throw new ServiceError('Customer not found', 'NOT_FOUND', 404);
+      }
+      
+      // Create log entry - use repository's createCustomerLog if available
+      let logEntry;
+      
+      // Convert details to string if it's an object
+      const detailsString = typeof details === 'object' ? JSON.stringify(details) : details;
+      
+      if (typeof this.repository.createCustomerLog === 'function') {
+        logEntry = await this.repository.createCustomerLog({
+          customerId,
+          userId,
+          action,
+          details: detailsString
+        });
+      } else {
+        // Fall back to adding a note
+        logEntry = await this.repository.addNote(customerId, userId, detailsString || action);
+      }
+      
+      // Convert to DTO
+      const logDto: CustomerLogDto = {
+        id: logEntry.id,
+        action: action,
+        details: typeof details === 'string' ? { text: details || '' } : (details || {}),
+        text: typeof details === 'string' ? details : JSON.stringify(details),
+        createdAt: logEntry.createdAt instanceof Date ? logEntry.createdAt.toISOString() : logEntry.createdAt,
+        updatedAt: logEntry.createdAt instanceof Date ? logEntry.createdAt.toISOString() : logEntry.createdAt,
+        userId: userId,
+        userName: logEntry.userName || userName,
+        customerId: customerId,
+        customerName: customer.name || '',
+        entityType: EntityType.CUSTOMER,
+        entityId: customerId,
+      };
+      
+      return logDto;
+    } catch (error) {
+      this.logger.error('Error creating customer log:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         customerId,
-        subscribe,
-        options?.context?.userId
-      );
+        action,
+        details,
+        options
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Soft delete a customer
+   */
+  async softDelete(customerId: number, options?: ServiceOptions): Promise<boolean> {
+    try {
+      this.logger.debug('Soft deleting customer:', { customerId, options });
+      
+      // Check if customer exists
+      const customer = await this.repository.findById(customerId);
+      if (!customer) {
+        throw new ServiceError('Customer not found', 'NOT_FOUND', 404);
+      }
+      
+      // Use repository's softDelete method if available
+      if (typeof this.repository.softDelete === 'function') {
+        return await this.repository.softDelete(customerId, options?.context?.userId);
+      }
+      
+      // Fall back to updating status to DELETED
+      await this.repository.update(customerId, {
+        status: CommonStatus.DELETED,
+        updatedBy: options?.context?.userId
+      } as Partial<Customer>);
+      
+      return true;
+    } catch (error) {
+      this.logger.error('Error soft deleting customer:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        customerId,
+        options
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Hard delete a customer (permanent)
+   */
+  async hardDelete(customerId: number, options?: ServiceOptions): Promise<boolean> {
+    try {
+      this.logger.debug('Hard deleting customer:', { customerId, options });
+      
+      // Check if customer exists
+      const customer = await this.repository.findById(customerId);
+      if (!customer) {
+        throw new ServiceError('Customer not found', 'NOT_FOUND', 404);
+      }
+      
+      // Delete the customer
+      return await this.repository.delete(customerId);
+    } catch (error) {
+      this.logger.error('Error hard deleting customer:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        customerId,
+        options
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Export customers
+   */
+  async exportCustomers(filters: CustomerFilterParamsDto, format: string, options?: ServiceOptions): Promise<Buffer> {
+    try {
+      this.logger.debug('Exporting customers:', { filters, format, options });
+      
+      // Find customers matching filters
+      const result = await this.findCustomers(filters, options);
+      const customers = result.data;
+      
+      // Create CSV or other format data
+      if (format === 'csv') {
+        // Create CSV
+        const headers = ['ID', 'Name', 'Company', 'Email', 'Phone', 'Address', 'City', 'Country', 'Status', 'Type', 'Created At'];
+        const rows = customers.map(customer => [
+          customer.id,
+          customer.name,
+          customer.company || '',
+          customer.email || '',
+          customer.phone || '',
+          customer.address || '',
+          customer.city || '',
+          customer.country || '',
+          customer.status,
+          customer.type,
+          customer.createdAt
+        ]);
+        
+        // Create CSV content
+        const csvContent = [
+          headers.join(','),
+          ...rows.map(row => row.map(cell => 
+            typeof cell === 'string' && cell.includes(',') ? `"${cell}"` : cell
+          ).join(','))
+        ].join('\n');
+        
+        return Buffer.from(csvContent, 'utf-8');
+      }
+      
+      // For other formats
+      throw new ServiceError(`Export format '${format}' not supported`, 'UNSUPPORTED_FORMAT', 400);
+    } catch (error) {
+      this.logger.error('Error exporting customers:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        filters,
+        format,
+        options
+      });
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Update newsletter subscription
+   */
+  async updateNewsletterSubscription(customerId: number, subscribe: boolean, options?: ServiceOptions): Promise<CustomerResponseDto> {
+    try {
+      this.logger.debug('Updating newsletter subscription:', { customerId, subscribe, options });
+      
+      // Check if customer exists
+      const customer = await this.repository.findById(customerId);
+      if (!customer) {
+        throw new ServiceError('Customer not found', 'NOT_FOUND', 404);
+      }
+      
+      // Use repository's updateNewsletterSubscription method if available
+      if (typeof this.repository.updateNewsletterSubscription === 'function') {
+        const updatedCustomer = await this.repository.updateNewsletterSubscription(
+          customerId,
+          subscribe,
+          options?.context?.userId
+        );
+        
+        return this.toDTO(updatedCustomer);
+      }
+      
+      // Fall back to standard update
+      const updatedCustomer = await this.repository.update(customerId, {
+        newsletter: subscribe,
+        updatedBy: options?.context?.userId
+      } as Partial<Customer>);
       
       return this.toDTO(updatedCustomer);
+    } catch (error) {
+      this.logger.error('Error updating newsletter subscription:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        customerId,
+        subscribe,
+        options
+      });
+      throw this.handleError(error);
     }
-    
-    // Fall back to standard update
-    const updatedCustomer = await this.repository.update(customerId, {
-      newsletter: subscribe,
-      updatedBy: options?.context?.userId
-    } as Partial<Customer>);
-    
-    return this.toDTO(updatedCustomer);
-  } catch (error) {
-    this.logger.error('Error updating newsletter subscription:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      customerId,
-      subscribe,
-      options
-    });
-    throw this.handleError(error);
   }
-}
 }
 
 // Export for compatibility

@@ -1,13 +1,20 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { PermissionClient } from '@/features/permissions/lib/clients/PermissionClient';
+import React, { useState, useEffect, useCallback, useMemo, createContext, useContext, useRef } from 'react';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { UserRole } from '@/domain/entities/User';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
-import { subscribeToAuthEvent } from '@/features/auth/lib/initialization/AuthInitializer';
+// Import the client-specific permission service directly to avoid server-only imports
+import { permissionService as permissionServiceClient } from '@/features/permissions/lib/services/PermissionService.client';
+// Import permission cache utilities
+import { getPermissionFromCache, setPermissionInCache, clearPermissionCache } from '@/features/permissions/lib/utils/permissionCacheUtils';
+// Import the user permissions response DTO type
+import { UserPermissionsResponseDto } from '@/domain/dtos/PermissionDtos';
 
-// Error class for permission-related failures
+
+/**
+ * Error class for permission-related failures
+ */
 export class PermissionError extends Error {
   constructor(
     message: string,
@@ -16,630 +23,474 @@ export class PermissionError extends Error {
   ) {
     super(message);
     this.name = 'PermissionError';
-    Object.setPrototypeOf(this, PermissionError.prototype);
   }
 }
 
-// Tracking ongoing permission fetches - for diagnostic purposes only
-const ongoingPermissionsFetches = new Map<number, Promise<any>>();
+// Permission context interface
+interface PermissionContextValue {
+  permissions: SystemPermission[];
+  userRole?: string;
+  isLoading: boolean;
+  error: Error | null;
+  hasPermission: (permission: SystemPermission | string) => boolean;
+  hasAnyPermission: (permissions: (SystemPermission | string)[]) => boolean;
+  hasAllPermissions: (permissions: (SystemPermission | string)[]) => boolean;
+  refreshPermissions: () => Promise<void>;
+  cachedPermissions: Map<string, boolean>;
+}
+
+// Create context with default values
+const PermissionContext = createContext<PermissionContextValue>({
+  permissions: [],
+  isLoading: true,
+  error: null,
+  hasPermission: () => false,
+  hasAnyPermission: () => false,
+  hasAllPermissions: () => false,
+  refreshPermissions: async () => {},
+  cachedPermissions: new Map()
+});
 
 /**
- * Hook for managing and checking user permissions
- * This implementation includes enhanced authentication state handling to prevent
- * premature permission requests before the auth system is ready
- * 
- * @param userId - User ID to get permissions for (defaults to current user)
- * @returns Permission-related state and utility functions
+ * Permission Provider Component
+ * Provides centralized permission management for the entire application
+ * This prevents multiple API calls for the same permissions
  */
-export const usePermissions = (userId?: number) => {
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const effectiveUserId = userId || user?.id;
+export function PermissionProvider({ children }: { children: React.ReactNode }) {
+  const { user, isInitialized } = useAuth();
+  const userId = user?.id;
   
-  const [permissions, setPermissions] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const permissionFetchAttempts = useRef(0);
+  // Store state in a single object for easier updates
+  const [state, setState] = useState<{
+    permissions: SystemPermission[];
+    isLoading: boolean;
+    error: Error | null;
+    lastRefresh: number;
+  }>({
+    permissions: [],
+    isLoading: true,
+    error: null,
+    lastRefresh: 0
+  });
+
+  // Cache for permissions to avoid redundant checks
+  const permissionCacheRef = useRef<Map<string, boolean>>(new Map());
   
   // Check if user is admin for optimizations
   const isAdmin = useMemo(() => {
-    return userRole === UserRole.ADMIN || user?.role === UserRole.ADMIN;
-  }, [userRole, user?.role]);
+    return user?.role === UserRole.ADMIN;
+  }, [user?.role]);
 
-  // Set auth ready status when authentication loading completes
-  useEffect(() => {
-    if (!isAuthLoading) {
-      // Auth loading is complete, whether successful or not
-      setAuthReady(true);
-    }
-  }, [isAuthLoading]);
-
-  // Fetch user permissions with improved error handling and auth awareness
-  const fetchPermissions = useCallback(async (force: boolean = false) => {
-    // Increment fetch attempt counter
-    permissionFetchAttempts.current += 1;
-    const currentAttempt = permissionFetchAttempts.current;
-    
-    // No userId means no permissions - handle gracefully with awareness of auth state
-    if (!effectiveUserId) {
-      // If auth is ready but no user ID, then the user is likely not authenticated
-      const noUserError = new PermissionError(
-        'No user ID available for permission check',
-        'NO_USER_ID',
-        { userId, userFromAuth: user?.id, authReady, attempt: currentAttempt }
-      );
-      
-      // Log at debug level instead of warning to reduce noise for expected states
-      console.debug('Unable to fetch permissions: No user ID available', {
-        userId, 
-        userFromAuth: user?.id,
-        authReady
-      });
-      
-      // Only set permissions if they aren't already empty - prevents infinite render loop
-      if (permissions.length > 0) {
-        setPermissions([]);
-      }
-      
-      // Set minimum permissions based on user role from auth context
-      if (user?.role) {
-        setUserRole(user.role);
-      }
-      
-      setIsLoading(false);
-      setError(noUserError);
-      return; // Return early without throwing
+  // Fetch permissions once on mount or when user changes
+  const fetchPermissions = useCallback(async () => {
+    if (!userId) {
+      setState(prev => ({ ...prev, permissions: [], isLoading: false }));
+      return;
     }
 
     try {
-      setIsLoading(true);
-      setError(null);
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      // Check if there's already an ongoing fetch for this user
-      const existingFetch = ongoingPermissionsFetches.get(effectiveUserId);
-      if (existingFetch && !force) {
-        /*console.log(`Using existing permission fetch for user ID: ${effectiveUserId}`);
-        */
-        try {
-          // Wait for existing fetch
-          const response = await existingFetch;
-          
-          // Process successful response
-          if (response.success && response.data) {
-            const perms = response.data.permissions || [];
-            const role = response.data.role || null;
-            
-            setPermissions(perms);
-            setUserRole(role);
-            
-            console.log(`Loaded ${perms.length} permissions for user ID: ${effectiveUserId} with role: ${role}`);
-          } else {
-            // API returned success: false - this is an error
-            const apiError = new PermissionError(
-              `Error loading permissions: ${response.message || 'Unknown error'}`,
-              'API_ERROR',
-              response
-            );
-            
-            setError(apiError);
-            throw apiError;
-          }
-        } catch (error) {
-          // Remove from ongoing fetches
-          ongoingPermissionsFetches.delete(effectiveUserId);
-          
-          // Set error state and rethrow
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          const permissionError = error instanceof PermissionError 
-            ? error 
-            : new PermissionError(
-                `Error fetching permissions: ${errorMessage}`,
-                'FETCH_ERROR',
-                error
-              );
-          
-          setError(permissionError);
-          throw permissionError;
-        } finally {
-          setIsLoading(false);
-        }
-        
-        return;
-      }
-      
-      // Make a fresh API call for permissions
-      console.log(`Fetching permissions for user ID: ${effectiveUserId} (attempt: ${currentAttempt})`);
+      // Create an AbortController for timeout management
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       try {
-        // Create the API call and store the promise - BUT DON'T AWAIT IT YET
-        const fetchPromise = PermissionClient.getUserPermissions(effectiveUserId);
+        console.log(`Fetching permissions for user ID: ${userId}`);
+        const userPermissionsResponse = await Promise.race([
+          permissionServiceClient.getUserPermissions(userId),
+          new Promise<never>((_, reject) => {
+            controller.signal.addEventListener('abort', () => {
+              reject(new Error('Permission fetch timeout'));
+            }); 
+          })
+        ]);
         
-        // Store in the tracking Map
-        ongoingPermissionsFetches.set(effectiveUserId, fetchPromise);
+        // Clear timeout as request completed
+        clearTimeout(timeoutId);
         
-        // Now await the promise
-        const response = await fetchPromise;
+        // Log the raw response for debugging
+        console.log('Raw permissions response:', JSON.stringify(userPermissionsResponse));
         
-        // Log response for debugging
-        console.log(`Permission API response for user ${effectiveUserId}:`, {
-          success: response?.success,
-          statusCode: response?.statusCode,
-          hasData: !!response?.data
-        });
+        // Type safety: cast only after checking structure exists
+        const userPermissions = userPermissionsResponse as UserPermissionsResponseDto;
         
-        // Validate response - throw explicit errors
-        if (!response) {
-          throw new PermissionError(
-            `No response received from permissions API for user ${effectiveUserId}`,
-            'NO_RESPONSE',
-            { userId: effectiveUserId }
-          );
-        }
-        
-        if (!response.success) {
-          throw new PermissionError(
-            `Permission API error: ${response.message || 'Unknown error'}`,
-            'API_ERROR',
-            { 
-              userId: effectiveUserId,
-              statusCode: response.statusCode,
-              message: response.message
-            }
-          );
-        }
-        
-        if (!response.data || !response.data.permissions) {
-          throw new PermissionError(
-            `Permission API returned invalid data structure: missing permissions array`,
-            'INVALID_RESPONSE',
-            {
-              userId: effectiveUserId,
-              responseData: response.data
-            }
-          );
-        }
-        
-        // Process valid response
-        const perms = response.data.permissions || [];
-        const role = response.data.role || null;
-        
-        setPermissions(perms);
-        setUserRole(role);
-        
-        console.log(`Loaded ${perms.length} permissions for user ID: ${effectiveUserId} with role: ${role}`);
-      } catch (error) {
-        // Log error with detailed information but don't swallow it
-        console.error('Permission fetch error:', {
-          userId: effectiveUserId,
-          errorMessage: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : undefined
-        });
-        
-        // Create a permission error if needed
-        const permissionError = error instanceof PermissionError 
-          ? error 
-          : new PermissionError(
-              `Error fetching permissions: ${error instanceof Error ? error.message : String(error)}`,
-              'FETCH_ERROR',
-              error
-            );
-        
-        // Update state to reflect error
-        // Only set permissions if they aren't already empty
-        if (permissions.length > 0) {
-          setPermissions([]);
-        }
-        setUserRole(null);
-        setError(permissionError);
-        
-        // Explicitly throw the error to propagate it
-        throw permissionError;
-      } finally {
-        setIsLoading(false);
-        
-        // Remove from ongoing fetches
-        setTimeout(() => {
-          ongoingPermissionsFetches.delete(effectiveUserId);
-        }, 300);
-      }
-    } catch (err) {
-      // This catch shouldn't be needed since we're propagating errors,
-      // but it's here as a safety measure
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('Unexpected error in permission fetch wrapper:', errorMessage);
-      
-      // Create a permission error if needed
-      const permissionError = err instanceof PermissionError 
-        ? err 
-        : new PermissionError(
-            `Unexpected error fetching permissions: ${errorMessage}`,
-            'UNEXPECTED_ERROR',
-            err
-          );
-      
-      // Update state
-      // Only set permissions if they aren't already empty
-      if (permissions.length > 0) {
-        setPermissions([]);
-      }
-      setUserRole(null);
-      setError(permissionError);
-      setIsLoading(false);
-      
-      // Clean up ongoing fetch on error
-      setTimeout(() => {
-        ongoingPermissionsFetches.delete(effectiveUserId);
-      }, 300);
-      
-      // Rethrow the error
-      throw permissionError;
-    }
-  }, [effectiveUserId, user, permissions.length, authReady]);
-
-  // Subscribe to auth events instead of using a polling mechanism
-  useEffect(() => {
-    // If already authenticated and we have a user ID, fetch permissions immediately
-    if (authReady && effectiveUserId) {
-      // Use a small delay to ensure all systems are ready
-      const initialFetchTimeout = setTimeout(() => {
-        if (effectiveUserId) {
-          fetchPermissions().catch(err => {
-            console.error('Error loading permissions on initial fetch:', err);
+        if (userPermissions && Array.isArray(userPermissions.permissions)) {
+          console.log(`Received ${userPermissions.permissions.length} permissions for user`);
+          
+          // Normalize permissions to lowercase strings
+          const normalizedPermissions = userPermissions.permissions.map(p => String(p).toLowerCase());
+          
+          // No automatic injection of permissions not assigned to the user
+          
+          // Update local state with normalized permissions
+          setState({
+            permissions: normalizedPermissions as SystemPermission[],
+            isLoading: false,
+            error: null,
+            lastRefresh: Date.now()
           });
-        }
-      }, 500);
-      
-      return () => {
-        clearTimeout(initialFetchTimeout);
-      };
-    }
-    
-    // If the auth system is still initializing, subscribe to the auth events
-    console.log('Permissions system: Subscribing to auth initialization events');
-    
-    // Handler for authentication initialization completion
-    const handleAuthInit = (status: any) => {
-      console.log('Permissions system: Auth initialization completed', status);
-      
-      // Check if component is still mounted (through effectiveUserId dependency)
-      if (status.isAuthenticated && status.userId) {
-        console.log(`Permissions system: Auth ready and user authenticated (${status.userId}), fetching permissions`);
-        // Small delay to ensure all systems are ready
-        setTimeout(() => {
-          if (effectiveUserId) {
-            fetchPermissions().catch(err => {
-              console.error('Error loading permissions after auth init:', err);
+          
+          // Update the permission cache with the fresh data
+          if (normalizedPermissions.length > 0) {
+            // Clear existing cached permissions for this user
+            permissionCacheRef.current.clear();
+            
+            // Cache all permissions
+            normalizedPermissions.forEach((permission: string) => {
+              // Cache in both storage systems
+              setPermissionInCache(userId, permission, true, 600);
+              permissionCacheRef.current.set(permission, true);
             });
+            
+            console.log(`Cached ${normalizedPermissions.length} permissions for user ${userId}`);
           }
-        }, 500);
-      } else {
-        // No authentication, set proper state
-        console.log('Permissions system: Auth ready but user not authenticated');
-        setIsLoading(false);
-        setError(new PermissionError(
-          'Authentication required for permissions',
-          'AUTH_REQUIRED',
-          { authStatus: status }
-        ));
+        } else {
+          console.warn('Received empty permissions from service', userPermissions);
+          setState(prev => ({ ...prev, permissions: [], isLoading: false }));
+        }
+      } catch (apiError) {
+        clearTimeout(timeoutId);
+        console.error('API initialization or permission fetch failed:', apiError);
+        throw apiError; // Propagate for proper handling
       }
-    };
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
+      setState(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error : new Error('Failed to fetch permissions'),
+        isLoading: false 
+      }));
+    }
+  }, [userId]);
+
+  // Refresh permissions effect - run once when component mounts or user changes
+  useEffect(() => {
+    // Track if the effect is still mounted
+    let isMounted = true;
     
-    // Subscribe to the initialization complete event
-    const unsubscribe = subscribeToAuthEvent('init_complete', handleAuthInit);
+    // Only run if we have a valid user and auth is initialized
+    if (isInitialized && userId) {
+      // Set initial loading state
+      setState(prev => ({ ...prev, isLoading: true }));
+      
+      // Execute fetch with proper error handling
+      (async () => {
+        try {
+          await fetchPermissions();
+        } catch (error) {
+          console.error('Permission fetch failed in effect:', error);
+          
+          // Only update state if still mounted
+          if (isMounted) {
+            setState(prev => ({ 
+              ...prev, 
+              isLoading: false,
+              error: error instanceof Error ? error : new Error('Failed to fetch permissions'),
+              // Keep existing permissions if any
+              permissions: prev.permissions.length > 0 ? prev.permissions : []
+            }));
+          }
+        }
+      })();
+    }
     
-    // Clean up subscription on unmount
+    // Cleanup function
     return () => {
-      unsubscribe();
+      isMounted = false;
     };
-  }, [effectiveUserId, authReady, fetchPermissions]);
+  }, [isInitialized, userId, fetchPermissions]);
 
-  /**
-   * Checks if the user has a specific permission
-   * Handles authentication timing issues gracefully
-   * 
-   * @param permission - Permission to check for
-   * @returns Whether the user has the permission
-   */
+  // Permission check function with caching using synchronous pattern
+  // We must keep this synchronous for compatibility with the rest of the app
   const hasPermission = useCallback((permission: SystemPermission | string): boolean => {
-    // Quick validation - if no permission specified, default to deny
-    if (!permission) {
-      console.warn('hasPermission called with empty permission');
-      return false;
-    }
-    
     // Admin users automatically have all permissions
     if (isAdmin) return true;
     
-    // If permissions are still loading, we should deny but not throw
-    if (isLoading) {
-      console.debug(`Permission check for '${permission}' while still loading - temporarily denied`);
-      return false;
+    // If still loading permissions and we have a pending API call, 
+    // assume permission is granted temporarily rather than blocking UI
+    // This avoids UI flickering during initialization
+    if (state.isLoading && !state.error) {
+      console.log(`Permission check during loading for ${permission} - allowing temporarily`);
+      // We should only do this during initial loading
+      return true;
     }
     
-    // If there's no user ID but we're not loading, this is an auth timing issue
-    // This happens during initial mount when auth isn't complete
-    if (!effectiveUserId) {
-      console.debug(`No user ID available for permission check '${permission}' - auth likely in progress`);
-      // Return false instead of throwing since this could be temporary during auth
-      return false;
+    // Normalize permission string to lowercase for case-insensitive comparison
+    const permissionStr = String(permission).toLowerCase();
+    
+    // First check in-memory cache (fastest and synchronous) with normalized key
+    if (permissionCacheRef.current.has(permissionStr)) {
+      const result = permissionCacheRef.current.get(permissionStr) || false;
+      console.log(`Cache hit for ${permissionStr}: ${result}`);
+      return result;
     }
     
-    // If there was an error loading permissions, we should fail closed without throwing
-    if (error) {
-      console.warn(`Cannot verify permission '${permission}' due to error: ${error.message}`);
-      // During normal app operation, deny but don't throw to prevent unnecessary crashes
-      return false;
+    // Check in state - normalize both the permission being checked and the permissions in state
+    const normalizedStatePermissions = state.permissions.map(p => String(p).toLowerCase());
+    const hasPermissionInState = normalizedStatePermissions.includes(permissionStr);
+    
+    // Update memory cache with normalized key
+    permissionCacheRef.current.set(permissionStr, hasPermissionInState);
+    
+    // Schedule async cache update without waiting for result
+    if (userId && !state.isLoading && !state.error) {
+      try {
+        // Use a fire-and-forget approach for the persistent cache
+        setPermissionInCache(userId, permissionStr, hasPermissionInState, 300);
+      } catch (cacheError) {
+        console.warn('Error updating permission cache:', cacheError);
+      }
     }
     
-    // Check permissions directly once everything is properly loaded
-    return permissions.includes(permission);
-  }, [permissions, isAdmin, isLoading, error, effectiveUserId]);
-  
-  /**
-   * Gets permissions for a role based on role defaults
-   * This is used as a fallback when permission service fails
-   * 
-   * @param role - User role
-   * @returns Array of permissions for the role
-   */
-  const getRoleBasedPermissions = useCallback((role?: string): SystemPermission[] => {
-    if (!role) return [];
-    
-    // Use role-based permissions from PermissionEnums
-    const normalizedRole = role.toLowerCase();
-    
-    switch (normalizedRole) {
-      case 'admin':
-        return Object.values(SystemPermission);
-        
-      case 'manager':
-        return [
-          SystemPermission.SYSTEM_ACCESS,
-          SystemPermission.DASHBOARD_VIEW,
-          SystemPermission.PROFILE_VIEW,
-          SystemPermission.PROFILE_EDIT,
-          SystemPermission.USERS_VIEW,
-          SystemPermission.USERS_EDIT,
-          SystemPermission.CUSTOMERS_VIEW, 
-          SystemPermission.CUSTOMERS_CREATE,
-          SystemPermission.CUSTOMERS_EDIT,
-          SystemPermission.APPOINTMENTS_VIEW,
-          SystemPermission.APPOINTMENTS_CREATE,
-          SystemPermission.APPOINTMENTS_EDIT,
-          SystemPermission.REQUESTS_VIEW,
-          SystemPermission.REQUESTS_CREATE,
-          SystemPermission.REQUESTS_EDIT,
-          SystemPermission.REQUESTS_ASSIGN,
-          SystemPermission.NOTIFICATIONS_VIEW,
-          SystemPermission.NOTIFICATIONS_EDIT
-        ];
-        
-      case 'employee':
-        return [
-          SystemPermission.SYSTEM_ACCESS,
-          SystemPermission.DASHBOARD_VIEW,
-          SystemPermission.PROFILE_VIEW,
-          SystemPermission.PROFILE_EDIT,
-          SystemPermission.CUSTOMERS_VIEW,
-          SystemPermission.APPOINTMENTS_VIEW,
-          SystemPermission.APPOINTMENTS_CREATE,
-          SystemPermission.REQUESTS_VIEW,
-          SystemPermission.NOTIFICATIONS_VIEW
-        ];
-        
-      case 'user':
-      default:
-        return [
-          SystemPermission.SYSTEM_ACCESS,
-          SystemPermission.DASHBOARD_VIEW,
-          SystemPermission.PROFILE_VIEW,
-          SystemPermission.PROFILE_EDIT,
-          SystemPermission.APPOINTMENTS_VIEW
-        ];
-    }
-  }, []);
+    console.log(`Permission check: ${permissionStr}, result: ${hasPermissionInState}`);
+    return hasPermissionInState;
+  }, [state.permissions, state.isLoading, state.error, isAdmin, userId]);
 
-  /**
-   * Checks if the user has any of the given permissions
-   * Gracefully handles auth timing issues
-   * 
-   * @param permissionList - List of permissions to check
-   * @returns Whether the user has any of the permissions
-   */
+  // Check if user has any of the given permissions
   const hasAnyPermission = useCallback((permissionList: (SystemPermission | string)[]): boolean => {
-    // Validate input
-    if (!Array.isArray(permissionList) || permissionList.length === 0) {
-      console.warn('hasAnyPermission called with invalid permission list');
-      return false;
-    }
-    
-    // Admin users automatically have all permissions
     if (isAdmin) return true;
-    
-    // Check if the user has any of the permissions
-    // This will use hasPermission which handles loading/error states gracefully
-    return permissionList.some(permission => hasPermission(permission));
+    return permissionList.some(p => hasPermission(p));
   }, [hasPermission, isAdmin]);
 
-  /**
-   * Checks if the user has all of the given permissions
-   * Strict implementation that doesn't use fallbacks
-   * 
-   * @param permissionList - List of permissions to check
-   * @returns Whether the user has all of the permissions
-   */
+  // Check if user has all of the given permissions
   const hasAllPermissions = useCallback((permissionList: (SystemPermission | string)[]): boolean => {
-    // Validate input
-    if (!Array.isArray(permissionList) || permissionList.length === 0) {
-      console.warn('hasAllPermissions called with invalid permission list');
-      return false;
-    }
-    
-    // Admin users automatically have all permissions
     if (isAdmin) return true;
-    
-    // If we're loading or have an error, delegate to hasPermission which handles these cases
-    if (isLoading || error) {
-      try {
-        return permissionList.every(permission => hasPermission(permission));
-      } catch (err) {
-        // If hasPermission throws, propagate the error
-        throw err;
-      }
-    }
-    
-    // Check if the user has all of the permissions
-    return permissionList.every(permission => permissions.includes(permission));
-  }, [hasPermission, isAdmin, isLoading, error, permissions]);
-  
-  /**
-   * Updates user permissions
-   * No fallbacks - throws errors for all failures
-   * 
-   * @param newPermissions - New permissions to set
-   * @returns Promise that resolves when update is complete
-   * @throws PermissionError if update fails
-   */
-  const updatePermissions = async (newPermissions: string[]): Promise<boolean> => {
-    if (!effectiveUserId) {
-      throw new PermissionError(
-        'Cannot update permissions: No user ID available',
-        'NO_USER_ID',
-        { newPermissions }
-      );
-    }
-    
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Call the API without error swallowing
-      const response = await PermissionClient.updateUserPermissions({
-        userId: effectiveUserId,
-        permissions: newPermissions
-      });
-      
-      // Handle API errors
-      if (!response.success) {
-        throw new PermissionError(
-          `Failed to update user permissions: ${response.message || 'Unknown error'}`,
-          'UPDATE_FAILED',
-          { 
-            userId: effectiveUserId,
-            statusCode: response.statusCode,
-            apiMessage: response.message
-          }
-        );
-      }
-      
-      // Update state on success
-      setPermissions(newPermissions);
-      
-      return true;
-    } catch (error) {
-      // Create a permission error if needed
-      const permissionError = error instanceof PermissionError 
-        ? error 
-        : new PermissionError(
-            `Error updating permissions: ${error instanceof Error ? error.message : String(error)}`,
-            'UPDATE_ERROR',
-            error
-          );
-      
-      // Update error state
-      setError(permissionError);
-      
-      // Rethrow the error
-      throw permissionError;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    return permissionList.every(p => hasPermission(p));
+  }, [hasPermission, isAdmin]);
 
-  // Return all permission-related state and functions
-  return {
-    permissions,
-    userRole,
-    isLoading,
-    error,
+  // Context value
+  const contextValue = useMemo(() => ({
+    permissions: state.permissions,
+    userRole: user?.role,
+    isLoading: state.isLoading,
+    error: state.error,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
-    updatePermissions,
+    refreshPermissions: fetchPermissions,
+    cachedPermissions: permissionCacheRef.current
+  }), [state, user?.role, hasPermission, hasAnyPermission, hasAllPermissions, fetchPermissions]);
+
+  return React.createElement(
+    PermissionContext.Provider,
+    { value: contextValue },
+    children
+  );
+}
+
+/**
+ * Hook for accessing the permission context
+ * @returns Permission context value
+ */
+export function usePermissionContext() {
+  return useContext(PermissionContext);
+}
+
+/**
+ * Hook for accessing permission data and capabilities
+ * This version uses the global permission context to prevent duplicate API calls
+ * 
+ * @param userId - Optional user ID to get permissions for (defaults to current user)
+ * @returns Permission-related state and utility functions
+ */
+export const usePermissions = (userId?: number) => {
+  // Use the centralized permission context
+  const context = usePermissionContext();
+  const { user } = useAuth();
+  
+  // Determine if we're checking for a different user than the current
+  const isCustomUserCheck = userId !== undefined && userId !== user?.id;
+  
+  // If checking for same user as current, use context for efficiency
+  if (!isCustomUserCheck) {
+    return {
+      // Return all context values
+      ...context,
+      // Add legacy methods for backward compatibility
+      grantPermission: async (permission: SystemPermission): Promise<void> => {
+        // Call the API
+        if (!user?.id) {
+          throw new PermissionError('Cannot grant permission: No user ID available', 'NO_USER_ID');
+        }
+        
+        try {
+          await permissionServiceClient.addUserPermission(user.id, permission as string);
+          // Refresh permissions
+          await context.refreshPermissions();
+        } catch (error) {
+          throw new PermissionError(
+            `Error granting permission: ${error instanceof Error ? error.message : String(error)}`,
+            'GRANT_ERROR',
+            error
+          );
+        }
+      },
+      revokePermission: async (permission: SystemPermission): Promise<void> => {
+        if (!user?.id) {
+          throw new PermissionError('Cannot revoke permission: No user ID available', 'NO_USER_ID');
+        }
+        
+        try {
+          await permissionServiceClient.removeUserPermission(user.id, permission as string);
+          // Refresh permissions
+          await context.refreshPermissions();
+        } catch (error) {
+          throw new PermissionError(
+            `Error revoking permission: ${error instanceof Error ? error.message : String(error)}`,
+            'REVOKE_ERROR',
+            error
+          );
+        }
+      },
+      refetch: context.refreshPermissions
+    };
+  }
+  
+  // If checking for a different user, use a custom implementation
+  // This is for when components need to check permissions for users other than the current
+  const [customState, setCustomState] = useState<{
+    permissions: SystemPermission[];
+    isLoading: boolean;
+    error: Error | null;
+  }>({
+    permissions: [],
+    isLoading: true,
+    error: null
+  });
+  
+  // Custom fetch implementation for other users
+  const fetchPermissions = useCallback(async () => {
+    if (!userId) {
+      setCustomState(prev => ({ ...prev, permissions: [], isLoading: false }));
+      return;
+    }
+    
+    try {
+      setCustomState(prev => ({ ...prev, isLoading: true, error: null }));
+      const userPermissionsResponse = await permissionServiceClient.getUserPermissions(userId);
+      
+      // Type safety: ensure we have the right structure before accessing properties
+      const userPermissions = userPermissionsResponse as UserPermissionsResponseDto;
+      
+      if (userPermissions && Array.isArray(userPermissions.permissions)) {
+        setCustomState({
+          permissions: userPermissions.permissions as SystemPermission[],
+          isLoading: false,
+          error: null
+        });
+      } else {
+        setCustomState({
+          permissions: [],
+          isLoading: false,
+          error: null
+        });
+      }
+    } catch (error) {
+      setCustomState({
+        permissions: [],
+        isLoading: false,
+        error: error instanceof Error ? error : new Error('Failed to fetch permissions')
+      });
+    }
+  }, [userId]);
+  
+  // Fetch permissions on mount
+  useEffect(() => {
+    if (userId) {
+      fetchPermissions();
+    }
+  }, [userId, fetchPermissions]);
+  
+  // Custom permission check for different users
+  const hasPermission = useCallback((permission: SystemPermission | string): boolean => {
+    // Normalize permission string to lowercase for case-insensitive comparison
+    const permissionStr = String(permission).toLowerCase();
+    
+    // No special handling for specific permissions
+    
+    // Check permission cache first - use a synchronous pattern since this must return a boolean
+    let cacheResult: boolean | undefined = undefined;
+    if (userId) {
+      try {
+        // Get from cache but handle the fact that it might be a Promise
+        const cachedValue = getPermissionFromCache(userId, permissionStr);
+        // Since we need a synchronous result, only use the cache if it's already resolved
+        if (typeof cachedValue === 'boolean') {
+          cacheResult = cachedValue;
+        }
+      } catch (e) {
+        console.warn('Error accessing permission cache:', e);
+      }
+      
+      if (cacheResult !== undefined) {
+        console.log(`Custom user check: Cache hit for ${permissionStr}: ${cacheResult}`);
+        return cacheResult;
+      }
+    }
+    
+    // Check in memory - normalize permissions to lowercase strings
+    const normalizedPermissions = customState.permissions.map(p => String(p).toLowerCase());
+    const result = normalizedPermissions.includes(permissionStr);
+    
+    // Cache result for future checks
+    if (userId && !customState.isLoading) {
+      try {
+        setPermissionInCache(userId, permissionStr, result, 300);
+      } catch (cacheError) {
+        console.warn('Error setting permission in cache:', cacheError);
+      }
+    }
+    
+    console.log(`Custom user check: Permission ${permissionStr}, result: ${result}`);
+    return result;
+  }, [userId, customState.permissions, customState.isLoading]);
+  
+  // Check for any permissions
+  const hasAnyPermission = useCallback((permissions: (SystemPermission | string)[]): boolean => {
+    return permissions.some(p => hasPermission(p));
+  }, [hasPermission]);
+  
+  // Check for all permissions
+  const hasAllPermissions = useCallback((permissions: (SystemPermission | string)[]): boolean => {
+    return permissions.every(p => hasPermission(p));
+  }, [hasPermission]);
+  
+  // Return custom implementation for other users
+  return {
+    permissions: customState.permissions,
+    userRole: undefined, // We don't know the role for other users typically
+    isLoading: customState.isLoading,
+    error: customState.error,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    grantPermission: async () => { throw new Error('Cannot grant permissions for other users'); },
+    revokePermission: async () => { throw new Error('Cannot revoke permissions for other users'); },
     refetch: fetchPermissions
   };
 };
 
 /**
  * Permission check utility for functional components
- * Strict implementation that requires proper permissions data
  * 
  * @param permission - Permission to check
  * @param userPermissions - List of user permissions
  * @param userRole - User role for admin check
  * @returns Whether the user has the permission
- * @throws PermissionError if input validation fails
  */
 export const checkPermission = (
   permission: SystemPermission | string,
-  userPermissions: string[],
+  userPermissions: SystemPermission[],
   userRole?: string
 ): boolean => {
-  // Validate inputs
-  if (!permission) {
-    throw new PermissionError(
-      'Invalid permission: Permission cannot be empty',
-      'INVALID_PERMISSION',
-      { permission }
-    );
-  }
-  
-  if (!Array.isArray(userPermissions)) {
-    throw new PermissionError(
-      'Invalid permissions array',
-      'INVALID_PERMISSIONS',
-      { permissions: userPermissions }
-    );
-  }
-  
   // Admin users automatically have all permissions
   if (userRole === UserRole.ADMIN) {
     return true;
   }
   
   // Check if the permission is in the user's permissions
-  return userPermissions.includes(permission);
-};
-
-/**
- * Utility to clear the permissions cache for a specific user
- * Call this after major permission changes or role updates
- * 
- * @param userId - User ID to clear from cache
- */
-export const clearPermissionsCache = (userId: number): void => {
-  // This function does nothing now since we've removed the cache
-  console.log(`Permission caching has been disabled. Clearing cache for user ${userId} not needed.`);
-  
-  // Clear any ongoing fetch
-  if (ongoingPermissionsFetches.has(userId)) {
-    ongoingPermissionsFetches.delete(userId);
-    console.debug(`Cleared ongoing permissions fetch for user ${userId}`);
-  }
-};
-
-/**
- * Utility to clear the entire permissions cache
- * Call this after system-wide permission changes
- */
-export const clearAllPermissionsCache = (): void => {
-  // This function does nothing now since we've removed the cache
-  console.log('Permission caching has been disabled. Clearing all caches not needed.');
-  
-  // Clear all ongoing fetches
-  ongoingPermissionsFetches.clear();
-  console.debug('Cleared all ongoing permission requests');
+  return userPermissions.includes(permission as SystemPermission);
 };
 
 export default usePermissions;

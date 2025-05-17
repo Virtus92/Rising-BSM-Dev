@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError } from '@/core/errors/index';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 
 /**
  * GET /api/dashboard
@@ -55,7 +55,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
       customerService.count({ 
         context, 
         filters: { status: 'active' } 
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching total customers count', { error: err.message });
         return 0;
       }),
@@ -66,13 +66,13 @@ export const GET = routeHandler(async (request: NextRequest) => {
           status: 'active',
           createdAfter: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
         }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching new customers count', { error: err.message });
         return 0;
       }),
       
       // Appointment statistics
-      appointmentService.count({ context }).catch(err => {
+      appointmentService.count({ context }).catch((err: Error) => {
         logger.warn('Error fetching total appointments count', { error: err.message });
         return 0;
       }),
@@ -83,7 +83,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
           dateAfter: new Date(),
           status: ['planned', 'confirmed']
         }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching upcoming appointments count', { error: err.message });
         return 0;
       }),
@@ -94,13 +94,13 @@ export const GET = routeHandler(async (request: NextRequest) => {
           dateFrom: new Date(new Date().setHours(0, 0, 0, 0)),
           dateTo: new Date(new Date().setHours(23, 59, 59, 999))
         }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching today appointments count', { error: err.message });
         return 0;
       }),
       
       // Request statistics
-      requestService.count({ context }).catch(err => {
+      requestService.count({ context }).catch((err: Error) => {
         logger.warn('Error fetching total requests count', { error: err.message });
         return 0;
       }),
@@ -108,7 +108,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
       requestService.count({ 
         context, 
         filters: { status: 'new' } 
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching new requests count', { error: err.message });
         return 0;
       }),
@@ -116,7 +116,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
       requestService.count({ 
         context, 
         filters: { status: 'in_progress' } 
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching in-progress requests count', { error: err.message });
         return 0;
       }),
@@ -124,13 +124,13 @@ export const GET = routeHandler(async (request: NextRequest) => {
       requestService.count({ 
         context, 
         filters: { status: 'completed' } 
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching completed requests count', { error: err.message });
         return 0;
       }),
       
       // User statistics
-      userService.count({ context }).catch(err => {
+      userService.count({ context }).catch((err: Error) => {
         logger.warn('Error fetching total users count', { error: err.message });
         return 0;
       }),
@@ -138,13 +138,13 @@ export const GET = routeHandler(async (request: NextRequest) => {
       userService.count({ 
         context, 
         filters: { status: 'active' } 
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching active users count', { error: err.message });
         return 0;
       }),
       
       // Upcoming appointments list (next 7 days, limited to 5)
-      appointmentService.getUpcoming(5, { context }).catch(err => {
+      appointmentService.getUpcoming(5, { context }).catch((err: Error) => {
         logger.warn('Error fetching upcoming appointments list', { error: err.message });
         return [];
       }),
@@ -156,7 +156,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
         page: 1,
         limit: 5,
         sort: { field: 'createdAt', direction: 'desc' }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching recent requests', { error: err.message });
         return { data: [], pagination: { page: 1, limit: 5, total: 0, totalPages: 0 } };
       }),
@@ -167,7 +167,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
         page: 1,
         limit: 10,
         sort: { field: 'createdAt', direction: 'desc' }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching recent activities', { error: err.message });
         return { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } };
       })

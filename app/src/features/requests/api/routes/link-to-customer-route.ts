@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
-import { apiAuth } from '@/features/auth/api/middleware';
+import { authenticateRequest } from '@/features/auth/api/middleware/authMiddleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { formatResponse } from '@/core/errors';
 import { routeHandler } from '@/core/api/route-handler';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { IRequestService } from '@/domain/services/IRequestService';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { LinkRequestToCustomerRequest } from '../models/request-request-models';
@@ -14,12 +15,13 @@ import { LinkRequestToCustomerRequest } from '../models/request-request-models';
  * @param params - Route parameters with request ID
  * @returns Response with updated request
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export const POST = routeHandler(async (request: NextRequest) => {
   try {
-    // Extract ID from route parameters - properly access params in App Router
-    const id = Number(params.id);
+    // Extract ID from URL path segments
+    const urlParts = request.nextUrl.pathname.split('/');
+    const id = Number(urlParts[urlParts.length - 2]); // Take the second-to-last segment (the [id] part)
     console.log(`Request URL: ${request.nextUrl.pathname}`);
-    console.log(`Request ID from params: ${id}`);
+    console.log(`Request ID from URL: ${id}`);
     
     if (isNaN(id) || id <= 0) {
       return formatResponse.error('Invalid request ID', 400);
@@ -27,9 +29,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     // Authenticate user
     console.log('Authenticating user');
-    const auth = await apiAuth(request);
-    if (!auth) {
-      return formatResponse.error('Authentication required', 401);
+    const authResult = await authenticateRequest(request);
+    if (!authResult.success) {
+      return formatResponse.error(authResult.message || 'Authentication required', authResult.statusCode || 401);
     }
     console.log('Authentication successful');
 
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       try {
         const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-me';
         const jwt = await import('jsonwebtoken');
-        const decoded = jwt.verify(token, jwtSecret) as any;
+        const decoded = jwt.verify(token, jwtSecret);
         userId = Number(decoded.sub) || 0;
         console.log(`User ID from token: ${userId}`);
       } catch (e) {
@@ -95,5 +97,5 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     console.error('Error in link-to-customer route:', error);
     return formatResponse.error('An error occurred while linking the request to a customer', 500);
   }
-}
+});
 

@@ -7,6 +7,7 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess } from '@/core/errors/index';
 import { getLogger } from '@/core/logging';
+import { UserRole } from '@/domain';
 
 /**
  * GET /api/settings
@@ -60,7 +61,7 @@ export const PUT = routeHandler(
     // Authentifizierung für das Aktualisieren von Einstellungen erfordern
     requiresAuth: true,
     // Nur Administratoren dürfen Einstellungen aktualisieren
-    requiredRoles: ['admin']
+    requiredRole: UserRole.ADMIN,
   }
 );
 
@@ -91,6 +92,6 @@ export const POST = routeHandler(
     // Authentifizierung für das Zurücksetzen von Einstellungen erfordern
     requiresAuth: true,
     // Nur Administratoren dürfen Einstellungen zurücksetzen
-    requiredRoles: ['admin']
+    requiredRole: UserRole.ADMIN
   }
 );

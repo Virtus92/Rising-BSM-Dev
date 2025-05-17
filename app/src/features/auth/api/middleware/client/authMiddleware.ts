@@ -9,12 +9,12 @@ import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 
 export interface AuthOptions {
-  requiredRoles?: string[];
+  requiredRole?: string[];
   throwOnFail?: boolean;
 }
 
 export const authOptions: AuthOptions = {
-  requiredRoles: ['admin', 'employee'],
+  requiredRole: ['admin', 'employee'],
   throwOnFail: true,
 };
 

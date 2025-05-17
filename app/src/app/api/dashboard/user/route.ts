@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError } from '@/core/errors/index';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 
 /**
  * GET /api/dashboard/user
@@ -65,7 +65,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
         page: 1,
         limit: 5,
         sort: { field: 'appointmentDate', direction: 'asc' }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching user appointments', { userId, error: err.message });
         return { data: [], pagination: { page: 1, limit: 5, total: 0, totalPages: 0 } };
       }),
@@ -80,7 +80,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
         page: 1,
         limit: 5,
         sort: { field: 'createdAt', direction: 'desc' }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching user requests', { userId, error: err.message });
         return { data: [], pagination: { page: 1, limit: 5, total: 0, totalPages: 0 } };
       }),
@@ -92,7 +92,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
         page: 1,
         limit: 10,
         sort: { field: 'createdAt', direction: 'desc' }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching user activities', { userId, error: err.message });
         return { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } };
       }),
@@ -101,7 +101,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
       requestService.count({
         context,
         filters: { processorId: userId }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching assigned requests count', { userId, error: err.message });
         return 0;
       }),
@@ -113,7 +113,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
           processorId: userId,
           status: 'completed'
         }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching completed requests count', { userId, error: err.message });
         return 0;
       }),
@@ -125,7 +125,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
           userId,
           dateAfter: new Date()
         }
-      }).catch(err => {
+      }).catch((err: Error) => {
         logger.warn('Error fetching upcoming appointments count', { userId, error: err.message });
         return 0;
       })

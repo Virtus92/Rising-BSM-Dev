@@ -9,7 +9,7 @@ import { LoggingService, LogLevel, LogFormat } from './LoggingService';
 import type { ILoggingService } from './ILoggingService';
 
 // Singleton instance
-let logger: ILoggingService;
+let logger: ILoggingService | null = null;
 
 /**
  * Returns a singleton instance of the LoggingService
@@ -35,7 +35,7 @@ export function getLogger(): ILoggingService {
  * Resets the logger instance (mainly for tests)
  */
 export function resetLogger(): void {
-  logger = undefined as any;
+  logger = null;
 }
 
 // Re-export important types

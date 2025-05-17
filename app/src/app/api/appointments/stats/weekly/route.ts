@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError } from '@/core/errors/index';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { generateWeeklyStats } from '@/shared/utils/statistics-utils';
 import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';

@@ -56,6 +56,14 @@ export interface IRefreshTokenRepository extends IBaseRepository<RefreshToken, s
   deleteExpiredTokens(): Promise<number>;
   
   /**
+   * Löscht Tokens basierend auf Kriterien
+   * 
+   * @param criteria - Filterkriterien
+   * @returns Anzahl der gelöschten Tokens
+   */
+  deleteMany(criteria?: Record<string, any>): Promise<number>;
+  
+  /**
    * Erstellt ein neues Token mit automatischer Widerrufung des alten Tokens
    * 
    * @param token - Neues Token

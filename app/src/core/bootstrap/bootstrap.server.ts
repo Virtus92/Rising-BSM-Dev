@@ -77,7 +77,7 @@ export function getErrorHandler(): IErrorHandler {
         if (error && typeof error === 'object') {
           // Handle based on error codes or types
           if ('code' in error) {
-            const code = (error as any).code;
+            const code = (error).code;
             
             if (code === 'P2025') { // Prisma not found
               return new NotFoundError('Resource not found');
@@ -138,7 +138,7 @@ export function getErrorHandler(): IErrorHandler {
  */
 export function getValidationService(): IValidationService {
   if (!validationService) {
-    validationService = new ValidationService(getLogger());
+    validationService = new ValidationService();
   }
   return validationService;
 }
@@ -187,27 +187,9 @@ export async function bootstrapServer(): Promise<void> {
     });
     logger.debug('API error interceptor initialized');
     
-    // Import factory functions explicitly with a modified approach
-    // Using destructuring import to ensure we get the required functions
-    // This is more reliable than dynamic imports in case of circular references
-    let getServiceFactory, getRepositoryFactory, getDatabaseFactory;
-    try {
-      // Try standard import first
-      const factories = await import('../factories');
-      getServiceFactory = factories.getServiceFactory;
-      getRepositoryFactory = factories.getRepositoryFactory;
-      getDatabaseFactory = factories.getDatabaseFactory;
-      
-      // Verify we got all the required functions
-      if (!getServiceFactory || !getRepositoryFactory || !getDatabaseFactory) {
-        throw new Error('One or more factory functions not available');
-      }
-      
-      logger.debug('Factory functions imported successfully');
-    } catch (importError) {
-      logger.error('Error importing factory functions', { error: importError });
-      throw new Error('Failed to initialize application: Factory functions unavailable');
-    }
+    // Import factory functions from server-side implementation
+    const { getRepositoryFactory, getServiceFactory, getDatabaseFactory } = await import('../factories/index.server');
+    logger.debug('Factory functions imported successfully');
     
     // Get service factory
     const serviceFactory = getServiceFactory();
@@ -223,7 +205,7 @@ export async function bootstrapServer(): Promise<void> {
     logger.debug('Prisma client initialized');
     
     // Initialize repositories
-    const userRepository = repositoryFactory.createUserRepository();
+    repositoryFactory.createUserRepository();
     repositoryFactory.createCustomerRepository();
     repositoryFactory.createAppointmentRepository();
     repositoryFactory.createRequestRepository();
@@ -252,6 +234,23 @@ export async function bootstrapServer(): Promise<void> {
     serviceFactory.createNotificationService();
     serviceFactory.createRefreshTokenService();
     const permissionService = serviceFactory.createPermissionService();
+    
+    // Initialize permission system
+    try {
+      logger.info('Initializing permission system...');
+      // Import dynamically to avoid circular dependencies
+      const { initializePermissionSystem } = await import('@/features/permissions/lib/services/PermissionInitializer');
+      const result = await initializePermissionSystem();
+      
+      if (result.success) {
+        logger.info(`Permission system initialized: ${result.message}`);
+      } else {
+        logger.warn(`Permission initialization warning: ${result.message}`);
+      }
+    } catch (error) {
+      logger.error('Error initializing permission system', { error });
+      // Don't block startup for permission initialization
+    }
     
     // Pre-warm caches on server only
     try {
@@ -290,8 +289,10 @@ export async function bootstrapServer(): Promise<void> {
  */
 export function resetServices(): void {
   resetLogger();
-  errorHandlerInstance = undefined as any;
-  validationService = undefined as any;
+  // Reset references safely without assigning undefined directly
+  // The next time getErrorHandler() or getValidationService() is called, it will create a new instance
+  errorHandlerInstance = undefined as unknown as IErrorHandler;
+  validationService = undefined as unknown as IValidationService;
   
   // Import from core factories with improved error handling
   // This is critical for proper test cleanup

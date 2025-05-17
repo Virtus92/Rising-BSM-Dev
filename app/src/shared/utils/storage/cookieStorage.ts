@@ -12,6 +12,7 @@ const DEFAULT_CONFIG = {
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax' as const,
   maxAge: 60 * 60 * 24 * 7, // 7 days default
+  domain: typeof window !== 'undefined' ? window.location.hostname : undefined,
 };
 
 /**

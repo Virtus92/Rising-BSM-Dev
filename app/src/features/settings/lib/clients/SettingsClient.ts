@@ -1,7 +1,7 @@
 /**
  * API-Client for System Settings
  */
-import { ApiClient, ApiResponse, apiClient } from '@/core/api/ApiClient';
+import { ApiClient, ApiResponse } from '@/core/api/ApiClient';
 
 // API-URL for settings
 const SETTINGS_API_URL = '/settings';
@@ -31,7 +31,7 @@ export class SettingsClient {
   /**
    * Singleton instance of the API client
    */
-  private static apiClient = apiClient;
+  private static apiClient = ApiClient;
 
   /**
    * Loads the system settings
@@ -48,6 +48,7 @@ export class SettingsClient {
       return {
         success: true,
         message: 'Default settings loaded (fallback)',
+        error: null,
         data: {
           companyName: 'Rising BSM',
           dateFormat: 'dd.MM.yyyy',
@@ -74,8 +75,9 @@ export class SettingsClient {
       console.error('Error updating setting:', error as Error);
       return {
         success: false,
+        error: error instanceof Error ? error.message : 'An error occurred',
         message: error instanceof Error ? error.message : 'An error occurred',
-        data: null
+        data: undefined
       };
     }
   }
@@ -93,6 +95,7 @@ export class SettingsClient {
       console.error('Error updating settings:', error as Error);
       return {
         success: false,
+        error: error instanceof Error ? error.message : 'An error occurred',
         message: error instanceof Error ? error.message : 'An error occurred',
         data: null
       };
@@ -112,7 +115,8 @@ export class SettingsClient {
       return {
         success: false,
         message: error instanceof Error ? error.message : 'An error occurred',
-        data: null
+        data: null,
+        error: error instanceof Error ? error.message : 'An error occurred',
       };
     }
   }

@@ -1,4 +1,24 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+
+// Define a type for Prisma models with required methods
+/**
+ * Type definition for a Prisma model method
+ */
+type PrismaModelMethod = (...args: any[]) => Promise<any>;
+
+/**
+ * Type definition for a Prisma model with required methods
+ */
+interface PrismaModel {
+  findMany: PrismaModelMethod;
+  findUnique: PrismaModelMethod;
+  findFirst: PrismaModelMethod;
+  create: PrismaModelMethod;
+  update: PrismaModelMethod;
+  delete: PrismaModelMethod;
+  count: PrismaModelMethod;
+  updateMany: PrismaModelMethod;
+}
 import { BaseRepository } from './BaseRepository';
 import { ILoggingService } from '@/core/logging/ILoggingService';
 import { IErrorHandler } from '@/core/errors/';
@@ -169,14 +189,42 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
    * @param args - Query arguments
    * @returns Promise with query result
    */
+  /**
+   * Gets the appropriate Prisma model with type safety
+   * 
+   * @returns A properly typed Prisma model
+   */
+  protected getTypedPrismaModel(): PrismaModel {
+    const client = this.prismaTransaction || this.prisma;
+    
+    // Get the model by name
+    const model = client[this.modelName as keyof typeof client] as unknown;
+    
+    // Validate model has required methods
+    if (!model || typeof model !== 'object') {
+      throw new Error(`Invalid model: ${this.modelName}`);
+    }
+    
+    // Check that the model has all required methods
+    const requiredMethods = ['findMany', 'findUnique', 'findFirst', 'create', 'update', 'delete', 'count', 'updateMany'];
+    for (const method of requiredMethods) {
+      if (typeof (model as Record<string, unknown>)[method] !== 'function') {
+        throw new Error(`Model ${this.modelName} is missing required method: ${method}`);
+      }
+    }
+    
+    // The model has all required methods, so it's safe to cast to PrismaModel
+    return model as PrismaModel;
+  }
+
   protected async executeQuery(operation: string, ...args: any[]): Promise<any> {
     // Log start time if in debug mode
     const isDebug = configService.getLoggingConfig().level === 'debug';
     const startTime = isDebug ? Date.now() : 0;
     
     try {
-      // Get the appropriate model
-      const model = this.prismaTransaction || this.prisma[this.modelName as keyof PrismaClient];
+      // Get the appropriate model with proper type handling
+      const model = this.getTypedPrismaModel();
       
       if (!model) {
         throw new Error(`Model ${this.modelName} not found on Prisma client`);
@@ -187,14 +235,20 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
       
       switch (operation) {
         case 'findAll':
-          result = await (model as any).findMany(args[0]);
+          if (typeof model.findMany !== 'function') {
+            throw new Error(`Operation findMany not available on model ${this.modelName}`);
+          }
+          result = await model.findMany(args[0]);
           break;
           
         case 'findById':
           // Don't do any ID normalization or validation at all - just try to find the record
           try {
+            if (typeof model.findUnique !== 'function') {
+              throw new Error(`Operation findUnique not available on model ${this.modelName}`);
+            }
             // First try a direct lookup by id
-            result = await (model as any).findUnique({
+            result = await model.findUnique({
               where: { id: args[0] },
               ...(args[1] || {})
             });
@@ -202,13 +256,13 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
             // If that fails, try converting string to number and vice versa
             if (!result && typeof args[0] === 'string' && /^\d+$/.test(args[0])) {
               // Try as number if it's a numeric string
-              result = await (model as any).findUnique({
+              result = await model.findUnique({
                 where: { id: parseInt(args[0]) },
                 ...(args[1] || {})
               });
             } else if (!result && typeof args[0] === 'number') {
               // Try as string if it's a number
-              result = await (model as any).findUnique({
+              result = await model.findUnique({
                 where: { id: String(args[0]) },
                 ...(args[1] || {})
               });
@@ -224,26 +278,38 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
           break;
           
         case 'findByCriteria':
-          result = await (model as any).findMany({
+          if (typeof model.findMany !== 'function') {
+            throw new Error(`Operation findMany not available on model ${this.modelName}`);
+          }
+          result = await model.findMany({
             where: args[0],
             ...(args[1] || {})
           });
           break;
           
         case 'findOneByCriteria':
-          result = await (model as any).findFirst({
+          if (typeof model.findFirst !== 'function') {
+            throw new Error(`Operation findFirst not available on model ${this.modelName}`);
+          }
+          result = await model.findFirst({
             where: args[0],
             ...(args[1] || {})
           });
           break;
           
         case 'create':
-          result = await (model as any).create({
+          if (typeof model.create !== 'function') {
+            throw new Error(`Operation create not available on model ${this.modelName}`);
+          }
+          result = await model.create({
             data: args[0]
           });
           break;
           
         case 'update':
+          if (typeof model.update !== 'function') {
+            throw new Error(`Operation update not available on model ${this.modelName}`);
+          }
           // Normalize the ID for Prisma
           const updateId = this.normalizeId(args[0]);
           
@@ -259,13 +325,13 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
           // Handle special case for RefreshToken which uses token as primary key instead of id
           if (this.modelName === 'refreshToken') {
             // For RefreshToken, use token as the key field
-            result = await (model as any).update({
+            result = await model.update({
               where: { token: updateId },
               data: updateData
             });
           } else {
             // For all other models, use id as the key field
-            result = await (model as any).update({
+            result = await model.update({
               where: { id: updateId },
               data: updateData
             });
@@ -273,27 +339,36 @@ export abstract class PrismaRepository<T, ID = number> extends BaseRepository<T,
           break;
           
         case 'delete':
+          if (typeof model.delete !== 'function') {
+            throw new Error(`Operation delete not available on model ${this.modelName}`);
+          }
           // Normalize the ID for Prisma
           const deleteId = this.normalizeId(args[0]);
           
-          result = await (model as any).delete({
+          result = await model.delete({
             where: { id: deleteId }
           });
           break;
           
         case 'count':
-          result = await (model as any).count({
+          if (typeof model.count !== 'function') {
+            throw new Error(`Operation count not available on model ${this.modelName}`);
+          }
+          result = await model.count({
             where: args[0]
           });
           break;
           
         case 'bulkUpdate':
+          if (typeof model.updateMany !== 'function') {
+            throw new Error(`Operation updateMany not available on model ${this.modelName}`);
+          }
           // Normalize all IDs in the array
           const bulkUpdateIds = Array.isArray(args[0]) 
             ? args[0].map(id => this.normalizeId(id)) 
             : args[0];
             
-          result = await (model as any).updateMany({
+          result = await model.updateMany({
             where: { id: { in: bulkUpdateIds } },
             data: args[1]
           });

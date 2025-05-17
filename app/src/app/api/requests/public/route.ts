@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { CreateRequestDto, RequestSource } from '@/domain/dtos/RequestDtos';
 
 /**
@@ -73,7 +74,7 @@ export const POST = routeHandler(async (request: NextRequest) => {
     // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
       return formatResponse.validationError(
-        (error as any).validationErrors
+        (error).validationErrors
       );
     }
     

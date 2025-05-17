@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError } from '@/core/errors/index';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { UserResponseDto } from '@/domain/dtos/UserDtos';
 import { generateMonthlyStats } from '@/shared/utils/statistics-utils';
 
@@ -26,7 +27,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
       ...({
         includePermissions: false, // Exclude permissions for optimization
         includeRole: false // Exclude role details for optimization
-      } as any)
+      })
     }, {
       context: {
         userId: request.auth?.userId

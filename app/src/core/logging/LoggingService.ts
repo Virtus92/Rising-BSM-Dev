@@ -150,7 +150,7 @@ export class LoggingService implements ILoggingService {
     });
     
     // Combine parent and child context
-    (childLogger as any).context = {
+    (childLogger).context = {
       ...this.context,
       ...context
     };

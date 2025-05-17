@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError } from '@/core/errors/index';
 import { getLogger } from '@/core/logging';
-import { getNotificationService } from '@/core/factories';
+import { getNotificationService } from '@/core/factories/serviceFactory.server';
 
 /**
  * PUT /api/notifications/read-all

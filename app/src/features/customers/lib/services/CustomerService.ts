@@ -1,521 +1,348 @@
-/**
- * Client service for customer-related API calls
- */
-import { ApiClient } from '@/core/api/ApiClient';
+'use client';
+
+import { ICustomerService } from '@/domain/services/ICustomerService';
+import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
+import { Customer } from '@/domain/entities/Customer';
 import { 
-  CustomerResponseDto, 
-  CustomerFilterParamsDto, 
   CreateCustomerDto, 
-  UpdateCustomerDto,
+  UpdateCustomerDto, 
+  CustomerResponseDto, 
   CustomerDetailResponseDto,
+  UpdateCustomerStatusDto,
+  CustomerFilterParamsDto,
   CustomerLogDto
 } from '@/domain/dtos/CustomerDtos';
-import { CommonStatus } from '@/domain/enums/CommonEnums';
+import { ServiceOptions } from '@/domain/services/IBaseService';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
+import { CustomerClient } from '../clients/CustomerClient';
 
-// Define interface for API responses for consistency with other services
-interface ApiResponse<T = any> {
-  success: boolean;
-  data: T | null;
-  message?: string;
-  errors?: string[];
-  statusCode?: number;
-  errorType?: string;
-}
-
-// Define interface for paginated responses for consistency with other services
-interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-export class CustomerService {
-  private static readonly basePath = "/customers";
+/**
+ * Client-side service for managing customers
+ * This is a lightweight client service that delegates to the API client
+ */
+export class CustomerService implements ICustomerService {
+  private repository: any;
+  
+  public async getRepository(): Promise<any> {
+    return this.repository;
+  }
 
   /**
-   * Get all customers with optional filtering
+   * Creates a new customer
    */
-  static async getCustomers(filters?: CustomerFilterParamsDto): Promise<ApiResponse<PaginatedResponse<CustomerResponseDto>>> {
-    try {
-      // Build query parameters - standardized approach across all services
-      const queryParams = new URLSearchParams();
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            queryParams.append(key, String(value));
-          }
-        });
-      }
-      
-      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      return await ApiClient.get(`${this.basePath}${query}`);
-    } catch (error) {
-      console.error('Error in CustomerService.getCustomers:', error as Error);
-      return {
-        success: false,
-        data: { 
-          data: [], 
-          pagination: {
-            page: filters?.page || 1,
-            limit: filters?.limit || 10,
-            total: 0,
-            totalPages: 0
-          }
-        },
-        message: error instanceof Error ? error.message : 'Error fetching customers'
-      };
+  public async create(data: CreateCustomerDto, options?: ServiceOptions): Promise<CustomerResponseDto> {
+    const response = await CustomerClient.createCustomer(data);
+    if (!response || !response.data) {
+      throw new Error('Failed to create customer');
     }
-  }
-  
-  /**
-   * Alias method for getCustomers to maintain consistency with other services
-   */
-  static async getAll(filters?: CustomerFilterParamsDto): Promise<ApiResponse<PaginatedResponse<CustomerResponseDto>>> {
-    return this.getCustomers(filters);
+    return response.data;
   }
 
   /**
-   * Get a specific customer by ID
+   * Updates a customer
    */
-  static async getCustomerById(id: number): Promise<ApiResponse<CustomerDetailResponseDto>> {
-    try {
-      return await ApiClient.get(`${this.basePath}/${id}`);
-    } catch (error) {
-      console.error('Error in CustomerService.getCustomerById:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : `Error fetching customer with ID ${id}`
-      };
+  public async update(id: number, data: UpdateCustomerDto, options?: ServiceOptions): Promise<CustomerResponseDto> {
+    const response = await CustomerClient.updateCustomer(id, data);
+    if (!response || !response.data) {
+      throw new Error('Failed to update customer');
     }
-  }
-  
-  /**
-   * Alias method for getCustomerById to maintain consistency with other services
-   */
-  static async getById(id: number): Promise<ApiResponse<CustomerDetailResponseDto>> {
-    return this.getCustomerById(id);
-  }
-  
-  /**
-   * Alias method for deleteCustomer to maintain consistency with other services
-   */
-  static async delete(id: number): Promise<ApiResponse<void>> {
-    return this.deleteCustomer(id);
+    return response.data;
   }
 
   /**
-   * Create a new customer
+   * Deletes a customer
    */
-  static async createCustomer(data: CreateCustomerDto): Promise<ApiResponse<CustomerResponseDto>> {
-    try {
-      // Handle field name normalization (zipCode -> postalCode)
-      const normalizedData = { ...data };
-      
-      // Handle legacy zipCode field
-      if (normalizedData.zipCode !== undefined) {
-        normalizedData.postalCode = normalizedData.zipCode;
-        delete normalizedData.zipCode;
-      }
-      
-      // Handle companyName/company
-      if (normalizedData.companyName !== undefined) {
-        normalizedData.company = normalizedData.companyName;
-        delete normalizedData.companyName;
-      }
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Creating customer with normalized data:', normalizedData);
-      }
-      
-      return await ApiClient.post(this.basePath, normalizedData);
-    } catch (error) {
-      console.error('Error in CustomerService.createCustomer:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error creating customer'
-      };
-    }
-  }
-  
-  /**
-   * Alias method for createCustomer to maintain consistency with other services
-   */
-  static async create(data: CreateCustomerDto): Promise<ApiResponse<CustomerResponseDto>> {
-    return this.createCustomer(data);
+  public async delete(id: number, options?: ServiceOptions): Promise<boolean> {
+    const response = await CustomerClient.deleteCustomer(id);
+    return response.success;
   }
 
   /**
-   * Update an existing customer
+   * Finds a customer by ID
    */
-  static async updateCustomer(id: number, data: UpdateCustomerDto): Promise<ApiResponse<CustomerResponseDto>> {
+  public async findById(id: number, options?: ServiceOptions): Promise<CustomerResponseDto | null> {
     try {
-      // Handle field name normalization (zipCode -> postalCode)
-      const normalizedData = { ...data };
-      
-      // Handle legacy zipCode field
-      if (normalizedData.zipCode !== undefined) {
-        normalizedData.postalCode = normalizedData.zipCode;
-        delete normalizedData.zipCode;
-      }
-      
-      // Handle companyName/company
-      if (normalizedData.companyName !== undefined) {
-        normalizedData.company = normalizedData.companyName;
-        delete normalizedData.companyName;
-      }
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Updating customer with normalized data:', normalizedData);
-      }
-      
-      return await ApiClient.put(`${this.basePath}/${id}`, normalizedData);
+      const response = await CustomerClient.getCustomer(id);
+      return response.data || null;
     } catch (error) {
-      console.error('Error in CustomerService.updateCustomer:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : `Error updating customer with ID ${id}`
-      };
-    }
-  }
-  
-  /**
-   * Alias method for updateCustomer to maintain consistency with other services
-   */
-  static async update(id: number, data: UpdateCustomerDto): Promise<ApiResponse<CustomerResponseDto>> {
-    return this.updateCustomer(id, data);
-  }
-
-  /**
-   * Delete a customer
-   */
-  static async deleteCustomer(id: number): Promise<ApiResponse<void>> {
-    try {
-      return await ApiClient.delete(`${this.basePath}/${id}`);
-    } catch (error) {
-      console.error('Error in CustomerService.deleteCustomer:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : `Error deleting customer with ID ${id}`
-      };
+      return null;
     }
   }
 
   /**
-   * Get customer count
+   * Finds all customers
    */
-  static async count(): Promise<ApiResponse<{ count: number }>> {
-    try {
-      const response = await ApiClient.get(`${this.basePath}/count`);
-      
-      // Ensure consistent response format
-      if (response.success) {
-        // If response.data is directly a number, wrap it in a count object
-        if (typeof response.data === 'number') {
-          return {
-            ...response,
-            data: { count: response.data }
-          };
-        }
-        
-        // If response.data is already a properly structured object, use it
-        if (response.data && typeof response.data === 'object' && 'count' in response.data) {
-          return response;
-        }
-        
-        // If response.data is an object with a total property, normalize it
-        if (response.data && typeof response.data === 'object' && 'total' in response.data) {
-          return {
-            ...response,
-            data: { count: response.data.total as number }
-          };
-        }
-        
-        // If we can't determine the count format, assume 0
-        console.warn('Unknown count response format:', response.data);
-        return {
-          ...response,
-          data: { count: 0 }
-        };
-      }
-      
-      // Return original response for error cases
-      return response as ApiResponse<{ count: number }>;
-    } catch (error) {
-      console.error('Error in CustomerService.count:', error as Error);
-      return {
-        success: false,
-        data: { count: 0 },
-        message: error instanceof Error ? error.message : 'Error counting customers'
-      };
+  public async findAll(options?: ServiceOptions): Promise<PaginationResult<CustomerResponseDto>> {
+    const params: CustomerFilterParamsDto = {
+      page: options?.page || 1,
+      limit: options?.limit || 10
+    };
+    const response = await CustomerClient.getCustomers(params);
+    if (!response || !response.data) {
+      throw new Error('Failed to get customers');
     }
-  }
-  
-  /**
-   * Get monthly customer statistics
-   */
-  static async getMonthlyStats() {
-    return ApiClient.get(`${this.basePath}/stats/monthly`);
-  }
-  
-  /**
-   * Get weekly customer statistics
-   */
-  static async getWeeklyStats() {
-    return ApiClient.get(`${this.basePath}/stats/weekly`);
-  }
-  
-  /**
-   * Get yearly customer statistics
-   */
-  static async getYearlyStats() {
-    return ApiClient.get(`${this.basePath}/stats/yearly`);
+    return response.data;
   }
 
   /**
-   * Add a note to a customer
+   * Get all entities with pagination
    */
-  static async addNote(id: number, note: string): Promise<ApiResponse<CustomerLogDto>> {
+  public async getAll(options?: ServiceOptions): Promise<PaginationResult<CustomerResponseDto>> {
+    return this.findAll(options);
+  }
+
+  /**
+   * Get an entity by ID
+   */
+  public async getById(id: number, options?: ServiceOptions): Promise<CustomerResponseDto | null> {
+    return this.findById(id, options);
+  }
+
+  /**
+   * Find entities matching criteria
+   */
+  public async findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<CustomerResponseDto[]> {
+    // Since the client doesn't have direct access to the database,
+    // we simulate this by using the search API
+    const searchText = Object.values(criteria).join(' ');
+    return this.searchCustomers(searchText, options);
+  }
+
+  /**
+   * Count entities
+   */
+  public async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
+    const result = await this.findAll({ page: 1, limit: 1 } as ServiceOptions);
+    return result.total || 0;
+  }
+
+  /**
+   * Check if an entity exists
+   */
+  public async exists(id: number, options?: ServiceOptions): Promise<boolean> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Adding note to customer ${id}:`, note);
-      }
-      
-      return await ApiClient.post(`${this.basePath}/${id}/notes`, { text: note, note: note });
-    } catch (error) {
-      console.error('Error in CustomerService.addNote:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error adding customer note'
-      };
+      const customer = await this.findById(id, options);
+      return customer !== null;
+    } catch {
+      return false;
     }
   }
 
   /**
-   * Get notes for a customer
+   * Search for entities
    */
-  static async getNotes(id: number, forceFresh = false): Promise<ApiResponse<CustomerLogDto[]>> {
-    try {
-      // Add cache busting parameter if needed
-      const cacheBuster = forceFresh ? `?_t=${Date.now()}` : '';
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Fetching notes for customer ${id}${forceFresh ? ' with cache busting' : ''}`);
-      }
-      
-      return await ApiClient.get(`${this.basePath}/${id}/notes${cacheBuster}`);
-    } catch (error) {
-      console.error('Error in CustomerService.getNotes:', error as Error);
-      return {
-        success: false,
-        data: [],
-        message: error instanceof Error ? error.message : 'Error fetching customer notes'
-      };
-    }
+  public async search(searchText: string, options?: ServiceOptions): Promise<CustomerResponseDto[]> {
+    return this.searchCustomers(searchText, options);
   }
-  
-  /**
-   * Update customer status
-   * @param id Customer ID
-   * @param status Status string that will be converted to CommonStatus enum
-   * @param note Optional note about the status change
-   */
-  static async updateStatus(id: number, status: string, note?: string): Promise<ApiResponse<CustomerResponseDto>> {
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Updating customer ${id} status to ${status}`);
-      }
 
-      // Validate that the status is a valid CommonStatus enum value
-      if (!Object.values(CommonStatus).includes(status as CommonStatus)) {
-        throw new Error(`Invalid status value: ${status}`);
-      }
-      
-      const validStatus = status as CommonStatus;
-      let retryCount = 0;
-      const maxRetries = 1;
-      
-      // Try to use the dedicated status endpoint with improved error handling
-      try {
-        // Add retry logic with exponential backoff for transient errors
-        const response = await this.retryOperation(
-          () => ApiClient.patch(`${this.basePath}/${id}/status`, { status: validStatus, note }),
-          maxRetries
-        );
-        return response;
-      } catch (error: any) {
-        console.error('Status update endpoint error:', error as Error);
-        
-        // Check for specific error conditions to determine if we should fall back
-        const shouldFallback = this.shouldFallbackToRegularUpdate(error);
-        
-        if (shouldFallback) {
-          console.warn(`Status endpoint issue for customer ${id}, falling back to regular update`, 
-            error instanceof Error ? error.message : 'Unknown error');
-            
-          // Fall back to regular update with minimal data
-          return await this.update(id, { status: validStatus });
-        }
-        
-        // Handle authentication errors specifically
-        if (error?.statusCode === 401 || error?.status === 401) {
-          console.error('Authentication error when updating status. User may need to re-login.');
-          return {
-            success: false,
-            data: null,
-            message: 'Authentication error. Please log in again.',
-            statusCode: 401,
-            errorType: 'authentication'
-          };
-        }
-        
-        // For other types of errors, rethrow to be handled by the outer catch
-        throw error;
-      }
-    } catch (error) {
-      console.error('Error in CustomerService.updateStatus:', error as Error);
-      
-      // Create a standardized error response
-      let errorMessage = 'Error updating customer status';
-      let errorType = 'unknown';
-      let statusCode = 500;
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
-      // Add more context for status-specific errors
-      if (typeof error === 'object' && error !== null) {
-        statusCode = (error as any).statusCode || (error as any).status || 500;
-        
-        if (statusCode === 403) {
-          errorMessage = 'You do not have permission to update customer status';
-          errorType = 'permission';
-        } else if (statusCode === 404) {
-          errorMessage = `Customer with ID ${id} not found`;
-          errorType = 'not_found';
-        } else if (statusCode === 400) {
-          errorMessage = (error as any).message || 'Invalid status update request';
-          errorType = 'validation';
-        } else if (statusCode === 401) {
-          errorMessage = 'Authentication error. Please log in again.';
-          errorType = 'authentication';
-        }
-      }
-      
-      return {
-        success: false,
-        data: null,
-        message: errorMessage,
-        errorType,
-        statusCode
-      };
-    }
-  }
-  
   /**
-   * Retry an operation with exponential backoff
-   * @param operation The function to retry
-   * @param maxRetries Maximum number of retries
-   * @param baseDelay Base delay in ms
+   * Validate data
    */
-  private static async retryOperation<T>(
-    operation: () => Promise<T>,
-    maxRetries: number = 1,
-    baseDelay: number = 500
-  ): Promise<T> {
-    let lastError: any;
+  public async validate(data: CreateCustomerDto | UpdateCustomerDto, isUpdate?: boolean, entityId?: number): Promise<any> {
+    // Client-side validation placeholder
+    return { valid: true, errors: {} };
+  }
+
+  /**
+   * Execute a transaction
+   */
+  public async transaction<R>(callback: (service: ICustomerService) => Promise<R>): Promise<R> {
+    // Transactions are handled server-side
+    return callback(this);
+  }
+
+  /**
+   * Bulk update entities
+   */
+  public async bulkUpdate(ids: number[], data: UpdateCustomerDto, options?: ServiceOptions): Promise<number> {
+    // Not implemented on client side
+    throw new Error('Bulk update not supported on client side');
+  }
+
+  /**
+   * Convert entity to DTO
+   */
+  public toDTO(entity: Customer): CustomerResponseDto {
+    return {
+      id: entity.id,
+      name: entity.name,
+      email: entity.email,
+      phone: entity.phone || undefined,
+      address: entity.address || undefined,
+      city: entity.city || undefined,
+      postalCode: entity.postalCode || undefined,
+      country: entity.country,
+      newsletter: entity.newsletter || false,
+      status: entity.status || CommonStatus.ACTIVE,
+      type: entity.type || CustomerType.PRIVATE,
+      createdAt: entity.createdAt.toISOString(),
+      updatedAt: entity.updatedAt.toISOString()
+    };
+  }
+
+  /**
+   * Convert DTO to entity
+   */
+  public fromDTO(dto: CreateCustomerDto | UpdateCustomerDto): Partial<Customer> {
+    const result: Partial<Customer> = {
+      name: dto.name,
+      email: dto.email,
+      phone: dto.phone,
+      address: dto.address,
+      city: dto.city,
+      postalCode: dto.postalCode,
+      country: dto.country,
+      status: dto.status,
+      type: dto.type,
+      newsletter: dto.newsletter,
+      state: dto.state,
+      notes: dto.notes,
+      vatNumber: dto.vatNumber
+    };
     
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await operation();
-      } catch (error) {
-        lastError = error;
-        
-        // Don't retry for certain error types
-        if (
-          (error && (error as any).statusCode === 400) || // Bad request
-          (error && (error as any).statusCode === 403) || // Permission denied
-          (error && (error as any).statusCode === 404)    // Not found
-        ) {
-          throw error;
-        }
-        
-        if (attempt < maxRetries) {
-          // Wait with exponential backoff before retrying
-          const delay = baseDelay * Math.pow(2, attempt);
-          console.log(`Retrying operation, attempt ${attempt + 1} in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        } else {
-          throw lastError;
-        }
-      }
+    // Add timestamps
+    if ('createdAt' in dto && dto.createdAt) {
+      result.createdAt = new Date(dto.createdAt);
+    }
+    if ('updatedAt' in dto && dto.updatedAt) {
+      result.updatedAt = new Date(dto.updatedAt);
     }
     
-    // This should never happen due to the throw in the loop
-    throw lastError;
+    return result;
   }
-  
+
   /**
-   * Helper method to determine if we should fall back to regular update
-   * when the status endpoint fails
+   * Finds a customer by email
    */
-  private static shouldFallbackToRegularUpdate(error: any): boolean {
-    // Case 1: API returned 404 Not Found (endpoint doesn't exist)
-    if (error?.statusCode === 404 || error?.status === 404) {
-      return true;
+  public async findByEmail(email: string, options?: ServiceOptions): Promise<CustomerResponseDto | null> {
+    const params: CustomerFilterParamsDto = {
+      page: 1,
+      limit: 1,
+      search: email
+    };
+    const result = await CustomerClient.getCustomers(params);
+    if (!result || !result.data) {
+      return null;
     }
-    
-    // Case 2: Response object with 404 status
-    if (error?.response?.status === 404) {
-      return true;
-    }
-    
-    // Case 3: API response with 404 status code
-    if (error?.success === false && error?.statusCode === 404) {
-      return true;
-    }
-    
-    // Case 4: Specific server errors that might indicate temporary issues
-    if (error?.statusCode === 500 || error?.status === 500) {
-      // For 500 errors, we'll only fall back for specific known issues
-      const errorMsg = error.message || '';
-      const knownRecoverableErrors = [
-        'database connection', 
-        'timeout', 
-        'deadlock', 
-        'connection refused',
-        'foreign key constraint',
-        'database error',
-        'constraint violation'
-      ];
-      
-      // Check if this is a known recoverable error
-      return knownRecoverableErrors.some(known => 
-        errorMsg.toLowerCase().includes(known.toLowerCase())
-      );
-    }
-    
-    // Default: don't fall back
-    return false;
+    // Handle both array and paginated response formats
+    const customers = Array.isArray(result.data) ? result.data : result.data.data;
+    return customers?.find(c => c.email === email) || null;
   }
-  
+
   /**
-   * Legacy alias methods for backward compatibility
+   * Gets customer details
    */
-  static async addCustomerNote(id: number, note: string): Promise<ApiResponse<CustomerLogDto>> {
-    return this.addNote(id, note);
+  public async getCustomerDetails(id: number, options?: ServiceOptions): Promise<CustomerDetailResponseDto | null> {
+    // Use the standard get method which includes details
+    const customer = await this.findById(id, options);
+    return customer as CustomerDetailResponseDto;
   }
-  
-  static async getCustomerNotes(id: number, forceFresh = false): Promise<ApiResponse<CustomerLogDto[]>> {
-    return this.getNotes(id, forceFresh);
+
+  /**
+   * Finds customers with filtering
+   */
+  public async findCustomers(filters: CustomerFilterParamsDto, options?: ServiceOptions): Promise<PaginationResult<CustomerResponseDto>> {
+    const response = await CustomerClient.getCustomers(filters);
+    if (!response || !response.data) {
+      throw new Error('Failed to find customers');
+    }
+    return response.data;
+  }
+
+  /**
+   * Updates customer status
+   */
+  public async updateStatus(customerId: number, data: UpdateCustomerStatusDto, options?: ServiceOptions): Promise<CustomerResponseDto> {
+    const response = await CustomerClient.updateCustomerStatus(customerId, data);
+    if (!response || !response.data) {
+      throw new Error('Failed to update customer status');
+    }
+    return response.data;
+  }
+
+  /**
+   * Searches customers
+   */
+  public async searchCustomers(searchText: string, options?: ServiceOptions): Promise<CustomerResponseDto[]> {
+    const params: CustomerFilterParamsDto = {
+      page: 1,
+      limit: 10,
+      search: searchText
+    };
+    const result = await CustomerClient.getCustomers(params);
+    if (!result || !result.data) {
+      return [];
+    }
+    // Handle both array and paginated response formats
+    return Array.isArray(result.data) ? result.data : result.data.data || [];
+  }
+
+  /**
+   * Gets similar customers
+   */
+  public async getSimilarCustomers(customerId: number, options?: ServiceOptions): Promise<CustomerResponseDto[]> {
+    // Not implemented on client side
+    return [];
+  }
+
+  /**
+   * Gets customer statistics
+   */
+  public async getCustomerStatistics(options?: ServiceOptions): Promise<any> {
+    // Not implemented on client side
+    return {};
+  }
+
+  /**
+   * Gets customer logs
+   */
+  public async getCustomerLogs(customerId: number, options?: ServiceOptions): Promise<CustomerLogDto[]> {
+    const response = await CustomerClient.getCustomerLogs(customerId);
+    if (!response || !response.data) {
+      return [];
+    }
+    return response.data;
+  }
+
+  /**
+   * Creates a customer log
+   */
+  public async createCustomerLog(customerId: number, action: string, details?: string, options?: ServiceOptions): Promise<CustomerLogDto> {
+    const response = await CustomerClient.createCustomerLog(customerId, { action, details });
+    if (!response || !response.data) {
+      throw new Error('Failed to create customer log');
+    }
+    return response.data;
+  }
+
+  /**
+   * Soft deletes a customer
+   */
+  public async softDelete(customerId: number, options?: ServiceOptions): Promise<boolean> {
+    const response = await CustomerClient.deleteCustomer(customerId);
+    return response.success;
+  }
+
+  /**
+   * Hard deletes a customer (permanent)
+   */
+  public async hardDelete(customerId: number, options?: ServiceOptions): Promise<boolean> {
+    // Not supported on client side for safety
+    throw new Error('Hard delete not supported on client side');
+  }
+
+  /**
+   * Exports customers
+   */
+  public async exportCustomers(filters: CustomerFilterParamsDto, format: string, options?: ServiceOptions): Promise<Buffer> {
+    // Not implemented on client side
+    throw new Error('Export not supported on client side');
+  }
+
+  /**
+   * Updates newsletter subscription
+   */
+  public async updateNewsletterSubscription(customerId: number, subscribe: boolean, options?: ServiceOptions): Promise<CustomerResponseDto> {
+    return this.update(customerId, { newsletter: subscribe } as UpdateCustomerDto, options);
   }
 }

@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError } from '@/core/errors/index';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 
@@ -24,15 +25,23 @@ export const GET = routeHandler(
         try {
           const result = await userService.count();
           
+          // Define proper type for count result
+          type CountResult = number | { count?: number; total?: number } | unknown;
+          
           // Ensure we have a proper count response
           let count = 0;
           
-          if (result && typeof result === 'object' && 'count' in result) {
-            count = result.count as number;
+          if (result && typeof result === 'object') {
+            // Type guard for object with count property
+            if ('count' in result && typeof result.count === 'number') {
+              count = result.count;
+            } 
+            // Type guard for object with total property
+            else if ('total' in result && typeof result.total === 'number') {
+              count = result.total;
+            }
           } else if (typeof result === 'number') {
             count = result;
-          } else if (result && typeof result === 'object' && 'total' in result) {
-            count = (result as any).total as number;
           }
           
           return formatSuccess({ count }, 'User count retrieved successfully');
@@ -51,10 +60,13 @@ export const GET = routeHandler(
           if (typeof repositoryResult === 'number') {
             count = repositoryResult;
           } else if (repositoryResult && typeof repositoryResult === 'object') {
-            if ('count' in repositoryResult) {
-              count = repositoryResult.count as number;
-            } else if ('total' in repositoryResult) {
-              count = repositoryResult.total as number;
+            // Type guard for object with count property
+            if ('count' in repositoryResult && typeof repositoryResult.count === 'number') {
+              count = repositoryResult.count;
+            } 
+            // Type guard for object with total property
+            else if ('total' in repositoryResult && typeof repositoryResult.total === 'number') {
+              count = repositoryResult.total;
             }
           }
           

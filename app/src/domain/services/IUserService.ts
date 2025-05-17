@@ -17,6 +17,14 @@ import { PaginationResult } from '../repositories/IBaseRepository';
  */
 export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUserDto, UserResponseDto> {
   /**
+   * Find a user by ID
+   * 
+   * @param id - User ID
+   * @param options - Service options
+   * @returns Found user or null
+   */
+  findById(id: number, options?: ServiceOptions): Promise<UserResponseDto | null>;
+  /**
    * Find a user by email address
    * 
    * @param email - Email address

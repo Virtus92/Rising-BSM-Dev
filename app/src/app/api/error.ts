@@ -88,8 +88,8 @@ export function handleApiError(
   };
   
   // Include stack trace in development
-  if (process.env.NODE_ENV === 'development') {
-    (errorResponse.error as any).stack = error.stack;
+  if (process.env.NODE_ENV === 'development' && error instanceof Error) {
+    (errorResponse.error as { stack?: string }).stack = error.stack;
   }
   
   return NextResponse.json(errorResponse, { 

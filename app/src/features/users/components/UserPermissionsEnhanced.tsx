@@ -106,7 +106,7 @@ export const UserPermissionsEnhanced: React.FC<UserPermissionsProps> = ({
       
       if (allPermsResponse.success && allPermsResponse.data && Array.isArray(allPermsResponse.data.data)) {
         // Extract all permission codes
-        const permissionCodes = allPermsResponse.data.data.map((p: any) => p.code);
+        const permissionCodes = allPermsResponse.data.data.map(p => p.code);
         return permissionCodes;
       }
       

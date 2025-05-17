@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { changePasswordHandler } from '@/features/auth/api';
-import { getUserFromToken } from '@/features/auth/lib/clients/token/server';
+import AuthService from '@/features/auth/core';
 import { formatResponse } from '@/core/errors';
 
 /**
@@ -15,7 +15,7 @@ import { formatResponse } from '@/core/errors';
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get token from cookies 
+    // Get cookie token and validate it through AuthService
     const cookieStore = await cookies();
     const token = cookieStore.get('auth_token')?.value;
     
@@ -26,17 +26,17 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Verify token and get user information
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
+    // Verify token is valid
+    const isValid = await AuthService.validateToken();
+    if (!isValid) {
       return NextResponse.json(
-        formatResponse.error('Server configuration error', 500),
-        { status: 500 }
+        formatResponse.error('Invalid authentication token', 401),
+        { status: 401 }
       );
     }
     
-    // Extract user from token
-    const user = getUserFromToken(token, jwtSecret);
+    // Get user from AuthService
+    const user = AuthService.getUser();
     
     if (!user || !user.id) {
       return NextResponse.json(

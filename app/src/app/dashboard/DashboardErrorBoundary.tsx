@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
+import { ServerCodeErrorBoundary } from '@/shared/components/errors';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -63,6 +64,12 @@ export default function DashboardErrorBoundary(
                       errorInfo.message.toLowerCase().includes('permission') || 
                       errorInfo.message.toLowerCase().includes('unauthorized') || 
                       errorInfo.message.toLowerCase().includes('forbidden');
+                      
+  // Check for Prisma/database errors
+  const isPrismaError = errorInfo.message.toLowerCase().includes('prisma') ||
+                      errorInfo.message.toLowerCase().includes('database') ||
+                      errorInfo.message.toLowerCase().includes('db') ||
+                      errorInfo.message.toLowerCase().includes('unable to run in this browser');
                       
   // Check for network connectivity issues
   const isNetworkError = errorInfo.message.toLowerCase().includes('network') ||
@@ -154,16 +161,25 @@ export default function DashboardErrorBoundary(
           </div>
           
           <p className="text-sm text-muted-foreground mt-4">
-            {isAuthError 
-              ? 'This appears to be related to your login session. You may need to log in again.'
-              : isNetworkError
-                ? 'It looks like you may be experiencing network connectivity issues. Please check your internet connection.'
-                : isServerError
-                  ? 'Our servers appear to be experiencing issues. Please try again in a few moments.'
-                  : isCorsError
-                    ? 'There appears to be a security configuration issue. Please contact support.'
-                    : 'You can try refreshing the page or contact support if the problem persists.'}
+            {isPrismaError
+              ? 'This appears to be a database-related error. The application is trying to access the database directly from the browser, which is not allowed.'
+              : isAuthError 
+                ? 'This appears to be related to your login session. You may need to log in again.'
+                : isNetworkError
+                  ? 'It looks like you may be experiencing network connectivity issues. Please check your internet connection.'
+                  : isServerError
+                    ? 'Our servers appear to be experiencing issues. Please try again in a few moments.'
+                    : isCorsError
+                      ? 'There appears to be a security configuration issue. Please contact support.'
+                      : 'You can try refreshing the page or contact support if the problem persists.'}
           </p>
+          
+          {isPrismaError && (
+            <div className="mt-4 p-3 bg-amber-100 text-amber-800 rounded-md text-sm">
+              <strong>Technical Detail:</strong> Prisma is a server-side database ORM and cannot be used directly in the browser.
+              <p className="mt-2">This is usually caused by importing server-side code in client components. Please see the architecture guidelines.</p>
+            </div>
+          )}
         </CardContent>
         
         <CardFooter className="flex justify-end space-x-2">

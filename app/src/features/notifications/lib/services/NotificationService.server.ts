@@ -446,7 +446,8 @@ export class NotificationService extends BaseService<
    */
   fromDTO(dto: CreateNotificationDto | UpdateNotificationDto): Partial<Notification> {
     if (!dto) {
-      return null as any;
+      // Return an empty object instead of null
+      return {};
     }
     
     if ('isRead' in dto) {
@@ -478,7 +479,19 @@ export class NotificationService extends BaseService<
   
   toDTO(entity: Notification): NotificationResponseDto {
     if (!entity) {
-      return null as any;
+      // Return a default NotificationResponseDto instead of null
+      return {
+        id: 0,
+        userId: 0,
+        title: '',
+        message: '',
+        content: '',
+        type: NotificationType.INFO,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        formattedDate: new Date().toLocaleDateString()
+      };
     }
     
     // Convert dates to ISO strings first to ensure they're valid

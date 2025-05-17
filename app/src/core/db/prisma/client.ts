@@ -1,3 +1,5 @@
+// This file should only be used in server contexts
+import 'server-only';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -28,6 +30,11 @@ const createPrismaClient = () => {
     
     return new PrismaClient({
       log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL || 'postgresql://postgres.qkhermeufcstwtlyttpo:postgres@aws-0-eu-central-1.pooler.supabase.com:5432/postgres?schema=public&connection_limit=5&pool_timeout=10'
+        },
+      },
     });
   } catch (error) {
     // Avoid infinite recursion
@@ -42,24 +49,14 @@ const createPrismaClient = () => {
     console.error('Error creating Prisma client:', error);
     console.log('Attempting to fix by regenerating Prisma client...');
     
-    // This is a last-resort attempt to regenerate the client at runtime
+    // This is a last-resort message - we can't regenerate the client at runtime in the browser
     try {
-      const { execSync } = require('child_process');
-      execSync('npx prisma generate', { stdio: 'inherit' });
-      console.log('Prisma client regenerated successfully');
+      // Cannot use child_process in browser environment
+      console.error('Cannot regenerate Prisma client in the browser environment.');
+      console.error('Please run `npx prisma generate` manually in your terminal.');
       
-      // Try to clear require cache for @prisma/client
-      Object.keys(require.cache).forEach(key => {
-        if (key.includes('@prisma/client')) {
-          delete require.cache[key];
-        }
-      });
-      
-      // Re-require PrismaClient
-      const { PrismaClient: RegeneratedPrismaClient } = require('@prisma/client');
-      return new RegeneratedPrismaClient({
-        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-      });
+      // Just throw a clear error to indicate the problem
+      throw new Error('PrismaClient initialization failed. Please run `npx prisma generate` manually in your terminal.');
     } catch (regenerationError) {
       console.error('Failed to regenerate Prisma client:', regenerationError);
       throw new Error('Could not initialize or regenerate Prisma client. Please run `npx prisma generate` manually.');

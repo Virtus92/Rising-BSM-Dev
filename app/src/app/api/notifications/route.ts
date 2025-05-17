@@ -5,8 +5,10 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { NotificationFilterParamsDto } from '@/domain/dtos/NotificationDtos';
+import { UserRole } from '@/domain';
 
 /**
  * GET /api/notifications
@@ -123,7 +125,7 @@ export const POST = routeHandler(async (request: NextRequest) => {
     // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
       return formatResponse.validationError(
-        (error as any).validationErrors
+        (error).validationErrors
       );
     }
     
@@ -136,5 +138,5 @@ export const POST = routeHandler(async (request: NextRequest) => {
   // Secure this endpoint
   requiresAuth: true,
   // Restrict to admin role
-  requiredRoles: ['ADMIN']
+  requiredRole: UserRole.ADMIN
 });

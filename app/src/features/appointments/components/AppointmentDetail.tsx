@@ -7,7 +7,7 @@ import { AppointmentClient } from '@/features/appointments/lib/clients';
 import { CustomerClient } from '@/features/customers/lib/clients';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 import { Button } from '@/shared/components/ui/button';
-import { usePermissions } from '@/features/users/hooks/usePermissions';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import {
   getCustomerData,

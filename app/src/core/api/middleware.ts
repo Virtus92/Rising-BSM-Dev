@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server';
 import { AuthInfo } from './types';
 import { getItem } from '@/shared/utils/storage/cookieStorage';
+import { auth } from '@/features/auth/api/middleware/client/authMiddleware';
 
 /**
  * Helper functions for working with authentication in API requests
@@ -25,29 +26,8 @@ export const authHelpers = {
         if ((window as any).__AUTH_PROVIDER_STATE_KEY?.user?.id) {
           const user = (window as any).__AUTH_PROVIDER_STATE_KEY.user;
           return {
-            userId: user.id,
-            role: user.role,
-            name: user.name,
-            email: user.email
+            user: user
           };
-        }
-        
-        // Fall back to localStorage
-        const authDataStr = getItem('auth_user_data');
-        if (authDataStr) {
-          try {
-            const authData = JSON.parse(authDataStr);
-            if (authData && authData.id) {
-              return {
-                userId: authData.id,
-                role: authData.role,
-                name: authData.name,
-                email: authData.email
-              };
-            }
-          } catch (e) {
-            console.error('Error parsing auth data from localStorage', e);
-          }
         }
       } catch (e) {
         console.error('Error accessing auth info in client context', e);

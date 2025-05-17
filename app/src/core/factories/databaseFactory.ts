@@ -4,16 +4,15 @@
 import { PrismaClient } from '@prisma/client';
 import { prisma as prismaInstance } from '@/core/db/prisma';
 
-// Singleton instance for Prisma
-let prismaClient: PrismaClient;
+/**
+ * The shared Prisma client instance for the entire application
+ */
+let prismaClient: PrismaClient = prismaInstance;
 
 /**
  * Returns a singleton instance of PrismaClient
  */
 export function getPrismaClient(): PrismaClient {
-  if (!prismaClient) {
-    prismaClient = prismaInstance;
-  }
   return prismaClient;
 }
 
@@ -21,15 +20,18 @@ export function getPrismaClient(): PrismaClient {
  * Resets the Prisma instance (mainly for testing)
  */
 export function resetPrismaClient(): void {
-  prismaClient = undefined as any;
-  DatabaseFactory.instance = undefined as any;
+  if (prismaClient) {
+    prismaClient.$disconnect();
+  }
+  prismaClient = prismaInstance;
+  DatabaseFactory.instance = undefined;
 }
 
 /**
  * Database Factory class for centralized database access
  */
 export class DatabaseFactory {
-  static instance: DatabaseFactory;
+  static instance: DatabaseFactory | undefined = undefined;
 
   private constructor() {}
 

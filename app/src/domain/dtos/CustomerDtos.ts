@@ -294,17 +294,18 @@ export interface CustomerResponseDto extends BaseResponseDto {
    * Type-Label für die Anzeige
    */
   typeLabel?: string;
+  
+  /**
+   * Zugehörige Termine
+   * @typedef {import('./AppointmentDtos').AppointmentResponseDto}
+   */
+  appointments?: import('./AppointmentDtos').AppointmentResponseDto[];
 }
 
 /**
  * DTO für detaillierte Kundeninformationen
  */
 export interface CustomerDetailResponseDto extends CustomerResponseDto {
-  /**
-   * Zugehörige Termine
-   */
-  appointments?: any[];
-  
   /**
    * Aktivitätsprotokoll
    */

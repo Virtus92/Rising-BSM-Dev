@@ -2,18 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AppointmentClient } from '@/features/appointments/lib/clients/AppointmentClient';
-import { CustomerService } from '@/features/customers/lib/services/CustomerService';
+import { CustomerService } from '@/features/customers/lib/services/CustomerService.client';
 import { AppointmentDto } from '@/domain/dtos/AppointmentDtos';
-import { usePermissions } from '@/features/users/hooks/usePermissions';
-import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { PermissionError } from '@/features/users/hooks/usePermissions';
-
-// Define response type interface
-interface AppointmentResponseData {
-  appointments?: AppointmentDto[];
-  data?: AppointmentDto[];
-  [key: string]: any;
-}
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import AuthService from '@/features/auth/core/AuthService';
 
 // Define appointment with customer type
 interface AppointmentWithCustomer extends AppointmentDto {
@@ -26,10 +18,14 @@ interface AppointmentWithCustomer extends AppointmentDto {
   };
 }
 
+/**
+ * Custom hook for loading and managing upcoming appointments
+ */
 export const useUpcomingAppointments = () => {
   const [appointments, setAppointments] = useState<AppointmentWithCustomer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   // Use ref to track if component is mounted
   const isMountedRef = useRef(true);
@@ -38,8 +34,8 @@ export const useUpcomingAppointments = () => {
   const isFetchingRef = useRef(false);
   
   // Get permissions from the auth hooks
-  const { hasPermission, isLoading: isLoadingPermissions } = usePermissions();
-
+  const permissionsData = usePermissions();
+  
   // Helper function to load customer data
   const loadCustomerData = async (customerId: number) => {
     try {
@@ -58,399 +54,210 @@ export const useUpcomingAppointments = () => {
       return null;
     }
   };
-
-  // Effect for loading appointments data initially
-  useEffect(() => {
-    // Set mounted flag on component mount
-    isMountedRef.current = true;
-    
-    // Wait for permissions to load before proceeding
-    if (isLoadingPermissions) {
-      console.log('Waiting for permissions to load before fetching appointments');
+  
+  // Function to fetch appointments with proper error handling
+  const fetchAppointmentsWithErrorHandling = useCallback(async () => {
+    // Skip if already fetching or component unmounted
+    if (isFetchingRef.current || !isMountedRef.current) {
       return;
     }
     
-    // Use try/catch with error boundary to handle permission check
     try {
-      // Check if the user has the required permission
-      if (!hasPermission(SystemPermission.APPOINTMENTS_VIEW)) {
-        console.log('User lacks permission to view upcoming appointments');
-        if (isMountedRef.current) {
-          setError('You do not have permission to view appointments.');
-          setIsLoading(false);
-        }
-        return;
-      }
-      
-      const fetchUpcomingAppointments = async () => {
-      // Skip if already fetching
-      if (isFetchingRef.current) {
-        console.log('Already fetching appointments data, skipping duplicate request');
-        return;
-      }
-      
-      // Set fetching flag
+      // Mark as fetching
       isFetchingRef.current = true;
       
-      try {
-        if (isMountedRef.current) {
-          setIsLoading(true);
-          setError(null); // Clear any previous errors
-        }
-        
-        // First try the dedicated upcoming endpoint
-        try {
-          // Try primary endpoint
-          const response = await AppointmentClient.getUpcomingAppointments(5);
-          // Process response
-          
-          if (response.success) {
-            // Ensure data is an array with proper type handling
-            const responseData = response.data as AppointmentResponseData | AppointmentDto[];
-            const appointmentData: AppointmentDto[] = Array.isArray(responseData) ? responseData :
-                                 responseData && Array.isArray(responseData.appointments) ? responseData.appointments :
-                                 responseData && Array.isArray(responseData.data) ? responseData.data :
-                                 [];
-            
-            // Process appointments with customer data
-            const processedAppointments = await Promise.all(
-              appointmentData.map(async (appt: AppointmentWithCustomer) => {
-                // Ensure we have customerName if we have customer object but no customerName
-                if (!appt.customerName && appt.customer && appt.customer.name) {
-                  return { ...appt, customerName: appt.customer.name };
-                }
-                // If we have customerId but no customer object or name, try to load it
-                if (appt.customerId && !appt.customerName && (!appt.customer || !appt.customer.name)) {
-                  const customerData = await loadCustomerData(appt.customerId);
-                  if (customerData) {
-                    return { 
-                      ...appt, 
-                      customerName: customerData.name,
-                      customer: customerData
-                    };
-                  }
-                  return { ...appt, customerName: `Customer ${appt.customerId}` };
-                }
-                return appt;
-              })
-            );
-            
-            // Set processed appointments (only if still mounted)
-            if (isMountedRef.current) {
-              setAppointments(processedAppointments);
-              setIsLoading(false);
-            }
-            return;
-          } else {
-            console.warn('Primary endpoint returned unsuccessful response');
-          }
-        } catch (upcomingError) {
-          console.warn('Upcoming appointments endpoint failed with error:', upcomingError);
-          // Log full error details in development for easier debugging
-          if (process.env.NODE_ENV === 'development') {
-            console.error('Detailed error:', upcomingError);
-          }
-        }
-        
-        // Fallback to regular appointments endpoint with date filters
-        try {
-          const today = new Date();
-          const nextWeek = new Date();
-          nextWeek.setDate(today.getDate() + 7);
-          
-          const params = {
-            startDate: today.toISOString().split('T')[0],
-            endDate: nextWeek.toISOString().split('T')[0],
-            limit: 5,
-            sortBy: 'appointmentDate',
-            sortDirection: 'asc'
-          };
-          
-          // Prepare fallback request
-          const fallbackResponse = await AppointmentClient.getAppointments(params);
-          
-          if (fallbackResponse.success) {
-            const data = fallbackResponse.data;
-            const appointmentData = Array.isArray(data) ? data :
-                               data && 'data' in data && Array.isArray((data as any).data) ? (data as any).data :
-                               [];
-            
-            // Process appointments with customer data
-            const processedAppointments = await Promise.all(
-              appointmentData.map(async (appt: AppointmentWithCustomer) => {
-                // Ensure we have customerName if we have customer object but no customerName
-                if (!appt.customerName && appt.customer && appt.customer.name) {
-                  return { ...appt, customerName: appt.customer.name };
-                }
-                // If we have customerId but no customer object or name, try to load it
-                if (appt.customerId && !appt.customerName && (!appt.customer || !appt.customer.name)) {
-                  const customerData = await loadCustomerData(appt.customerId);
-                  if (customerData) {
-                    return { 
-                      ...appt, 
-                      customerName: customerData.name,
-                      customer: customerData
-                    };
-                  }
-                  return { ...appt, customerName: `Customer ${appt.customerId}` };
-                }
-                return appt;
-              })
-            );
-            
-            // Only update state if still mounted
-            if (isMountedRef.current) {
-              setAppointments(processedAppointments);
-              setError(null);
-            }
-          } else {
-            const errorMsg = fallbackResponse.message || 'Failed to fetch upcoming appointments';
-            console.error('Fallback endpoint failed:', errorMsg);
-            
-            // Only update state if still mounted
-            if (isMountedRef.current) {
-              setError(errorMsg);
-            }
-          }
-        } catch (fallbackError) {
-          console.error('Critical error in fallback fetch:', fallbackError);
-          
-          // Only update state if still mounted
-          if (isMountedRef.current) {
-            setError('Unable to load appointments data. Please try again later.');
-          }
-        }
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred while fetching appointments';
-        console.error('Critical error in appointments fetch:', errorMsg, error);
-        
-        // Only update state if still mounted
-        if (isMountedRef.current) {
-          setError(`Data fetching error: ${errorMsg}`);
-        }
-      } finally {
-        // Only update state if still mounted
-        if (isMountedRef.current) {
-          setIsLoading(false);
-        }
-        
-        // Reset fetching flag with slight delay to avoid rapid consecutive calls
-        setTimeout(() => {
-          isFetchingRef.current = false;
-        }, 200);
-      }
-    };
-
-    fetchUpcomingAppointments();
-    
-    // Set up refresh interval - 5 minutes
-    const interval = setInterval(() => {
-      // Only refresh if component is still mounted and not already fetching
-      if (isMountedRef.current && !isFetchingRef.current) {
-        fetchUpcomingAppointments();
-      }
-    }, 5 * 60 * 1000);
-    
-    // Cleanup on unmount
-    return () => {
-      clearInterval(interval);
-      isMountedRef.current = false;
-    };
-    } catch (error) {
-      // Handle permission errors gracefully
-      if (error instanceof PermissionError) {
-        console.error('Permission error in UpcomingAppointments:', error.message);
-        if (isMountedRef.current) {
-          setError('Permission error: ' + error.message);
-          setIsLoading(false);
-        }
-      } else {
-        // Unexpected errors should still be thrown for error boundaries
-        console.error('Unexpected error in useUpcomingAppointments:', error);
-        throw error;
-      }
-    }
-  }, [isLoadingPermissions, hasPermission]); // Only re-run when permissions loading state changes
-
-  // Function to manually refresh data
-  const refreshAppointments = async () => {
-    // Skip if already fetching
-    if (isFetchingRef.current) {
-      console.log('Already fetching appointments data, skipping manual refresh');
-      return;
-    }
-    
-    // Skip if component unmounted
-    if (!isMountedRef.current) {
-      console.log('Component unmounted, skipping refresh');
-      return;
-    }
-    
-    // Handle permission check with proper error handling
-    try {
-      // Check if user has permission
-      if (!hasPermission(SystemPermission.APPOINTMENTS_VIEW)) {
-        if (isMountedRef.current) {
-          setError('You do not have permission to view appointments.');
-          setIsLoading(false);
-        }
-        return;
-      }
-      
-      // Set fetching flag
-      isFetchingRef.current = true;
-    
-    try {
-      // Only update state if still mounted
       if (isMountedRef.current) {
         setIsLoading(true);
-        setError(null); // Clear previous errors
+        setError(null);
       }
       
-      // Try using the upcoming endpoint first
-      try {
-        const response = await AppointmentClient.getUpcomingAppointments(5);
-        
-        if (response.success) {
-          const responseData = response.data as AppointmentResponseData | AppointmentDto[];
-          const appointmentData: AppointmentDto[] = Array.isArray(responseData) ? responseData :
-                               responseData && Array.isArray(responseData.appointments) ? responseData.appointments :
-                               responseData && Array.isArray(responseData.data) ? responseData.data :
-                               [];
-          
-          // Process appointments with customer data
-          const processedAppointments = await Promise.all(
-            appointmentData.map(async (appt: AppointmentWithCustomer) => {
-              // Ensure we have customerName if we have customer object but no customerName
-              if (!appt.customerName && appt.customer && appt.customer.name) {
-                return { ...appt, customerName: appt.customer.name };
-              }
-              // If we have customerId but no customer object or name, try to load it
-              if (appt.customerId && !appt.customerName && (!appt.customer || !appt.customer.name)) {
-                const customerData = await loadCustomerData(appt.customerId);
-                if (customerData) {
-                  return { 
-                    ...appt, 
-                    customerName: customerData.name,
-                    customer: customerData
-                  };
-                }
-                return { ...appt, customerName: `Customer ${appt.customerId}` };
-              }
-              return appt;
-            })
-          );
-          
-          // Only update state if still mounted
-          if (isMountedRef.current) {
-            setAppointments(processedAppointments);
-            setError(null);
-          }
-          return;
-        } else {
-          console.warn('Refresh: Primary endpoint returned unsuccessful response');
-        }
-      } catch (upcomingError) {
-        console.warn('Refresh: Upcoming appointments endpoint failed:', upcomingError);
-      }
-      
-      // Fallback to regular appointments with date filters
-      try {
-        const today = new Date();
-        const nextWeek = new Date();
-        nextWeek.setDate(today.getDate() + 7);
-        
-        const params = {
-          startDate: today.toISOString().split('T')[0],
-          endDate: nextWeek.toISOString().split('T')[0],
-          limit: 5,
-          sortBy: 'appointmentDate',
-          sortDirection: 'asc'
-        };
-        
-        const fallbackResponse = await AppointmentClient.getAppointments(params);
-        
-        if (fallbackResponse.success) {
-          const data = fallbackResponse.data;
-          const appointmentData = Array.isArray(data) ? data :
-                             data && 'data' in data && Array.isArray((data as any).data) ? (data as any).data :
-                             [];
-          
-          // Process appointments with customer data
-          const processedAppointments = await Promise.all(
-            appointmentData.map(async (appt: AppointmentWithCustomer) => {
-              // Ensure we have customerName if we have customer object but no customerName
-              if (!appt.customerName && appt.customer && appt.customer.name) {
-                return { ...appt, customerName: appt.customer.name };
-              }
-              // If we have customerId but no customer object or name, try to load it
-              if (appt.customerId && !appt.customerName && (!appt.customer || !appt.customer.name)) {
-                const customerData = await loadCustomerData(appt.customerId);
-                if (customerData) {
-                  return { 
-                    ...appt, 
-                    customerName: customerData.name,
-                    customer: customerData
-                  };
-                }
-                return { ...appt, customerName: `Customer ${appt.customerId}` };
-              }
-              return appt;
-            })
-          );
-          
-          // Only update state if still mounted
-          if (isMountedRef.current) {
-            setAppointments(processedAppointments);
-            setError(null);
-          }
-        } else {
-          const errorMsg = fallbackResponse.message || 'Failed to refresh upcoming appointments';
-          console.error('Refresh: Fallback endpoint failed:', errorMsg);
-          
-          // Only update state if still mounted
-          if (isMountedRef.current) {
-            setError(`Refresh failed: ${errorMsg}`);
-          }
-        }
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred while refreshing';
-        console.error('Refresh: Critical error:', errorMsg, error);
-        
-        // Only update state if still mounted
+      // First check if we're authenticated at all
+      const isUserAuthenticated = await AuthService.isAuthenticated();
+      if (!isUserAuthenticated) {
         if (isMountedRef.current) {
-          setError(`Refresh error: ${errorMsg}`);
+          setIsAuthenticated(false);
+          setError('Authentication required. Please reload the page or log in again.');
+          setIsLoading(false);
+          setAppointments([]);
         }
+        return;
+      }
+      
+      // Make the API call
+      const response = await AppointmentClient.getUpcomingAppointments(5);
+      
+      // Handle authentication errors
+      if (response.statusCode === 401 || response.statusCode === 403 || 
+          response.code === 'AUTHENTICATION_REQUIRED' || response.code === 'PERMISSION_DENIED') {
+        if (isMountedRef.current) {
+          setIsAuthenticated(false);
+          setError('Authentication required. Please reload the page or log in again.');
+          setIsLoading(false);
+          setAppointments([]);
+        }
+        return;
+      }
+      
+      if (response.success && isMountedRef.current) {
+        // Extract appointment data
+        let appointmentData: AppointmentDto[] = [];
+        const responseData = response.data;
+        
+        // Process the response based on its structure
+        if (responseData) {
+          if (Array.isArray(responseData)) {
+            appointmentData = responseData;
+          } else if (typeof responseData === 'object') {
+            if (Array.isArray(responseData.appointments)) {
+              appointmentData = responseData.appointments;
+            } else if (Array.isArray(responseData.data)) {
+              appointmentData = responseData.data;
+            }
+          }
+        }
+        
+        // Process appointments with customer data
+        const processedAppointments = await Promise.all(
+          appointmentData.map(async (appt: AppointmentWithCustomer) => {
+            // Use existing customer name if available
+            if (appt.customer?.name) {
+              return { ...appt, customerName: appt.customer.name };
+            }
+            
+            // Load customer data if needed
+            if (appt.customerId && !appt.customerName) {
+              try {
+                const customerData = await loadCustomerData(appt.customerId);
+                if (customerData) {
+                  return { 
+                    ...appt, 
+                    customerName: customerData.name,
+                    customer: customerData
+                  };
+                }
+              } catch (err) {
+                // Fail gracefully with placeholder
+                console.warn(`Error loading customer data for ${appt.customerId}`, err);
+              }
+              return { ...appt, customerName: `Customer ${appt.customerId}` };
+            }
+            
+            return appt;
+          })
+        );
+        
+        if (isMountedRef.current) {
+          setAppointments(processedAppointments);
+          setIsLoading(false);
+          setIsAuthenticated(true);
+        }
+      } else {
+        if (isMountedRef.current) {
+          setError(response.error || response.message || 'Failed to load appointments');
+          setIsLoading(false);
+          setAppointments([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error in appointments fetch:', error);
+      if (isMountedRef.current) {
+        setError('Error loading appointments: ' + (error instanceof Error ? error.message : String(error)));
+        setIsLoading(false);
+        setAppointments([]);
       }
     } finally {
-      // Only update state if still mounted
       if (isMountedRef.current) {
         setIsLoading(false);
       }
       
-      // Reset fetching flag with small delay
-      setTimeout(() => {
-        isFetchingRef.current = false;
-      }, 200);
+      // Reset fetching flag immediately instead of with timeout
+      isFetchingRef.current = false;
     }
-    } catch (permError) {
-      // Handle permission errors gracefully
-      if (permError instanceof PermissionError) {
-        console.error('Permission error during refresh:', permError.message);
-        if (isMountedRef.current) {
-          setError('Permission error: ' + permError.message);
+  }, []);
+
+  // Setup event listeners for authentication and initialization
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    // Track event listeners for cleanup
+    const handleAuthRequired = () => {
+      if (isMountedRef.current) {
+        setIsAuthenticated(false);
+        setError('Authentication required. Please log in again.');
+        setIsLoading(false);
+      }
+    };
+    
+    const handleAuthStateChange = (event: CustomEvent) => {
+      if (isMountedRef.current && event.detail?.isAuthenticated === true) {
+        // Retry fetching when authentication is restored
+        fetchAppointmentsWithErrorHandling();
+      }
+    };
+    
+    // Add event listeners
+    window.addEventListener('auth-required', handleAuthRequired);
+    window.addEventListener('auth-state-change', handleAuthStateChange as EventListener);
+    
+    // Check authentication state immediately
+    AuthService.isAuthenticated().then(isAuthed => {
+      if (isMountedRef.current) {
+        setIsAuthenticated(isAuthed);
+        if (!isAuthed) {
+          setError('Authentication required. Please log in again.');
           setIsLoading(false);
-        }
-      } else {
-        // Unexpected permission-related errors should be logged but not crash the app
-        console.error('Unexpected error during permission check:', permError);
-        if (isMountedRef.current) {
-          setError('Error checking permissions');
-          setIsLoading(false);
+        } else {
+          // Only fetch if authenticated
+          fetchAppointmentsWithErrorHandling();
         }
       }
+    }).catch(() => {
+      // On error, try to fetch anyway in case it's just an auth check issue
+      if (isMountedRef.current) {
+        fetchAppointmentsWithErrorHandling();
+      }
+    });
+    
+    // Setup refresh interval only if authenticated
+    let refreshIntervalId: NodeJS.Timeout | null = null;
+    if (isAuthenticated) {
+      refreshIntervalId = setInterval(() => {
+        if (isMountedRef.current && !isFetchingRef.current && isAuthenticated) {
+          fetchAppointmentsWithErrorHandling();
+        }
+      }, 5 * 60 * 1000); // Refresh every 5 minutes
     }
-  };
+    
+    // Cleanup
+    return () => {
+      isMountedRef.current = false;
+      window.removeEventListener('auth-required', handleAuthRequired);
+      window.removeEventListener('auth-state-change', handleAuthStateChange as EventListener);
+      if (refreshIntervalId) {
+        clearInterval(refreshIntervalId);
+      }
+    };
+  }, [fetchAppointmentsWithErrorHandling, isAuthenticated]);
 
-  return { appointments, isLoading, error, refreshAppointments };
+  // Function to manually refresh data with proper auth check
+  const refreshAppointments = useCallback(() => {
+    if (!isAuthenticated) {
+      setError('Cannot refresh - authentication required');
+      return;
+    }
+    
+    if (isFetchingRef.current || !isMountedRef.current) {
+      return;
+    }
+    
+    fetchAppointmentsWithErrorHandling();
+  }, [fetchAppointmentsWithErrorHandling, isAuthenticated]);
+
+  return { 
+    appointments, 
+    isLoading, 
+    error, 
+    refreshAppointments,
+    isAuthenticated
+  };
 };

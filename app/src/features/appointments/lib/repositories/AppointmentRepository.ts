@@ -7,7 +7,9 @@ import { AppointmentFilterParamsDto } from '@/domain/dtos/AppointmentDtos';
 import { ILoggingService } from '@/core/logging/ILoggingService';
 import { IErrorHandler } from '@/core/errors/';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
-import { AppointmentStatus, LogActionType } from '@/domain/enums/CommonEnums';
+import { AppointmentStatus, CommonStatus, CustomerType, LogActionType } from '@/domain/enums/CommonEnums';
+import { createCustomerEntity, createAppointmentEntity } from '@/domain/utils/entityFactory';
+import { getValidEnumValue, getValidAppointmentStatus, getValidStatus, getValidCustomerType } from '@/domain/utils/enumUtils';
 
 /**
  * Implementation of AppointmentRepository
@@ -125,13 +127,15 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
         
         // Add customer data if loaded
         if (entity.customer) {
-          (domainEntity as any).customerName = entity.customer.name;
-          (domainEntity as any).customer = {
+          (domainEntity).customerName = entity.customer.name;
+          (domainEntity).customer = createCustomerEntity({
             id: entity.customer.id,
             name: entity.customer.name,
             email: entity.customer.email,
-            phone: entity.customer.phone
-          };
+            phone: entity.customer.phone,
+            status: CommonStatus.ACTIVE,
+            type: CustomerType.INDIVIDUAL
+          });
         }
         
         return domainEntity;
@@ -181,12 +185,14 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
       });
       
       if (customer) {
-        return {
+        return createCustomerEntity({
           id: customer.id,
           name: customer.name || `Customer ${customer.id}`,
-          email: customer.email,
-          phone: customer.phone
-        };
+          email: customer.email || undefined,
+          phone: customer.phone || undefined,
+          status: CommonStatus.ACTIVE,
+          type: CustomerType.INDIVIDUAL
+        });
       }
       
       return null;
@@ -278,8 +284,8 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
           if (appointment.customerId) {
             const customerData = await this.loadCustomerData(appointment.customerId);
             if (customerData) {
-              (appointmentEntity as any).customerName = customerData.name;
-              (appointmentEntity as any).customer = customerData;
+              (appointmentEntity).customerName = customerData.name;
+              (appointmentEntity).customer = customerData;
             }
           }
           
@@ -323,8 +329,8 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
           if (appointment.customerId) {
             const customerData = await this.loadCustomerData(appointment.customerId);
             if (customerData) {
-              (appointmentEntity as any).customerName = customerData.name;
-              (appointmentEntity as any).customer = customerData;
+              (appointmentEntity).customerName = customerData.name;
+              (appointmentEntity).customer = customerData;
             }
           }
           
@@ -400,10 +406,8 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
           if (appointment.customerId) {
             const customerData = await this.loadCustomerData(appointment.customerId);
             if (customerData) {
-              (appointmentEntity as any).customerName = customerData.name;
-              (appointmentEntity as any).customer = customerData;
-            } else {
-              throw new Error(`Customer data not found for ID ${appointment.customerId}`);
+              (appointmentEntity).customerName = customerData.name;
+              (appointmentEntity).customer = customerData;
             }
           }
           
@@ -530,14 +534,27 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
         appointments.map(async (appointment) => {
           const appointmentEntity = this.mapToDomainEntity(appointment);
           
-          // Load customer data if available
-          if (appointment.customerId) {
-            const customerData = await this.loadCustomerData(appointment.customerId);
-            if (customerData) {
-              (appointmentEntity as any).customerName = customerData.name;
-              (appointmentEntity as any).customer = customerData;
-            } else {
-              throw new Error(`Customer data not found for ID ${appointment.customerId}`);
+          // Load customer data if available - with proper type guard
+          if (appointment.customer && typeof appointment.customer === 'object' && !Array.isArray(appointment.customer)) {
+            // Ensure the customer object has the required properties
+            if ('id' in appointment.customer) {
+              const customerId = appointment.customerId || 0;
+              const customer = appointment.customer as Record<string, any> || {};
+              const hasName = 'name' in customer && typeof customer.name === 'string';
+              const hasEmail = 'email' in customer && typeof customer.email === 'string';
+              const hasPhone = 'phone' in customer && typeof customer.phone === 'string';
+              
+              const customerData = createCustomerEntity({
+                id: 'id' in customer ? Number(customer.id) : customerId,
+                name: hasName ? customer.name : `Customer ${customerId}`,
+                email: hasEmail ? customer.email : undefined,
+                phone: hasPhone ? customer.phone : undefined,
+                status: CommonStatus.ACTIVE,
+                type: CustomerType.INDIVIDUAL
+              });
+              
+              (appointmentEntity).customerName = customerData.name;
+              (appointmentEntity).customer = customerData;
             }
           }
           
@@ -578,9 +595,7 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
   async updateStatus(id: number | string, status: string, updatedBy?: number): Promise<Appointment> {
     try {
       // Validate the status
-      if (!Object.values(AppointmentStatus).includes(status as AppointmentStatus)) {
-        throw this.errorHandler.createValidationError(`Invalid status: ${status}`);
-      }
+      const validStatus = getValidAppointmentStatus(status);
       
       // We need to ensure the ID is numeric for Prisma
       const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
@@ -597,7 +612,7 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
       const updatedAppointment = await this.prisma.appointment.update({
         where: { id: prismaId },
         data: {
-          status: status as AppointmentStatus,
+          status: validStatus,
           updatedAt: new Date(),
           // updatedBy field is omitted as it doesn't exist in the schema
         }
@@ -607,7 +622,7 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
       await this.logActivity(
         updatedBy || 0,
         LogActionType.CHANGE_STATUS,
-        `Appointment status changed to ${status}`,
+        `Appointment status changed to ${validStatus}`,
         undefined
       );
       
@@ -618,8 +633,8 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
       if (updatedAppointment.customerId) {
         const customerData = await this.loadCustomerData(updatedAppointment.customerId);
         if (customerData) {
-          (appointmentEntity as any).customerName = customerData.name;
-          (appointmentEntity as any).customer = customerData;
+          (appointmentEntity).customerName = customerData.name;
+          (appointmentEntity).customer = customerData;
         }
       }
       
@@ -678,17 +693,15 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
       if (appointment.customerId) {
         const customerData = await this.loadCustomerData(appointment.customerId);
         if (customerData) {
-          (appointmentEntity as any).customer = customerData;
+          (appointmentEntity).customer = customerData;
           // Ensure customerName is also set for consistency
-          (appointmentEntity as any).customerName = customerData.name;
-        } else {
-          throw new Error(`Customer data not found for ID ${appointment.customerId}`);
+          (appointmentEntity).customerName = customerData.name;
         }
       }
       
       // Separately load notes
       const notes = await this.findNotes(prismaId);
-      (appointmentEntity as any).notes = notes;
+      (appointmentEntity).notes = notes;
       
       return appointmentEntity;
     } catch (error) {
@@ -847,7 +860,8 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
         userId, 
         actionType 
       });
-      return null;
+      // Return an empty object instead of null
+      return {};
     }
   }
 
@@ -859,7 +873,7 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
    */
   protected mapToDomainEntity(ormEntity: any): Appointment {
     if (!ormEntity) {
-      return null as any;
+      throw new Error('Cannot map null or undefined ORM entity to Appointment');
     }
     
     // Enhanced error handling for malformed date
@@ -870,9 +884,13 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
         appointmentDate = ormEntity.appointmentDate;
       } else if (typeof ormEntity.appointmentDate === 'string') {
         appointmentDate = new Date(ormEntity.appointmentDate);
-        throw new Error('Invalid date format');
       } else {
         throw new Error('Invalid date type');
+      }
+      
+      // Validate the date is valid
+      if (isNaN(appointmentDate.getTime())) {
+        throw new Error('Invalid date format');
       }
     } catch (error) {
       this.logger.error(`Error parsing appointment date: ${ormEntity.appointmentDate}`, {
@@ -882,30 +900,49 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
       appointmentDate = new Date(); // Default to current date
     }
     
-    const appointment = new Appointment({
-      id: ormEntity.id,
-      title: ormEntity.title || 'Untitled Appointment',
-      customerId: ormEntity.customerId,
-      appointmentDate: appointmentDate,
-      duration: ormEntity.duration || 60, // Default to 60 minutes if not specified
-      location: ormEntity.location,
-      description: ormEntity.description,
-      status: ormEntity.status || AppointmentStatus.PLANNED, // Default to PLANNED if not specified
-      createdAt: ormEntity.createdAt ? new Date(ormEntity.createdAt) : new Date(),
-      updatedAt: ormEntity.updatedAt ? new Date(ormEntity.updatedAt) : new Date(),
-      createdBy: ormEntity.createdBy,
-      updatedBy: ormEntity.updatedBy
+    // Validate the status using our enum utility
+    const status = getValidAppointmentStatus(ormEntity.status);
+    
+    const appointment = createAppointmentEntity({
+    id: ormEntity.id,
+    title: ormEntity.title || 'Untitled Appointment',
+    customerId: ormEntity.customerId,
+    appointmentDate: appointmentDate,
+    duration: ormEntity.duration || 60, // Default to 60 minutes if not specified
+    location: ormEntity.location === null ? undefined : ormEntity.location,
+    description: ormEntity.description === null ? undefined : ormEntity.description,
+    status: status,
+    createdAt: ormEntity.createdAt ? new Date(ormEntity.createdAt) : new Date(),
+    updatedAt: ormEntity.updatedAt ? new Date(ormEntity.updatedAt) : new Date(),
+    createdBy: ormEntity.createdBy,
+    updatedBy: ormEntity.updatedBy
     });
     
-    // Add customer information if available
-    if (ormEntity.customer) {
-      (appointment as any).customerName = ormEntity.customer.name || `Customer ${ormEntity.customerId}`;
-      (appointment as any).customer = {
-        id: ormEntity.customer.id,
-        name: ormEntity.customer.name || `Customer ${ormEntity.customerId}`,
-        email: ormEntity.customer.email,
-        phone: ormEntity.customer.phone
-      };
+    // Add customer information if available - with proper type guard
+    if (ormEntity.customer && typeof ormEntity.customer === 'object' && !Array.isArray(ormEntity.customer)) {
+      // Access customer as an indexed type to avoid 'never' type issues
+      const customer = ormEntity.customer as Record<string, any>;
+      
+      // Verify that customer has required properties
+      if ('id' in customer) {
+        // Safe access to customer properties
+        const customerId = ormEntity.customerId || 0;
+        const hasName = 'name' in customer && typeof customer.name === 'string';
+        const hasEmail = 'email' in customer && typeof customer.email === 'string';
+        const hasPhone = 'phone' in customer && typeof customer.phone === 'string';
+        
+        const customerName = hasName ? customer.name : `Customer ${customerId}`;
+        
+        (appointment).customerName = customerName;
+        (appointment).customer = createCustomerEntity({
+          id: Number(customer.id),
+          name: customerName,
+          email: hasEmail ? customer.email : undefined,
+          phone: hasPhone ? customer.phone : undefined,
+          status: CommonStatus.ACTIVE,
+          type: CustomerType.INDIVIDUAL
+        });
+      }
     }
     
     return appointment;
@@ -928,7 +965,12 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
     if (domainEntity.duration !== undefined) result.duration = domainEntity.duration;
     if (domainEntity.location !== undefined) result.location = domainEntity.location;
     if (domainEntity.description !== undefined) result.description = domainEntity.description;
-    if (domainEntity.status !== undefined) result.status = domainEntity.status;
+    
+    // Use enum validation for status
+    if (domainEntity.status !== undefined) {
+      result.status = getValidAppointmentStatus(domainEntity.status);
+    }
+    
     if (domainEntity.createdBy !== undefined) result.createdBy = domainEntity.createdBy;
     // updatedBy is omitted as it doesn't exist in the database schema
     
@@ -968,8 +1010,8 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
           if (appointment.customerId) {
             const customerData = await this.loadCustomerData(appointment.customerId);
             if (customerData) {
-              (appointmentEntity as any).customerName = customerData.name;
-              (appointmentEntity as any).customer = customerData;
+              (appointmentEntity).customerName = customerData.name;
+              (appointmentEntity).customer = customerData;
             }
           }
           

@@ -4,36 +4,67 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { ErrorResponse, SuccessResponse } from '@/core/errors/types/ApiTypes';
+import { MiddlewareFunction } from './server/route-handler';
+import { UserRole } from '@/domain/entities/User';
+
+/**
+ * Standardized API response structure
+ */
+export interface ApiResponse<T = any> {
+  /**
+   * Whether the request was successful
+   */
+  success: boolean;
+  
+  /**
+   * Response data (only present on success)
+   */
+  data: T | null;
+  
+  /**
+   * Error information (only present on failure)
+   */
+  error: string | null;
+  
+  /**
+   * Optional status code
+   */
+  statusCode?: number;
+  
+  /**
+   * @deprecated Use error property instead
+   */
+  message?: string;
+}
 
 /**
  * Auth information added to request by middleware
  */
 export interface AuthInfo {
   /**
-   * User ID
+   * User object
    */
-  userId: number;
-  
-  /**
-   * User role
-   */
-  role?: string;
-  
-  /**
-   * User name
-   */
-  name?: string;
-  
-  /**
-   * User email
-   */
-  email?: string;
-  
-  /**
-   * Token expiration timestamp
-   */
-  exp?: number;
+  user: {
+    /**
+     * User ID
+     */
+    id: number;
+    
+    /**
+     * User role
+     */
+    role?: string;
+    
+    /**
+     * User name
+     */
+    name?: string;
+    
+    /**
+     * User email
+     */
+    email: string;
+  };
 }
 
 /**
@@ -46,31 +77,43 @@ export interface RouteHandlerOptions {
   requiresAuth?: boolean;
   
   /**
-   * Required roles for accessing this route
+   * Required role for accessing this route (single role)
    */
-  requiredRoles?: string[];
+  requiredRole?: UserRole | UserRole[];
   
   /**
-   * Legacy alias for requiredRoles (for backward compatibility)
+   * Required permissions for accessing this route
    */
-  requiresRole?: string[];
+  requiredPermission?: string | string[];
   
   /**
    * Whether to skip the default error handler
    */
   skipErrorHandler?: boolean;
   
-  /** Required permission */
-  requiredPermission?: string | string[];
-  
   /**
-   * Whether to include detailed error information
+   * Custom middleware to apply to the route
    */
-  detailedErrors?: boolean;
+  middleware?: MiddlewareFunction[];
 }
 
 /**
  * Route handler type
  * Ensures consistent response types
  */
-export type RouteHandler<T = any> = (request: NextRequest, ...args: any[]) => Promise<NextResponse<ErrorResponse | SuccessResponse<T>>>;
+export type RouteHandler<T = any> = (request: NextRequest, ...args: any[]) => Promise<NextResponse<ApiResponse<T>>>;
+
+/**
+ * API request error class for standardized error handling
+ */
+export class ApiRequestError extends Error {
+  public statusCode: number;
+  public data: any;
+  
+  constructor(message: string, statusCode: number = 500, data: any = null) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.statusCode = statusCode;
+    this.data = data;
+  }
+}

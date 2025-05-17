@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/features/auth/api/middleware/authMiddleware';
 import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { formatResponse } from '@/core/errors/formatting/response-formatter';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { INotificationService } from '@/domain/services/INotificationService';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { CreateNotificationRequest } from '../models/notification-request-models';
@@ -12,19 +13,13 @@ import { CreateNotificationRequest } from '../models/notification-request-models
  * @param request - Next.js request object
  * @returns Response with created notification
  */
-export async function POST(request: Request) {
-  try {
-    // Authenticate user
-    const authResult = await auth(request);
-    if (!authResult.success) {
-    return formatResponse.error(authResult.message || 'Authentication required', authResult.status || 401);
-    }
-
-    // Check permissions
-    const hasPermission = await permissionMiddleware.checkPermission(request as NextRequest, [SystemPermission.NOTIFICATIONS_CREATE]);
-    if (!hasPermission.success) {
-    return formatResponse.error('You do not have permission to create notifications', 403);
-    }
+export const POST = auth(
+  async (request: NextRequest, user) => {
+    try {
+      // User is already authenticated through the auth middleware
+      if (!user) {
+        return formatResponse.error('Authentication failed', 401);
+      }
 
     // Parse request body
     const data: CreateNotificationRequest = await request.json();
@@ -41,13 +36,22 @@ export async function POST(request: Request) {
     // Create notification
     const notification = await notificationService.create(data, {
       context: {
-        userId: authResult.user?.id
+        userId: user.id
       }
     });
 
     // Return formatted response
     return formatResponse.success(notification, 'Notification created successfully', 201);
   } catch (error) {
-    return formatResponse.error('An error occurred while creating the notification', 500);
+    console.error('Error creating notification:', error);
+    return formatResponse.error(
+      error instanceof Error ? error.message : 'An error occurred while creating the notification', 
+      500
+    );
   }
-}
+},
+// Auth middleware options
+{
+  requireAuth: true,
+  requiredPermission: [SystemPermission.NOTIFICATIONS_CREATE]
+});

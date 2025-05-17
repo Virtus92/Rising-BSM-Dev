@@ -62,7 +62,7 @@ export default function PermissionsPage() {
         });
         
         if (allPerms.success && allPerms.data) {
-          const permCodes = allPerms.data.data.map((p: any) => p.code);
+          const permCodes = allPerms.data.data.map(p => p.code);
           const definitions = createPermissionDefinitionList(permCodes);
           setPermissionDefinitions(definitions);
         }

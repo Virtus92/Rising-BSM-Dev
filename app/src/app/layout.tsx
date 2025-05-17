@@ -1,18 +1,17 @@
-import React from 'react';
-import { Metadata } from 'next';
-import './globals.css';
-import ThemeProvider from '@/shared/providers/ThemeProvider';
-import { QueryProvider } from '@/shared/providers/QueryProvider';
-import ApiInitializer from '@/shared/components/ApiInitializer';
-import ClientOnly from '@/shared/components/ClientOnly';
-// Add Toaster import
-import { Toaster } from 'sonner';
-// Add AuthProvider import
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/features/auth/providers/AuthProvider';
+import { PermissionProvider } from '@/features/permissions/providers/PermissionProvider';
+import { ToastProvider } from '@/shared/providers/ToastProvider';
+import { ThemeProvider } from '@/shared/providers/ThemeProvider';
+import { AppInitializer } from '@/features/app';
+import './globals.css';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Rising BSM',
-  description: 'Business Service Management application by Rising',
+  description: 'Business Service Management Platform',
 };
 
 export default function RootLayout({
@@ -21,25 +20,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="de" suppressHydrationWarning>
-      <body>
-        {/* API initialization must happen first */}
-        <ApiInitializer />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <QueryProvider>
-            <ClientOnly>
-                <AuthProvider>
-                    {children}
-                </AuthProvider>
-            </ClientOnly>
-          </QueryProvider>
-          {/* Add Sonner Toaster component */}
-          <Toaster position="bottom-right" richColors closeButton />
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ThemeProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <PermissionProvider>
+                <AppInitializer>
+                  {children}
+                </AppInitializer>
+              </PermissionProvider>
+            </AuthProvider>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

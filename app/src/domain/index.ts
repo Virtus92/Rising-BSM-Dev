@@ -29,11 +29,37 @@ export * from './entities/RefreshToken';
 export * from './entities/RequestNote';
 
 // DTOs
-export * from './dtos/UserDtos';
 export * from './dtos/CustomerDtos';
 export * from './dtos/AppointmentDtos';
 export * from './dtos/RequestDtos';
-export * from './dtos/AuthDtos';
+// Export AuthDtos except ChangePasswordDto to avoid conflict
+export type { 
+  LoginDto,
+  RegisterDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  LoginResponseDto,
+  TokenResponseDto,
+  RefreshTokenDto,
+  TokenPayloadDto,
+  LoginCredentialsDto,
+  AuthResponseDto,
+  RefreshTokenResponseDto,
+  LogoutDto,
+  ChangePasswordRequestDto,
+  ChangePasswordDto as AuthChangePasswordDto
+} from './dtos/AuthDtos';
+// Export UserDtos except ChangePasswordDto
+export type {
+  UserDto,
+  CreateUserDto,
+  UpdateUserDto,
+  UpdateUserStatusDto,
+  UserResponseDto,
+  UserDetailResponseDto,
+  UserFilterParamsDto
+} from './dtos/UserDtos';
+export { mapUserToDto } from './dtos/UserDtos';
 export * from './dtos/ActivityLogDto';
 export * from './dtos/NotificationDtos';
 export * from './dtos/LogActionDto';

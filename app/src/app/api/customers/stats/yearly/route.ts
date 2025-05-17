@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError } from '@/core/errors/index';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { generateYearlyStats } from '@/shared/utils/statistics-utils';
 import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
 import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';

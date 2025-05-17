@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError } from '@/core/errors/index';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { generateMonthlyStats } from '@/shared/utils/statistics-utils';
 import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
@@ -31,7 +32,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
       // Add custom options as additional property using type assertion
       ...({
         includeDetails: false // Optimize by excluding details
-      } as any)
+      })
     });
     
     // Safely extract appointment data from response

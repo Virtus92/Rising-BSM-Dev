@@ -23,8 +23,7 @@ import { ServiceOptions } from '@/domain/services/IBaseService';
 import { getLogger } from '@/core/logging';
 import { getErrorHandler } from '@/core/errors';
 import { getValidationService } from '@/core/validation';
-import { getUserRepository } from '@/core/factories/repositoryFactory';
-import { getActivityLogRepository } from '@/core/factories/repositoryFactory';
+import { getUserRepository, getActivityLogRepository } from '@/core/factories/repositoryFactory.server';
 import { IUserRepository } from '@/domain/repositories/IUserRepository';
 import { IErrorHandler } from '@/core/errors';
 import { IValidationService } from '@/core/validation';
@@ -278,6 +277,20 @@ export class UserService implements IUserService {
   }
 
   /**
+   * Find a user by ID (implements IUserService.findById)
+   */
+  async findById(id: number, options?: ServiceOptions): Promise<UserResponseDto | null> {
+    try {
+      this.logger.debug(`Finding user by ID: ${id}`);
+      const user = await this.userRepository.findById(id);
+      return user ? this.mapToUserResponseDto(user) : null;
+    } catch (error) {
+      this.logger.error(`Error in UserService.findById(${id}):`, error as Error);
+      return null;
+    }
+  }
+
+  /**
    * Get a user by ID
    */
   async getById(id: number, options?: ServiceOptions): Promise<UserResponseDto | null> {
@@ -437,8 +450,8 @@ export class UserService implements IUserService {
       }
 
       // Clean up input data - remove fields that don't exist in the Prisma model
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, confirmPassword, ...cleanData } = data as any;
+      // Create a clean object from the data without any extra fields
+      const cleanData = { ...data };
       
       // Normalize profilePicture path if present
       if (cleanData.profilePicture) {
@@ -448,9 +461,10 @@ export class UserService implements IUserService {
         }
         
         // If no profilePictureId is provided but there's a profile picture,
-        // set profilePictureId to null to avoid type mismatch errors
+        // don't set a profilePictureId to avoid type mismatch errors
         if (cleanData.profilePictureId === undefined) {
-          cleanData.profilePictureId = null;
+          // Skip setting it altogether rather than setting to null
+          // as the repository expects a string or undefined
         }
       }
       
@@ -623,8 +637,20 @@ export class UserService implements IUserService {
    */
   async getUserStatistics(options?: ServiceOptions): Promise<any> {
     try {
-      // TODO: Implement proper stats collection from repository
-      // For now return a placeholder
+      // Get user statistics from the repository
+      const userStats = await this.userRepository.getUserStatistics(options);
+      if (userStats) {
+        return {
+          totalUsers: userStats.totalUsers,
+          activeUsers: userStats.activeUsers,
+          inactiveUsers: userStats.inactiveUsers,
+          // Add more stats as needed
+        };
+      }
+      // Fallback to manual counting if repository method is not available
+      // This is a fallback in case the repository method is not implemented
+      // or if we want to ensure we have the latest data
+
       return {
         totalUsers: await this.userRepository.count(),
         activeUsers: await this.userRepository.count({ status: UserStatus.ACTIVE }),

@@ -3,6 +3,9 @@
  * All custom errors in the application should extend this class
  */
 export class AppError extends Error {
+  // Add code property as alias for errorCode for compatibility
+  public readonly code: string;
+  
   /**
    * Create a new AppError
    * 
@@ -19,6 +22,7 @@ export class AppError extends Error {
   ) {
     super(message);
     this.name = this.constructor.name;
+    this.code = errorCode; // Set code alias
     
     // Maintains proper stack trace for where error was thrown (only in V8)
     if (Error.captureStackTrace) {

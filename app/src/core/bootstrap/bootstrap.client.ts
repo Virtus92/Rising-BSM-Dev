@@ -78,7 +78,7 @@ export function getErrorHandler(): IErrorHandler {
         if (error && typeof error === 'object') {
           // Handle based on error codes or types
           if ('code' in error) {
-            const code = (error as any).code;
+            const code = (error).code;
             
             if (code === 'P2025') { // Prisma not found
               return new NotFoundError('Resource not found');
@@ -138,7 +138,7 @@ export function getErrorHandler(): IErrorHandler {
  */
 export function getValidationService(): IValidationService {
   if (!validationService) {
-    validationService = new ValidationService(getLogger());
+    validationService = new ValidationService();
   }
   return validationService;
 }
@@ -185,17 +185,11 @@ export async function bootstrapClient(): Promise<void> {
     });
     logger.debug('API error interceptor initialized');
     
-    // Import Auth initialization functionality from features module
-    const { initializeAuth } = await import('@/features/auth/lib/initialization/AuthInitializer');
-    
-    // Initialize client-side services
-    const apiConfig = configService.getApiConfig();
+    /* Initialize authentication service
+    const { AuthService } = await import('@/features/auth/core');
     
     // Initialize API client through auth initializer which handles token management
-    await initializeAuth({
-      forceApi: true,
-      source: 'core-bootstrap-client'
-    });
+    await AuthService.initialize();*/
     
     logger.info('Client-side application bootstrap completed successfully');
     isBootstrapCompleted = true;
@@ -212,15 +206,15 @@ export async function bootstrapClient(): Promise<void> {
  */
 export function resetClientServices(): void {
   resetLogger();
-  errorHandlerInstance = undefined as any;
-  validationService = undefined as any;
+  errorHandlerInstance = undefined as unknown as IErrorHandler;
+  validationService = undefined as unknown as IValidationService;
   isBootstrapCompleted = false;
   
-  // Optional: import and call auth reset to maintain consistency
-  import('@/features/auth/lib/initialization/AuthInitializer').then(({ resetAuthInitialization }) => {
-    resetAuthInitialization();
+  // Reset auth service
+  import('@/features/auth/core').then(({ AuthService }) => {
+    // If there's a way to reset AuthService, call it here
   }).catch(err => {
-    console.warn('Error resetting auth initialization:', err);
+    console.warn('Error resetting auth service:', err);
   });
 }
 

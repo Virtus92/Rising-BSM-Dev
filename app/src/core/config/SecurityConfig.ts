@@ -1,190 +1,122 @@
-import { getLogger } from '@/core/logging';
-
 /**
- * JWT Configuration interface
+ * Security Configuration
+ * Provides security-related configuration settings
  */
-export interface JwtConfig {
-  secret: string;
-  accessTokenExpiry: number;
-  refreshTokenExpiry: number;
-  useTokenRotation: boolean;
-}
 
-/**
- * Security configuration manager
- * Handles security-related configuration and validation
- */
 export class SecurityConfig {
-  private static instance: SecurityConfig;
-  private jwtSecret: string | null = null;
-  private initialized = false;
-  private logger = getLogger();
-
-  private constructor() {
-    // Private constructor to enforce singleton pattern
+  private readonly _jwtSecret: string;
+  private readonly _jwtAudience: string;
+  private readonly _jwtIssuer: string;
+  private readonly _bcryptRounds: number;
+  private readonly _accessTokenLifetime: number;
+  private readonly _refreshTokenLifetime: number;
+  
+  constructor() {
+    this._jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key';
+    this._jwtAudience = process.env.JWT_AUDIENCE || 'rising-bsm-app';
+    this._jwtIssuer = process.env.JWT_ISSUER || 'rising-bsm';
+    this._bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
+    this._accessTokenLifetime = parseInt(process.env.ACCESS_TOKEN_LIFETIME || '900', 10); // 15 minutes default
+    this._refreshTokenLifetime = parseInt(process.env.REFRESH_TOKEN_LIFETIME || '2592000', 10); // 30 days default
   }
-
+  
   /**
-   * Get singleton instance
+   * Get JWT secret
    */
-  public static getInstance(): SecurityConfig {
-    if (!SecurityConfig.instance) {
-      SecurityConfig.instance = new SecurityConfig();
-    }
-    return SecurityConfig.instance;
+  getJwtSecret(): string {
+    return this._jwtSecret;
   }
-
+  
   /**
-   * Initialize security configuration
-   * Must be called before using security features
-   * @returns True if initialization succeeded
+   * Get JWT audience
    */
-  public initialize(): boolean {
-    if (this.initialized) {
-      return true;
-    }
-
-    try {
-      // Get JWT secret from environment
-      const secret = process.env.JWT_SECRET;
-      
-      if (!secret) {
-        // In development, log a warning but continue with a default
-        const devDefault = 'default-secret-change-me';
-        this.logger.warn(
-          'JWT_SECRET not found in environment variables. ' +
-          'Using default secret for development. ' +
-          'THIS IS NOT SECURE FOR PRODUCTION!'
-        );
-        this.jwtSecret = devDefault;
-      } else {
-        this.jwtSecret = secret;
-        this.logger.info('JWT security configuration loaded successfully.');
-      }
-
-      this.initialized = true;
-      return true;
-    } catch (error) {
-      this.logger.error('Failed to initialize security configuration', { error });
-      return false;
-    }
+  getJwtAudience(): string {
+    return this._jwtAudience;
   }
-
+  
   /**
-   * Get JWT secret for token signing/verification
-   * @throws Error if JWT secret is not configured
+   * Get JWT issuer
    */
-  public getJwtSecret(): string {
-    if (!this.initialized) {
-      const initialized = this.initialize();
-      if (!initialized) {
-        throw new Error('Security configuration not initialized');
-      }
-    }
-
-    if (!this.jwtSecret) {
-      // Fall back to default in development
-      if (process.env.NODE_ENV !== 'production') {
-        return 'default-secret-change-me';
-      }
-      throw new Error('JWT_SECRET not configured properly');
-    }
-
-    return this.jwtSecret;
+  getJwtIssuer(): string {
+    return this._jwtIssuer;
   }
-
+  
   /**
-   * Check if JWT secret is properly configured
+   * Get bcrypt rounds
    */
-  public isJwtSecretConfigured(): boolean {
-    if (!this.initialized) {
-      this.initialize();
-    }
-    
-    // In development, always return true
-    if (process.env.NODE_ENV !== 'production') {
-      return true;
-    }
-    
-    return !!this.jwtSecret && this.jwtSecret !== 'default-secret-change-me';
-  }
-
-  /**
-   * Get JWT token options for signing
-   */
-  public getJwtOptions() {
-    return {
-      // Standard JWT options
-      expiresIn: process.env.ACCESS_TOKEN_LIFETIME || '30m',  // 30 minutes default to reduce refresh frequency
-      issuer: 'rising-bsm',
-      audience: process.env.JWT_AUDIENCE || 'rising-bsm-app',
-    };
-  }
-
-  /**
-   * Get JWT verification options for token validation
-   */
-  public getJwtVerifyOptions() {
-    // For backward compatibility, don't require any claims by default
-    return {};
+  getBcryptRounds(): number {
+    return this._bcryptRounds;
   }
   
   /**
    * Get access token lifetime in seconds
    */
-  public getAccessTokenLifetime(): number {
-    const lifetimeStr = process.env.ACCESS_TOKEN_LIFETIME || '30m'; // Increased to 30 minutes to reduce refresh frequency
-    
-    if (lifetimeStr.endsWith('h')) {
-      const hours = parseInt(lifetimeStr.slice(0, -1), 10);
-      return hours * 60 * 60;
-    } else if (lifetimeStr.endsWith('m')) {
-      const minutes = parseInt(lifetimeStr.slice(0, -1), 10);
-      return minutes * 60;
-    } else if (lifetimeStr.endsWith('d')) {
-      const days = parseInt(lifetimeStr.slice(0, -1), 10);
-      return days * 24 * 60 * 60;
-    } else {
-      return 30 * 60; // Default to 30 minutes
-    }
+  getAccessTokenLifetime(): number {
+    return this._accessTokenLifetime;
   }
   
   /**
    * Get refresh token lifetime in seconds
    */
-  public getRefreshTokenLifetime(): number {
-    const lifetimeStr = process.env.REFRESH_TOKEN_LIFETIME || '30d';
-    
-    if (lifetimeStr.endsWith('h')) {
-      const hours = parseInt(lifetimeStr.slice(0, -1), 10);
-      return hours * 60 * 60;
-    } else if (lifetimeStr.endsWith('m')) {
-      const minutes = parseInt(lifetimeStr.slice(0, -1), 10);
-      return minutes * 60;
-    } else if (lifetimeStr.endsWith('d')) {
-      const days = parseInt(lifetimeStr.slice(0, -1), 10);
-      return days * 24 * 60 * 60;
-    } else {
-      return 30 * 24 * 60 * 60; // Default to 30 days
-    }
+  getRefreshTokenLifetime(): number {
+    return this._refreshTokenLifetime;
   }
   
   /**
-   * Get JWT configuration object
-   * @returns JwtConfig with all required properties
+   * Get session cookie options
    */
-  public getJwtConfig(): JwtConfig {
+  getSessionCookieOptions() {
     return {
-      secret: this.getJwtSecret(),
-      accessTokenExpiry: this.getAccessTokenLifetime(),
-      refreshTokenExpiry: this.getRefreshTokenLifetime(),
-      useTokenRotation: process.env.USE_TOKEN_ROTATION === 'true' || false
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      path: '/',
     };
   }
   
-
+  /**
+   * Get CORS configuration
+   */
+  getCorsConfiguration() {
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
+    
+    return {
+      origin: allowedOrigins,
+      credentials: true,
+      optionsSuccessStatus: 200,
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    };
+  }
+  
+  /**
+   * Get rate limiting configuration
+   */
+  getRateLimitConfiguration() {
+    return {
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 100, // limit each IP to 100 requests per windowMs
+      message: 'Too many requests from this IP, please try again later.',
+      standardHeaders: true,
+      legacyHeaders: false,
+    };
+  }
+  
+  /**
+   * Validate environment configuration
+   */
+  validateConfiguration(): boolean {
+    const required = ['JWT_SECRET'];
+    const missing = required.filter(key => !process.env[key]);
+    
+    if (missing.length > 0) {
+      console.warn(`Missing required security configuration: ${missing.join(', ')}`);
+      return false;
+    }
+    
+    return true;
+  }
 }
 
-// Export singleton instance for simpler imports
-export const securityConfig = SecurityConfig.getInstance();
-export default securityConfig;
+// Export singleton instance
+export const securityConfig = new SecurityConfig();

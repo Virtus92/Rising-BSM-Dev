@@ -4,7 +4,7 @@ import { IValidationService } from '@/core/validation/IValidationService';
 import { IErrorHandler } from '@/core/errors/';
 import { ServiceOptions } from '@/domain/services/IBaseService';
 import { IBaseRepository, PaginationResult, QueryOptions } from '@/domain/repositories/IBaseRepository';
-import { RequestData } from '@/domain/entities/RequestData';
+import { RequestData, RequestDataType } from '@/domain/entities/RequestData';
 import { 
   RequestDataDto, 
   CreateRequestDataDto,
@@ -273,7 +273,22 @@ export class RequestDataService extends BaseService<RequestData, CreateRequestDa
    * @returns Entity DTO
    */
   public toDTO(entity: RequestData): RequestDataDto {
-    if (!entity) return null as any;
+    if (!entity) {
+      // Return a minimal valid DTO instead of null
+      return {
+        id: 0,
+        requestId: 0,
+        category: '',
+        label: '',
+        order: 0,
+        dataType: 'json' as RequestDataType,
+        data: {},
+        isValid: false,
+        version: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    }
     
     return {
       id: entity.id,

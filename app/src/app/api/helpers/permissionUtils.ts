@@ -1,3 +1,6 @@
+// Mark as server-only to prevent client-side imports
+import 'server-only';
+
 /**
  * Permission Utilities for API Routes
  * 
@@ -36,7 +39,19 @@ export async function checkUserPermission(
       return false;
     }
     
-    return await permissionMiddleware.hasPermission(userId, permission);
+    // Normalize permission code
+    const normalizedPermission = permission.trim().toLowerCase();
+    
+    // Check if user is admin (admin has all permissions)
+    const userRepository = (await import('@/core/factories/repositoryFactory')).getRepositoryFactory().createUserRepository();
+    const user = await userRepository.findById(userId);
+    
+    if (user?.role?.toLowerCase() === 'admin') {
+      return true; // Admin has all permissions
+    }
+    
+    // Check permission directly with middleware
+    return await permissionMiddleware.hasPermission(userId, normalizedPermission);
   } catch (error) {
     logger.error('Error checking user permission:', {
       error: error instanceof Error ? error.message : String(error),
@@ -217,15 +232,17 @@ export async function filterDataByUserRole<T>(
         // Check team relationship
         // Try to get teamId from user properties
         const employeeTeamId = 
-          extendedEmployee.teamId || // Direct teamId property
-          (extendedEmployee.team?.id) || // Team object reference
-          (extendedEmployee.metadata && extendedEmployee.metadata.teamId); // Metadata
+          'teamId' in extendedEmployee ? extendedEmployee.teamId : 
+          ('team' in extendedEmployee && extendedEmployee.team && typeof extendedEmployee.team === 'object' && 'id' in extendedEmployee.team) ? extendedEmployee.team.id : 
+          ('metadata' in extendedEmployee && extendedEmployee.metadata && typeof extendedEmployee.metadata === 'object' && 'teamId' in extendedEmployee.metadata) ? extendedEmployee.metadata.teamId : 
+          undefined;
         
         // Try to get the manager's teamId
         const managerTeamId = 
-          (user as any).teamId || // Direct teamId property
-          ((user as any).team?.id) || // Team object reference
-          ((user as any).metadata && (user as any).metadata.teamId); // Metadata
+          'teamId' in user ? user.teamId : 
+          ('team' in user && user.team && typeof user.team === 'object' && 'id' in user.team) ? user.team.id : 
+          ('metadata' in user && user.metadata && typeof user.metadata === 'object' && 'teamId' in user.metadata) ? user.metadata.teamId : 
+          undefined;
           
         // If both have team IDs and they match, add to subordinates
         if (employeeTeamId && managerTeamId && employeeTeamId === managerTeamId) {

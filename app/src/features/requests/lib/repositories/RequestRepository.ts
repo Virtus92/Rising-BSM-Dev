@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, User } from '@prisma/client';
 import { ILoggingService } from '@/core/logging/ILoggingService';
 import { IErrorHandler } from '@/core/errors/';
 import { PrismaRepository } from '@/core/repositories/PrismaRepository';
@@ -10,6 +10,9 @@ import { Appointment } from '@/domain/entities/Appointment';
 import { RequestNote } from '@/domain/entities/RequestNote';
 import { RequestStatus, LogActionType, AppointmentStatus, CustomerType, CommonStatus } from '@/domain/enums/CommonEnums';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
+import { convertToRequestNotes } from '@/domain/utils/noteUtils';
+import { createCustomerEntity } from '@/domain/utils/entityFactory';
+import { UserRole } from '@/domain/enums/UserEnums';
 
 /**
  * Repository implementation for contact requests
@@ -39,9 +42,27 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
       // Create a safe copy of data without fields that don't exist in Prisma schema
       const safeData: any = { ...data };
       
+      // Handle notes conversion - convert RequestNote[] to string[]
+      if (data.notes) {
+        // If notes is an array of RequestNote objects, extract the text from each note
+        if (Array.isArray(data.notes) && data.notes.length > 0) {
+          if (data.notes[0] instanceof RequestNote) {
+            safeData.notes = data.notes.map(note => {
+              return typeof note === 'string' ? note : (note as RequestNote).text;
+            });
+          }
+        }
+        
+        // Don't attempt to update notes directly as they're stored in a separate table
+        delete safeData.notes;
+      }
+      
       // Remove these fields because they don't exist in the Prisma schema
       delete safeData.updatedBy;
       delete safeData.createdBy;
+      delete safeData.processor;
+      delete safeData.customer;
+      delete safeData.appointment;
       
       // Set updatedAt timestamp
       safeData.updatedAt = new Date();
@@ -130,13 +151,13 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
       });
       
       return new RequestNote({
-      id: requestNote.id,
-      requestId: requestNote.requestId,
-      userId: requestNote.userId,
-      userName: requestNote.userName,
-      text: requestNote.text,
-      createdAt: requestNote.createdAt,
-      updatedAt: requestNote.createdAt // If updatedAt doesn't exist, use createdAt
+        id: requestNote.id,
+        requestId: requestNote.requestId,
+        userId: requestNote.userId,
+        userName: requestNote.userName,
+        text: requestNote.text,
+        createdAt: requestNote.createdAt,
+        updatedAt: requestNote.createdAt // If updatedAt doesn't exist, use createdAt
       });
     } catch (error) {
       this.logger.error('Error adding note to request', { error, id, userId, text });
@@ -163,7 +184,8 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         userId: note.userId,
         userName: note.userName || 'Unknown User',
         text: note.text,
-        createdAt: note.createdAt
+        createdAt: note.createdAt,
+        updatedAt: note.createdAt // If updatedAt doesn't exist, use createdAt
       }));
     } catch (error) {
       this.logger.error('Error getting notes for request', { error, id });
@@ -267,25 +289,23 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
 
         // Create customer data ensuring required fields are not undefined
         const customerData = {
-        // Required fields must have values
-        name: data.customerData?.name || request.name || 'Unknown',
-        email: data.customerData?.email || request.email || '',
-        phone: data.customerData?.phone || request.phone || '',
-        // Optional fields can be undefined - convert nulls to undefined
-        company: data.customerData?.company || undefined,
-        address: data.customerData?.address || undefined,
-        postalCode: data.customerData?.postalCode || undefined,
-        city: data.customerData?.city || undefined,
-        country: data.customerData?.country || 'Deutschland',
-        type: CustomerType.PRIVATE, // Using enum value directly
-        newsletter: data.customerData?.newsletter || false,
-        // Remove source field as it's not in the Prisma schema
-        status: CommonStatus.ACTIVE // Using enum value directly
+          // Required fields must have values
+          name: data.customerData?.name || request.name || 'Unknown',
+          email: data.customerData?.email || request.email || '',
+          phone: data.customerData?.phone || request.phone || '',
+          // Optional fields can be undefined - convert nulls to undefined
+          company: data.customerData?.company || undefined,
+          address: data.customerData?.address || undefined,
+          postalCode: data.customerData?.postalCode || undefined,
+          city: data.customerData?.city || undefined,
+          country: data.customerData?.country || 'Deutschland',
+          type: CustomerType.INDIVIDUAL, // Using enum value directly
+          newsletter: data.customerData?.newsletter || false,
+          status: CommonStatus.ACTIVE // Using enum value directly
         };
         
         // Apply customer type if provided
         if (data.customerData?.type) {
-          // Cast the string value to CustomerType enum
           customerData.type = data.customerData.type as CustomerType;
         }
 
@@ -294,8 +314,8 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
           data: customerData
         });
 
-        // Create Customer-Domain-Entity
-        const customer = new Customer({
+        // Create complete Customer domain entity
+        const customer = createCustomerEntity({
           id: customerRecord.id,
           name: customerRecord.name,
           company: customerRecord.company || undefined,
@@ -427,13 +447,13 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
 
         // Create log entry
         await this.prisma.requestLog.create({
-        data: {
-        requestId,
-        userId: updatedRequest.processorId || 0,
-        userName: 'System',
-        action: LogActionType.LINK,
-        details: note || `Linked with customer ${customer.name}`
-        }
+          data: {
+            requestId,
+            userId: updatedRequest.processorId || 0,
+            userName: 'System',
+            action: LogActionType.LINK,
+            details: note || `Linked with customer ${customer.name}`
+          }
         });
 
         return this.mapToDomainEntity(updatedRequest);
@@ -468,13 +488,13 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         // Process appointment date and time
         let appointmentDate;
         if (typeof appointmentData.appointmentDate === 'string') {
-          // Wenn ein String übergeben wurde, parsen
+          // Parse if a string was passed
           appointmentDate = new Date(String(appointmentData.appointmentDate));
         } else if (appointmentData.appointmentDate instanceof Date) {
-          // Wenn bereits ein Date-Objekt übergeben wurde, verwenden
+          // Use directly if already a Date object
           appointmentDate = appointmentData.appointmentDate;
         } else {
-          // Standarddatum (heute + 2 Tage)
+          // Default date (today + 2 days at noon)
           appointmentDate = new Date();
           appointmentDate.setDate(appointmentDate.getDate() + 2);
           appointmentDate.setHours(12, 0, 0, 0);
@@ -482,14 +502,14 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
 
         // Compile appointment data
         const appointmentCreateData = {
-        title: appointmentData.title || `Termin mit ${request.name}`,
-        customerId: request.customerId || undefined,
-        appointmentDate,
-        duration: appointmentData.duration || 60,
-        location: appointmentData.location || undefined, // Convert null to undefined
-        description: appointmentData.description || request.message || undefined, // Convert null to undefined
-        status: AppointmentStatus.PLANNED,  // Already using enum value
-        createdBy: request.processorId || undefined
+          title: appointmentData.title || `Appointment with ${request.name}`,
+          customerId: request.customerId || undefined,
+          appointmentDate,
+          duration: appointmentData.duration || 60,
+          location: appointmentData.location || undefined, // Convert null to undefined
+          description: appointmentData.description || request.message || undefined, // Convert null to undefined
+          status: AppointmentStatus.PLANNED,  // Already using enum value
+          createdBy: request.processorId || undefined
         };
 
         // Create appointment
@@ -497,7 +517,7 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
           data: appointmentCreateData
         });
         
-        // Domain-Entität erstellen
+        // Create domain entity
         const appointment = new Appointment({
           id: appointmentRecord.id,
           title: appointmentRecord.title,
@@ -568,7 +588,7 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
           startDate.setFullYear(startDate.getFullYear() - 1);
           break;
         default:
-          // Standard: 30 Tage
+          // Standard: 30 days
           startDate.setDate(startDate.getDate() - 30);
       }
 
@@ -686,11 +706,11 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         where.createdAt = {};
         
         if (filters.startDate) {
-          where.createdAt.gte = filters.startDate;
+          where.createdAt.gte = new Date(filters.startDate);
         }
         
         if (filters.endDate) {
-          where.createdAt.lte = filters.endDate;
+          where.createdAt.lte = new Date(filters.endDate);
         }
       }
       
@@ -726,7 +746,58 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
       ]);
       
       // Map to domain entities
-      const data = requests.map(request => this.mapToDomainEntity(request));
+      const data = requests.map(request => {
+        // Create the base entity
+        const entity = this.mapToDomainEntity(request);
+        
+        // Add related data with proper type casting to avoid 'never' type issues
+        if (request.processor) {
+          const processor = request.processor as Record<string, any>;
+          // Use a more complete User type representation
+          (entity as any).processor = {
+            id: processor.id,
+            name: processor.name,
+            email: processor.email,
+            role: processor.role as UserRole,
+            status: 'active',
+            firstName: processor.firstName || '',
+            lastName: processor.lastName || '',
+            getFullName: () => processor.name || ''
+          };
+        }
+        
+        if (request.customer) {
+          entity.customer = createCustomerEntity({
+            id: request.customer.id,
+            name: request.customer.name,
+            email: request.customer.email,
+            phone: request.customer.phone
+          });
+        }
+        
+        if (request.appointment) {
+          const appointment = request.appointment as Record<string, any>;
+          // Create a more complete Appointment-compatible object
+          (entity as any).appointment = {
+            id: appointment.id,
+            title: appointment.title,
+            appointmentDate: appointment.appointmentDate,
+            status: appointment.status as AppointmentStatus,
+            isConfirmed: appointment.status === AppointmentStatus.CONFIRMED,
+            isCompleted: appointment.status === AppointmentStatus.COMPLETED,
+            isCancelled: appointment.status === AppointmentStatus.CANCELLED,
+            isRescheduled: appointment.status === AppointmentStatus.RESCHEDULED,
+            duration: appointment.duration || 60,
+            location: appointment.location || '',
+            description: appointment.description || '',
+            customerId: appointment.customerId,
+            createdAt: appointment.createdAt || new Date(),
+            updatedAt: appointment.updatedAt || new Date()
+          };
+        }
+        
+        return entity;
+      });
       
       // Calculate pagination information
       const totalPages = Math.ceil(total / limit);
@@ -780,7 +851,7 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
       });
     } catch (error) {
       this.logger.error('Error logging activity', { error, userId, actionType });
-      return null;
+      return {};
     }
   }
 
@@ -792,10 +863,11 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
    */
   protected mapToDomainEntity(ormEntity: any): ContactRequest {
     if (!ormEntity) {
-      return null as any;
+      // Return empty object instead of null
+      return new ContactRequest();
     }
     
-    return new ContactRequest({
+    const request = new ContactRequest({
       id: ormEntity.id,
       name: ormEntity.name || '',
       email: ormEntity.email || '',
@@ -812,6 +884,15 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
       createdBy: ormEntity.createdBy || undefined,
       updatedBy: ormEntity.updatedBy || undefined
     });
+    
+    // Convert string notes to RequestNote objects
+    if (ormEntity.notes && Array.isArray(ormEntity.notes)) {
+      request.notes = convertToRequestNotes(ormEntity.notes, ormEntity.processorId || 0, ormEntity.id);
+    } else {
+      request.notes = [];
+    }
+    
+    return request;
   }
 
   /**
@@ -822,7 +903,7 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
    */
   protected mapToORMEntity(domainEntity: Partial<ContactRequest>): any {
     // Remove undefined values, ID and other problematic fields for the database
-    const { id, createdAt, updatedAt, requestData, updatedBy, createdBy, ...dataWithoutProblematicFields } = domainEntity;
+    const { id, createdAt, updatedAt, requestData, updatedBy, createdBy, processor, customer, appointment, notes, ...dataWithoutProblematicFields } = domainEntity;
     const result: Record<string, any> = {};
     
     Object.entries(dataWithoutProblematicFields).forEach(([key, value]) => {
@@ -844,6 +925,10 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
       if ('id' in domainEntity) removedFields.push('id');
       if ('createdBy' in domainEntity) removedFields.push('createdBy');
       if ('updatedBy' in domainEntity) removedFields.push('updatedBy');
+      if ('notes' in domainEntity) removedFields.push('notes');
+      if ('processor' in domainEntity) removedFields.push('processor');
+      if ('customer' in domainEntity) removedFields.push('customer');
+      if ('appointment' in domainEntity) removedFields.push('appointment');
       if (removedFields.length > 0) {
         this.logger.debug(`Removed fields from ORM entity data in RequestRepository: ${removedFields.join(', ')}`);
       }
@@ -958,37 +1043,55 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
       // Map to domain entity
       const requestEntity = this.mapToDomainEntity(request);
       
-      // Add related data
+      // Add related data with proper type casting to avoid 'never' type issues
       if (request.processor) {
+        const processor = request.processor as Record<string, any>;
+        // Create a User-compatible object for processor
         (requestEntity as any).processor = {
-          id: request.processor.id,
-          name: request.processor.name,
-          email: request.processor.email,
-          role: request.processor.role
-        };
+        id: processor.id,
+        name: processor.name,
+        email: processor.email,
+          role: processor.role as UserRole,
+            status: 'active',
+            firstName: processor.firstName || '',
+            lastName: processor.lastName || '',
+            getFullName: () => processor.name || '',
+          };
       }
       
       if (request.customer) {
-        (requestEntity as any).customer = {
+        (requestEntity).customer = createCustomerEntity({
           id: request.customer.id,
           name: request.customer.name,
           email: request.customer.email,
           phone: request.customer.phone
-        };
+        });
       }
       
       if (request.appointment) {
+        const appointment = request.appointment as Record<string, any>;
+        // Create an Appointment-compatible object
         (requestEntity as any).appointment = {
-          id: request.appointment.id,
-          title: request.appointment.title,
-          appointmentDate: request.appointment.appointmentDate,
-          status: request.appointment.status
+          id: appointment.id,
+          title: appointment.title,
+          appointmentDate: appointment.appointmentDate,
+          status: appointment.status as AppointmentStatus,
+          isConfirmed: appointment.status === AppointmentStatus.CONFIRMED,
+          isCompleted: appointment.status === AppointmentStatus.COMPLETED,
+          isCancelled: appointment.status === AppointmentStatus.CANCELLED,
+          isRescheduled: appointment.status === AppointmentStatus.RESCHEDULED,
+          duration: appointment.duration || 60,
+          location: appointment.location || '',
+          description: appointment.description || '',
+          customerId: appointment.customerId,
+          createdAt: appointment.createdAt || new Date(),
+          updatedAt: appointment.updatedAt || new Date()
         };
       }
       
       // Load notes separately
       const notes = await this.findNotes(id);
-      (requestEntity as any).notes = notes;
+      (requestEntity).notes = notes;
       
       return requestEntity;
     } catch (error) {

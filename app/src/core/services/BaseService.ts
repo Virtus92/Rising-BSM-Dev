@@ -168,7 +168,7 @@ export abstract class BaseService<T, C extends Record<string, any>, U extends Re
       }
       
       // Validate input data
-      const validationResult = await this.validate(data, true, id as any);
+      const validationResult = await this.validate(data, true, (id as number));
       
       // Check for validation errors
       if (validationResult.result === ValidationResult.ERROR) {
@@ -678,7 +678,7 @@ export abstract class BaseService<T, C extends Record<string, any>, U extends Re
     const { relations, withDeleted } = options;
     
     // Type assertion for pagination options that might be passed from older code
-    const serviceOptions = options as any;
+    const serviceOptions = options;
     
     // Add sort options if they exist
     const sortOptions = options.sort ? {

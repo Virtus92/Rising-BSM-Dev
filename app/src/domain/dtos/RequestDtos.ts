@@ -1,6 +1,7 @@
 import { BaseResponseDto, BaseFilterParamsDto } from './BaseDto';
 import { RequestStatus } from '../enums/CommonEnums';
 import { ContactRequest } from '../entities/ContactRequest';
+import { RequestType } from '../enums/CommonEnums';
 
 // Explicitly redefine these types here to avoid circular dependencies with Symbol exports
 export type RequestSource = 'human' | 'chatbot' | 'call-agent' | 'email' | 'form' | 'api';
@@ -371,6 +372,11 @@ export interface RequestResponseDto extends BaseResponseDto {
    * CSS-Klasse für Status
    */
   statusClass?: string;
+
+  /**
+   * Typ der Anfrage
+   */
+  type?: RequestType;
   
   /**
    * ID des bearbeitenden Benutzers
@@ -502,6 +508,11 @@ export interface RequestDetailResponseDto extends RequestResponseDto {
     appointmentDate: string;
     status: string;
   };
+  
+  /**
+   * Form data from the request
+   */
+  formData?: any;
   
   /**
    * Aktivitätsprotokoll

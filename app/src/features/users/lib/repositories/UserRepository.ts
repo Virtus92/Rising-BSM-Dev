@@ -337,11 +337,13 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
       let activityModel: any;
       
       // Try to find the appropriate model for activity logs
-      // Check if these properties exist in Prisma client
-      if ('userActivity' in this.prisma) {
-        activityModel = (this.prisma as any).userActivity;
-      } else if ('activityLog' in this.prisma) {
-        activityModel = (this.prisma as any).activityLog;
+      // Type cast prisma to any to bypass type checking for model access
+      const prismaAny = this.prisma as any;
+      
+      if (prismaAny.userActivity) {
+        activityModel = prismaAny.userActivity;
+      } else if (prismaAny.activityLog) {
+        activityModel = prismaAny.activityLog;
       } else {
         this.logger.warn('No suitable activity log model found in Prisma schema. Returning empty activity list.');
         return [];
@@ -755,6 +757,39 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
     result.updatedAt = new Date();
     
     return result;
+  }
+
+  /**
+   * Gets user statistics such as total users, active users, and inactive users
+   * 
+   * @param options - Optional service options
+   * @returns User statistics object
+   */
+  async getUserStatistics(options?: any): Promise<{
+    totalUsers: number;
+    activeUsers: number;
+    inactiveUsers: number;
+    [key: string]: any;
+  }> {
+    try {
+      const [totalUsers, activeUsers, inactiveUsers] = await Promise.all([
+        this.prisma.user.count(),
+        this.prisma.user.count({ where: { status: UserStatus.ACTIVE } }),
+        this.prisma.user.count({ where: { status: UserStatus.INACTIVE } })
+      ]);
+      
+      return {
+        totalUsers,
+        activeUsers,
+        inactiveUsers
+      };
+    } catch (error) {
+      this.logger.error('Error getting user statistics:', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw this.errorHandler.mapError(error);
+    }
   }
 
   /**

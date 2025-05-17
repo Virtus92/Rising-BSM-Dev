@@ -1,6 +1,7 @@
 import { BaseEntity } from './BaseEntity';
 import { AppointmentStatus } from '../enums/CommonEnums';
 import { AppointmentNote } from './AppointmentNote';
+import { Customer } from './Customer';
 
 /**
  * Termin-Entität
@@ -49,6 +50,16 @@ export class Appointment extends BaseEntity {
   notes?: AppointmentNote[];
   
   /**
+   * Customer object relationship
+   */
+  customer?: Customer;
+  
+  /**
+   * Customer name (calculated property)
+   */
+  customerName?: string;
+  
+  /**
    * Konstruktor
    * 
    * @param data - Initialisierungsdaten
@@ -64,6 +75,8 @@ export class Appointment extends BaseEntity {
     this.description = data.description;
     this.status = data.status || AppointmentStatus.PLANNED;
     this.notes = data.notes || [];
+    this.customer = data.customer;
+    this.customerName = data.customer?.name || data.customerName;
   }
   
   /**
@@ -198,7 +211,22 @@ export class Appointment extends BaseEntity {
       location: this.location,
       description: this.description,
       status: this.status,
-      notes: this.notes
+      notes: this.notes,
+      customerName: this.customer?.name || this.customerName
     };
+  }
+  
+  /**
+   * Gets the customer name, either from the customer relation or the cached property
+   */
+  getCustomerName(): string {
+    return this.customer?.name || this.customerName || '';
+  }
+  
+  /**
+   * Helper method to get customer information from the relation
+   */
+  getCustomer(): Customer | undefined {
+    return this.customer;
   }
 }

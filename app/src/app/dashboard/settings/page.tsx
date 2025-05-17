@@ -11,11 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/shared/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Separator } from '@/shared/components/ui/separator';
-import { Loader2, RefreshCcw, AlertCircle, Sun, Moon, Monitor, Check, X } from 'lucide-react';
+import { Loader2, RefreshCcw, AlertCircle, Sun, Moon, Monitor, Check, X, Shield } from 'lucide-react';
+import { useAuth } from '@/features/auth/providers/AuthProvider';
+import dynamic from 'next/dynamic';
 
 export default function SettingsPage() {
   const { settings, isLoading, error, updateSetting, resetToDefaults, reloadSettings } = useSettings();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -185,10 +188,14 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-3 w-full max-w-md">
+        <TabsList className="grid w-full max-w-md" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <TabsTrigger value="general">Allgemein</TabsTrigger>
           <TabsTrigger value="appearance">Erscheinungsbild</TabsTrigger>
           <TabsTrigger value="notifications">Benachrichtigungen</TabsTrigger>
+          <TabsTrigger value="admin" className="relative">
+            <Shield className="h-4 w-4 mr-1" />
+            Admin
+          </TabsTrigger>
         </TabsList>
 
         {/* General Settings Tab */}

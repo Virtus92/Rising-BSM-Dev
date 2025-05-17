@@ -3,10 +3,10 @@ import { useToast } from '@/shared/hooks/useToast';
 import { UserService } from '@/features/users/lib/services/UserService';
 import { RequestService } from '@/features/requests/lib/services/RequestService';
 import { AppointmentService } from '@/features/appointments/lib/services/AppointmentService';
-import { CustomerService } from '@/features/customers/lib/services/CustomerService';
+import { CustomerService } from '@/features/customers/lib/services/CustomerService.client';
 import { ApiResponse } from '@/core/api/ApiClient';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
-import { subscribeToAuthEvent } from '@/features/auth/lib/initialization/AuthInitializer';
+import AuthService from '@/features/auth/core/AuthService';
 
 // Define API response types for count endpoints
 interface CountResponse {
@@ -189,17 +189,18 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     try {
       // Ensure API client is initialized before making requests
       const { ApiClient } = await import('@/core/api/ApiClient');
-      await ApiClient.initialize({ 
-        source: 'dashboard-stats',
-        autoRefreshToken: true 
-      }).catch(err => console.warn('API init warning:', err));
+      await ApiClient.initialize().catch(err => console.warn('API init warning:', err));
       
       // Safely get the service methods - use static methods correctly
       const services = {
         user: typeof UserService.count === 'function' ? () => UserService.count() : (() => Promise.resolve({ success: false, data: null })),
         customer: typeof CustomerService.count === 'function' ? () => CustomerService.count() : (() => Promise.resolve({ success: false, data: null })),
         request: typeof RequestService.count === 'function' ? () => RequestService.count() : (() => Promise.resolve({ success: false, data: null })),
-        appointment: typeof AppointmentService.count === 'function' ? () => AppointmentService.count() : (() => Promise.resolve({ success: false, data: null }))
+        // AppointmentService is an instance class, not static
+        appointment: async () => {
+          const appointmentService = new AppointmentService();
+          return { success: true, data: { count: await appointmentService.count() } };
+        }
       };
       
       // Use Promise.allSettled with dedicated count endpoints with error catching for each call
@@ -367,8 +368,8 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
       }
     };
     
-    // Subscribe to the initialization complete event
-    const unsubscribe = subscribeToAuthEvent('init_complete', handleAuthInit);
+    // Subscribe to the initialization complete event using AuthService
+    const unsubscribe = AuthService.onAuthStateChange(handleAuthInit);
     
     // Clean up subscription on unmount
     return () => {

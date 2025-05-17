@@ -1,3 +1,7 @@
+// IMPORTANT: This file should only be imported in server components
+// Importing in client components will cause build errors
+import 'server-only';
+
 // Re-export all database modules
 export * from './prisma';
 

@@ -1,50 +1,67 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import DashboardLayout from '@/shared/layouts/dashboard/DashboardLayout';
-import DashboardInitializer from './DashboardInitializer';
-import ErrorBoundary from '@/shared/components/error/ErrorBoundary';
-import { useAuth } from '@/features/auth/providers/AuthProvider';
-import { getItem } from '@/shared/utils/storage/cookieStorage';
+/**
+ * Dashboard Layout
+ * 
+ * Provides centralized initialization for authentication, API client,
+ * and permission service before rendering child components.
+ */
 
-export default function AppDashboardLayout({ 
-  children 
-}: { 
-  children: React.ReactNode 
-}) {
-  const { refreshAuth } = useAuth();
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/features/auth/providers/AuthProvider';
+import { getLogger } from '@/core/logging';
+import DashboardHeader from '@/features/dashboard/components/DashboardHeader';
+import DashboardSidebar from '@/features/dashboard/components/DashboardSidebar';
+
+// Logger instance
+const logger = getLogger();
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  // Auth state
+  const { isAuthenticated, isInitialized: authInitialized, user } = useAuth();
+  const router = useRouter();
+  // State for mobile sidebar visibility
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
-  // Check for check_auth_local cookie which indicates we should use localStorage tokens
+  // Simplified dashboard layout - only handles authentication status, not initialization
   useEffect(() => {
-    const checkCookie = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('check_auth_local='));
-    
-    if (checkCookie) {
-      console.log('Dashboard layout detected check_auth_local cookie, refreshing auth state');
-      
-      // Clear the cookie immediately to prevent infinite loops
-      document.cookie = 'check_auth_local=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      
-      // Check localStorage for tokens
-      const hasAuthToken = !!getItem('auth_token_backup');
-      const hasRefreshToken = !!getItem('refresh_token_backup');
-      
-      if (hasAuthToken || hasRefreshToken) {
-        console.log('Found tokens in localStorage, refreshing auth state');
-        refreshAuth();
-      }
+    // Redirect to login if not authenticated once auth is initialized
+    if (authInitialized && !isAuthenticated) {
+      logger.warn('User not authenticated, redirecting to login');
+      router.push('/auth/login?returnUrl=/dashboard');
     }
-  }, [refreshAuth]);
+  }, [authInitialized, isAuthenticated, router]);
   
+  // Render the dashboard layout with header and sidebar
   return (
-    <>
-      <DashboardInitializer />
-      <ErrorBoundary>
-        <DashboardLayout>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-slate-900/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        ></div>
+      )}
+      
+      {/* Mobile sidebar */}
+      <div className={`fixed top-0 left-0 z-50 h-full w-64 transform transition-transform duration-300 ease-in-out md:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <DashboardSidebar />
+      </div>
+      
+      {/* Desktop sidebar - hidden on mobile */}
+      <div className="hidden md:block md:fixed md:top-0 md:left-0 md:bottom-0 md:w-64">
+        <DashboardSidebar />
+      </div>
+      
+      {/* Main content area */}
+      <div className="md:pl-64">
+        <DashboardHeader setSidebarOpen={setSidebarOpen} />
+        
+        <main className="container mx-auto px-4 py-6">
           {children}
-        </DashboardLayout>
-      </ErrorBoundary>
-    </>
+        </main>
+      </div>
+    </div>
   );
 }

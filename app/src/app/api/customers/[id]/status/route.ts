@@ -44,9 +44,9 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
     
     try {
       const jwt = await import('jsonwebtoken');
-      const decoded = jwt.verify(token, jwtSecret) as any;
+      const decoded = jwt.verify(token, jwtSecret);
       userId = decoded.sub ? Number(decoded.sub) : null;
-      userRole = decoded.role;
+      userRole = typeof decoded === 'object' && 'role' in decoded ? decoded.role : undefined;
       
       if (!userId) {
         logger.warn('Invalid token - no user ID found');
@@ -185,10 +185,14 @@ export const PATCH = routeHandler(async (request: NextRequest) => {
     
     try {
       // Prepare update data safely
-      const updateData = { 
+      const updateData: { 
+        status: CommonStatus;
+        updatedAt: Date;
+        updatedBy?: number;
+      } = { 
         status: status as CommonStatus,
         updatedAt: new Date()
-      } as any;
+      };
       
       // Only add updatedBy if we have a valid user ID
       if (verifiedUserId !== null) {

@@ -1,8 +1,9 @@
 'use client';
 import React from 'react';
 import CustomerForm from '@/features/customers/components/CustomerForm';
-import { CustomerService } from '@/features/customers/lib/services/CustomerService';
-import { usePermissions } from '@/features/users/hooks/usePermissions';
+// Make sure we're using the client-side service
+import { CustomerService } from '@/features/customers/lib/services/CustomerService.client';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { AccessDenied } from '@/shared/components/AccessDenied';
 import { CreateCustomerDto, CustomerResponseDto, UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 

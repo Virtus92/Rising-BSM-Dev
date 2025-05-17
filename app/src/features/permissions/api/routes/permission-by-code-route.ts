@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 
 /**
  * Get permission by code

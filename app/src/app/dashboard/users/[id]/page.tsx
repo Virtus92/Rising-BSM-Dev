@@ -87,7 +87,7 @@ export default function UserDetailPage() {
         if (response.success && response.data) {
           setUser(response.data);
         } else {
-          setError(response.message || 'Failed to fetch user details');
+          setError(response.error || 'Failed to fetch user details');
         }
       } catch (err) {
         console.error('Error fetching user:', err);

@@ -42,7 +42,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { UserService } from '@/features/users/lib/services/UserService';
 import { UserDto } from '@/domain/dtos/UserDtos';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { usePermissions } from '@/features/users/hooks/usePermissions';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { useRouter } from 'next/navigation';
 import { UserPermissions } from '@/features/users/components/UserPermissions';
 

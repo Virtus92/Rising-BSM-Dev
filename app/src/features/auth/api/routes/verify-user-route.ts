@@ -4,7 +4,8 @@
  * Verifies if a user exists and is active
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
 import { formatResponse } from '@/core/errors';
 

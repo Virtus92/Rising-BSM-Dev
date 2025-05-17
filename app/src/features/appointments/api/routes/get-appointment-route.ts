@@ -5,7 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 

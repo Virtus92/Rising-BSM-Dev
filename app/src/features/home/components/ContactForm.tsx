@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, FieldValues, UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/shared/components/ui/button';
@@ -26,21 +26,21 @@ import ApiClient from '@/core/api/ApiClient';
 import { CreateRequestDto } from '@/domain/dtos/RequestDtos';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 
-// Validierungsschema für das Formular
+// Form validation schema
 const formSchema = z.object({
-  name: z.string().min(2, 'Name muss mindestens 2 Zeichen haben'),
-  email: z.string().email('Gültige E-Mail-Adresse erforderlich'),
+  name: z.string().min(2, 'Name must have at least 2 characters'),
+  email: z.string().email('Valid email address required'),
   phone: z.string().optional(),
   service: z.string({
-    required_error: 'Bitte wählen Sie einen Service aus',
+    required_error: 'Please select a service',
   }),
-  message: z.string().min(10, 'Nachricht muss mindestens 10 Zeichen haben'),
+  message: z.string().min(10, 'Message must have at least 10 characters'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 /**
- * Komponente für das Kontaktformular auf der öffentlichen Website
+ * Contact form component for the public website
  */
 export const ContactForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,49 +82,51 @@ export const ContactForm: React.FC = () => {
       form.reset();
       
       toast({
-        title: 'Erfolg',
-        description: 'Vielen Dank für Ihre Anfrage! Wir werden uns in Kürze bei Ihnen melden.',
+        title: 'Success',
+        description: 'Thank you for your inquiry! We will get back to you shortly.',
         variant: 'success'
       });
     } catch (error) {
       toast({
-        title: 'Fehler',
-        description: 'Beim Senden Ihrer Anfrage ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut.',
+        title: 'Error',
+        description: 'An error occurred while sending your request. Please try again later.',
         variant: 'error'
       });
-      console.error('Error submitting contact form:', error as Error);
+      console.error('Error submitting contact form:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Wenn das Formular erfolgreich abgeschickt wurde, zeige eine Erfolgsmeldung
+  // If the form has been successfully submitted, show a success message
   if (isSuccess) {
     return (
       <div className="bg-card rounded-lg p-6 shadow-md">
         <div className="text-center space-y-4">
           <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
-          <h3 className="text-xl font-bold">Anfrage gesendet!</h3>
+          <h3 className="text-xl font-bold">Request sent!</h3>
           <p className="text-muted-foreground">
-            Vielen Dank für Ihre Anfrage. Wir haben Ihre Nachricht erhalten und werden uns in Kürze bei Ihnen melden.
+            Thank you for your inquiry. We have received your message and will get back to you shortly.
           </p>
           <Button 
             onClick={() => setIsSuccess(false)}
             className="mt-4"
           >
-            Neues Formular
+            New Form
           </Button>
         </div>
       </div>
     );
   }
 
+  // No need for type conversion with explicit generic type
+
   return (
     <div className="bg-card rounded-lg p-6 shadow-md">
-      <h2 className="text-2xl font-bold mb-6">Kontaktieren Sie uns</h2>
+      <h2 className="text-2xl font-bold mb-6">Contact Us</h2>
       
-      <Form {...form as any} onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="space-y-4">
+      <Form {...form as unknown as UseFormReturn<FieldValues>}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
             control={form.control}
             name="name"
@@ -132,7 +134,7 @@ export const ContactForm: React.FC = () => {
               <FormItem>
                 <FormLabel>Name *</FormLabel>
                 <FormControl>
-                  <Input placeholder="Ihr Name" {...field} />
+                  <Input placeholder="Your Name" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -145,9 +147,9 @@ export const ContactForm: React.FC = () => {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>E-Mail *</FormLabel>
+                  <FormLabel>Email *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ihre E-Mail-Adresse" type="email" {...field} />
+                    <Input placeholder="Your Email Address" type="email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -159,9 +161,9 @@ export const ContactForm: React.FC = () => {
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Telefon</FormLabel>
+                  <FormLabel>Phone</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ihre Telefonnummer (optional)" {...field} />
+                    <Input placeholder="Your Phone Number (optional)" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -174,22 +176,22 @@ export const ContactForm: React.FC = () => {
             name="service"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Gewünschter Service *</FormLabel>
+                <FormLabel>Desired Service *</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Service auswählen" />
+                      <SelectValue placeholder="Select Service" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="Website-Entwicklung">Website-Entwicklung</SelectItem>
-                    <SelectItem value="SEO-Optimierung">SEO-Optimierung</SelectItem>
-                    <SelectItem value="Online-Marketing">Online-Marketing</SelectItem>
-                    <SelectItem value="App-Entwicklung">App-Entwicklung</SelectItem>
-                    <SelectItem value="IT-Beratung">IT-Beratung</SelectItem>
+                    <SelectItem value="Website Development">Website Development</SelectItem>
+                    <SelectItem value="SEO Optimization">SEO Optimization</SelectItem>
+                    <SelectItem value="Online Marketing">Online Marketing</SelectItem>
+                    <SelectItem value="App Development">App Development</SelectItem>
+                    <SelectItem value="IT Consulting">IT Consulting</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -202,16 +204,16 @@ export const ContactForm: React.FC = () => {
             name="message"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Nachricht *</FormLabel>
+                <FormLabel>Message *</FormLabel>
                 <FormControl>
                   <Textarea 
-                    placeholder="Ihre Nachricht an uns"
+                    placeholder="Your Message"
                     rows={5}
                     {...field} 
                   />
                 </FormControl>
                 <FormDescription>
-                  Bitte beschreiben Sie Ihr Anliegen so genau wie möglich
+                  Please describe your request as precisely as possible
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -226,14 +228,14 @@ export const ContactForm: React.FC = () => {
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Wird gesendet...
+                Sending...
               </>
             ) : (
-              'Anfrage senden'
+              'Send Request'
             )}  
-            </Button>
-            </div>
-            </Form>
+          </Button>
+        </form>
+      </Form>
     </div>
   );
 };

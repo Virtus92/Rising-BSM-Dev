@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import CustomerForm from '@/features/customers/components/CustomerForm';
-import { CustomerService } from '@/features/customers/lib/services/CustomerService';
+// Make sure we're using the client-side service
+import { CustomerService } from '@/features/customers/lib/services/CustomerService.client';
 import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { useToast } from '@/shared/hooks/useToast';

@@ -5,4 +5,5 @@
  */
 
 export * from './AppointmentService';
-export { default as AppointmentService } from './AppointmentService';
+import { AppointmentService as DefaultAppointmentService } from './AppointmentService';
+export default DefaultAppointmentService;

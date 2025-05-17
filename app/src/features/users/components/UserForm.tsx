@@ -80,8 +80,9 @@ export const UserForm: React.FC<UserFormProps> = ({
     onSuccess: (result) => {
       if (result.filePath) {
         setPreviewImage(result.filePath);
-        // Use a type assertion to access the fileId property from the API response
-        const fileId = (result as any).fileId;
+        // Safely access potential fileId property from the result
+        const resultObj = result as Record<string, any>;
+        const fileId = resultObj.fileId || null;
         setFormData(prev => ({ 
           ...prev, 
           profilePicture: result.filePath,

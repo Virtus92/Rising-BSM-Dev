@@ -103,7 +103,7 @@ export function useToast() {
         return sonnerToast.success(title, {
           description,
           duration,
-          position: position as any,
+          position: position,
           id,
           onDismiss,
           action: action ? {
@@ -116,7 +116,7 @@ export function useToast() {
         return sonnerToast.error(title, {
           description,
           duration,
-          position: position as any,
+          position: position,
           id,
           onDismiss,
           action: action ? {
@@ -128,7 +128,7 @@ export function useToast() {
         return sonnerToast.warning(title, {
           description,
           duration,
-          position: position as any,
+          position: position,
           id,
           onDismiss,
           action: action ? {
@@ -140,7 +140,7 @@ export function useToast() {
         return sonnerToast.info(title, {
           description,
           duration,
-          position: position as any,
+          position: position,
           id,
           onDismiss,
           action: action ? {
@@ -153,7 +153,7 @@ export function useToast() {
         return sonnerToast(title, {
           description,
           duration,
-          position: position as any,
+          position: position,
           id,
           onDismiss,
           action: action ? {

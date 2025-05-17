@@ -45,7 +45,7 @@ export default function ApiInitializer() {
     }
     
     // Check if it's already initialized globally
-    if (typeof window !== 'undefined' && (window as any).__API_CLIENT_STATE?.initialized) {
+    if (typeof window !== 'undefined' && window.__API_CLIENT_STATE?.initialized) {
       console.debug(`ApiInitializer: API already initialized globally (instance: ${instanceIdRef.current})`);
       hasInitializedRef.current = true;
       return;
@@ -61,15 +61,17 @@ export default function ApiInitializer() {
     
     // Register this initialization with global state
     if (typeof window !== 'undefined') {
-      if (!(window as any).__API_INITIALIZERS) {
-        (window as any).__API_INITIALIZERS = {
+      // Initialize if not present
+      if (!window.__API_INITIALIZERS) {
+        window.__API_INITIALIZERS = {
           inProgress: 0,
           instances: {},
           lastInitTime: 0
         };
       }
       
-      const apiState = (window as any).__API_INITIALIZERS;
+      // Get the API state
+      const apiState = window.__API_INITIALIZERS;
       apiState.inProgress++;
       apiState.instances[instanceIdRef.current] = Date.now();
       apiState.lastInitTime = Date.now();
@@ -82,8 +84,8 @@ export default function ApiInitializer() {
       setIsInitializing(false);
       
       // Cleanup global state
-      if (typeof window !== 'undefined' && (window as any).__API_INITIALIZERS) {
-        const apiState = (window as any).__API_INITIALIZERS;
+      if (typeof window !== 'undefined' && window.__API_INITIALIZERS) {
+        const apiState = window.__API_INITIALIZERS;
         apiState.inProgress = Math.max(0, apiState.inProgress - 1);
         delete apiState.instances[instanceIdRef.current];
       }
@@ -93,8 +95,8 @@ export default function ApiInitializer() {
     const performInitialization = async () => {
       try {
         // Check if there's already a global initialization going on in AuthInitializer
-        if (typeof window !== 'undefined' && (window as any).__AUTH_INITIALIZER_STATE) {
-          const authState = (window as any).__AUTH_INITIALIZER_STATE;
+        if (typeof window !== 'undefined' && window.__AUTH_INITIALIZER_STATE) {
+          const authState = window.__AUTH_INITIALIZER_STATE;
           
           // If auth initialization is in progress, wait for it instead of duplicating effort
           if (authState.isInitializing && authState.initPromise) {
@@ -115,14 +117,7 @@ export default function ApiInitializer() {
         }
         
         // Initialize API client
-        await ApiClient.initialize({ 
-          baseUrl: '/api',
-          autoRefreshToken: true,
-          force: false, // Don't force reinitialization unless necessary
-          headers: {
-            'X-Initialization-Source': `component-${instanceIdRef.current}`, // Track initialization source
-          }
-        });
+        await ApiClient.initialize();
         
         console.log('API Client initialized successfully');
         

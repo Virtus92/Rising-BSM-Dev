@@ -1,20 +1,10 @@
 /**
- * Auth Library Module
+ * Deprecated: This module has been replaced by the new auth system
  * 
- * This file exports all authorization-related library components
+ * All functionality has been moved to @/features/auth/core
  */
 
-// Export services
-export * from './services';
+export const DEPRECATED_NOTICE = true;
 
-// Export repositories
-export * from './repositories';
-
-// Export clients
-export * from './clients/AuthClient';
-
-// Export initialization utilities
-export * from './initialization';
-
-// Export entities
-export * from './entities';
+// Re-export core auth functionality for backward compatibility
+export * from '@/features/auth/core';

@@ -5,7 +5,8 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { generateSecurePassword } from '@/core/security/password-utils';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
@@ -83,5 +84,5 @@ export const POST = routeHandler(async (req: NextRequest, { params }) => {
   }
 }, {
   requiresAuth: true
-  // Removed requiredRoles: ['ADMIN'] - we're checking permissions directly in the handler now
+  // Removed requiredRole: UserRole.ADMIN - we're checking permissions directly in the handler now
 });

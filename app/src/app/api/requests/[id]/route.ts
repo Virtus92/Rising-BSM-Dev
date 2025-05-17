@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
@@ -153,7 +154,7 @@ export const PUT = routeHandler(async (req: NextRequest) => {
     // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
       return formatValidationError(
-        (error as any).validationErrors,
+        (error).validationErrors,
         'Request validation failed'
       );
     }

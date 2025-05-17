@@ -4,9 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2, UserPlus } from 'lucide-react';
-import { useAuthManagement } from '@/features/auth/hooks/useAuthManagement';
+import { useAuth, RegisterData } from '@/features/auth/providers/AuthProvider';
 import { useToast } from '@/shared/hooks/useToast';
-import { RegisterFormData } from '@/features/auth/providers/AuthProvider';
 
 /**
  * Type definitions for form fields and errors
@@ -39,7 +38,7 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Hooks
-  const { register } = useAuthManagement();
+  const { register } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -128,18 +127,18 @@ export default function RegisterPage() {
     
     setIsSubmitting(true);
     try {
-      // Use register function from auth management hook
-      const registerData: RegisterFormData = {
+      // Create registration data
+      const registerData: RegisterData = {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        confirmPassword: formData.passwordConfirm,
+        passwordConfirm: formData.passwordConfirm,
         terms: formData.acceptTerms
       };
       
-      const success = await register(registerData);
+      const result = await register(registerData);
       
-      if (success) {
+      if (result.success) {
         toast({
           title: 'Registration successful',
           description: 'Please sign in with your new credentials.',
@@ -148,6 +147,12 @@ export default function RegisterPage() {
         
         // Redirect to login screen
         router.push('/auth/login');
+      } else {
+        toast({
+          title: 'Registration failed',
+          description: result.message || 'An unexpected error occurred',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Registration failed:', error as Error);

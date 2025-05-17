@@ -26,6 +26,9 @@ export {
 export { errorHandler } from './error-handler';
 export { getErrorHandler } from './error-handler';
 
+// Export ErrorHandler class
+export { ErrorHandler } from './ErrorHandler';
+
 // Export API error interceptor
 export { 
   handleApiError, 

@@ -1,85 +1,197 @@
 /**
- * Environment-aware bootstrap router
- * This file detects the current environment and routes to the appropriate bootstrap implementation
+ * Clean Bootstrap System
+ * 
+ * Single source of truth for application initialization.
+ * Follows strict order of operations with no circular dependencies.
  */
+import { getLogger } from '../logging';
 
-// Re-export common functions from server bootstrap
-export { getLogger } from '../logging';
-export { getErrorHandler, getValidationService } from './bootstrap.server';
+const logger = getLogger();
 
 /**
- * Initializes application services based on the current environment
- * 
- * @returns Promise resolved after initialization
+ * Bootstrap options
  */
-export async function bootstrap(): Promise<void> {
+export interface BootstrapOptions {
+  environment?: 'development' | 'production' | 'test';
+  features?: {
+    auth?: boolean;
+    api?: boolean;
+    database?: boolean;
+    cache?: boolean;
+  };
+}
+
+/**
+ * Bootstrap result
+ */
+export interface BootstrapResult {
+  success: boolean;
+  error?: Error;
+  timestamp: Date;
+  duration: number;
+}
+
+/**
+ * Main bootstrap function for the application
+ * Coordinates initialization across client and server environments
+ * 
+ * @param options Bootstrap options
+ */
+export async function bootstrap(options?: BootstrapOptions): Promise<BootstrapResult> {
+  const startTime = Date.now();
+  
   try {
-    // Simplified and more reliable environment detection
-    // 1. First check for server-only marker - the most reliable method
-    const isServerOnlyModule = typeof require !== 'undefined' && require?.main?.path?.includes('node_modules/next');
+    logger.info('Starting application bootstrap', options);
     
-    // 2. Then check for window which definitively indicates client
-    const hasWindow = typeof window !== 'undefined';
-    
-    // 3. Check for Next.js Edge runtime
-    const isNextEdge = typeof process !== 'undefined' && process.env.NEXT_RUNTIME === 'edge';
-    
-    // Determine environment using the checks above
-    const isServer = isServerOnlyModule || (!hasWindow && !isNextEdge);
-    const isClient = hasWindow;
-    
-    if (isServer) {
-      // Server environment - use server bootstrap
-      // Use dynamic import to avoid server-only module errors
-      try {
-        // Import without using await to improve error handling
-        const serverModule = await import('./bootstrap.server');
-        console.log('Running server bootstrap');
-        return await serverModule.bootstrapServer();
-      } catch (serverError) {
-        console.warn('Server bootstrap failed:', serverError);
-        // Don't rethrow - allow for graceful degradation
-        return;
-      }
-    } else if (isClient) {
-      // Client environment - use client bootstrap
-      try {
-        const clientModule = await import('./bootstrap.client');
-        console.log('Running client bootstrap');
-        return await clientModule.bootstrapClient();
-      } catch (clientError) {
-        console.warn('Client bootstrap failed:', clientError);
-        // Don't crash the application on bootstrap failure
-        return;
-      }
-    } else if (isNextEdge) {
-      // Edge Runtime environment - don't use PrismaClient or other Node.js features
-      console.log('Detected Edge Runtime environment, using minimal bootstrap');
-      return;
+    // Determine environment
+    if (typeof window === 'undefined') {
+      // Server-side bootstrap
+      return await bootstrapServer(options);
     } else {
-      console.warn('Unknown environment detected, skipping bootstrap (this may be an RSC environment)');
-      return;
+      // Client-side bootstrap
+      return await bootstrapClient(options);
     }
   } catch (error) {
-    console.error('Bootstrap router failed', error as Error);
-    // Log but don't crash - enable graceful degradation
-    return;
+    logger.error('Bootstrap failed:', error instanceof Error ? error : String(error));
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+      timestamp: new Date(),
+      duration: Date.now() - startTime
+    };
   }
 }
 
 /**
- * Resets all singleton instances (mainly for testing)
- * Routes to the appropriate reset function based on environment
+ * Server-side bootstrap
+ * Initializes server-specific services
+ * 
+ * @param options Bootstrap options
  */
-export async function resetServices(): Promise<void> {
-  const isServer = typeof window === 'undefined' && !process.env.NEXT_RUNTIME;
-  const isClient = typeof window !== 'undefined';
+export async function bootstrapServer(options?: BootstrapOptions): Promise<BootstrapResult> {
+  const startTime = Date.now();
   
-  if (isServer) {
-    const { resetServices } = await import('./bootstrap.server');
-    resetServices();
-  } else if (isClient) {
-    const { resetClientServices } = await import('./bootstrap.client');
-    resetClientServices();
+  try {
+    logger.info('Starting server-side bootstrap');
+    
+    // 1. First, load environment and configuration
+    const config = process.env;
+    
+    // Validate required configuration
+    if (!config.JWT_SECRET) {
+      throw new Error('JWT_SECRET not configured');
+    }
+    
+    if (options?.features?.database !== false && !config.DATABASE_URL) {
+      throw new Error('DATABASE_URL not configured');
+    }
+    
+    // 2. Initialize database connection
+    if (options?.features?.database !== false) {
+      const { db } = await import('../db');
+      
+      // Test connection
+      try {
+        await db.$queryRaw`SELECT 1`;
+        logger.info('Database connection established');
+      } catch (error) {
+        throw new Error(`Database connection failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    
+    // 3. Initialize services sequentially to avoid circular dependencies
+    // Get service factory (with no circular imports)
+    const { getServiceFactory } = await import('../factories/serviceFactory.server');
+    const serviceFactory = getServiceFactory();
+    
+    // Initialize core services first
+    logger.debug('Initializing core services');
+    
+    // 4. Initialize auth if enabled
+    if (options?.features?.auth !== false) {
+      logger.debug('Initializing authentication services');
+      // No need to explicitly initialize as services are created on-demand
+    }
+    
+    // 5. Initialize permission system
+    try {
+      logger.info('Initializing permission system');
+      const { initializePermissionSystem } = await import('@/features/permissions/lib/services/PermissionInitializer');
+      await initializePermissionSystem();
+      logger.info('Permission system initialized');
+    } catch (error) {
+      logger.warn('Permission system initialization warning:', error as Error);
+      // Don't block bootstrap for permission initialization
+    }
+    
+    // Success
+    const duration = Date.now() - startTime;
+    logger.info(`Server-side bootstrap completed in ${duration}ms`);
+    
+    return {
+      success: true,
+      timestamp: new Date(),
+      duration
+    };
+  } catch (error) {
+    logger.error('Server-side bootstrap failed:', error instanceof Error ? error : String(error));
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+      timestamp: new Date(),
+      duration: Date.now() - startTime
+    };
   }
 }
+
+/**
+ * Client-side bootstrap
+ * Initializes client-specific services
+ * 
+ * @param options Bootstrap options
+ */
+export async function bootstrapClient(options?: BootstrapOptions): Promise<BootstrapResult> {
+  const startTime = Date.now();
+  
+  try {
+    logger.info('Starting client-side bootstrap');
+    
+    /* 1. Initialize API client
+    if (options?.features?.api !== false) {
+      const { ApiClient } = await import('../api/ApiClient');
+      await ApiClient.initialize();
+      logger.debug('API client initialized');
+    }
+    
+    // 2. Initialize auth service
+    if (options?.features?.auth !== false) {
+      const { default: AuthService } = await import('@/features/auth/core/AuthService');
+      await AuthService.initialize();
+      logger.debug('Auth service initialized');
+    }*/
+    
+    // Success
+    const duration = Date.now() - startTime;
+    logger.info(`Client-side bootstrap completed in ${duration}ms`);
+    
+    return {
+      success: true,
+      timestamp: new Date(),
+      duration
+    };
+  } catch (error) {
+    logger.error('Client-side bootstrap failed:', error instanceof Error ? error : String(error));
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+      timestamp: new Date(),
+      duration: Date.now() - startTime
+    };
+  }
+}
+
+// Default export
+export default bootstrap;

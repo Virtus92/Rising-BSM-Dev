@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, LogIn } from 'lucide-react';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { useToast } from '@/shared/hooks/useToast';
+import { getLogger } from '@/core/logging';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -15,16 +16,81 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  const { login } = useAuth();
+  const { signIn } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnUrl = searchParams.get('returnUrl') || '/dashboard';
   
   // Reset error message when inputs change
   useEffect(() => {
     if (errorMessage) setErrorMessage(null);
   }, [email, password, errorMessage]);
+
   
-  // Handle form submission
+  // Use logger for consistent logging
+  const logger = getLogger();
+  
+  // Streamlined authentication verification and redirect flow
+  const verifyAuthAndRedirect = async () => {
+    // Generate unique ID for tracking this authentication flow in logs
+    const verifyId = crypto.randomUUID().substring(0, 8);
+    
+    try {
+      logger.info('Starting authentication verification', { verifyId });
+      
+      // Import necessary services
+      const { default: AuthService } = await import('@/features/auth/core/AuthService');
+      
+      // Initialize with force to ensure fresh state
+      await AuthService.initialize({ force: true });
+      
+      // Add a short delay to allow full initialization
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Check if authentication was successful after initialization
+      const isAuthenticated = await AuthService.isAuthenticated();
+      const authState = AuthService.getAuthState();
+      
+      if (!isAuthenticated || !authState.user) {
+        logger.error('Authentication failed - not authenticated after initialization', {
+          verifyId,
+          authState: JSON.stringify(authState),
+          isAuthenticated
+        });
+        throw new Error('Authentication verification failed');
+      }
+      
+      // Import TokenManager for token state management
+      const { TokenManager } = await import('@/core/initialization');
+      const token = await TokenManager.getToken();
+      
+      // Validate token is actually present
+      if (!token || token.trim() === '') {
+        logger.error('No valid token found after sign in', { verifyId });
+        throw new Error('No valid authentication token');
+      }
+      
+      // Log successful verification
+      logger.info('Authentication verified successfully', { 
+        verifyId,
+        userId: authState.user?.id, 
+        tokenLength: token.length
+      });
+      
+      // All verification passed, redirect to intended destination
+      router.push(returnUrl);
+    } catch (error) {
+      logger.error('Auth verification failed', {
+        verifyId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw error; // Rethrow to handle in the calling function
+    }
+  };
+
+  // Simplified login submission flow without multiple retries
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -40,7 +106,34 @@ export default function LoginPage() {
     setIsSubmitting(true);
     
     try {
-      await login({ email, password });
+      logger.info('Login attempt started', { email });
+      
+      // Process the login
+      const result = await signIn(email, password);
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Authentication failed');
+      }
+      
+      // Check if token is in cookies - important validation
+      const hasCookies = document.cookie.includes('js_token=') || 
+                        document.cookie.includes('auth_token=') || 
+                        document.cookie.includes('access_token=');
+      
+      if (!hasCookies) {
+        logger.error('Authentication cookies not set after login', {
+          cookieString: document.cookie.substring(0, 100) // Log partial cookie string for debugging
+        });
+        throw new Error('Authentication failed - no cookies set');
+      }
+      
+      // Add explicit log for debugging
+      logger.debug('Cookie check after login passed', {
+        cookieNames: document.cookie.split(';').map(c => c.trim().split('=')[0]),
+        hasJsToken: document.cookie.includes('js_token='),
+        hasAuthToken: document.cookie.includes('auth_token='),
+        hasAccessToken: document.cookie.includes('access_token=')
+      });
       
       // Show success toast
       toast({
@@ -49,10 +142,16 @@ export default function LoginPage() {
         variant: 'success',
       });
       
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Short delay to ensure cookies are properly set
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Verify authentication and redirect
+      await verifyAuthAndRedirect();
     } catch (error) {
-      console.error('Login error:', error as Error);
+      logger.error('Login error:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       
       if (error instanceof Error) {
         // Set error message based on error
@@ -61,6 +160,8 @@ export default function LoginPage() {
           setErrorMessage('Invalid email or password');
         } else if (error.message.includes('Network') || error.message.includes('fetch')) {
           setErrorMessage('Network error. Please check your internet connection.');
+        } else if (error.message.includes('token') || error.message.includes('Token')) {
+          setErrorMessage(`Authentication token error: ${error.message}`);
         } else {
           setErrorMessage(error.message || 'An unexpected error occurred');
         }
@@ -73,7 +174,8 @@ export default function LoginPage() {
         description: errorMessage || 'Please check your credentials and try again',
         variant: 'destructive',
       });
-    } finally {
+      
+      // Ensure we reset isSubmitting in case of error
       setIsSubmitting(false);
     }
   };

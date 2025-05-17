@@ -39,7 +39,7 @@ export function useSearch() {
     limit: 5
   });
 
-  // Perform search across entities
+  // Perform search across entities - removed data dependencies to prevent infinite loop
   const search = useCallback(async (term: string) => {
     if (!term) {
       setSearchResults([]);
@@ -55,7 +55,16 @@ export function useSearch() {
         refetchAppointments(),
         refetchRequests()
       ]);
-      
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [refetchCustomers, refetchAppointments, refetchRequests]);
+
+  // Combine results whenever data changes
+  useEffect(() => {
+    if (searchTerm && !isSearching) {
       // Combine results
       const results: SearchResult[] = [
         ...customers.map(customer => ({
@@ -81,14 +90,10 @@ export function useSearch() {
       ];
       
       setSearchResults(results);
-    } catch (error) {
-      console.error('Search error:', error);
-    } finally {
-      setIsSearching(false);
     }
-  }, [customers, appointments, requests, refetchCustomers, refetchAppointments, refetchRequests]);
-
-  // Search when search term changes
+  }, [customers, appointments, requests, searchTerm, isSearching]);
+  
+  // Search when search term changes - removed search dependency
   useEffect(() => {
     if (searchTerm) {
       const timeout = setTimeout(() => {
@@ -99,7 +104,9 @@ export function useSearch() {
     } else {
       setSearchResults([]);
     }
-  }, [searchTerm, search]);
+    // Intentionally exclude 'search' from dependencies to prevent infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   // Return search state and functions
   return {

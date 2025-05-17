@@ -6,7 +6,7 @@
 import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
-import { getAppointmentService } from '@/core/factories';
+import { getAppointmentService } from '@/core/factories/serviceFactory.server';
 import { UpdateAppointmentStatusDto } from '@/domain/dtos/AppointmentDtos';
 import { getLogger } from '@/core/logging';
 import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
@@ -86,7 +86,7 @@ async function handleStatusUpdate(req: NextRequest, params: { id: string }) {
     // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
       return formatValidationError(
-        (error as any).validationErrors,
+        (error).validationErrors,
         'Status validation failed'
       );
     }

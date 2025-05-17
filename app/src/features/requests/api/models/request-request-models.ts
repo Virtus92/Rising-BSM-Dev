@@ -330,6 +330,11 @@ export interface RequestFilterParams {
   type?: RequestType | RequestType[];
   
   /**
+   * Source filter
+   */
+  source?: string;
+  
+  /**
    * Customer ID filter
    */
   customerId?: number;
@@ -350,6 +355,11 @@ export interface RequestFilterParams {
   sortDirection?: 'asc' | 'desc';
   
   /**
+   * Sort order
+   */
+  sortOrder?: 'asc' | 'desc';
+  
+  /**
    * Date range - from
    */
   fromDate?: string;
@@ -358,6 +368,16 @@ export interface RequestFilterParams {
    * Date range - to
    */
   toDate?: string;
+  
+  /**
+   * Start date
+   */
+  startDate?: Date | string;
+  
+  /**
+   * End date
+   */
+  endDate?: Date | string;
   
   /**
    * Priority filter

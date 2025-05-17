@@ -26,7 +26,7 @@ import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { usePermissions } from '@/features/users/hooks/usePermissions';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 
 // Type definition for permission item
 interface PermissionItem {

@@ -2,11 +2,13 @@
  * Permission Error Handler Utility
  * 
  * Provides standardized error handling for permission-related errors across the application.
+ * Updated with improved error diagnostics and logging.
  */
 import { NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { getPermissionFromCache } from '@/features/permissions/lib/utils/permissionCacheUtils';
 
 /**
  * Formats a permission denied error message
@@ -50,25 +52,56 @@ export function formatPermissionDeniedMessage(
 }
 
 /**
- * Creates a permission denied response
+ * Creates a permission denied response with detailed diagnostics
  * 
  * @param permission - Permission code that was required
  * @param userId - User ID that was denied
  * @returns Formatted NextResponse with error
  */
-export function createPermissionDeniedResponse(
+export async function createPermissionDeniedResponse(
   permission: SystemPermission | string | (SystemPermission | string)[],
   userId?: number
-): NextResponse {
+): Promise<NextResponse> {
   const logger = getLogger();
+  const requestId = `perm-check-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   
   try {
     const message = formatPermissionDeniedMessage(permission, userId);
-    logger.warn(`Permission denied: User ${userId} does not have permission ${Array.isArray(permission) ? JSON.stringify(permission) : permission}`);
+    
+    // Enhanced logging with diagnostics information
+    logger.warn(`Permission denied: User ${userId} does not have permission(s)`, { 
+      userId, 
+      permission: Array.isArray(permission) ? permission : [permission],
+      requestId
+    });
+    
+    // Diagnostic cache check to help troubleshoot issues
+    if (userId && typeof permission === 'string') {
+      try {
+        const cacheStatus = await getPermissionFromCache(Number(userId), permission);
+        logger.info(`Permission cache diagnostics for denied permission:`, {
+          userId,
+          permission,
+          cachedValue: cacheStatus,
+          requestId
+        });
+      } catch (cacheError) {
+        logger.warn(`Failed to check permission cache during error handling`, {
+          error: cacheError instanceof Error ? cacheError.message : String(cacheError),
+          requestId
+        });
+      }
+    }
+    
     return formatResponse.error(message, 403);
   } catch (error) {
     // Log but return a safe default response
-    logger.error('Error creating permission denied response:', { error, permission, userId });
+    logger.error('Error creating permission denied response:', { 
+      error: error instanceof Error ? error.message : String(error), 
+      permission, 
+      userId,
+      requestId
+    });
     return formatResponse.error('Permission denied', 403);
   }
 }
@@ -126,8 +159,8 @@ export const permissionErrorHandler = {
   showGlobalToast(message: string): void {
     try {
       // Check for toast function in global scope
-      if (typeof window !== 'undefined' && (window as any).__TOAST_REGISTRY__?.toast) {
-        const toast = (window as any).__TOAST_REGISTRY__.toast;
+      if (typeof window !== 'undefined' && window.__TOAST_REGISTRY__?.toast) {
+        const toast = window.__TOAST_REGISTRY__.toast;
         toast({
           title: 'Permission Denied',
           description: message || 'You do not have permission to perform this action',

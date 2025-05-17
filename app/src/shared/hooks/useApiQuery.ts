@@ -14,11 +14,12 @@ import {
 import { ApiResponse } from '@/core/api/ApiClient';
 import { useToast } from './useToast';
 import { useErrorHandler } from '@/shared/utils/errorHandler';
-import { processApiResponse } from '@/shared/utils/apiUtils';
+import apiUtils from '@/shared/utils/apiUtils';
+const { processApiResponse } = apiUtils;
 
 type ApiQueryFn<TData> = (...args: any[]) => Promise<ApiResponse<TData>>;
 type ApiQueryOptions<TData, TError> = Omit<
-  UseQueryOptions<TData, TError, TData, any[]>,
+  UseQueryOptions<TData, TError, TData, readonly unknown[]>,
   'queryFn'
 > & {
   showErrorToast?: boolean;
@@ -67,10 +68,12 @@ export function useApiQuery<TData = unknown, TError = Error>(
     }
   };
   
+  const typedQueryKey = queryKey;
+  
   return useQuery<TData, TError>({
-    queryKey,
+    queryKey: typedQueryKey,
     queryFn: enhancedQueryFn,
-    ...queryOptions as any
+    ...queryOptions
   });
 }
 

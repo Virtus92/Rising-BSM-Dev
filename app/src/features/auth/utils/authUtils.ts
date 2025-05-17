@@ -1,24 +1,27 @@
 'use client';
 
 /**
- * Auth Utils - Re-export from lib/initialization/AuthInitializer
- * This file is kept for backwards compatibility only
- * New code should import directly from AuthInitializer
+ * Auth Utils - Direct exports from AuthService
+ * This provides the same auth utility functions but directly using AuthService
  */
 
-import { 
-  initializeAuth as setupAuth,
-  isAuthInitialized,
-  clearAuthState,
-  getAuthStatus,
-  isAuthenticated
-} from '../lib/initialization/AuthInitializer';
+import AuthService from '@/features/auth/core/AuthService';
 
-// Re-export for backwards compatibility
-export { setupAuth as initializeAuth, isAuthInitialized, clearAuthState, getAuthStatus, isAuthenticated };
+// Export auth functions directly from AuthService
+export const initializeAuth = AuthService.initialize.bind(AuthService);
+export const isAuthInitialized = AuthService.isInitialized.bind(AuthService);
+export const clearAuthState = AuthService.signOut.bind(AuthService);
+export const isAuthenticated = AuthService.isAuthenticated.bind(AuthService);
+export const getAuthStatus = () => {
+  const state = AuthService.getAuthState();
+  return {
+    isAuthenticated: state.isAuthenticated,
+    user: state.user
+  };
+};
 
 export default {
-  initializeAuth: setupAuth,
+  initializeAuth,
   isAuthInitialized,
   clearAuthState,
   getAuthStatus,

@@ -896,7 +896,7 @@ export class RequestService extends BaseService<
       // Calculate conversion rate (requests with customers / total)
       const requestsWithCustomer = await this.requestRepository.count({
         customerId: { $ne: null }
-      } as any);
+      });
       
       const conversionRate = totalRequests ? (requestsWithCustomer / totalRequests) * 100 : 0;
 

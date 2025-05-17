@@ -4,6 +4,7 @@
  * Feature-specific data transfer objects that extend core domain DTOs
  */
 
+// Import DTOs from domain
 import { 
   LoginDto, 
   RegisterDto, 
@@ -14,7 +15,7 @@ import {
   ResetPasswordDto,
   TokenPayloadDto,
   LogoutDto,
-  ChangePasswordRequestDto
+  ChangePasswordDto
 } from '@/domain/dtos/AuthDtos';
 import { UserRole } from '@/domain/enums/UserEnums';
 
@@ -60,8 +61,11 @@ export type {
   ResetPasswordDto,
   TokenPayloadDto,
   LogoutDto,
-  ChangePasswordRequestDto
+  ChangePasswordDto
 };
+
+// Create alias to avoid ambiguity
+export type ChangePasswordRequestDto = ChangePasswordDto;
 
 /**
  * Re-export relevant enums

@@ -11,7 +11,7 @@ import {
   UpdateUserStatusDto
 } from '@/domain/dtos/UserDtos';
 import { ActivityLogDto } from '@/domain/dtos/ActivityLogDto';
-import { ApiResponse, apiClient } from '@/core/api';
+import { ApiResponse, ApiClient } from '@/core/api';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 
 // Create instance of UserServiceClient to use for static methods
@@ -24,7 +24,8 @@ function wrapInApiResponse<T>(data: T, message = 'Success'): ApiResponse<T> {
   return {
     success: true,
     data,
-    message
+    message,
+    error: null,
   };
 }
 
@@ -35,6 +36,7 @@ function handleError(error: any, message = 'An error occurred'): ApiResponse<any
   console.error(message, error);
   return {
     success: false,
+    error: error instanceof Error ? error.message : String(error),
     data: {
     message: error instanceof Error ? error.message : String(message),
     statusCode: 500

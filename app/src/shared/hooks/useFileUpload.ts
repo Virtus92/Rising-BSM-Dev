@@ -254,7 +254,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
             uploadResponse = result;
             break;
           } else {
-            throw new Error((result as any)?.message || 'Unknown error during upload');
+            throw new Error((result)?.message || 'Unknown error during upload');
           }
         } catch (error) {
           lastError = error;

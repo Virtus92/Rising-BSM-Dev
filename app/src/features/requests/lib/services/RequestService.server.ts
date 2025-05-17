@@ -1,3 +1,6 @@
+// Mark as server-only to prevent client-side imports
+import 'server-only';
+
 import { ContactRequest } from '@/domain/entities/ContactRequest';
 import { 
   RequestResponseDto, 
@@ -29,20 +32,116 @@ import { Appointment } from '@/domain/entities/Appointment';
 import { AppError } from '@/core/errors/types/app-errors';
 import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
 import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
+import { getLogger } from '@/core/logging';
+
+const logger = getLogger();
 
 /**
  * Server-side implementation of the RequestService
  * 
  * This service handles request-related operations directly using the repository
  */
-export class RequestService implements IRequestService {
+export class RequestServiceImpl implements IRequestService {
   // IRequestService interface implementation methods
   async createRequest(data: CreateRequestDto, options?: ServiceOptions): Promise<RequestResponseDto> {
     return this.create(data, options);
   }
   
+  /**
+   * Find requests based on filter parameters
+   * 
+   * @param filters - Filter parameters
+   * @param options - Service options
+   * @returns Paginated request results
+   */
   async findRequests(filters: RequestFilterParamsDto, options?: ServiceOptions): Promise<PaginationResult<RequestResponseDto>> {
-    return this.findAll({ ...options, filters });
+    try {
+      logger.debug('Finding requests with filters:', filters);
+      
+      // Check if repository has a dedicated findRequests method
+      if (typeof this.repository.findRequests === 'function') {
+        // Use the dedicated method with proper parameters
+        const result = await this.repository.findRequests(filters);
+        
+        // Map entities to DTOs
+        return {
+          data: result.data.map(request => this.toDTO(request)),
+          pagination: result.pagination
+        };
+      }
+      
+      // Fallback to generic implementation
+      // Process filters into repository-compatible criteria
+      const repositoryCriteria: Record<string, any> = {};
+      
+      // Map filters to criteria
+      if (filters.status) repositoryCriteria.status = filters.status;
+      if (filters.source) repositoryCriteria.source = filters.source;
+      if (filters.customerId) repositoryCriteria.customerId = filters.customerId;
+      if (filters.processorId) repositoryCriteria.processorId = filters.processorId;
+      if (filters.search) repositoryCriteria.search = filters.search;
+      if (filters.unassigned) repositoryCriteria.processorId = null;
+      if (filters.assigned) repositoryCriteria.customerId = { not: null };
+      if (filters.notConverted) repositoryCriteria.customerId = null;
+      
+      // Handle date-based filters
+      if (filters.createdAfter || filters.startDate) {
+        const dateValue = filters.createdAfter || filters.startDate;
+        if (dateValue) {
+          repositoryCriteria.createdAfter = new Date(dateValue);
+        }
+      }
+      
+      if (filters.createdBefore || filters.endDate) {
+        const dateValue = filters.createdBefore || filters.endDate;
+        if (dateValue) {
+          repositoryCriteria.createdBefore = new Date(dateValue);
+        }
+      }
+      
+      // Create query options object with proper typing to include sort property
+      interface QueryOptionsWithSort {
+        page: number;
+        limit: number;
+        relations: string[];
+        sort?: {
+          field: string;
+          direction: 'asc' | 'desc';
+        };
+      }
+
+      const queryOptions: QueryOptionsWithSort = {
+        page: filters.page || 1,
+        limit: filters.limit || 10,
+        relations: filters.relations || ['customer', 'assignedTo']
+      };
+      
+      // Add sorting if provided
+      if (filters.sortBy) {
+        queryOptions.sort = {
+          field: filters.sortBy,
+          direction: filters.sortDirection || 'desc'
+        };
+      }
+      
+      // Convert queryOptions to the expected format with criteria included
+      const combinedOptions: QueryOptionsWithSort & { criteria?: Record<string, any> } = {
+        ...queryOptions,
+        criteria: repositoryCriteria  // Pass criteria to the repository via the options object
+      };
+      
+      // Call repository's findAll method with the combined options
+      const result = await this.repository.findAll(combinedOptions);
+      
+      // Map entities to DTOs and return with pagination info
+      return {
+        data: result.data.map(request => this.toDTO(request)),
+        pagination: result.pagination
+      };
+    } catch (error) {
+      logger.error('Error finding requests:', error as Error);
+      throw this.handleError(error);
+    }
   }
   
   async findRequestById(id: number, options?: ServiceOptions): Promise<RequestDetailResponseDto> {
@@ -85,7 +184,7 @@ export class RequestService implements IRequestService {
     try {
       return await this.repository.getRequestStats(period);
     } catch (error) {
-      this.logger.error('Error getting request stats:', {
+      logger.error('Error getting request stats:', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
         period,
@@ -117,14 +216,15 @@ export class RequestService implements IRequestService {
     validationService?: IValidationService,
     errorHandler?: IErrorHandler
   ) {
-    // Dependencies are injected, but we'll get them from factories if not provided
-    const factories = require('@/core/factories');
-    this.repository = repository || factories.getRequestRepository();
-    this.customerRepository = customerRepository || factories.getCustomerRepository();
-    this.userRepository = userRepository || factories.getUserRepository();
-    this.appointmentRepository = appointmentRepository || factories.getAppointmentRepository();
-    this.requestDataRepository = requestDataRepository || factories.getRequestDataRepository();
-    this.logger = logger || require('@/core/logging').getLogger();
+    // Dependencies are injected directly or obtained from serverFactory
+    const serverFactories = require('@/core/factories/serviceFactory.server');
+    
+    this.repository = repository || serverFactories.getRequestRepository();
+    this.customerRepository = customerRepository || serverFactories.getCustomerRepository();
+    this.userRepository = userRepository || serverFactories.getUserRepository();
+    this.appointmentRepository = appointmentRepository || serverFactories.getAppointmentRepository();
+    this.requestDataRepository = requestDataRepository || serverFactories.getRequestDataRepository();
+    this.logger = logger || getLogger();
     this.validationService = validationService || require('@/core/validation').getValidationService();
     this.errorHandler = errorHandler || require('@/core/errors').getErrorHandler();
     
@@ -154,11 +254,17 @@ export class RequestService implements IRequestService {
         
         // Handle date-based filters
         if (options.filters.createdAfter || options.filters.startDate) {
-          criteria.createdAfter = new Date(options.filters.createdAfter || options.filters.startDate);
+          const dateValue = options.filters.createdAfter || options.filters.startDate;
+          if (dateValue) {
+            criteria.createdAfter = new Date(dateValue);
+          }
         }
         
         if (options.filters.createdBefore || options.filters.endDate) {
-          criteria.createdBefore = new Date(options.filters.createdBefore || options.filters.endDate);
+          const dateValue = options.filters.createdBefore || options.filters.endDate;
+          if (dateValue) {
+            criteria.createdBefore = new Date(dateValue);
+          }
         }
       }
       
@@ -238,15 +344,19 @@ export class RequestService implements IRequestService {
         
         // Handle date filters
         if (options.filters.createdAfter) {
-          filterParams.createdAfter = typeof options.filters.createdAfter === 'string' 
-            ? options.filters.createdAfter 
-            : options.filters.createdAfter.toISOString();
+          if (typeof options.filters.createdAfter === 'string') {
+            filterParams.createdAfter = options.filters.createdAfter;
+          } else if (options.filters.createdAfter instanceof Date) {
+            filterParams.createdAfter = options.filters.createdAfter.toISOString();
+          }
         }
         
         if (options.filters.createdBefore) {
-          filterParams.createdBefore = typeof options.filters.createdBefore === 'string' 
-            ? options.filters.createdBefore 
-            : options.filters.createdBefore.toISOString();
+          if (typeof options.filters.createdBefore === 'string') {
+            filterParams.createdBefore = options.filters.createdBefore;
+          } else if (options.filters.createdBefore instanceof Date) {
+            filterParams.createdBefore = options.filters.createdBefore.toISOString();
+          }
         }
       }
       
@@ -268,18 +378,33 @@ export class RequestService implements IRequestService {
       }
       
       // Fall back to standard findAll method
-      // Create proper QueryOptions object
-      const queryOptions = {
+      // Create proper QueryOptions object with typing for sort property
+      interface ExpandedQueryOptions {
+        page: number;
+        limit: number;
+        relations: string[];
+        sort?: {
+          field: string;
+          direction: 'asc' | 'desc';
+        };
+        criteria?: Record<string, any>;
+      }
+      
+      const queryOptions: ExpandedQueryOptions = {
         page: options?.page || 1,
         limit: options?.limit || 10,
-        sort: options?.sort,
         relations: ['customer', 'assignedTo']
       };
       
-      // Process filters separately
-      const criteria = this.mapFiltersToRepositoryCriteria(options?.filters);
+      // Add sort if provided
+      if (options?.sort) {
+        queryOptions.sort = options.sort;
+      }
       
-      // Get requests with options
+      // Process filters separately and add to options
+      queryOptions.criteria = this.mapFiltersToRepositoryCriteria(options?.filters);
+      
+      // Get requests with options (single parameter)
       const result = await this.repository.findAll(queryOptions);
       
       // Map entities to DTOs
@@ -324,8 +449,8 @@ export class RequestService implements IRequestService {
       let notes: RequestNote[] = [];
       
       // Safely access notes property if it exists
-      if (request && (request as any).notes) {
-        notes = (request as any).notes;
+      if (request && (request).notes) {
+        notes = (request).notes as RequestNote[];
       } else {
         // Fallback to repository call
         notes = await this.repository.findNotes(id);
@@ -367,7 +492,7 @@ export class RequestService implements IRequestService {
       
       // Add form data if available (using type casting since these are dynamically added properties)
       if (requestData) {
-        (detailedResponse as any).formData = requestData.data || null;
+        detailedResponse.formData = requestData.data || null;
       }
       
       return detailedResponse;
@@ -1092,7 +1217,7 @@ export class RequestService implements IRequestService {
       // Convert to repository criteria
       const repositoryCriteria = this.mapFiltersToRepositoryCriteria(criteria);
       
-      // Find requests
+      // Find requests - using find method with a single parameter
       const requests = await this.repository.find(repositoryCriteria);
       
       // Convert to DTOs
@@ -1201,7 +1326,7 @@ export class RequestService implements IRequestService {
       // Start transaction in repository
       return await this.repository.transaction(async (repo) => {
         // Create a new service instance with the transaction repository
-        const transactionService = new RequestService(
+        const transactionService = new RequestServiceImpl(
           repo as IRequestRepository,
           this.customerRepository,
           this.userRepository,
@@ -1350,7 +1475,19 @@ export class RequestService implements IRequestService {
    */
   toDTO(entity: ContactRequest): RequestResponseDto {
     if (!entity) {
-      return null as any;
+      // Instead of returning null, return a minimal valid RequestResponseDto
+      return {
+        id: 0,
+        name: '',
+        email: '',
+        status: RequestStatus.NEW,
+        service: '', // Add missing required property
+        message: '', // Add missing required property
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        statusLabel: 'Unknown',
+        statusClass: 'secondary'
+      };
     }
     
     // Derive status label and class based on entity.status
@@ -1398,24 +1535,24 @@ export class RequestService implements IRequestService {
     };
     
     // Add customer information if available
-    if ((entity as any).customer) {
-      dto.customerName = (entity as any).customer.name;
+    if ((entity).customer) {
+      dto.customerName = (entity).customer.name;
       dto.customerData = {
-        id: (entity as any).customer.id,
-        name: (entity as any).customer.name,
-        email: (entity as any).customer.email,
-        phone: (entity as any).customer.phone
+        id: (entity).customer.id,
+        name: (entity).customer.name,
+        email: (entity).customer.email,
+        phone: (entity).customer.phone
       };
     }
     
     // Add assignee information if available
-    if ((entity as any).assignedTo) {
-      dto.assignedToName = (entity as any).assignedTo.name;
+    if ((entity).assignedTo) {
+      dto.assignedToName = (entity).assignedTo.name;
       dto.assignedToData = {
-        id: (entity as any).assignedTo.id,
-        name: (entity as any).assignedTo.name,
-        email: (entity as any).assignedTo.email,
-        role: (entity as any).assignedTo.role
+        id: (entity).assignedTo.id,
+        name: (entity).assignedTo.name,
+        email: (entity).assignedTo.email,
+        role: (entity).assignedTo.role
       };
     }
     
@@ -1483,11 +1620,21 @@ export class RequestService implements IRequestService {
     
     // Handle date-based filters
     if (filters.createdAfter) {
-      criteria.createdAfter = new Date(filters.createdAfter);
+      // Handle different possible types for createdAfter
+      if (typeof filters.createdAfter === 'string') {
+        criteria.createdAfter = new Date(filters.createdAfter);
+      } else if (filters.createdAfter instanceof Date) {
+        criteria.createdAfter = filters.createdAfter;
+      }
     }
     
     if (filters.createdBefore) {
-      criteria.createdBefore = new Date(filters.createdBefore);
+      // Handle different possible types for createdBefore
+      if (typeof filters.createdBefore === 'string') {
+        criteria.createdBefore = new Date(filters.createdBefore);
+      } else if (filters.createdBefore instanceof Date) {
+        criteria.createdBefore = filters.createdBefore;
+      }
     }
     
     // Handle search
@@ -1521,4 +1668,4 @@ export class RequestService implements IRequestService {
 }
 
 // Export for compatibility
-export default RequestService;
+export default RequestServiceImpl;

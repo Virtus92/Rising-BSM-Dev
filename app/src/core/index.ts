@@ -90,7 +90,8 @@ export type { IValidationService, ValidationResult, SchemaDefinition };
 import { bootstrap, resetServices } from './bootstrap';
 export { bootstrap, resetServices };
 
-// Import factory functions and classes - using explicit imports for clarity
+// Import factory functions and classes - using conditional imports for client/server
+// This will be selected at build time by Next.js based on the rendering environment
 import { 
   getServiceFactory, 
   getRepositoryFactory, 
@@ -98,7 +99,7 @@ import {
   ServiceFactory, 
   RepositoryFactory, 
   DatabaseFactory 
-} from './factories';
+} from './factories/index.server';
 
 // Export factory functions and classes
 export { 

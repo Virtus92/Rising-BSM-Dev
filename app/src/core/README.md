@@ -139,7 +139,8 @@ The Factories module provides factories for creating service and repository inst
 **Usage Example**:
 
 ```typescript
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 
 // Get service factory
 const serviceFactory = getServiceFactory();

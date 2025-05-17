@@ -1,55 +1,84 @@
 /**
  * Login API Route Handler
  * Handles user authentication and token generation
+ * Centralized implementation using AuthService as the single source of truth
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
-import { cookies } from 'next/headers'; // Fix: Import cookies from next/headers
-import { jwtDecode } from 'jwt-decode'; // Fix: Use jwtDecode instead of jwt.decode
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
+import AuthService from '@/features/auth/core/AuthService';
+import { authErrorHandler, AuthErrorType } from '@/features/auth/utils/AuthErrorHandler';
+import { cookies } from 'next/headers';
+import { UserRole } from '@/domain/enums/UserEnums';
 
 /**
- * Helper function to clean up stale tokens
+ * Handle response cookies for authentication
  */
-async function cleanupStaleAuthTokens(request: NextRequest, logger: any): Promise<void> {
-  try {
-    const cookieStore = await cookies();
-    const authToken = cookieStore.get('auth_token')?.value;
-    
-    if (authToken) {
-      try {
-        // Try to decode the token to check if it's expired
-        const decoded = jwtDecode(authToken) as any;
-        
-        if (decoded && decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
-          logger.debug('Found expired token in cookies, will be replaced');
-        }
-      } catch (error) {
-        logger.debug('Error decoding token during login, will be replaced', { error });
-      }
-    }
-  } catch (error) {
-    // Non-critical error, just log and continue
-    logger.debug('Error checking for stale tokens', { error });
-  }
+async function setAuthCookies(response: NextResponse, accessToken: string, refreshToken: string, accessExpiration: number, refreshExpiration: number): Promise<void> {
+  // Set HTTP-only cookies with proper security settings
+  response.cookies.set('auth_token', accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+    maxAge: accessExpiration,
+  });
+  
+  response.cookies.set('refresh_token', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth/refresh',
+    maxAge: refreshExpiration,
+  });
+  
+  // Add security headers
+  response.headers.set('X-Token-Set', 'true');
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.headers.set('Pragma', 'no-cache');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
 }
+
+// Simplified request tracker to prevent recursive calls
+const requestTracker = new Set<string>();
+const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 export async function loginHandler(request: NextRequest): Promise<NextResponse> {
   const logger = getLogger();
-  const serviceFactory = getServiceFactory();
+  
+  // Generate a unique request ID
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
+  
+  // Check if we're already processing this request (prevents recursion)
+  if (requestTracker.has(requestId)) {
+    logger.warn('Detected recursive login call, aborting', { requestId });
+    const error = authErrorHandler.createError(
+      'Internal server error: recursive login detected',
+      AuthErrorType.SERVER_ERROR
+    );
+    return error.toResponse();
+  }
+  
+  // Add request to ongoing set with proper cleanup
+  requestTracker.add(requestId);
+  setTimeout(() => requestTracker.delete(requestId), REQUEST_TIMEOUT);
   
   try {
-    // Get the auth service
-    const authService = serviceFactory.createAuthService();
-    
     // Parse request data
     const data = await request.json();
     const { email, password, remember = false } = data;
 
     // Validate input
     if (!email || !password) {
-      return formatResponse.error('Email and password are required', 400);
+      const error = authErrorHandler.createError(
+        'Email and password are required',
+        AuthErrorType.INVALID_REQUEST
+      );
+      return error.toResponse();
     }
 
     // Prepare context for login
@@ -57,119 +86,125 @@ export async function loginHandler(request: NextRequest): Promise<NextResponse> 
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
       device: request.headers.get('sec-ch-ua') || 'unknown-device',
-      requestId: request.headers.get('x-request-id') || crypto.randomUUID()
+      requestId
     };
     
-    // Attempt to log any prior tokens for this session
-    await cleanupStaleAuthTokens(request, logger);
+    // Use AuthService directly
+    const result = await AuthService.signIn(email, password);
     
-    // Perform login with proper context tracking
-    const result = await authService.login({
-      email,
-      password,
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent,
-      rememberMe: remember
-    }, { context });
+    if (!result.success) {
+      const error = authErrorHandler.createError(
+        result.message || 'Invalid credentials',
+        AuthErrorType.LOGIN_FAILED,
+      );
+      return error.toResponse();
+    }
     
-    // Get token expiration from security config
+    // Get token and user info
+    const token = await AuthService.getToken();
+    const user = AuthService.getUser();
+    
+    if (!token || !user) {
+      const error = authErrorHandler.createError(
+        'Authentication successful but failed to get user information',
+        AuthErrorType.SERVER_ERROR
+      );
+      return error.toResponse();
+    }
+    
+    // Get token expiration time from current token
+    const tokenInfo = await AuthService.getTokenInfo();
+    const retrievedExpiresIn = tokenInfo.expiresAt 
+      ? Math.floor((tokenInfo.expiresAt.getTime() - Date.now()) / 1000) 
+      : 3600;
+    
+    // Standardized minimum token durations
+    const MIN_ACCESS_TOKEN_DURATION = 1800; // 30 minutes minimum
+    const MIN_REFRESH_TOKEN_DURATION = 86400; // 24 hours minimum
+    
+    // Get token expiration from security config for refresh token
     const securityConfig = getServiceFactory().createSecurityConfig();
-    const accessExpiration = securityConfig.getAccessTokenLifetime(); // default 15 minutes
-    const refreshExpiration = securityConfig.getRefreshTokenLifetime(); // default 30 days
     
-    // Add expiration fields if not already present
-    result.accessExpiration = result.accessExpiration || accessExpiration;
-    result.refreshExpiration = result.refreshExpiration || refreshExpiration;
+    // Ensure access token has appropriate duration regardless of what was received
+    const accessExpiration = Math.max(MIN_ACCESS_TOKEN_DURATION, retrievedExpiresIn);
     
-    // Log expiration information
-    logger.info('Token expiration settings', { 
-      accessExpiration: `${Math.floor(accessExpiration / 60)} minutes`, 
-      refreshExpiration: `${Math.floor(refreshExpiration / 60 / 60 / 24)} days` 
+    // Get refresh token duration from config but ensure minimum
+    const configRefreshDuration = securityConfig.getRefreshTokenLifetime(); // default 30 days
+    const refreshExpiration = Math.max(MIN_REFRESH_TOKEN_DURATION, configRefreshDuration);
+    
+    // Final sanitized values
+    const accessExpirationSeconds = Math.floor(accessExpiration);
+    const refreshExpirationSeconds = Math.floor(refreshExpiration);
+    
+    // Log the standardized token durations for monitoring
+    logger.debug('Setting standardized token durations', {
+      originalExpiresIn: retrievedExpiresIn,
+      finalAccessExpiration: accessExpirationSeconds,
+      finalRefreshExpiration: refreshExpirationSeconds
     });
     
-    // Log successful login
-    logger.info('User logged in successfully', { userId: result.user.id });
+    // Create a refresh token
+    let refreshToken = '';
+    
+    try {
+      const refreshResult = await AuthService.refreshToken();
+      refreshToken = refreshResult.data?.refreshToken || '';
+    } catch (refreshError) {
+      logger.warn('Failed to generate refresh token, continuing with access token only', { 
+        error: refreshError instanceof Error ? refreshError.message : String(refreshError) 
+      });
+    }
+    
+    // Generate a sessionId for tracking
+    const sessionId = crypto.randomUUID().split('-')[0];
     
     // Create response
     const response = formatResponse.success({
       user: {
-        id: result.user.id,
-        name: result.user.name,
-        email: result.user.email,
-        role: result.user.role
+        id: user.id,
+        name: user.name || '',
+        email: user.email,
+        role: user.role
       },
       // Include tokens in response body for client-side storage backup
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken
+      accessToken: token,
+      refreshToken
     }, 'Login successful');
     
-    // Set HTTP-only cookies with proper security settings
-    // Fix: Use the proper NextResponse cookies API structure
-    response.cookies.set('auth_token', result.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: result.accessExpiration,
-    });
+    // Set HTTP-only cookies and security headers
+    await setAuthCookies(response, token, refreshToken, accessExpirationSeconds, refreshExpirationSeconds);
     
-    response.cookies.set('refresh_token', result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/api/auth/refresh',
-      maxAge: result.refreshExpiration,
-    });
+    // Add expiration details in header for monitoring/debugging
+    response.headers.set('X-Token-Expires', accessExpirationSeconds.toString());
     
-    // Add security headers
-    response.headers.set('X-Token-Set', 'true');
-    response.headers.set('X-Auth-User-ID', result.user.id.toString());
-    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    response.headers.set('Pragma', 'no-cache');
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    response.headers.set('X-Frame-Options', 'DENY');
-    response.headers.set('X-XSS-Protection', '1; mode=block');
-    
-    // Add tracking information for monitoring
-    response.headers.set('X-Request-ID', context.requestId);
-    
-    // Give the client a session ID (but not the user ID) to help with debugging
-    const sessionId = crypto.randomUUID().split('-')[0];
+    // Add additional headers
+    response.headers.set('X-Auth-User-ID', user.id.toString());
+    response.headers.set('X-Request-ID', requestId);
     response.headers.set('X-Session-ID', sessionId);
     
     // Log successful login for monitoring
     logger.info('User authenticated successfully', { 
-      userId: result.user.id,
-      email: result.user.email,
-      role: result.user.role,
+      userId: user.id,
+      email: user.email,
+      role: user.role,
       sessionId,
-      requestId: context.requestId
+      requestId
     });
     
     return response;
   } catch (error) {
-    // Handle authentication errors
+    // Use AuthErrorHandler to normalize and handle errors
+    const normalizedError = authErrorHandler.normalizeError(error as Error);
+    
     logger.error('Login error:', { 
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      error: normalizedError.message,
+      type: normalizedError.type,
+      status: normalizedError.status
     });
     
-    // Determine appropriate error message and status
-    let message = 'An error occurred during login';
-    let status = 500;
-    
-    if (error instanceof Error) {
-      if (error.message.includes('Invalid credentials') || 
-          error.message.includes('not found') || 
-          error.message.includes('invalid password')) {
-        message = 'Invalid email or password';
-        status = 401;
-      } else if (error.message.includes('not active')) {
-        message = 'Account is not active. Please contact admin.';
-        status = 403;
-      }
-    }
-    
-    return formatResponse.error(message, status);
+    return normalizedError.toResponse();
+  } finally {
+    // Ensure we clean up even if there's an unexpected error
+    requestTracker.delete(requestId);
   }
 }

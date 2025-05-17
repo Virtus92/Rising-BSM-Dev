@@ -94,6 +94,9 @@ export interface UseBaseListResult<T, F extends BaseFilterParamsDto> {
   // Item management
   setItems: (items: T[]) => void;
   
+  // Function setter to allow updating the fetch function
+  setFetchFunction?: (fn: (filters: F) => Promise<any>) => void;
+  
   // Access to dispatch for internal use
   dispatch: React.Dispatch<BaseListAction<T, F>>;
 }
@@ -264,8 +267,8 @@ function getFiltersFromUrl<F extends BaseFilterParamsDto>(
     
     // Validate enum values
     if (config.enum && key in config.enum) {
-      const enumValues = config.enum[key as keyof F] as any[];
-      if (enumValues.includes(value)) {
+      const enumValues = config.enum[key as keyof F] || [];
+      if (Array.isArray(enumValues) && enumValues.includes(value)) {
         filters[key] = value;
       }
       return;
@@ -369,7 +372,7 @@ function baseListReducer<T, F extends BaseFilterParamsDto>(
       
       // Reset page to 1 if needed and not explicitly set in new filters
       if (resetPage && !('page' in newPartialFilters) && Object.keys(newPartialFilters).length > 0) {
-        updatedFilters.page = 1 as any;
+        updatedFilters.page = 1;
       }
       
       // If new filters are identical to current filters, don't update
@@ -400,10 +403,10 @@ function baseListReducer<T, F extends BaseFilterParamsDto>(
     case 'RESET_FILTERS': {
       const baseResetFilters = {
         ...options.initialFilters,
-        page: options.defaultPage as any,
-        limit: options.defaultLimit as any,
-        sortBy: options.defaultSortField as any,
-        sortDirection: options.defaultSortDirection as any
+        page: options.defaultPage,
+        limit: options.defaultLimit,
+        sortBy: options.defaultSortField,
+        sortDirection: options.defaultSortDirection
       };
       
       // Override with any specified values
@@ -905,8 +908,8 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
     }
     
     updateFilters({
-      sortBy: field as any,
-      sortDirection: direction as any,
+      sortBy: field,
+      sortDirection: direction,
       page: 1
     } as Partial<F>);
   }, [updateFilters, state.filters.sortBy, state.filters.sortDirection]);
@@ -978,6 +981,17 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
     });
   }, [state.pagination, state.lastRequestId]);
 
+  // Create a function to update the fetch function
+  const setFetchFunction = useCallback((newFetchFunction: (filters: F) => Promise<any>) => {
+    // Store the new fetch function
+    fetchFunction = newFetchFunction;
+    
+    // Trigger a refetch with the new function
+    if (state.isInitialized && isApiInitialized) {
+      fetchData();
+    }
+  }, [state.isInitialized, isApiInitialized, fetchData]);
+
   return {
     // State
     items: state.items,
@@ -1005,6 +1019,9 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
     
     // Item management
     setItems,
+    
+    // Function setter
+    setFetchFunction,
     
     // Internal
     dispatch

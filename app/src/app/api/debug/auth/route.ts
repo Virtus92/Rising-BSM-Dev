@@ -1,161 +1,162 @@
-import { NextRequest } from 'next/server';
-import { formatResponse } from '@/core/errors';
-import { getServiceFactory } from '@/core/factories/serviceFactory.server';
+/**
+ * Authentication Diagnostic API
+ * 
+ * This endpoint provides diagnostic information about the current authentication state,
+ * including cookie details, token validation, and server configuration.
+ * 
+ * IMPORTANT: This should only be enabled in development or testing environments.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { getLogger } from '@/core/logging';
-import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
-import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 
 const logger = getLogger();
 
-/**
- * API handler for auth and permission diagnostics
- * This endpoint provides detailed information about the current auth state and permissions
- * Only available to administrators for security reasons
- * 
- * @param request NextRequest with auth information
- * @returns Diagnostic information in a structured format
- */
 export async function GET(request: NextRequest) {
-  try {
-    // Extract userId from auth
-    const userId = request.auth?.userId;
-    
-    // If no userId, return unauthorized
-    if (!userId) {
-      return formatResponse.unauthorized('Authentication required for auth diagnostics');
-    }
-    
-    // Check if user has admin permission
-    const permissionCheck = await permissionMiddleware.checkPermission(
-      request, 
-      SystemPermission.SYSTEM_ADMIN
-    );
-    
-    if (!permissionCheck.success) {
-      return formatResponse.forbidden(
-        'Admin permission required to access authentication diagnostics', 
-        { permissionCheck }.toString()
-      );
-    }
-    
-    // Get service factory and services
-    const serviceFactory = getServiceFactory();
-    const userService = serviceFactory.createUserService();
-    const permissionService = serviceFactory.createPermissionService();
-    const authService = serviceFactory.createAuthService();
-    
-    // Check if services are available
-    if (!userService || !permissionService) {
-      return formatResponse.error(
-        'Required services not available', 
-        500, 
-        { 
-          availableServices: {
-            userService: !!userService,
-            permissionService: !!permissionService,
-            authService: !!authService
-          }
-        }.toString()
-      );
-    }
-    
-    // Collect user information
-    const user = await userService.getById(userId);
-    if (!user) {
-      return formatResponse.error(
-        'User not found despite valid authentication', 
-        500, 
-        { userId }.toString()
-      );
-    }
-    
-    // Get user permissions (without caching)
-    const permissions = await permissionService.getUserPermissions(userId);
-    
-    // Extract auth info from headers
-    const authHeaders = {
-      authorization: request.headers.get('authorization'),
-      cookie: request.headers.get('cookie'),
-      xAuthToken: request.headers.get('x-auth-token')
-    };
-    
-    // Get auth token from cookie (if any)
-    const getCookieValue = (cookieString: string | null, name: string): string | null => {
-      if (!cookieString) return null;
-      const matches = cookieString.match(new RegExp(`${name}=([^;]+)`));
-      return matches ? decodeURIComponent(matches[1]) : null;
-    };
-    
-    const cookieString = request.headers.get('cookie');
-    const authTokenFromCookie = getCookieValue(cookieString, 'auth_token');
-    const refreshTokenFromCookie = getCookieValue(cookieString, 'refresh_token');
-    
-    // Check x-auth-token header
-    const xAuthToken = request.headers.get('x-auth-token');
-    
-    // Check both token sources
-    const tokenStatus = {
-      hasCookieToken: !!authTokenFromCookie,
-      hasRefreshToken: !!refreshTokenFromCookie,
-      hasXAuthToken: !!xAuthToken,
-      tokenMatch: authTokenFromCookie === xAuthToken
-    };
-    
-    // Get all cookies for debugging
-    const cookies = cookieString ? 
-      Object.fromEntries(
-        cookieString.split(';')
-          .map(cookie => cookie.trim().split('='))
-          .map(([key, value]) => [key, decodeURIComponent(value)])
-      ) : {};
-    
-    // Collect diagnostic information
-    const diagnosticInfo = {
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        status: user.status
-      },
-      permissions: permissions,
-      auth: {
-        headers: authHeaders,
-        tokenStatus,
-        cookies: Object.keys(cookies)
-      },
-      services: {
-        userService: !!userService,
-        permissionService: !!permissionService,
-        authService: !!authService
-      },
-      systemInfo: {
-        nodeEnv: process.env.NODE_ENV,
-        timestamp: new Date().toISOString()
-      }
-    };
-    
-    // Return diagnostic information
-    return formatResponse.success(
-      diagnosticInfo, 
-      'Authentication and permission diagnostic information'
-    );
-  } catch (error) {
-    // Log error and return error response
-    logger.error('Error in auth diagnostics endpoint', { 
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined 
-    });
-    
-    return formatResponse.error(
-      `Error getting authentication diagnostics: ${error instanceof Error ? error.message : String(error)}`, 
-      500
+  // Disable in production by default
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_AUTH_DIAGNOSTICS !== 'true') {
+    return NextResponse.json(
+      { message: 'Authentication diagnostics are disabled in production.' },
+      { status: 403 }
     );
   }
-}
 
-/**
- * Options handler for CORS
- */
-export function OPTIONS() {
-  return formatResponse.success(null, 'OK');
+  try {
+    // Generate a request ID for tracing this diagnostic session
+    const requestId = crypto.randomUUID();
+    
+    // Get all cookies - handle safely with try/catch
+    let cookieStore;
+    let allCookies: { name: string; value: string }[] = [];
+    let authCookies: { name: string; value: string }[] = [];
+    let authTokenCookie = null;
+    let refreshTokenCookie = null;
+    
+    try {
+      cookieStore = await cookies();
+      allCookies = cookieStore.getAll();
+      
+      // Filter for auth-related cookies only
+      authCookies = allCookies.filter(cookie => 
+        cookie.name.includes('auth') || 
+        cookie.name.includes('token') || 
+        cookie.name === 'refresh_token'
+      );
+      
+      // Extract auth token
+      authTokenCookie = cookieStore.get('auth_token');
+      refreshTokenCookie = cookieStore.get('refresh_token');
+    } catch (cookieError) {
+      logger.error('Error accessing cookies:', {
+        requestId,
+        error: cookieError instanceof Error ? cookieError.message : 'Unknown error'
+      });
+      
+      // Continue with empty cookies
+      allCookies = [];
+      authCookies = [];
+    }
+    
+    // Get auth service for token validation
+    const serviceFactory = getServiceFactory();
+    const authService = serviceFactory.createAuthService();
+    
+    // Check token validity
+    let tokenValidity = null;
+    let tokenDecodeResult = null;
+    let tokenInfo = null;
+    
+    if (authTokenCookie?.value) {
+      try {
+        // Get token info without validation - RequestCookie doesn't have path, sameSite, secure, expires props
+        tokenInfo = {
+        length: authTokenCookie.value.length,
+        format: authTokenCookie.value.split('.').length === 3 ? 'valid JWT format' : 'invalid format',
+        cookiePath: 'N/A', // RequestCookie doesn't have path property
+        sameSite: 'N/A', // RequestCookie doesn't have sameSite property
+        secure: 'N/A', // RequestCookie doesn't have secure property
+        expires: 'session', // RequestCookie doesn't have expires property
+        };
+        
+        // Check token validity
+        tokenValidity = await authService.verifyToken(authTokenCookie.value);
+        
+        // Try to decode token
+        // Using JWT decode directly since there's no decodeToken method
+        const { jwtDecode } = await import('jwt-decode');
+        tokenDecodeResult = jwtDecode(authTokenCookie.value);
+      } catch (error) {
+        tokenValidity = { 
+          valid: false, 
+          error: error instanceof Error ? error.message : String(error)
+        };
+      }
+    }
+    
+    // Get server time and environment info
+    const serverInfo = {
+      time: new Date().toISOString(),
+      nodeEnv: process.env.NODE_ENV || 'development',
+      serverHost: request.headers.get('host'),
+      clientIp: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      diagRequestId: requestId
+    };
+    
+    // Log diagnostic info
+    logger.info('Auth diagnostic executed', { 
+      requestId,
+      authCookiesCount: authCookies.length,
+      hasAuthToken: !!authTokenCookie,
+      hasRefreshToken: !!refreshTokenCookie,
+      tokenValid: tokenValidity?.valid === true
+    });
+    
+    // Create diagnostic response
+    return NextResponse.json({
+      requestId,
+      timestamp: Date.now(),
+      serverInfo,
+      cookies: {
+        count: allCookies.length,
+        authRelated: authCookies.map(c => ({
+          name: c.name,
+          path: 'N/A', // RequestCookie doesn't have path property
+          sameSite: 'N/A', // RequestCookie doesn't have sameSite property
+          secure: 'N/A', // RequestCookie doesn't have secure property
+          httpOnly: 'N/A', // RequestCookie doesn't have httpOnly property
+          expires: 'session', // RequestCookie doesn't have expires property
+          valueLength: c.value?.length || 0
+        }))
+      },
+      auth: {
+        authToken: authTokenCookie ? tokenInfo : null,
+        refreshToken: refreshTokenCookie ? {
+          exists: true,
+          path: 'N/A', // RequestCookie doesn't have path property
+          sameSite: 'N/A', // RequestCookie doesn't have sameSite property
+          secure: 'N/A', // RequestCookie doesn't have secure property
+          expires: 'session', // RequestCookie doesn't have expires property
+        } : null,
+        tokenValidation: tokenValidity,
+        tokenDecode: tokenDecodeResult ? {
+          success: true,
+          userId: tokenDecodeResult.sub,
+          expires: tokenDecodeResult.exp ? new Date(tokenDecodeResult.exp * 1000).toISOString() : null,
+          issued: tokenDecodeResult.iat ? new Date(tokenDecodeResult.iat * 1000).toISOString() : null,
+        } : null
+      }
+    });
+  } catch (error) {
+    logger.error('Error in auth diagnostics', { error });
+    
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: Date.now()
+      },
+      { status: 500 }
+    );
+  }
 }

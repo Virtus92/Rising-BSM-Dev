@@ -31,6 +31,26 @@ export interface PaginationResult<T> {
      */
     totalPages: number;
   };
+  
+  /**
+   * Total count (backward compatibility)
+   */
+  total?: number;
+  
+  /**
+   * Current page (backward compatibility)
+   */
+  page?: number;
+  
+  /**
+   * Page limit (backward compatibility)
+   */
+  limit?: number;
+  
+  /**
+   * Total pages (backward compatibility)
+   */
+  totalPages?: number;
 }
 
 /**

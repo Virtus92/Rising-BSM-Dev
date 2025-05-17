@@ -5,11 +5,12 @@
 import { NextRequest } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { NotFoundError, PermissionError } from '@/core/errors/types/AppError';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
 import { routeHandler } from '@/core/api/route-handler';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { apiAuth } from '@/features/auth/api/middleware';
+import { auth } from '@/features/auth/api/middleware/authMiddleware';
 
 const logger = getLogger();
 
@@ -89,34 +90,44 @@ export const deleteNotificationHandler = async (
 /**
  * DELETE /api/notifications/:id route
  */
-export const DELETE = routeHandler(async (request: NextRequest) => {
-  try {
-    // Extract ID from URL path segments
-    const urlParts = request.nextUrl.pathname.split('/');
-    const id = urlParts[urlParts.length - 1]; // Take the last segment (the id part)
+export const DELETE = auth(
+  async (request: NextRequest, user) => {
+    try {
+      // Extract ID from URL path segments
+      const urlParts = request.nextUrl.pathname.split('/');
+      const id = urlParts[urlParts.length - 1]; // Take the last segment (the id part)
 
-    if (!id) {
-      return formatResponse.error('Notification ID is required', 400);
+      if (!id) {
+        return formatResponse.error('Notification ID is required', 400);
+      }
+      
+      // User is already authenticated through the auth middleware
+      if (!user || !user.id) {
+        return formatResponse.error('Authentication failed', 401);
+      }
+      
+      // Create a context object with user ID
+      const context = { 
+        auth: { 
+          userId: user.id 
+        } 
+      };
+      
+      // Call handler with ID and context
+      const result = await deleteNotificationHandler(request, { id }, context);
+      return formatResponse.success(result, 'Notification deleted successfully');
+    } catch (error) {
+      logger.error('Error deleting notification:', error as Error);
+      return formatResponse.error(
+        error instanceof Error ? error.message : 'An error occurred while deleting the notification', 
+        error instanceof NotFoundError ? 404 : 
+        error instanceof PermissionError ? 403 : 500
+      );
     }
-    
-    // Create a context object
-    const context = { auth: { userId: 0 } };
-    
-    // Authenticate user
-    const auth = await apiAuth(request);
-    if (!auth) {
-      return formatResponse.error('Authentication required', 401);
-    }
-    
-    // Set the authenticated user ID in context
-    if (auth.user?.id) {
-      context.auth.userId = auth.user.id;
-    }
-    
-    // Call handler with ID and context
-    const result = await deleteNotificationHandler(request, { id }, context);
-    return formatResponse.success(result, 'Notification deleted successfully');
-  } catch (error) {
-    return formatResponse.error('An error occurred while deleting the notification', 500);
+  },
+  // Auth middleware options
+  {
+    requireAuth: true,
+    requiredPermission: [SystemPermission.NOTIFICATIONS_MANAGE]
   }
-});
+);

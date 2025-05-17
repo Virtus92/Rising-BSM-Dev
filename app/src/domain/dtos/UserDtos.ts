@@ -45,8 +45,17 @@ export interface UserResponseDto extends BaseResponseDto {
   phone?: string;
   status: UserStatus;
   profilePicture?: string;
+  profilePictureId?: string;
   lastLoginAt?: string;
   permissions?: string[];
+  teamId?: number;
+  team?: {
+    id: number;
+    name: string;
+  };
+  metadata?: {
+    [key: string]: any
+  };
 }
 
 import { ActivityLogDto } from './ActivityLogDto';
@@ -79,9 +88,9 @@ export interface UserFilterParamsDto extends BaseFilterParamsDto {
  * @param user - User entity to map
  * @returns UserDto with mapped properties
  */
-export function mapUserToDto(user: User): UserDto {
+export function mapUserToDto(user: User): UserDto | null {
   // Ensure we have a valid user
-  if (!user) return null as any;
+  if (!user) return null;
   
   return {
     id: user.id,

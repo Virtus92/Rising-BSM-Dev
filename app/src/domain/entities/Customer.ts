@@ -39,6 +39,24 @@ export class Customer extends BaseEntity {
    * Postleitzahl
    */
   postalCode?: string;
+
+  /**
+   * Customer appointments
+   * Can be either appointment objects or just references
+   */
+  appointments?: Array<{
+    id: number;
+    title: string;
+    appointmentDate: Date;
+    status: string;
+    duration: number | null;
+    location: string;
+    description: string;
+    customerId: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+    createdBy: number | null;
+  }>;
   
   /**
    * Alias for postalCode - used for backward compatibility

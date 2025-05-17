@@ -8,6 +8,20 @@ import { getPermissionsForRole } from '@/domain/enums/PermissionEnums';
 import { SystemPermissionMap, getAllPermissionCodes } from '@/domain/permissions/SystemPermissionMap';
 import { UserRole } from '@/domain/entities/User';
 import { QueryOptions } from '@/core/repositories/PrismaRepository';
+import { PermissionItem, PermissionObject, extractPermissionCode } from '../types/PermissionTypes';
+
+// Type for permission response from DB
+interface PermissionDbEntity {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  category: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  createdBy?: number;
+  updatedBy?: number;
+}
 
 /**
  * Implementation of the Permission Repository
@@ -52,11 +66,11 @@ export class PermissionRepository implements IPermissionRepository {
         name: permission.name,
         description: permission.description,
         category: permission.category
-      }));
+      })) as { code: string; name: string; description: string; category: string; }[];
       
       // Insert all permissions in a transaction
       await this.prisma.$transaction(
-        allPermissions.map(p => 
+        allPermissions.map((p: { code: string; name: string; description: string; category: string; }) => 
           this.prisma.permission.create({
             data: {
               code: p.code,
@@ -149,7 +163,7 @@ export class PermissionRepository implements IPermissionRepository {
       ]);
       
       // Map to domain entities
-      const data = permissions.map((p: any) => this.mapToDomainEntity(p));
+      const data = permissions.map((p: PermissionDbEntity) => this.mapToDomainEntity(p));
       
       // Calculate pagination info
       const totalPages = Math.ceil(total / limit);
@@ -208,7 +222,9 @@ export class PermissionRepository implements IPermissionRepository {
       });
       
       // Combine role permissions with user-specific permissions
-      const userPermissionCodes = userPermissions.map((up: any) => up.permission.code);
+      const userPermissionCodes = userPermissions.map((up: any) => {
+        return up && up.permission ? up.permission.code : null;
+      }).filter((code: any): code is string => code !== null);
       
       // Use a Set to ensure uniqueness of permission codes
       const allPermissions = new Set([...rolePermissions, ...userPermissionCodes]);
@@ -250,12 +266,15 @@ export class PermissionRepository implements IPermissionRepository {
       }
       
       // Get default permissions for the user's role
-      const rolePermissions = getPermissionsForRole(user.role);
+      const rolePermissions = getPermissionsForRole(user.role) as string[];
+      
+      // Convert all permissions to strings for consistent comparison
+      const permissionStrings = permissions.map((p: string) => p);
+      const rolePermissionStrings = rolePermissions;
       
       // Determine which permissions need to be explicitly added or removed
-      // We only need to store permissions in the database that differ from role defaults
-      const additionalPermissions = permissions.filter(p => !rolePermissions.includes(p));
-      const removedPermissions = rolePermissions.filter(p => !permissions.includes(p));
+      const additionalPermissions = permissionStrings.filter((p: string) => !rolePermissionStrings.includes(p));
+      const removedPermissions = rolePermissionStrings.filter((p: string) => !permissionStrings.includes(p));
       
       // Run this as a transaction
       await this.prisma.$transaction(async (tx: any) => {
@@ -268,18 +287,23 @@ export class PermissionRepository implements IPermissionRepository {
         const permissionEntities = await tx.permission.findMany({
           where: {
             code: {
-              in: additionalPermissions.concat(removedPermissions)
+              in: [...additionalPermissions, ...removedPermissions]
             }
           }
         });
         
         // Create a map of permission code to ID
         const permissionMap = new Map<string, number>();
-        permissionEntities.forEach((p: any) => permissionMap.set(p.code, p.id));
+        permissionEntities.forEach((p: PermissionDbEntity) => {
+          if (p && typeof p === 'object' && 'code' in p && 'id' in p) {
+            permissionMap.set(p.code, p.id);
+          }
+        });
         
         // Add explicitly granted permissions
-        const grantsToAdd = additionalPermissions.filter(code => permissionMap.has(code))
-          .map(code => ({
+        const grantsToAdd = additionalPermissions
+          .filter((code: string) => permissionMap.has(code))
+          .map((code: string) => ({
             userId,
             permissionId: permissionMap.get(code)!,
             grantedAt: new Date(),
@@ -287,8 +311,9 @@ export class PermissionRepository implements IPermissionRepository {
           }));
         
         // Add negative grants for explicitly removed permissions
-        const grantsToRemove = removedPermissions.filter(code => permissionMap.has(code))
-          .map(code => ({
+        const grantsToRemove = removedPermissions
+          .filter((code: string) => permissionMap.has(code))
+          .map((code: string) => ({
             userId,
             permissionId: permissionMap.get(code)!,
             grantedAt: new Date(),
@@ -433,7 +458,9 @@ export class PermissionRepository implements IPermissionRepository {
       }
       
       // Get role-based permissions
-      const rolePermissions = getPermissionsForRole(user.role);
+      const rolePermissions = getPermissionsForRole(user.role) as string[];
+      
+      // Check if the permission code is in the role permissions
       if (rolePermissions.includes(permissionCode)) {
         return true;
       }
@@ -501,7 +528,7 @@ export class PermissionRepository implements IPermissionRepository {
       
       const permissions = await this.prisma.permission.findMany({ where });
       
-      return permissions.map((p: any) => this.mapToDomainEntity(p));
+      return permissions.map((p: PermissionDbEntity) => this.mapToDomainEntity(p));
     } catch (error) {
       this.logger.error('Error in PermissionRepository.findByCriteria', { error, criteria });
       throw this.errorHandler.createError('Failed to find permissions by criteria');
@@ -590,7 +617,7 @@ export class PermissionRepository implements IPermissionRepository {
         const total = permissions.length;
         
         return {
-          data: permissions.map((p: any) => this.mapToDomainEntity(p)),
+          data: permissions.map((p: PermissionDbEntity) => this.mapToDomainEntity(p)),
           pagination: {
             page: 1,
             limit: total,
@@ -627,7 +654,7 @@ export class PermissionRepository implements IPermissionRepository {
       const totalPages = Math.ceil(total / limit);
       
       return {
-        data: permissions.map((p: any) => this.mapToDomainEntity(p)),
+        data: permissions.map((p: PermissionDbEntity) => this.mapToDomainEntity(p)),
         pagination: {
           page,
           limit,
@@ -721,7 +748,17 @@ export class PermissionRepository implements IPermissionRepository {
    * @param dbEntity - Database entity
    * @returns Domain entity
    */
-  private mapToDomainEntity(dbEntity: any): Permission {
+  private mapToDomainEntity(dbEntity: PermissionDbEntity): Permission {
+    // Ensure we have a proper object with expected properties
+    if (!dbEntity || typeof dbEntity !== 'object') {
+      this.logger.warn('Invalid database entity passed to mapToDomainEntity');
+      return new Permission({
+        id: 0,
+        code: '',
+        name: '',
+        description: ''
+      });
+    }
     return new Permission({
       id: dbEntity.id,
       code: dbEntity.code,

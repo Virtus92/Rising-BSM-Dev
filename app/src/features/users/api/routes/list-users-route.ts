@@ -5,7 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { UserFilterParamsDto } from '@/domain/dtos/UserDtos';
 import { UserStatus, UserRole } from '@/domain/enums/UserEnums';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';

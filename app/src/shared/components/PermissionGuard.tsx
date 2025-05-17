@@ -1,14 +1,21 @@
 'use client';
 
+/**
+ * PermissionGuard.tsx
+ * 
+ * A component that conditionally renders its children based on user permissions.
+ * Used to protect UI elements that require specific permissions.
+ */
+
 import React, { ReactNode, useMemo } from 'react';
-import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { usePermissions, PermissionError } from '@/features/users/hooks/usePermissions';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
-import { UserRole } from '@/domain/entities/User';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { UserRole } from '@/domain/enums/UserEnums';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { PermissionDeniedMessage } from '@/shared/components/permissions/PermissionIndicator';
 import { AuthErrorDisplay } from '@/shared/components/AuthErrorDisplay';
-import { authErrorHandler, AuthErrorType } from '@/features/auth/utils/AuthErrorHandler';
+import { authErrorHandler } from '@/features/auth/utils/AuthErrorHandler';
 
 interface PermissionGuardProps {
   /**
@@ -25,11 +32,6 @@ interface PermissionGuardProps {
    * Multiple permissions (all are required)
    */
   allPermissions?: (SystemPermission | string)[];
-  
-  /**
-   * User ID to check permissions for (defaults to current user)
-   */
-  userId?: number;
   
   /**
    * Content to render if user has permission
@@ -73,13 +75,11 @@ interface PermissionGuardProps {
 
 /**
  * Component that conditionally renders content based on user permissions
- * This implementation exposes all errors with proper error components
  */
 export const PermissionGuard: React.FC<PermissionGuardProps> = React.memo(function PermissionGuard({
   permission,
   anyPermission,
   allPermissions,
-  userId,
   children,
   fallback = null,
   adminBypass = true,
@@ -93,84 +93,101 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = React.memo(functi
     const permStr = permission || '';
     const anyPermStr = anyPermission ? anyPermission.join(',') : '';
     const allPermStr = allPermissions ? allPermissions.join(',') : '';
-    return `pg-${permStr}-${anyPermStr}-${allPermStr}-${userId || 'current'}`;
-  }, [permission, anyPermission, allPermissions, userId]);
+    return `pg-${permStr}-${anyPermStr}-${allPermStr}`;
+  }, [permission, anyPermission, allPermissions]);
 
-  // Use permissions hook - will throw errors when permissions aren't loaded
-  const { hasPermission, hasAnyPermission, hasAllPermissions, isLoading, error, userRole } = usePermissions(userId);
+  // Get current user from auth context
   const { user } = useAuth();
   
-  /* Only log in development mode
-  if (process.env.NODE_ENV === 'development') {
-    console.debug(`PermissionGuard[${componentId}]:`, {
-      permission,
-      anyPermission,
-      allPermissions,
-      adminBypass,
-      isAdmin: userRole === UserRole.ADMIN || user?.role === UserRole.ADMIN,
-      isLoading,
-      hasError: !!error
-    });
-  }*/
+  // Get permission check utilities from permissions context
+  const { 
+    hasPermission, 
+    hasAllPermissions, 
+    hasAnyPermission, 
+    isLoading,
+    isInitialized
+  } = usePermissions();
   
-  // Handle errors in permission checking
-  if (error) {
-    // For critical permissions (like profile view), assume granted to avoid locking users out
-    const isCriticalPermission = (
-      (permission && [
-        SystemPermission.PROFILE_VIEW,
-        SystemPermission.DASHBOARD_VIEW,
-        SystemPermission.SYSTEM_ACCESS
-      ].includes(permission as SystemPermission)) ||
-      (anyPermission && anyPermission.some(p => [
-        SystemPermission.PROFILE_VIEW,
-        SystemPermission.DASHBOARD_VIEW,
-        SystemPermission.SYSTEM_ACCESS
-      ].includes(p as SystemPermission)))
-    );
-    
-    if (isCriticalPermission) {
-      console.warn(`PermissionGuard: Allowing access to critical permission despite error: ${error.message}`);
-      return <>{children}</>;
-    }
-    
-    if (showErrors) {
-      // Convert error to AuthError for consistent display
-      const authError = authErrorHandler.normalizeError(error, {
-        component: 'PermissionGuard',
-        componentId,
-        permission: permission || anyPermission || allPermissions
-      });
-      
-      return <AuthErrorDisplay error={authError} />;
-    }
-    
-    if (fallback) {
-      return <>{fallback}</>;
-    }
-    
-    if (showDeniedMessage) {
-      return <PermissionDeniedMessage 
-        title="Permission Error" 
-        message="An error occurred while checking permissions." 
-      />;
-    }
-    
-    // Default case: no error display
-    return null;
-  }
+  // Check if we need to show loading state
+  const showLoadingState = useMemo(() => {
+    return isLoading && !isInitialized;
+  }, [isLoading, isInitialized]);
   
-  // Handle loading state with a spinner or custom loading fallback
-  if (isLoading) {
+  // Determine if user has access based on permissions
+  const hasAccess = useMemo(() => {
+    // Special case: admin bypass if enabled
+    if (adminBypass && user?.role === UserRole.ADMIN) {
+      return true;
+    }
+    
+    // If no permissions are specified, always allow access
+    if (!permission && !anyPermission && !allPermissions) {
+      return true;
+    }
+    
+    // Check all specified permission types
+    let checkResult = false;
+    
+    // Check individual permission
+    if (permission) {
+      try {
+        if (hasPermission(permission)) {
+          checkResult = true;
+        }
+      } catch (err) {
+        console.warn(`Error checking permission ${permission}:`, err);
+      }
+    }
+    
+    // Check any permission
+    if (anyPermission && !checkResult) {
+      try {
+        if (hasAnyPermission(anyPermission)) {
+          checkResult = true;
+        }
+      } catch (err) {
+        console.warn(`Error checking any permissions:`, err);
+      }
+    }
+    
+    // Check all permissions
+    if (allPermissions && !checkResult) {
+      try {
+        if (hasAllPermissions(allPermissions)) {
+          checkResult = true;
+        }
+      } catch (err) {
+        console.warn(`Error checking all permissions:`, err);
+      }
+    }
+    
+    return checkResult;
+  }, [
+    permission, 
+    anyPermission, 
+    allPermissions, 
+    hasPermission, 
+    hasAnyPermission, 
+    hasAllPermissions, 
+    adminBypass, 
+    user?.role
+  ]);
+  
+  // Handle loading states
+  if (showLoadingState) {
+    // Show custom loading fallback if provided
     if (loadingFallback) {
       return <>{loadingFallback}</>;
     } else if (showLoading) {
+      // Show a loading indicator with contextual information
       return (
-        <div className="flex justify-center items-center py-4">
-          <LoadingSpinner size="sm" />
-          <span className="ml-2 text-sm text-muted-foreground">Checking permissions...</span>
+        <div className="flex flex-col justify-center items-center py-4">
+          <div className="flex items-center">
+            <LoadingSpinner size="sm" />
+            <span className="ml-2 text-sm text-muted-foreground">Checking permissions...</span>
+          </div>
           {process.env.NODE_ENV === 'development' && (
-            <span className="ml-2 text-xs text-muted-foreground">
+            <span className="mt-2 text-xs text-muted-foreground">
               (Permission: {permission || 
                 (anyPermission ? anyPermission.join(',') : '') || 
                 (allPermissions ? allPermissions.join(',') : '')})
@@ -180,51 +197,8 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = React.memo(functi
       );
     }
     
-    // Don't render anything during loading
+    // Don't render anything during loading if no fallback specified
     return null;
-  }
-  
-  // Special case: admin bypass if enabled
-  if (adminBypass) {
-    // Check user role in a case-insensitive way to be consistent with server-side checks
-    const isAdmin = 
-      userRole === UserRole.ADMIN || 
-      user?.role === UserRole.ADMIN || 
-      (user?.role && typeof user.role === 'string' && user.role.toLowerCase() === 'admin');
-    
-    if (isAdmin) {
-      return <>{children}</>;
-    }
-  }
-  
-  // If no permissions are specified, simply render the children
-  if (!permission && !anyPermission && !allPermissions) {
-    return <>{children}</>;
-  }
-  
-  // Simplified permission check with built-in error handling from our updated hook
-  // Check all specified permission types
-  let hasAccess = false;
-  
-  // Check individual permission
-  if (permission) {
-    if (hasPermission(permission)) {
-      hasAccess = true;
-    }
-  }
-  
-  // Check any permission
-  if (anyPermission && !hasAccess) {
-    if (hasAnyPermission(anyPermission)) {
-      hasAccess = true;
-    }
-  }
-  
-  // Check all permissions
-  if (allPermissions && !hasAccess) {
-    if (hasAllPermissions(allPermissions)) {
-      hasAccess = true;
-    }
   }
   
   // Render children if user has access
@@ -245,12 +219,9 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = React.memo(functi
         ? `any of (${anyPermission.join(', ')})`
         : `all of (${allPermissions?.join(', ')})`;
     
-    return <AuthErrorDisplay 
-      error={authErrorHandler.createPermissionError(
-        `You don't have the required permission: ${permissionLabel}`,
-        { permission: permissionLabel, component: 'PermissionGuard', componentId }
-      )} 
-      showDetails={false}
+    return <PermissionDeniedMessage 
+      title="Access Denied" 
+      message={`You don't have the required permission: ${permissionLabel}`} 
     />;
   }
   

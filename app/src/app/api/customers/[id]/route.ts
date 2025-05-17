@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { getLogger } from '@/core/logging';
 import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
@@ -166,7 +167,7 @@ export const PUT = routeHandler(async (req: NextRequest) => {
     // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
       return formatValidationError(
-        (error as any).validationErrors,
+        (error).validationErrors,
         'Customer validation failed'
       );
     }
@@ -228,8 +229,9 @@ export const DELETE = routeHandler(async (req: NextRequest) => {
     }
     
     // Check for appointment dependencies
-    if ((existingCustomer as any).appointments?.length > 0) {
-      logger.warn(`Customer ${customerId} has ${(existingCustomer as any).appointments.length} appointments and cannot be deleted directly`);
+    const customerAppointments = existingCustomer.appointments || [];
+    if (customerAppointments.length > 0) {
+      logger.warn(`Customer ${customerId} has ${customerAppointments.length} appointments and cannot be deleted directly`);
       return formatError('This customer has appointments and cannot be deleted. Please delete the appointments first or archive the customer instead.', 400);
     }
     

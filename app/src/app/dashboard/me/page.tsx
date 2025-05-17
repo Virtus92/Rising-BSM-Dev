@@ -13,7 +13,7 @@ import { UserRole, UserStatus } from '@/domain/enums/UserEnums';
 import { getItem, setItem } from '@/shared/utils/storage/cookieStorage';
 
 export default function UserProfilePage() {
-  const { user, isLoading, refreshAuth } = useAuth();
+  const { user, isLoading, refreshToken } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
 
   // Helper function to get role display name
@@ -103,8 +103,8 @@ export default function UserProfilePage() {
   const handleRetry = useCallback(() => {
     setLoadingState('initial');
     setLoadError(null);
-    refreshAuth();
-  }, [refreshAuth]);
+    refreshToken();
+  }, [refreshToken]);
   
   if (isLoading && loadingState === 'initial') {
     return (
@@ -155,13 +155,11 @@ export default function UserProfilePage() {
     );
   }
 
-  const statusInfo = getStatusInfo(user.status);
+  const statusInfo = getStatusInfo(user.status as UserStatus);
 
   return (
     <div className="container max-w-4xl py-6">
-      <h1 className="text-3xl font-bold mb-6">Mein Profil</h1>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <h1 className="text-3xl font-bold mb-6">Mein Profil</h1>      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-md">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <UserCircle className="h-4 w-4" />
@@ -175,11 +173,24 @@ export default function UserProfilePage() {
             <Settings className="h-4 w-4" />
             <span>Konto</span>
           </TabsTrigger>
-        </TabsList>
-
-        {/* Profile Tab */}
+        </TabsList>        {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6">
-          <ProfileForm user={user} onProfileUpdated={refreshAuth} />
+          {user && (
+            <ProfileForm 
+              user={{
+                id: user.id,
+                email: user.email,
+                name: user.name || 'Unnamed User',
+                role: user.role as UserRole || UserRole.USER,
+                status: user.status as UserStatus || UserStatus.ACTIVE,
+                phone: user.phone,
+                profilePicture: user.profilePicture,
+                createdAt: user.createdAt || new Date().toISOString(),
+                updatedAt: user.updatedAt || new Date().toISOString()
+              }} 
+              onProfileUpdated={refreshToken} 
+            />
+          )}
         </TabsContent>
 
         {/* Security Tab */}
@@ -207,7 +218,7 @@ export default function UserProfilePage() {
                     <div className="text-sm font-medium text-muted-foreground">Rolle</div>
                     <div className="flex items-center gap-2 mt-1">
                       <Shield className="h-4 w-4 text-primary" />
-                      {getRoleName(user.role)}
+                      {getRoleName(user.role as UserRole)}
                     </div>
                   </div>
                   <div>

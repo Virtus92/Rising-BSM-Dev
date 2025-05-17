@@ -43,7 +43,7 @@ export const POST = routeHandler(
   },
   { 
     requiresAuth: true,
-    requiredRoles: [UserRole.ADMIN, UserRole.MANAGER]
+    requiredRole: [UserRole.ADMIN, UserRole.MANAGER]
   }
 );
 
@@ -66,6 +66,6 @@ export const PUT = routeHandler(
   },
   { 
     requiresAuth: true,
-    requiredRoles: [UserRole.EMPLOYEE]
+    requiredRole: [UserRole.EMPLOYEE]
   }
 );

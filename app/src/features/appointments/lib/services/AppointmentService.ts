@@ -1,430 +1,334 @@
-/**
- * Client service for appointment-related API calls
- */
-import { ApiClient } from '@/core/api/ApiClient';
+'use client';
+
+import { IAppointmentService } from '@/domain/services/IAppointmentService';
+import { Appointment } from '@/domain/entities/Appointment';
 import { 
+  CreateAppointmentDto, 
+  UpdateAppointmentDto, 
   AppointmentResponseDto,
   AppointmentDetailResponseDto,
-  AppointmentFilterParamsDto
+  UpdateAppointmentStatusDto,
+  StatusUpdateDto
 } from '@/domain/dtos/AppointmentDtos';
-
-// Define interface for API responses
-interface ApiResponse<T = any> {
-  success: boolean;
-  data: T | null;
-  message?: string;
-  errors?: string[];
-  statusCode?: number;
-}
-
-// Define interface for paginated responses
-interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
+import { ServiceOptions } from '@/domain/services/IBaseService';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
+import { AppointmentClient } from '../clients/AppointmentClient';
+import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 
 /**
- * Client service for appointment-related API calls
+ * Client-side service for managing appointments
+ * This is a lightweight client service that delegates to the API client
  */
-export class AppointmentService {
-  private static readonly basePath = "/appointments";
+export class AppointmentService implements IAppointmentService {
+  private repository: any;
   
+  public async getRepository(): Promise<any> {
+    return this.repository;
+  }
+
   /**
-  * Get all appointments with optional filtering
-  */
-  static async getAppointments(filters?: AppointmentFilterParamsDto): Promise<ApiResponse<PaginatedResponse<AppointmentResponseDto>>> {
+   * Creates a new appointment
+   */
+  public async create(data: CreateAppointmentDto, options?: ServiceOptions): Promise<AppointmentResponseDto> {
+    const response = await AppointmentClient.createAppointment(data);
+    if (!response || !response.data) {
+      throw new Error('Failed to create appointment');
+    }
+    return response.data;
+  }
+
+  /**
+   * Updates an appointment
+   */
+  public async update(id: number, data: UpdateAppointmentDto, options?: ServiceOptions): Promise<AppointmentResponseDto> {
+    const response = await AppointmentClient.updateAppointment(id, data);
+    if (!response || !response.data) {
+      throw new Error('Failed to update appointment');
+    }
+    return response.data;
+  }
+
+  /**
+   * Deletes an appointment
+   */
+  public async delete(id: number, options?: ServiceOptions): Promise<boolean> {
+    const response = await AppointmentClient.deleteAppointment(id);
+    return response.success;
+  }
+
+  /**
+   * Finds an appointment by ID
+   */
+  public async findById(id: number, options?: ServiceOptions): Promise<AppointmentResponseDto | null> {
     try {
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            if (key === 'startDate' || key === 'endDate') {
-              // Format dates as ISO strings for the API
-              const dateValue = value instanceof Date ? value.toISOString() : String(value);
-              queryParams.append(key, dateValue);
-            } else {
-              queryParams.append(key, String(value));
-            }
-          }
-        });
-      }
-      
-      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      return ApiClient.get(`${this.basePath}${query}`);
+      const response = await AppointmentClient.getAppointment(id);
+      return response.data as AppointmentResponseDto;
     } catch (error) {
-      console.error('Error in AppointmentService.getAppointments:', error as Error);
-      return {
-        success: false,
-        data: {
-          data: [],
-          pagination: {
-            page: filters?.page || 1,
-            limit: filters?.limit || 10,
-            total: 0,
-            totalPages: 0
-          }
-        },
-        message: error instanceof Error ? error.message : 'Error fetching appointments'
-      };
+      return null;
     }
   }
 
   /**
-   * Alias for getAppointments to maintain consistency with other services
+   * Finds all appointments
    */
-  static async getAll(filters?: AppointmentFilterParamsDto): Promise<ApiResponse<PaginatedResponse<AppointmentResponseDto>>> {
-    return this.getAppointments(filters);
-  }
-
-  /**
-   * Get an appointment by ID
-   */
-  static async getById(id: number): Promise<ApiResponse<AppointmentDetailResponseDto>> {
-    try {
-      return ApiClient.get(`${this.basePath}/${id}`);
-    } catch (error) {
-      console.error('Error in AppointmentService.getById:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error fetching appointment'
-      };
+  public async findAll(options?: ServiceOptions): Promise<PaginationResult<AppointmentResponseDto>> {
+    const response = await AppointmentClient.getAppointments(options);
+    if (!response || !response.data) {
+      throw new Error('Failed to get appointments');
     }
-  }
-
-  /**
-   * Create a new appointment
-   */
-  static async create(data: {
-    title: string;
-    appointmentDate: string;
-    duration?: number;
-    location?: string;
-    description?: string;
-    status?: string;
-    customerId?: number;
-    requestId?: number;
-    note?: string;
-  }): Promise<ApiResponse<AppointmentResponseDto>> {
-    try {
-      // Format the appointment data
-      const formattedData = { ...data };
-      
-      // Handle request or customer relationship
-      if (data.requestId) {
-        // If created from a request, use the request endpoint
-        const requestId = data.requestId;
-        delete formattedData.requestId; // Remove requestId before sending
-        
-        return ApiClient.post(`/requests/${requestId}/appointment`, formattedData);
-      }
-      
-      // Log the appointment creation in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Creating appointment with data:', formattedData);
-      }
-      
-      // Otherwise use the direct appointments endpoint
-      return ApiClient.post(this.basePath, formattedData);
-    } catch (error) {
-      console.error('Error in AppointmentService.create:', error as Error);
+    // Handle both array and paginated response formats
+    if (Array.isArray(response.data)) {
       return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error creating appointment'
-      };
-    }
-  }
-
-  /**
-   * Create an appointment from a request
-   */
-  static async createFromRequest(requestId: number, data: {
-    title: string;
-    appointmentDate: string;
-    duration?: number;
-    location?: string;
-    description?: string;
-    status?: string;
-    customerId?: number;
-    note?: string;
-  }): Promise<ApiResponse<AppointmentResponseDto>> {
-    try {
-      console.log(`Creating appointment for request ${requestId}:`, data);
-      return ApiClient.post(`/requests/${requestId}/appointment`, data);
-    } catch (error) {
-      console.error('Error in AppointmentService.createFromRequest:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error creating appointment from request'
-      };
-    }
-  }
-
-  /**
-   * Update an appointment
-   */
-  static async update(id: number, data: {
-    title?: string;
-    appointmentDate?: string;
-    duration?: number;
-    location?: string;
-    description?: string;
-    status?: string;
-    customerId?: number;
-  }): Promise<ApiResponse<AppointmentResponseDto>> {
-    try {
-      return ApiClient.put(`${this.basePath}/${id}`, data);
-    } catch (error) {
-      console.error('Error in AppointmentService.update:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error updating appointment'
-      };
-    }
-  }
-
-  /**
-   * Update an appointment's status
-   */
-  static async updateStatus(id: number, status: string, note?: string): Promise<ApiResponse<AppointmentResponseDto>> {
-    try {
-      return ApiClient.patch(`${this.basePath}/${id}/status`, { status, note });
-    } catch (error) {
-      console.error('Error in AppointmentService.updateStatus:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error updating appointment status'
-      };
-    }
-  }
-
-  /**
-   * Delete an appointment
-   */
-  static async deleteAppointment(id: number): Promise<ApiResponse<void>> {
-    try {
-      return ApiClient.delete(`${this.basePath}/${id}`);
-    } catch (error) {
-      console.error('Error in AppointmentService.deleteAppointment:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error deleting appointment'
-      };
-    }
-  }
-  
-  /**
-   * Alias for deleteAppointment for consistency with other services
-   */
-  static async delete(id: number): Promise<ApiResponse<void>> {
-    return this.deleteAppointment(id);
-  }
-
-  /**
-   * Get upcoming appointments
-   */
-  static async getUpcoming(limit?: number): Promise<ApiResponse<AppointmentResponseDto[]>> {
-    try {
-      const query = limit ? `?limit=${limit}` : '';
-      return ApiClient.get(`${this.basePath}/upcoming${query}`);
-    } catch (error) {
-      console.error('Error in AppointmentService.getUpcoming:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error fetching upcoming appointments'
-      };
-    }
-  }
-  
-  /**
-   * Get appointments for a specific customer
-   */
-  static async getCustomerAppointments(customerId: number, options?: AppointmentFilterParamsDto): Promise<ApiResponse<PaginatedResponse<AppointmentResponseDto>>> {
-    try {
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      queryParams.append('customerId', customerId.toString());
-      
-      if (options) {
-        Object.entries(options).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && key !== 'customerId') {
-            queryParams.append(key, String(value));
-          }
-        });
-      }
-      
-      const query = `?${queryParams.toString()}`;
-      return ApiClient.get(`${this.basePath}${query}`);
-    } catch (error) {
-      console.error('Error in AppointmentService.getCustomerAppointments:', error as Error);
-      return {
-        success: false,
-        data: {
-          data: [],
-          pagination: {
-            page: options?.page || 1,
-            limit: options?.limit || 10,
-            total: 0,
-            totalPages: 0
-          }
-        },
-        message: error instanceof Error ? error.message : 'Error fetching customer appointments'
-      };
-    }
-  }
-
-  /**
-   * Get appointment statistics
-   */
-  static async getAppointmentStats(period?: string): Promise<ApiResponse<{
-    totalAppointments: number;
-    plannedAppointments: number;
-    confirmedAppointments: number;
-    completedAppointments: number;
-    cancelledAppointments: number;
-  }>> {
-    try {
-      const query = period ? `?period=${period}` : '';
-      return ApiClient.get(`${this.basePath}/stats${query}`);
-    } catch (error) {
-      console.error('Error in AppointmentService.getAppointmentStats:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error fetching appointment statistics'
-      };
-    }
-  }
-
-  /**
-   * Add a note to an appointment
-   */
-  static async addNote(id: number, note: string): Promise<ApiResponse<any>> {
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Adding note to appointment ${id}:`, note);
-      }
-      
-      return await ApiClient.post(`${this.basePath}/${id}/notes`, { text: note });
-    } catch (error) {
-      console.error('Error in AppointmentService.addNote:', error as Error);
-      return {
-        success: false,
-        data: null,
-        message: error instanceof Error ? error.message : 'Error adding appointment note'
-      };
-    }
-  }
-
-  /**
-   * Get notes for an appointment
-   */
-  static async getNotes(id: number, forceFresh = false): Promise<ApiResponse<any[]>> {
-    try {
-      // Add cache busting parameter if needed
-      const cacheBuster = forceFresh ? `?_t=${Date.now()}` : '';
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Fetching notes for appointment ${id}${forceFresh ? ' with cache busting' : ''}`);
-      }
-      
-      return await ApiClient.get(`${this.basePath}/${id}/notes${cacheBuster}`);
-    } catch (error) {
-      console.error('Error in AppointmentService.getNotes:', error as Error);
-      return {
-        success: false,
-        data: [],
-        message: error instanceof Error ? error.message : 'Error fetching appointment notes'
-      };
-    }
-  }
-
-  /**
-   * Count appointments
-   */
-  static async count(filters?: {
-    status?: string;
-    startDate?: string;
-    endDate?: string;
-    customerId?: number;
-  }): Promise<ApiResponse<{ count: number }>> {
-    try {
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            if (key === 'startDate' || key === 'endDate') {
-              // Check if value is a Date object - using a type guard instead of instanceof
-              const isDate = (value: any): value is Date => 
-                value && typeof value === 'object' && 'toISOString' in value;
-                
-              const dateValue = isDate(value) ? value.toISOString() : String(value);
-              queryParams.append(key, dateValue);
-            } else {
-              queryParams.append(key, String(value));
-            }
-          }
-        });
-      }
-      
-      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      const response = await ApiClient.get(`${this.basePath}/count${query}`);
-      
-      // Ensure consistent response format
-      if (response.success) {
-        // If response.data is directly a number, wrap it in a count object
-        if (typeof response.data === 'number') {
-          return {
-            ...response,
-            data: { count: response.data }
-          };
+        data: response.data,
+        pagination: {
+          page: 1,
+          limit: response.data.length,
+          total: response.data.length,
+          totalPages: 1
         }
-        
-        // If response.data is an object with a count property, use it
-        if (response.data && typeof response.data === 'object' && 'count' in response.data) {
-          return response;
-        }
-        
-        // If response.data is an object with a total property, normalize it
-        if (response.data && typeof response.data === 'object' && 'total' in response.data) {
-          return {
-            ...response,
-            data: { count: response.data.total as number }
-          };
-        }
-        
-        // If we can't determine the count format, assume 0
-        console.warn('Unknown count response format:', response.data);
-        return {
-          ...response,
-          data: { count: 0 }
-        };
-      }
-      
-      // Return the original response for error cases
-      return response as ApiResponse<{ count: number }>;
-    } catch (error) {
-      console.error('Error in AppointmentService.count:', error as Error);
-      return {
-        success: false,
-        data: { count: 0 },
-        message: error instanceof Error ? error.message : 'Error counting appointments'
       };
     }
+    return response.data;
+  }
+
+  /**
+   * Get all entities with pagination
+   */
+  public async getAll(options?: ServiceOptions): Promise<PaginationResult<AppointmentResponseDto>> {
+    return this.findAll(options);
+  }
+
+  /**
+   * Get an entity by ID
+   */
+  public async getById(id: number, options?: ServiceOptions): Promise<AppointmentResponseDto | null> {
+    return this.findById(id, options);
+  }
+
+  /**
+   * Find entities matching criteria
+   */
+  public async findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<AppointmentResponseDto[]> {
+    // Since the client doesn't have direct access to the database,
+    // we simulate this by using appropriate filters
+    const response = await AppointmentClient.getAppointments(criteria);
+    if (!response || !response.data) {
+      throw new Error('Failed to find appointments');
+    }
+    // AppointmentClient returns ApiResponse<AppointmentResponseDto[]>
+    return response.data;
+  }
+
+  /**
+   * Count entities
+   */
+  public async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
+    // Since AppointmentClient doesn't have getCount, get appointments and count them
+    const response = await AppointmentClient.getAppointments(options?.filters || {});
+    if (!response || !response.data) {
+      return 0;
+    }
+    // AppointmentClient returns ApiResponse<AppointmentResponseDto[]>
+    return response.data.length;
+  }
+
+  /**
+   * Check if an entity exists
+   */
+  public async exists(id: number, options?: ServiceOptions): Promise<boolean> {
+    try {
+      const appointment = await this.findById(id, options);
+      return appointment !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Search for entities
+   */
+  public async search(searchText: string, options?: ServiceOptions): Promise<AppointmentResponseDto[]> {
+    const response = await AppointmentClient.getAppointments({ search: searchText });
+    if (!response || !response.data) {
+      return [];
+    }
+    // AppointmentClient returns ApiResponse<AppointmentResponseDto[]>
+    return response.data;
+  }
+
+  /**
+   * Validate data
+   */
+  public async validate(data: CreateAppointmentDto | UpdateAppointmentDto, isUpdate?: boolean, entityId?: number): Promise<any> {
+    // Client-side validation placeholder
+    return { valid: true, errors: {} };
+  }
+
+  /**
+   * Execute a transaction
+   */
+  public async transaction<R>(callback: (service: IAppointmentService) => Promise<R>): Promise<R> {
+    // Transactions are handled server-side
+    return callback(this);
+  }
+
+  /**
+   * Bulk update entities
+   */
+  public async bulkUpdate(ids: number[], data: UpdateAppointmentDto, options?: ServiceOptions): Promise<number> {
+    // Not implemented on client side
+    throw new Error('Bulk update not supported on client side');
+  }
+
+  /**
+   * Convert entity to DTO
+   */
+  public toDTO(entity: Appointment): AppointmentResponseDto {
+    return {
+      id: entity.id,
+      customerId: entity.customerId,
+      title: entity.title,
+      description: entity.description,
+      appointmentDate: entity.appointmentDate.toISOString(),
+      appointmentTime: entity.appointmentDate.toTimeString().substring(0, 5),
+      duration: entity.duration ?? 0,
+      location: entity.location,
+      status: entity.status,
+      createdAt: entity.createdAt.toISOString(),
+      updatedAt: entity.updatedAt.toISOString(),
+      dateFormatted: new Date(entity.appointmentDate).toLocaleDateString(),
+      timeFormatted: new Date(entity.appointmentDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      statusLabel: this.getStatusLabel(entity.status),
+      statusClass: this.getStatusClass(entity.status)
+    };
+  }
+
+  /**
+   * Gets a human-readable label for the appointment status
+   */
+  private getStatusLabel(status: any): string {
+    const statusMap: Record<string, string> = {
+      pending: 'Pending',
+      confirmed: 'Confirmed',
+      cancelled: 'Cancelled',
+      completed: 'Completed',
+      noShow: 'No Show'
+    };
+    return statusMap[status] || status;
+  }
+
+  /**
+   * Gets a CSS class based on the appointment status
+   */
+  private getStatusClass(status: any): string {
+    const classMap: Record<string, string> = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      confirmed: 'bg-blue-100 text-blue-800',
+      cancelled: 'bg-red-100 text-red-800',
+      completed: 'bg-green-100 text-green-800',
+      noShow: 'bg-gray-100 text-gray-800'
+    };
+    return classMap[status] || 'bg-gray-100';
+  }
+
+  /**
+   * Convert DTO to entity
+   */
+  public fromDTO(dto: CreateAppointmentDto | UpdateAppointmentDto): Partial<Appointment> {
+    let dateTime: Date;
+    if ('appointmentDate' in dto && dto.appointmentDate) {
+      dateTime = new Date(`${dto.appointmentDate}T${dto.appointmentTime || '00:00'}`);
+    } else {
+      dateTime = new Date();
+    }
+    
+    // Ensure the return type matches Partial<Appointment> correctly
+    const result: Partial<Appointment> = {
+      title: dto.title,
+      description: dto.description,
+      appointmentDate: dateTime,
+      location: dto.location,
+      status: dto.status,
+      notes: undefined
+    };
+    
+    // Only add customerId if it's defined
+    if (dto.customerId !== undefined) {
+      result.customerId = dto.customerId;
+    }
+    
+    // Only add duration if it's defined
+    if (dto.duration !== undefined) {
+      result.duration = dto.duration;
+    }
+    
+    return result;
+  }
+
+  /**
+   * Gets appointment details
+   */
+  public async getAppointmentDetails(id: number | string, options?: ServiceOptions): Promise<AppointmentDetailResponseDto | null> {
+    try {
+      const response = await AppointmentClient.getAppointment(id);
+      return response.data as AppointmentDetailResponseDto;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Finds appointments by customer
+   */
+  public async findByCustomer(customerId: number, options?: ServiceOptions): Promise<AppointmentResponseDto[]> {
+    const response = await AppointmentClient.getAppointments({ customerId });
+    if (!response || !response.data) {
+      return [];
+    }
+    // AppointmentClient returns ApiResponse<AppointmentResponseDto[]>
+    return response.data;
+  }
+
+  /**
+   * Finds appointments by date range
+   */
+  public async findByDateRange(startDate: string, endDate: string, options?: ServiceOptions): Promise<AppointmentResponseDto[]> {
+    const response = await AppointmentClient.getAppointments({ startDate, endDate });
+    if (!response || !response.data) {
+      return [];
+    }
+    // AppointmentClient returns ApiResponse<AppointmentResponseDto[]>
+    return response.data;
+  }
+
+  /**
+   * Updates appointment status
+   */
+  public async updateStatus(id: number, statusData: UpdateAppointmentStatusDto | string, options?: ServiceOptions): Promise<AppointmentResponseDto> {
+    const statusUpdate: StatusUpdateDto = typeof statusData === 'string' ? { status: statusData as AppointmentStatus } : statusData;
+    const response = await AppointmentClient.updateAppointmentStatus(id, statusUpdate);
+    if (!response || !response.data) {
+      throw new Error('Failed to update appointment status');
+    }
+    return response.data;
+  }
+
+  /**
+   * Adds a note to an appointment
+   */
+  public async addNote(id: number, note: string, options?: ServiceOptions): Promise<boolean> {
+    const response = await AppointmentClient.addNote(id, note);
+    return response?.success || false;
+  }
+
+  /**
+   * Gets upcoming appointments
+   */
+  public async getUpcoming(limit?: number, options?: ServiceOptions): Promise<AppointmentResponseDto[]> {
+    const response = await AppointmentClient.getUpcomingAppointments(limit);
+    if (!response || !response.data) {
+      return [];
+    }
+    return response.data;
   }
 }
-
-export default AppointmentService;

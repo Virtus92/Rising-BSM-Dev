@@ -6,6 +6,17 @@
 // Export the API client (client-safe)
 export * from './ApiClient';
 
+/* Set up token refresh using AuthService when in browser environment
+if (typeof window !== 'undefined') {
+  import('@/features/auth/core')
+    .then(({ AuthService }) => {
+      console.log('AuthService loaded for token refresh');
+      // Schedule token refresh check
+      AuthService.initialize();
+    })
+    .catch(err => console.error('Failed to initialize AuthService for token refresh:', err));
+}*/
+
 // Client-safe route handler types (without implementations)
 // These are safe to use in client components
 export type {

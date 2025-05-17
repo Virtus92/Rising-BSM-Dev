@@ -5,7 +5,8 @@ import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { useToast } from '@/shared/hooks/useToast';
 import { Loader2 } from 'lucide-react';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 
 /**
  * N8N Workflow Selector Component

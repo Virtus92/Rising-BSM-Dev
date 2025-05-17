@@ -1,78 +1,140 @@
 # Authentication Middleware Usage Guide
 
-## Important Notice: Correct Usage of `withAuth` Middleware
+This document provides clear instructions and examples for using the authentication middleware in the Rising-BSM application.
 
-The `withAuth` function from the authentication middleware is an asynchronous function that returns a Promise that resolves to a route handler. Therefore, it must be properly awaited before being used.
+## Overview
 
-## Correct Usage Pattern
+The authentication middleware is designed to protect API routes and ensure that only authenticated users can access them. The middleware also supports role-based and permission-based access control.
+
+## Basic Authentication
+
+For routes that require just authentication:
 
 ```typescript
-// ✅ CORRECT: Using withAuth properly
 export async function GET(request: NextRequest) {
-  const authHandler = await withAuth(async (req: NextRequest) => {
-    // Your handler logic here
-    return someHandlerFunction(req);
-  });
-  return authHandler(request);
+  return withAuth(async (req: NextRequest, user: any) => {
+    // Your authenticated route logic here
+    return NextResponse.json({ success: true, data: {...} });
+  })(request);
 }
 ```
 
-## Incorrect Usage Pattern
+## Authentication with Permissions
+
+For routes that require authentication and permissions:
 
 ```typescript
-// ❌ INCORRECT: This will cause TypeErrors
-export const GET = withAuth(async (request: NextRequest) => {
-  // Your handler logic here
-  return someHandlerFunction(request);
-});
-```
-
-## Why This Matters
-
-The incorrect pattern treats the result of `withAuth` as if it were the route handler itself, but since `withAuth` returns a Promise, this leads to the error:
-
-```
-TypeError: Function.prototype.apply was called on #<Promise>, which is an object and not a function
-```
-
-## Router Handler Pattern
-
-For Next.js App Router routes, always follow this pattern:
-
-1. Define an async function for the HTTP method (GET, POST, etc.)
-2. Inside this function, await the call to `withAuth` to get the authenticated handler
-3. Call and return the result of the authenticated handler with the request
-
-## Example: Complete Route Handler
-
-```typescript
-import { NextRequest } from 'next/server';
-import { withAuth } from '@/features/auth/api/middleware/authMiddleware';
-import { someHandlerFunction } from '@/features/your-feature/api';
-
-export async function GET(request: NextRequest) {
-  const authHandler = await withAuth(async (req: NextRequest) => {
-    return someHandlerFunction(req);
-  });
-  return authHandler(request);
+export async function POST(request: NextRequest) {
+  return withAuth(
+    async (req: NextRequest, user: any) => {
+      // Your authenticated route logic here
+      return NextResponse.json({ success: true, data: {...} });
+    },
+    { requireAuth: true, requiredPermission: ['PERMISSION_CODE'] }
+  )(request);
 }
 ```
 
-## Using routeHandler Instead
+## Chaining Middlewares
 
-If you're using the `routeHandler` function instead, follow this pattern:
+For routes that need more complex middleware chaining:
 
 ```typescript
-import { NextRequest } from 'next/server';
-import { routeHandler } from '@/core/api/server/route-handler';
-
-export async function GET(request: NextRequest) {
-  const handler = routeHandler(async (req: NextRequest) => {
-    // Your logic here
-    return someResponse;
-  }, {
-    requiresAuth: true
-  });
-  return handler(request);
+export async function PUT(request: NextRequest) {
+  return withAuth(async (req: NextRequest, user: any) => {
+    return withPermission(
+      async (req: NextRequest, user: any) => {
+        // Your authenticated and permission-checked route logic here
+        return NextResponse.json({ success: true, data: {...} });
+      },
+      'PERMISSION_CODE'
+    )(req);
+  })(request);
 }
 ```
+
+## Handling Route Parameters
+
+For routes with URL parameters:
+
+```typescript
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  return withAuth(async (req: NextRequest, user: any) => {
+    const id = params.id;
+    // Your authenticated route logic here that uses the ID parameter
+    return NextResponse.json({ success: true, data: {...} });
+  })(request);
+}
+```
+
+## Error Handling
+
+Always include error handling in your route handlers:
+
+```typescript
+export async function GET(request: NextRequest) {
+  return withAuth(async (req: NextRequest, user: any) => {
+    try {
+      // Your authenticated route logic here
+      return NextResponse.json({ success: true, data: {...} });
+    } catch (error) {
+      return NextResponse.json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : 'An error occurred' 
+      }, { status: 500 });
+    }
+  })(request);
+}
+```
+
+## Common Mistakes
+
+1. **Passing Request Directly**: Never pass the request object directly to a middleware function
+   ```typescript
+   // WRONG
+   return withAuth(request);
+   
+   // CORRECT
+   return withAuth(handler)(request);
+   ```
+
+2. **Incorrect Access to User**: User data is passed to your handler, not attached to the middleware
+   ```typescript
+   // WRONG
+   const userData = withAuth.user;
+   
+   // CORRECT (inside your handler)
+   async (req, user) => {
+     const userData = user;
+   }
+   ```
+
+3. **Missing Error Handling**: Always handle errors in your route handlers
+   ```typescript
+   // WRONG
+   return withAuth(async (req, user) => {
+     const result = await someOperationThatMightFail();
+     return NextResponse.json({ success: true, data: result });
+   })(request);
+   
+   // CORRECT
+   return withAuth(async (req, user) => {
+     try {
+       const result = await someOperationThatMightFail();
+       return NextResponse.json({ success: true, data: result });
+     } catch (error) {
+       return NextResponse.json({ 
+         success: false, 
+         message: error instanceof Error ? error.message : 'An error occurred' 
+       }, { status: 500 });
+     }
+   })(request);
+   ```
+
+## Best Practices
+
+1. **Consistent Error Handling**: Use consistent error response formats
+2. **Middleware Composition**: Use composition for complex middleware chains
+3. **TypeScript Typing**: Use proper typing for user objects where possible
+4. **Clear Permissions**: Use explicit permission codes from constants
+5. **Logging**: Include appropriate logging for auth failures

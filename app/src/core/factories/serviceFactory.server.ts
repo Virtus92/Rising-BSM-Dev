@@ -9,6 +9,7 @@ import 'server-only';
 import { getLogger } from '@/core/logging';
 import { getErrorHandler, getValidationService } from '@/core/bootstrap/bootstrap.server';
 import { configService } from '@/core/config/ConfigService';
+import { SecurityConfig, securityConfig } from '@/core/config/SecurityConfig';
 import { IServiceFactory } from './serviceFactory.interface';
 
 // Server-only repository factories
@@ -25,17 +26,18 @@ import {
 } from './repositoryFactory.server';
 
 // Services
-import { AuthService } from '@/features/auth/lib/services/AuthService';
-import { CustomerService } from '@/features/customers/lib/services/CustomerService';
-import { AppointmentService } from '@/features/appointments/lib/services/AppointmentService';
-import { RequestService } from '@/features/requests/lib/services/RequestService';
+import { AuthServiceServer } from '@/features/auth/lib/services/AuthService.server';
+import { CustomerService } from '@/features/customers/lib/services/CustomerService.server';
+import { AppointmentService } from '@/features/appointments/lib/services/AppointmentService.server';
+import { RequestServiceImpl } from '@/features/requests/lib/services/RequestService.server';
 import { ActivityLogService } from '@/features/activity/lib/services/ActivityLogService';
-import { RefreshTokenService } from '@/features/auth/lib/services/RefreshTokenService';
 import { PermissionService } from '@/features/permissions/lib/services/PermissionService';
 import { RequestDataService } from '@/features/requests/lib/services/RequestDataService';
 import { N8NIntegrationService } from '@/features/requests/lib/n8n/N8NIntegrationService';
 import { UserService } from '@/features/users/lib/services/UserService.server';
 import { NotificationService } from '@/features/notifications/lib/services/NotificationService.server';
+import { RefreshTokenServiceServer } from '@/features/auth/lib/services/RefreshTokenService.server';
+// Use dynamic import for NotificationService to avoid circular dependencies
 
 // Interfaces
 import { IAuthService } from '@/domain/services/IAuthService';
@@ -49,6 +51,7 @@ import { IRefreshTokenService } from '@/domain/services/IRefreshTokenService';
 import { IPermissionService } from '@/domain/services/IPermissionService';
 import { IRequestDataService } from '@/domain/services/IRequestDataService';
 import { IN8NIntegrationService } from '@/domain/services/IN8NIntegrationService';
+import { RefreshToken } from '@/domain/entities/RefreshToken';
 
 /**
  * ServiceFactory class for uniform creation of services
@@ -57,17 +60,17 @@ export class ServiceFactory implements IServiceFactory {
   private static instance: ServiceFactory;
 
   // Singleton instances for services
-  private authService?: AuthService;
+  private authService = new AuthServiceServer;
   private userService?: UserService;
   private customerService?: CustomerService;
   private appointmentService?: AppointmentService;
-  private requestService?: RequestService;
+  private requestService?: RequestServiceImpl;
   private activityLogService?: ActivityLogService;
   private notificationService?: NotificationService;
-  private refreshTokenService?: RefreshTokenService;
   private permissionService?: PermissionService;
   private requestDataService?: RequestDataService;
   private n8nIntegrationService?: N8NIntegrationService;
+  private refreshTokenService?: RefreshTokenServiceServer;
 
   /**
    * Private constructor for singleton pattern
@@ -88,27 +91,18 @@ export class ServiceFactory implements IServiceFactory {
    * Creates an instance of AuthService
    */
   public createAuthService(): IAuthService {
+    // Return the server-side AuthService implementation
     if (!this.authService) {
-      // Use JWT configuration from ConfigService
-      const jwtConfig = configService.getJwtConfig();
-      
-      this.authService = new AuthService(
-        getUserRepository(),
-        getRefreshTokenRepository(),
-        getLogger(),
-        getValidationService(),
-        getErrorHandler(),
-        jwtConfig
-      );
+      this.authService = new AuthServiceServer;
     }
-    return this.authService;
+    return this.authService as IAuthService;
   }
 
   /**
    * Creates an instance of UserService
    */
   public createUserService(): IUserService {
-    if (!this.userService) {
+    if (!this.userService) { 
       // Create a properly initialized UserService instance
       this.userService = new UserService();
     }
@@ -121,7 +115,12 @@ export class ServiceFactory implements IServiceFactory {
   public createCustomerService(): ICustomerService {
     if (!this.customerService) {
       // Create a properly initialized CustomerService instance
-      this.customerService = new CustomerService();
+      this.customerService = new CustomerService(
+        getCustomerRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
     }
     return this.customerService as ICustomerService;
   }
@@ -132,7 +131,12 @@ export class ServiceFactory implements IServiceFactory {
   public createAppointmentService(): IAppointmentService {
     if (!this.appointmentService) {
       // Complete implementation of AppointmentService
-      this.appointmentService = new AppointmentService();
+      this.appointmentService = new AppointmentService(
+        getAppointmentRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
     }
     return this.appointmentService as IAppointmentService;
   }
@@ -143,7 +147,7 @@ export class ServiceFactory implements IServiceFactory {
   public createRequestService(): IRequestService {
     if (!this.requestService) {
       // Complete implementation of RequestService
-      this.requestService = new RequestService(
+      this.requestService = new RequestServiceImpl(
         getRequestRepository(),
         getCustomerRepository(),
         getUserRepository(),
@@ -167,7 +171,6 @@ export class ServiceFactory implements IServiceFactory {
       const requestRepo = getRequestRepository();
       
       // Create service with proper repositories
-      // Both repository.findAll and repository interfaces now match what's expected
       this.requestDataService = new RequestDataService(
         repository,
         requestRepo,
@@ -227,17 +230,14 @@ export class ServiceFactory implements IServiceFactory {
 
   /**
    * Creates an instance of RefreshTokenService
+   * Directly uses AuthService as the single source of truth
    */
   public createRefreshTokenService(): IRefreshTokenService {
+    // Return the server-side RefreshTokenService implementation
     if (!this.refreshTokenService) {
-      this.refreshTokenService = new RefreshTokenService(
-        getRefreshTokenRepository(),
-        getLogger(),
-        getValidationService(),
-        getErrorHandler()
-      );
+      this.refreshTokenService = new RefreshTokenServiceServer;
     }
-    return this.refreshTokenService!;
+    return this.refreshTokenService as IRefreshTokenService;
   }
 
   /**
@@ -245,31 +245,35 @@ export class ServiceFactory implements IServiceFactory {
    */
   public createPermissionService(): IPermissionService {
     if (!this.permissionService) {
-      this.permissionService = new PermissionService(
-        getPermissionRepository(),
-        getLogger(),
-        getValidationService(),
-        getErrorHandler()
-      );
+      // Get the singleton instance
+      this.permissionService = PermissionService.getInstance();
     }
-    return this.permissionService!;
+    return this.permissionService as IPermissionService;
   }
 
   /**
    * Resets all service instances
    */
   public resetServices(): void {
-    this.authService = undefined;
+    // No need to initialize AuthService on server-side, as it's stateless
+    
+    // Reset other services
     this.userService = undefined;
     this.customerService = undefined;
     this.appointmentService = undefined;
     this.requestService = undefined;
     this.activityLogService = undefined;
     this.notificationService = undefined;
-    this.refreshTokenService = undefined;
     this.permissionService = undefined;
     this.requestDataService = undefined;
     this.n8nIntegrationService = undefined;
+  }
+  
+  /**
+   * Create security configuration
+   */
+  public createSecurityConfig(): SecurityConfig {
+    return securityConfig;
   }
 }
 

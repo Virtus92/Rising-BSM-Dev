@@ -1,3 +1,4 @@
+import { UserDto } from '../dtos/UserDtos';
 import { ServiceOptions } from './IBaseService';
 import { 
   LoginDto, 
@@ -14,6 +15,13 @@ import {
  * Service Interface for Authentication
  */
 export interface IAuthService {
+  /**
+   * Generates authentication tokens for a user
+   * 
+   * @param user - User data
+   * @returns Access token and expiration time
+   */
+  generateAuthTokens(user: any): Promise<{ accessToken: string; expiresIn: number }>;
   /**
    * Registers a new user
    * 
@@ -96,4 +104,18 @@ export interface IAuthService {
    * @returns Whether the user has the role
    */
   hasRole(userId: number, role: string, options?: ServiceOptions): Promise<boolean>;
+  
+  /**
+   * Gets the current authenticated user
+   * 
+   * @returns Current user information
+   */
+  getCurrentUser(): Promise<UserDto>;
+  
+  /**
+   * Checks if a user is authenticated
+   * 
+   * @returns Authentication status
+   */
+  isAuthenticated(): Promise<boolean>;
 }

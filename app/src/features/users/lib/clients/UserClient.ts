@@ -11,6 +11,7 @@ import { ActivityLogDto } from '@/domain/dtos/ActivityLogDto';
 import { ApiClient, ApiResponse } from '@/core/api/ApiClient';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 
+
 // API-URL for Users
 const USERS_API_URL = '/users';
 
@@ -78,25 +79,23 @@ export class UserClient {
           attempts++;
           
           // Only retry for network or server errors (not validation or auth errors)
+          const errorObj = error as Record<string, any>;
           const isTransientError = (
-            !(error as any)?.statusCode || // Network error
-            (error as any)?.statusCode >= 500 || // Server error
-            (error as any)?.statusCode === 429 // Rate limiting
+            !errorObj?.statusCode || // Network error
+            errorObj?.statusCode >= 500 || // Server error
+            errorObj?.statusCode === 429 // Rate limiting
           );
           
           if (!isTransientError || attempts > maxRetries) {
             // Don't retry client errors or if we've reached max retries
-            if ((error as any)?.message) {
-              console.error(`API error (${method.toUpperCase()} ${url}):`, (error as any).message);
-              resolve({
-                success: false,
-                message: (error as any).message,
-                data: null,
-                statusCode: (error as any)?.statusCode || 500
-              });
-              return;
-            }
-            break;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`API error (${method.toUpperCase()} ${url}):`, errorMessage);
+            resolve({
+              success: false,
+              error: errorMessage,
+              data: null,
+            });
+            return;
           }
           
           // Exponential backoff: wait longer between each retry
@@ -109,6 +108,7 @@ export class UserClient {
       console.error(`All retries failed for ${method.toUpperCase()} ${url}`);
       resolve({
         success: false,
+        error: `Failed to ${method} data after ${maxRetries} attempts`,
         message: `Failed to ${method} data after multiple attempts`,
         data: null,
         statusCode: 500
@@ -149,11 +149,13 @@ export class UserClient {
       return ApiClient.get<PaginationResult<UserResponseDto>>(url);
     } catch (error: unknown) {
       console.error('Error in UserClient.getUsers:', error);
+      const errorObj = error as Record<string, any>;
       return {
         success: false,
+        error: error instanceof Error ? error.message : 'Failed to get users',
         message: error instanceof Error ? error.message : 'Failed to get users',
         data: null,
-        statusCode: (error as any)?.statusCode || 500
+        statusCode: errorObj?.statusCode || 500
       };
     }
   }
@@ -174,11 +176,13 @@ export class UserClient {
       return await apiCall;
     } catch (error: unknown) {
       console.error(`Error in UserClient.getUserById(${id}):`, error);
+      const errorObj = error as Record<string, any>;
       return {
         success: false,
+        error: error instanceof Error ? error.message : 'Failed to get user',
         message: error instanceof Error ? error.message : 'Failed to get user',
         data: null,
-        statusCode: (error as any)?.statusCode || 500
+        statusCode: errorObj?.statusCode || 500
       };
     }
   }
@@ -198,11 +202,13 @@ export class UserClient {
       return await apiCall;
     } catch (error: unknown) {
       console.error('Error in UserClient.getCurrentUser:', error);
+      const errorObj = error as Record<string, any>;
       return {
         success: false,
+        error: error instanceof Error ? error.message : 'Failed to get current user',
         message: error instanceof Error ? error.message : 'Failed to get current user',
         data: null,
-        statusCode: (error as any)?.statusCode || 500
+        statusCode: errorObj?.statusCode || 500
       };
     }
   }
@@ -270,7 +276,8 @@ export class UserClient {
           console.warn(`Error updating user (attempt ${attempts}/${maxAttempts}):`, error as Error);
           
           // Don't retry on client errors like validation errors
-          const statusCode = (error as any).statusCode || 500;
+          const errorObj = error as Record<string, any>;
+          const statusCode = errorObj?.statusCode || 500;
           if (statusCode < 500 && statusCode !== 429) {
             throw error; // Don't retry on 4xx errors except for rate limiting (429)
           }
@@ -281,11 +288,13 @@ export class UserClient {
       throw lastError || new Error('Failed to update user after multiple attempts');
     } catch (error: unknown) {
       console.error('Error in UserClient.updateUser:', error as Error);
+      const errorObj = error as Record<string, any>;
       return {
         success: false,
+        error: error instanceof Error ? error.message : 'Failed to update user',
         message: error instanceof Error ? error.message : 'Failed to update user',
         data: null,
-        statusCode: (error as any)?.statusCode || 500
+        statusCode: errorObj?.statusCode || 500
       };
     }
   }
@@ -301,11 +310,13 @@ export class UserClient {
       return await UserClient.apiRequest<UserResponseDto>('put', `${USERS_API_URL}/me`, data);
     } catch (error: unknown) {
       console.error('Error in UserClient.updateCurrentUser:', error as Error);
+      const errorObj = error as Record<string, any>;
       return {
         success: false,
+        error: error instanceof Error ? error.message : 'Failed to update user profile',
         message: error instanceof Error ? error.message : 'Failed to update user profile',
         data: null,
-        statusCode: (error as any)?.statusCode || 500
+        statusCode: errorObj?.statusCode || 500
       };
     }
   }
@@ -382,11 +393,13 @@ export class UserClient {
       return ApiClient.get<UserResponseDto | null>(url);
     } catch (error: unknown) {
       console.error(`Error in UserClient.findByEmail(${email}):`, error);
+      const errorObj = error as Record<string, any>;
       return {
         success: false,
+        error: error instanceof Error ? error.message : 'Failed to find user by email',
         message: error instanceof Error ? error.message : 'Failed to find user by email',
         data: null,
-        statusCode: (error as any)?.statusCode || 500
+        statusCode: errorObj?.statusCode || 500
       };
     }
   }
@@ -432,11 +445,13 @@ export class UserClient {
       return await apiCall;
     } catch (error: unknown) {
       console.error('Error in UserClient.getUserPermissions:', error as Error);
+      const errorObj = error as Record<string, any>;
       return {
         success: false,
+        error: error instanceof Error ? error.message : 'Failed to get user permissions',
         message: error instanceof Error ? error.message : 'Failed to get user permissions',
         data: null,
-        statusCode: (error as any)?.statusCode || 500
+        statusCode: errorObj?.statusCode || 500
       };
     }
   }
@@ -484,11 +499,13 @@ export class UserClient {
       return await apiCall;
     } catch (error: unknown) {
       console.error(`Error in UserClient.getUserActivity(${userId}):`, error);
+      const errorObj = error as Record<string, any>;
       return {
         success: false,
+        error: error instanceof Error ? error.message : 'Failed to get user activity',
         message: error instanceof Error ? error.message : 'Failed to get user activity',
         data: null,
-        statusCode: (error as any)?.statusCode || 500
+        statusCode: errorObj?.statusCode || 500
       };
     }
   }
@@ -509,6 +526,7 @@ export class UserClient {
       return {
         success: false,
         data: null,
+        error: error instanceof Error ? error.message : 'Failed to fetch user count',
         message: error instanceof Error ? error.message : 'Failed to fetch user count',
         statusCode: 500
       };

@@ -69,3 +69,18 @@ export interface PaginatedResponse<T> {
   totalPages: number;
   hasMore: boolean;
 }
+
+/**
+ * API Error class for handling API errors
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly statusCode: number = 500,
+    public readonly details?: any
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}

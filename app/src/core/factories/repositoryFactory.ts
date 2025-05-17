@@ -2,7 +2,9 @@
  * Factory functions for repository instances
  */
 import { getLogger } from '@/core/logging';
-import { getErrorHandler } from '@/core/bootstrap';
+// Import what we need from bootstrap/bootstrap.client directly
+// This avoids circular dependencies
+import { getErrorHandler, getValidationService } from '@/core/bootstrap/bootstrap.client';
 import { getPrismaClient } from './databaseFactory';
 
 // Repositories
@@ -28,15 +30,15 @@ import { IPermissionRepository } from '@/domain/repositories/IPermissionReposito
 import { IRequestDataRepository } from '@/domain/repositories/IRequestDataRepository';
 
 // Singleton instances for repositories
-let userRepository: UserRepository;
-let customerRepository: CustomerRepository;
-let refreshTokenRepository: RefreshTokenRepository;
-let activityLogRepository: ActivityLogRepository;
-let appointmentRepository: AppointmentRepository;
-let requestRepository: RequestRepository;
-let notificationRepository: NotificationRepository;
-let permissionRepository: PermissionRepository;
-let requestDataRepository: RequestDataRepository;
+let userRepository: UserRepository | null = null;
+let customerRepository: CustomerRepository | null = null;
+let refreshTokenRepository: RefreshTokenRepository | null = null;
+let activityLogRepository: ActivityLogRepository | null = null;
+let appointmentRepository: AppointmentRepository | null = null;
+let requestRepository: RequestRepository | null = null;
+let notificationRepository: NotificationRepository | null = null;
+let permissionRepository: PermissionRepository | null = null;
+let requestDataRepository: RequestDataRepository | null = null;
 
 /**
  * Returns a singleton instance of UserRepository
@@ -141,12 +143,8 @@ export function getRequestDataRepository(): IRequestDataRepository {
  */
 export function getNotificationRepository(): INotificationRepository {
   if (!notificationRepository) {
-    // Create properly initialized NotificationRepository with prisma client
-    notificationRepository = new NotificationRepository(
-      getPrismaClient(),
-      getLogger(),
-      getErrorHandler()
-    );
+    // Create a client-side repository instance
+    notificationRepository = new NotificationRepository();
   }
   return notificationRepository;
 }
@@ -169,23 +167,23 @@ export function getPermissionRepository(): IPermissionRepository {
  * Resets all repository instances
  */
 export function resetRepositories(): void {
-  userRepository = undefined as any;
-  customerRepository = undefined as any;
-  refreshTokenRepository = undefined as any;
-  activityLogRepository = undefined as any;
-  appointmentRepository = undefined as any;
-  requestRepository = undefined as any;
-  notificationRepository = undefined as any;
-  permissionRepository = undefined as any;
-  requestDataRepository = undefined as any;
-  RepositoryFactory.instance = undefined as any;
+  userRepository = null;
+  customerRepository = null;
+  refreshTokenRepository = null;
+  activityLogRepository = null;
+  appointmentRepository = null;
+  requestRepository = null;
+  notificationRepository = null;
+  permissionRepository = null;
+  requestDataRepository = null;
+  RepositoryFactory.instance = null;
 }
 
 /**
  * Repository Factory class for centralized repository creation
  */
 export class RepositoryFactory {
-  static instance: RepositoryFactory;
+  static instance: RepositoryFactory | null = null;
 
   private constructor() {}
 

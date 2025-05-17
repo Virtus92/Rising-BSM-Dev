@@ -13,10 +13,6 @@ import { useToast } from '@/shared/hooks/useToast';
 export function formatError(error: unknown): string {
   // Wenn es ein Error-Objekt ist, verwende die Nachricht
   if (error instanceof Error) {
-    // Spezielle Behandlung für API-Fehler
-    if (error instanceof ApiRequestError && error.errors && error.errors.length > 0) {
-      return error.errors[0];
-    }
     return error.message;
   }
   

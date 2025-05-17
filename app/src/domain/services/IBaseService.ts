@@ -82,6 +82,16 @@ export interface ServiceOptions {
    * Perform hard delete instead of soft delete
    */
   hardDelete?: boolean;
+
+  /**
+   * Timeout for the operation
+   **/
+  timeout?: number;
+
+  /**
+   * Custom params
+   */
+  params?: Record<string, any>;
 }
 
 /**

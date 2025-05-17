@@ -6,7 +6,8 @@
 import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError, formatValidationError } from '@/core/errors/index';
-import { getServiceFactory } from '@/core/factories';
+
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
 import { CreateAppointmentDto } from '@/domain/dtos/AppointmentDtos';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
@@ -19,22 +20,12 @@ import { getAppointmentsHandler } from '@/features/appointments/api';
  * Retrieves a list of appointments, optionally filtered and paginated
  * Requires APPOINTMENTS_VIEW permission
  */
-export const GET = routeHandler(async (req: NextRequest) => {
-  const logger = getLogger();
-  
-  try {
-    // Check permission using consistent pattern
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.APPOINTMENTS_VIEW
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_VIEW}`);
-      return formatError(
-        `You don't have permission to view appointments`, 
-        403
-      );
-    }
-    
+export const GET = routeHandler(
+  await permissionMiddleware.withPermission(
+
+    async (req: NextRequest) => {
+      const logger = getLogger();
+    try {
     // Use the appointment handler function
     return getAppointmentsHandler(req);
     
@@ -50,9 +41,11 @@ export const GET = routeHandler(async (req: NextRequest) => {
       500
     );
   }
-}, {
-  requiresAuth: true
-});
+    },
+    SystemPermission.APPOINTMENTS_VIEW
+  ),
+  { requiresAuth: true }
+);
 
 /**
  * POST /api/appointments
@@ -60,23 +53,12 @@ export const GET = routeHandler(async (req: NextRequest) => {
  * Creates a new appointment
  * Requires APPOINTMENTS_CREATE permission
  */
-export const POST = routeHandler(async (req: NextRequest) => {
-  const logger = getLogger();
-  const serviceFactory = getServiceFactory();
-  
-  try {
-    // Check permission using consistent pattern
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.APPOINTMENTS_CREATE
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_CREATE}`);
-      return formatError(
-        `You don't have permission to create appointments`, 
-        403
-      );
-    }
-    
+export const POST = routeHandler(
+  await permissionMiddleware.withPermission(
+    async (req: NextRequest) => {
+      const logger = getLogger();
+      const serviceFactory = getServiceFactory();
+    try {
     // Parse request body
     const data = await req.json() as CreateAppointmentDto;
     
@@ -106,7 +88,7 @@ export const POST = routeHandler(async (req: NextRequest) => {
     // Handle validation errors
     if (error instanceof Error && 'validationErrors' in error) {
       return formatValidationError(
-        (error as any).validationErrors,
+        (error).validationErrors,
         'Appointment validation failed'
       );
     }
@@ -116,6 +98,8 @@ export const POST = routeHandler(async (req: NextRequest) => {
       500
     );
   }
-}, {
-  requiresAuth: true
-});
+    },
+    SystemPermission.APPOINTMENTS_CREATE
+  ),
+  { requiresAuth: true }
+);

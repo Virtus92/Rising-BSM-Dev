@@ -117,4 +117,17 @@ export interface IUserRepository extends IBaseRepository<User> {
     details?: string,
     ipAddress?: string
   ): Promise<any>;
+
+  /**
+   * Gets user statistics such as total users, active users, and inactive users
+   * 
+   * @param options - Optional service options
+   * @returns User statistics object
+   */
+  getUserStatistics(options?: any): Promise<{
+    totalUsers: number;
+    activeUsers: number;
+    inactiveUsers: number;
+    [key: string]: any;
+  }>;
 }

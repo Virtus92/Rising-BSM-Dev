@@ -1,5 +1,5 @@
 import React from 'react';
-import { usePermissions } from '@/features/users/hooks/usePermissions';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { LockIcon, AlertCircle, ShieldAlert, ChevronLeft, Mail } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';

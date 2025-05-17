@@ -15,8 +15,9 @@ import { NewRequests } from '@/features/dashboard/components/NewRequests';
  * Main dashboard showing upcoming appointments, new requests, and system status
  */
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
+  // Permissions are now loaded by the PermissionProvider
   const router = useRouter();
   
   // Update time every minute
@@ -27,6 +28,9 @@ export default function DashboardPage() {
     
     return () => clearInterval(timer);
   }, []);
+  
+  // No longer need to load permissions here - handled by the PermissionProvider
+  // This avoids duplicated permission loading
   
   // Format greeting based on time of day
   const getGreeting = () => {
@@ -84,6 +88,19 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+      
+      {/* Dashboard Content Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Upcoming appointments section */}
+        <div>
+          <UpcomingAppointments />
+        </div>
+        
+        {/* New requests section */}
+        <div>
+          <NewRequests />
+        </div>
+      </div>
 
       {/* Quick Actions */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -135,19 +152,6 @@ export default function DashboardPage() {
           </motion.div>
         ))}
       </section>
-      
-      {/* Dashboard Content Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Upcoming appointments section */}
-        <div>
-          <UpcomingAppointments />
-        </div>
-        
-        {/* New requests section */}
-        <div>
-          <NewRequests />
-        </div>
-      </div>
     </div>
   );
 }

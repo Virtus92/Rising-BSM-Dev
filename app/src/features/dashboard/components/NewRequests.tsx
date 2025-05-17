@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { getLogger } from '@/core/logging';
 import { useRouter } from 'next/navigation';
 import { 
   FileText,
@@ -33,6 +34,8 @@ import { useToast } from '@/shared/hooks/useToast';
  * and clean layout for optimal usability.
  */
 export const NewRequests = () => {
+  // Initialize logger
+  const logger = getLogger();
   const router = useRouter();
   const { toast } = useToast();
   const [requests, setRequests] = useState<RequestResponseDto[]>([]);
@@ -40,43 +43,216 @@ export const NewRequests = () => {
   const [error, setError] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState<number | null>(null);
   
-  // Load requests on component mount
+  // Load requests on component mount with improved initialization coordination
   useEffect(() => {
-    fetchRequests();
+    let isComponentMounted = true;
+    let eventListener: (() => void) | null = null;
+    let intervalId: NodeJS.Timeout | null = null;
     
-    // Refresh data every 5 minutes
-    const interval = setInterval(() => {
-      fetchRequests(false);
-    }, 5 * 60 * 1000);
+    // Prevent duplicate initialization - track in module scope
+    if (typeof window !== 'undefined' && !(window as any).__DASHBOARD_REQUESTS_INITIALIZED) {
+      (window as any).__DASHBOARD_REQUESTS_INITIALIZED = true;
+    }
     
-    return () => clearInterval(interval);
+    // Use a debounced fetch to prevent rapid multiple calls
+    const debouncedFetch = (() => {
+      let timeoutId: NodeJS.Timeout | null = null;
+      return (showLoading = true) => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        timeoutId = setTimeout(() => {
+          if (isComponentMounted) {
+            fetchRequests(showLoading);
+          }
+          timeoutId = null;
+        }, 300); // 300ms debounce delay
+      };
+    })();
+    
+    // Function to handle API client init
+    const initializeAndFetch = async () => {
+      try {
+        const { ApiClient } = await import('@/core/api/ApiClient');
+        
+        // Only initialize if needed and component is still mounted
+        if (!isComponentMounted) return;
+        
+        if (!ApiClient.isInitialized()) {
+          console.log('ApiClient not initialized in NewRequests');
+        }
+        
+        // Fetch data if component is still mounted
+        if (isComponentMounted) {
+          debouncedFetch();
+          
+          // Set up refresh interval
+          intervalId = setInterval(() => {
+            if (isComponentMounted) {
+              debouncedFetch(false);
+            }
+          }, 5 * 60 * 1000);
+        }
+      } catch (error) {
+        console.error('Error initializing API client:', error);
+      }
+    };
+    
+    // Start initialization sequence
+    const handleApiInitialized = () => {
+      if (isComponentMounted) {
+        debouncedFetch();
+      }
+    };
+    
+    // Listen for API initialization event
+    window.addEventListener('api-client-initialized', handleApiInitialized);
+    eventListener = handleApiInitialized;
+    
+    // Start initialization process
+    initializeAndFetch();
+    
+    // Cleanup function
+    return () => {
+      isComponentMounted = false;
+      if (eventListener) {
+        window.removeEventListener('api-client-initialized', eventListener);
+      }
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, []);
   
-  // Fetch requests from API
+  // Fetch requests from API with authentication handling
   const fetchRequests = async (showLoading = true) => {
     if (showLoading) {
       setIsLoading(true);
     }
+    setError(null); // Clear any existing errors before fetching
     
     try {
+      // Import auth service and API client for potential token refresh
+      const { default: AuthService } = await import('@/features/auth/core/AuthService');
+      const { ApiClient } = await import('@/core/api/ApiClient');
+      
+      // Ensure proper initialization
+      if (!ApiClient.isInitialized()) {
+        console.error('API Client not initialized, cannot fetch requests');
+        setError('API Client not initialized');
+        return;
+      }
+      
+      // Try to get requests
       const response = await RequestClient.getRequests({
         status: RequestStatus.NEW,
         sortBy: 'createdAt',
         sortDirection: 'desc',
         limit: 5
       });
+
+      //Process the response
+      logger.debug('API Response:', response);
       
-      if (response.success && Array.isArray(response.data)) {
-        setRequests(response.data);
-        setError(null);
+      // Check for auth errors (401) and try to refresh token
+      if (!response.success && response.statusCode === 401) {
+        logger.info('API Request returned 401, attempting token refresh');
+        
+        // Try to refresh token
+        const refreshResult = await AuthService.refreshToken();
+        
+        if (refreshResult.success) {
+          logger.info('Token refreshed, retrying request');
+          
+          // Small delay to ensure token propagation
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Retry the request with fresh token
+          const retryResponse = await RequestClient.getRequests({
+            status: RequestStatus.NEW,
+            sortBy: 'createdAt',
+            sortDirection: 'desc',
+            limit: 5
+          });
+          
+          // If retry succeeds, use its response instead
+          if (retryResponse.success) {
+            logger.info('Retry successful after token refresh');
+            processResponse(retryResponse);
+            return;
+          } else {
+            // If retry still fails, report the error
+            logger.warn('API Client Error', {
+              message: retryResponse.error || 'Authentication required',
+              code: retryResponse.statusCode,
+              status: retryResponse.statusCode
+            });
+            
+            setError('Authentication required. Please refresh the page or log in again.');
+          }
+        } else {
+          // Token refresh failed
+          logger.warn('Token refresh failed, authentication required');
+          setError('Your session has expired. Please refresh the page or log in again.');
+        }
+      } else if (response.success) {
+        // Process successful response
+        processResponse(response);
       } else {
-        setError('Failed to load requests');
+        // Other errors
+        logger.error('Request fetch failed:', response.error || response.message);
+        setError(response.error || response.message || 'Failed to load requests');
       }
     } catch (err) {
       console.error('Error fetching requests:', err);
-      setError('An error occurred while loading requests');
+      setError(err instanceof Error ? err.message : 'An error occurred while loading requests');
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // Process API response and extract request data
+  const processResponse = (response: any) => {
+    // Handle different response formats
+    if (Array.isArray(response.data)) {
+      // Direct array format
+      setRequests(response.data);
+    } else if (response.data && 'data' in response.data && Array.isArray(response.data.data)) {
+      // Nested data.data array format (matches the expected API response)
+      setRequests(response.data.data);
+    } else if (!response.data) {
+      // Handle empty data case gracefully
+      console.log('No request data available');
+      setRequests([]);
+    } else if (response.data && typeof response.data === 'object' && response.data !== null) {
+      // Handle other possible response formats
+      const typedData = response.data as Record<string, unknown>;
+      
+      if ('items' in typedData && Array.isArray(typedData.items)) {
+        setRequests(typedData.items as RequestResponseDto[]);
+      } else if ('results' in typedData && Array.isArray(typedData.results)) {
+        setRequests(typedData.results as RequestResponseDto[]);
+      } else {
+        // Try to extract request-like objects from data
+        const possibleRequests = Object.values(typedData)
+          .filter(item => 
+            item && 
+            typeof item === 'object' && 
+            item !== null &&
+            'id' in (item as object) && 
+            'name' in (item as object)
+          );
+        
+        if (possibleRequests.length > 0) {
+          setRequests(possibleRequests as RequestResponseDto[]);
+        } else {
+          console.warn('Unable to locate requests in response format:', response);
+          setError('Invalid response format - please check browser console');
+        }
+      }
+    } else {
+      console.warn('Invalid response format:', response);
+      setError('Invalid response format - please check browser console');
     }
   };
 

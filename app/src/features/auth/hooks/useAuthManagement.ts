@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/features/auth/providers/AuthProvider';
-import { AuthClient } from '@/features/auth/lib/clients/AuthClient';
+import { useAuth, RegisterData } from '@/features/auth/providers/AuthProvider';
+import AuthService from '@/features/auth/core/AuthService';
 import { useToast } from '@/shared/hooks/useToast';
 
 type ForgotPasswordData = {
@@ -14,13 +14,8 @@ type ResetPasswordData = {
   confirmPassword: string;
 };
 
-type RegisterData = {
-  name: string;
-  email: string;
-  password: string;
-  passwordConfirm?: string;
-  terms?: boolean;
-};
+// We'll use RegisterFormData from AuthProvider instead of this local type
+// This ensures type consistency
 
 type ChangePasswordData = {
   currentPassword: string;
@@ -29,9 +24,8 @@ type ChangePasswordData = {
 };
 
 /**
- * Hook für die Verwaltung von Authentifizierungsfunktionen
- * 
- * Bietet Hilfsfunktionen für Anmeldung, Registrierung, Passwort-Verwaltung, etc.
+ * Hook for auth management functions
+ * Uses the new clean authentication service
  */
 export function useAuthManagement() {
   const { login: authLogin, logout: authLogout, register: authRegister } = useAuth();
@@ -42,65 +36,49 @@ export function useAuthManagement() {
   const [error, setError] = useState<string | null>(null);
   
   /**
-   * Login-Funktion
+   * Login function
    */
   const login = useCallback(async (email: string, password: string, remember: boolean = false) => {
-    // Verwenden Sie die Funktion aus dem AuthProvider, um Dopplung zu vermeiden
-    // Der AuthProvider kümmert sich um das Token-Management und die Benutzerstatusverwaltung
     setLoading(true);
     setError(null);
     
     try {
-      // Wichtig: Hier wird der Login direkt über den AuthProvider ausgeführt
-      // Der AuthProvider kümmert sich um die Weiterleitung, daher keine weitere Router-Navigation hier
-      await authLogin({ email, password, remember });
-      
-      // Success toast is now handled by the LoginForm component
-      // This prevents duplicate toast notifications
-      
-      // Keine Weiterleitung hier, die wird vom AuthProvider übernommen
-      // Router-Navigation hier würde zu Dopplung führen und Konflikte verursachen
-      console.log('Login successful, redirect will be handled by AuthProvider');
-      
+      const result = await AuthService.signIn(email, password);
+      if (!result.success) {
+        throw new Error(result.message || 'Login failed');
+      }
       return true;
     } catch (error) {
-      console.error('Login fehlgeschlagen:', error as Error);
-      
-      // Store the error message in state for potential UI display
-      setError(error instanceof Error ? error.message : 'Anmeldung fehlgeschlagen');
-      
-      // Error toast is now handled by the LoginForm component
-      // This prevents duplicate toast notifications
-      
+      console.error('Login failed:', error);
+      setError(error instanceof Error ? error.message : 'Login failed');
       return false;
     } finally {
       setLoading(false);
     }
-  }, [authLogin, toast]);
+  }, [authLogin]);
   
   /**
-   * Logout-Funktion
+   * Logout function
    */
   const logout = useCallback(async () => {
     setLoading(true);
     
     try {
-      await authLogout();
+      await AuthService.signOut();
       
       toast({
-        title: 'Erfolgreich abgemeldet',
-        description: 'Sie wurden erfolgreich abgemeldet.',
+        title: 'Successfully logged out',
+        description: 'You have been logged out.',
         variant: 'success'
       });
       
-      router.push('/auth/login');
       return true;
     } catch (error) {
-      console.error('Abmeldung fehlgeschlagen:', error as Error);
+      console.error('Logout failed:', error);
       
       toast({
-        title: 'Fehler bei der Abmeldung',
-        description: 'Bitte versuchen Sie es erneut.',
+        title: 'Logout error',
+        description: 'Please try again.',
         variant: 'error'
       });
       
@@ -108,42 +86,44 @@ export function useAuthManagement() {
     } finally {
       setLoading(false);
     }
-  }, [authLogout, router, toast]);
+  }, [authLogout, toast]);
   
   /**
-   * Funktion zum Zurücksetzen des Passworts (Schritt 1: E-Mail anfordern)
+   * Forgot password function
    */
   const forgotPassword = useCallback(async ({ email }: ForgotPasswordData) => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await AuthClient.forgotPassword(email);
+      // This would call the forgot password API
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
       
-      if (response.success) {
+      const data = await response.json();
+      
+      if (data.success) {
         toast({
-          title: 'E-Mail gesendet',
-          description: 'Eine E-Mail mit Anweisungen zum Zurücksetzen Ihres Passworts wurde gesendet.',
+          title: 'Email sent',
+          description: 'Password reset instructions have been sent to your email.',
           variant: 'success'
         });
         return true;
       } else {
-        setError(response.message || 'Fehler beim Anfordern des Passwort-Resets');
-        toast({
-          title: 'Fehler',
-          description: response.message || 'Fehler beim Anfordern des Passwort-Resets',
-          variant: 'error'
-        });
-        return false;
+        throw new Error(data.error || 'Failed to send reset email');
       }
     } catch (error) {
-      console.error('Fehler bei Passwort vergessen:', error as Error);
+      console.error('Forgot password error:', error);
       
-      setError(error instanceof Error ? error.message : 'Fehler beim Anfordern des Passwort-Resets');
+      const message = error instanceof Error ? error.message : 'Failed to send reset email';
+      setError(message);
       
       toast({
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Fehler beim Anfordern des Passwort-Resets',
+        title: 'Error',
+        description: message,
         variant: 'error'
       });
       
@@ -154,41 +134,69 @@ export function useAuthManagement() {
   }, [toast]);
   
   /**
-   * Funktion zum Zurücksetzen des Passworts (Schritt 2: Neues Passwort setzen)
+   * Validate reset token function
+   */
+  const validateResetToken = useCallback(async (token: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/auth/validate-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      
+      const data = await response.json();
+      
+      return data.success;
+    } catch (error) {
+      console.error('Token validation error:', error);
+      setError('Failed to validate token');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  /**
+   * Reset password function
    */
   const resetPassword = useCallback(async ({ token, password, confirmPassword }: ResetPasswordData) => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await AuthClient.resetPassword(token, password, confirmPassword);
+      // This would call the reset password API
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password, confirmPassword }),
+      });
       
-      if (response.success) {
+      const data = await response.json();
+      
+      if (data.success) {
         toast({
-          title: 'Passwort zurückgesetzt',
-          description: 'Ihr Passwort wurde erfolgreich zurückgesetzt. Sie können sich jetzt anmelden.',
+          title: 'Password reset',
+          description: 'Your password has been reset successfully.',
           variant: 'success'
         });
         
         router.push('/auth/login');
         return true;
       } else {
-        setError(response.message || 'Fehler beim Zurücksetzen des Passworts');
-        toast({
-          title: 'Fehler',
-          description: response.message || 'Fehler beim Zurücksetzen des Passworts',
-          variant: 'error'
-        });
-        return false;
+        throw new Error(data.error || 'Failed to reset password');
       }
     } catch (error) {
-      console.error('Fehler beim Zurücksetzen des Passworts:', error as Error);
+      console.error('Reset password error:', error);
       
-      setError(error instanceof Error ? error.message : 'Fehler beim Zurücksetzen des Passworts');
+      const message = error instanceof Error ? error.message : 'Failed to reset password';
+      setError(message);
       
       toast({
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Fehler beim Zurücksetzen des Passworts',
+        title: 'Error',
+        description: message,
         variant: 'error'
       });
       
@@ -199,32 +207,42 @@ export function useAuthManagement() {
   }, [router, toast]);
   
   /**
-   * Funktion zum Registrieren eines neuen Benutzers
+   * Register function
    */
   const register = useCallback(async (userData: RegisterData) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Verwenden Sie immer die AuthProvider-Funktion, wenn vorhanden
-      await authRegister(userData);
+      // Call the register API endpoint directly
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
       
       toast({
-        title: 'Registrierung erfolgreich',
-        description: 'Ihr Konto wurde erfolgreich erstellt. Sie können sich jetzt anmelden.',
+        title: 'Registration successful',
+        description: 'Your account has been created. You can now log in.',
         variant: 'success'
       });
       
-      router.push('/auth/login');
       return true;
     } catch (error) {
-      console.error('Fehler bei der Registrierung:', error as Error);
+      console.error('Registration error:', error);
       
-      setError(error instanceof Error ? error.message : 'Fehler bei der Registrierung');
+      const message = error instanceof Error ? error.message : 'Registration failed';
+      setError(message);
       
       toast({
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Fehler bei der Registrierung',
+        title: 'Error',
+        description: message,
         variant: 'error'
       });
       
@@ -232,80 +250,44 @@ export function useAuthManagement() {
     } finally {
       setLoading(false);
     }
-  }, [authRegister, router, toast]);
+  }, [authRegister, toast]);
   
   /**
-   * Funktion zum Ändern des Passworts
+   * Change password function
    */
   const changePassword = useCallback(async ({ currentPassword, newPassword, newPasswordConfirm }: ChangePasswordData) => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await AuthClient.changePassword(currentPassword, newPassword, newPasswordConfirm);
+      // This would call the change password API
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword, newPasswordConfirm }),
+      });
       
-      if (response.success) {
+      const data = await response.json();
+      
+      if (data.success) {
         toast({
-          title: 'Passwort geändert',
-          description: 'Ihr Passwort wurde erfolgreich geändert.',
+          title: 'Password changed',
+          description: 'Your password has been changed successfully.',
           variant: 'success'
         });
         return true;
       } else {
-        setError(response.message || 'Fehler beim Ändern des Passworts');
-        toast({
-          title: 'Fehler',
-          description: response.message || 'Fehler beim Ändern des Passworts',
-          variant: 'error'
-        });
-        return false;
+        throw new Error(data.error || 'Failed to change password');
       }
     } catch (error) {
-      console.error('Fehler beim Ändern des Passworts:', error as Error);
+      console.error('Change password error:', error);
       
-      setError(error instanceof Error ? error.message : 'Fehler beim Ändern des Passworts');
-      
-      toast({
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Fehler beim Ändern des Passworts',
-        variant: 'error'
-      });
-      
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-  
-  /**
-   * Funktion zum Validieren eines Reset-Tokens
-   */
-  const validateResetToken = useCallback(async (token: string) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await AuthClient.validateResetToken(token);
-      
-      if (response.success) {
-        return true;
-      } else {
-        setError(response.message || 'Ungültiger oder abgelaufener Token');
-        toast({
-          title: 'Fehler',
-          description: response.message || 'Ungültiger oder abgelaufener Token',
-          variant: 'error'
-        });
-        return false;
-      }
-    } catch (error) {
-      console.error('Fehler beim Validieren des Tokens:', error as Error);
-      
-      setError(error instanceof Error ? error.message : 'Ungültiger oder abgelaufener Token');
+      const message = error instanceof Error ? error.message : 'Failed to change password';
+      setError(message);
       
       toast({
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Ungültiger oder abgelaufener Token',
+        title: 'Error',
+        description: message,
         variant: 'error'
       });
       

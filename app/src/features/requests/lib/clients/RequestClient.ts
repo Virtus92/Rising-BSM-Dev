@@ -33,9 +33,17 @@ export class RequestClient {
    * Gets all requests with optional filtering
    * 
    * @param filters - Optional filter parameters
-   * @returns API response
+   * @returns API response with paginated results
    */
-  static async getRequests(filters?: RequestFilterParamsDto): Promise<ApiResponse<RequestResponseDto[]>> {
+  static async getRequests(filters?: RequestFilterParamsDto): Promise<ApiResponse<{
+    data: RequestResponseDto[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    }
+  }>> {
     const queryParams = buildQueryParams(filters);
     return await ApiClient.get(`${REQUESTS_API_URL}${queryParams}`);
   }
@@ -44,9 +52,17 @@ export class RequestClient {
    * Gets all requests with optional filtering (alias for getRequests)
    * 
    * @param filters - Optional filter parameters
-   * @returns API response
+   * @returns API response with paginated results
    */
-  static async getAll(filters?: RequestFilterParamsDto): Promise<ApiResponse<RequestResponseDto[]>> {
+  static async getAll(filters?: RequestFilterParamsDto): Promise<ApiResponse<{
+    data: RequestResponseDto[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    }
+  }>> {
     return await RequestClient.getRequests(filters);
   }
   

@@ -249,7 +249,10 @@ export class RequestDataRepository extends PrismaRepository<RequestData> impleme
    * @returns Domain entity
    */
   protected mapToDomainEntity(record: any): RequestData {
-    if (!record) return null as any;
+    if (!record) {
+      // Return an empty RequestData object instead of null
+      return new RequestData();
+    }
     
     const entity = new RequestData({
       id: record.id,
@@ -420,7 +423,7 @@ export class RequestDataRepository extends PrismaRepository<RequestData> impleme
         try {
           // Create a new repository with the transaction client
           const repoWithTx = new RequestDataRepository(
-            tx as any,
+            tx,
             this.logger,
             this.errorHandler
           );
