@@ -2,8 +2,9 @@
 
 import React from 'react';
 import AuthDiagnostics from '@/features/auth/components/AuthDiagnostics';
-import { usePermissions } from '@/features/users/hooks/usePermissions';
-import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
+import { NoPermissionView } from '@/shared/components/NoPermissionView';
 
 /**
  * Authentication and Permission Diagnostics Page
@@ -12,17 +13,11 @@ import { SystemPermission } from '@/domain/enums/PermissionEnums';
  * It requires SYSTEM_ADMIN permission to access
  */
 export default function DiagnosticsPage() {
+  // Get permissions using the updated permissions provider
   const { hasPermission, isLoading, error } = usePermissions();
   
-  // Check if user is admin
-  let isAdmin = false;
-  let permissionError = error;
-  
-  try {
-    isAdmin = hasPermission(SystemPermission.SYSTEM_ADMIN);
-  } catch (err) {
-    permissionError = err as Error;
-  }
+  // Check if user is admin using new permission constants
+  const isAdmin = hasPermission(API_PERMISSIONS.SYSTEM.ADMIN);
   
   // Loading state
   if (isLoading) {
@@ -42,17 +37,17 @@ export default function DiagnosticsPage() {
     );
   }
   
-  // Permission error
-  if (permissionError) {
+  // Error state
+  if (error) {
     return (
       <div className="container mx-auto p-6">
         <h1 className="text-3xl font-bold mb-6">System Diagnostics</h1>
         <div className="bg-white rounded-lg p-6 shadow">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6">
             <h2 className="text-xl font-semibold text-red-700 mb-4">Permission Check Error</h2>
-            <p className="mb-4">{permissionError.message}</p>
+            <p className="mb-4">{error}</p>
             <pre className="bg-white p-3 rounded text-sm overflow-auto max-h-96 text-red-600">
-              {JSON.stringify(permissionError, null, 2)}
+              {JSON.stringify(error, null, 2)}
             </pre>
           </div>
         </div>
@@ -60,21 +55,14 @@ export default function DiagnosticsPage() {
     );
   }
   
-  // Access denied
+  // Access denied - use the standardized NoPermissionView
   if (!isAdmin) {
     return (
-      <div className="container mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6">System Diagnostics</h1>
-        <div className="bg-white rounded-lg p-6 shadow">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-yellow-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <h2 className="text-xl font-semibold text-yellow-700 mb-2">Access Restricted</h2>
-            <p className="text-yellow-600">Administrator permissions are required to access this page.</p>
-          </div>
-        </div>
-      </div>
+      <NoPermissionView 
+        title="Access Denied"
+        message="Administrator permissions are required to access this page."
+        permissionNeeded={API_PERMISSIONS.SYSTEM.ADMIN}
+      />
     );
   }
   

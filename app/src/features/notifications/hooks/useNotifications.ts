@@ -282,7 +282,7 @@ export const useNotifications = ({
     return count || NOTIFICATIONS_STATE.cachedUnreadCount;
   }, [baseList?.items]);
   
-  // Handle auto-fetch based on authentication status
+  // Handle auto-fetch based on authentication status with improved reliability
   useEffect(() => {
     // Skip if auth not ready
     if (!authReadyRef.current) return;
@@ -299,52 +299,42 @@ export const useNotifications = ({
       return;
     }
     
-    /* Check if we should auto-fetch on mount
+    // Always do an initial fetch when authenticated and auto-fetch is enabled
     if (autoFetch && !didInitialFetchRef.current) {
       // Delay initial fetch to avoid too many simultaneous requests
-      const offset = 1000 + Math.random() * 2000; // Random delay between 1-3 seconds
-      const timer = setTimeout(() => {
+      const offset = Math.min(1000 + (NOTIFICATIONS_STATE.activeInstanceIds.size * 300), 5000);
+      
+      const initialFetchTimer = setTimeout(() => {
         if (authStateRef.current.isAuthenticated && authStateRef.current.user && baseListRef.current) {
           if (process.env.NODE_ENV === 'development') {
             console.log(`[Notifications] Initial fetch for ${instanceId.current}`);
           }
-          // Fix void promise return type by ignoring the result
-          baseListRef.current.refetch().catch(err => {
-            console.error('[Notifications] Refetch error:', err);
-          });
+          // Set this flag before the fetch to prevent duplicates
           didInitialFetchRef.current = true;
+          
+          // Perform the fetch
+          baseListRef.current.refetch().catch(err => {
+            console.error('[Notifications] Initial fetch error:', err);
+          });
         }
       }, offset);
       
-      return () => clearTimeout(timer);
-    }*/
-    
-    // Set up polling if requested
-    if (pollInterval && pollInterval > 0) {
-      // Stagger poll intervals to avoid all instances polling at the same time
-      const randomOffset = Math.random() * 30000; // Random offset up to 30 seconds
-      const effectivePollInterval = pollInterval + randomOffset;
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Notifications] Setting up poll interval: ${Math.round(effectivePollInterval / 1000)}s for ${instanceId.current}`);
+      // Set up polling if requested
+      if (pollInterval && pollInterval > 0) {
+        setupPolling();
       }
       
-      intervalRef.current = setInterval(() => {
-        const { isAuthenticated, user } = authStateRef.current;
-        if (isAuthenticated && user && baseListRef.current && !NOTIFICATIONS_STATE.requestInProgress) {
-          // Only refetch if no request is in progress and we've waited at least 5 seconds since last fetch
-          const now = Date.now();
-          if (now - NOTIFICATIONS_STATE.lastFetchTime >= 5000) {
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`[Notifications] Poll interval triggered for ${instanceId.current}`);
-            }
-            // Fix void promise return type by ignoring the result
-            baseListRef.current.refetch().catch(err => {
-              console.error('[Notifications] Poll refetch error:', err);
-            });
-          }
+      return () => {
+        clearTimeout(initialFetchTimer);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
         }
-      }, effectivePollInterval);
+      };
+    }
+    // Just set up polling without initial fetch
+    else if (pollInterval && pollInterval > 0) {
+      setupPolling();
       
       return () => {
         if (intervalRef.current) {
@@ -353,9 +343,49 @@ export const useNotifications = ({
         }
       };
     }
+    
+    // Function to set up polling with improved reliability
+    function setupPolling() {
+      // Stagger poll intervals to avoid all instances polling at the same time
+      // Use a deterministic offset based on instanceId to maintain consistency across renders
+      const hash = instanceId.current.split('-').pop() || '';
+      const hashNumber = parseInt(hash, 36) || 0;
+      const deterministicOffset = (hashNumber % 100) * 300; // 0-30 seconds based on instance hash
+      const effectivePollInterval = Math.max((pollInterval || 60000) + deterministicOffset, 60000); // Minimum 60s
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Notifications] Setting up poll interval: ${Math.round(effectivePollInterval / 1000)}s for ${instanceId.current}`);
+      }
+      
+      intervalRef.current = setInterval(() => {
+        const { isAuthenticated, user } = authStateRef.current;
+        if (isAuthenticated && user && baseListRef.current) {
+          // Only refetch if no request is in progress and we've waited at least 5 seconds
+          const now = Date.now();
+          const timeSinceLastFetch = now - NOTIFICATIONS_STATE.lastFetchTime;
+          
+          if (!NOTIFICATIONS_STATE.requestInProgress && timeSinceLastFetch >= 5000) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[Notifications] Poll interval triggered for ${instanceId.current} after ${Math.round(timeSinceLastFetch/1000)}s`);
+            }
+            
+            // Use a try-catch to prevent errors from stopping the polling
+            try {
+              baseListRef.current.refetch().catch(err => {
+                console.error('[Notifications] Poll refetch error:', err);
+              });
+            } catch (error) {
+              console.error('[Notifications] Error in polling interval:', error);
+            }
+          } else if (process.env.NODE_ENV === 'development' && NOTIFICATIONS_STATE.requestInProgress) {
+            console.log(`[Notifications] Skipping poll due to request in progress`);
+          }
+        }
+      }, effectivePollInterval);
+    }
   }, [isAuthenticated, user, autoFetch, pollInterval]);
   
-  // Track this hook instance for debugging - moved after other hooks for consistency
+  // Track this hook instance for debugging with improved HMR handling
   useEffect(() => {
     if (!NOTIFICATIONS_STATE.activeInstanceIds.has(instanceId.current)) {
       NOTIFICATIONS_STATE.activeInstanceIds.add(instanceId.current);
@@ -365,8 +395,34 @@ export const useNotifications = ({
       }
     }
     
+    // Handle HMR scenario - set up custom event listeners
+    const handleHmrEvent = () => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Notifications] HMR event detected for ${instanceId.current}, refreshing state`);
+      }
+      
+      // Reset state when HMR occurs
+      NOTIFICATIONS_STATE.requestInProgress = false;
+      NOTIFICATIONS_STATE.lastFetchTime = 0;
+      
+      // Trigger a refresh if component is still mounted
+      if (baseListRef.current) {
+        baseListRef.current.refetch().catch(err => {
+          console.error('[Notifications] HMR refetch error:', err);
+        });
+      }
+    };
+    
+    // Listen for both HMR event types
+    window.addEventListener('hmr-reload', handleHmrEvent);
+    window.addEventListener('fast-refresh-reload', handleHmrEvent);
+    
     return () => {
+      // Cleanup event listeners and instance tracking
+      window.removeEventListener('hmr-reload', handleHmrEvent);
+      window.removeEventListener('fast-refresh-reload', handleHmrEvent);
       NOTIFICATIONS_STATE.activeInstanceIds.delete(instanceId.current);
+      
       if (process.env.NODE_ENV === 'development') {
         console.log(`[Notifications] Instance ${instanceId.current} unmounted. Remaining: ${NOTIFICATIONS_STATE.activeInstanceIds.size}`);
       }

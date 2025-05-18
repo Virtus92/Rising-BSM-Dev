@@ -9,11 +9,19 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { CustomerService } from '@/features/customers/lib/services/CustomerService.client';
 import { CreateCustomerDto, CustomerResponseDto, UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { useToast } from '@/shared/hooks/useToast';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
+import { NoPermissionView } from '@/shared/components/NoPermissionView';
 
 export default function CustomersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  
+  // Get permissions
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canViewCustomers = hasPermission(API_PERMISSIONS.CUSTOMERS.VIEW);
+  const canCreateCustomers = hasPermission(API_PERMISSIONS.CUSTOMERS.CREATE);
   
   // Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -159,9 +167,21 @@ export default function CustomersPage() {
   
   return (
     <div className="space-y-6 p-4 sm:p-6">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-        <CustomerList onCreateClick={handleCreateClick} />
-      </div>
+      {/* Check if user has permission to view customers */}
+      {!permissionsLoading && !canViewCustomers ? (
+        <NoPermissionView 
+          title="Access Denied"
+          message="You don't have permission to view customers."
+          permissionNeeded={API_PERMISSIONS.CUSTOMERS.VIEW}
+        />
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+          <CustomerList 
+            onCreateClick={canCreateCustomers ? handleCreateClick : undefined}
+            showCreateButton={canCreateCustomers} 
+          />
+        </div>
+      )}
       
       {/* Create Customer Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>

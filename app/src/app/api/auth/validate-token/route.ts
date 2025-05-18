@@ -7,20 +7,6 @@ import { decodeAndValidateToken } from '@/features/auth/api/middleware/authMiddl
 import tokenBlacklist from '@/features/auth/utils/tokenBlacklist';
 
 /**
- * Validate token API route
- * 
- * This endpoint performs full server-side validation of tokens.
- * It's used by client-side code to verify token validity.
- */
-export async function GET(req: NextRequest): Promise<NextResponse> {
-  return await handleValidation(req);
-}
-
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  return await handleValidation(req);
-}
-
-/**
  * Handle token validation with proper error handling
  */
 async function handleValidation(req: NextRequest): Promise<NextResponse> {
@@ -131,6 +117,11 @@ async function handleValidation(req: NextRequest): Promise<NextResponse> {
   }
 }
 
-// For backward compatibility
-// Export the handler function directly
-export const validateTokenHandler = handleValidation;
+// Export the standard HTTP methods that Next.js expects
+export const GET = async (req: NextRequest): Promise<NextResponse> => {
+  return await handleValidation(req);
+};
+
+export const POST = async (req: NextRequest): Promise<NextResponse> => {
+  return await handleValidation(req);
+};

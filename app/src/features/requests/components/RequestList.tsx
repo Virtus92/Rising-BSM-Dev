@@ -18,9 +18,10 @@ import { BaseListComponent } from '@/shared/components/data/BaseListComponent';
 import type { ColumnDef, CardProps } from '@/shared/components/data/BaseListComponent';
 import { BaseCard } from '@/shared/components/data/BaseCard';
 
-interface RequestListProps {
+export interface RequestListProps {
   initialFilters?: Partial<RequestFilterParamsDto>;
   onCreateClick?: () => void;
+  showCreateButton?: boolean;
 }
 
 // Enhanced request type to include any additional properties needed for action handling
@@ -108,7 +109,11 @@ const RequestCard = ({ item, onActionClick }: CardProps<EnhancedRequestDto>) => 
 /**
  * Request list component using the unified list utilities
  */
-export const RequestList: React.FC<RequestListProps> = ({ initialFilters, onCreateClick }) => {
+export const RequestList: React.FC<RequestListProps> = ({ 
+  initialFilters = {}, 
+  onCreateClick, 
+  showCreateButton 
+}) => {
   const router = useRouter();
   const { toast } = useToast();
   const [showFilters, setShowFilters] = useState(false);
@@ -306,9 +311,9 @@ export const RequestList: React.FC<RequestListProps> = ({ initialFilters, onCrea
         }}
         onActionClick={handleCardAction}
         
-        // No Create button for requests as they come from public form
-        // createButtonLabel="New Request"
-        // onCreateClick={onCreateClick || (() => router.push('/dashboard/requests/new'))}
+        // Conditionally render the create button based on the prop
+        createButtonLabel={showCreateButton ? "New Request" : undefined}
+        onCreateClick={showCreateButton && onCreateClick ? onCreateClick : undefined}
         
         
         // Sort state

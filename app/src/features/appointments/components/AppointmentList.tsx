@@ -20,10 +20,11 @@ import { BaseCard, BaseCardProps } from '@/shared/components/data/BaseCard';
 interface AppointmentListProps {
   initialFilters?: Partial<AppointmentFilterParamsDto>;
   onCreateClick?: () => void;
+  showCreateButton?: boolean;
 }
 
 // Card component for mobile view - defined outside the main component to ensure stable reference
-const AppointmentCard = ({ item, onActionClick }: BaseCardProps<AppointmentDto>) => {
+const AppointmentCard = ({ item, onActionClick }: CardProps<AppointmentDto>) => {
   const customerName = item.customerName || `Customer #${item.customerId}` || 'Unknown Customer';
   
   // Get status badge color using our utility
@@ -111,7 +112,8 @@ const AppointmentCard = ({ item, onActionClick }: BaseCardProps<AppointmentDto>)
  */
 export const AppointmentList: React.FC<AppointmentListProps> = ({ 
   initialFilters,
-  onCreateClick
+  onCreateClick,
+  showCreateButton = true
 }) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -336,13 +338,14 @@ export const AppointmentList: React.FC<AppointmentListProps> = ({
         // Configuration
         columns={columns}
         keyExtractor={(item) => item.id}
-        cardComponent={AppointmentCard as React.FC<CardProps<AppointmentDto>>}
+        cardComponent={AppointmentCard as any}
         
         // UI elements
         title="Appointments"
         searchPlaceholder="Search appointments..."
         emptyStateMessage="No appointments found"
         createButtonLabel="Create Appointment"
+        showCreateButton={showCreateButton}
         
         // Active filters
         activeFilters={activeFilters.length > 0 ? activeFilters : undefined}

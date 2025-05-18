@@ -580,7 +580,7 @@ async hasPermission(userId: number, permissionCode: string, options?: ServiceOpt
       }
       
       // Create properly formatted response with guaranteed array
-      const permissionArray = Array.from(rolePermissions);
+      const permissionArray = Array.from(rolePermissions).map(String);
       
       logger.info(`Retrieved ${permissionArray.length} permissions for user ${userId}`, {
         userId,
@@ -592,11 +592,20 @@ async hasPermission(userId: number, permissionCode: string, options?: ServiceOpt
       
       // Warning for unusual cases, but don't change behavior
       if (permissionArray.length === 0 && user.role === UserRole.ADMIN) {
-        logger.warn(`Admin user ${userId} has zero permissions - possible data issue`, {
+        // Add fundamental admin permissions to prevent complete lockout
+        const basicAdminPermissions = [
+          'system.access', 'users.view', 'users.edit', 'customers.view',
+          'requests.view', 'appointments.view', 'settings.view', 'system.admin'
+        ];
+        
+        logger.warn(`Adding fallback permissions for admin user ${userId} with zero permissions`, {
           userRole: user.role,
           directUserPermissions: user.permissions.length,
-          rolePermissionsCount: DEFAULT_ROLE_PERMISSIONS[user.role]?.length || 0
+          rolePermissionsCount: DEFAULT_ROLE_PERMISSIONS[user.role]?.length || 0,
+          fallbackPermissionCount: basicAdminPermissions.length
         });
+        
+        permissionArray.push(...basicAdminPermissions);
       }
       
       // Consistent, strictly-typed response structure

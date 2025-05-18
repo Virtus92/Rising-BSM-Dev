@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, LogIn } from 'lucide-react';
@@ -8,7 +8,8 @@ import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { useToast } from '@/shared/hooks/useToast';
 import { getLogger } from '@/core/logging';
 
-export default function LoginPage() {
+// This component will use the search params
+function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -300,5 +301,45 @@ export default function LoginPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+// Loading fallback for when the Suspense boundary is active
+function LoginFormSkeleton() {
+  return (
+    <div className="w-full">
+      <div className="mb-8 text-center">
+        <div className="h-8 w-64 bg-slate-200 dark:bg-slate-700 rounded-lg mx-auto mb-2 animate-pulse"></div>
+        <div className="h-5 w-72 bg-slate-100 dark:bg-slate-800 rounded-lg mx-auto animate-pulse"></div>
+      </div>
+      <div className="space-y-6">
+        <div>
+          <div className="h-5 w-24 bg-slate-200 dark:bg-slate-700 rounded-lg mb-2 animate-pulse"></div>
+          <div className="h-12 w-full bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse"></div>
+        </div>
+        <div>
+          <div className="flex justify-between mb-2">
+            <div className="h-5 w-20 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse"></div>
+            <div className="h-5 w-32 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse"></div>
+          </div>
+          <div className="h-12 w-full bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse"></div>
+        </div>
+        <div className="h-5 w-full flex items-center">
+          <div className="h-4 w-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+          <div className="h-4 w-40 bg-slate-100 dark:bg-slate-800 rounded-lg ml-2 animate-pulse"></div>
+        </div>
+        <div className="h-12 w-full bg-indigo-400 dark:bg-indigo-700 rounded-lg animate-pulse"></div>
+        <div className="h-5 w-64 mx-auto bg-slate-100 dark:bg-slate-800 rounded-lg mt-6 animate-pulse"></div>
+      </div>
+    </div>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFormSkeleton />}>
+      <LoginForm />
+    </Suspense>
   );
 }

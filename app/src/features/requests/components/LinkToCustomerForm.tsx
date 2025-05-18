@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, FormProvider } from 'react-hook-form';
 import { z } from 'zod';
@@ -14,7 +14,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/shared/components/ui/form';
-import { useQuery } from '@tanstack/react-query';
 import { CustomerClient } from '@/features/customers/lib/clients/CustomerClient';
 import { useToast } from '@/shared/hooks/useToast';
 import { Loader2, Search } from 'lucide-react';
@@ -53,9 +52,6 @@ interface LinkToCustomerFormProps {
 /**
  * Form for linking a request to an existing customer
  */
-/**
- * Form for linking a request to an existing customer
- */
 export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   requestId,
   onClose,
@@ -63,21 +59,38 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   const [isLinking, setIsLinking] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const [customers, setCustomers] = useState<any>(null);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
-  // Customer search - Always enabled, search with empty string will return all customers
-  // limited by the limit parameter
-  const { data: customers, isLoading: isLoadingCustomers } = useQuery({
-    queryKey: ['customers', searchQuery],
-    queryFn: () => CustomerClient.getCustomers({ 
-      search: searchQuery, 
-      limit: 10,
-      sortBy: 'name',
-      sortDirection: 'asc'
-    }),
-    enabled: true, // Always enabled
-  });
+  // Function to fetch customers directly without React Query
+  const fetchCustomers = async (query: string) => {
+    try {
+      setIsLoadingCustomers(true);
+      const response = await CustomerClient.getCustomers({
+        search: query,
+        limit: 10,
+        sortBy: 'name',
+        sortDirection: 'asc'
+      });
+      setCustomers(response);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load customers. Please try again.',
+        variant: 'error'
+      });
+    } finally {
+      setIsLoadingCustomers(false);
+    }
+  };
+
+  // Fetch customers on initial load and when search query changes
+  useEffect(() => {
+    fetchCustomers(searchQuery);
+  }, [searchQuery]);
 
   // Fix: Explicitly type the useForm result to match the expected type for Form component
   const form = useForm<FormValues>({
@@ -111,6 +124,18 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
   
   // Use our safer helper function
   const selectedCustomer = findCustomerById(selectedCustomerId);
+
+  // Debug logging to diagnose customer selection issues
+  useEffect(() => {
+    if (customers) {
+      console.log('Customer data loaded:', {
+        hasData: !!customers,
+        customerCount: customers?.data?.data?.length || customers?.data?.length || 0,
+        selectedId: selectedCustomerId,
+        selectedCustomer
+      });
+    }
+  }, [customers, selectedCustomerId, selectedCustomer]);
 
   const onSubmit = async (data: FormValues) => {
     try {
@@ -177,8 +202,16 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
                       variant="outline"
                       role="combobox"
                       aria-expanded={open}
+                      onClick={() => {
+                        // Make sure the popover opens when clicked
+                        setOpen(true);
+                        // Fetch customers if they haven't been fetched yet
+                        if (!customers) {
+                          fetchCustomers('');
+                        }
+                      }}
                       className={cn(
-                        "w-full justify-between",
+                        "w-full justify-between cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors",
                         !field.value && "text-muted-foreground"
                       )}
                     >
@@ -212,46 +245,51 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
                         )}
                       </CommandEmpty>
                       <CommandGroup>
+                        {/* Improved customer rendering with better data handling */}
                         {Array.isArray(customers?.data?.data) 
-                        ? customers.data.data.map((customer: any) => (
-                          <CommandItem
-                            value={customer.name || `customer-${customer.id}`}
-                            key={customer.id}
-                            onSelect={() => {
-                              form.setValue("customerId", customer.id);
-                              setOpen(false);
-                            }}
-                          >
-                            <div className="flex flex-col">
-                              <span>{customer.name}</span>
-                              {customer.email && (
-                                <span className="text-xs text-muted-foreground">
-                                  {customer.email}
-                                </span>
-                              )}
-                            </div>
-                            <CheckIcon
-                              className={cn(
-                                "ml-auto h-4 w-4",
-                                customer.id === field.value
-                                  ? "opacity-100"
-                                  : "opacity-0"
-                              )}
-                            />
-                          </CommandItem>
-                        ))
+                          ? customers.data.data.map((customer: any) => (
+                            <CommandItem
+                              value={customer.name || `customer-${customer.id}`}
+                              key={customer.id}
+                              onSelect={() => {
+                                console.log("Customer selected:", customer);
+                                form.setValue("customerId", customer.id);
+                                setOpen(false);
+                              }}
+                              className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium">{customer.name}</span>
+                                {customer.email && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {customer.email}
+                                  </span>
+                                )}
+                              </div>
+                              <CheckIcon
+                                className={cn(
+                                  "ml-auto h-4 w-4",
+                                  customer.id === field.value
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          ))
                         : Array.isArray(customers?.data)
                           ? customers.data.map((customer: any) => (
                             <CommandItem
                               value={customer.name || `customer-${customer.id}`}
                               key={customer.id}
                               onSelect={() => {
+                                console.log("Customer selected:", customer);
                                 form.setValue("customerId", customer.id);
                                 setOpen(false);
                               }}
+                              className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                             >
                               <div className="flex flex-col">
-                                <span>{customer.name}</span>
+                                <span className="font-medium">{customer.name}</span>
                                 {customer.email && (
                                   <span className="text-xs text-muted-foreground">
                                     {customer.email}
@@ -269,7 +307,15 @@ export const LinkToCustomerForm: React.FC<LinkToCustomerFormProps> = ({
                             </CommandItem>
                           ))
                           : null
-                      }
+                        }
+                        {/* Show a message if no customers are available but not loading */}
+                        {!isLoadingCustomers && 
+                          !Array.isArray(customers?.data?.data) && 
+                          !Array.isArray(customers?.data) && (
+                            <div className="p-2 text-center text-sm text-muted-foreground">
+                              Click to search for customers
+                            </div>
+                        )}
                       </CommandGroup>
                     </CommandList>
                   </Command>

@@ -24,7 +24,7 @@ import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 import { AppointmentClient } from '@/features/appointments/lib/clients/AppointmentClient';
 import { Badge } from '@/shared/components/ui/badge';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
-import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { useToast } from '@/shared/hooks/useToast';
 
@@ -305,7 +305,7 @@ export const UpcomingAppointments = () => {
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
-            <PermissionGuard permission={SystemPermission.APPOINTMENTS_CREATE}>
+            <PermissionGuard permission={API_PERMISSIONS.APPOINTMENTS.CREATE}>
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -327,7 +327,7 @@ export const UpcomingAppointments = () => {
             You don't have any appointments scheduled in the near future.
           </p>
           <PermissionGuard 
-            permission={SystemPermission.APPOINTMENTS_CREATE}
+            permission={API_PERMISSIONS.APPOINTMENTS.CREATE}
             fallback={<Button variant="outline" onClick={handleViewAll}>View All Appointments</Button>}
           >
             <Button onClick={handleAddAppointment} className="bg-blue-600 hover:bg-blue-700">
@@ -358,7 +358,7 @@ export const UpcomingAppointments = () => {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <PermissionGuard permission={SystemPermission.APPOINTMENTS_CREATE}>
+          <PermissionGuard permission={API_PERMISSIONS.APPOINTMENTS.CREATE}>
             <Button 
               variant="ghost" 
               size="sm" 
@@ -413,7 +413,7 @@ export const UpcomingAppointments = () => {
                   <TooltipProvider>
                     {appointment.status !== AppointmentStatus.COMPLETED && (
                       <PermissionGuard 
-                        permission={SystemPermission.APPOINTMENTS_EDIT}
+                        permission={API_PERMISSIONS.APPOINTMENTS.UPDATE}
                         fallback={null}
                       >
                         <Tooltip>
@@ -437,7 +437,7 @@ export const UpcomingAppointments = () => {
                     
                     {appointment.status !== AppointmentStatus.CANCELLED && (
                       <PermissionGuard 
-                        permission={SystemPermission.APPOINTMENTS_EDIT}
+                        permission={API_PERMISSIONS.APPOINTMENTS.UPDATE}
                         fallback={null}
                       >
                         <Tooltip>
@@ -460,8 +460,8 @@ export const UpcomingAppointments = () => {
                     )}
                     
                     <PermissionGuard 
-                      permission={SystemPermission.APPOINTMENTS_EDIT}
-                      fallback={null}
+                    permission={API_PERMISSIONS.APPOINTMENTS.UPDATE}
+                    fallback={null}
                     >
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -484,8 +484,8 @@ export const UpcomingAppointments = () => {
                     <div className="grow"></div> {/* Spacer */}
                     
                     <PermissionGuard 
-                      permission={SystemPermission.APPOINTMENTS_EDIT}
-                      fallback={null}
+                    permission={API_PERMISSIONS.APPOINTMENTS.UPDATE}
+                    fallback={null}
                     >
                       <Tooltip>
                         <TooltipTrigger asChild>

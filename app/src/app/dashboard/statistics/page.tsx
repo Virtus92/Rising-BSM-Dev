@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BarChart2, Calendar, PieChart, Users, UserPlus, FileText, Download, RefreshCw, Filter } from 'lucide-react';
+import { BarChart2, Calendar, PieChart, Users, UserPlus, FileText, Download, RefreshCw, Filter, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Button } from '@/shared/components/ui/button';
@@ -10,6 +10,9 @@ import { StatsCards } from '@/features/dashboard/components/StatsCards';
 import { DashboardCharts } from '@/features/dashboard/components/DashboardCharts';
 import { useDashboardStats } from '@/features/dashboard/hooks/useDashboardStats';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
+import { NoPermissionView } from '@/shared/components/NoPermissionView';
 
 /**
  * Statistics Page Component
@@ -22,17 +25,49 @@ export default function StatisticsPage() {
   const [timeframe, setTimeframe] = useState('month');
   const [chartType, setChartType] = useState('bar');
   
+  // Get permissions
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canViewStatistics = hasPermission(API_PERMISSIONS.STATISTICS.VIEW);
+  
   // Use the dashboard stats hook for data
   const { 
     userCount, 
     customerCount, 
     requestCount, 
     appointmentCount,
-    loading,
+    loading: statsLoading,
     error,
     refreshStats
   } = useDashboardStats();
+  
+  // Combined loading state
+  const loading = statsLoading || permissionsLoading;
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Loading statistics...
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Check if user has permission to view statistics
+  if (!permissionsLoading && !canViewStatistics) {
+    return (
+      <NoPermissionView 
+        title="Access Denied"
+        message="You don't have permission to view statistics."
+        permissionNeeded={API_PERMISSIONS.STATISTICS.VIEW}
+      />
+    );
+  }
+  
   return (
     <div className="space-y-8">
       {/* Page header */}

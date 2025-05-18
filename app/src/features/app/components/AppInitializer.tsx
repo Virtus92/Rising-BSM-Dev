@@ -85,6 +85,42 @@ export default function AppInitializer({ children, fallback, options = {} }: App
   };
 
   useEffect(() => {
+    // Add HMR detection logic
+    const handleHmrChange = () => {
+      logger.debug('HMR reload detected, reinitializing application');
+      // Clear the initialization state to force a reinit
+      setInitialized(false);
+      updateInitState({ initialized: false, initializing: false, phase: 'hmr-reset' });
+    };
+
+    // Listen for HMR events using various possible signals
+    if (typeof window !== 'undefined') {
+      // React to module.hot changes
+      window.addEventListener('hmr-reload', handleHmrChange);
+      window.addEventListener('webpackHotUpdate', handleHmrChange);
+
+      // Also detect when modules are invalidated (Next.js specific)
+      const originalConsoleWarn = console.warn;
+      console.warn = (message, ...args) => {
+        if (typeof message === 'string' && (
+          message.includes('HMR') ||
+          message.includes('hot module replacement') ||
+          message.includes('module invalidation')
+        )) {
+          handleHmrChange();
+        }
+        originalConsoleWarn(message, ...args);
+      };
+
+      return () => {
+        window.removeEventListener('hmr-reload', handleHmrChange);
+        window.removeEventListener('webpackHotUpdate', handleHmrChange);
+        console.warn = originalConsoleWarn;
+      };
+    }
+  }, []);
+
+  useEffect(() => {
     // Skip if already initialized or on auth page
     if (initialized || isAuthPage) {
       return;
@@ -150,14 +186,16 @@ export default function AppInitializer({ children, fallback, options = {} }: App
 
     // Initialize application
     const initApp = async () => {
+      const initId = `init-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      logger.debug(`Starting initialization with ID: ${initId}`);
       try {
-        logger.info('Starting application initialization');
+        logger.info('Starting application initialization', { initId });
 
         // Phase 1: Initialize auth service
         setInitPhase('auth');
         updateInitState({ phase: 'auth' });
         
-        logger.info('Initializing authentication service');
+        logger.info('Initializing authentication service', { initId });
         const authResult = await AuthService.initialize({ force: true });
         
         if (!authResult) {
@@ -168,15 +206,27 @@ export default function AppInitializer({ children, fallback, options = {} }: App
         
         // Phase 2: Load permissions if authenticated
         if (isAuthenticated && user && permissions) {
+          // Always force permission loading
           setInitPhase('permissions');
           updateInitState({ phase: 'permissions' });
           
-          logger.info('Loading permissions');
+          logger.info('Loading permissions', { initId, userId: user?.id });
           
           // Direct call to load permissions - no fallbacks or retries
           try {
-            await permissions.loadPermissions();
-            logger.info('Permissions loaded successfully');
+            // IMPORTANT FIX: Always force refresh permissions to ensure they're loaded
+            const permResult = await permissions.loadPermissions();
+            if (!permResult) {
+              logger.warn('Permission loading returned false', { userId: user?.id });
+            }
+            
+            // Log the permissions count for debugging
+            logger.info('Permissions loaded successfully', { 
+              initId, 
+              userId: user?.id,
+              permissionsCount: permissions.permissions.length,
+              permissions: permissions.permissions.slice(0, 10).map(p => p.code) 
+            });
           } catch (permError) {
             // Log error and let it fail properly
             logger.error('Error loading permissions:', {
@@ -194,7 +244,7 @@ export default function AppInitializer({ children, fallback, options = {} }: App
         updateInitState({ initializing: false, initialized: true, phase: 'complete' });
         setInitialized(true);
         
-        logger.info('Application initialization completed successfully');
+        logger.info('Application initialization completed successfully', { initId });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         logger.error('Application initialization failed', { error: errorMessage });

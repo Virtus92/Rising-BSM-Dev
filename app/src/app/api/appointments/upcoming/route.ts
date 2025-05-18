@@ -56,7 +56,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
     const appointmentService = serviceFactory.createAppointmentService();
     
     // Context for service calls - use the authenticated user ID
-    const context = { userId: request.auth.userId };
+    const context = { userId: request.auth?.userId || userId };
     
     // Use service method to get upcoming appointments
     let appointments = await appointmentService.getUpcoming(limit, {
@@ -66,7 +66,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
     
     // Apply role-based filtering
     appointments = await filterDataByUserRole(
-      request.auth.userId,
+      request.auth?.userId || userId,
       appointments,
       // Function to get the owner ID from an appointment
       (appointment) => appointment.createdBy

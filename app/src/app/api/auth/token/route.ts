@@ -10,27 +10,33 @@ import { decodeAndValidateToken } from '@/features/auth/api/middleware/authMiddl
  * Provides access to the current authentication token.
  * This endpoint is critical for client-side authentication.
  * 
- * The approach used here ensures tokens are sent in BOTH:
- * 1. HTTP-only cookies (for secure API requests)
- * 2. Response body (for client-side JavaScript access)
+ * Standardized implementation using a consistent approach:
+ * 1. HTTP-only cookies for primary security (auth_token & refresh_token)
+ * 2. js_token cookie for javascript access (not HTTP-only)
+ * 3. Response body (for client-side JavaScript access)
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const logger = getLogger();
-  const requestId = crypto.randomUUID().substring(0, 8);
+  const requestId = req.headers.get('x-request-id') || crypto.randomUUID().substring(0, 8);
   
   logger.debug('Token API called', {
     requestId,
     url: req.url
   });
   
+  const startTime = performance.now();
+  
   try {
-    // Try to get token from cookies - using await properly
+    // Get cookie store
     const cookieStore = await cookies();
+    
+    // Try to get token from cookies in priority order
     const authToken = cookieStore.get('auth_token')?.value;
+    const jsToken = cookieStore.get('js_token')?.value;
     const accessToken = cookieStore.get('access_token')?.value;
     
     // Get the first valid token
-    const token = authToken || accessToken;
+    const token = authToken || jsToken || accessToken;
     
     if (!token) {
       logger.warn('No auth token found in cookies', { requestId });
@@ -59,11 +65,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       );
     }
     
-    // Valid token found - return it in the response body to ensure client can access it
-    // even if the cookies are HttpOnly
+    // Valid token found - calculate processing time
+    const processingTime = Math.round(performance.now() - startTime);
+    
     logger.debug('Token retrieved successfully', {
       requestId,
-      processingTimeMs: 0,
+      processingTimeMs: processingTime,
       tokenLength: token.length
     });
     

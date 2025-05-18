@@ -1253,6 +1253,11 @@ export class RequestServiceImpl implements IRequestService {
         errors.push('Either email or phone is required');
       }
       
+      // Service is required for creation
+      if (!isUpdate && !data.service) {
+        errors.push('Service is required');
+      }
+      
       // Validate status if provided
       if ('status' in data && data.status && !Object.values(RequestStatus).includes(data.status as RequestStatus)) {
         errors.push(`Invalid status: ${data.status}`);
@@ -1578,10 +1583,16 @@ export class RequestServiceImpl implements IRequestService {
     if (dto.email !== undefined) entity.email = dto.email;
     if (dto.phone !== undefined) entity.phone = dto.phone;
     if (dto.message !== undefined) entity.message = dto.message;
+    if (dto.service !== undefined) entity.service = dto.service;
     if (dto.source !== undefined) entity.source = dto.source;
     if (dto.status !== undefined) entity.status = dto.status as RequestStatus;
     if (dto.customerId !== undefined) entity.customerId = dto.customerId;
     if (dto.processorId !== undefined) entity.processorId = dto.processorId;
+    
+    // Ensure service is set for new requests
+    if (!entity.service && dto.source) {
+      entity.service = dto.source;
+    }
     
     return entity;
   }

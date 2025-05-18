@@ -9,8 +9,16 @@ import { UserRole } from '@/domain/enums/UserEnums';
 import { UserService } from '@/features/users/lib/services/UserService';
 import { ModalController } from '@/shared/components/ModalController';
 import { parseModalFromUrl, updateUrlWithoutNavigation, removeModalParamFromUrl } from '@/shared/utils/modal-controller';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
+import { NoPermissionView } from '@/shared/components/NoPermissionView';
 
 export default function UsersPage() {
+  // Get permission state
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canViewUsers = hasPermission(API_PERMISSIONS.USERS.VIEW);
+  const canCreateUsers = hasPermission(API_PERMISSIONS.USERS.CREATE);
+  
   // Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
@@ -121,13 +129,21 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
-      {/* Removed redundant title and description */}
-      
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-        <UserList 
-          onCreateClick={handleCreateClick}
+      {/* Check if user has permission to view users */}
+      {!permissionsLoading && !canViewUsers ? (
+        <NoPermissionView 
+          title="Access Denied"
+          message="You don't have permission to view users."
+          permissionNeeded={API_PERMISSIONS.USERS.VIEW}
         />
-      </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+          <UserList 
+            onCreateClick={canCreateUsers ? handleCreateClick : undefined}
+            showCreateButton={canCreateUsers}
+          />
+        </div>
+      )}
       
       {/* Create User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

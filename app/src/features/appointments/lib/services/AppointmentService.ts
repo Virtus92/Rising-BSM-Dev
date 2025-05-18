@@ -109,14 +109,37 @@ export class AppointmentService implements IAppointmentService {
    * Find entities matching criteria
    */
   public async findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<AppointmentResponseDto[]> {
-    // Since the client doesn't have direct access to the database,
-    // we simulate this by using appropriate filters
-    const response = await AppointmentClient.getAppointments(criteria);
-    if (!response || !response.data) {
-      throw new Error('Failed to find appointments');
+    try {
+      // Since the client doesn't have direct access to the database,
+      // we simulate this by using appropriate filters
+      const response = await AppointmentClient.getAppointments(criteria);
+      
+      if (!response || !response.data) {
+        return [];
+      }
+      
+      // Handle both direct array response and paginated response formats
+      let appointments: AppointmentResponseDto[] = [];
+      
+      if (Array.isArray(response.data)) {
+        appointments = response.data;
+      } else if (response.data.data && Array.isArray(response.data.data)) {
+        // Handle paginated response format
+        appointments = response.data.data;
+      }
+      
+      // Apply customerId filter if provided in criteria
+      if (criteria.customerId && appointments.length > 0) {
+        return appointments.filter(appointment => 
+          appointment.customerId === criteria.customerId
+        );
+      }
+      
+      return appointments;
+    } catch (error) {
+      console.error('Error in findByCriteria:', error);
+      return [];
     }
-    // AppointmentClient returns ApiResponse<AppointmentResponseDto[]>
-    return response.data;
   }
 
   /**

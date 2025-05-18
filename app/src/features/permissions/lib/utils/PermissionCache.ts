@@ -1,135 +1,178 @@
 /**
- * PermissionCache - Compatibility file
+ * Permission Cache Utility
  * 
- * This file maintains the same interface as the original PermissionCache
- * but delegates to the new PermissionProvider system.
- * 
- * It serves as a compatibility layer to make migration easier.
+ * Provides efficient caching of user permissions to reduce database load
+ * and improve API response times. Implements proper invalidation and TTL.
  */
 
 import { getLogger } from '@/core/logging';
-import {
-  getPermissionFromCache,
-  setPermissionInCache,
-  invalidateUserPermissionCache,
-  clearPermissionCache,
-  getPermissionCacheStats,
-  isPermissionCachingEnabled
-} from './permissionCompatibility';
 
 const logger = getLogger();
 
-logger.info('Using new PermissionProvider through compatibility layer');
+// Cache structure
+interface PermissionCacheEntry {
+  permissions: string[];
+  timestamp: number;
+}
+
+// Cache settings
+const CACHE_TTL = 300000; // 5 minutes
+const CACHE_CLEANUP_INTERVAL = 600000; // 10 minutes
+
+// In-memory permission cache
+const permissionCache = new Map<number, PermissionCacheEntry>();
+
+// Last cleanup timestamp
+let lastCleanup = Date.now();
 
 /**
- * Dummy PermissionCache implementation that delegates to the new system
+ * Get permissions from cache
  */
-export class PermissionCache {
-  /**
-   * Create a new permission cache
-   */
-  constructor(maxSize: number = 1000, defaultTtlSeconds: number = 300) {
-    logger.info('PermissionCache created (compatibility mode)');
-  }
-  
-  /**
-   * Dispose the cache
-   */
-  dispose(): void {
-    // No-op in compatibility mode
-  }
-  
-  /**
-   * Get a value from the cache
-   */
-  async get(key: string): Promise<boolean | undefined> {
-    // Extract userId and permission from key
-    const parts = key.split(':');
-    if (parts.length !== 2) {
-      return undefined;
+export function getCachedPermissions(userId: number): string[] | null {
+  try {
+    // Run cache cleanup check if needed
+    maybeCleanupCache();
+    
+    // Check if cache has the permissions
+    const cacheEntry = permissionCache.get(userId);
+    
+    // If no cache entry or entry expired, return null
+    if (!cacheEntry) {
+      return null;
     }
     
-    const userId = parseInt(parts[0], 10);
-    const permission = parts[1];
-    
-    if (isNaN(userId)) {
-      return undefined;
+    // Check if entry has expired
+    const now = Date.now();
+    if (now - cacheEntry.timestamp > CACHE_TTL) {
+      // Remove expired entry
+      permissionCache.delete(userId);
+      return null;
     }
     
-    return getPermissionFromCache(userId, permission);
-  }
-  
-  /**
-   * Set a value in the cache
-   */
-  async set(key: string, value: boolean, ttlSeconds?: number): Promise<boolean> {
-    // Extract userId and permission from key
-    const parts = key.split(':');
-    if (parts.length !== 2) {
-      return false;
-    }
+    // Return cached permissions
+    return [...cacheEntry.permissions]; // Return a copy to prevent mutation
+  } catch (error) {
+    // Don't fail the application on cache errors
+    logger.error('Error reading from permission cache', {
+      userId,
+      error: error instanceof Error ? error.message : String(error)
+    });
     
-    const userId = parseInt(parts[0], 10);
-    const permission = parts[1];
-    
-    if (isNaN(userId)) {
-      return false;
-    }
-    
-    return setPermissionInCache(userId, permission, value, ttlSeconds);
-  }
-  
-  /**
-   * Delete an entry from the cache
-   */
-  async delete(key: string): Promise<boolean> {
-    // In compatibility mode, we can't delete individual entries
-    return false;
-  }
-  
-  /**
-   * Clear all entries from the cache
-   */
-  async clear(): Promise<void> {
-    await clearPermissionCache();
-  }
-  
-  /**
-   * Clear entries for a specific user
-   */
-  async clearForUser(userId: number | string): Promise<void> {
-    const numericUserId = typeof userId === 'string' ? parseInt(userId, 10) : userId;
-    if (isNaN(numericUserId)) {
-      return;
-    }
-    
-    await invalidateUserPermissionCache(numericUserId);
-  }
-  
-  /**
-   * Get cache statistics
-   */
-  getStats(): any {
-    return getPermissionCacheStats();
-  }
-  
-  /**
-   * Reset statistics
-   */
-  resetStats(): void {
-    // No-op in compatibility mode
-  }
-  
-  /**
-   * Get all keys in the cache
-   */
-  keys(): string[] {
-    return []; // Empty in compatibility mode
+    return null;
   }
 }
 
-// Export singleton instance
-export const permissionCache = new PermissionCache(2000, 300);
+/**
+ * Store permissions in cache
+ */
+export function cachePermissions(userId: number, permissions: string[]): void {
+  try {
+    // Create a cache entry
+    const cacheEntry: PermissionCacheEntry = {
+      permissions: [...permissions], // Store a copy to prevent mutation
+      timestamp: Date.now()
+    };
+    
+    // Store in cache
+    permissionCache.set(userId, cacheEntry);
+    
+    logger.debug('Permissions cached for user', {
+      userId,
+      permissionCount: permissions.length
+    });
+  } catch (error) {
+    // Don't fail the application on cache errors
+    logger.error('Error writing to permission cache', {
+      userId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
 
-// Default export for backwards compatibility
-export default permissionCache;
+/**
+ * Invalidate cache for user
+ */
+export function invalidatePermissionCache(userId: number): void {
+  try {
+    // Remove from cache
+    permissionCache.delete(userId);
+    
+    logger.debug('Permission cache invalidated for user', { userId });
+  } catch (error) {
+    // Don't fail the application on cache errors
+    logger.error('Error invalidating permission cache', {
+      userId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/**
+ * Clear entire permission cache
+ */
+export function clearPermissionCache(): void {
+  try {
+    // Clear all entries
+    permissionCache.clear();
+    
+    logger.debug('Permission cache cleared');
+  } catch (error) {
+    // Don't fail the application on cache errors
+    logger.error('Error clearing permission cache', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/**
+ * Clean up expired cache entries
+ */
+function cleanupCache(): void {
+  try {
+    const now = Date.now();
+    let expiredCount = 0;
+    
+    // Iterate through all cache entries
+    for (const [userId, entry] of permissionCache.entries()) {
+      // Check if entry has expired
+      if (now - entry.timestamp > CACHE_TTL) {
+        // Remove expired entry
+        permissionCache.delete(userId);
+        expiredCount++;
+      }
+    }
+    
+    // Update last cleanup timestamp
+    lastCleanup = now;
+    
+    if (expiredCount > 0) {
+      logger.debug('Cleaned up expired permission cache entries', {
+        expiredCount,
+        remainingEntries: permissionCache.size
+      });
+    }
+  } catch (error) {
+    // Don't fail the application on cache errors
+    logger.error('Error cleaning up permission cache', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/**
+ * Run cache cleanup if it's time
+ */
+function maybeCleanupCache(): void {
+  const now = Date.now();
+  if (now - lastCleanup > CACHE_CLEANUP_INTERVAL) {
+    cleanupCache();
+  }
+}
+
+// Export the cache utilities
+export default {
+  getPermissions: getCachedPermissions,
+  cachePermissions,
+  invalidateCache: invalidatePermissionCache,
+  clearCache: clearPermissionCache
+};

@@ -16,8 +16,9 @@ import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { useToast } from '@/shared/hooks/useToast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/shared/components/ui/card';
 import { DeleteConfirmationDialog } from '@/shared/components/DeleteConfirmationDialog';
-import { usePermissions } from '@/features/users/hooks/usePermissions';
-import { AccessDenied } from '@/shared/components/AccessDenied';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
+import { NoPermissionView } from '@/shared/components/NoPermissionView';
 import { Badge } from '@/shared/components/ui/badge';
 import {
   DropdownMenu,
@@ -97,27 +98,12 @@ export default function CustomerDetailsPage() {
   const { toast } = useToast();
   
   // Debug permissions loading state and get permission functions
-  const { hasPermission, isLoading: permissionsLoading, permissions, refetch } = usePermissions() ?? { hasPermission: () => false, isLoading: true, permissions: [], refetch: () => {} };
-  
-  // Log permissions debugging info
-  useEffect(() => {
-    console.log('Permissions state:', { 
-      permissionsLoading, 
-      permissions, 
-      hasCustomersView: permissions.includes(SystemPermission.CUSTOMERS_VIEW),
-      hasCustomersEdit: permissions.includes(SystemPermission.CUSTOMERS_EDIT)
-    });
-    
-    // If permissions aren't loaded yet, try to fetch them explicitly
-    if (permissionsLoading || permissions.length === 0) {
-      refetch(); // Force refresh permissions
-    }
-  }, [permissionsLoading, permissions, refetch]);
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   
   // Use proper permission checks but wait until permissions are loaded
-  const canViewCustomer = !permissionsLoading && hasPermission(SystemPermission.CUSTOMERS_VIEW);
-  const canEditCustomer = !permissionsLoading && hasPermission(SystemPermission.CUSTOMERS_EDIT);
-  const canDeleteCustomer = !permissionsLoading && hasPermission(SystemPermission.CUSTOMERS_DELETE);
+  const canViewCustomer = hasPermission(API_PERMISSIONS.CUSTOMERS.VIEW);
+  const canEditCustomer = hasPermission(API_PERMISSIONS.CUSTOMERS.UPDATE);
+  const canDeleteCustomer = hasPermission(API_PERMISSIONS.CUSTOMERS.DELETE);
 
   // Fetch customer details
   useEffect(() => {
@@ -227,7 +213,11 @@ export default function CustomerDetailsPage() {
   }
 
   if (!canViewCustomer) {
-    return <AccessDenied resource="customers" action="view" />;
+    return <NoPermissionView 
+      title="Access Denied"
+      message="You don't have permission to view customer details."
+      permissionNeeded={API_PERMISSIONS.CUSTOMERS.VIEW}
+    />;
   }
 
   if (loading) {
@@ -720,7 +710,10 @@ export default function CustomerDetailsPage() {
         
         {/* Appointments tab content */}
         <TabsContent value="appointments" className="mt-6 px-2 sm:px-0">
-          <CustomerAppointmentsTab customerId={customerId} />
+          {/* Only render CustomerAppointmentsTab when customer data is fully loaded */}
+          {customer && customer.id && (
+            <CustomerAppointmentsTab customerId={customerId} />
+          )}
         </TabsContent>
         
         {/* Activity tab content */}

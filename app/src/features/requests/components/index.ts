@@ -11,4 +11,4 @@ export { RequestDetail } from './RequestDetail';
 export { RequestDetailTabs } from './RequestDetailTabs';
 export { RequestFilterPanel } from './RequestFilterPanel';
 export { default as RequestForm } from './RequestForm';
-export { RequestList } from './RequestList';
+export { RequestList, type RequestListProps } from './RequestList';

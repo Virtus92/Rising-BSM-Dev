@@ -26,12 +26,15 @@ import {
   Filter as FilterIcon
 } from 'lucide-react';
 import { getPaginationProps } from '@/shared/utils/list/baseListUtils';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
 
 // ----- Interfaces -----
 
 export interface UserListProps {
   initialFilters?: Partial<UserFilterParamsDto>;
   onCreateClick?: () => void;
+  showCreateButton?: boolean;
 }
 
 // Enhanced user type with currentUser property
@@ -176,7 +179,11 @@ const UserCard = ({ item, onActionClick }: BaseCardProps<EnhancedUser>) => {
 /**
  * User list component using our new baseList implementation
  */
-export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreateClick }) => {
+export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreateClick, showCreateButton = true }) => {
+  // Get permissions
+  const { hasPermission } = usePermissions();
+  const canEditUsers = hasPermission(API_PERMISSIONS.USERS.UPDATE);
+  const canDeleteUsers = hasPermission(API_PERMISSIONS.USERS.DELETE);
   const router = useRouter();
   
   // Provide a default implementation if onCreateClick is not provided
@@ -327,7 +334,7 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
           size="icon" 
           title="Edit User"
           onClick={() => router.push(`/dashboard/users/edit/${user.id}`)}
-          disabled={isDeleted}
+          disabled={isDeleted || !canEditUsers}
         >
           <Edit className="h-4 w-4" />
         </Button>
@@ -337,7 +344,7 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
           size="icon" 
           title="Delete User"
           onClick={() => setUserToDelete({ id: Number(user.id), name: user.name })}
-          disabled={isDeleted || isCurrentUser}
+          disabled={isDeleted || isCurrentUser || !canDeleteUsers}
         >
           <Trash2 className="h-4 w-4" />
         </Button>
@@ -410,7 +417,7 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
         // Data props
         items={enhancedUsers}
         isLoading={isLoading}
-        error={error}
+        error={error || null}
         {...getPaginationProps(pagination)} // Extract pagination props
         
         // Configuration
@@ -423,6 +430,7 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
         searchPlaceholder="Search users by name or email..."
         emptyStateMessage="No users found"
         createButtonLabel="Add New User"
+        showCreateButton={showCreateButton}
         
         // Active filters
         activeFilters={activeFilters}

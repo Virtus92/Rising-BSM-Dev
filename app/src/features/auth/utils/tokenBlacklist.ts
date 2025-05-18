@@ -13,7 +13,6 @@ const logger = getLogger();
 const memoryBlacklist = new Set<string>();
 let lastBlacklistUpdate = 0;
 const BLACKLIST_CACHE_TTL = 60000; // 1 minute
-let isRefreshing = false; // Lock to prevent concurrent refreshes
 let refreshPromise: Promise<void> | null = null; // Store promise for concurrent requests
 
 /**
@@ -51,6 +50,7 @@ export async function isTokenBlacklisted(token: string): Promise<boolean> {
         lastUpdate: new Date(lastBlacklistUpdate).toISOString(),
         ttlSeconds: BLACKLIST_CACHE_TTL / 1000
       });
+      
       await refreshBlacklist();
       
       // Recheck cache after refresh
@@ -145,35 +145,27 @@ function getTokenIdentifier(token: string): string {
 
 /**
  * Refresh the in-memory blacklist from persistent storage
- * with concurrency control to prevent multiple simultaneous refreshes
+ * with proper concurrency control using Promise
  */
 async function refreshBlacklist(): Promise<void> {
-  // Create a unique identifier for this refresh operation
-  const refreshId = crypto.randomUUID().substring(0, 8);
-  // If a refresh is already in progress, wait for it to complete instead of skipping
-  if (isRefreshing && refreshPromise) {
-    logger.debug('Token blacklist refresh already in progress, waiting');
+  // If there's an existing refresh in progress, wait for it
+  if (refreshPromise) {
     try {
       await refreshPromise;
       return;
     } catch (err) {
-      // If the existing refresh fails, we'll try again
-      logger.warn('Previous blacklist refresh failed, attempting fresh refresh');
+      // Previous refresh failed, continue with a new one
+      logger.warn('Previous blacklist refresh failed, starting new refresh');
     }
   }
   
-  try {
-    // Set refresh lock
-    isRefreshing = true;
-    
-    // Create a new promise for this refresh operation
-    refreshPromise = (async () => {
-    
-    // Imported dynamically to avoid circular dependencies
-    const { prisma } = await import('@/core/db/prisma/client');
-    
-    // Get all revoked tokens
+  // Create a new promise for this refresh
+  refreshPromise = (async () => {
     try {
+      // Imported dynamically to avoid circular dependencies
+      const { prisma } = await import('@/core/db/prisma/client');
+      
+      // Get all revoked tokens
       const revokedTokens = await prisma.refreshToken.findMany({
         where: {
           isRevoked: true,
@@ -214,21 +206,15 @@ async function refreshBlacklist(): Promise<void> {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
       });
-      // Handle database errors gracefully - don't fail
-      // If we can't refresh, just continue with existing blacklist
+      // Don't rethrow - we'll continue with existing blacklist
     }
   })();
   
-  // Wait for the operation to complete
-  await refreshPromise;
-} catch (error) {
-    logger.error('Error refreshing token blacklist:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
-    });
+  try {
+    // Wait for the refresh to complete
+    await refreshPromise;
   } finally {
-    // Release the lock in finally block to ensure it's always released
-    isRefreshing = false;
+    // Clear the promise once it's done (success or error)
     refreshPromise = null;
   }
 }

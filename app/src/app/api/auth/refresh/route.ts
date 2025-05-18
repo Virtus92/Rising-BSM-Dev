@@ -367,4 +367,4 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 }
 
-export { POST as refreshTokenHandler };
+// Next.js route handler - don't add additional exports

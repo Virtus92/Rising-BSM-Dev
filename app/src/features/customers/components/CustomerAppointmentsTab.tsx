@@ -102,11 +102,39 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         });
         
         // Now await the promise
-        const appointments = await apiCall;
-        setAppointments(appointments || []);
+        const result = await apiCall;
+        
+        // Handle paginated response format
+        if (result && typeof result === 'object') {
+          // Case 1: Response is a paginated object with data array
+          if (result.data && Array.isArray(result.data)) {
+            // Filter to ensure only appointments for this customer
+            const filteredAppointments = result.data.filter(appointment => 
+              appointment.customerId === customerId
+            );
+            setAppointments(filteredAppointments);
+          } 
+          // Case 2: Response is an array directly
+          else if (Array.isArray(result)) {
+            // Filter to ensure only appointments for this customer
+            const filteredAppointments = result.filter(appointment => 
+              appointment.customerId === customerId
+            );
+            setAppointments(filteredAppointments);
+          }
+          // Case 3: Unexpected response format
+          else {
+            console.warn('Unexpected appointment response format:', result);
+            setAppointments([]);
+          }
+        } else {
+          console.warn('Invalid appointments response:', result);
+          setAppointments([]);
+        }
       } catch (err) {
         setError('Failed to load appointments');
         console.error('Error fetching appointments:', err);
+        setAppointments([]); // Set empty array on error
       } finally {
         setIsLoading(false);
       }
@@ -311,9 +339,12 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
   }
 
   // Sort appointments by date (most recent first)
-  const sortedAppointments = [...appointments].sort((a, b) => {
-    return new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime();
-  });
+  // First ensure appointments is an array and has items before attempting to sort
+  const sortedAppointments = Array.isArray(appointments) && appointments.length > 0 
+    ? [...appointments].sort((a, b) => {
+        return new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime();
+      })
+    : [];
 
   // Form validation and submission
   const validateAppointmentForm = () => {

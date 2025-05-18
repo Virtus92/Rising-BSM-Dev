@@ -88,6 +88,7 @@ export interface BaseListComponentProps<T> {
   showSearch?: boolean;
   showToolbar?: boolean;
   forceCardView?: boolean;
+  showCreateButton?: boolean;
   
   // ----- Active Filters -----
   activeFilters?: ActiveFilterInfo[];
@@ -123,7 +124,7 @@ export interface BaseListComponentProps<T> {
  * BaseListComponent handles the presentation of list data
  * with support for both table and card views, filtering, sorting, and pagination
  */
-export function BaseListComponent<T>({
+export function BaseListComponent<T extends {}>({
   // Data props
   items,
   isLoading,
@@ -150,6 +151,7 @@ export function BaseListComponent<T>({
   showSearch = true,
   showToolbar = true,
   forceCardView = false,
+  showCreateButton = true,
   
   // Active filters
   activeFilters,
@@ -278,7 +280,7 @@ export function BaseListComponent<T>({
         </div>
         
         <div className="flex items-center gap-2 mt-2 sm:mt-0 self-end sm:self-auto">
-          {onCreateClick && (
+          {onCreateClick && showCreateButton && (
             <Button 
               onClick={onCreateClick} 
               size="sm"
@@ -291,7 +293,7 @@ export function BaseListComponent<T>({
         </div>
       </div>
     );
-  }, [createButtonLabel, headerActions, onCreateClick, showHeader, title]);
+  }, [createButtonLabel, headerActions, onCreateClick, showCreateButton, showHeader, title]);
   
   // Render toolbar section
   const renderToolbar = useCallback(() => {
@@ -720,7 +722,7 @@ export function BaseListComponent<T>({
               </Button>
             ) : null}
             
-            {onCreateClick && (
+            {onCreateClick && showCreateButton && (
               <Button 
                 onClick={onCreateClick}
                 className="shadow-sm hover:shadow-md transition-shadow"

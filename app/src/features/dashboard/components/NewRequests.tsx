@@ -78,8 +78,10 @@ export const NewRequests = () => {
         // Only initialize if needed and component is still mounted
         if (!isComponentMounted) return;
         
+        // Ensure ApiClient is initialized before proceeding
         if (!ApiClient.isInitialized()) {
-          console.log('ApiClient not initialized in NewRequests');
+          logger.debug('ApiClient not initialized, initializing now in NewRequests');
+          await ApiClient.initialize();
         }
         
         // Fetch data if component is still mounted
@@ -94,13 +96,22 @@ export const NewRequests = () => {
           }, 5 * 60 * 1000);
         }
       } catch (error) {
-        console.error('Error initializing API client:', error);
+        logger.error('Error initializing API client:', error as Error);
+        setError('Failed to initialize API client. Please refresh the page.');
       }
     };
     
-    // Start initialization sequence
-    const handleApiInitialized = () => {
+    // Start initialization sequence with improved event handling
+    const handleApiInitialized = (event?: Event) => {
       if (isComponentMounted) {
+        // Check if the API was successfully initialized from event
+        const detail = (event as CustomEvent)?.detail;
+        if (detail && !detail.success) {
+          logger.warn('API initialization event received but initialization failed');
+          return;
+        }
+        
+        logger.debug('API initialization event received, fetching requests');
         debouncedFetch();
       }
     };
@@ -109,8 +120,26 @@ export const NewRequests = () => {
     window.addEventListener('api-client-initialized', handleApiInitialized);
     eventListener = handleApiInitialized;
     
-    // Start initialization process
-    initializeAndFetch();
+    // Check if API is already initialized
+    const checkApiInitialization = async () => {
+      try {
+        const { ApiClient } = await import('@/core/api/ApiClient');
+        if (ApiClient.isInitialized()) {
+          logger.debug('API Client already initialized, fetching immediately');
+          handleApiInitialized();
+        } else {
+          // Start initialization process
+          initializeAndFetch();
+        }
+      } catch (error) {
+        logger.error('Error checking API initialization:', error as Error);
+        // Start initialization as fallback
+        initializeAndFetch();
+      }
+    };
+    
+    // Begin the process
+    checkApiInitialization();
     
     // Cleanup function
     return () => {
@@ -124,7 +153,7 @@ export const NewRequests = () => {
     };
   }, []);
   
-  // Fetch requests from API with authentication handling
+  // Fetch requests from API with robust authentication handling
   const fetchRequests = async (showLoading = true) => {
     if (showLoading) {
       setIsLoading(true);
@@ -136,14 +165,21 @@ export const NewRequests = () => {
       const { default: AuthService } = await import('@/features/auth/core/AuthService');
       const { ApiClient } = await import('@/core/api/ApiClient');
       
-      // Ensure proper initialization
+      // Ensure proper initialization with retry
       if (!ApiClient.isInitialized()) {
-        console.error('API Client not initialized, cannot fetch requests');
-        setError('API Client not initialized');
-        return;
+        logger.debug('API Client not initialized, initializing before fetch');
+        const initResult = await ApiClient.initialize();
+        
+        if (!initResult) {
+          logger.error('API Client initialization failed before fetch');
+          setError('API Client initialization failed. Please refresh the page.');
+          setIsLoading(false);
+          return;
+        }
       }
       
       // Try to get requests
+      logger.debug('Fetching new requests...');
       const response = await RequestClient.getRequests({
         status: RequestStatus.NEW,
         sortBy: 'createdAt',
@@ -183,9 +219,9 @@ export const NewRequests = () => {
           } else {
             // If retry still fails, report the error
             logger.warn('API Client Error', {
-              message: retryResponse.error || 'Authentication required',
-              code: retryResponse.statusCode,
-              status: retryResponse.statusCode
+              message: retryResponse.error ? String(retryResponse.error) : 'Authentication required',
+              code: retryResponse.statusCode ? Number(retryResponse.statusCode) : 500,
+              status: retryResponse.statusCode ? Number(retryResponse.statusCode) : 500
             });
             
             setError('Authentication required. Please refresh the page or log in again.');
@@ -200,11 +236,11 @@ export const NewRequests = () => {
         processResponse(response);
       } else {
         // Other errors
-        logger.error('Request fetch failed:', response.error || response.message);
+        logger.error('Request fetch failed:', response.error ? String(response.error) : (response.message ? String(response.message) : 'Unknown error'));
         setError(response.error || response.message || 'Failed to load requests');
       }
     } catch (err) {
-      console.error('Error fetching requests:', err);
+      console.error('Error fetching requests:', err instanceof Error ? err.message : String(err));
       setError(err instanceof Error ? err.message : 'An error occurred while loading requests');
     } finally {
       setIsLoading(false);

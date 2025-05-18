@@ -4,6 +4,7 @@ import { AuthProvider } from '@/features/auth/providers/AuthProvider';
 import { PermissionProvider } from '@/features/permissions/providers/PermissionProvider';
 import { ToastProvider } from '@/shared/providers/ToastProvider';
 import { ThemeProvider } from '@/shared/providers/ThemeProvider';
+import { QueryProvider } from '@/shared/providers/QueryProvider';
 import { AppInitializer } from '@/features/app';
 import './globals.css';
 
@@ -23,15 +24,17 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider>
-          <ToastProvider>
-            <AuthProvider>
-              <PermissionProvider>
-                <AppInitializer>
-                  {children}
-                </AppInitializer>
-              </PermissionProvider>
-            </AuthProvider>
-          </ToastProvider>
+          <QueryProvider>
+            <ToastProvider>
+              <AuthProvider>
+                <PermissionProvider>
+                  <AppInitializer>
+                    {children}
+                  </AppInitializer>
+                </PermissionProvider>
+              </AuthProvider>
+            </ToastProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

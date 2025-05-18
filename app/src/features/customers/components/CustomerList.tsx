@@ -32,6 +32,7 @@ interface EnhancedCustomerDto extends CustomerDto {
 // Props for CustomerList component
 export interface CustomerListProps {
   onCreateClick?: () => void;
+  showCreateButton?: boolean;
 }
 
 // Card component for mobile view - defined outside the main component to ensure stable reference
@@ -109,7 +110,7 @@ const CustomerCard = ({ item, onActionClick }: CardProps<EnhancedCustomerDto>) =
 /**
  * Customer list component using the unified list utilities
  */
-export const CustomerList: React.FC<CustomerListProps> = ({ onCreateClick }) => {
+export const CustomerList: React.FC<CustomerListProps> = ({ onCreateClick, showCreateButton = true }) => {
   const router = useRouter();
   const { toast } = useToast();
   const { hasPermission } = useCustomerPermissions();
@@ -339,6 +340,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({ onCreateClick }) => 
         searchPlaceholder="Search customers..."
         emptyStateMessage="No customers found"
         createButtonLabel="Add New Customer"
+        showCreateButton={showCreateButton && canCreateCustomer}
         
         // Active filters
         activeFilters={activeFilters.length > 0 ? activeFilters : undefined}

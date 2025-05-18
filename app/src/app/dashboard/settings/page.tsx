@@ -13,15 +13,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 import { Separator } from '@/shared/components/ui/separator';
 import { Loader2, RefreshCcw, AlertCircle, Sun, Moon, Monitor, Check, X, Shield } from 'lucide-react';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
-import dynamic from 'next/dynamic';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
+import { NoPermissionView } from '@/shared/components/NoPermissionView';
 
 export default function SettingsPage() {
-  const { settings, isLoading, error, updateSetting, resetToDefaults, reloadSettings } = useSettings();
+  const { settings, isLoading: settingsLoading, error: settingsError, updateSetting, resetToDefaults, reloadSettings } = useSettings();
   const { toast } = useToast();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+
+  // Get permissions
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canViewSettings = hasPermission(API_PERMISSIONS.SETTINGS.VIEW);
+  const canManageSettings = hasPermission(API_PERMISSIONS.SETTINGS.UPDATE);
+  
+  // Track if the page is in loading state
+  const isLoading = settingsLoading || permissionsLoading;
+  const error = settingsError;
 
   // For immediate UI feedback before the actual setting is updated
   const [themeValue, setThemeValue] = useState(settings.theme);
@@ -137,6 +148,17 @@ export default function SettingsPage() {
     );
   }
 
+  // Check for permissions
+  if (!permissionsLoading && !canViewSettings) {
+    return (
+      <NoPermissionView 
+        title="Access Denied"
+        message="You don't have permission to view settings."
+        permissionNeeded={API_PERMISSIONS.SETTINGS.VIEW}
+      />
+    );
+  }
+
   // Error state
   if (error) {
     return (
@@ -153,49 +175,56 @@ export default function SettingsPage() {
     );
   }
 
+  // Check if admin tab should be available
+  const showAdminTab = canManageSettings;
+
   return (
     <div className="container max-w-4xl py-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Einstellungen</h1>
         
-        <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={reloadSettings}
-            disabled={isSaving || isResetting}
-          >
-            <RefreshCcw className="h-4 w-4 mr-2" />
-            Aktualisieren
-          </Button>
-          
-          <Button 
-            variant="destructive" 
-            size="sm" 
-            onClick={handleResetSettings}
-            disabled={isSaving || isResetting}
-          >
-            {isResetting ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Zurücksetzen...
-              </>
-            ) : (
-              <>Zurücksetzen</>
-            )}
-          </Button>
-        </div>
+        {canManageSettings && (
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={reloadSettings}
+              disabled={isSaving || isResetting}
+            >
+              <RefreshCcw className="h-4 w-4 mr-2" />
+              Aktualisieren
+            </Button>
+            
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={handleResetSettings}
+              disabled={isSaving || isResetting}
+            >
+              {isResetting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Zurücksetzen...
+                </>
+              ) : (
+                <>Zurücksetzen</>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-md" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <TabsList className="grid w-full max-w-md" style={{ gridTemplateColumns: showAdminTab ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)' }}>
           <TabsTrigger value="general">Allgemein</TabsTrigger>
           <TabsTrigger value="appearance">Erscheinungsbild</TabsTrigger>
           <TabsTrigger value="notifications">Benachrichtigungen</TabsTrigger>
-          <TabsTrigger value="admin" className="relative">
-            <Shield className="h-4 w-4 mr-1" />
-            Admin
-          </TabsTrigger>
+          {showAdminTab && (
+            <TabsTrigger value="admin" className="relative">
+              <Shield className="h-4 w-4 mr-1" />
+              Admin
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* General Settings Tab */}
@@ -214,6 +243,7 @@ export default function SettingsPage() {
                   id="companyName" 
                   value={settings.companyName} 
                   onChange={async (e) => {
+                    if (!canManageSettings) return; // Prevent changes if no permission
                     setIsSaving(true);
                     try {
                       await updateSetting('companyName', e.target.value);
@@ -222,7 +252,8 @@ export default function SettingsPage() {
                     }
                   }}
                   placeholder="Firmenname"
-                  disabled={isSaving}
+                  disabled={isSaving || !canManageSettings}
+                  readOnly={!canManageSettings}
                 />
               </div>
               

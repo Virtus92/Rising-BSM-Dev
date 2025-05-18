@@ -13,6 +13,7 @@ import { UserRole } from '@/domain/enums/UserEnums';
 import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { UserPermissionsResponseDto } from '@/domain/dtos/PermissionDtos';
+import permissionCache from '@/features/permissions/lib/utils/PermissionCache';
 
 const logger = getLogger();
 
@@ -22,6 +23,9 @@ const logger = getLogger();
  */
 export async function GET(request: NextRequest) {
   const authHandler = await withAuth(async (req: NextRequest, user: any) => {
+    // Start performance measurement
+    const startTime = performance.now();
+    
     // Strict input validation
     const searchParams = req.nextUrl.searchParams;
     const userIdParam = searchParams.get('userId');
@@ -61,6 +65,34 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Try to get permissions from cache first
+    const cachedPermissions = permissionCache.getPermissions(userId);
+    
+    if (cachedPermissions) {
+      // Calculate performance metrics
+      const endTime = performance.now();
+      const duration = Math.round(endTime - startTime);
+      
+      logger.info(`Retrieved ${cachedPermissions.length} permissions for user ${userId} from cache`, {
+        userId,
+        permissionCount: cachedPermissions.length,
+        permissions: cachedPermissions.length <= 10 
+          ? cachedPermissions.join(', ')
+          : cachedPermissions.slice(0, 10).join(', ') + '...',
+        userPermissionsCount: 0,
+        duration,
+        source: 'cache'
+      });
+
+      // Return cached permissions
+      return NextResponse.json({
+        success: true,
+        data: cachedPermissions,
+        message: 'Permissions retrieved successfully'
+      }, { status: 200 });
+    }
+
+    // Cache miss - get permissions from service
     // Initialize services
     const serviceFactory = getServiceFactory();
     const userService = serviceFactory.createUserService();
@@ -200,21 +232,32 @@ export async function GET(request: NextRequest) {
       ? userPermissions.permissions 
       : [];
     
+    // Store in cache for future requests
+    permissionCache.cachePermissions(userId, permissionsArray);
+    
+    // Calculate performance metrics
+    const endTime = performance.now();
+    const duration = Math.round(endTime - startTime);
+    
     // Log comprehensive data for debugging 
-    logger.info(`Retrieved ${permissionsArray.length} permissions for user ${userId}`, {
+    logger.info(`Retrieved ${permissionsArray.length} permissions for user ${userId} from database`, {
       userId,
       role: userPermissions.role,
       permissionCount: permissionsArray.length,
-      permissions: permissionsArray.length <= 10 ? permissionsArray : permissionsArray.slice(0, 10).concat(['...and more']),
-      permissionsType: 'array',
-      isArray: true
+      permissions: permissionsArray.length <= 10 
+        ? permissionsArray.join(', ')
+        : permissionsArray.slice(0, 10).join(', ') + '...',
+      userPermissionsCount: 0,
+      duration,
+      source: 'database'
     });
 
     // Return permissions array directly - simple, straightforward contract
-    return NextResponse.json(
-      permissionsArray,
-      { status: 200 }
-    );
+    return NextResponse.json({
+      success: true,
+      data: permissionsArray,
+      message: 'Permissions retrieved successfully'
+    }, { status: 200 });
   });
   
   return authHandler(request);
@@ -417,15 +460,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Invalidate the permissions cache for this user
-    try {
-      await permissionMiddleware.invalidatePermissionCache(Number(userId));
-    } catch (cacheError) {
-      // Log but don't fail the operation if cache invalidation fails
-      logger.warn('Failed to invalidate permission cache', {
-        error: cacheError instanceof Error ? cacheError.message : String(cacheError),
-        userId: Number(userId)
-      });
-    }
+    permissionCache.invalidateCache(Number(userId));
     
     // Log the permission update for audit purposes
     logger.info(`User permissions updated for user ${userId} by ${user?.id}`, {
