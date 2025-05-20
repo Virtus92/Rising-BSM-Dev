@@ -36,13 +36,19 @@ export const GET = routeHandler(
             name: searchParams.get('name') || undefined,
             type: searchParams.get('type') || undefined,
             page: searchParams.has('page') ? parseInt(searchParams.get('page')!) : 1,
-            limit: searchParams.has('limit') ? parseInt(searchParams.get('limit')!) : 10
+            limit: searchParams.has('limit') ? parseInt(searchParams.get('limit')!) : 100 // Use a reasonable limit that can still show all permissions
           };
+          
+          // Always ensure we're getting ALL permissions by setting a high enough limit
+          // Minimum of 100 to capture the complete set
+          if (filters.limit < 100) {
+            filters.limit = 100;
+          }
 
           // Request additional metadata
           const requestInfo = {
             userId: userId,
-            requestId: searchParams.get('requestId') || undefined,
+            requestId: searchParams.get('requestId') || `perm-list-${Date.now()}`,
             includeDetails: searchParams.get('includeDetails') === 'true'
           };
 
@@ -68,7 +74,8 @@ export const GET = routeHandler(
       };
   
     // Apply permission middleware with proper signature
-    const handler = await withPermission(permissionHandler, SystemPermission.SYSTEM_ADMIN);
+    // Using PERMISSIONS_MANAGE permission which already exists in the system
+    const handler = await withPermission(permissionHandler, SystemPermission.PERMISSIONS_MANAGE);
 return await handler(req);
   },
   { requiresAuth: true }
@@ -112,7 +119,8 @@ export const POST = routeHandler(
       };
     
     // Apply permission middleware with proper signature
-    const handler = await withPermission(permissionHandler, SystemPermission.SYSTEM_ADMIN);
+    // Using PERMISSIONS_MANAGE permission which already exists in the system
+    const handler = await withPermission(permissionHandler, SystemPermission.PERMISSIONS_MANAGE);
     return await handler(req);
   },
   { requiresAuth: true }
@@ -168,7 +176,8 @@ export const PATCH = routeHandler(
       };
     
     // Apply permission middleware with proper signature
-    const handler = await withPermission(permissionHandler, SystemPermission.SYSTEM_ADMIN);
+    // Using PERMISSIONS_MANAGE permission which already exists in the system
+    const handler = await withPermission(permissionHandler, SystemPermission.PERMISSIONS_MANAGE);
     return await handler(req);
   },
   { requiresAuth: true }
@@ -222,7 +231,8 @@ export const DELETE = routeHandler(
       };
     
     // Apply permission middleware with proper signature
-    const handler = await withPermission(permissionHandler, SystemPermission.SYSTEM_ADMIN);
+    // Using PERMISSIONS_MANAGE permission which already exists in the system
+    const handler = await withPermission(permissionHandler, SystemPermission.PERMISSIONS_MANAGE);
 return await handler(req);
   },
   { requiresAuth: true }

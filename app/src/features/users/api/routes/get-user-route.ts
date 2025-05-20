@@ -62,7 +62,7 @@ export async function getUserHandler(
     
     if (includeDetails && !isOwnProfile && !await permissionMiddleware.hasPermission(
       request.auth.userId,
-      SystemPermission.USERS_MANAGE
+      SystemPermission.USERS_EDIT
     )) {
       // If no permission for detailed view, return basic user data
       return formatResponse.success(user, 'User found');

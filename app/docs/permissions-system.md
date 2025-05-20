@@ -126,7 +126,7 @@ For features that require multiple permissions, use the anyPermission prop:
 ```tsx
 <PermissionGuard 
   anyPermission={[
-    SystemPermission.USERS_MANAGE,
+    SystemPermission.USERS_EDIT,
     SystemPermission.SYSTEM_ADMIN
   ]}
 >

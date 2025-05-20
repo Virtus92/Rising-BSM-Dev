@@ -260,7 +260,7 @@ import { SystemPermission } from '@/domain/enums/PermissionEnums';
 export function AdminSection() {
   const { hasPermission } = useEnhancedPermissions();
   
-  if (!hasPermission(SystemPermission.USERS_MANAGE)) {
+  if (!hasPermission(SystemPermission.USERS_EDIT)) {
     return null;
   }
   

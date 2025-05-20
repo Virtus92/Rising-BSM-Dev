@@ -9,10 +9,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getLogger } from '@/core/logging';
-import { permissionService } from '../lib/services/PermissionService';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { getUserFromRequest } from '@/features/auth/api/middleware/authMiddleware';
 import AuthService from '@/features/auth/core/AuthService';
+import { getPermissionService } from '@/core/factories/serviceFactory';
 
 const logger = getLogger();
 
@@ -54,10 +54,33 @@ export function withPermission(
         );
       }
       
+      // Get permission service
+      const permissionService = getPermissionService();
+      
       // Check permissions
-      const hasPermission = options.requireAll
-        ? await permissionService.hasAllPermissions(user.id, options.permissions)
-        : await permissionService.hasAnyPermission(user.id, options.permissions);
+      let hasPermission = false;
+      
+      if (options.requireAll) {
+        // Check if user has all required permissions
+        hasPermission = true;
+        for (const permission of options.permissions) {
+          const hasThisPermission = await permissionService.hasPermission(user.id, permission);
+          if (!hasThisPermission) {
+            hasPermission = false;
+            break;
+          }
+        }
+      } else {
+        // Check if user has any required permission
+        hasPermission = false;
+        for (const permission of options.permissions) {
+          const hasThisPermission = await permissionService.hasPermission(user.id, permission);
+          if (hasThisPermission) {
+            hasPermission = true;
+            break;
+          }
+        }
+      }
       
       if (!hasPermission) {
         const permissionList = options.permissions.join(', ');

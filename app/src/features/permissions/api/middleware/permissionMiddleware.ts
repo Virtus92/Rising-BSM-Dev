@@ -24,7 +24,6 @@ export const API_PERMISSIONS = {
     CREATE: SystemPermission.USERS_CREATE,
     UPDATE: SystemPermission.USERS_EDIT,
     DELETE: SystemPermission.USERS_DELETE,
-    MANAGE_PERMISSIONS: SystemPermission.USERS_MANAGE,
   },
   
   // Customer management permissions
@@ -42,6 +41,8 @@ export const API_PERMISSIONS = {
     UPDATE: SystemPermission.REQUESTS_EDIT,
     DELETE: SystemPermission.REQUESTS_DELETE,
     ASSIGN: SystemPermission.REQUESTS_ASSIGN,
+    APPROVE: SystemPermission.REQUESTS_APPROVE,
+    REJECT: SystemPermission.REQUESTS_REJECT,
     CONVERT: SystemPermission.REQUESTS_CONVERT,
   },
   
@@ -53,12 +54,9 @@ export const API_PERMISSIONS = {
     DELETE: SystemPermission.APPOINTMENTS_DELETE,
   },
   
-  // Notification management permissions
+  // Notification management permission
   NOTIFICATIONS: {
     VIEW: SystemPermission.NOTIFICATIONS_VIEW,
-    UPDATE: SystemPermission.NOTIFICATIONS_EDIT,
-    DELETE: SystemPermission.NOTIFICATIONS_DELETE,
-    MANAGE: SystemPermission.NOTIFICATIONS_MANAGE,
   },
   
   // Settings management permissions
@@ -66,11 +64,11 @@ export const API_PERMISSIONS = {
     VIEW: SystemPermission.SETTINGS_VIEW,
     UPDATE: SystemPermission.SETTINGS_EDIT,
   },
-  
-  // System permissions
-  SYSTEM: {
-    ADMIN: SystemPermission.SYSTEM_ADMIN,
-    LOGS: SystemPermission.SYSTEM_LOGS,
+
+  // Permission management
+  PERMISSIONS: {
+    VIEW: SystemPermission.PERMISSIONS_VIEW,
+    MANAGE: SystemPermission.PERMISSIONS_MANAGE,
   },
 };
 
@@ -102,64 +100,54 @@ return import('@/features/permissions/lib/utils/permissionCacheUtils')
 
 /**
 * Checks if a user has a specific permission
+* Direct database check with proper error handling - NO FALLBACKS
 */
 export async function hasPermission(userId: number | undefined, permission: string): Promise<boolean> {
-// Input validation with proper error handling
-if (userId === undefined || userId === null) {
-logger.warn('Permission check attempted without valid user ID', { permission });
+  // Input validation with proper error handling
+  if (userId === undefined || userId === null) {
+    logger.warn('Permission check attempted without valid user ID', { permission });
+    return false; // No user ID means no permission
+  }
 
-// Fail definitively - auth required
-throw authErrorHandler.createError(
-'Authentication required',
-AuthErrorType.AUTH_REQUIRED,
-{ permission },
-  401
-);
-}
+  if (isNaN(userId) || userId <= 0) {
+    logger.error('Invalid user ID for permission check', { userId, permission });
+    return false; // Invalid user ID means no permission
+  }
 
-if (isNaN(userId) || userId <= 0) {
-logger.error('Invalid user ID for permission check', { userId, permission });
-throw authErrorHandler.createError(
-'Invalid user ID for permission check',
-AuthErrorType.INVALID_USER_ID,
-  { userId, permission },
-  400
-);
-}
+  if (!permission || typeof permission !== 'string') {
+    logger.error('Invalid permission code for permission check', { 
+      permission,
+      permissionType: typeof permission,
+      userId,
+      stack: new Error().stack
+    });
+    return false; // Invalid permission means deny access
+  }
 
-if (!permission || typeof permission !== 'string') {
-throw authErrorHandler.createError(
-'Invalid permission code for permission check',
-AuthErrorType.INVALID_PERMISSION,
-{ permission },
-    400
-);
-}
+  // Normalize permission code for consistent comparison
+  const normalizedPermission = permission.trim().toLowerCase();
 
-// Normalize permission code for consistent comparison
-const normalizedPermission = permission.trim().toLowerCase();
+  try {
+    // Check cache first if enabled
+    if (CACHE_ENABLED) {
+      try {
+        // Import the cache utils safely
+        const cacheUtils = await getPermissionCacheUtil();
 
-try {
-// Check cache first if enabled
-if (CACHE_ENABLED) {
-try {
-// Import the cache utils safely
-const cacheUtils = await getPermissionCacheUtil();
+        // Get from cache with explicit typing
+        const cachedResult = await cacheUtils.getPermissionFromCache(userId, normalizedPermission);
 
-// Get from cache with explicit typing
-const cachedResult = await cacheUtils.getPermissionFromCache(userId, normalizedPermission);
-
-// Return early if we have a cached result
-if (cachedResult !== undefined) {
-logger.debug('Permission check result from cache', { 
-  userId, 
-    permission: normalizedPermission,
-      result: cachedResult
+        // Return early if we have a cached result
+        if (cachedResult !== undefined) {
+          logger.debug('Permission check result from cache', { 
+            userId, 
+            permission: normalizedPermission,
+            result: cachedResult
           });
           return cachedResult;
         }
       } catch (cacheError) {
-        // Log cache error but continue to service check
+        // Log cache error but continue to database check
         logger.warn('Permission cache lookup failed', { 
           userId, 
           permission: normalizedPermission,
@@ -173,15 +161,18 @@ logger.debug('Permission check result from cache', {
     const permissionService = serviceFactory.createPermissionService();
     
     if (!permissionService) {
-      throw authErrorHandler.createError(
-        'Permission service not available',
-        AuthErrorType.SERVICE_UNAVAILABLE,
-        { userId, permission: normalizedPermission },
-        500
-      );
+      logger.error('Permission service not available', { userId, permission: normalizedPermission });
+      return false; // No service means deny by default (secure approach)
     }
     
-    // Check permission with the database service
+    // Log permission check for debugging
+    logger.debug(`Checking permission ${normalizedPermission} for user ${userId}`, {
+      userId,
+      permission: normalizedPermission,
+      source: 'database'
+    });
+    
+    // Check permission with the database service - no fallbacks
     const hasPermissionResult = await permissionService.hasPermission(userId, normalizedPermission);
     
     // Store result in cache when enabled
@@ -202,23 +193,15 @@ logger.debug('Permission check result from cache', {
     
     return hasPermissionResult;
   } catch (error) {
+    // Log the error but don't throw
+    logger.error('Error in permission check', { 
+      userId, 
+      permission: normalizedPermission,
+      error: error instanceof Error ? { message: error.message, stack: error.stack } : String(error) 
+    });
     
-    // Propagate errors with proper handling
-    if (error && typeof error === 'object' && 'type' in error) {
-      throw error; // Already a handled error
-    }
-    
-    // Convert other errors to standard format
-    throw authErrorHandler.createError(
-      'Error checking permission',
-      AuthErrorType.PERMISSION_CHECK_FAILED,
-      { 
-        userId, 
-        permission: normalizedPermission,
-        error: error instanceof Error ? error.message : String(error) 
-      },
-      500
-    );
+    // For security, any error means denying permission
+    return false;
   }
 }
 
@@ -283,6 +266,7 @@ export interface PermissionCheckResult {
 
 /**
  * Checks if a user has a specific permission and returns a structured result
+ * With improved error handling and no thrown errors
  * 
  * Uses the centralized permission service with caching for efficient checks
  * 
@@ -318,11 +302,12 @@ export async function checkPermission(
       // Check permissions in parallel (with individual error handling)
       const checkPromises = permission.map(async (perm) => {
         try {
+          // Our improved hasPermission never throws, so this is safer now
           const hasPermResult = await hasPermission(userId, perm);
           return { permission: perm, hasPermission: hasPermResult };
         } catch (error) {
-          // Log but continue with other permissions
-          logger.warn(`Error checking permission ${perm}:`, {
+          // This shouldn't happen anymore, but handle it just in case
+          logger.warn(`Unexpected error checking permission ${perm}:`, {
             error: error instanceof Error ? error.message : String(error),
             userId,
             perm
@@ -354,17 +339,24 @@ export async function checkPermission(
       // No permissions matched - provide detailed diagnostic information
       const permissionStr = permission.join(', ');
       
-      throw authErrorHandler.createPermissionError(
-        `You don't have any of the required permissions: ${permissionStr}`,
-        {
-          userId,
-          requiredPermissions: permission,
-          permissionResults
+      // Return a structured result instead of throwing
+      return {
+        success: false,
+        message: `You don't have any of the required permissions: ${permissionStr}`,
+        status: 403,
+        permission: permissionStr,
+        error: {
+          type: AuthErrorType.PERMISSION_DENIED,
+          details: {
+            userId,
+            requiredPermissions: permission,
+            permissionResults
+          }
         }
-      );
+      };
     }
     
-    // Check single permission
+    // Check single permission - our new implementation never throws
     const hasPermResult = await hasPermission(userId, permission);
     
     if (hasPermResult) {
@@ -374,25 +366,37 @@ export async function checkPermission(
       };
     }
     
-    // Permission denied - throw error with details
-    throw authErrorHandler.createPermissionError(
-      `You don't have permission to perform this action (requires ${permission})`,
-      {
-        userId,
-        requiredPermission: permission,
-        permissionCheckResult: hasPermResult
+    // Permission denied - return structured result with details
+    return {
+      success: false,
+      message: `You don't have permission to perform this action (requires ${permission})`,
+      status: 403,
+      permission,
+      error: {
+        type: AuthErrorType.PERMISSION_DENIED,
+        details: {
+          userId,
+          requiredPermission: permission
+        }
       }
-    );
+    };
   } catch (error) {
-    // Convert error to PermissionCheckResult
-    const normalizedError = authErrorHandler.normalizeError(error as Error) ;
+    // This should never happen with our improved implementation,
+    // but handle unexpected errors gracefully
+    logger.error('Unexpected error in checkPermission', {
+      userId: request.auth?.userId,
+      permission,
+      error: error instanceof Error ? { message: error.message, stack: error.stack } : String(error)
+    });
     
     // Return structured error result
     return {
       success: false,
-      message: normalizedError.message,
+      message: 'An error occurred while checking permissions',
+      status: 500,
       error: {
-        type: normalizedError.type,
+        type: AuthErrorType.PERMISSION_CHECK_FAILED,
+        details: { permission }
       }
     };
   }
@@ -400,22 +404,28 @@ export async function checkPermission(
 
 /**
  * Middleware to check if a user has a specific permission
+ * With improved error handling and fallbacks
  * 
  * @param handler Route handler function
  * @param permission Required permission or array of permissions
  * @returns Wrapped handler function with permission check
  */
 export function withPermission(
-  handler: (request: NextRequest, ...args: any[]) => Promise<NextResponse>,
+  handler: (request: NextRequest, user: any, context?: any) => Promise<NextResponse>,
   permission: string | string[]
 ) {
   // Return a direct function, not a Promise of a function
-  return async function permissionHandler(request: NextRequest, ...args: any[]): Promise<NextResponse> {
+  return async function permissionHandler(request: NextRequest, context?: any): Promise<NextResponse> {
     try {
       // Get user ID from auth
       const userId = request.auth?.userId;
       
       if (!userId) {
+        logger.warn('Authentication required for protected route', {
+          url: request.url,
+          requiredPermission: permission
+        });
+        
         return formatResponse.unauthorized('Authentication required', {
           details: {
             missingUserId: true,
@@ -426,18 +436,20 @@ export function withPermission(
       
       // If permission is an array, check each permission
       if (Array.isArray(permission)) {
-        // Check each permission individually
+        // Check each permission individually without throwing
         for (const perm of permission) {
           try {
             const hasPermResult = await hasPermission(userId, perm);
             
             if (hasPermResult) {
               // Permission granted, proceed to handler
-              return handler(request, ...args);
+              logger.debug(`Permission check passed for ${perm}`, { userId });
+              return await handler(request, request.auth, context);
             }
           } catch (error) {
-            // Log but continue trying other permissions
-            logger.warn(`Error checking permission ${perm}:`, {
+            // This should never happen with our improved hasPermission,
+            // but log just in case and continue checking other permissions
+            logger.warn(`Unexpected error checking permission ${perm}:`, {
               error: error instanceof Error ? error.message : String(error),
               userId,
               permission: perm
@@ -448,6 +460,11 @@ export function withPermission(
         // No permissions matched, return error
         const permissionLabel = permission.join(' or ');
         
+        logger.info(`Permission denied (${permissionLabel}) for user ${userId}`, {
+          url: request.url,
+          permissions: permission
+        });
+        
         return formatResponse.forbidden(`You don't have permission to perform this action (requires ${permissionLabel})`, {
           details: {
             userId,
@@ -455,27 +472,52 @@ export function withPermission(
           }
         }.toString());
       } else {
-        // Check single permission directly - throw error if not granted
-        const hasPermResult = await hasPermission(userId, permission);
-        
-        if (!hasPermResult) {
-          return formatResponse.forbidden(`You don't have permission to perform this action (requires ${permission})`, {
+        // Check single permission without throwing
+        try {
+          const hasPermResult = await hasPermission(userId, permission);
+          
+          if (!hasPermResult) {
+            logger.info(`Permission denied (${permission}) for user ${userId}`, {
+              url: request.url
+            });
+            
+            return formatResponse.forbidden(`You don't have permission to perform this action (requires ${permission})`, {
+              details: {
+                userId,
+                requiredPermission: permission
+              }
+            }.toString());
+          }
+          
+          // User has permission, proceed to handler
+          logger.debug(`Permission check passed for ${permission}`, { userId });
+          return await handler(request, request.auth, context);
+        } catch (permError) {
+          // This should never happen with our improved hasPermission,
+          // but handle it gracefully just in case
+          logger.error(`Unexpected error in permission check for ${permission}`, {
+            error: permError instanceof Error ? permError.message : String(permError),
+            userId,
+            stack: permError instanceof Error ? permError.stack : undefined
+          });
+          
+          // Fail closed for security - deny access on errors
+          return formatResponse.forbidden(`Permission check failed, access denied`, {
             details: {
               userId,
-              requiredPermission: permission
+              requiredPermission: permission,
+              error: 'Permission check failed'
             }
           }.toString());
         }
-        
-        // User has permission, proceed to handler
-        return handler(request, ...args);
       }
     } catch (error) {
       // Log error with context
-      logger.error('Error in permission middleware', { 
+      logger.error('Unhandled error in permission middleware', { 
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        requiredPermission: permission
+        requiredPermission: permission,
+        url: request.url
       });
       
       // Format error response based on error type
@@ -488,16 +530,13 @@ export function withPermission(
         }.toString());
       }
       
-      // Handle normal errors
-      const normalizedError = authErrorHandler.normalizeError(error as Error);
-      
+      // Fail closed for security - return error but don't expose details
       return formatResponse.error(
-        normalizedError.message,
-        normalizedError.status || 500,
+        'An error occurred while checking permissions',
+        500,
         {
           details: {
-            permission,
-            errorType: normalizedError.type
+            permission
           }
         }.toString()
       );
@@ -506,18 +545,33 @@ export function withPermission(
 }
 
 /**
- * Checks if a permission is included in a role's default permissions
+ * Checks if a permission is included in a role's defined permissions
+ * Direct database check with no fallbacks
  * 
  * @param permission Permission code to check
  * @param role User role
  * @returns Whether the permission is included
  * @throws Error if permission check fails
  */
-export async function isPermissionIncludedInRole(permission: string, role: string): Promise<boolean> {
+export async function isPermissionIncludedInRole(permission: string, role?: string): Promise<boolean> {
   try {
-    // Admin role always has all permissions
-    if (role?.toUpperCase() === 'ADMIN') {
-      return true;
+    // Validation checks
+    if (!permission) {
+      throw authErrorHandler.createError(
+        'Permission code is required',
+        AuthErrorType.INVALID_REQUEST,
+        { permission },
+        400
+      );
+    }
+
+    if (!role) {
+      throw authErrorHandler.createError(
+        'Role is required for permission check',
+        AuthErrorType.INVALID_REQUEST,
+        { role },
+        400
+      );
     }
     
     // Get role permissions from service
@@ -533,8 +587,8 @@ export async function isPermissionIncludedInRole(permission: string, role: strin
       );
     }
     
-    // Get the default permissions for the role
-    const rolePermissions = await permissionService.getDefaultPermissionsForRole(role);
+    // Get the permissions for the role - direct database check 
+    const rolePermissions = await permissionService.getRolePermissions(role.toLowerCase());
     
     // Check if the permission is included
     return rolePermissions.includes(permission);

@@ -529,13 +529,48 @@ export class AuthServiceClass implements IAuthService, IRefreshTokenService {
     // If no valid token in memory, try to get from storage
     if (typeof window !== 'undefined') {
       try {
+        // Import TokenCache to prevent circular dependencies
+        const { default: TokenCache } = await import('./TokenCache');
+        
+        // Check if token is cached in TokenCache
+        const cachedToken = TokenCache.getCachedToken();
+        if (cachedToken) {
+          // Use the cached token
+          this.token = cachedToken;
+          this.tokenExpiresAt = Date.now() + 600000; // Assume at least 10 mins validity
+          logger.debug('Using token from TokenCache');
+          return cachedToken;
+        }
+        
+        // Check if we should throttle requests
+        if (TokenCache.shouldThrottleRequest()) {
+          // If we need to throttle, try to get from cookies directly
+          const cookies = document.cookie.split(';');
+          
+          for (const cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'js_token' || name === 'auth_token' || name === 'access_token') {
+              try {
+                const token = decodeURIComponent(value);
+                if (token && token.includes('.') && token.split('.').length === 3) {
+                  return token;
+                }
+              } catch (e) {
+                // Invalid cookie, continue to next
+              }
+            }
+          }
+          return null;
+        }
+        
         // First try to fetch a fresh token from API - most reliable method
         const response = await fetch('/api/auth/token', {
           method: 'GET',
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store'
+            'Cache-Control': 'private, max-age=5',
+            'If-None-Match': TokenCache.getCachedToken() ? 'throttled' : ''
           }
         });
         
@@ -547,17 +582,22 @@ export class AuthServiceClass implements IAuthService, IRefreshTokenService {
           
           if (token) {
             try {
-              // Check expiration
-              const decoded = jwtDecode<{ exp: number }>(token);
-              const expiresAt = decoded.exp * 1000;
-              
-              if (Date.now() < expiresAt) {
-                // Cache token in memory
-                this.token = token;
-                this.tokenExpiresAt = expiresAt;
-                logger.debug('Using token from API response');
-                return token;
-              }
+            // Check expiration
+            const decoded = jwtDecode<{ exp: number }>(token);
+            const expiresAt = decoded.exp * 1000;
+            
+            if (Date.now() < expiresAt) {
+            // Cache token in memory and TokenCache
+            this.token = token;
+            this.tokenExpiresAt = expiresAt;
+            
+            // Cache the token for future requests
+              const { default: TokenCache } = await import('./TokenCache');
+                  TokenCache.cacheToken(token, expiresAt);
+                  
+                  logger.debug('Using token from API response');
+                  return token;
+                }
             } catch (e) {
               // Invalid token from API - try cookies next
               logger.warn('Invalid token from API response', {

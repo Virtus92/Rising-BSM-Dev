@@ -54,7 +54,7 @@ export async function updateUserHandler(
     
     // For role or status changes, require USERS_MANAGE permission
     if ((isRoleChange || isStatusChange) && 
-        !await permissionMiddleware.hasPermission(request.auth.userId, SystemPermission.USERS_MANAGE)) {
+        !await permissionMiddleware.hasPermission(request.auth.userId, SystemPermission.USERS_EDIT)) {
       return formatResponse.forbidden('You do not have permission to change user roles or status');
     }
     

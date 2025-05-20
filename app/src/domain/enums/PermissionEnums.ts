@@ -2,14 +2,15 @@
  * System Permission Categories
  */
 export enum PermissionCategory {
-  SYSTEM = "System",
+  DASHBOARD = "Dashboard",
   USERS = "Users",
-  ROLES = "Roles",
   CUSTOMERS = "Customers",
   REQUESTS = "Requests",
   APPOINTMENTS = "Appointments",
   SETTINGS = "Settings",
-  PROFILE = "Profile"
+  PROFILE = "Profile",
+  NOTIFICATIONS = "Notifications",
+  PERMISSIONS = "Permissions"
 }
 
 /**
@@ -31,31 +32,23 @@ export enum PermissionAction {
  * Common System Permissions
  * 
  * Format: {category}.{action}
+ * ONLY includes permissions that are actually implemented and used
  */
 export enum SystemPermission {
-  // System permissions
-  SYSTEM_ACCESS = "system.access",
-  DASHBOARD_VIEW = "dashboard.view",
+  // Dashboard permission
+  DASHBOARD_ACCESS = "dashboard.access",
   
   // User permissions
   USERS_VIEW = "users.view",
   USERS_CREATE = "users.create",
   USERS_EDIT = "users.edit",
   USERS_DELETE = "users.delete",
-  USERS_MANAGE = "users.manage",
-  
-  // Role permissions
-  ROLES_VIEW = "roles.view",
-  ROLES_CREATE = "roles.create",
-  ROLES_EDIT = "roles.edit",
-  ROLES_DELETE = "roles.delete",
   
   // Customer permissions
   CUSTOMERS_VIEW = "customers.view",
   CUSTOMERS_CREATE = "customers.create",
   CUSTOMERS_EDIT = "customers.edit",
   CUSTOMERS_DELETE = "customers.delete",
-  CUSTOMERS_HARD_DELETE = "customers.hard_delete",
   
   // Request permissions
   REQUESTS_VIEW = "requests.view",
@@ -65,7 +58,6 @@ export enum SystemPermission {
   REQUESTS_APPROVE = "requests.approve",
   REQUESTS_REJECT = "requests.reject",
   REQUESTS_ASSIGN = "requests.assign",
-  REQUESTS_MANAGE = "requests.manage",
   REQUESTS_CONVERT = "requests.convert",
   
   // Appointment permissions
@@ -74,12 +66,8 @@ export enum SystemPermission {
   APPOINTMENTS_EDIT = "appointments.edit",
   APPOINTMENTS_DELETE = "appointments.delete",
   
-  // Notification permissions
+  // Notification permission
   NOTIFICATIONS_VIEW = "notifications.view",
-  NOTIFICATIONS_CREATE = "notifications.create",
-  NOTIFICATIONS_EDIT = "notifications.edit",
-  NOTIFICATIONS_DELETE = "notifications.delete",
-  NOTIFICATIONS_MANAGE = "notifications.manage",
 
   // Settings permissions
   SETTINGS_VIEW = "settings.view",
@@ -88,105 +76,104 @@ export enum SystemPermission {
   // Profile permissions
   PROFILE_VIEW = "profile.view",
   PROFILE_EDIT = "profile.edit",
-
-  // System permissions
-  SYSTEM_ADMIN = "system.admin",
-  SYSTEM_LOGS = "system.logs",
   
   // Permission management
   PERMISSIONS_VIEW = "permissions.view",
   PERMISSIONS_MANAGE = "permissions.manage",
+  
+  // IMPORTANT: This is added to fix references in code
+  // This permission is used in routes, so must be defined here
+  SYSTEM_ADMIN = "system.admin"
 }
 
-// Role-based permission presets
-export const RolePermissions: Record<string, SystemPermission[]> = {
-  "admin": [
-    SystemPermission.SYSTEM_ACCESS,
-    SystemPermission.SYSTEM_ADMIN, // Added SYSTEM_ADMIN permission for admin role
-    SystemPermission.USERS_VIEW,
-    SystemPermission.USERS_CREATE,
-    SystemPermission.USERS_EDIT,
-    SystemPermission.USERS_DELETE,
-    SystemPermission.USERS_MANAGE,
-    SystemPermission.ROLES_VIEW,
-    SystemPermission.ROLES_CREATE,
-    SystemPermission.ROLES_EDIT,
-    SystemPermission.ROLES_DELETE,
-    SystemPermission.CUSTOMERS_VIEW,
-    SystemPermission.CUSTOMERS_CREATE,
-    SystemPermission.CUSTOMERS_EDIT,
-    SystemPermission.CUSTOMERS_DELETE,
-    SystemPermission.CUSTOMERS_HARD_DELETE,
-    SystemPermission.REQUESTS_VIEW,
-    SystemPermission.REQUESTS_CREATE,
-    SystemPermission.REQUESTS_EDIT,
-    SystemPermission.REQUESTS_DELETE,
-    SystemPermission.REQUESTS_APPROVE,
-    SystemPermission.REQUESTS_REJECT,
-    SystemPermission.REQUESTS_ASSIGN,
-    SystemPermission.REQUESTS_MANAGE,
-    SystemPermission.APPOINTMENTS_VIEW,
-    SystemPermission.APPOINTMENTS_CREATE,
-    SystemPermission.APPOINTMENTS_EDIT,
-    SystemPermission.APPOINTMENTS_DELETE,
-    SystemPermission.SETTINGS_VIEW,
-    SystemPermission.SETTINGS_EDIT,
-    SystemPermission.PERMISSIONS_VIEW,
-    SystemPermission.PERMISSIONS_MANAGE,
-    SystemPermission.PROFILE_VIEW,
-    SystemPermission.PROFILE_EDIT
-  ],
-  "manager": [
-    SystemPermission.SYSTEM_ACCESS,
-    SystemPermission.USERS_VIEW,
-    SystemPermission.USERS_MANAGE,
-    SystemPermission.CUSTOMERS_VIEW,
-    SystemPermission.CUSTOMERS_CREATE,
-    SystemPermission.CUSTOMERS_EDIT,
-    SystemPermission.REQUESTS_VIEW,
-    SystemPermission.REQUESTS_CREATE,
-    SystemPermission.REQUESTS_EDIT,
-    SystemPermission.REQUESTS_DELETE,
-    SystemPermission.REQUESTS_APPROVE,
-    SystemPermission.REQUESTS_REJECT,
-    SystemPermission.REQUESTS_ASSIGN,
-    SystemPermission.APPOINTMENTS_VIEW,
-    SystemPermission.APPOINTMENTS_CREATE,
-    SystemPermission.APPOINTMENTS_EDIT,
-    SystemPermission.APPOINTMENTS_DELETE,
-    SystemPermission.SETTINGS_VIEW,
-    SystemPermission.PERMISSIONS_VIEW,
-    SystemPermission.PROFILE_VIEW,
-    SystemPermission.PROFILE_EDIT
-  ],
-  "employee": [
-    SystemPermission.SYSTEM_ACCESS,
-    SystemPermission.CUSTOMERS_VIEW,
-    SystemPermission.CUSTOMERS_CREATE,
-    SystemPermission.REQUESTS_VIEW,
-    SystemPermission.REQUESTS_CREATE,
-    SystemPermission.APPOINTMENTS_VIEW,
-    SystemPermission.APPOINTMENTS_CREATE,
-    SystemPermission.APPOINTMENTS_EDIT,
-    SystemPermission.PROFILE_VIEW,
-    SystemPermission.PROFILE_EDIT
-  ],
-  "user": [
-    SystemPermission.SYSTEM_ACCESS,
-    SystemPermission.PROFILE_VIEW,
-    SystemPermission.PROFILE_EDIT,
-    SystemPermission.APPOINTMENTS_VIEW,
-    SystemPermission.APPOINTMENTS_CREATE
-  ]
-};
-
 /**
- * Gets permissions for a specific role
+ * Gets default permissions for a specific role
  * 
- * @param role - User role
+ * @param role - Role name
  * @returns Array of permission codes for the role
  */
 export function getPermissionsForRole(role: string): string[] {
-  const lowercaseRole = role.toLowerCase();
-  return (RolePermissions[lowercaseRole] || []).map(permission => permission.toString());
+  // Convert role to lowercase for consistent comparison
+  const normalizedRole = role.toLowerCase();
+  
+  // Base permissions that all users should have
+  const basePermissions = [
+    SystemPermission.PROFILE_VIEW,
+    SystemPermission.PROFILE_EDIT,
+    SystemPermission.DASHBOARD_ACCESS,
+    SystemPermission.NOTIFICATIONS_VIEW
+  ];
+  
+  // Role-specific permissions
+  switch (normalizedRole) {
+    case 'admin':
+      // Admin has all permissions - ensure SYSTEM_ADMIN is included
+      const adminPermissions = Object.values(SystemPermission);
+      // Verify SYSTEM_ADMIN is included (it should be since we added it to the enum)
+      if (!adminPermissions.includes(SystemPermission.SYSTEM_ADMIN)) {
+        adminPermissions.push(SystemPermission.SYSTEM_ADMIN);
+      }
+      return adminPermissions;
+      
+    case 'manager':
+      return [
+        ...basePermissions,
+        // User management
+        SystemPermission.USERS_VIEW,
+        SystemPermission.USERS_CREATE,
+        SystemPermission.USERS_EDIT,
+        // Customer management
+        SystemPermission.CUSTOMERS_VIEW,
+        SystemPermission.CUSTOMERS_CREATE,
+        SystemPermission.CUSTOMERS_EDIT,
+        SystemPermission.CUSTOMERS_DELETE,
+        // Request management
+        SystemPermission.REQUESTS_VIEW,
+        SystemPermission.REQUESTS_CREATE,
+        SystemPermission.REQUESTS_EDIT,
+        SystemPermission.REQUESTS_DELETE,
+        SystemPermission.REQUESTS_APPROVE,
+        SystemPermission.REQUESTS_REJECT,
+        SystemPermission.REQUESTS_ASSIGN,
+        SystemPermission.REQUESTS_CONVERT,
+        // Appointment management
+        SystemPermission.APPOINTMENTS_VIEW,
+        SystemPermission.APPOINTMENTS_CREATE,
+        SystemPermission.APPOINTMENTS_EDIT,
+        SystemPermission.APPOINTMENTS_DELETE,
+        // Settings
+        SystemPermission.SETTINGS_VIEW,
+        // Permission management (limited)
+        SystemPermission.PERMISSIONS_VIEW
+      ];
+      
+    case 'staff':
+      return [
+        ...basePermissions,
+        // Limited customer access
+        SystemPermission.CUSTOMERS_VIEW,
+        SystemPermission.CUSTOMERS_CREATE,
+        // Request handling
+        SystemPermission.REQUESTS_VIEW,
+        SystemPermission.REQUESTS_CREATE,
+        SystemPermission.REQUESTS_EDIT,
+        // Appointment management
+        SystemPermission.APPOINTMENTS_VIEW,
+        SystemPermission.APPOINTMENTS_CREATE,
+        SystemPermission.APPOINTMENTS_EDIT,
+      ];
+      
+    case 'guest':
+      return [
+        ...basePermissions,
+        // Read-only access
+        SystemPermission.CUSTOMERS_VIEW,
+        SystemPermission.REQUESTS_VIEW,
+        SystemPermission.APPOINTMENTS_VIEW,
+      ];
+      
+    default:
+      // Unknown role gets only base permissions
+      return basePermissions;
+  }
 }

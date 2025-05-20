@@ -28,7 +28,7 @@ import { UserService } from '@/features/users/lib/services/UserService';
 import { UserDto } from '@/domain/dtos/UserDtos';
 import { UserRole, UserStatus } from '@/domain/entities/User';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
-import { UserPermissions } from '@/features/users/components/UserPermissions';
+import UserPermissions from '@/features/users/components/UserPermissions';
 import { UserActivity } from '@/features/users/components/UserActivity';
 import { PasswordResetForm } from '@/features/users/components/PasswordResetForm';
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
@@ -500,7 +500,7 @@ export default function UserDetailPage() {
                 </DialogHeader>
                 <UserPermissions 
                   user={user}
-                  onSave={async (permissions) => {
+                  onSave={async (permissions: string[]) => {
                     // In a real implementation, you would call the API to save permissions
                     console.log('Saving permissions:', permissions);
                     handleClosePermissions();

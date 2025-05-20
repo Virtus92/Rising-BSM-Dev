@@ -120,7 +120,7 @@ export async function extractAuthToken(request: NextRequest): Promise<string | n
 /**
  * Decode and validate JWT token with strict validation
  */
-async function decodeAndValidateToken(token: string): Promise<{ valid: boolean; userId?: number; role?: string; error?: Error; serverValidated?: boolean }> {
+async function decodeAndValidateToken(token: string): Promise<{ valid: boolean; userId?: number; role?: string; error?: Error; serverValidated?: boolean; expiresAt?: number }> {
   try {
     // Basic validation
     if (!token || token.trim() === '') {
@@ -223,7 +223,8 @@ async function decodeAndValidateToken(token: string): Promise<{ valid: boolean; 
           valid: true,
           userId,
           role: decoded.role,
-          serverValidated: true
+          serverValidated: true,
+          expiresAt: decoded.exp * 1000  // Convert to milliseconds
         };
       } catch (jwtError) {
         return { 
@@ -238,7 +239,8 @@ async function decodeAndValidateToken(token: string): Promise<{ valid: boolean; 
         valid: true,
         userId,
         role: decoded.role,
-        serverValidated: false
+        serverValidated: false,
+        expiresAt: decoded.exp * 1000  // Convert to milliseconds
       };
     }
   } catch (error) {
@@ -461,12 +463,18 @@ export function withAuth(
         return error.toResponse();
       }
       
-      // Create auth info object
+      // Create auth info object with a consistent structure
       const authInfo = {
         userId: authResult.user.id,
-        email: authResult.user.email,
-        role: authResult.user.role,
-        name: authResult.user.name
+        email: authResult.user.email || '',
+        role: authResult.user.role || 'USER', // Always provide a default role
+        name: authResult.user.name || '',
+        user: { // Add a nested user object with consistent properties
+          id: authResult.user.id,
+          email: authResult.user.email || '',
+          role: authResult.user.role || 'USER',
+          name: authResult.user.name || ''
+        }
       };
       
       // Attach user authentication info to request

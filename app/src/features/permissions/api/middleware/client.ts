@@ -17,7 +17,7 @@ export const API_PERMISSIONS = {
     CREATE: SystemPermission.USERS_CREATE,
     UPDATE: SystemPermission.USERS_EDIT,
     DELETE: SystemPermission.USERS_DELETE,
-    MANAGE_PERMISSIONS: SystemPermission.USERS_MANAGE,
+    MANAGE_PERMISSIONS: SystemPermission.USERS_EDIT,
   },
   
   // Customer management permissions
@@ -49,9 +49,6 @@ export const API_PERMISSIONS = {
   // Notification management permissions
   NOTIFICATIONS: {
     VIEW: SystemPermission.NOTIFICATIONS_VIEW,
-    UPDATE: SystemPermission.NOTIFICATIONS_EDIT,
-    DELETE: SystemPermission.NOTIFICATIONS_DELETE,
-    MANAGE: SystemPermission.NOTIFICATIONS_MANAGE,
   },
   
   // Settings management permissions
@@ -63,7 +60,6 @@ export const API_PERMISSIONS = {
   // System permissions
   SYSTEM: {
     ADMIN: SystemPermission.SYSTEM_ADMIN,
-    LOGS: SystemPermission.SYSTEM_LOGS,
   },
 };
 

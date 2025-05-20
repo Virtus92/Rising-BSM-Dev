@@ -215,14 +215,17 @@ export async function bootstrapServer(): Promise<void> {
     const permissionRepository = repositoryFactory.createPermissionRepository();
     logger.debug('Repositories initialized');
     
-    // Seed permissions if needed
+    // Bootstrap permission system
     try {
-      logger.info('Seeding permissions...');
-      await permissionRepository.seedDefaultPermissions();
-      logger.info('Permission seeding completed');
+      const { bootstrapPermissionSystem } = await import('./permission-bootstrap.server');
+      await bootstrapPermissionSystem();
+      logger.info('Permission system bootstrapped successfully');
     } catch (error) {
-      logger.error('Error seeding permissions', { error });
-      // Don't block startup for permission seeding
+      logger.warn('Error bootstrapping permission system, will continue with default permissions', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      // Continue startup even if permission system fails
     }
     
     // Initialize server-side services
@@ -234,23 +237,6 @@ export async function bootstrapServer(): Promise<void> {
     serviceFactory.createNotificationService();
     serviceFactory.createRefreshTokenService();
     const permissionService = serviceFactory.createPermissionService();
-    
-    // Initialize permission system
-    try {
-      logger.info('Initializing permission system...');
-      // Import dynamically to avoid circular dependencies
-      const { initializePermissionSystem } = await import('@/features/permissions/lib/services/PermissionInitializer');
-      const result = await initializePermissionSystem();
-      
-      if (result.success) {
-        logger.info(`Permission system initialized: ${result.message}`);
-      } else {
-        logger.warn(`Permission initialization warning: ${result.message}`);
-      }
-    } catch (error) {
-      logger.error('Error initializing permission system', { error });
-      // Don't block startup for permission initialization
-    }
     
     // Pre-warm caches on server only
     try {

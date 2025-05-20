@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { changePasswordHandler } from '@/features/auth/api';
-import AuthService from '@/features/auth/core';
 import { formatResponse } from '@/core/errors';
+import { verifyAuthToken } from '@/features/auth/lib/server/ServerAuthUtils';
 
 /**
  * POST /api/auth/change-password
@@ -15,9 +15,15 @@ import { formatResponse } from '@/core/errors';
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get cookie token and validate it through AuthService
+    // Get token from various possible sources
     const cookieStore = await cookies();
-    const token = cookieStore.get('auth_token')?.value;
+    const authToken = cookieStore.get('auth_token')?.value;
+    const jsToken = cookieStore.get('js_token')?.value;
+    const authHeader = request.headers.get('authorization');
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    
+    // Try all token sources
+    const token = authToken || jsToken || bearerToken;
     
     if (!token) {
       return NextResponse.json(
@@ -26,30 +32,29 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Verify token is valid
-    const isValid = await AuthService.validateToken();
-    if (!isValid) {
+    // Use server-side token verification
+    const verification = verifyAuthToken(token);
+    
+    if (!verification.valid) {
       return NextResponse.json(
-        formatResponse.error('Invalid authentication token', 401),
+        formatResponse.error(`Invalid authentication token: ${verification.reason || 'Validation failed'}`, 401),
         { status: 401 }
       );
     }
     
-    // Get user from AuthService
-    const user = AuthService.getUser();
-    
-    if (!user || !user.id) {
+    // Ensure we have a user ID
+    if (!verification.userId) {
       return NextResponse.json(
-        formatResponse.error('Invalid authentication token', 401),
+        formatResponse.error('Invalid user information in token', 401),
         { status: 401 }
       );
     }
     
     // Create a new request with authentication headers
     const headers = new Headers(request.headers);
-    headers.set('x-user-id', user.id.toString());
-    if (user.role) headers.set('x-user-role', user.role);
-    if (user.email) headers.set('x-user-email', user.email);
+    headers.set('x-user-id', verification.userId.toString());
+    if (verification.role) headers.set('x-user-role', verification.role);
+    if (verification.email) headers.set('x-user-email', verification.email);
     
     // Create a new request with the updated headers
     const authenticatedRequest = new NextRequest(request.url, {

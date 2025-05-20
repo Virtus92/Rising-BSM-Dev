@@ -52,6 +52,7 @@ import { IPermissionService } from '@/domain/services/IPermissionService';
 import { IRequestDataService } from '@/domain/services/IRequestDataService';
 import { IN8NIntegrationService } from '@/domain/services/IN8NIntegrationService';
 import { RefreshToken } from '@/domain/entities/RefreshToken';
+import { PermissionRepository } from '@/features/permissions/lib';
 
 /**
  * ServiceFactory class for uniform creation of services
@@ -245,8 +246,9 @@ export class ServiceFactory implements IServiceFactory {
    */
   public createPermissionService(): IPermissionService {
     if (!this.permissionService) {
-      // Get the singleton instance
-      this.permissionService = PermissionService.getInstance();
+      // Create a new instance with the repository
+      const repository = new PermissionRepository(prisma, getLogger(), getErrorHandler());
+      this.permissionService = new PermissionService(repository);
     }
     return this.permissionService as IPermissionService;
   }

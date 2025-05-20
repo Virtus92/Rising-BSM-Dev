@@ -163,11 +163,12 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
 const loadPermissions = useCallback(async (options?: { force?: boolean, maxRetries?: number }): Promise<boolean> => {
   // If not authenticated, no permissions
   if (!isAuthenticated || !user) {
-  logger.debug('Not authenticated, skipping permission loading');
-  setPermissions([]);
-  setIsLoading(false);
-  setError(null);
-  setLastUpdated(new Date());
+    logger.debug('Not authenticated, skipping permission loading');
+    setPermissions([]);
+    setIsLoading(false);
+    setError(null);
+    setLastUpdated(new Date());
+    setIsInitialized(true);
     return false;
   }
 
@@ -319,7 +320,7 @@ const loadPermissions = useCallback(async (options?: { force?: boolean, maxRetri
   return false;
 }, [isAuthenticated, user, permissionCache]);
 
-    // Load permissions when authenticated with improved initialization
+
 useEffect(() => {
   // Skip if auth is not initialized
   if (!user || !isAuthenticated) {

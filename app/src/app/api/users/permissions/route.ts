@@ -224,38 +224,39 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // CRITICAL FIX: Always return permissions as an array directly, not nested in an object
-    // This matches what PermissionRequestManager expects and fixes the permission format mismatch
+    // CRITICAL FIX: Return permissions in a consistent format
+    // We need to return both the permissions array AND the role for proper processing
     
-    // Extract permissions array to return directly
-    const permissionsArray = Array.isArray(userPermissions.permissions) 
-      ? userPermissions.permissions 
-      : [];
+    // Ensure we have the right data format
+    const formattedPermissions = {
+      permissions: Array.isArray(userPermissions.permissions) ? userPermissions.permissions : [],
+      userId: userId,
+      role: userPermissions.role || targetUser.role || 'user' // Fallback to user's role if not in permissions
+    };
     
     // Store in cache for future requests
-    permissionCache.cachePermissions(userId, permissionsArray);
+    permissionCache.cachePermissions(userId, formattedPermissions.permissions);
     
     // Calculate performance metrics
     const endTime = performance.now();
     const duration = Math.round(endTime - startTime);
     
     // Log comprehensive data for debugging 
-    logger.info(`Retrieved ${permissionsArray.length} permissions for user ${userId} from database`, {
+    logger.info(`Retrieved ${formattedPermissions.permissions.length} permissions for user ${userId} from database`, {
       userId,
-      role: userPermissions.role,
-      permissionCount: permissionsArray.length,
-      permissions: permissionsArray.length <= 10 
-        ? permissionsArray.join(', ')
-        : permissionsArray.slice(0, 10).join(', ') + '...',
-      userPermissionsCount: 0,
+      role: formattedPermissions.role,
+      permissionCount: formattedPermissions.permissions.length,
+      permissions: formattedPermissions.permissions.length <= 10 
+        ? formattedPermissions.permissions.join(', ')
+        : formattedPermissions.permissions.slice(0, 10).join(', ') + '...',
       duration,
       source: 'database'
     });
 
-    // Return permissions array directly - simple, straightforward contract
+    // Return consistent format with all required fields
     return NextResponse.json({
       success: true,
-      data: permissionsArray,
+      data: formattedPermissions,
       message: 'Permissions retrieved successfully'
     }, { status: 200 });
   });

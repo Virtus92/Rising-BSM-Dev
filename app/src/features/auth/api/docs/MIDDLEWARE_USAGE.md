@@ -58,7 +58,7 @@ export const POST = routeHandler(
       // Your route logic here
       return formatResponse.success({ message: 'Success' });
     },
-    [SystemPermission.USERS_MANAGE, SystemPermission.USERS_CREATE] // Multiple permissions
+    [SystemPermission.USERS_EDIT, SystemPermission.USERS_CREATE] // Multiple permissions
   ),
   { requiresAuth: true }
 );

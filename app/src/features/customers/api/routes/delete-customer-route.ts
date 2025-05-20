@@ -80,7 +80,7 @@ export async function deleteCustomerHandler(
       // Verify user has the special hard delete permission
       const hasHardDeletePermission = await permissionMiddleware.hasPermission(
         request.auth.userId,
-        SystemPermission.CUSTOMERS_HARD_DELETE
+        SystemPermission.CUSTOMERS_DELETE
       );
       
       if (!hasHardDeletePermission) {

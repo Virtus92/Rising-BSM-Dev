@@ -27,6 +27,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const startTime = performance.now();
   
   try {
+    // Check for client-side throttling signal
+    const ifNoneMatch = req.headers.get('if-none-match');
+    if (ifNoneMatch === 'throttled') {
+      logger.debug('Client requested token throttling', { requestId });
+      
+      // Return 304 (Not Modified) to signal the client to use its cached token
+      return new NextResponse(null, {
+        status: 304, // Not Modified
+        headers: {
+          'Cache-Control': 'private, max-age=5',
+          'ETag': 'throttled'
+        }
+      });
+    }
+    
     // Get cookie store
     const cookieStore = await cookies();
     
@@ -65,6 +80,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       );
     }
     
+    // Calculate expiration time to include with response for client-side caching
+    const expiresAt = validationResult.expiresAt || 0;
+    const expiresIn = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+    
     // Valid token found - calculate processing time
     const processingTime = Math.round(performance.now() - startTime);
     
@@ -77,13 +96,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // Include userId if available
     const responseData = {
       token,
-      userId: validationResult.userId
+      userId: validationResult.userId,
+      expiresIn // Add expiration time for client-side caching
     };
     
-    // Return the token in response body - this is crucial for client-side access
+    // Return the token in response body with cache-related headers
     return NextResponse.json(
       formatResponse.success(responseData),
-      { status: 200 }
+      { 
+        status: 200,
+        headers: {
+          'Cache-Control': 'private, max-age=5',
+          'ETag': `"${crypto.randomUUID().substring(0, 8)}"` // Unique ETag for caching
+        }
+      }
     );
   } catch (error) {
     logger.error('Error retrieving token', {

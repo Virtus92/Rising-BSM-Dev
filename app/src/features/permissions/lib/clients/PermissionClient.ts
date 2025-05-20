@@ -155,7 +155,7 @@ export class PermissionClient {
   }
 
   /**
-   * Gets all permissions with optional filtering
+   * Gets all permissions with optional filtering and improved token handling
    * 
    * @param params - Optional filter parameters
    * @returns API response
@@ -163,11 +163,79 @@ export class PermissionClient {
    */
   static async getPermissions(params: Record<string, any> = {}): Promise<ApiResponse<PaginationResult<PermissionResponseDto>>> {
     try {
-      const queryString = PermissionClient.createQueryParams(params);
+      // Use a reasonable limit to prevent overloading
+      const enhancedParams = {
+        ...params,
+        limit: params.limit || 100 // Default to reasonable limit
+      };
+      
+      // Use the special TokenManager utility to ensure we have a valid token
+      const { default: TokenManager } = await import('@/core/initialization/TokenManager');
+      const { token, headers } = await TokenManager.getTokenForPermissionCheck();
+      
+      // Log the token status for debugging
+      logger.debug('Using token for permissions fetch', {
+        hasToken: !!token,
+        tokenLength: token ? token.length : 0,
+        hasAuthHeader: !!headers['Authorization'],
+        limit: enhancedParams.limit
+      });
+      
+      const queryString = PermissionClient.createQueryParams(enhancedParams);
       const url = `${PERMISSIONS_API_URL}${queryString}`;
       
-      return await PermissionClient.apiClient.get<PaginationResult<PermissionResponseDto>>(url);
+      // Create request options with explicit auth token
+      const options = {
+        withAuth: true,
+        headers: {
+          ...headers,
+          'X-Request-ID': `perms-list-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        }
+      };
+      
+      // Make the API request with token
+      const response = await PermissionClient.apiClient.get<PaginationResult<PermissionResponseDto>>(url, options);
+      return response;
     } catch (error) {
+      // Check if this is an auth error
+      if (error instanceof ApiRequestError && error.statusCode === 401) {
+        // Try to refresh the token and retry
+        try {
+          const { default: TokenManager } = await import('@/core/initialization/TokenManager');
+          const refreshed = await TokenManager.refreshToken({ force: true });
+          
+          if (refreshed) {
+            // Retry the request with the new token
+            const { headers } = await TokenManager.getTokenForPermissionCheck();
+            
+            // Get query string again
+            const enhancedParams = {
+              ...params,
+              limit: params.limit || 100
+            };
+            const queryString = PermissionClient.createQueryParams(enhancedParams);
+            const url = `${PERMISSIONS_API_URL}${queryString}`;
+            
+            // Make the retry API request
+            return await PermissionClient.apiClient.get<PaginationResult<PermissionResponseDto>>(
+              url,
+              {
+                withAuth: true,
+                headers: {
+                  ...headers,
+                  'X-Request-ID': `perms-list-retry-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                  'Cache-Control': 'no-cache, no-store, must-revalidate'
+                }
+              }
+            );
+          }
+        } catch (refreshError) {
+          logger.error('Error refreshing token for permissions list request:', refreshError instanceof Error ? refreshError.message : String(refreshError));
+          // Continue to standard error handling if refresh fails
+        }
+      }
+      
       // Enhance error with more details
       if (error instanceof ApiRequestError) {
         throw new PermissionClientError(
@@ -351,6 +419,85 @@ export class PermissionClient {
    * Request timeout (in milliseconds)
    */
   private static REQUEST_TIMEOUT = 10000; // 10 seconds
+  
+  /**
+   * Helper method to normalize permission response data to ensure consistent format
+   * @param response API response from server
+   * @param userId User ID for which permissions were requested
+   * @returns Normalized UserPermissionsResponseDto
+   */
+  private static normalizePermissionResponse(
+    response: any, 
+    userId: number | string
+  ): UserPermissionsResponseDto {
+    // Default empty response
+    const defaultResponse: UserPermissionsResponseDto = {
+      userId: Number(userId),
+      role: 'user',
+      permissions: []
+    };
+    
+    // If response is not valid, return default
+    if (!response || typeof response !== 'object') {
+      return defaultResponse;
+    }
+    
+    // If response is already in the correct format
+    if (response.userId && response.role && Array.isArray(response.permissions)) {
+      return {
+        userId: Number(response.userId),
+        role: response.role,
+        permissions: response.permissions
+      };
+    }
+    
+    // If response is just an array of permissions
+    if (Array.isArray(response)) {
+      return {
+        userId: Number(userId),
+        role: 'user', // Default role
+        permissions: response
+      };
+    }
+    
+    // Extract permissions from response based on common patterns
+    let permissions: string[] = [];
+    let role = 'user';
+    
+    if (Array.isArray(response.permissions)) {
+      permissions = response.permissions;
+    } else if (Array.isArray(response.data)) {
+      permissions = response.data;
+    } else if (response.data && Array.isArray(response.data.permissions)) {
+      permissions = response.data.permissions;
+      if (response.data.role) {
+        role = response.data.role;
+      }
+    } else if (response.data && typeof response.data === 'object') {
+      // Try to extract from data property if it's an object
+      const data = response.data;
+      
+      if (Array.isArray(data)) {
+        permissions = data;
+      } else if (data.permissions && Array.isArray(data.permissions)) {
+        permissions = data.permissions;
+        if (data.role) {
+          role = data.role;
+        }
+      }
+    }
+    
+    // If we found a role in the response, use it
+    if (response.role) {
+      role = response.role;
+    }
+    
+    return {
+      userId: Number(userId),
+      role,
+      permissions
+    };
+  }
 
   /**
    * Gets permissions for a user with request tracking and improved error handling
@@ -604,16 +751,74 @@ export class PermissionClient {
   }
   
   /**
-   * Gets default permissions for a role
+   * Gets default permissions for a role with improved token handling
    * 
    * @param role - User role
    * @returns API response
    * @throws PermissionClientError for any API or network failures
    */
-  static async getDefaultPermissionsForRole(role: string): Promise<ApiResponse<string[]>> {
+  static async getDefaultPermissionsForRole(role: string): Promise<ApiResponse<{role: string, permissions: string[]}>> {
     try {
-      return await PermissionClient.apiClient.get<string[]>(`${PERMISSIONS_API_URL}/role-defaults/${role}`);
+      // Use the special TokenManager utility to ensure we have a valid token
+      const { default: TokenManager } = await import('@/core/initialization/TokenManager');
+      const { token, headers } = await TokenManager.getTokenForPermissionCheck();
+      
+      // Log the token status for debugging
+      logger.debug('Using token for role permissions check', {
+        hasToken: !!token,
+        tokenLength: token ? token.length : 0,
+        hasAuthHeader: !!headers['Authorization'],
+        role
+      });
+
+      // Create request options with explicit auth token
+      const options = {
+        withAuth: true,
+        headers: {
+          ...headers,
+          'X-Request-ID': `role-perms-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        }
+      };
+      
+      // Make the API request with token
+      const response = await PermissionClient.apiClient.get<{role: string, permissions: string[]}>(
+        `${PERMISSIONS_API_URL}/role-defaults/${role}`, 
+        options
+      );
+      
+      return response;
     } catch (error) {
+      // Check if this is an auth error
+      if (error instanceof ApiRequestError && error.statusCode === 401) {
+        // Try to refresh the token and retry
+        try {
+          const { default: TokenManager } = await import('@/core/initialization/TokenManager');
+          const refreshed = await TokenManager.refreshToken({ force: true });
+          
+          if (refreshed) {
+            // Retry the request with the new token
+            const { headers } = await TokenManager.getTokenForPermissionCheck();
+            
+            // Make the retry API request
+            return await PermissionClient.apiClient.get<{role: string, permissions: string[]}>(
+              `${PERMISSIONS_API_URL}/role-defaults/${role}`,
+              {
+                withAuth: true,
+                headers: {
+                  ...headers,
+                  'X-Request-ID': `role-perms-retry-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                  'Cache-Control': 'no-cache, no-store, must-revalidate'
+                }
+              }
+            );
+          }
+        } catch (refreshError) {
+          logger.error('Error refreshing token for role permissions request:', refreshError instanceof Error ? refreshError.message : String(refreshError));
+          // Continue to standard error handling if refresh fails
+        }
+      }
+      
       // Enhance error with more details
       if (error instanceof ApiRequestError) {
         throw new PermissionClientError(

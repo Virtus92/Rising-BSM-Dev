@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -69,10 +69,22 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
 
   // Update role permissions when active role changes
   useEffect(() => {
-    if (rolePermissions && rolePermissions[activeRole]) {
-      const permissions = rolePermissions[activeRole];
-      // Ensure rolePerms is always an array
-      setRolePerms(Array.isArray(permissions) ? permissions : []);
+    if (rolePermissions && activeRole) {
+      // Handle different possible data structures
+      let permissions: string[] = [];
+      
+      // Direct access from rolePermissions object
+      if (rolePermissions[activeRole]) {
+        const roleData = rolePermissions[activeRole];
+        
+        // Check if it's a direct array
+        if (Array.isArray(roleData)) {
+          permissions = roleData;
+        }
+      }
+      
+      // Set permissions ensuring it's always an array
+      setRolePerms(permissions);
       setHasChanges(false);
     } else {
       setRolePerms([]);
@@ -91,7 +103,18 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
   const filteredPermissions = React.useMemo(() => {
     if (!allPermissions) return [];
     
-    return allPermissions.filter(permission => {
+    // Debug the input permissions
+    console.log(`Filtering ${allPermissions.length} total permissions with filterText: '${filterText}' and categoryFilter: '${categoryFilter}'`);
+    
+    // Add additional logging for category distribution
+    const categories: Record<string, number> = {};
+    allPermissions.forEach(p => {
+      categories[p.category] = (categories[p.category] || 0) + 1;
+    });
+    console.log('Permission distribution by category:', categories);
+    
+    // Apply filtering
+    const filtered = allPermissions.filter(permission => {
       const matchesText = !filterText || 
         permission.name.toLowerCase().includes(filterText.toLowerCase()) ||
         permission.description.toLowerCase().includes(filterText.toLowerCase()) ||
@@ -101,17 +124,43 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
       
       return matchesText && matchesCategory;
     });
+    
+    // Log filter results for debugging
+    console.log(`Filter result: ${filtered.length} permissions after filtering`);
+    
+    return filtered;
   }, [allPermissions, filterText, categoryFilter]);
 
-  // Group filtered permissions by category
+  // Group filtered permissions by category with explicit debugging
   const groupedPermissions = React.useMemo(() => {
-    return filteredPermissions.reduce((acc, permission) => {
+    // Log the total number of permissions being processed
+    console.log(`Processing ${filteredPermissions.length} filtered permissions for grouping`);
+    
+    // Create grouped permissions with logging
+    const result = filteredPermissions.reduce<Record<string, PermissionItem[]>>((acc, permission) => {
+      // Initialize the category array if it doesn't exist
       if (!acc[permission.category]) {
         acc[permission.category] = [];
+        console.log(`Created new category: ${permission.category}`);
       }
+      
+      // Always add the permission to its category group
       acc[permission.category].push(permission);
+      
       return acc;
-    }, {} as Record<string, PermissionItem[]>);
+    }, {});
+    
+    // Log the final grouping results with detailed information
+    console.log(`Grouped permissions into ${Object.keys(result).length} categories:`, 
+      Object.entries(result).map(([cat, perms]) => `${cat}: ${perms.length} permissions`));
+    
+    // Additional debug logging to verify permission counts
+    Object.entries(result).forEach(([category, permissions]) => {
+      console.log(`Category ${category} has ${permissions.length} permissions:`, 
+        permissions.map(p => p.code).join(', '));
+    });
+    
+    return result;
   }, [filteredPermissions]);
 
   // Toggle permission for role
@@ -129,7 +178,7 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
     setHasChanges(true);
   }, [canManagePermissions]);
 
-  // Save role permissions
+  // Save role permissions with improved error handling and token management
   const saveRolePermissions = async () => {
     if (!canManagePermissions) {
       setError('You do not have permission to manage role permissions');
@@ -140,49 +189,144 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
     setError(null);
     
     try {
-      // Implement actual API call to update role permissions
-      // Create an appropriate structure based on PermissionClient expectations
-      // This would typically be a dedicated API endpoint to update role permissions
-      
-      // This is a placeholder for what would be a real API call
-      // In a production system, you would have a specific endpoint for updating role permissions
-      // For consistency with the rest of the application, we'll use a more direct approach:
-      
-      // 1. Create a specific data structure for the update
+      // Create a specific data structure for the update
       const updateData = {
         role: activeRole,
         permissions: rolePerms
       };
       
-      // 2. Make the API call
+      // Ensure we have a valid token before making the request
+      const { default: TokenManager } = await import('@/core/initialization/TokenManager');
+      await TokenManager.initialize();
+      const token = await TokenManager.getToken();
+      
+      if (!token) {
+        throw new Error('Authentication token not available. Please try logging in again.');
+      }
+      
+      // Make the API call with proper error handling
       const response = await fetch(`/api/permissions/role-defaults/${activeRole}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'X-Request-ID': `role-perms-save-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
         },
         body: JSON.stringify(updateData),
       });
       
-      if (!response.ok) {
-        throw new Error(`Failed to update role permissions: ${response.statusText}`);
+      // Check for authentication errors
+      if (response.status === 401) {
+        // Try to refresh the token and retry
+        const refreshed = await TokenManager.refreshToken({ force: true });
+        
+        if (refreshed) {
+          // Get the new token
+          const newToken = await TokenManager.getToken();
+          
+          if (newToken) {
+            // Retry the request with the new token
+            const retryResponse = await fetch(`/api/permissions/role-defaults/${activeRole}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${newToken}`,
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+                'X-Request-ID': `role-perms-save-retry-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+              },
+              body: JSON.stringify(updateData),
+            });
+            
+            // Process the retry response
+            if (retryResponse.ok) {
+              const retryData = await retryResponse.json();
+              
+              if (retryData.success) {
+                if (isMounted.current) {
+                  setSuccessMessage(`Permissions updated successfully for ${activeRole} role`);
+                  setTimeout(() => isMounted.current && setSuccessMessage(null), 3000);
+                  setHasChanges(false);
+                }
+                
+                // Refresh parent data if needed
+                if (onRefresh) {
+                  await onRefresh();
+                }
+                
+                return; // Exit early on successful retry
+              }
+            }
+          }
+        }
+        
+        // If we reach here, the retry failed
+        throw new Error('Authentication failed. Please log in again.');
       }
       
-      setSuccessMessage(`Permissions updated successfully for ${activeRole} role`);
-      setTimeout(() => setSuccessMessage(null), 3000);
-      setHasChanges(false);
+      // Check HTTP response status for other errors
+      if (!response.ok) {
+        // Try to get error details from response body
+        try {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || 
+            `Failed to update role permissions: ${response.statusText} (${response.status})`
+          );
+        } catch (jsonError) {
+          // If we can't parse the JSON, just use the status text
+          throw new Error(`Failed to update role permissions: ${response.statusText} (${response.status})`);
+        }
+      }
+      
+      // Parse response data
+      const data = await response.json();
+      
+      // Check for success flag in response
+      if (!data.success) {
+        throw new Error(
+          data.message || 
+          `Server returned an unsuccessful response: ${JSON.stringify(data.error || {})}`
+        );
+      }
+      
+      if (isMounted.current) {
+        // Show success message
+        setSuccessMessage(`Permissions updated successfully for ${activeRole} role`);
+        setTimeout(() => isMounted.current && setSuccessMessage(null), 3000);
+        setHasChanges(false);
+      }
       
       // Refresh parent data if needed
       if (onRefresh) {
         await onRefresh();
       }
     } catch (err) {
-      setError(`Failed to update role permissions: ${err instanceof Error ? err.message : String(err)}`);
+      console.error('Error saving role permissions:', err);
+      
+      if (isMounted.current) {
+        setError(`Failed to update role permissions: ${err instanceof Error ? err.message : String(err)}`);
+      }
     } finally {
-      setIsSaving(false);
+      if (isMounted.current) {
+        setIsSaving(false);
+      }
     }
   };
 
-  // Reset role permissions to defaults
+  // Keep track of component mount state
+  const isMounted = useRef(true);
+  
+  // Setup cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+  
+  // Reset role permissions to defaults with improved token handling
   const resetToDefaults = async () => {
     if (!canManagePermissions) {
       setError('You do not have permission to manage role permissions');
@@ -193,32 +337,177 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
     setError(null);
     
     try {
-      // Get default permissions from the API
-      const response = await PermissionClient.getDefaultPermissionsForRole(activeRole);
+      // Ensure we have a valid token before making the request
+      const { default: TokenManager } = await import('@/core/initialization/TokenManager');
+      await TokenManager.initialize();
+      const token = await TokenManager.getToken();
       
-      if (response.success && response.data) {
-        setRolePerms(response.data);
-        setSuccessMessage(`Reset to default permissions for ${activeRole} role`);
-        setTimeout(() => setSuccessMessage(null), 3000);
-        setHasChanges(false);
+      if (!token) {
+        throw new Error('Authentication token not available. Please try logging in again.');
+      }
+      
+      // Log the reset operation for debugging
+      console.log(`Resetting permissions for role ${activeRole} to defaults`);
+      
+      // Use a single approach with TokenManager
+      const response = await fetch(`/api/permissions/role-defaults/${activeRole}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'X-Request-ID': `role-defaults-${activeRole}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+        }
+      });
+      
+      // Check for authentication errors
+      if (response.status === 401) {
+        // Try to refresh the token and retry
+        const refreshed = await TokenManager.refreshToken({ force: true });
+        
+        if (refreshed) {
+          // Get the new token
+          const newToken = await TokenManager.getToken();
+          
+          if (newToken) {
+            // Retry the request with the new token
+            const retryResponse = await fetch(`/api/permissions/role-defaults/${activeRole}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${newToken}`,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'X-Request-ID': `role-defaults-retry-${activeRole}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+              }
+            });
+            
+            // Check if retry was successful
+            if (retryResponse.ok) {
+              const retryData = await retryResponse.json();
+              
+              if (retryData.success && retryData.data) {
+                // Extract permissions array from response
+                let roleDefaultPerms: string[] = [];
+                
+                if (Array.isArray(retryData.data)) {
+                  roleDefaultPerms = retryData.data;
+                } else if (typeof retryData.data === 'object' && 'permissions' in retryData.data && 
+                           Array.isArray(retryData.data.permissions)) {
+                  roleDefaultPerms = retryData.data.permissions;
+                }
+                
+                if (roleDefaultPerms.length > 0 && isMounted.current) {
+                  // Log the permissions we're setting
+                  console.log(`Setting ${roleDefaultPerms.length} default permissions for role ${activeRole} after retry`);
+                  
+                  setRolePerms(roleDefaultPerms);
+                  setSuccessMessage(`Reset to default permissions for ${activeRole} role`);
+                  setTimeout(() => isMounted.current && setSuccessMessage(null), 3000);
+                  setHasChanges(false);
+                  
+                  // Refresh parent data
+                  if (onRefresh) {
+                    await onRefresh();
+                  }
+                  
+                  return; // Exit early on successful retry
+                }
+              }
+            }
+          }
+        }
+        
+        // If we reach here, the retry failed
+        throw new Error('Authentication failed. Please log in again.');
+      }
+      
+      // Handle non-success response
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      // Parse response data
+      const data = await response.json();
+      
+      let roleDefaultPerms: string[] = [];
+      let successfulReset = false;
+      
+      if (data.success && data.data) {
+        // Handle different response formats
+        if (Array.isArray(data.data)) {
+          roleDefaultPerms = data.data;
+          successfulReset = true;
+          console.log(`API returned ${roleDefaultPerms.length} permissions directly as array`);
+        } else if (typeof data.data === 'object') {
+          if ('permissions' in data.data && Array.isArray(data.data.permissions)) {
+            roleDefaultPerms = data.data.permissions;
+            successfulReset = true;
+            console.log(`API returned ${roleDefaultPerms.length} permissions in permissions property`);
+          }
+        }
+      }
+      
+      // Set the permissions if successful
+      if (successfulReset && roleDefaultPerms.length > 0) {
+        if (isMounted.current) {
+          console.log(`Setting ${roleDefaultPerms.length} default permissions for role ${activeRole}`);
+          setRolePerms(roleDefaultPerms);
+          setSuccessMessage(`Reset to default permissions for ${activeRole} role`);
+          setTimeout(() => isMounted.current && setSuccessMessage(null), 3000);
+          setHasChanges(false);
+        }
         
         // Refresh parent data
         if (onRefresh) {
           await onRefresh();
         }
       } else {
-        throw new Error(response.message || 'Failed to get default permissions');
+        // Fall back to the API client as a last resort
+        try {
+          console.log(`Falling back to PermissionClient for default permissions of role ${activeRole}`);
+          const apiResponse = await PermissionClient.getDefaultPermissionsForRole(activeRole);
+          
+          if (apiResponse.success && apiResponse.data) {
+            const perms = Array.isArray(apiResponse.data) ? apiResponse.data : [];
+            
+            if (isMounted.current) {
+              console.log(`Client API returned ${perms.length} default permissions for role ${activeRole}`);
+              setRolePerms(perms);
+              setSuccessMessage(`Reset to default permissions for ${activeRole} role`);
+              setTimeout(() => isMounted.current && setSuccessMessage(null), 3000);
+              setHasChanges(false);
+            }
+            
+            // Refresh parent data
+            if (onRefresh) {
+              await onRefresh();
+            }
+            
+            return; // Exit early if successful
+          }
+        } catch (apiError) {
+          console.error('Error using PermissionClient as fallback:', apiError);
+          // Continue to error handling
+        }
+        
+        throw new Error('Failed to get default permissions from API');
       }
     } catch (err) {
       console.error('Error resetting permissions:', err);
-      setError(`Failed to reset permissions: ${err instanceof Error ? err.message : String(err)}`);
+      if (isMounted.current) {
+        setError(`Failed to reset permissions: ${err instanceof Error ? err.message : String(err)}`);
+      }
       
       // Fallback to current role permissions from props
-      if (rolePermissions && rolePermissions[activeRole]) {
+      if (rolePermissions && rolePermissions[activeRole] && isMounted.current) {
         setRolePerms(rolePermissions[activeRole]);
       }
     } finally {
-      setIsSaving(false);
+      if (isMounted.current) {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -326,61 +615,76 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
                       </p>
                     </div>
                   ) : (
-                    Object.entries(groupedPermissions).map(([category, permissions]) => (
-                      <div key={category} className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold">{category}</h3>
-                          <Badge variant="outline">{permissions.length}</Badge>
-                        </div>
-                        <Separator />
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-                          {permissions.map(permission => {
-                            const hasPermission = rolePerms.includes(permission.code);
-                            
-                            return (
-                              <div 
-                                key={permission.code} 
-                                className={`p-3 border rounded-md ${
-                                  hasPermission 
-                                    ? 'bg-primary/5 border-primary/20' 
-                                    : 'bg-background border-input'
-                                }`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="pt-0.5">
-                                    <Checkbox
-                                      id={`${role}-${permission.code}`}
-                                      checked={hasPermission}
-                                      onCheckedChange={() => togglePermission(permission.code)}
-                                      disabled={!canManagePermissions || isSaving}
-                                    />
-                                  </div>
-                                  <div className="flex-1">
-                                    <Label 
-                                      htmlFor={`${role}-${permission.code}`}
-                                      className="font-medium cursor-pointer"
-                                    >
-                                      {permission.name}
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                      {permission.description}
-                                    </p>
-                                    <div className="mt-2 flex items-center justify-between">
-                                      <Badge variant="outline" className="text-xs">
-                                        {category}
-                                      </Badge>
-                                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                                        {permission.code}
-                                      </code>
+                    <div className="space-y-8">
+                      {/* Display stats summary of visible permissions */}
+                      <div className="bg-secondary/20 p-3 rounded-md">
+                        <p className="text-sm font-medium">
+                          Displaying {filteredPermissions.length} permissions across {Object.keys(groupedPermissions).length} categories
+                        </p>
+                      </div>
+                      
+                      {/* Render each category with its permissions */}
+                      {Object.entries(groupedPermissions).map(([category, categoryPermissions]) => {
+                        // Debug log to verify all permissions in each category
+                        console.log(`Rendering category ${category} with ${categoryPermissions.length} permissions`);
+                        return (
+                          <div key={category} className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-lg font-semibold">{category}</h3>
+                              <Badge variant="outline">{categoryPermissions.length}</Badge>
+                            </div>
+                            <Separator />
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 max-h-[800px] overflow-y-auto pr-2">
+                              {/* Map ALL permissions from this category - not a limited subset */}
+                              {categoryPermissions.map((permission: PermissionItem) => {
+                                const hasPermission = rolePerms.includes(permission.code);
+                                
+                                return (
+                                  <div 
+                                    key={permission.code} 
+                                    className={`p-3 border rounded-md ${
+                                      hasPermission 
+                                        ? 'bg-primary/5 border-primary/20' 
+                                        : 'bg-background border-input'
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <div className="pt-0.5">
+                                        <Checkbox
+                                          id={`${role}-${permission.code}`}
+                                          checked={hasPermission}
+                                          onCheckedChange={() => togglePermission(permission.code)}
+                                          disabled={!canManagePermissions || isSaving}
+                                        />
+                                      </div>
+                                      <div className="flex-1">
+                                        <Label 
+                                          htmlFor={`${role}-${permission.code}`}
+                                          className="font-medium cursor-pointer"
+                                        >
+                                          {permission.name}
+                                        </Label>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                          {permission.description}
+                                        </p>
+                                        <div className="mt-2 flex items-center justify-between">
+                                          <Badge variant="outline" className="text-xs">
+                                            {category}
+                                          </Badge>
+                                          <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                                            {permission.code}
+                                          </code>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               )}

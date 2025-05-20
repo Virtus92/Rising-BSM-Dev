@@ -20,6 +20,4 @@ export {
   PermissionCategory,
   PermissionAction,
   SystemPermission,
-  RolePermissions,
-  getPermissionsForRole
 } from '@/domain/enums/PermissionEnums';

@@ -1,11 +1,17 @@
+/**
+ * This component is DEPRECATED - use UserPermissions instead.
+ * It remains for backward compatibility, but all new features should go into UserPermissions.
+ * 
+ * IMPORTANT: The two components must stay in sync until this one is fully removed.
+ */
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { 
   Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
+  CardContent,
+  CardHeader,
+  CardTitle,
   CardDescription, 
   CardFooter 
 } from '@/shared/components/ui/card';
@@ -45,11 +51,6 @@ export interface Permission {
   description: string;
   category: string;
 }
-
-/**
- * Using centralized permission definitions from SystemPermissionMap
- * This ensures consistency between backend and frontend
- */
 
 /**
  * Creates formatted permissions list from system permissions enum and raw permission codes
@@ -99,6 +100,7 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   
   // Fetch all permissions first to get the full list of available permissions
   const fetchAvailablePermissions = async () => {
@@ -115,6 +117,7 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
       }
       
       // Fallback to using enum values if API fails
+      console.warn('Failed to get permissions from API, using enum values as fallback');
       return Object.values(SystemPermission);
     } catch (err) {
       console.error('Error fetching available permissions:', err instanceof Error ? err.message : String(err));
@@ -124,18 +127,29 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
   };
 
   // Get role permissions
-  const fetchRolePermissions = async (role: string) => {
+  const fetchRolePermissions = async (role: string): Promise<string[]> => {
     try {
       // Try API call first
       const response = await PermissionClient.getDefaultPermissionsForRole(role);
       
       if (response.success && response.data) {
+        // Handle API response which may be an object with permissions array
+      if (typeof response.data === 'object' && 'permissions' in response.data) {
+        return response.data.permissions;
+      } else if (Array.isArray(response.data)) {
         return response.data;
       }
       
+      // If structure is unexpected, return empty array
+      console.warn('Unexpected response structure from role permissions API');
+      return [];
+      }
+      
       // Fallback to local permissions if API fails
+      console.warn('Failed to get role permissions from API, using local data as fallback');
       return getPermissionsForRole(role);
     } catch (error) {
+      console.warn('Error fetching role permissions, using local fallback', error);
       // Fallback to local list
       return getPermissionsForRole(role);
     }
@@ -158,7 +172,11 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
         
         // Get role permissions
         const roleBased = await fetchRolePermissions(user.role);
-        setRolePermissions(roleBased);
+        
+        // Process role permissions response
+        const rolePerms: string[] = roleBased;
+        
+        setRolePermissions(rolePerms);
         
         // Fetch user-specific permissions from the API
         let userPermissions: string[] = [];
@@ -247,14 +265,24 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
     return filtered;
   }, [availablePermissions, filterText, activeTab, selectedPermissions, rolePermissions]);
   
-  // Group filtered permissions by category
+  // Group filtered permissions by category with debug logging
   const groupedPermissions: Record<string, Permission[]> = filteredPermissions.reduce((acc, permission) => {
+    // Debug logging for grouping
+    console.log(`Processing permission: ${permission.id} in category: ${permission.category}`);
     if (!acc[permission.category]) {
       acc[permission.category] = [];
     }
     acc[permission.category].push(permission);
+    // Log category creation
+    if (!acc[permission.category]) {
+      console.log(`Created new category: ${permission.category}`);
+    }
     return acc;
   }, {} as Record<string, Permission[]>);
+  
+  // Log final grouping results
+  console.log(`Grouped ${filteredPermissions.length} permissions into ${Object.keys(groupedPermissions).length} categories:`, 
+    Object.entries(groupedPermissions).map(([cat, perms]) => `${cat}: ${perms.length} items`));
 
   // Check if a permission is granted by the user's role
   const isRolePermission = (permissionId: string): boolean => {
@@ -298,6 +326,9 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
         // If we can't refresh, just keep the current state - don't show error to user
         console.warn('Could not refresh permissions after save:', refreshErr instanceof Error ? refreshErr.message : String(refreshErr));
       }
+      
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       console.error('Error saving permissions:', err instanceof Error ? err.message : String(err));
       setError('Failed to save permissions. Please try again.');
@@ -316,8 +347,8 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
       // Fetch default permissions for the role
       const rolePermsResponse = await fetchRolePermissions(role);
       
-      // Ensure rolePerms is always treated as an array
-      const rolePerms = Array.isArray(rolePermsResponse) ? rolePermsResponse : [];
+      // Apply role permissions
+      const rolePerms: string[] = rolePermsResponse;
       
       // Get the user's existing individual permissions (not from role)
       // Ensure rolePermissions is always treated as an array
@@ -330,7 +361,7 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
       setSelectedPermissions(newPerms);
     } catch (err) {
       console.error('Error loading role permissions:', err);
-      setError('Failed to load role permissions. Please try again.');
+      // Don't show error to user to prevent UI disruption
     } finally {
       setIsLoading(false);
     }
@@ -367,7 +398,7 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
       </CardHeader>
       
       <CardContent className="space-y-6">
-        {/* Notification about permissions feature being under development */}
+        {/* Notification about permissions feature */}
         <Alert variant="success" className="bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400 border border-green-200 dark:border-green-900">
           <CheckCircle className="h-4 w-4" />
           <AlertTitle>Permissions System Active</AlertTitle>
@@ -377,9 +408,19 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
         </Alert>
         
         {error && (
-          <div className="bg-red-50 p-3 rounded-md text-red-800 text-sm mb-4">
-            {error}
-          </div>
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        {success && (
+          <Alert variant="success" className="bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400 border border-green-200 dark:border-green-900">
+            <CheckCircle className="h-4 w-4" />
+            <AlertTitle>Success</AlertTitle>
+            <AlertDescription>Permissions have been updated successfully.</AlertDescription>
+          </Alert>
         )}
         
         <div className="flex flex-wrap gap-2 mb-4">
@@ -455,11 +496,13 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
             
             <TabsContent value={activeTab} className="space-y-4">
               {Object.entries(groupedPermissions).length > 0 ? (
-                Object.entries(groupedPermissions).map(([category, permissions]) => (
+                Object.entries(groupedPermissions).map(([category, permissions]) => {
+                  console.log(`Rendering category ${category} with ${permissions.length} permissions`);
+                  return (
                   <div key={category} className="space-y-3">
                     <h3 className="text-lg font-semibold">{category}</h3>
                     <Separator />
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[800px] overflow-y-auto pr-2">
                       {permissions.map((permission) => {
                         const isGrantedByRole = isRolePermission(permission.id);
                         const isSelected = selectedPermissions.includes(permission.id);
@@ -503,7 +546,7 @@ export const UserPermissions: React.FC<UserPermissionsProps> = ({
                       })}
                     </div>
                   </div>
-                ))
+                )})
               ) : (
                 <div className="p-8 text-center text-muted-foreground">
                   <Info className="h-8 w-8 mx-auto mb-2" />

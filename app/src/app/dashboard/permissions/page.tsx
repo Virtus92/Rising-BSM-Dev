@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
@@ -17,33 +16,27 @@ import {
   TabsTrigger 
 } from "@/shared/components/ui/tabs";
 import { 
-  Settings, 
   Users, 
   Shield,
-  CheckCircle,
-  Book,
-  AlertTriangle,
-  Lock,
   Info,
-  ArrowLeft
+  AlertTriangle,
+  ArrowLeft,
+  RefreshCw
 } from 'lucide-react';
-import { Separator } from "@/shared/components/ui/separator";
-import { Badge } from "@/shared/components/ui/badge";
 import { Alert, AlertTitle, AlertDescription } from "@/shared/components/ui/alert";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/shared/components/ui/breadcrumb";
-import { Input } from "@/shared/components/ui/input";
 import { useRouter } from 'next/navigation';
-import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { PermissionClient } from '@/features/permissions/lib/clients/PermissionClient';
-import { SystemPermissionMap, createPermissionDefinitionList } from '@/domain/permissions/SystemPermissionMap';
+import { createPermissionDefinitionList, getAllPermissionCodes } from '@/domain/permissions/SystemPermissionMap';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { UserRole } from '@/domain/enums/UserEnums';
-import { PermissionGuard } from '@/shared/components/PermissionGuard';
 import PermissionRoleManager from './components/PermissionRoleManager';
-import PermissionList from './components/PermissionList';
 import PermissionUserAssignment from './components/PermissionUserAssignment';
+import PermissionList from './components/PermissionList';
+
 
 export default function PermissionsPage() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('permissions'); // Set permissions as default tab
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [permissionDefinitions, setPermissionDefinitions] = useState<any[]>([]);
@@ -56,48 +49,72 @@ export default function PermissionsPage() {
       setIsLoading(true);
       setError(null);
       
-      // Fetch permissions and role permissions in parallel for better performance
-      const [allPermsResponse, rolePermissionsData] = await Promise.all([
-        // Get all permissions
-        PermissionClient.getPermissions({
-          limit: 250 // Increased limit to ensure all permissions are retrieved
-        }),
-        
-        // Get role permissions for all roles
-        (async () => {
-          const roleData: Record<string, string[]> = {};
-          
-          await Promise.all(Object.values(UserRole).map(async (role) => {
-            try {
-              const response = await PermissionClient.getDefaultPermissionsForRole(role);
-              if (response.success && response.data) {
-                roleData[role] = response.data;
-              }
-            } catch (err) {
-              console.error(`Error loading permissions for role ${role}:`, err);
-              // Continue with other roles - don't let one role failure stop everything
-            }
-          }));
-          
-          return roleData;
-        })()
-      ]);
+      // First, ensure we have a valid token before making requests
+      const { default: TokenManager } = await import('@/core/initialization/TokenManager');
+      const initialized = await TokenManager.initialize();
       
-      // Process permissions data
-      if (allPermsResponse.success && allPermsResponse.data) {
-        const permCodes = allPermsResponse.data.data.map(p => p.code);
-        const definitions = createPermissionDefinitionList(permCodes);
-        setPermissionDefinitions(definitions);
-      } else {
-        throw new Error(allPermsResponse.message || 'Failed to get permissions');
+      if (!initialized) {
+        throw new Error('Failed to initialize token');
+      }
+      
+      // Get all possible permission codes from the enum
+      const allEnumPermCodes = Object.values(SystemPermission).map(p => p.toString());
+      console.log(`Found ${allEnumPermCodes.length} permissions in SystemPermission enum`);
+      
+      // Create definitions for all permissions defined in the enum
+      const allDefinitions = createPermissionDefinitionList(allEnumPermCodes);
+      setPermissionDefinitions(allDefinitions);
+      console.log(`Created ${allDefinitions.length} permission definitions`);
+      
+      // Fetch all permissions from API - throws error if it fails
+      const allPermsResponse = await PermissionClient.getPermissions({
+        limit: 1000 // Set high limit to get all permissions
+      });
+      
+      // If API call fails, throw error
+      if (!allPermsResponse.success) {
+        throw new Error(`Failed to get permissions: ${allPermsResponse.message || 'Unknown error'}`);
+      }
+      
+      // Then fetch role permissions for each role
+      const roleData: Record<string, string[]> = {};
+      
+      for (const role of Object.values(UserRole)) {
+        // Get role permissions - throw error if it fails
+        const response = await PermissionClient.getDefaultPermissionsForRole(role);
+        
+        if (!response.success) {
+          throw new Error(`Failed to get permissions for role ${role}: ${response.message || 'Unknown error'}`);
+        }
+        
+        if (!response.data || (!Array.isArray(response.data) && !response.data.permissions)) {
+          throw new Error(`Invalid response format for role ${role}`);
+        }
+        
+        // Handle different response formats
+        if (typeof response.data === 'object' && 'permissions' in response.data && Array.isArray(response.data.permissions)) {
+          roleData[role] = response.data.permissions;
+        } else if (Array.isArray(response.data)) {
+          roleData[role] = response.data;
+        } else {
+          throw new Error(`Unexpected response format for role ${role}`);
+        }
+        
+        console.log(`Loaded ${roleData[role].length} permissions for role ${role}`);
+        
+        // Small delay to prevent concurrent requests
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       // Set role permissions
-      setRolePermissions(rolePermissionsData);
+      setRolePermissions(roleData);
       
     } catch (err) {
       console.error('Error loading permission data:', err);
       setError(`Failed to load permission data: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      
+      // Show error alert - don't hide or recover from errors
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +122,10 @@ export default function PermissionsPage() {
   
   // Fetch permissions on component mount
   useEffect(() => {
-    fetchPermissionData();
+    fetchPermissionData().catch(err => {
+      console.error('Error in permission data fetch:', err);
+      // Error is already set in the fetchPermissionData function
+    });
   }, [fetchPermissionData]);
 
   return (
@@ -140,20 +160,36 @@ export default function PermissionsPage() {
             </p>
           </div>
         </div>
-        
-        <PermissionGuard permission={SystemPermission.SYSTEM_ADMIN}>
-          <div className="flex gap-2">
-            <Button variant="outline">
-              <Book className="mr-2 h-4 w-4" />
-              Documentation
-            </Button>
-            <Button>
-              <Shield className="mr-2 h-4 w-4" />
-              Save Changes
-            </Button>
-          </div>
-        </PermissionGuard>
+        <Button 
+          variant="outline" 
+          onClick={fetchPermissionData}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh Permissions
+        </Button>
       </div>
+      
+      {/* Error Alert - Make errors very visible */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error Loading Permissions</AlertTitle>
+          <AlertDescription className="whitespace-pre-wrap">
+            {error}
+            <div className="mt-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchPermissionData}
+                disabled={isLoading}
+              >
+                Try Again
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
       
       <Alert>
         <Info className="h-4 w-4" />
@@ -165,137 +201,31 @@ export default function PermissionsPage() {
       </Alert>
       
       <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-3 lg:grid-cols-5 max-w-3xl">
-          <TabsTrigger value="overview">
-            <Info className="h-4 w-4 mr-2" />
-            Overview
-          </TabsTrigger>
+        <TabsList className="grid grid-cols-4 max-w-4xl">
           <TabsTrigger value="permissions">
             <Shield className="h-4 w-4 mr-2" />
-            Permissions
+            All Permissions
           </TabsTrigger>
           <TabsTrigger value="roles">
-            <Users className="h-4 w-4 mr-2" />
-            Roles
+            <Shield className="h-4 w-4 mr-2" />
+            Role Permissions
           </TabsTrigger>
           <TabsTrigger value="users">
             <Users className="h-4 w-4 mr-2" />
-            User Assignment
+            User Permissions
           </TabsTrigger>
-          <TabsTrigger value="settings">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
+          <TabsTrigger value="admin">
+            <Shield className="h-4 w-4 mr-2" />
+            System Tools
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="overview" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Permissions System Overview</CardTitle>
-              <CardDescription>
-                Understanding how permissions work in the system
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Permissions</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold">{permissionDefinitions.length}</div>
-                    <p className="text-sm text-muted-foreground">
-                      Total system permissions
-                    </p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Roles</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold">{Object.keys(rolePermissions).length}</div>
-                    <p className="text-sm text-muted-foreground">
-                      Default user roles
-                    </p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Categories</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold">
-                      {new Set(permissionDefinitions.map(p => p.category)).size}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Permission categories
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">How Permissions Work</h3>
-                <Separator />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <h4 className="font-medium">Role-Based Permissions</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Each user is assigned a role (Admin, Manager, Employee, User) which comes with a default set of permissions.
-                      Role-based permissions provide a baseline access level for users with that role.
-                    </p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {Object.keys(rolePermissions).map(role => (
-                        <Badge key={role} variant="outline">
-                          {role.charAt(0).toUpperCase() + role.slice(1)}
-                          <span className="ml-1 text-xs opacity-70">
-                            ({rolePermissions[role]?.length || 0})
-                          </span>
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <h4 className="font-medium">Individual User Permissions</h4>
-                    <p className="text-sm text-muted-foreground">
-                      In addition to role-based permissions, individual users can be granted specific permissions
-                      that are not included in their role. This allows for fine-grained access control.
-                    </p>
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-md p-3">
-                      <div className="flex items-start">
-                        <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 mr-2" />
-                        <p className="text-sm text-blue-700 dark:text-blue-300">
-                          A user's effective permissions are the combination of their role-based permissions
-                          and any individual permissions that have been granted to them specifically.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <Alert variant="success" className="bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400 border border-green-200 dark:border-green-900">
-                <CheckCircle className="h-4 w-4" />
-                <AlertTitle>Permission System Active</AlertTitle>
-                <AlertDescription>
-                  The permission system is active and functioning correctly. Users will only be able to access 
-                  features and perform actions for which they have the appropriate permissions.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
         <TabsContent value="permissions" className="space-y-4">
           <PermissionList 
-            permissions={permissionDefinitions} 
-            isLoading={isLoading} 
+            permissions={permissionDefinitions}
+            isLoading={isLoading}
             error={error}
-            onRefresh={fetchPermissionData} 
+            onRefresh={fetchPermissionData}
           />
         </TabsContent>
         
@@ -313,103 +243,25 @@ export default function PermissionsPage() {
           <PermissionUserAssignment onPermissionsChanged={fetchPermissionData} />
         </TabsContent>
         
-        <TabsContent value="settings" className="space-y-4">
+        <TabsContent value="admin" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Permission System Settings</CardTitle>
+              <CardTitle>System Administration</CardTitle>
               <CardDescription>
-                Configure how the permission system works
+                Advanced tools for managing the permissions system. Use with caution.  
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-8">
-                <Alert variant="warning" className="bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
+              <div className="space-y-6">
+                <Alert variant="warning" className="mb-4">
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Admin Access Required</AlertTitle>
+                  <AlertTitle>Administrator Tools</AlertTitle>
                   <AlertDescription>
-                    Changing permission system settings requires system administrator access.
-                    These changes can affect the entire application and all users.
+                    These tools should only be used by system administrators. Improper use could affect system functionality.
                   </AlertDescription>
                 </Alert>
-                
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold">System Settings</h3>
-                  <Separator />
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm font-medium">Default Cache Duration</label>
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Input type="number" placeholder="30" className="max-w-[100px]" />
-                          <span className="text-sm text-muted-foreground">minutes</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Time to cache permission information before refreshing
-                        </p>
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm font-medium">Permission Check Behavior</label>
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                          <Button variant="outline" className="justify-start px-3">
-                            <Lock className="h-4 w-4 mr-2" />
-                            Deny by Default
-                          </Button>
-                          <Button variant="default" className="justify-start px-3">
-                            <Shield className="h-4 w-4 mr-2" />
-                            Cache and Check
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          How to handle permission checks when system is unreachable
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm font-medium">Permission Audit Logging</label>
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                          <Button variant="default" className="justify-start px-3">
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Enabled
-                          </Button>
-                          <Button variant="outline" className="justify-start px-3">
-                            <AlertTriangle className="h-4 w-4 mr-2" />
-                            Disabled
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Log all permission checks and changes for audit purposes
-                        </p>
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm font-medium">Role Inheritance</label>
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                          <Button variant="outline" className="justify-start px-3">
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Enabled
-                          </Button>
-                          <Button variant="default" className="justify-start px-3">
-                            <AlertTriangle className="h-4 w-4 mr-2" />
-                            Disabled
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Roles inherit permissions from lower roles automatically
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="outline">Reset to Defaults</Button>
-              <Button disabled>Save Settings</Button>
-            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>

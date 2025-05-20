@@ -74,7 +74,7 @@ export class CustomerRepository extends PrismaRepository<Customer> implements IC
       
       this.logger.debug(`Searching customers with term: ${search}`);
       
-      // Execute search query - search by name, company, email, etc.
+      // Execute search query - search by name, company, email, etc
       const customers = await this.prisma.customer.findMany({
         where: {
           OR: [

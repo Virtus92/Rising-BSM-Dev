@@ -28,16 +28,24 @@ const logger = getLogger();
  * Wraps the feature-level permission middleware for app router API routes
  */
 export async function withPermission(
-  handler: (request: NextRequest, user: any) => Promise<NextResponse>,
+  handler: (request: NextRequest, user: any, context?: any) => Promise<NextResponse>,
   requiredPermission: string | string[]
 ) {
-  return async (request: NextRequest): Promise<NextResponse> => {
+  return async (request: NextRequest, context?: any): Promise<NextResponse> => {
     try {
       // Extract user from auth object (added by auth middleware)
       const auth = request.auth;
-      const userId = auth?.user?.id || null;
+      
+      // Handle different auth structures consistently
+      // auth.userId (directly attached) or auth.user.id (nested user object)
+      const userId = auth?.userId || auth?.user?.id || null;
       
       if (!userId) {
+        logger.warn('Missing userId in auth object for permission check', {
+          hasAuth: !!auth,
+          authKeys: auth ? Object.keys(auth) : [],
+          url: request.url
+        });
         return formatResponse.unauthorized('Authentication required', 'User ID not found in request');
       }
       
@@ -66,8 +74,8 @@ export async function withPermission(
         return formatResponse.forbidden(`Insufficient permissions: ${permissionLabel}`);
       }
       
-      // Permission granted, call the handler
-      return await handler(request, auth);
+      // Permission granted, call the handler with context if provided
+      return await handler(request, auth, context);
     } catch (error) {
       // Normalize error with auth error handler
       const normalizedError = authErrorHandler.normalizeError(error as Error);

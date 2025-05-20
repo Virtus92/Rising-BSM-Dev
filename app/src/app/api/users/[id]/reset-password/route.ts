@@ -23,11 +23,11 @@ export const POST = routeHandler(async (req: NextRequest, { params }) => {
     // Check permission directly - using the user management permission
     if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number,
-      SystemPermission.USERS_MANAGE
+      SystemPermission.USERS_EDIT
     )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.USERS_MANAGE}`);
+      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.USERS_EDIT}`);
       return formatResponse.error(
-        `You don't have permission to perform this action (requires ${SystemPermission.USERS_MANAGE})`,
+        `You don't have permission to perform this action (requires ${SystemPermission.USERS_EDIT})`,
         403
       );
     }

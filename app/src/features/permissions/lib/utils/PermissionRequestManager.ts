@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * PermissionRequestManager - Clean implementation with caching
+ * PermissionRequestManager
  * 
  * A robust manager for permission requests with proper caching to reduce
  * network traffic and improve performance. No fallbacks or workarounds -
- * just clean, maintainable code.
+ * focuses on consistent behavior and proper error propagation.
  */
 
 import { getLogger } from '@/core/logging';
@@ -61,23 +61,27 @@ export class PermissionRequestManager {
   
   /**
    * Get permissions for a user with proper caching
+   * No fallbacks - errors are propagated
    */
   public async getPermissions(userId: number, requestId: string, options?: { force?: boolean }): Promise<string[]> {
-    // Check for invalid userId
+    // Validate userId
     if (!userId) {
-      logger.warn('Invalid userId provided to getPermissions', { requestId });
-      return [];
+      logger.error('Invalid userId provided to getPermissions', { requestId });
+      throw new Error('Invalid user ID provided to getPermissions');
     }
     
     // Return from cache if available and not forced to refresh
     if (!options?.force && this.hasCachedPermissions(userId)) {
       const cachedData = this.permissionCache.get(userId);
-      logger.debug(`Using cached permissions for user ${userId}`, { 
-        requestId,
-        permissionCount: cachedData?.permissions.length,
-        cacheAge: Date.now() - (cachedData?.timestamp || 0)
-      });
-      return cachedData?.permissions || [];
+      
+      if (cachedData && Array.isArray(cachedData.permissions)) {
+        logger.debug(`Using cached permissions for user ${userId}`, { 
+          requestId,
+          permissionCount: cachedData.permissions.length,
+          cacheAge: Date.now() - (cachedData.timestamp || 0)
+        });
+        return cachedData.permissions;
+      }
     }
     
     // Check if there's already a request in progress for this user
@@ -93,11 +97,28 @@ export class PermissionRequestManager {
     // Store the promise to prevent duplicate requests
     this.requestsInProgress.set(userId, permissionPromise);
     
-    return permissionPromise;
+    try {
+      // Await the promise to handle errors properly
+      const permissions = await permissionPromise;
+      return permissions;
+    } catch (error) {
+      // Log error but don't swallow it
+      logger.error(`Error getting permissions for user ${userId}`, {
+        error: error instanceof Error ? error.message : String(error),
+        requestId
+      });
+      
+      // Remove from in-progress map on error
+      this.requestsInProgress.delete(userId);
+      
+      // Rethrow so calling code can handle
+      throw error;
+    }
   }
   
   /**
    * Fetch permissions from API with robust error handling and response normalization
+   * No fallbacks or workarounds - errors are propagated properly
    */
   private async fetchPermissions(userId: number, requestId: string): Promise<string[]> {
     try {
@@ -109,19 +130,25 @@ export class PermissionRequestManager {
         await ApiClient.initialize();
       }
       
-      // Make API request with explicit userId
+      // Use the token manager to ensure we have a valid token
+      const { default: TokenManager } = await import('@/core/initialization/TokenManager');
+      
+      // Make API request with auth headers
+      const headers: Record<string, string> = {
+        'X-Request-ID': requestId,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'X-Auth-User-ID': userId.toString()
+      };
+      
       const response = await ApiClient.get(`/api/users/permissions?userId=${userId}`, {
-        headers: {
-          'X-Request-ID': requestId,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'X-Auth-User-ID': userId.toString()
-        },
+        headers,
+        withAuth: true,
         cache: 'no-store' as RequestCache
       });
       
-      // Check authentication errors first
-      if (response && typeof response === 'object' && 'statusCode' in response) {
+      // Check for auth errors
+      if (response && typeof response === 'object' && response.statusCode !== undefined) {
         if (response.statusCode === 401 || response.statusCode === 403) {
           logger.warn(`Authentication error when fetching permissions: ${response.statusCode}`, {
             userId,
@@ -130,8 +157,7 @@ export class PermissionRequestManager {
             error: response.error || response.message
           });
           
-          // Try to refresh token and retry
-          const { TokenManager } = await import('@/core/initialization');
+          // Try to refresh token and retry exactly once
           const refreshed = await TokenManager.refreshToken({ force: true });
           
           if (refreshed) {
@@ -144,17 +170,61 @@ export class PermissionRequestManager {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
                 'X-Auth-User-ID': userId.toString()
-              }
+              },
+              withAuth: true
             });
             
+            // If retry fails with auth error, throw proper error
+            if (retryResponse.statusCode === 401 || retryResponse.statusCode === 403) {
+              logger.error('Authentication failed after token refresh', {
+                userId,
+                requestId: `${requestId}-retry`,
+                statusCode: retryResponse.statusCode
+              });
+              throw new Error('Authentication required to fetch permissions');
+            }
+            
             // Process retry response
-            return this.normalizePermissionsResponse(retryResponse, userId, `${requestId}-retry`);
+            const permissions = this.normalizePermissionsResponse(retryResponse, userId, `${requestId}-retry`);
+            
+            // Cache the permissions
+            if (permissions.length > 0) {
+              this.permissionCache.set(userId, {
+                permissions,
+                timestamp: Date.now()
+              });
+            }
+            
+            return permissions;
+          } else {
+            // Token refresh failed
+            logger.error('Token refresh failed when fetching permissions', { userId, requestId });
+            throw new Error('Authentication required to fetch permissions');
           }
+        } else if (response.statusCode >= 400) {
+          // Other error status codes
+          logger.error(`API error when fetching permissions: ${response.statusCode}`, {
+            userId,
+            requestId,
+            statusCode: response.statusCode,
+            error: response.error || response.message
+          });
+          throw new Error(`Failed to fetch permissions: ${response.error || response.message || 'Unknown error'}`);
         }
       }
       
       // Process response normally
-      return this.normalizePermissionsResponse(response, userId, requestId);
+      const permissions = this.normalizePermissionsResponse(response, userId, requestId);
+      
+      // Cache the permissions
+      if (permissions.length > 0) {
+        this.permissionCache.set(userId, {
+          permissions,
+          timestamp: Date.now()
+        });
+      }
+      
+      return permissions;
     } catch (error) {
       // Detailed error logging
       logger.error(`Error fetching permissions for user ${userId}`, {
@@ -164,37 +234,8 @@ export class PermissionRequestManager {
         requestId
       });
       
-      // If cache exists but is stale, use it as fallback on error
-      const cachedData = this.permissionCache.get(userId);
-      if (cachedData) {
-        logger.warn(`Using stale cache for user ${userId} due to fetch error`, {
-          requestId,
-          cacheAge: Date.now() - cachedData.timestamp,
-          permissionCount: cachedData.permissions.length
-        });
-        return cachedData.permissions;
-      }
-      
-      // For admin users, return emergency permissions
-      if (userId === 1) {
-        logger.info('Returning emergency permissions for admin user', { userId, requestId });
-        const emergencyPermissions = [
-          'users.view', 'users.create', 'users.edit',
-          'customers.view', 'requests.view', 'appointments.view'
-        ];
-        
-        // Cache these emergency permissions
-        this.permissionCache.set(userId, {
-          permissions: emergencyPermissions,
-          timestamp: Date.now()
-        });
-        
-        return emergencyPermissions;
-      }
-      
-      // Use empty array as last resort so the app doesn't crash
-      logger.warn('Returning empty permissions array after all fetch attempts failed', { userId, requestId });
-      return [];
+      // Propagate the error - no fallbacks
+      throw error;
     } finally {
       // Clean up when request is done
       this.requestsInProgress.delete(userId);
@@ -203,7 +244,7 @@ export class PermissionRequestManager {
   
   /**
    * Normalize permissions response to standard string array format
-   * Extracted to a separate method for better maintainability and reuse
+   * Consistent processing with proper error handling
    */
   private normalizePermissionsResponse(response: any, userId: number, requestId: string): string[] {
     // Log the raw response for debugging
@@ -212,154 +253,139 @@ export class PermissionRequestManager {
       responseType: typeof response,
       isArray: Array.isArray(response),
       hasSuccess: response && typeof response === 'object' && 'success' in response,
-      hasData: response && typeof response === 'object' && 'data' in response,
+      hasData: response && typeof response === 'object' && 'data' in response
     });
     
-    // Default empty array
-    let permissionsArray: string[] = [];
-    
-    // Direct array response
-    if (Array.isArray(response)) {
-      logger.debug('Response is a direct array', { responseLength: response.length });
-      permissionsArray = response.filter((item: any) => typeof item === 'string') as string[];
-    } 
-    // Object response with nested data
-    else if (response && typeof response === 'object') {
-      // Standard API response format
-      if ('success' in response && 'data' in response) {
-        // Success check
+    try {
+      // Handle different response formats in order of preference
+      
+      // Case 1: Standard API response format with success and data
+      if (response && typeof response === 'object' && 'success' in response && 'data' in response) {
+        // Check for error response
         if (response.success === false) {
-          logger.warn('API returned error response for permissions', {
+          logger.error('API returned error response for permissions', {
             userId,
             requestId,
             error: response.error || response.message,
             statusCode: response.statusCode
           });
-          return []; // Return empty array for error responses
+          throw new Error(`API error: ${response.error || response.message || 'Unknown error'}`);
         }
         
-        // Direct array in data
-        if (Array.isArray(response.data)) {
-          logger.debug('Response is ApiResponse with array data', {
-            userId,
-            requestId,
-            dataLength: response.data.length
-          });
-          permissionsArray = response.data.filter((item: any) => typeof item === 'string');
-        } 
-        // Object with permissions array in data
-        else if (response.data && typeof response.data === 'object') {
-          // Standard permissions array in data object
-          if ('permissions' in response.data && Array.isArray(response.data.permissions)) {
-            logger.debug('Response has nested permissions array', {
-              userId,
-              requestId,
-              permissionsLength: response.data.permissions.length
-            });
-            permissionsArray = response.data.permissions.filter((item: any) => typeof item === 'string');
-          } 
-          // Try to find permissions in data structure
-          else if (response.data && typeof response.data === 'object') {
-            // Look for any array property in data
-            for (const [key, value] of Object.entries(response.data)) {
-              if (Array.isArray(value) && value.length > 0) {
-                const validItems = value.filter((item: any) => typeof item === 'string');
-                if (validItems.length > 0) {
-                  logger.debug(`Found permissions array in data.${key}`, {
-                    userId,
-                    requestId,
-                    length: validItems.length
-                  });
-                  permissionsArray = validItems;
-                  break;
-                }
-              }
-            }
-          }
-        }
-      } 
-      // Legacy format: direct permissions property
-      else if ('permissions' in response && Array.isArray(response.permissions)) {
-        logger.debug('Response has direct permissions property', {
-          userId,
-          requestId,
-          permissionsLength: response.permissions.length
-        });
-        permissionsArray = response.permissions.filter((item: any) => typeof item === 'string');
-      } 
-      // Last resort: scan for any array property
-      else {
-        // Find any array property
-        const arrayProps = Object.entries(response)
-          .filter(([_, value]) => Array.isArray(value) && (value as any[]).length > 0)
-          .map(([key, value]) => ({
-            key,
-            value: (value as any[]).filter(item => typeof item === 'string'),
-            length: (value as any[]).length
-          }))
-          .filter(prop => prop.value.length > 0);
+        const data = response.data;
         
-        if (arrayProps.length > 0) {
-          // Use the first valid array property found
-          const firstArrayProp = arrayProps[0];
-          logger.debug(`Using array property '${firstArrayProp.key}' as permissions`, { 
-            length: firstArrayProp.value.length,
-            userId,
-            requestId
+        // Case 1.1: data is array of strings
+        if (Array.isArray(data)) {
+          logger.debug('Response data is an array', { dataLength: data.length });
+          return this.sanitizePermissions(data, userId, requestId);
+        }
+        
+        // Case 1.2: data contains permissions array
+        if (data && typeof data === 'object' && 'permissions' in data && Array.isArray(data.permissions)) {
+          logger.debug('Response data has permissions array', {
+            permissionsLength: data.permissions.length,
+            role: data.role || 'unknown'
           });
-          permissionsArray = firstArrayProp.value;
-        } else {
-          logger.warn('No valid permission arrays found in response', {
-            userId,
-            requestId,
-            responseKeys: Object.keys(response)
-          });
+          return this.sanitizePermissions(data.permissions, userId, requestId);
         }
       }
-    } else {
-      logger.warn('Invalid permissions response format', {
+      
+      // Case 2: Direct array response
+      if (Array.isArray(response)) {
+        logger.debug('Response is a direct array', { responseLength: response.length });
+        return this.sanitizePermissions(response, userId, requestId);
+      }
+      
+      // Case 3: Object with direct permissions property
+      if (response && typeof response === 'object' && 'permissions' in response && Array.isArray(response.permissions)) {
+        logger.debug('Response has direct permissions property', {
+          permissionsLength: response.permissions.length
+        });
+        return this.sanitizePermissions(response.permissions, userId, requestId);
+      }
+      
+      // We couldn't find permissions in a standard format
+      // Log the error with detailed information
+      logger.error('Unable to extract permissions from response in standard format', {
         userId,
         requestId,
         responseType: typeof response,
-        responseValue: response ? String(response).substring(0, 100) : 'null'
+        responseKeys: response && typeof response === 'object' ? Object.keys(response) : 'N/A',
+        dataType: response && typeof response === 'object' && response.data ? typeof response.data : 'N/A',
+        dataKeys: response && typeof response === 'object' && response.data && typeof response.data === 'object' ? 
+          Object.keys(response.data) : 'N/A'
       });
+      
+      // Throw an error to propagate the problem
+      throw new Error('Invalid permission response format - could not extract permissions');
+    } catch (error) {
+      // Log error and propagate
+      logger.error('Error normalizing permissions response:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        userId,
+        requestId
+      });
+      
+      throw error;
     }
-    
+  }
+  
+  /**
+   * Sanitize and validate permissions
+   * Ensures we only work with valid string permissions
+   */
+  private sanitizePermissions(permissionsArray: any[], userId: number, requestId: string): string[] {
     // Validate and sanitize permissions
     const validPermissions = permissionsArray
       .filter(Boolean) // Remove any null/undefined values
       .filter(p => typeof p === 'string') // Ensure all are strings
-      .map(p => p.trim()) // Trim whitespace
+      .map(p => p.trim().toLowerCase()) // Trim whitespace and lowercase for consistency
       .filter(p => p.length > 0); // Remove empty strings
     
-    // Cache the normalized permissions
-    this.permissionCache.set(userId, {
-      permissions: validPermissions,
-      timestamp: Date.now()
-    });
-    
-    logger.debug(`Successfully normalized ${validPermissions.length} permissions`, {
-      userId,
-      requestId
-    });
+    if (validPermissions.length === 0 && permissionsArray.length > 0) {
+      // We had input but nothing valid came out
+      logger.warn('No valid string permissions found in array', {
+        userId,
+        requestId,
+        inputLength: permissionsArray.length,
+        inputTypes: permissionsArray.map(p => typeof p).join(', ')
+      });
+    } else {
+      logger.debug(`Successfully extracted ${validPermissions.length} permissions`, {
+        userId,
+        requestId
+      });
+    }
     
     return validPermissions;
   }
   
-   
   /**
-   * Check if user has a specific permission
+   * Check if user has a specific permission with proper error handling
    */
   public async hasPermission(userId: number, permissionCode: string): Promise<boolean> {
     try {
+      // Input validation
+      if (!userId) {
+        throw new Error('Invalid user ID provided to hasPermission');
+      }
+      
+      if (!permissionCode) {
+        throw new Error('Invalid permission code provided to hasPermission');
+      }
+      
+      // Normalize permission code
+      const normalizedPermission = permissionCode.trim().toLowerCase();
+      
       // Generate a request ID for tracing
       const requestId = `perm-check-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
       
       // Get all permissions
       const permissions = await this.getPermissions(userId, requestId);
       
-      // Simple contains check
-      return permissions.includes(permissionCode);
+      // Check if the permission exists
+      return permissions.includes(normalizedPermission);
     } catch (error) {
       logger.error(`Permission check failed for ${permissionCode}`, {
         error: error instanceof Error ? error.message : String(error),
@@ -368,7 +394,7 @@ export class PermissionRequestManager {
         permissionCode
       });
       
-      // Properly propagate error instead of silently returning false
+      // Propagate the error
       throw error;
     }
   }
@@ -378,6 +404,18 @@ export class PermissionRequestManager {
    */
   public async hasAnyPermission(userId: number, permissionCodes: string[]): Promise<boolean> {
     try {
+      // Input validation
+      if (!userId) {
+        throw new Error('Invalid user ID provided to hasAnyPermission');
+      }
+      
+      if (!permissionCodes || !Array.isArray(permissionCodes) || permissionCodes.length === 0) {
+        throw new Error('Invalid permission codes provided to hasAnyPermission');
+      }
+      
+      // Normalize permission codes
+      const normalizedPermissions = permissionCodes.map(code => code.trim().toLowerCase());
+      
       // Generate a request ID for tracing
       const requestId = `perm-check-any-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
       
@@ -385,16 +423,16 @@ export class PermissionRequestManager {
       const permissions = await this.getPermissions(userId, requestId);
       
       // Check if any permission codes match
-      return permissions.some(p => permissionCodes.includes(p));
+      return normalizedPermissions.some(code => permissions.includes(code));
     } catch (error) {
-      logger.error(`Permission check failed for ${permissionCodes.join(', ')}`, {
+      logger.error(`hasAnyPermission check failed`, {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
         userId,
         permissionCodes
       });
       
-      // Properly propagate error
+      // Propagate the error
       throw error;
     }
   }
@@ -404,6 +442,18 @@ export class PermissionRequestManager {
    */
   public async hasAllPermissions(userId: number, permissionCodes: string[]): Promise<boolean> {
     try {
+      // Input validation
+      if (!userId) {
+        throw new Error('Invalid user ID provided to hasAllPermissions');
+      }
+      
+      if (!permissionCodes || !Array.isArray(permissionCodes) || permissionCodes.length === 0) {
+        throw new Error('Invalid permission codes provided to hasAllPermissions');
+      }
+      
+      // Normalize permission codes
+      const normalizedPermissions = permissionCodes.map(code => code.trim().toLowerCase());
+      
       // Generate a request ID for tracing
       const requestId = `perm-check-all-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
       
@@ -411,16 +461,16 @@ export class PermissionRequestManager {
       const permissions = await this.getPermissions(userId, requestId);
       
       // Check if all permission codes match
-      return permissionCodes.every(p => permissions.includes(p));
+      return normalizedPermissions.every(code => permissions.includes(code));
     } catch (error) {
-      logger.error(`Permission check failed for ${permissionCodes.join(', ')}`, {
+      logger.error(`hasAllPermissions check failed`, {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
         userId,
         permissionCodes
       });
       
-      // Properly propagate error
+      // Propagate the error
       throw error;
     }
   }

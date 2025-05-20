@@ -59,7 +59,7 @@ export const deleteNotificationHandler = async (
     const permissionService = serviceFactory.createPermissionService();
     const hasPermission = await permissionService.hasPermission(
       userId,
-      SystemPermission.NOTIFICATIONS_MANAGE
+      SystemPermission.NOTIFICATIONS_VIEW
     );
     
     if (!hasPermission) {
@@ -128,6 +128,6 @@ export const DELETE = auth(
   // Auth middleware options
   {
     requireAuth: true,
-    requiredPermission: [SystemPermission.NOTIFICATIONS_MANAGE]
+    requiredPermission: [SystemPermission.NOTIFICATIONS_VIEW]
   }
 );

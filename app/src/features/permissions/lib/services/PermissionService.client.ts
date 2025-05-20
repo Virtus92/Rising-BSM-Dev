@@ -480,7 +480,56 @@ export class PermissionService implements IPermissionService {
   }
   
   /**
-   * Get default permissions for role
+   * Sets default permissions for a role
+   * 
+   * @param role - Role name
+   * @param permissions - Array of permission codes
+   * @param options - Service options
+   * @returns Updated permissions for the role
+   */
+  async setDefaultPermissionsForRole(role: string, permissions: string[], options?: ServiceOptions): Promise<string[]> {
+    try {
+      // Validate role and permissions
+      if (!role) {
+        logger.error('Invalid role provided to setDefaultPermissionsForRole');
+        return [];
+      }
+      
+      if (!Array.isArray(permissions)) {
+        logger.error('Permissions must be an array in setDefaultPermissionsForRole');
+        return [];
+      }
+      
+      const response = await ApiClient.post(`/api/permissions/role-defaults/${role}`, {
+        role,
+        permissions
+      });
+      
+      if (!response.success || !response.data) {
+        logger.error(`Failed to set default permissions for role ${role}:`, response.message || 'Unknown error');
+        return [];
+      }
+      
+      // Extract permissions from response
+      if (Array.isArray(response.data)) {
+        return response.data;
+      } else if (response.data.permissions && Array.isArray(response.data.permissions)) {
+        return response.data.permissions;
+      }
+      
+      return [];
+    } catch (error) {
+      logger.error(`Error setting default permissions for role ${role}:`, error as Error);
+      return [];
+    }
+  }
+  
+  /**
+   * Gets the default permissions for a role
+   * 
+   * @param role - User role
+   * @param options - Service options
+   * @returns Default permissions for the role
    */
   async getDefaultPermissionsForRole(role: string, options?: ServiceOptions): Promise<string[]> {
     try {
@@ -490,11 +539,14 @@ export class PermissionService implements IPermissionService {
         return [];
       }
       
-      // Extract permission codes
+      // Handle different response formats
       if (Array.isArray(response.data)) {
-        return response.data.map((p: PermissionItem) => typeof p === 'string' ? p : p.code);
+        return response.data.map((item: any) => typeof item === 'string' ? item : (item && typeof item === 'object' && 'code' in item) ? item.code : '');
       } else if (response.data.permissions && Array.isArray(response.data.permissions)) {
-        return response.data.permissions.map((p: PermissionItem) => typeof p === 'string' ? p : p.code);
+        return response.data.permissions.map((item: any) => typeof item === 'string' ? item : (item && typeof item === 'object' && 'code' in item) ? item.code : '');
+      } else if (typeof response.data === 'object' && response.data !== null) {
+        return Object.values(response.data).map((item: any) => typeof item === 'string' ? item : 
+          (typeof item === 'object' && item !== null && 'code' in item) ? item.code : '');
       }
       
       return [];
@@ -502,6 +554,18 @@ export class PermissionService implements IPermissionService {
       logger.error(`Error getting default permissions for role ${role}:`, error as Error);
       return [];
     }
+  }
+  
+  /**
+   * Gets role permissions from the database with fallback to defaults
+   * 
+   * @param role - Role name
+   * @param options - Service options
+   * @returns Permissions for the role
+   */
+  async getRolePermissions(role: string, options?: ServiceOptions): Promise<string[]> {
+    // This is just an alias for getDefaultPermissionsForRole for consistency
+    return this.getDefaultPermissionsForRole(role, options);
   }
   
   // Additional required methods
@@ -678,29 +742,37 @@ export class PermissionService implements IPermissionService {
       
       // Case 1: permissions is an array
       if (response.data.permissions && Array.isArray(response.data.permissions)) {
-        permissions = response.data.permissions.map((p: PermissionItem) => typeof p === 'string' ? p : p.code);
+        permissions = response.data.permissions.map((p: any) => {
+          return typeof p === 'string' ? p : (p && typeof p === 'object' && 'code' in p ? p.code : '');
+        }).filter(Boolean);
         logger.debug(`Found permissions array with ${permissions.length} items`);
       }
       // Case 2: permissions is a comma-separated string (as seen in server logs)
       else if (response.data.permissions && typeof response.data.permissions === 'string') {
-        permissions = response.data.permissions.split(',').map((p: PermissionItem) => p.trim());
+        permissions = response.data.permissions.split(',').map((p: string) => p.trim()).filter(Boolean);
         logger.debug(`Parsed comma-separated permissions string into ${permissions.length} items`);
       }
       // Case 3: data itself is an array of permissions
       else if (Array.isArray(response.data)) {
-        permissions = response.data.map((p: PermissionItem) => typeof p === 'string' ? p : p.code);
+        permissions = response.data.map((p: any) => {
+          return typeof p === 'string' ? p : (p && typeof p === 'object' && 'code' in p ? p.code : '');
+        }).filter(Boolean);
         logger.debug(`Response data is an array with ${permissions.length} permission items`);
       }
       // Case 4: permissions might be in a nested data property
       else if (response.data.data) {
         if (Array.isArray(response.data.data)) {
-          permissions = response.data.data.map((p: PermissionItem) => typeof p === 'string' ? p : p.code);
+          permissions = response.data.data.map((p: any) => {
+            return typeof p === 'string' ? p : (p && typeof p === 'object' && 'code' in p ? p.code : '');
+          }).filter(Boolean);
           logger.debug(`Found permissions in data property with ${permissions.length} items`);
         } else if (response.data.data.permissions && Array.isArray(response.data.data.permissions)) {
-          permissions = response.data.data.permissions.map((p: PermissionItem) => typeof p === 'string' ? p : p.code);
+          permissions = response.data.data.permissions.map((p: any) => {
+            return typeof p === 'string' ? p : (p && typeof p === 'object' && 'code' in p ? p.code : '');
+          }).filter(Boolean);
           logger.debug(`Found permissions in data.permissions with ${permissions.length} items`);
         } else if (response.data.data.permissions && typeof response.data.data.permissions === 'string') {
-          permissions = response.data.data.permissions.split(',').map((p: PermissionItem) => p.trim());
+          permissions = response.data.data.permissions.split(',').map((p: string) => p.trim()).filter(Boolean);
           logger.debug(`Parsed comma-separated permissions from data.permissions into ${permissions.length} items`);
         }
       }

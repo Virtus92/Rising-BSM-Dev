@@ -60,7 +60,7 @@ export const POST = routeHandler(
         );
       }
     },
-    SystemPermission.REQUESTS_MANAGE
+    SystemPermission.REQUESTS_EDIT
   ),
   { requiresAuth: true }
 );

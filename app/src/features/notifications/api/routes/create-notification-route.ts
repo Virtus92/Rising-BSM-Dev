@@ -53,5 +53,5 @@ export const POST = auth(
 // Auth middleware options
 {
   requireAuth: true,
-  requiredPermission: [SystemPermission.NOTIFICATIONS_CREATE]
+  requiredPermission: [SystemPermission.NOTIFICATIONS_VIEW]
 });

@@ -89,4 +89,23 @@ export interface IPermissionService extends IBaseService<Permission, CreatePermi
    * @returns Default permissions for the role
    */
   getDefaultPermissionsForRole(role: string, options?: ServiceOptions): Promise<string[]>;
+  
+  /**
+   * Sets default permissions for a role
+   * 
+   * @param role - Role name
+   * @param permissions - Array of permission codes
+   * @param options - Service options
+   * @returns Updated permissions for the role
+   */
+  setDefaultPermissionsForRole(role: string, permissions: string[], options?: ServiceOptions): Promise<string[]>;
+  
+  /**
+   * Gets role permissions from the database with fallback to defaults
+   * 
+   * @param role - Role name
+   * @param options - Service options
+   * @returns Permissions for the role
+   */
+  getRolePermissions(role: string, options?: ServiceOptions): Promise<string[]>;
 }

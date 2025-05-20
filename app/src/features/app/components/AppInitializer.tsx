@@ -13,6 +13,7 @@ import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { ServiceRegistry } from '@/core/initialization/ServiceRegistry';
 import AuthService from '@/features/auth/core';
+import { AuthOptimizations } from '@/features/auth/core/AuthOptimizations';
 
 const logger = getLogger();
 
@@ -306,7 +307,10 @@ export default function AppInitializer({
 
   // If on auth page, don't wait for initialization
   if (isAuthPage) {
-    return <>{children}</>;
+    return <>
+      <AuthOptimizations />
+      {children}
+    </>;
   }
 
   // Show fallback during initialization
@@ -358,5 +362,8 @@ export default function AppInitializer({
   }
 
   // Render children when initialized
-  return <>{children}</>;
+  return <>
+    <AuthOptimizations />
+    {children}
+  </>;
 }

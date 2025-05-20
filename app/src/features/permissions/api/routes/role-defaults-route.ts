@@ -12,7 +12,7 @@ import { UserRole } from '@/domain/enums/UserEnums';
  */
 export async function getRoleDefaultsHandler(
   req: NextRequest,
-  role: string
+  role: string | undefined
 ): Promise<NextResponse> {
   const logger = getLogger();
   const serviceFactory = getServiceFactory();

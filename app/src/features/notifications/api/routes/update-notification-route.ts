@@ -59,7 +59,7 @@ export async function PUT(
         // Create the permission-wrapped handler and execute it
         const permissionHandlerWithCheck = await withPermission(
           permissionHandler,
-          SystemPermission.NOTIFICATIONS_EDIT
+          SystemPermission.NOTIFICATIONS_VIEW
         );
         return await permissionHandlerWithCheck(req);
       }

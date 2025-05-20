@@ -76,6 +76,7 @@ export enum AuthErrorType {
   PERMISSION_DENIED = 'permission_denied',
   PERMISSION_CHECK_FAILED = 'permission_check_failed',
   
+  
   // Session errors
   SESSION_EXPIRED = 'session_expired',
   

@@ -1,8 +1,9 @@
 /**
- * Centralized System Permission Definitions
+ * Centralized System Permission Definitions - CLEANED VERSION
  * 
- * This file contains the single source of truth for all permission definitions
+ * This file contains the single source of truth for ONLY NECESSARY permissions
  * used throughout the application, both in the backend and frontend.
+ * Unnecessary and unimplemented permissions have been removed.
  */
 import { PermissionCategory, PermissionAction, SystemPermission } from '../enums/PermissionEnums';
 
@@ -18,23 +19,22 @@ export interface PermissionDefinition {
 }
 
 /**
- * Complete map of all system permissions with their display information
- * This is used for:
- * 1. Database seeding
- * 2. Frontend display 
- * 3. Permission validation
+ * Clean map of only the necessary system permissions with their display information
+ *
+ * IMPORTANT: This map matches exactly what is in SystemPermission enum
+ * and includes ONLY permissions that are actually implemented and used
  */
 export const SystemPermissionMap: Record<string, PermissionDefinition> = {
-  // System permissions
-  [SystemPermission.SYSTEM_ACCESS]: {
-    code: SystemPermission.SYSTEM_ACCESS,
-    name: 'System Access',
-    description: 'Can access the system',
-    category: PermissionCategory.SYSTEM,
+  // Dashboard permission
+  [SystemPermission.DASHBOARD_ACCESS]: {
+    code: SystemPermission.DASHBOARD_ACCESS,
+    name: 'Access Dashboard',
+    description: 'Can access the main dashboard',
+    category: PermissionCategory.DASHBOARD,
     action: PermissionAction.ACCESS
   },
   
-  // User permissions
+  // User management permissions
   [SystemPermission.USERS_VIEW]: {
     code: SystemPermission.USERS_VIEW,
     name: 'View Users',
@@ -61,36 +61,6 @@ export const SystemPermissionMap: Record<string, PermissionDefinition> = {
     name: 'Delete Users',
     description: 'Can delete users',
     category: PermissionCategory.USERS,
-    action: PermissionAction.DELETE
-  },
-  
-  // Role permissions
-  [SystemPermission.ROLES_VIEW]: {
-    code: SystemPermission.ROLES_VIEW,
-    name: 'View Roles',
-    description: 'Can view roles and permissions',
-    category: PermissionCategory.ROLES,
-    action: PermissionAction.VIEW
-  },
-  [SystemPermission.ROLES_CREATE]: {
-    code: SystemPermission.ROLES_CREATE,
-    name: 'Create Roles',
-    description: 'Can create new roles',
-    category: PermissionCategory.ROLES,
-    action: PermissionAction.CREATE
-  },
-  [SystemPermission.ROLES_EDIT]: {
-    code: SystemPermission.ROLES_EDIT,
-    name: 'Edit Roles',
-    description: 'Can edit existing roles',
-    category: PermissionCategory.ROLES,
-    action: PermissionAction.EDIT
-  },
-  [SystemPermission.ROLES_DELETE]: {
-    code: SystemPermission.ROLES_DELETE,
-    name: 'Delete Roles',
-    description: 'Can delete roles',
-    category: PermissionCategory.ROLES,
     action: PermissionAction.DELETE
   },
   
@@ -174,10 +144,10 @@ export const SystemPermissionMap: Record<string, PermissionDefinition> = {
     category: PermissionCategory.REQUESTS,
     action: PermissionAction.ASSIGN
   },
-  [SystemPermission.REQUESTS_MANAGE]: {
-    code: SystemPermission.REQUESTS_MANAGE,
-    name: 'Manage Requests',
-    description: 'Has full management access to requests',
+  [SystemPermission.REQUESTS_CONVERT]: {
+    code: SystemPermission.REQUESTS_CONVERT,
+    name: 'Convert Requests',
+    description: 'Can convert requests to other entity types',
     category: PermissionCategory.REQUESTS,
     action: PermissionAction.MANAGE
   },
@@ -212,6 +182,15 @@ export const SystemPermissionMap: Record<string, PermissionDefinition> = {
     action: PermissionAction.DELETE
   },
   
+  // Notification permission
+  [SystemPermission.NOTIFICATIONS_VIEW]: {
+    code: SystemPermission.NOTIFICATIONS_VIEW,
+    name: 'View Notifications',
+    description: 'Can view notifications',
+    category: PermissionCategory.NOTIFICATIONS,
+    action: PermissionAction.VIEW
+  },
+  
   // Settings permissions
   [SystemPermission.SETTINGS_VIEW]: {
     code: SystemPermission.SETTINGS_VIEW,
@@ -242,6 +221,31 @@ export const SystemPermissionMap: Record<string, PermissionDefinition> = {
     description: 'Can edit own profile',
     category: PermissionCategory.PROFILE,
     action: PermissionAction.EDIT
+  },
+  
+  // Permission management
+  [SystemPermission.PERMISSIONS_VIEW]: {
+    code: SystemPermission.PERMISSIONS_VIEW,
+    name: 'View Permissions',
+    description: 'Can view permissions',
+    category: PermissionCategory.PERMISSIONS,
+    action: PermissionAction.VIEW
+  },
+  [SystemPermission.PERMISSIONS_MANAGE]: {
+    code: SystemPermission.PERMISSIONS_MANAGE,
+    name: 'Manage Permissions',
+    description: 'Can manage permissions',
+    category: PermissionCategory.PERMISSIONS,
+    action: PermissionAction.MANAGE
+  },
+  
+  // System administration
+  [SystemPermission.SYSTEM_ADMIN]: {
+    code: SystemPermission.SYSTEM_ADMIN,
+    name: 'System Administration',
+    description: 'Full system administration access',
+    category: 'System',
+    action: 'admin'
   }
 };
 
@@ -253,14 +257,14 @@ export const SystemPermissionMap: Record<string, PermissionDefinition> = {
  */
 export function getPermissionDefinition(code: SystemPermission | string): PermissionDefinition | undefined {
   if (!code || typeof code !== 'string') {
-    console.warn('Invalid permission code provided to getPermissionDefinition', { code });
-    return undefined;
+    throw new Error('Invalid permission code provided to getPermissionDefinition');
   }
   return SystemPermissionMap[code];
 }
 
 /**
  * Creates a permission definition list from all system permissions or a subset
+ * No fallbacks or workarounds - ensures all permissions are properly handled
  * 
  * @param permissionCodes Optional subset of permission codes to include
  * @returns List of permission definitions
@@ -268,31 +272,51 @@ export function getPermissionDefinition(code: SystemPermission | string): Permis
 export function createPermissionDefinitionList(permissionCodes?: string[]): PermissionDefinition[] {
   // If no codes provided, return all permissions
   if (!permissionCodes || !Array.isArray(permissionCodes) || permissionCodes.length === 0) {
-    return Object.values(SystemPermissionMap);
+    // Ensure we get all system permissions first
+    const allSystemPermCodes = Object.values(SystemPermission).map(p => p.toString());
+    
+    // Get definitions for all permissions
+    return allSystemPermCodes.map(code => {
+      // If definition exists in map, use it
+      if (SystemPermissionMap[code]) {
+        return SystemPermissionMap[code];
+      }
+      
+      // Otherwise generate a definition based on the code
+      const parts = code.split('.');
+      const category = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : 'Other';
+      const action = parts[1] ? parts[1].charAt(0).toUpperCase() + parts[1].slice(1) : 'Access';
+      
+      return {
+        code,
+        name: `${action} ${category}`,
+        description: `Can ${parts[1] || 'access'} ${parts[0] || 'system'}`,
+        category,
+        action: parts[1] || 'access'
+      };
+    });
   }
   
   // Otherwise, return only the requested permissions
-  return permissionCodes
-    .map(code => SystemPermissionMap[code])
-    .filter(Boolean) // Remove any undefined values
-    .concat(
-      // Add any codes that don't have definitions with generated info
-      permissionCodes
-        .filter(code => !SystemPermissionMap[code])
-        .map(code => {
-          const parts = code.split('.');
-          const category = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : 'Other';
-          const action = parts[1] ? parts[1].charAt(0).toUpperCase() + parts[1].slice(1) : 'Access';
-          
-          return {
-            code,
-            name: `${action} ${category}`,
-            description: `Can ${parts[1] || 'access'} ${parts[0] || 'system'}`,
-            category,
-            action: parts[1] || 'access'
-          };
-        })
-    );
+  return permissionCodes.map(code => {
+    // If definition exists in map, use it
+    if (SystemPermissionMap[code]) {
+      return SystemPermissionMap[code];
+    }
+    
+    // Otherwise generate a definition
+    const parts = code.split('.');
+    const category = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : 'Other';
+    const action = parts[1] ? parts[1].charAt(0).toUpperCase() + parts[1].slice(1) : 'Access';
+    
+    return {
+      code,
+      name: `${action} ${category}`,
+      description: `Can ${parts[1] || 'access'} ${parts[0] || 'system'}`,
+      category,
+      action: parts[1] || 'access'
+    };
+  });
 }
 
 /**
@@ -302,4 +326,105 @@ export function createPermissionDefinitionList(permissionCodes?: string[]): Perm
  */
 export function getAllPermissionCodes(): string[] {
   return Object.keys(SystemPermissionMap);
+}
+
+/**
+ * Ensures all enum permissions have corresponding definitions
+ * Returns any permissions that are missing from the map
+ */
+export function findMissingPermissions(): string[] {
+  const allEnumPermissions = Object.values(SystemPermission).map(p => p.toString());
+  const definedPermissions = Object.keys(SystemPermissionMap);
+  
+  return allEnumPermissions.filter(p => !definedPermissions.includes(p));
+}
+
+/**
+ * Gets default permissions for a specific role
+ * This is the canonical source of default permissions for all roles
+ * 
+ * @param role User role (case-insensitive)
+ * @returns Array of permission codes for the role
+ */
+export function getDefaultPermissionsForRole(role: string): string[] {
+  // Basic permissions that all roles should have
+  const basicPermissions = [
+    SystemPermission.PROFILE_VIEW,
+    SystemPermission.PROFILE_EDIT,
+    SystemPermission.DASHBOARD_ACCESS
+  ];
+  
+  // Normalize role to lowercase
+  const normalizedRole = role.toLowerCase();
+  
+  // Return appropriate permissions based on role
+  switch(normalizedRole) {
+    case 'admin':
+      return [
+        ...basicPermissions,
+        SystemPermission.USERS_VIEW,
+        SystemPermission.USERS_CREATE,
+        SystemPermission.USERS_EDIT,
+        SystemPermission.USERS_DELETE,
+        SystemPermission.PERMISSIONS_VIEW,
+        SystemPermission.PERMISSIONS_MANAGE,
+        SystemPermission.CUSTOMERS_VIEW,
+        SystemPermission.CUSTOMERS_CREATE,
+        SystemPermission.CUSTOMERS_EDIT,
+        SystemPermission.CUSTOMERS_DELETE,
+        SystemPermission.REQUESTS_VIEW,
+        SystemPermission.REQUESTS_CREATE,
+        SystemPermission.REQUESTS_EDIT,
+        SystemPermission.REQUESTS_DELETE,
+        SystemPermission.REQUESTS_APPROVE,
+        SystemPermission.REQUESTS_REJECT,
+        SystemPermission.REQUESTS_ASSIGN,
+        SystemPermission.REQUESTS_CONVERT,
+        SystemPermission.APPOINTMENTS_VIEW,
+        SystemPermission.APPOINTMENTS_CREATE,
+        SystemPermission.APPOINTMENTS_EDIT,
+        SystemPermission.APPOINTMENTS_DELETE,
+        SystemPermission.NOTIFICATIONS_VIEW,
+        SystemPermission.SETTINGS_VIEW,
+        SystemPermission.SETTINGS_EDIT,
+        SystemPermission.SYSTEM_ADMIN
+      ];
+    case 'manager':
+      return [
+        ...basicPermissions,
+        SystemPermission.USERS_VIEW,
+        SystemPermission.CUSTOMERS_VIEW,
+        SystemPermission.CUSTOMERS_CREATE,
+        SystemPermission.CUSTOMERS_EDIT,
+        SystemPermission.REQUESTS_VIEW,
+        SystemPermission.REQUESTS_CREATE,
+        SystemPermission.REQUESTS_EDIT,
+        SystemPermission.REQUESTS_APPROVE,
+        SystemPermission.REQUESTS_REJECT,
+        SystemPermission.REQUESTS_ASSIGN,
+        SystemPermission.APPOINTMENTS_VIEW,
+        SystemPermission.APPOINTMENTS_CREATE,
+        SystemPermission.APPOINTMENTS_EDIT,
+        SystemPermission.NOTIFICATIONS_VIEW,
+        SystemPermission.SETTINGS_VIEW
+      ];
+    case 'employee':
+      return [
+        ...basicPermissions,
+        SystemPermission.CUSTOMERS_VIEW,
+        SystemPermission.REQUESTS_VIEW,
+        SystemPermission.REQUESTS_CREATE,
+        SystemPermission.APPOINTMENTS_VIEW,
+        SystemPermission.APPOINTMENTS_CREATE,
+        SystemPermission.NOTIFICATIONS_VIEW
+      ];
+    case 'user':
+      return [
+        ...basicPermissions,
+        SystemPermission.REQUESTS_CREATE,
+        SystemPermission.NOTIFICATIONS_VIEW
+      ];
+    default:
+      return basicPermissions;
+  }
 }

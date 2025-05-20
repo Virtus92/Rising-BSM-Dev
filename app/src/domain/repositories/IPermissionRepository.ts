@@ -68,14 +68,41 @@ export interface IPermissionRepository extends IBaseRepository<Permission> {
    */
   hasPermission(userId: number, permissionCode: string): Promise<boolean>;
 
+  // seedDefaultPermissions method has been deliberately removed
+  // and replaced with the proper initialization in PermissionInitializer.ts
+  
   /**
-   * Seeds default permissions into the database
+   * Gets permissions for a role from the database
    * 
-   * @returns Promise that resolves when seeding is complete
-   * @throws Error if seeding fails
-   * @description This method is used to populate the database with default permissions.
-   *              It should be called during application initialization or setup.
-   * 
+   * @param role - Role name
+   * @returns Permissions for the role or null if not found
    */
-  seedDefaultPermissions(): Promise<void>;
+  getRolePermissions(role: string): Promise<string[]>;
+  
+  /**
+   * Sets permissions for a role
+   * 
+   * @param role - Role name
+   * @param permissions - Array of permission codes
+   * @param updatedBy - ID of the user updating the permissions
+   * @returns Updated permissions for the role
+   */
+  setRolePermissions(role: string, permissions: string[], updatedBy?: number): Promise<string[]>;
+  
+  /**
+   * Gets default permissions for a role
+   * This is a fallback method used when database lookups fail
+   * 
+   * @param role - Role name in lowercase
+   * @returns Array of default permission codes for the role
+   */
+  getDefaultPermissionsForRole(role: string): string[];
+  
+  /**
+   * Gets the underlying repository implementation
+   * Required for direct database access in special cases
+   * 
+   * @returns Underlying repository implementation
+   */
+  getRepository(): any;
 }
