@@ -214,6 +214,9 @@ export function useAuthManagement() {
     setError(null);
     
     try {
+      // Log the userData for debugging
+      console.log('Registration payload:', userData);
+      
       // Call the register API endpoint directly
       const response = await fetch('/api/auth/register', {
         method: 'POST',

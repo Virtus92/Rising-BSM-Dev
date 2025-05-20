@@ -8,4 +8,3 @@ export { default as ConfigService } from './ConfigService';
 
 // Security configuration
 export { SecurityConfig, securityConfig } from './SecurityConfig';
-export { SecurityConfigEdge, securityConfigEdge } from './SecurityConfigEdge';

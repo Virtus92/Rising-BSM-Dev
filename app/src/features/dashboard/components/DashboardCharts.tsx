@@ -67,7 +67,7 @@ export const DashboardCharts = () => {
     refreshData
   } = useDashboardCharts();
   
-  const [chartType, setChartType] = useState<'bar' | 'line' | 'area'>('bar');
+  const [chartType, setChartType] = useState<'bar' | 'line' | 'area'>('area');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Handle time frame change

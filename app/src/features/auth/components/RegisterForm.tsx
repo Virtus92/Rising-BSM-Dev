@@ -136,7 +136,9 @@ export default function RegisterForm() {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        confirmPassword: formData.passwordConfirm
+        confirmPassword: formData.passwordConfirm,
+        passwordConfirm: formData.passwordConfirm, // Send both formats for compatibility
+        terms: formData.acceptTerms,
       };
       
       const success = await register(registerData);

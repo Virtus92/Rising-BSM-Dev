@@ -225,7 +225,7 @@ export class PermissionRepository implements IPermissionRepository {
         const allPermissions = await this.prisma.permission.findMany({
           select: { code: true }
         });
-        return allPermissions.map(p => p.code);
+        return allPermissions.map((p: any) => p.code);
       }
       
       // Get user's role for reference
@@ -243,8 +243,8 @@ export class PermissionRepository implements IPermissionRepository {
       
       // Get user-specific permission codes with explicit null check
       const userPermissionCodes = userPermissions
-        .filter(p => p.permission && p.permission.code)
-        .map(p => p.permission!.code as string);
+        .filter((p: any) => p.permission && p.permission.code)
+        .map((p: any) => p.permission!.code as string);
       
       // Get role-based permissions from the database using the correct model reference
       const rolePermissionModel = this.prisma.RolePermission;
@@ -259,7 +259,7 @@ export class PermissionRepository implements IPermissionRepository {
       
       // Extract permission codes from the result with explicit null check
       const rolePermissionCodes = rolePermissions
-        .filter(rp => rp.permission && rp.permission.code)
+        .filter((rp: RolePermissionWithPermission) => rp.permission && rp.permission.code)
         .map((rp: RolePermissionWithPermission) => rp.permission!.code as string);
       
       // Use a Set to ensure uniqueness of permission codes
@@ -402,8 +402,8 @@ export class PermissionRepository implements IPermissionRepository {
     const rolePermissionStrings = rolePermissionCodes.map(String);
     
     // Determine which permissions need to be explicitly added or removed
-    const additionalPermissions = permissionStrings.filter(p => !rolePermissionStrings.includes(p));
-    const removedPermissions = rolePermissionStrings.filter(p => !permissionStrings.includes(p));
+    const additionalPermissions = permissionStrings.filter((p: any) => !rolePermissionStrings.includes(p));
+    const removedPermissions = rolePermissionStrings.filter((p: any) => !permissionStrings.includes(p));
     
     // Run this as a transaction
     await this.prisma.$transaction(async (tx: any) => {

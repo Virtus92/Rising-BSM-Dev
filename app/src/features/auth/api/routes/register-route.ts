@@ -22,8 +22,10 @@ export async function registerHandler(req: NextRequest): Promise<NextResponse> {
     // Parse request body
     const data = await req.json();
     
-    // Basic validation
-    if (!data.name || !data.email || !data.password || !data.confirmPassword) {
+    // Basic validation - check all possible field names for password confirmation
+    const passwordConfirm = data.confirmPassword || data.passwordConfirm;
+    
+    if (!data.name || !data.email || !data.password || !passwordConfirm) {
       return NextResponse.json(
         formatResponse.validationError(
           ['All fields are required'],
@@ -33,7 +35,7 @@ export async function registerHandler(req: NextRequest): Promise<NextResponse> {
       );
     }
     
-    if (data.password !== data.confirmPassword) {
+    if (data.password !== passwordConfirm) {
       return NextResponse.json(
         formatResponse.validationError(
           ['Passwords do not match'],
@@ -69,8 +71,8 @@ export async function registerHandler(req: NextRequest): Promise<NextResponse> {
     // Get IP address for audit
     const ipAddress = req.headers.get('x-forwarded-for') || 'unknown';
     
-    // Terms agreement validation
-    if (!data.terms) {
+    // Terms agreement validation - check both possible field names
+    if (!data.terms && !data.acceptTerms) {
       return NextResponse.json(
         formatResponse.validationError(
           ['You must accept the terms and conditions'],
@@ -79,6 +81,9 @@ export async function registerHandler(req: NextRequest): Promise<NextResponse> {
         { status: 400 }
       );
     }
+    
+    // Normalize the terms field
+    data.terms = data.terms || data.acceptTerms;
     
     // Register the user using auth service
     const result = await authService.register(

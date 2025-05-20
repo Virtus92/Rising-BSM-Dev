@@ -9,6 +9,7 @@ import { IErrorHandler } from '@/core/errors/';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 import { EntityType } from '@/domain/enums/EntityTypes';
 import { LogActionType } from '@/domain/enums/CommonEnums';
+import { hashPassword } from '@/core/security/password-utils';
 
 /**
  * Implementation of the UserRepository
@@ -44,13 +45,13 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
     try {
       this.logger.debug('Creating new user', { email: userData.email });
       
-      // Bereite Daten für ORM vor
-      const data = this.mapToORMEntity(userData);
+      // Prepare data for ORM - now this properly hashes the password
+      const data = await this.mapToORMEntity(userData);
       
-      // Erstelle den Benutzer
+      // Create the user
       const createdUser = await this.prisma.user.create({ data });
       
-      // Protokolliere die Benutzeranlage
+      // Log the user creation
       await this.logActivity(
         createdUser.id,
         LogActionType.CREATE,
@@ -708,11 +709,30 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
    * @param domainEntity - Domain entity
    * @returns ORM entity
    */
-  protected mapToORMEntity(domainEntity: Partial<User>): any {
+  protected async mapToORMEntity(domainEntity: Partial<User>): Promise<any> {
     // Remove undefined properties
     const result: Record<string, any> = {};
     
+    // Process and hash password if present
+    if (domainEntity.password && domainEntity.password.trim() !== '') {
+      try {
+        // Hash the password before storing it
+        this.logger.debug('Hashing password for user');
+        result.password = await hashPassword(domainEntity.password);
+      } catch (error) {
+        this.logger.error('Error hashing password:', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        });
+        throw new Error('Error hashing password');
+      }
+    }
+    
+    // Process all other properties
     Object.entries(domainEntity).forEach(([key, value]) => {
+      // Skip password as it was already handled
+      if (key === 'password') return;
+      
       if (value !== undefined) {
         // Special handling for permissions to match Prisma's expectations
         if (key === 'permissions') {
@@ -725,14 +745,6 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
           }
           // If permissions is an empty array, don't include it at all
         } 
-        // Special handling for password - never set to null or empty during updates
-        else if (key === 'password') {
-          // Only include password if it has a valid value
-          if (value !== null && value !== '') {
-            result[key] = value;
-          }
-          // Otherwise, don't include the password field at all
-        }
         // Special handling for profilePictureId - must be a number or null
         else if (key === 'profilePictureId') {
           if (value === null) {

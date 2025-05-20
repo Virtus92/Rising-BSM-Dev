@@ -12,6 +12,8 @@ import NotificationBadge from '@/features/notifications/components/NotificationB
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { useSettings } from '@/shared/contexts/SettingsContext';
 import { useToast } from '@/shared/hooks/useToast';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
 import { Transition, Dialog, Popover } from '@headlessui/react';
 import { motion } from 'framer-motion';
 import { useSearch } from '@/shared/hooks/useSearch';
@@ -37,6 +39,7 @@ interface QuickAction {
   description: string;
   href: string;
   color: string;
+  requiredPermission?: string;
 }
 
 /**
@@ -50,6 +53,9 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
+  
+  // Add permission checks
+  const { hasPermission } = usePermissions();
   const { search, setSearchTerm, searchResults, isSearching } = useSearch();
   
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -200,37 +206,49 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
     }
   };
   
-  // Quick actions data
-  const quickActions: QuickAction[] = [
+  // Quick actions data with permission requirements
+  const allQuickActions: QuickAction[] = [
     {
       icon: <Users className="h-6 w-6" />,
       name: "New Customer",
       description: "Add a new customer to the system",
       href: "/dashboard/customers/new",
-      color: "bg-blue-500 text-white"
+      color: "bg-blue-500 text-white",
+      requiredPermission: API_PERMISSIONS.CUSTOMERS.CREATE
     },
     {
       icon: <Calendar className="h-6 w-6" />,
       name: "New Appointment",
       description: "Schedule a new appointment",
       href: "/dashboard/appointments/new",
-      color: "bg-emerald-500 text-white"
+      color: "bg-emerald-500 text-white",
+      requiredPermission: API_PERMISSIONS.APPOINTMENTS.CREATE
     },
     {
       icon: <Mail className="h-6 w-6" />,
       name: "New Request",
       description: "Create a new service request",
       href: "/dashboard/requests/new",
-      color: "bg-violet-500 text-white"
+      color: "bg-violet-500 text-white",
+      requiredPermission: API_PERMISSIONS.REQUESTS.CREATE
     },
     {
       icon: <BarChart2 className="h-6 w-6" />,
       name: "Analytics",
       description: "View business performance metrics",
       href: "/dashboard/statistics",
-      color: "bg-amber-500 text-white"
+      color: "bg-amber-500 text-white",
+      requiredPermission: API_PERMISSIONS.SETTINGS.VIEW
     }
   ];
+  
+  // Filter quick actions based on permissions
+  const quickActions = allQuickActions.filter(action => 
+    !action.requiredPermission || hasPermission(action.requiredPermission)
+  );
+  
+  // Only show the Quick Actions button if the user has permission for at least one action
+  const showQuickActionsButton = quickActions.length > 0;
   
   return (
     <>
@@ -287,8 +305,9 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
               <Search className="h-5 w-5" />
             </button>
             
-            {/* Quick actions dropdown */}
-            <Popover className="relative">
+            {/* Quick actions dropdown - only show if user has permissions for at least one action */}
+            {showQuickActionsButton && (
+              <Popover className="relative">
               {({ open }: { open: boolean }) => (
                 <>
                   <Popover.Button 
@@ -348,6 +367,7 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
                 </>
               )}
             </Popover>
+            )}
             
             {/* Notifications */}
             <div className="relative">

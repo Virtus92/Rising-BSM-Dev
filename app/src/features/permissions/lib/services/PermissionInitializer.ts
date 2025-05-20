@@ -37,7 +37,7 @@ export async function initializePermissionSystem(): Promise<{
     logger.info('Permission cache cleared on startup');
     
     // 2. Ensure all system permissions exist in the database
-    const existingPermissions = await db.Permission.findMany();
+    const existingPermissions = await db.permission.findMany();
     const existingPermissionCodes = existingPermissions.map(p => p.code);
     
     // Get all permission codes from the SystemPermission enum
@@ -61,7 +61,7 @@ export async function initializePermissionSystem(): Promise<{
         const description = `Can ${parts[1]} ${parts[0]}`;
         
         try {
-          await db.Permission.create({
+          await db.permission.create({
             data: {
               code,
               name,
@@ -78,7 +78,7 @@ export async function initializePermissionSystem(): Promise<{
     
     // 3. Verify admin users have the correct permissions
     // Get all users with ADMIN role
-    const adminUsers = await db.User.findMany({
+    const adminUsers = await db.user.findMany({
       where: { role: UserRole.ADMIN }
     });
     
@@ -95,7 +95,7 @@ export async function initializePermissionSystem(): Promise<{
     ];
     
     // Get updated list of all permissions after creating missing ones
-    const allPermissions = await db.Permission.findMany();
+    const allPermissions = await db.permission.findMany();
     
     // Results of permission verification
     const verificationResults = [];
@@ -104,7 +104,7 @@ export async function initializePermissionSystem(): Promise<{
     for (const admin of adminUsers) {
       try {
         // Get current permissions for this admin
-        const userPermissions = await db.UserPermission.findMany({
+        const userPermissions = await db.userPermission.findMany({
           where: { userId: admin.id },
           include: { permission: true }
         });
@@ -122,7 +122,7 @@ export async function initializePermissionSystem(): Promise<{
           
           if (permission) {
             try {
-              await db.UserPermission.upsert({
+              await db.userPermission.upsert({
                 where: {
                   userId_permissionId: {
                     userId: admin.id,

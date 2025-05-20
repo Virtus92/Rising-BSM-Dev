@@ -24,9 +24,9 @@ export default function UserProfilePage() {
       case UserRole.MANAGER:
         return 'Manager';
       case UserRole.USER:
-        return 'Benutzer';
+        return 'User';
       default:
-        return 'Unbekannt';
+        return 'Unknown';
     }
   };
 
@@ -34,13 +34,13 @@ export default function UserProfilePage() {
   const getStatusInfo = (status: UserStatus) => {
     switch (status) {
       case UserStatus.ACTIVE:
-        return { name: 'Aktiv', color: 'text-green-500' };
+        return { name: 'Active', color: 'text-green-500' };
       case UserStatus.INACTIVE:
-        return { name: 'Inaktiv', color: 'text-gray-500' };
+        return { name: 'Inactive', color: 'text-gray-500' };
       case UserStatus.SUSPENDED:
-        return { name: 'Gesperrt', color: 'text-orange-500' };
+        return { name: 'Suspended', color: 'text-orange-500' };
       default:
-        return { name: 'Unbekannt', color: 'text-gray-500' };
+        return { name: 'Unknown', color: 'text-gray-500' };
     }
   };
 
@@ -110,7 +110,7 @@ export default function UserProfilePage() {
     return (
       <div className="flex flex-col justify-center items-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
-        <p className="text-muted-foreground">Lade Profildaten...</p>
+        <p className="text-muted-foreground">Loading profile data...</p>
       </div>
     );
   }
@@ -119,16 +119,16 @@ export default function UserProfilePage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-4">
         <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Fehler beim Laden</h2>
+        <h2 className="text-2xl font-bold mb-2">Error Loading Profile</h2>
         <p className="text-muted-foreground text-center mb-6">
-          {loadError || 'Fehler beim Laden der Profildaten. Bitte versuchen Sie es später erneut.'}
+          {loadError || 'Failed to load profile data. Please try again later.'}
         </p>
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => window.location.href = '/auth/login'}>
-            Zum Login
+            Go to Login
           </Button>
           <Button onClick={handleRetry}>
-            Erneut versuchen
+            Try Again
           </Button>
         </div>
       </div>
@@ -139,16 +139,16 @@ export default function UserProfilePage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-4">
         <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Nicht angemeldet</h2>
+        <h2 className="text-2xl font-bold mb-2">Not Logged In</h2>
         <p className="text-muted-foreground text-center mb-6">
-          Sie müssen angemeldet sein, um Ihr Profil anzuzeigen.
+          You must be logged in to view your profile.
         </p>
         <div className="flex gap-3">
           <Button onClick={() => window.location.href = '/auth/login'}>
-            Zum Login
+            Go to Login
           </Button>
           <Button variant="outline" onClick={handleRetry}>
-            Erneut versuchen
+            Try Again
           </Button>
         </div>
       </div>
@@ -159,19 +159,19 @@ export default function UserProfilePage() {
 
   return (
     <div className="container max-w-4xl py-6">
-      <h1 className="text-3xl font-bold mb-6">Mein Profil</h1>      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <h1 className="text-3xl font-bold mb-6">My Profile</h1>      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-md">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <UserCircle className="h-4 w-4" />
-            <span>Profil</span>
+            <span>Profile</span>
           </TabsTrigger>
           <TabsTrigger value="security" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
-            <span>Sicherheit</span>
+            <span>Security</span>
           </TabsTrigger>
           <TabsTrigger value="account" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            <span>Konto</span>
+            <span>Account</span>
           </TabsTrigger>
         </TabsList>        {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6">
@@ -204,18 +204,18 @@ export default function UserProfilePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5 text-primary" />
-                Kontodetails
+                Account Details
               </CardTitle>
               <CardDescription>
-                Details zu Ihrem Konto und Status
+                Details about your account and status
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold">Kontoübersicht</h3>
+                <h3 className="text-lg font-semibold">Account Overview</h3>
                 <div className="mt-4 space-y-4">
                   <div>
-                    <div className="text-sm font-medium text-muted-foreground">Rolle</div>
+                    <div className="text-sm font-medium text-muted-foreground">Role</div>
                     <div className="flex items-center gap-2 mt-1">
                       <Shield className="h-4 w-4 text-primary" />
                       {getRoleName(user.role as UserRole)}
@@ -227,14 +227,14 @@ export default function UserProfilePage() {
                   </div>
                   <Separator />
                   <div>
-                    <div className="text-sm font-medium text-muted-foreground">Mitglied seit</div>
+                    <div className="text-sm font-medium text-muted-foreground">Member Since</div>
                     <div className="flex items-center gap-2 mt-1">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       {formatDate(user.createdAt)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-muted-foreground">Zuletzt aktualisiert</div>
+                    <div className="text-sm font-medium text-muted-foreground">Last Updated</div>
                     <div className="flex items-center gap-2 mt-1">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       {formatDate(user.updatedAt)}
@@ -246,10 +246,10 @@ export default function UserProfilePage() {
               <Separator />
               
               <div>
-                <h3 className="text-lg font-semibold">Benachrichtigungen</h3>
+                <h3 className="text-lg font-semibold">Notifications</h3>
                 <div className="mt-4">
                   <p className="text-muted-foreground">
-                    Benachrichtigungseinstellungen können in den Systemeinstellungen angepasst werden.
+                    Notification settings can be adjusted in the system settings.
                   </p>
                   <Button 
                     variant="outline" 
@@ -257,7 +257,7 @@ export default function UserProfilePage() {
                     onClick={() => window.location.href = '/dashboard/settings'}
                   >
                     <BellRing className="mr-2 h-4 w-4" />
-                    Zu den Einstellungen
+                    Go to Settings
                   </Button>
                 </div>
               </div>

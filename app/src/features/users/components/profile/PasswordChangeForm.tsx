@@ -102,8 +102,8 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
     
     // Show the toast first, then update state
     toast({
-      title: "Passwort generiert",
-      description: "Ein sicheres Passwort wurde generiert. Bitte speichern Sie es an einem sicheren Ort.",
+      title: "Password generated",
+      description: "A secure password has been generated. Please save it in a secure location.",
       variant: "success",
       dedupeKey: "password-generated",
       dedupeStrategy: "replace"
@@ -123,12 +123,12 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
     
     // Validate passwords
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setChangingPasswordError('Passwörter stimmen nicht überein');
+      setChangingPasswordError('Passwords do not match');
       return;
     }
     
     if (!validatePasswordStrength(passwordData.newPassword)) {
-      setChangingPasswordError('Das neue Passwort erfüllt nicht die Sicherheitsanforderungen');
+      setChangingPasswordError('The new password does not meet security requirements');
       return;
     }
     
@@ -145,8 +145,8 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
       if (response.success) {
         // First show the toast BEFORE resetting anything
         toast({
-          title: "Erfolg",
-          description: "Passwort wurde erfolgreich geändert",
+          title: "Success",
+          description: "Password has been successfully changed",
           variant: "success",
           dedupeKey: "password-change-success",
           dedupeStrategy: "replace"
@@ -167,14 +167,14 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
           }
         }, 100);
       } else {
-        throw new Error(response.message || "Fehler beim Ändern des Passworts");
+        throw new Error(response.message || "Error changing password");
       }
     } catch (error) {
       console.error('Failed to change password:', error as Error);
       // First show the error toast
       toast({
         title: "Fehler",
-        description: error instanceof Error ? error.message : "Passwort konnte nicht geändert werden",
+        description: error instanceof Error ? error.message : "Password could not be changed",
         variant: "destructive",
         dedupeKey: "password-change-error",
         dedupeStrategy: "replace"
@@ -226,10 +226,10 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
   const getPasswordStrengthText = (): { text: string; color: string } => {
     const percentage = getPasswordStrengthPercentage();
     
-    if (percentage < 40) return { text: 'Schwach', color: 'text-red-500' };
-    if (percentage < 70) return { text: 'Mittel', color: 'text-yellow-500' };
-    if (percentage < 100) return { text: 'Stark', color: 'text-orange-500' };
-    return { text: 'Sehr stark', color: 'text-green-500' };
+    if (percentage < 40) return { text: 'Weak', color: 'text-red-500' };
+    if (percentage < 70) return { text: 'Medium', color: 'text-yellow-500' };
+    if (percentage < 100) return { text: 'Strong', color: 'text-orange-500' };
+    return { text: 'Very strong', color: 'text-green-500' };
   };
   
   // If compact mode, render just the form content
@@ -240,7 +240,7 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
           {/* Current Password */}
           <div className="space-y-2">
             <Label htmlFor="currentPassword" className="flex items-center justify-between">
-              <span>Aktuelles Passwort</span>
+            <span>Current Password</span>
             </Label>
             <div className="relative">
               <Input 
@@ -271,7 +271,7 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
           {/* New Password */}
           <div className="space-y-2">
             <Label htmlFor="newPassword" className="flex items-center justify-between">
-              <span>Neues Passwort</span>
+            <span>New Password</span>
               {passwordData.newPassword && (
                 <span className={`text-xs font-medium ${getPasswordStrengthText().color}`}>
                   {getPasswordStrengthText().text}
@@ -371,8 +371,8 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
             {passwordData.confirmPassword && (
               <div className={`mt-1 text-sm ${passwordValidation.passwordsMatch ? 'text-green-500' : 'text-red-500'}`}>
                 {passwordValidation.passwordsMatch 
-                  ? 'Passwörter stimmen überein ✓' 
-                  : 'Passwörter stimmen nicht überein ✗'}
+                  ? 'Passwords match ✓' 
+                  : 'Passwords do not match ✗'}
               </div>
             )}
           </div>
@@ -409,9 +409,9 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
               {isChangingPassword ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Speichern...
+                  Saving...
                 </>
-              ) : 'Passwort ändern'}
+              ) : 'Change Password'}
             </Button>
             
             {onCancel && (
@@ -421,7 +421,7 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
                 onClick={onCancel}
                 disabled={isChangingPassword}
               >
-                Abbrechen
+                Cancel
               </Button>
             )}
           </div>
@@ -435,11 +435,11 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-          Passwort ändern
+        <ShieldCheck className="h-5 w-5 text-primary" />
+        Change Password
         </CardTitle>
         <CardDescription>
-          Aktualisieren Sie Ihr Passwort, um Ihre Kontosicherheit zu verbessern
+        Update your password to enhance your account security
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -549,7 +549,7 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
             
             {/* Confirm Password */}
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Passwort bestätigen</Label>
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
               <div className="relative">
                 <Input 
                   id="confirmPassword" 
@@ -604,7 +604,7 @@ export function PasswordChangeForm({ onPasswordChanged, onCancel, compact = fals
                 onClick={handleGeneratePassword}
                 disabled={isChangingPassword}
               >
-                Sicheres Passwort generieren
+                Generate Secure Password
               </Button>
             </div>
             

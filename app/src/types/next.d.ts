@@ -1,15 +1,22 @@
 /**
- * Type extensions for Next.js request objects
+ * Next.js request augmentation for auth properties
  */
-
-import { AuthInfo } from './auth';
 import { NextRequest } from 'next/server';
 
+// Extend NextRequest to include auth property
 declare module 'next/server' {
   interface NextRequest {
-    /**
-     * Auth information added by auth middleware
-     */
-    auth?: AuthInfo;
+    auth?: {
+      userId: number;
+      email: string;
+      role: string;
+      name?: string;
+      user: {
+        id: number;
+        email: string;
+        role: string;
+        name?: string;
+      };
+    };
   }
 }

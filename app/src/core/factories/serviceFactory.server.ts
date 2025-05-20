@@ -241,11 +241,20 @@ export class ServiceFactory implements IServiceFactory {
     return this.refreshTokenService as IRefreshTokenService;
   }
 
-  /**
+    /**
    * Creates a Permission Service instance
    */
   public createPermissionService(): IPermissionService {
     if (!this.permissionService) {
+      // Get the Prisma client explicitly from the proper import
+      const { prisma } = require('@/core/db/prisma/client');
+      // Ensure Prisma client is available
+      if (!prisma) {
+        const errorMsg = 'Prisma client is not available in serviceFactory.createPermissionService';
+        const logger = getLogger();
+        logger.error(errorMsg);
+        throw new Error(errorMsg);
+      }
       // Create a new instance with the repository
       const repository = new PermissionRepository(prisma, getLogger(), getErrorHandler());
       this.permissionService = new PermissionService(repository);

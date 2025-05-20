@@ -139,7 +139,14 @@ export abstract class BaseRepository<T, ID = number> implements IBaseRepository<
    */
   async create(data: Partial<T>): Promise<T> {
     try {
-      const entityData = this.mapToORMEntity(data);
+      // Handle both synchronous and asynchronous mapToORMEntity methods
+      const mappedEntity = this.mapToORMEntity(data);
+      
+      // Process the result which might be a promise
+      const entityData = mappedEntity instanceof Promise 
+        ? await mappedEntity 
+        : mappedEntity;
+        
       const result = await this.executeQuery('create', entityData);
       return this.mapToDomainEntity(result);
     } catch (error) {
@@ -164,7 +171,14 @@ export abstract class BaseRepository<T, ID = number> implements IBaseRepository<
    */
   async update(id: ID, data: Partial<T>): Promise<T> {
     try {
-      const entityData = this.mapToORMEntity(data);
+      // Handle both synchronous and asynchronous mapToORMEntity methods
+      const mappedEntity = this.mapToORMEntity(data);
+      
+      // Process the result which might be a promise
+      const entityData = mappedEntity instanceof Promise 
+        ? await mappedEntity 
+        : mappedEntity;
+        
       const result = await this.executeQuery('update', id, entityData);
       return this.mapToDomainEntity(result);
     } catch (error) {
@@ -232,7 +246,14 @@ export abstract class BaseRepository<T, ID = number> implements IBaseRepository<
         return 0;
       }
       
-      const entityData = this.mapToORMEntity(data);
+      // Handle both synchronous and asynchronous mapToORMEntity methods
+      const mappedEntity = this.mapToORMEntity(data);
+      
+      // Process the result which might be a promise
+      const entityData = mappedEntity instanceof Promise 
+        ? await mappedEntity 
+        : mappedEntity;
+        
       const result = await this.executeQuery('bulkUpdate', ids, entityData);
       return typeof result === 'number' ? result : (result).count || 0;
     } catch (error) {
@@ -357,11 +378,12 @@ export abstract class BaseRepository<T, ID = number> implements IBaseRepository<
 
   /**
    * Map domain entity to ORM entity
+   * This method can be synchronous or asynchronous depending on implementation
    * 
    * @param domainEntity - Domain entity
-   * @returns ORM entity
+   * @returns ORM entity or Promise with ORM entity
    */
-  protected abstract mapToORMEntity(domainEntity: Partial<T>): any;
+  protected abstract mapToORMEntity(domainEntity: Partial<T>): any | Promise<any>;
 
   /**
    * Check if an error is a database error

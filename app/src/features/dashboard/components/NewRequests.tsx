@@ -14,7 +14,8 @@ import {
   X, 
   ChevronRight, 
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Shield
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -26,6 +27,8 @@ import RequestClient from '@/features/requests/lib/clients/RequestClient';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { useToast } from '@/shared/hooks/useToast';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
 
 /**
  * NewRequests Component
@@ -43,8 +46,20 @@ export const NewRequests = () => {
   const [error, setError] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState<number | null>(null);
   
+  // Add permission check
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canViewRequests = hasPermission(API_PERMISSIONS.REQUESTS.VIEW);
+  
   // Load requests on component mount with improved initialization coordination
   useEffect(() => {
+    // Skip if permissions are still loading or user doesn't have permission
+    if (permissionsLoading || !canViewRequests) {
+      if (!permissionsLoading && !canViewRequests) {
+        setIsLoading(false); // Mark as not loading if we don't have permission
+      }
+      return;
+    }
+    
     let isComponentMounted = true;
     let eventListener: (() => void) | null = null;
     let intervalId: NodeJS.Timeout | null = null;
@@ -151,7 +166,7 @@ export const NewRequests = () => {
         clearInterval(intervalId);
       }
     };
-  }, []);
+  }, [canViewRequests, permissionsLoading]);
   
   // Fetch requests from API with robust authentication handling
   const fetchRequests = async (showLoading = true) => {
@@ -427,7 +442,33 @@ export const NewRequests = () => {
     }
   };
 
-  // Loading state
+  // If the user doesn't have permission, don't render anything
+  if (!permissionsLoading && !canViewRequests) {
+    return null;
+  }
+
+  // Still loading permissions state
+  if (permissionsLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <FileText className="mr-2 h-5 w-5 text-purple-500" />
+            New Requests
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="h-16 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
+            <div className="h-16 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
+            <div className="h-16 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  // Regular loading state
   if (isLoading) {
     return (
       <Card>

@@ -770,8 +770,8 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
           entity.customer = createCustomerEntity({
             id: request.customer.id,
             name: request.customer.name,
-            email: request.customer.email,
-            phone: request.customer.phone
+            email: request.customer.email || undefined,
+            phone: request.customer.phone || undefined
           });
         }
         
@@ -1069,8 +1069,8 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         (requestEntity).customer = createCustomerEntity({
           id: request.customer.id,
           name: request.customer.name,
-          email: request.customer.email,
-          phone: request.customer.phone
+          email: request.customer.email || undefined,
+          phone: request.customer.phone || undefined
         });
       }
       

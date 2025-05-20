@@ -69,7 +69,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     },
     onError: (error) => {
       toast({
-        title: "Upload fehlgeschlagen",
+        title: "Upload failed",
         description: error.message,
         variant: "error"
       });
@@ -115,21 +115,21 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     
     // Name validation
     if (!formData.name.trim()) {
-      errors.name = 'Name ist erforderlich';
+      errors.name = 'Name is required';
     } else if (formData.name.length < 2) {
-      errors.name = 'Name muss mindestens 2 Zeichen lang sein';
+      errors.name = 'Name must be at least 2 characters long';
     }
     
     // Email validation
     if (!formData.email.trim()) {
-      errors.email = 'E-Mail ist erforderlich';
+      errors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = 'Gültige E-Mail-Adresse erforderlich';
+      errors.email = 'Valid email address required';
     }
     
     // Phone validation (optional field)
     if (formData.phone && !/^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/.test(formData.phone)) {
-      errors.phone = 'Ungültiges Telefonnummer-Format';
+      errors.phone = 'Invalid phone number format';
     }
     
     setValidationErrors(errors);
@@ -153,7 +153,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
         console.error('Upload error:', error as Error);
         toast({
           title: "Fehler",
-          description: "Beim Hochladen des Profilbilds ist ein Fehler aufgetreten.",
+          description: "An error occurred while uploading the profile picture.",
           variant: "error"
         });
       })
@@ -215,8 +215,8 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
           if (response.success) {
             success = true;
             toast({
-              title: "Erfolg",
-              description: "Profilbild wurde aktualisiert.",
+              title: "Success",
+              description: "Profile picture has been updated.",
               variant: "success"
             });
             
@@ -225,7 +225,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
               onProfileUpdated();
             }
           } else {
-            throw new Error(response.message || "Profilbild konnte nicht aktualisiert werden.");
+            throw new Error(response.message || "Could not update profile picture.");
           }
         } catch (error) {
           console.error(`Error updating profile picture (attempt ${attempts}/${maxAttempts}):`, error as Error);
@@ -235,7 +235,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
           if (attempts === maxAttempts) {
             toast({
               title: "Fehler",
-              description: error instanceof Error ? error.message : "Profilbild konnte nicht aktualisiert werden.",
+              description: error instanceof Error ? error.message : "Could not update profile picture.",
               variant: "error"
             });
           }
@@ -272,8 +272,8 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
     if (!validateForm()) {
       // Show a validation error toast
       toast({
-        title: "Validierungsfehler",
-        description: "Bitte überprüfen Sie Ihre Eingaben.",
+        title: "Validation Error",
+        description: "Please check your inputs.",
         variant: "error",
         dedupeKey: "profile-validation-error",
         dedupeStrategy: "replace"
@@ -304,8 +304,8 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
 
       if (response.success) {
         toast({
-          title: "Erfolg",
-          description: "Profil wurde aktualisiert.",
+          title: "Success",
+          description: "Profile has been updated.",
           variant: "success",
           dedupeKey: "profile-update-success",
           dedupeStrategy: "replace"
@@ -318,12 +318,12 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
         
         setIsEditing(false);
       } else {
-        throw new Error(response.message || "Profil konnte nicht aktualisiert werden.");
+        throw new Error(response.message || "Profile could not be updated.");
       }
     } catch (error) {
       toast({
         title: "Fehler",
-        description: error instanceof Error ? error.message : "Profil konnte nicht aktualisiert werden.",
+        description: error instanceof Error ? error.message : "Profile could not be updated.",
         variant: "error",
         dedupeKey: "profile-update-error",
         dedupeStrategy: "replace"
@@ -402,7 +402,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
             onClick={() => setIsEditing(true)}
             disabled={isSaving || isUploadingImage}
           >
-            Profil bearbeiten
+            Edit Profile
           </Button>
         </CardFooter>
       </Card>
@@ -410,9 +410,9 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
       {/* Profile Details */}
       <Card className="md:col-span-2">
         <CardHeader>
-          <CardTitle>Profildetails</CardTitle>
+          <CardTitle>Profile Details</CardTitle>
           <CardDescription>
-            Ihre persönlichen Informationen und Kontodetails
+            Your personal information and account details
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -425,7 +425,7 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
                   name="name"
                   value={formData.name} 
                   onChange={handleInputChange}
-                  placeholder="Ihr vollständiger Name"
+                  placeholder="Your full name"
                   className={validationErrors.name ? "border-red-500" : ""}
                 />
                 {validationErrors.name && (
@@ -433,14 +433,14 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
                 )}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="email">E-Mail</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input 
                   id="email" 
                   name="email"
                   type="email" 
                   value={formData.email} 
                   onChange={handleInputChange}
-                  placeholder="Ihre E-Mail-Adresse"
+                  placeholder="Your email address"
                   className={validationErrors.email ? "border-red-500" : ""}
                 />
                 {validationErrors.email && (
@@ -448,13 +448,13 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
                 )}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="phone">Telefon</Label>
+                <Label htmlFor="phone">Phone</Label>
                 <Input 
                   id="phone" 
                   name="phone"
                   value={formData.phone} 
                   onChange={handleInputChange}
-                  placeholder="Ihre Telefonnummer"
+                  placeholder="Your phone number"
                   className={validationErrors.phone ? "border-red-500" : ""}
                 />
                 {validationErrors.phone && (
@@ -469,9 +469,9 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
                   {isSaving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Speichern...
+                      Saving...
                     </>
-                  ) : 'Speichern'}
+                  ) : 'Save'}
                 </Button>
                 <Button 
                   type="button" 
@@ -479,26 +479,26 @@ export function ProfileForm({ user, onProfileUpdated }: ProfileFormProps) {
                   onClick={() => setIsEditing(false)}
                   disabled={isSaving}
                 >
-                  Abbrechen
+                  Cancel
                 </Button>
               </div>
             </form>
           ) : (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold">Persönliche Informationen</h3>
+                <h3 className="text-lg font-semibold">Personal Information</h3>
                 <div className="mt-4 space-y-4">
                   <div>
-                    <div className="text-sm font-medium text-muted-foreground">Vollständiger Name</div>
+                    <div className="text-sm font-medium text-muted-foreground">Full Name</div>
                     <div>{user.name}</div>
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-muted-foreground">E-Mail-Adresse</div>
+                    <div className="text-sm font-medium text-muted-foreground">Email Address</div>
                     <div>{user.email}</div>
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-muted-foreground">Telefonnummer</div>
-                    <div>{user.phone || 'Nicht angegeben'}</div>
+                    <div className="text-sm font-medium text-muted-foreground">Phone Number</div>
+                    <div>{user.phone || 'Not provided'}</div>
                   </div>
                 </div>
               </div>

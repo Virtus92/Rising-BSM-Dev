@@ -189,7 +189,7 @@ async function decodeAndValidateToken(token: string): Promise<{ valid: boolean; 
     // Server-side validation with signature check
     if (typeof window === 'undefined') {
       try {
-        // Load verification tools
+        // Load verification tools - use standard jsonwebtoken
         const { verify } = await import('jsonwebtoken');
         const { securityConfig } = await import('@/core/config/SecurityConfig');
         

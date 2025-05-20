@@ -1,15 +1,14 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BarChart2, Calendar, PieChart, Users, UserPlus, FileText, Download, RefreshCw, Filter, Loader2 } from 'lucide-react';
+import { BarChart2, Calendar, PieChart, Users, UserPlus, FileText, RefreshCw, Filter, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Button } from '@/shared/components/ui/button';
 import { StatsCards } from '@/features/dashboard/components/StatsCards';
 import { DashboardCharts } from '@/features/dashboard/components/DashboardCharts';
 import { useDashboardStats } from '@/features/dashboard/hooks/useDashboardStats';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+// Select component import removed as it's no longer needed
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
 import { NoPermissionView } from '@/shared/components/NoPermissionView';
@@ -23,7 +22,7 @@ import { useDashboardCharts, TimeFrame } from '@/features/dashboard/hooks/useDas
  */
 export default function StatisticsPage() {
   const router = useRouter();
-  const [timeframe, setTimeframe] = useState<TimeFrame>('monthly');
+  // Timeframe is now handled internally by the dashboard charts hook
   
   // Get permissions
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
@@ -49,12 +48,7 @@ export default function StatisticsPage() {
     refreshData: refreshCharts
   } = useDashboardCharts();
   
-  // Handler for timeframe selection
-  const handleTimeframeChange = (value: string) => {
-    const newTimeframe = value as TimeFrame;
-    setTimeframe(newTimeframe);
-    changeTimeFrame(newTimeframe);
-  };
+  // Timeframe selection has been removed
 
   // Handler for refresh button click
   const handleRefresh = async () => {
@@ -102,27 +96,8 @@ export default function StatisticsPage() {
         </div>
         
         <div className="flex items-center gap-2">
-          <Select
-            value={timeframe}
-            onValueChange={handleTimeframeChange}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select timeframe" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-              <SelectItem value="yearly">Yearly</SelectItem>
-            </SelectContent>
-          </Select>
-          
           <Button variant="outline" size="icon" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4" />
-          </Button>
-          
-          <Button className="hidden sm:flex">
-            <Download className="mr-2 h-4 w-4" />
-            Export
           </Button>
         </div>
       </div>

@@ -109,12 +109,17 @@ if (process.env.NODE_ENV === 'production') {
   prismaInstance = global.prisma;
 }
 
-// Register shutdown handler to close connections gracefully
-if (typeof process !== 'undefined') {
-  process.on('beforeExit', async () => {
-    logger.info('Closing database connections on shutdown');
-    await prismaInstance.$disconnect();
-  });
+// Register shutdown handler in non-Edge environments
+if (typeof process !== 'undefined' && typeof process.on === 'function') {
+  try {
+    process.on('beforeExit', async () => {
+      logger.info('Closing database connections on shutdown');
+      await prismaInstance.$disconnect();
+    });
+  } catch (error) {
+    // Ignore if process.on is not available (e.g., in Edge runtime)
+    logger.debug('Could not register process shutdown handler (likely running in Edge runtime)');
+  }
 }
 
 export const prisma = prismaInstance;
