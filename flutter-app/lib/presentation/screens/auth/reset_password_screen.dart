@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/errors/api_exception.dart';
 import '../../../data/models/auth_model.dart';
+import '../../../data/models/auth_request_models.dart';
 import '../../../domain/repositories/auth_repository.dart';
 
 /// Reset password screen for setting a new password

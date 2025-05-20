@@ -35,6 +35,11 @@ export interface ApiResponse<T = any> {
    * @deprecated Use error property instead
    */
   message?: string;
+
+  /**
+   * Metadata for the response (pagination, etc.)
+   */
+  meta?: Record<string, any>;
 }
 
 /**

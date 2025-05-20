@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
-
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
@@ -19,13 +18,14 @@ type RequestParams = {
  * Links a request with an existing customer.
  */
 export const POST = routeHandler(
-  // Fix: Re-adding await here to match your implementation requirements
   await withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
 
-      const requestId = parseInt(params.id);
+      // Properly await params - use correct approach
+      const { id } = await params;
+      const requestId = parseInt(id);
       if (isNaN(requestId)) {
         return formatResponse.error('Invalid request ID', 400);
       }
@@ -44,21 +44,23 @@ export const POST = routeHandler(
         userRole: req.auth?.role
       };
       
-      // Get request service
-      const requestService = serviceFactory.createRequestService();
-      
       try {
+        // Get repositories
+        const requestService = serviceFactory.createRequestService();
+        const customerService = serviceFactory.createCustomerService();
+        
+        // Verify customer exists using the standard getById method from IBaseService
+        const customer = await customerService.getById(customerId);
+        if (!customer) {
+          return formatResponse.error('Customer not found', 404);
+        }
+        
         // Link request to customer
         const updatedRequest = await requestService.linkToCustomer(requestId, customerId, note, { context });
         
-        return formatResponse.success(updatedRequest, 'Request successfully linked to customer');
+        return formatResponse.success(updatedRequest, 'Request linked to customer successfully');
       } catch (error) {
-        logger.error('Error linking request to customer', {
-          error,
-          requestId,
-          customerId,
-          userId: context.userId
-        });
+        logger.error('Error linking request to customer:', error as Error);
         return formatResponse.error(
           error instanceof Error ? error.message : 'Failed to link request to customer',
           500

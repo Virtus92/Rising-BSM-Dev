@@ -67,6 +67,11 @@ export interface ServiceOptions {
    * User ID performing the operation (shorthand for context.userId)
    */
   userId?: number;
+
+  /**
+   * User Role
+   */
+  role?: string;
   
   /**
    * IP address of the client (shorthand for context.ipAddress)

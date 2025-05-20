@@ -29,8 +29,29 @@ const nextConfig = {
       ];
     }
     
+    // Fix for @tanstack modules to ensure proper bundling
+    config.module.rules.push({
+      test: /node_modules[\\/]@tanstack/,
+      use: {
+        loader: 'babel-loader',
+        options: {
+          presets: [
+            [require.resolve('next/dist/compiled/babel/preset-env')],
+            [require.resolve('next/dist/compiled/babel/preset-react')]
+          ],
+          plugins: []
+        }
+      }
+    });
+    
     return config;
   },
+  // Force transpilation of @tanstack packages
+  transpilePackages: [
+    '@tanstack/react-query',
+    '@tanstack/react-query-devtools',
+    '@tanstack/react-table'
+  ],
 }
 
 module.exports = nextConfig;

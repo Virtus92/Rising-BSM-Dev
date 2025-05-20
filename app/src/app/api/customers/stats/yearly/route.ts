@@ -6,7 +6,7 @@ import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { generateYearlyStats } from '@/shared/utils/statistics-utils';
 import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
-import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
+import { CommonStatus } from '@/domain/enums/CommonEnums';
 
 /**
  * GET /api/customers/stats/yearly
@@ -19,7 +19,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
   try {
     // Get URL parameters
     const url = new URL(request.url);
-    const years = parseInt(url.searchParams.get('years') || '3', 10);
+    const years = parseInt(url.searchParams.get('years') || '5', 10);
     
     const serviceFactory = getServiceFactory();
     const customerService = serviceFactory.createCustomerService();
@@ -47,27 +47,21 @@ export const GET = routeHandler(async (request: NextRequest) => {
     // Enrich with additional data needed for the UI
     const enrichedStats = yearlyStats.map(stat => {
       // Filter customers for this period
-      const periodCustomers = customers.filter(cust => {
-        const creationDate = new Date(cust.createdAt);
-        return creationDate >= new Date(stat.startDate) && 
-               creationDate <= new Date(stat.endDate);
+      const periodCustomers = customers.filter(customer => {
+        const customerDate = new Date(customer.createdAt);
+        return customerDate >= new Date(stat.startDate) && 
+               customerDate <= new Date(stat.endDate);
       });
       
       // Count by status
       const active = periodCustomers.filter(c => c.status === CommonStatus.ACTIVE).length;
       const inactive = periodCustomers.filter(c => c.status === CommonStatus.INACTIVE).length;
       
-      // Count by type
-      const privateCustomers = periodCustomers.filter(c => c.type === CustomerType.PRIVATE).length;
-      const businessCustomers = periodCustomers.filter(c => c.type === CustomerType.BUSINESS).length;
-      
       return {
         ...stat,
         customers: stat.count,
         active,
-        inactive,
-        privateCustomers,
-        businessCustomers
+        inactive
       };
     });
     
@@ -90,22 +84,3 @@ export const GET = routeHandler(async (request: NextRequest) => {
   // Secure this endpoint
   requiresAuth: true
 });
-
-/**
- * Calculates the percentage growth between current and previous period
- */
-function calculateGrowthPercentage(customers: CustomerResponseDto[], currentPeriod: string, previousPeriod: string): number {
-  const currentCount = customers.filter(c => {
-    const year = new Date(c.createdAt).getFullYear().toString();
-    return year === currentPeriod;
-  }).length;
-  
-  const previousCount = customers.filter(c => {
-    const year = new Date(c.createdAt).getFullYear().toString();
-    return year === previousPeriod;
-  }).length;
-  
-  if (previousCount === 0) return 100; // Consider it 100% growth if previous was 0
-  
-  return Math.round(((currentCount - previousCount) / previousCount) * 100);
-}

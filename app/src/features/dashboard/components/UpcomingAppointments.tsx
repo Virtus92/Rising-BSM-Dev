@@ -71,7 +71,7 @@ export const UpcomingAppointments = () => {
     if (note && note.trim()) {
       setIsActionLoading(Number(appointmentId));
       try {
-        const response = await AppointmentClient.addAppointmentNote(appointmentId, note);
+        const response = await AppointmentClient.addNote(appointmentId, note);
         if (response.success) {
           refreshAppointments();
           toast({

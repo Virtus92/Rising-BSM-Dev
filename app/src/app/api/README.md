@@ -37,7 +37,7 @@ api/
 │   └── user/                # User-specific dashboard data
 ├── error.ts                 # Global error handling
 ├── helpers/                 # API utility functions
-├── log/                     # Logging endpoints
+├── middleware/              # API middleware
 ├── notifications/           # Notification endpoints
 │   ├── read-all/            # Mark all as read endpoint
 │   ├── [id]/                # Single notification operations
@@ -62,22 +62,20 @@ api/
 │   └── route.ts             # Collection operations
 ├── settings/                # Application settings endpoints
 │   └── update/              # Settings update endpoint
-├── users/                   # User-related endpoints
-│   ├── count/               # Count endpoints
-│   ├── dashboard/           # User dashboard data
-│   ├── find-by-email/       # Email lookup endpoint
-│   ├── me/                  # Current user endpoint
-│   ├── permissions/         # User permissions endpoints
-│   │   └── check/           # Permission check endpoint
-│   ├── roles/               # User roles endpoints
-│   ├── stats/               # Statistics endpoints
-│   ├── [id]/                # Single user operations
-│   │   ├── activity/        # User activity operations
-│   │   ├── reset-password/  # Password reset operations
-│   │   └── status/          # User status operations
-│   └── route.ts             # Collection operations
-└── webhooks/                # Webhook endpoints
-    └── n8n/                 # n8n integration webhooks
+└── users/                   # User-related endpoints
+    ├── count/               # Count endpoints
+    ├── dashboard/           # User dashboard data
+    ├── find-by-email/       # Email lookup endpoint
+    ├── me/                  # Current user endpoint
+    ├── permissions/         # User permissions endpoints
+    │   └── check/           # Permission check endpoint
+    ├── roles/               # User roles endpoints
+    ├── stats/               # Statistics endpoints
+    ├── [id]/                # Single user operations
+    │   ├── activity/        # User activity operations
+    │   ├── reset-password/  # Password reset operations
+    │   └── status/          # User status operations
+    └── route.ts             # Collection operations
 ```
 
 ## API Design Principles
@@ -87,10 +85,9 @@ The Rising-BSM API is designed following these principles:
 1. **RESTful**: Resources are represented by URLs and manipulated using standard HTTP methods
 2. **JSON**: All requests and responses use JSON format
 3. **Consistent**: All endpoints follow consistent patterns for requests and responses
-4. **Versioned**: API versioning is supported through URL or header
-5. **Secure**: Authentication and permission checks are enforced
-6. **Documented**: Each endpoint is documented with input/output definitions
-7. **Error Handling**: Consistent error handling and reporting
+4. **Secure**: Authentication and permission checks are enforced
+5. **Error Handling**: Consistent error handling and reporting
+6. **Factory Pattern**: Services and repositories are created through factories
 
 ## Common Patterns
 
@@ -131,8 +128,7 @@ All responses follow a consistent format:
 {
   "success": true,
   "data": { ... },
-  "meta": { ... },
-  "message": "Optional message"
+  "error": null
 }
 ```
 
@@ -141,11 +137,9 @@ For error responses:
 ```json
 {
   "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Error message",
-    "details": { ... }
-  }
+  "data": null,
+  "error": "Error message",
+  "statusCode": 400
 }
 ```
 
@@ -155,8 +149,8 @@ Collection endpoints support pagination with the following query parameters:
 
 - `page`: Page number (default: 1)
 - `limit`: Items per page (default: 10)
-- `sort`: Field to sort by (default: createdAt)
-- `order`: Sort order (asc/desc, default: desc)
+- `sortBy`: Field to sort by (default: createdAt)
+- `sortDirection`: Sort direction (asc/desc, default: desc)
 
 Response includes pagination metadata:
 
@@ -164,13 +158,11 @@ Response includes pagination metadata:
 {
   "success": true,
   "data": [ ... ],
-  "meta": {
-    "pagination": {
-      "page": 1,
-      "limit": 10,
-      "total": 100,
-      "pages": 10
-    }
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 100,
+    "totalPages": 10
   }
 }
 ```
@@ -179,31 +171,99 @@ Response includes pagination metadata:
 
 Collection endpoints support filtering with query parameters:
 
-- `filter[field]`: Filter by field value
+- Field-based filters: Any field can be used as a filter
 - `search`: Search term for text search
-- `dateFrom`: Filter by date range start
-- `dateTo`: Filter by date range end
+- `status`: Filter by status
 
-Example: `/api/customers?filter[status]=active&search=smith`
+Example: `/api/customers?status=active&search=smith&city=london`
 
 ## Authentication
 
 The API uses JWT-based authentication. Authentication flow:
 
-1. **Login**: Client sends credentials to `/api/auth/login` and receives tokens
-2. **Access**: Client includes `Authorization: Bearer [token]` header
+1. **Login**: Client sends credentials to `/api/auth/login` and receives tokens via HTTP-only cookies
+2. **Access**: APIs validate tokens automatically via middleware
 3. **Refresh**: When access token expires, client uses refresh token to get new tokens
-4. **Logout**: Client sends refresh token to `/api/auth/logout` to invalidate it
+4. **Logout**: Client sends request to `/api/auth/logout` to invalidate tokens
 
 ### Authentication Endpoints
 
 - **POST /api/auth/login**: Authenticate user and get tokens
 - **POST /api/auth/register**: Register new user
 - **POST /api/auth/refresh**: Refresh access token
-- **POST /api/auth/logout**: Invalidate refresh token
+- **POST /api/auth/logout**: Invalidate tokens
 - **POST /api/auth/change-password**: Change user password
 - **POST /api/auth/forgot-password**: Initiate password recovery
 - **POST /api/auth/reset-password**: Reset password with token
+
+## Route Handler Pattern
+
+Each API endpoint is implemented using Next.js Route Handlers with a consistent pattern:
+
+```typescript
+// api/customers/route.ts
+import { NextRequest } from 'next/server';
+import { formatResponse } from '@/core/errors';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
+import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+
+// Get list of customers
+export const GET = routeHandler(
+  await permissionMiddleware.withPermission(
+    async (req: NextRequest) => {
+      const serviceFactory = getServiceFactory();
+      
+      try {
+        // Extract filter parameters from query
+        const { searchParams } = new URL(req.url);
+        
+        const filters = {
+          search: searchParams.get('search') || undefined,
+          status: searchParams.get('status') || undefined,
+          // Other filters...
+          page: searchParams.has('page') 
+            ? parseInt(searchParams.get('page') as string)
+            : 1,
+          limit: searchParams.has('limit') 
+            ? parseInt(searchParams.get('limit') as string)
+            : 10
+        };
+        
+        // Get the customer service
+        const customerService = serviceFactory.createCustomerService();
+        
+        // Use the service for getting data
+        const result = await customerService.getAll({
+          page: filters.page,
+          limit: filters.limit,
+          filters: {
+            status: filters.status,
+            search: filters.search
+            // Other filters...
+          }
+        });
+
+        // Success response
+        return formatResponse.success(
+          result,
+          'Customers retrieved successfully'
+        );
+        
+      } catch (error) {
+        // Error handling
+        return formatResponse.error(
+          error instanceof Error ? error.message : 'Error retrieving customers',
+          500
+        );
+      }
+    },
+    SystemPermission.CUSTOMERS_VIEW
+  ),
+  { requiresAuth: true }
+);
+```
 
 ## Key Endpoints
 
@@ -274,168 +334,93 @@ The API implements consistent error handling:
 6. **Internal Errors**: For unexpected server errors
 
 Error responses include:
-- Error code
-- Human-readable message
-- Detailed information where appropriate
+- Error message
+- HTTP status code
+- Success: false indicator
 
 Example error response:
 
 ```json
 {
   "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid input data",
-    "details": {
-      "email": "Invalid email format"
-    }
-  }
+  "data": null,
+  "error": "Invalid input data: Email is required",
+  "statusCode": 400
 }
 ```
 
-## Implementation Details
+## Middleware
 
-### Route Handler Pattern
+API endpoints use middleware for cross-cutting concerns:
 
-Each API endpoint is implemented using Next.js Route Handlers with a consistent pattern:
-
-```typescript
-// api/customers/route.ts
-import { NextRequest } from 'next/server';
-import { RouteHandler } from '@/core/api/server';
-import { customerService } from '@/features/customers/lib';
-import { authMiddleware } from '@/features/auth/api/middleware';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
-
-// Get list of customers
-export const GET = RouteHandler(
-  async (req: NextRequest) => {
-    const searchParams = req.nextUrl.searchParams;
-    const params = {
-      page: parseInt(searchParams.get('page') || '1'),
-      limit: parseInt(searchParams.get('limit') || '10'),
-      // Other params...
-    };
-    
-    const result = await customerService.findCustomers(params);
-    return result;
-  },
-  [
-    authMiddleware,
-    permissionMiddleware('customers.view')
-  ]
-);
-
-// Create new customer
-export const POST = RouteHandler(
-  async (req: NextRequest) => {
-    const data = await req.json();
-    const result = await customerService.createCustomer(data);
-    return result;
-  },
-  [
-    authMiddleware,
-    permissionMiddleware('customers.create')
-  ]
-);
-```
-
-### Middleware Chain
-
-API endpoints use middleware chains for cross-cutting concerns:
-
-1. **Authentication**: Verify user is authenticated
-2. **Authorization**: Check user permissions
+1. **Authentication**: Verify user is authenticated via `withAuth` middleware
+2. **Authorization**: Check user permissions via permission middleware
 3. **Validation**: Validate request data
-4. **Logging**: Log API requests
-5. **Error Handling**: Catch and format errors
+4. **Error Handling**: Catch and format errors
 
-### Service Integration
+## Service Integration
 
 API endpoints delegate business logic to service layers:
 
-1. **Service Call**: Call the appropriate service method
-2. **Data Mapping**: Map between API and domain models
-3. **Response Formatting**: Format the service response for the API
+1. **Service Factory**: Creates service instances with proper dependencies
+2. **Service Call**: Call the appropriate service method
+3. **Repository Integration**: Services use repositories for data access
+4. **Response Formatting**: Format the service response for the API
 
 ## Best Practices
 
-1. **Security First**: Always implement proper authentication and authorization
-2. **Validation**: Validate all input data
-3. **Clear Naming**: Use clear and consistent naming for endpoints
-4. **Documentation**: Document all endpoints
-6. **Error Handling**: Implement comprehensive error handling
-7. **Logging**: Log all API activity
-8. **Rate Limiting**: Implement rate limiting for public endpoints
-9. **CORS**: Configure proper CORS settings
-
-## API Documentation
-
-The full API documentation includes:
-
-1. **Endpoint Description**: What the endpoint does
-2. **URL**: The endpoint URL
-3. **Method**: HTTP method
-4. **URL Params**: Required and optional URL parameters
-5. **Data Params**: Required and optional request body parameters
-6. **Success Response**: Format of successful response
-7. **Error Responses**: Possible error responses
-8. **Sample Call**: Example API call
-9. **Notes**: Additional information
-
-For each endpoint, a comprehensive documentation will be maintained in the code comments and generated into API documentation.
-
-## Testing the API
-
-The API endpoints can be tested using:
-
-1. **Postman**: Collection of API requests
-2. **Swagger UI**: Interactive API documentation
-3. **Curl**: Command-line HTTP client
-4. **API Test Suite**: Automated tests
-
-Example test with curl:
-
-```bash
-# Get authentication token
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"password123"}'
-
-# Use token to get customers
-curl -X GET http://localhost:3000/api/customers \
-  -H "Authorization: Bearer [token]"
-```
+1. **Use routeHandler**: Always use the routeHandler utility for consistency
+2. **Proper Authentication**: Use authentication middleware for protected routes
+3. **Permission Checks**: Use permission middleware for access control
+4. **Service Factories**: Use the service factory pattern for dependency management
+5. **Consistent Responses**: Use formatResponse for consistent response format
+6. **Error Handling**: Implement proper error handling with try/catch blocks
+7. **Pagination**: Implement pagination for collection endpoints
+8. **Filtering**: Support filtering for collection endpoints
+9. **Documentation**: Document all endpoints with comments
 
 ## Adding New Endpoints
 
 To add a new API endpoint:
 
-1. Create route file in the appropriate directory
-2. Implement the route handler with proper middleware
-3. Add service integration
-4. Add documentation
-5. Add tests
+1. Create directory in the appropriate resource section
+2. Create route.ts file with the endpoint implementation
+3. Use routeHandler with proper middleware
+4. Implement service and repository as needed
+5. Test the endpoint
+6. Document the endpoint
 
-Example new endpoint implementation:
+Example new endpoint:
 
 ```typescript
 // api/customers/export/route.ts
 import { NextRequest } from 'next/server';
-import { RouteHandler } from '@/core/api/server';
-import { customerService } from '@/features/customers/lib';
-import { authMiddleware } from '@/features/auth/api/middleware';
+import { formatResponse } from '@/core/errors';
+import { routeHandler } from '@/core/api/server/route-handler';
+import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
 
-export const GET = RouteHandler(
-  async (req: NextRequest) => {
-    const format = req.nextUrl.searchParams.get('format') || 'csv';
-    const result = await customerService.exportCustomers(format);
-    return result;
-  },
-  [
-    authMiddleware,
-    permissionMiddleware('customers.export')
-  ]
+export const GET = routeHandler(
+  await permissionMiddleware.withPermission(
+    async (req: NextRequest) => {
+      try {
+        const format = req.nextUrl.searchParams.get('format') || 'csv';
+        const serviceFactory = getServiceFactory();
+        const customerService = serviceFactory.createCustomerService();
+        
+        const result = await customerService.exportCustomers(format);
+        
+        return formatResponse.success(result, 'Customers exported successfully');
+      } catch (error) {
+        return formatResponse.error(
+          error instanceof Error ? error.message : 'Error exporting customers',
+          500
+        );
+      }
+    },
+    SystemPermission.CUSTOMERS_EXPORT
+  ),
+  { requiresAuth: true }
 );
 ```

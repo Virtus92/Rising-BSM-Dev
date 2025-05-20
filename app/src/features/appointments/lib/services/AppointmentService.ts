@@ -146,13 +146,26 @@ export class AppointmentService implements IAppointmentService {
    * Count entities
    */
   public async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
-    // Since AppointmentClient doesn't have getCount, get appointments and count them
-    const response = await AppointmentClient.getAppointments(options?.filters || {});
-    if (!response || !response.data) {
+    // Use the dedicated count endpoint
+    const response = await AppointmentClient.getAppointmentCount(options?.filters || {});
+    if (!response || !response.success) {
       return 0;
     }
-    // AppointmentClient returns ApiResponse<AppointmentResponseDto[]>
-    return response.data.length;
+    
+    // Handle different response structures
+    if (response.data) {
+      if (typeof response.data === 'number') {
+        return response.data;
+      } else if (typeof response.data === 'object' && response.data !== null) {
+        if ('count' in response.data && typeof response.data.count === 'number') {
+          return response.data.count;
+        } else if ('total' in response.data && typeof response.data.total === 'number') {
+          return response.data.total;
+        }
+      }
+    }
+    
+    return 0;
   }
 
   /**

@@ -29,12 +29,46 @@ export class NotificationClient {
     options: { signal?: AbortSignal } = {}
   ): Promise<ApiResponse<any>> {
     try {
+      // Ensure authentication headers are sent
+      const headers: Record<string, string> = {
+        'X-Request-ID': `notifications-${Date.now()}`
+      };
+
       // Pass both params and any options (like AbortController signal) to the API Client
-      return await ApiClient.get(NOTIFICATIONS_API_URL, { 
+      const response = await ApiClient.get(NOTIFICATIONS_API_URL, { 
         params, 
-        headers: options.signal ? { 'X-Request-ID': `notifications-${Date.now()}` } : undefined,
+        withAuth: true,  // Explicitly request authentication
+        headers,
         signal: options.signal
       });
+      
+      // Normalize response to ensure consistent structure
+      if (response.success && response.data) {
+        // Check if data is nested in a data property
+        if (typeof response.data === 'object' && response.data !== null && 'data' in response.data) {
+          // Extract the nested data and pagination
+          const normalizedData = Array.isArray(response.data.data) ? response.data.data : [];
+          const pagination = response.data.pagination || {
+            page: params.page || 1,
+            limit: params.limit || 10,
+            total: normalizedData.length,
+            totalPages: Math.ceil(normalizedData.length / (params.limit || 10))
+          };
+          
+          // Return normalized response
+          return {
+            success: true,
+            data: {
+              items: normalizedData,
+              pagination
+            },
+            error: null
+          };
+        }
+      }
+      
+      // Return original response if not normalized
+      return response;
     } catch (error: unknown) {
       // Don't throw for aborted requests
       if (error instanceof DOMException && error.name === 'AbortError') {

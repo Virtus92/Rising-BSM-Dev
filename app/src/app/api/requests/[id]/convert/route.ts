@@ -17,7 +17,7 @@ type RequestParams = {
 /**
  * POST /api/requests/[id]/convert
  * 
- * Konvertiert eine Kontaktanfrage in einen Kunden.
+ * Converts a contact request to a customer.
  */
 export const POST = routeHandler(
   await withPermission(
@@ -34,18 +34,15 @@ export const POST = routeHandler(
       const body = await req.json();
       const { 
         customerData = {}, 
-        note, 
-        createAppointment = false, 
-        appointmentData = {} 
+        note
       } = body;
       
-      // Create convert to customer DTO
+      // Create convert to customer DTO - always set createAppointment to false
       const convertData: ConvertToCustomerDto = {
         requestId,
         customerData,
         note,
-        createAppointment,
-        appointmentData
+        createAppointment: false, // Never create appointments from requests
       };
       
       // Create context for service calls

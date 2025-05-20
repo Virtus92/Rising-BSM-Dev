@@ -10,7 +10,6 @@ import { RequestStatus } from '@/domain/enums/CommonEnums';
 
 /**
  * GET /api/requests/stats/monthly
- * 
  * Returns monthly request statistics for the past 12 months
  */
 export const GET = routeHandler(async (request: NextRequest) => {
@@ -24,7 +23,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
     const serviceFactory = getServiceFactory();
     const requestService = serviceFactory.createRequestService();
     
-    // Get all requests
+    // Get all requests - simplify data retrieval
     const requestsResponse = await requestService.findAll({
       limit: 1000, // High limit to get all requests
       context: {
@@ -32,15 +31,19 @@ export const GET = routeHandler(async (request: NextRequest) => {
       }
     });
     
+    // Safely extract request data from response
     let requests: RequestResponseDto[] = [];
+    
     if (requestsResponse && requestsResponse.data) {
       requests = requestsResponse.data;
     }
     
+    logger.info(`Generating monthly stats for ${requests.length} requests`);
+    
     // Generate monthly stats using our utility function
     const monthlyStats = generateMonthlyStats(
       requests,
-      (req: RequestResponseDto) => req.createdAt,
+      (request: RequestResponseDto) => request.createdAt,
       lookbackMonths
     );
     
@@ -48,28 +51,40 @@ export const GET = routeHandler(async (request: NextRequest) => {
     const enrichedStats = monthlyStats.map(stat => {
       // Filter requests for this period
       const periodRequests = requests.filter(req => {
-        const creationDate = new Date(req.createdAt);
-        return creationDate >= new Date(stat.startDate) && 
-               creationDate <= new Date(stat.endDate);
+        const requestDate = new Date(req.createdAt);
+        return requestDate >= new Date(stat.startDate) && 
+               requestDate <= new Date(stat.endDate);
       });
       
       // Count by status
-      const newRequests = periodRequests.filter(r => r.status === RequestStatus.NEW).length;
-      const inProgress = periodRequests.filter(r => r.status === RequestStatus.IN_PROGRESS).length;
       const completed = periodRequests.filter(r => r.status === RequestStatus.COMPLETED).length;
+      const inProgress = periodRequests.filter(r => r.status === RequestStatus.IN_PROGRESS).length;
+      const newRequests = periodRequests.filter(r => r.status === RequestStatus.NEW).length;
       const cancelled = periodRequests.filter(r => r.status === RequestStatus.CANCELLED).length;
-      const converted = periodRequests.filter(r => r.customerId !== null && r.customerId !== undefined).length;
+      
+      // Make sure we extract the month name correctly
+      const monthParts = stat.period.split(' ');
+      const month = monthParts[0];
+      const year = monthParts[1] || new Date().getFullYear().toString();
       
       return {
         ...stat,
-        month: stat.period.split(' ')[0], // Extract month name
-        requests: stat.count,
-        newRequests,
-        inProgress,
+        month, // Extract month name
+        year,  // Include year explicitly
+        period: stat.period, // Keep the original period
+        count: stat.count,  // Keep the original count
+        requests: stat.count, // Set the entity-specific count field
         completed,
-        cancelled,
-        converted
+        inProgress,
+        new: newRequests,
+        cancelled
       };
+    });
+    
+    // Log what we're returning for debugging
+    logger.info('Monthly request stats generated', { 
+      count: enrichedStats.length,
+      sample: enrichedStats.length > 0 ? JSON.stringify(enrichedStats[0]).substring(0, 200) : 'No data' 
     });
     
     return formatSuccess(
@@ -82,8 +97,9 @@ export const GET = routeHandler(async (request: NextRequest) => {
       stack: error instanceof Error ? error.stack : undefined
     });
     
+    // Return a more detailed error for debugging purposes
     return formatError(
-      error instanceof Error ? error.message : 'Failed to retrieve monthly request statistics',
+      error instanceof Error ? error.message : 'Server error while retrieving Requests statistics',
       500
     );
   }

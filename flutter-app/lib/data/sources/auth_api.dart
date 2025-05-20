@@ -1,110 +1,73 @@
-import '../../data/models/api_response.dart';
-import '../../data/models/auth_model.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/api_client_interface.dart';
+import '../models/auth_model.dart';
+import '../models/auth_request_models.dart';
+import '../models/auth_response_models.dart';
 
-/// Authentication API client for handling auth-related requests
 class AuthApi {
-  final ApiClient _apiClient;
-  
+  final ApiClientInterface _apiClient;
+
   AuthApi(this._apiClient);
-  
-  /// Login with email and password
-  Future<ApiResponse<AuthResponse>> login(LoginCredentials credentials) async {
+
+  Future<Map<String, dynamic>> login(LoginCredentials credentials) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '/auth/login',
+      '/api/auth/login',
       data: credentials.toJson(),
     );
-    
-    return ApiResponse<AuthResponse>.fromJson(
-      response.data!,
-      (json) => AuthResponse.fromJson(json as Map<String, dynamic>),
-    );
+    return response.data ?? {};
   }
-  
-  /// Register a new user
-  Future<ApiResponse<AuthResponse>> register(RegisterRequest request) async {
+
+  Future<Map<String, dynamic>> register(RegisterRequest request) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '/auth/register',
+      '/api/auth/register',
       data: request.toJson(),
     );
-    
-    return ApiResponse<AuthResponse>.fromJson(
-      response.data!,
-      (json) => AuthResponse.fromJson(json as Map<String, dynamic>),
-    );
+    return response.data ?? {};
   }
-  
-  /// Refresh access token
-  Future<ApiResponse<AuthTokens>> refreshToken(String refreshToken) async {
+
+  Future<Map<String, dynamic>> refreshToken(String refreshToken) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '/auth/refresh',
-      data: {'refreshToken': refreshToken},
+      '/api/auth/refresh',
+      data: {
+        'refreshToken': refreshToken,
+      },
     );
-    
-    return ApiResponse<AuthTokens>.fromJson(
-      response.data!,
-      (json) => AuthTokens.fromJson(json as Map<String, dynamic>),
-    );
+    return response.data ?? {};
   }
-    /// Logout and invalidate tokens
-  Future<ApiResponse<void>> logout() async {
-    final response = await _apiClient.post<Map<String, dynamic>>(
-      '/auth/logout',
-    );
-    
-    return ApiResponse<void>.fromJson(
-      response.data!,
-      (_) {},
-    );
+
+  Future<void> logout() async {
+    await _apiClient.post('/api/auth/logout');
   }
-    /// Change password
-  Future<ApiResponse<void>> changePassword(ChangePasswordRequest request) async {
+
+  Future<Map<String, dynamic>> forgotPassword(ForgotPasswordRequest request) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '/auth/change-password',
+      '/api/auth/forgot-password',
       data: request.toJson(),
     );
-    
-    return ApiResponse<void>.fromJson(
-      response.data!,
-      (_) {},
-    );
+    return response.data ?? {};
   }
-  
-  /// Request password reset
-  Future<ApiResponse<void>> forgotPassword(ForgotPasswordRequest request) async {
+
+  Future<Map<String, dynamic>> resetPassword(ResetPasswordRequest request) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '/auth/forgot-password',
+      '/api/auth/reset-password',
       data: request.toJson(),
     );
-    
-    return ApiResponse<void>.fromJson(
-      response.data!,
-      (_) {},
-    );
+    return response.data ?? {};
   }
-  
-  /// Reset password with token
-  Future<ApiResponse<void>> resetPassword(ResetPasswordRequest request) async {
+
+  Future<Map<String, dynamic>> changePassword(ChangePasswordRequest request) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '/auth/reset-password',
+      '/api/auth/change-password',
       data: request.toJson(),
     );
-    
-    return ApiResponse<void>.fromJson(
-      response.data!,
-      (_) {},
-    );
+    return response.data ?? {};
   }
-  
-  /// Validate current token
-  Future<ApiResponse<bool>> validateToken() async {
-    final response = await _apiClient.get<Map<String, dynamic>>(
-      '/auth/validate',
+
+  Future<Map<String, dynamic>> validateToken() async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '/api/auth/validate-token',
+      // No data needed, token is sent in auth header
     );
-    
-    return ApiResponse<bool>.fromJson(
-      response.data!,
-      (json) => json as bool,
-    );
+    return response.data ?? {};
   }
 }

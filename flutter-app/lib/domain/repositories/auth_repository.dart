@@ -1,4 +1,6 @@
 import '../../data/models/auth_model.dart';
+import '../../data/models/auth_request_models.dart';
+import '../../data/models/auth_response_models.dart';
 import '../../data/models/user_model.dart';
 
 /// Auth repository interface defining authentication operations

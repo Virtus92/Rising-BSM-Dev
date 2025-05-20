@@ -22,7 +22,8 @@ export const GET = routeHandler(
   async (req: NextRequest) => {
     // Create a handler function with the right signature
     const permissionHandler = async (req: NextRequest, user: any): Promise<NextResponse> => {
-        const userId = user?.id;
+        // Extract userId from the auth object directly
+        const userId = req.auth?.userId || user?.id;
         try {
           // Get the service factory and create permission service
           const serviceFactory = getServiceFactory();

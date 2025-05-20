@@ -1,178 +1,189 @@
 /**
- * Permission Cache Utility
+ * Permission Cache Service
  * 
- * Provides efficient caching of user permissions to reduce database load
- * and improve API response times. Implements proper invalidation and TTL.
+ * A robust implementation for caching permission check results
+ * to improve performance and reduce database load.
  */
 
 import { getLogger } from '@/core/logging';
 
 const logger = getLogger();
 
-// Cache structure
-interface PermissionCacheEntry {
-  permissions: string[];
-  timestamp: number;
+interface CacheEntry {
+  value: boolean;
+  expiry: number;
 }
 
-// Cache settings
-const CACHE_TTL = 300000; // 5 minutes
-const CACHE_CLEANUP_INTERVAL = 600000; // 10 minutes
-
-// In-memory permission cache
-const permissionCache = new Map<number, PermissionCacheEntry>();
-
-// Last cleanup timestamp
-let lastCleanup = Date.now();
-
 /**
- * Get permissions from cache
+ * Permission cache implementation using a class-based approach
+ * for better maintainability and encapsulation
  */
-export function getCachedPermissions(userId: number): string[] | null {
-  try {
-    // Run cache cleanup check if needed
-    maybeCleanupCache();
+class PermissionCacheService {
+  private cache: Map<string, CacheEntry> = new Map();
+  private permissionsCache: Map<number, string[]> = new Map();
+  private readonly DEFAULT_TTL_SECONDS = 300; // 5 minutes
+  
+  /**
+   * Cache a single permission check result
+   * 
+   * @param key Cache key (userId:permission format)
+   * @param value Permission check result
+   * @param ttlSeconds Optional TTL in seconds
+   */
+  public cachePermissionResult(key: string, value: boolean, ttlSeconds?: number): void {
+    if (!key) {
+      throw new Error('Invalid key provided to permission cache');
+    }
     
-    // Check if cache has the permissions
-    const cacheEntry = permissionCache.get(userId);
+    const ttl = ttlSeconds || this.DEFAULT_TTL_SECONDS;
+    const expiry = Date.now() + (ttl * 1000);
     
-    // If no cache entry or entry expired, return null
-    if (!cacheEntry) {
-      return null;
+    this.cache.set(key, { value, expiry });
+    
+    logger.debug(`Permission result cached: ${key} = ${value}`, {
+      key,
+      value,
+      expiryTime: new Date(expiry).toISOString(),
+      ttlSeconds: ttl
+    });
+  }
+  
+  /**
+   * Get a cached permission check result
+   * 
+   * @param key Cache key (userId:permission format)
+   * @returns The cached value or undefined if not found or expired
+   */
+  public getPermissionResult(key: string): boolean | undefined {
+    if (!key) {
+      return undefined;
+    }
+    
+    const entry = this.cache.get(key);
+    if (!entry) {
+      return undefined;
     }
     
     // Check if entry has expired
-    const now = Date.now();
-    if (now - cacheEntry.timestamp > CACHE_TTL) {
-      // Remove expired entry
-      permissionCache.delete(userId);
-      return null;
+    if (entry.expiry < Date.now()) {
+      this.cache.delete(key);
+      return undefined;
     }
     
-    // Return cached permissions
-    return [...cacheEntry.permissions]; // Return a copy to prevent mutation
-  } catch (error) {
-    // Don't fail the application on cache errors
-    logger.error('Error reading from permission cache', {
-      userId,
-      error: error instanceof Error ? error.message : String(error)
-    });
-    
-    return null;
+    return entry.value;
   }
-}
-
-/**
- * Store permissions in cache
- */
-export function cachePermissions(userId: number, permissions: string[]): void {
-  try {
-    // Create a cache entry
-    const cacheEntry: PermissionCacheEntry = {
-      permissions: [...permissions], // Store a copy to prevent mutation
-      timestamp: Date.now()
-    };
+  
+  /**
+   * Cache all permissions for a user
+   * 
+   * @param userId User ID
+   * @param permissions Array of permission codes
+   */
+  public cachePermissions(userId: number, permissions: string[]): void {
+    if (!userId || isNaN(userId) || userId <= 0) {
+      throw new Error(`Invalid userId provided to permission cache: ${userId}`);
+    }
     
-    // Store in cache
-    permissionCache.set(userId, cacheEntry);
+    // Store the permissions array
+    this.permissionsCache.set(userId, [...permissions]);
     
-    logger.debug('Permissions cached for user', {
-      userId,
-      permissionCount: permissions.length
-    });
-  } catch (error) {
-    // Don't fail the application on cache errors
-    logger.error('Error writing to permission cache', {
-      userId,
-      error: error instanceof Error ? error.message : String(error)
-    });
+    // Also cache individual permission results for fast lookups
+    for (const permission of permissions) {
+      const normalizedPermission = permission.toLowerCase().trim();
+      const key = `${userId}:${normalizedPermission}`;
+      this.cachePermissionResult(key, true);
+    }
+    
+    logger.debug(`Cached ${permissions.length} permissions for user ${userId}`);
   }
-}
-
-/**
- * Invalidate cache for user
- */
-export function invalidatePermissionCache(userId: number): void {
-  try {
-    // Remove from cache
-    permissionCache.delete(userId);
+  
+  /**
+   * Get all cached permissions for a user
+   * 
+   * @param userId User ID
+   * @returns Array of permission codes or undefined if not cached
+   */
+  public getPermissions(userId: number): string[] | undefined {
+    if (!userId || isNaN(userId) || userId <= 0) {
+      return undefined;
+    }
     
-    logger.debug('Permission cache invalidated for user', { userId });
-  } catch (error) {
-    // Don't fail the application on cache errors
-    logger.error('Error invalidating permission cache', {
-      userId,
-      error: error instanceof Error ? error.message : String(error)
-    });
+    return this.permissionsCache.get(userId);
   }
-}
-
-/**
- * Clear entire permission cache
- */
-export function clearPermissionCache(): void {
-  try {
-    // Clear all entries
-    permissionCache.clear();
+  
+  /**
+   * Invalidate cache for a specific user
+   * 
+   * @param userId User ID
+   */
+  public invalidateCache(userId: number): void {
+    if (!userId || isNaN(userId) || userId <= 0) {
+      return;
+    }
     
-    logger.debug('Permission cache cleared');
-  } catch (error) {
-    // Don't fail the application on cache errors
-    logger.error('Error clearing permission cache', {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
-/**
- * Clean up expired cache entries
- */
-function cleanupCache(): void {
-  try {
-    const now = Date.now();
-    let expiredCount = 0;
+    // Remove from permissions cache
+    this.permissionsCache.delete(userId);
     
-    // Iterate through all cache entries
-    for (const [userId, entry] of permissionCache.entries()) {
-      // Check if entry has expired
-      if (now - entry.timestamp > CACHE_TTL) {
-        // Remove expired entry
-        permissionCache.delete(userId);
-        expiredCount++;
+    // Find and delete all permission entries for this user
+    const prefix = `${userId}:`;
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(prefix)) {
+        this.cache.delete(key);
       }
     }
     
-    // Update last cleanup timestamp
-    lastCleanup = now;
+    logger.debug(`Permission cache invalidated for user ${userId}`);
+  }
+  
+  /**
+   * Clear all cache entries
+   */
+  public clearCache(): void {
+    this.cache.clear();
+    this.permissionsCache.clear();
+    logger.debug('Permission cache cleared');
+  }
+  
+  /**
+   * Get cache statistics for monitoring
+   */
+  public getStats(): Record<string, any> {
+    const now = Date.now();
+    const entries = Array.from(this.cache.entries());
     
-    if (expiredCount > 0) {
-      logger.debug('Cleaned up expired permission cache entries', {
-        expiredCount,
-        remainingEntries: permissionCache.size
-      });
+    // Count active vs expired entries
+    const activeEntries = entries.filter(([_, entry]) => entry.expiry >= now);
+    const expiredEntries = entries.filter(([_, entry]) => entry.expiry < now);
+    
+    // Group by user
+    const userStats: Record<string, { permissions: number, ttlRemaining: number }> = {};
+    for (const [key, entry] of activeEntries) {
+      const userId = key.split(':')[0];
+      if (!userStats[userId]) {
+        userStats[userId] = { permissions: 0, ttlRemaining: 0 };
+      }
+      userStats[userId].permissions++;
+      
+      // Track the minimum TTL remaining for this user
+      const ttlRemaining = Math.floor((entry.expiry - now) / 1000);
+      if (userStats[userId].ttlRemaining === 0 || ttlRemaining < userStats[userId].ttlRemaining) {
+        userStats[userId].ttlRemaining = ttlRemaining;
+      }
     }
-  } catch (error) {
-    // Don't fail the application on cache errors
-    logger.error('Error cleaning up permission cache', {
-      error: error instanceof Error ? error.message : String(error)
-    });
+    
+    return {
+      totalEntries: this.cache.size,
+      totalUserCaches: this.permissionsCache.size,
+      activeEntries: activeEntries.length,
+      expiredEntries: expiredEntries.length,
+      userStats,
+      defaultTtlSeconds: this.DEFAULT_TTL_SECONDS
+    };
   }
 }
 
-/**
- * Run cache cleanup if it's time
- */
-function maybeCleanupCache(): void {
-  const now = Date.now();
-  if (now - lastCleanup > CACHE_CLEANUP_INTERVAL) {
-    cleanupCache();
-  }
-}
+// Create singleton instance
+const permissionCache = new PermissionCacheService();
 
-// Export the cache utilities
-export default {
-  getPermissions: getCachedPermissions,
-  cachePermissions,
-  invalidateCache: invalidatePermissionCache,
-  clearCache: clearPermissionCache
-};
+// Export default for importing
+export default permissionCache;

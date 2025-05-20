@@ -36,11 +36,10 @@ function handleError(error: any, message = 'An error occurred'): ApiResponse<any
   console.error(message, error);
   return {
     success: false,
+    data: null,
     error: error instanceof Error ? error.message : String(error),
-    data: {
     message: error instanceof Error ? error.message : String(message),
     statusCode: 500
-    }
   };
 }
 
@@ -92,7 +91,22 @@ export class UserService {
    */
   static async createUser(data: CreateUserDto) {
     try {
-      const result = await userServiceClientInstance.create(data);
+      // Remove confirmPassword field to prevent Prisma errors
+      const { confirmPassword, ...cleanData } = data as any;
+      
+      const result = await userServiceClientInstance.create(cleanData);
+      
+      // Check if result is null or undefined and handle it properly
+      if (!result) {
+        return {
+          success: false,
+          data: null,
+          error: 'Failed to create user - no data returned',
+          message: 'User creation failed',
+          statusCode: 500
+        };
+      }
+      
       return wrapInApiResponse(result, 'User created successfully');
     } catch (error) {
       return handleError(error, 'Failed to create user');

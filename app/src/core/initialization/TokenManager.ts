@@ -45,6 +45,7 @@ export class TokenManager {
   private static lastRefreshError: Error | null = null;
   private static lastRefreshTime = 0;
   private static initializationPromise: Promise<boolean> | null = null;
+  private static hmrTokenLock = false;
   
   /**
    * Initialize the token manager
@@ -262,132 +263,83 @@ export class TokenManager {
   /**
   * Validate a token and verify its claims
   */
-public static async validateToken(token: string): Promise<TokenValidationResult> {
-  const errors: string[] = [];
-  
-  try {
-    // Check if token is present
-    if (!token) {
-      errors.push('No token provided');
-      return { valid: false, errors };
-    }
+  public static async validateToken(token: string): Promise<TokenValidationResult> {
+    const errors: string[] = [];
     
-    // Check token format
-    if (!token.includes('.') || token.split('.').length !== 3) {
-      errors.push('Invalid token format');
-      return { valid: false, errors };
-    }
-    
-    // Decode token locally
     try {
-      const decoded = jwtDecode<DecodedToken>(token);
-      
-      // Check for required claims
-      if (!decoded.sub) {
-        errors.push('Token missing subject claim');
+      // Check if token is present
+      if (!token) {
+        errors.push('No token provided');
         return { valid: false, errors };
       }
       
-      if (!decoded.exp) {
-        errors.push('Token missing expiration claim');
+      // Check token format
+      if (!token.includes('.') || token.split('.').length !== 3) {
+        errors.push('Invalid token format');
         return { valid: false, errors };
       }
       
-      // Check expiration
-      const now = Date.now();
-      const expiresAt = new Date(decoded.exp * 1000);
-      const remainingTimeMs = expiresAt.getTime() - now;
-      
-      // Log token expiration information
-      logger.debug('Token validation', {
-        createdAt: new Date(decoded.iat * 1000).toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        timeRemaining: `${Math.round(remainingTimeMs / 1000)} seconds`,
-        isExpired: now >= expiresAt.getTime()
-      });
-      
-      // Check current time against expiration time
-      if (now >= expiresAt.getTime()) {
-        errors.push(`Token is expired: Expired at ${expiresAt.toISOString()}, now ${new Date(now).toISOString()}`);
-        return { valid: false, errors, expiresAt };
-      }
-      
-      // Parse user ID
-      let userId: number;
-      if (typeof decoded.sub === 'number') {
-        userId = decoded.sub;
-      } else {
-        userId = parseInt(decoded.sub, 10);
-        if (isNaN(userId)) {
-          errors.push('Invalid user ID in token');
+      // Decode token locally
+      try {
+        const decoded = jwtDecode<DecodedToken>(token);
+        
+        // Check for required claims
+        if (!decoded.sub) {
+          errors.push('Token missing subject claim');
           return { valid: false, errors };
         }
+        
+        if (!decoded.exp) {
+          errors.push('Token missing expiration claim');
+          return { valid: false, errors };
+        }
+        
+        // Check expiration
+        const now = Date.now();
+        const expiresAt = new Date(decoded.exp * 1000);
+        const remainingTimeMs = expiresAt.getTime() - now;
+        
+        // Log token expiration information
+        logger.debug('Token validation', {
+          createdAt: new Date(decoded.iat * 1000).toISOString(),
+          expiresAt: expiresAt.toISOString(),
+          timeRemaining: `${Math.round(remainingTimeMs / 1000)} seconds`,
+          isExpired: now >= expiresAt.getTime()
+        });
+        
+        // Check current time against expiration time
+        if (now >= expiresAt.getTime()) {
+          errors.push(`Token is expired: Expired at ${expiresAt.toISOString()}, now ${new Date(now).toISOString()}`);
+          return { valid: false, errors, expiresAt };
+        }
+        
+        // Parse user ID
+        let userId: number;
+        if (typeof decoded.sub === 'number') {
+          userId = decoded.sub;
+        } else {
+          userId = parseInt(decoded.sub, 10);
+          if (isNaN(userId)) {
+            errors.push('Invalid user ID in token');
+            return { valid: false, errors };
+          }
+        }
+        
+        // Return successful validation based on local checks
+        return {
+          valid: true,
+          errors: [],
+          userId,
+          expiresAt,
+          remainingTimeMs
+        };
+      } catch (decodeError) {
+        errors.push(`Token decode error: ${decodeError instanceof Error ? decodeError.message : String(decodeError)}`);
+        return { valid: false, errors };
       }
-      
-      // Return successful validation based on local checks
-      return {
-        valid: true,
-        errors: [],
-        userId,
-      expiresAt,
-      remainingTimeMs
-    };
-      
-    } catch (decodeError) {
-      errors.push(`Token decode error: ${decodeError instanceof Error ? decodeError.message : String(decodeError)}`);
+    } catch (error) {
+      errors.push(`Validation error: ${error instanceof Error ? error.message : String(error)}`);
       return { valid: false, errors };
-    }
-  } catch (error) {
-    errors.push(`Validation error: ${error instanceof Error ? error.message : String(error)}`);
-    return { valid: false, errors };
-  }
-}
-  
-  /**
-   * Perform server-side token validation synchronously
-   */
-  private static async performServerValidation(token: string, userId: number): Promise<boolean> {
-    try {
-      // Make a direct validation request to the server
-      const response = await fetch('/api/auth/validate-token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ token })
-      });
-      
-      // Process response
-      if (!response.ok) {
-        logger.warn('Server token validation failed', {
-          status: response.status,
-          userId
-        });
-        return false;
-      }
-      
-      // Parse response
-      const result = await response.json();
-      
-      // Return validation result
-      if (!result.valid) {
-        logger.info('Server token validation returned invalid', {
-          reasons: result.errors || result.reasons || ['Unknown reason']
-        });
-        return false;
-      } else {
-        logger.debug('Server token validation successful', { userId });
-        return true;
-      }
-    } catch (validationError) {
-      // Log the error with more detail for troubleshooting
-      logger.warn('Server validation error:', {
-        error: validationError instanceof Error ? validationError.message : String(validationError),
-        stack: validationError instanceof Error ? validationError.stack : undefined,
-        userId
-      });
-      return false;
     }
   }
   
@@ -395,8 +347,23 @@ public static async validateToken(token: string): Promise<TokenValidationResult>
    * Refresh the token with proper synchronization to prevent race conditions
    */
   public static async refreshToken(options: TokenManagerOptions = {}): Promise<boolean> {
-    // Always clear existing tokens first to avoid using stale tokens
-    this.clearTokens();
+    // Prevent token refreshes in HMR scenarios
+    if (this.hmrTokenLock && (typeof module !== 'undefined' && (module as any).hot)) {
+      logger.debug('Token refresh blocked during HMR');
+      return false;
+    }
+    
+    // Check if token is still valid before attempting refresh
+    const currentToken = SharedTokenCache.getToken();
+    if (currentToken && !options.force) {
+      const validation = await this.validateToken(currentToken);
+      if (validation.valid && validation.remainingTimeMs && validation.remainingTimeMs > 300000) { // Token valid for >5min
+        logger.debug('Skipping unnecessary token refresh, current token still valid', {
+          timeRemaining: `${Math.round((validation.remainingTimeMs || 0) / 1000)} seconds`
+        });
+        return true;
+      }
+    }
     
     // Prevent concurrent refresh operations
     if (this.refreshInProgress && !options.force) {
@@ -457,11 +424,10 @@ public static async validateToken(token: string): Promise<TokenValidationResult>
     try {
       logger.debug('Starting token refresh', { requestId });
       
-      // Clear existing token first
-      SharedTokenCache.clearToken();
+      // Do not clear existing token yet to prevent token unavailability during refresh
       
       // Add retry logic for network issues
-      const maxRetries = options.retry ?? 2; // Default to 2 retries for better reliability
+      const maxRetries = options.retry ?? 1; // Default to 1 retry for better reliability
       let retryCount = 0;
       let lastError: Error | null = null;
       
@@ -571,6 +537,9 @@ public static async validateToken(token: string): Promise<TokenValidationResult>
             // If parsing fails but the response was successful, continue
             // to try fetching the token anyway
           }
+          
+          // Now clear the existing token to ensure we get a fresh one
+          SharedTokenCache.clearToken();
           
           // Fetch the new token - it should be available in cookies now
           const token = await this.fetchToken();
@@ -760,6 +729,85 @@ public static async validateToken(token: string): Promise<TokenValidationResult>
   }
   
   /**
+   * Set HMR lock to prevent token refreshes during hot module reloading
+   */
+  public static setHmrLock(locked: boolean): void {
+    this.hmrTokenLock = locked;
+    logger.debug(`HMR token lock ${locked ? 'enabled' : 'disabled'}`);
+  }
+  
+  /**
+   * Special utility function to get a token specifically for permission checks
+   * This ensures the token is always included with permission check requests
+   * 
+   * @returns Token and headers object ready to use in fetch requests
+   */
+  public static async getTokenForPermissionCheck(): Promise<{
+    token: string | null;
+    headers: Record<string, string>;
+  }> {
+    try {
+      // Initialize and ensure we have a valid token
+      await TokenManager.initialize();
+      
+      // Try to refresh the token first to ensure it's valid
+      // Use a lighter refresh approach that won't block if one is in progress
+      let refreshed = false;
+      if (!TokenManager.isRefreshInProgress()) {
+        refreshed = await TokenManager.refreshToken({ force: false, retry: 0 });
+      }
+      
+      // Get the token (either freshly refreshed or from cache)
+      const token = await TokenManager.getToken();
+      
+      // Create a set of headers specifically for permission checks
+      const headers: Record<string, string> = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'X-Request-Time': new Date().toISOString(),
+        'X-Request-ID': `perm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+      };
+      
+      // Add Authorization header if we have a token
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+        
+        // Also add userId as a backup method
+        try {
+          const decoded = jwtDecode<DecodedToken>(token);
+          const userId = typeof decoded.sub === 'number' ? decoded.sub : parseInt(String(decoded.sub), 10);
+          
+          if (!isNaN(userId)) {
+            headers['X-Auth-User-ID'] = String(userId);
+          }
+        } catch (error) {
+          logger.warn('Failed to decode user ID from token for permission check', {
+            error: error instanceof Error ? error.message : String(error),
+            tokenLength: token.length
+          });
+        }
+      }
+      
+      return { token, headers };
+    } catch (error) {
+      logger.error('Error preparing token for permission check', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      // Return empty token but still provide basic headers
+      return {
+        token: null,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'X-Request-Time': new Date().toISOString(),
+          'X-Request-ID': `perm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+        }
+      };
+    }
+  }
+  
+  /**
    * Clear token state
    */
   public static clearTokens(): void {
@@ -781,6 +829,21 @@ public static async validateToken(token: string): Promise<TokenValidationResult>
     
     logger.debug('Token cache cleared');
   }
+}
+
+// Register HMR handler to prevent token operations during reloads
+if (typeof module !== 'undefined' && (module as any).hot) {
+  (module as any).hot.dispose(() => {
+    TokenManager.setHmrLock(true);
+    logger.debug('HMR detected: Token manager locked for reload');
+  });
+  
+  (module as any).hot.accept(() => {
+    setTimeout(() => {
+      TokenManager.setHmrLock(false);
+      logger.debug('HMR completed: Token manager unlocked');
+    }, 1000); // Give a bit of time for the reload to complete
+  });
 }
 
 // Export

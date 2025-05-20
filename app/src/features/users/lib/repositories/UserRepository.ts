@@ -725,6 +725,14 @@ export class UserRepository extends PrismaRepository<User> implements IUserRepos
           }
           // If permissions is an empty array, don't include it at all
         } 
+        // Special handling for password - never set to null or empty during updates
+        else if (key === 'password') {
+          // Only include password if it has a valid value
+          if (value !== null && value !== '') {
+            result[key] = value;
+          }
+          // Otherwise, don't include the password field at all
+        }
         // Special handling for profilePictureId - must be a number or null
         else if (key === 'profilePictureId') {
           if (value === null) {

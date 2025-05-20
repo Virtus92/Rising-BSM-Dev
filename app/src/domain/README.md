@@ -32,6 +32,8 @@ Entities are the core domain objects that represent the business concepts in the
 - **Appointment**: Represents a scheduled meeting or service appointment
 - **Notification**: Represents a system or user-generated notification
 - **ActivityLog**: Represents an audit log entry for tracking user actions
+- **Permission**: Represents a permission in the system
+- **RefreshToken**: Represents a refresh token for authentication
 
 **Example (User Entity):**
 
@@ -69,7 +71,9 @@ DTOs define the data structures used for communication between the client and se
 - **CreateUserDto**: Data required to create a new user
 - **UpdateUserDto**: Data allowed for updating a user
 - **CustomerDto**: Customer data for display
+- **AppointmentDto**: Appointment data for display
 - **RequestDto**: Request data for display
+- **NotificationDto**: Notification data for display
 
 **Example (UserDtos):**
 
@@ -107,8 +111,9 @@ Enums define the fixed sets of values used throughout the application, ensuring 
 
 - **UserRole**: Defines the roles a user can have (ADMIN, MANAGER, EMPLOYEE, USER)
 - **UserStatus**: Defines the possible user statuses (ACTIVE, INACTIVE, SUSPENDED, DELETED)
-- **RequestStatus**: Defines the status of a service request
-- **AppointmentStatus**: Defines the status of an appointment
+- **CommonStatus**: Common status values used across entities
+- **CustomerType**: Types of customers (PRIVATE, BUSINESS, etc.)
+- **EntityTypes**: Types of entities in the system
 
 **Example (UserEnums):**
 
@@ -138,6 +143,9 @@ Repository interfaces define the data access contracts for entities. They abstra
 - **ICustomerRepository**: Customer data access
 - **IRequestRepository**: Request data access
 - **IAppointmentRepository**: Appointment data access
+- **INotificationRepository**: Notification data access
+- **IPermissionRepository**: Permission data access
+- **IRefreshTokenRepository**: Refresh token data access
 
 **Example (IUserRepository):**
 
@@ -161,11 +169,14 @@ Service interfaces define the business operations available in the application. 
 - **IRequestService**: Request management operations
 - **IAppointmentService**: Appointment management operations
 - **IAuthService**: Authentication and authorization operations
+- **INotificationService**: Notification operations
+- **IPermissionService**: Permission management operations
+- **IActivityLogService**: Activity logging operations
 
 **Example (IUserService):**
 
 ```typescript
-export interface IUserService extends IBaseService<User, CreateUserDto, UpdateUserDto, UserResponseDto> {
+export interface IUserService extends IBaseService<User> {
   findByEmail(email: string, options?: ServiceOptions): Promise<UserResponseDto | null>;
   changePassword(userId: number, data: ChangePasswordDto, options?: ServiceOptions): Promise<boolean>;
   updateStatus(userId: number, data: UpdateUserStatusDto, options?: ServiceOptions): Promise<UserResponseDto>;
@@ -181,6 +192,7 @@ The permissions module defines the authorization rules and permission schemas fo
 
 - **SystemPermissionMap**: Maps system operations to permission codes
 - **Permission entity**: Represents a permission in the system
+- **PermissionEnums**: Enumerations for permission types and roles
 
 ### Types
 
@@ -190,6 +202,18 @@ Types include TypeScript type definitions that extend or augment third-party lib
 
 - **next-auth.d.ts**: Extends NextAuth types for the application
 - **next.d.ts**: Extends Next.js types for the application
+
+### Utils
+
+Utility functions specific to the domain model, such as entity transformations, validation helpers, and business rule utilities.
+
+**Key Utils:**
+
+- **dtoFactory**: Creates DTOs from entities
+- **entityFactory**: Creates entities from data
+- **enumUtils**: Utilities for working with enums
+- **noteUtils**: Utilities for handling notes
+- **statusUtils**: Utilities for handling status changes
 
 ## Design Principles
 
@@ -206,3 +230,4 @@ Types include TypeScript type definitions that extend or augment third-party lib
 3. **Repository Pattern**: Use repositories to abstract data access logic.
 4. **Service Boundaries**: Define clear service boundaries based on business capabilities.
 5. **Enum Usage**: Use enums instead of string literals for fixed value sets.
+6. **Interface-First Development**: Define interfaces before implementations to enforce contracts.

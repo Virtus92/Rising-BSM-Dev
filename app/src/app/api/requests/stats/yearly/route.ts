@@ -11,7 +11,7 @@ import { RequestStatus } from '@/domain/enums/CommonEnums';
 /**
  * GET /api/requests/stats/yearly
  * 
- * Returns yearly contact request statistics
+ * Returns yearly request statistics
  */
 export const GET = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
@@ -19,7 +19,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
   try {
     // Get URL parameters
     const url = new URL(request.url);
-    const years = parseInt(url.searchParams.get('years') || '3', 10);
+    const years = parseInt(url.searchParams.get('years') || '5', 10);
     
     const serviceFactory = getServiceFactory();
     const requestService = serviceFactory.createRequestService();
@@ -48,27 +48,24 @@ export const GET = routeHandler(async (request: NextRequest) => {
     const enrichedStats = yearlyStats.map(stat => {
       // Filter requests for this period
       const periodRequests = requests.filter(req => {
-        const createdDate = new Date(req.createdAt);
-        return createdDate >= new Date(stat.startDate) && 
-               createdDate <= new Date(stat.endDate);
+        const requestDate = new Date(req.createdAt);
+        return requestDate >= new Date(stat.startDate) && 
+               requestDate <= new Date(stat.endDate);
       });
       
       // Count by status
-      const newRequests = periodRequests.filter(r => r.status === RequestStatus.NEW).length;
-      const inProgress = periodRequests.filter(r => r.status === RequestStatus.IN_PROGRESS).length;
       const completed = periodRequests.filter(r => r.status === RequestStatus.COMPLETED).length;
+      const inProgress = periodRequests.filter(r => r.status === RequestStatus.IN_PROGRESS).length;
+      const newRequests = periodRequests.filter(r => r.status === RequestStatus.NEW).length;
       const cancelled = periodRequests.filter(r => r.status === RequestStatus.CANCELLED).length;
-      const convertedToCustomer = periodRequests.filter(r => r.customerId !== null && r.customerId !== undefined).length;
       
       return {
         ...stat,
         requests: stat.count,
-        new: newRequests,
-        inProgress,
         completed,
-        cancelled,
-        convertedToCustomer,
-        conversionRate: stat.count > 0 ? Math.round((convertedToCustomer / stat.count) * 100) : 0
+        inProgress,
+        new: newRequests,
+        cancelled
       };
     });
     

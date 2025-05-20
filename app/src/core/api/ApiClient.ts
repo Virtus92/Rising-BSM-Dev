@@ -243,6 +243,9 @@ class ApiClientClass {
       });
     }
     
+    // Ensure cookies are sent with all requests
+    headers.set('Credentials', 'include');
+    
     // Add authentication header if required
     if (options?.withAuth !== false) {
       try {
@@ -538,7 +541,28 @@ class ApiClientClass {
   ): Promise<ApiResponse<T>> {
     // Ensure client is initialized
     if (!this.initialized) {
-      await this.initialize();
+      await this.initialize({ forceAuth: true });
+    }
+    
+    // Force token validation for user endpoints
+    if (options?.withAuth !== false && (path.includes('/users') || path.includes('/notifications'))) {
+      try {
+        // Validate current token without performing a refresh
+        const currentToken = await TokenManager.getToken();
+        
+        if (currentToken) {
+          const validationResult = await TokenManager.validateToken(currentToken);
+          
+          if (!validationResult.valid) {
+            // Only refresh if actually needed
+            await TokenManager.refreshToken({ force: true });
+          }
+        }
+      } catch (refreshError) {
+        logger.warn('Token validation failed, continuing with request', {
+          error: refreshError instanceof Error ? refreshError.message : String(refreshError)
+        });
+      }
     }
     
     // Format URL with query parameters

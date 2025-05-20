@@ -7,23 +7,26 @@ part of 'user_model.dart';
 // **************************************************************************
 
 UserModel _$UserModelFromJson(Map<String, dynamic> json) => UserModel(
-      id: (json['id'] as num).toInt(),
+      id: json['id'] as int,
       name: json['name'] as String,
       email: json['email'] as String,
       role: json['role'] as String,
       status: json['status'] as String,
       phone: json['phone'] as String?,
-      profilePictureId: (json['profilePictureId'] as num?)?.toInt(),
+      profilePictureId: json['profilePictureId'] as int?,
       profilePicture: json['profilePicture'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : DateTime.now(),
       lastLoginAt: json['lastLoginAt'] == null
           ? null
           : DateTime.parse(json['lastLoginAt'] as String),
       settings: json['settings'] == null
           ? null
-          : UserSettingsModel.fromJson(
-              json['settings'] as Map<String, dynamic>),
+          : UserSettingsModel.fromJson(json['settings'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$UserModelToJson(UserModel instance) => <String, dynamic>{

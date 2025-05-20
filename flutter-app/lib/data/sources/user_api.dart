@@ -1,128 +1,30 @@
-import '../../data/models/api_response.dart';
-import '../../data/models/user_model.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/api_client_interface.dart';
 
-/// User API client for handling user-related requests
 class UserApi {
-  final ApiClient _apiClient;
-  
+  final ApiClientInterface _apiClient;
+
   UserApi(this._apiClient);
-  
-  /// Get current user profile
-  Future<ApiResponse<UserModel>> getCurrentUser() async {
+
+  Future<Map<String, dynamic>> getCurrentUser() async {
     final response = await _apiClient.get<Map<String, dynamic>>(
-      '/users/me',
+      '/api/users/me',
     );
-    
-    return ApiResponse<UserModel>.fromJson(
-      response.data!,
-      (json) => UserModel.fromJson(json as Map<String, dynamic>),
-    );
+    return response.data ?? {};
   }
-  
-  /// Get user by ID
-  Future<ApiResponse<UserModel>> getUserById(int userId) async {
+
+  Future<Map<String, dynamic>> getUser(int id) async {
     final response = await _apiClient.get<Map<String, dynamic>>(
-      '/users/$userId',
+      '/api/users/$id',
     );
-    
-    return ApiResponse<UserModel>.fromJson(
-      response.data!,
-      (json) => UserModel.fromJson(json as Map<String, dynamic>),
-    );
+    return response.data ?? {};
   }
-  
-  /// Get list of users with pagination
-  Future<ApiResponse<List<UserModel>>> getUsers({
-    int page = 1,
-    int limit = 10,
-    String? search,
-    Map<String, dynamic>? filters,
-  }) async {
-    final Map<String, dynamic> queryParams = {
-      'page': page,
-      'limit': limit,
-    };
-    
-    if (search != null && search.isNotEmpty) {
-      queryParams['search'] = search;
-    }
-    
-    if (filters != null && filters.isNotEmpty) {
-      filters.forEach((key, value) {
-        queryParams['filter[$key]'] = value;
-      });
-    }
-    
+
+  Future<Map<String, dynamic>> getUsers({Map<String, dynamic>? queryParams}) async {
     final response = await _apiClient.get<Map<String, dynamic>>(
-      '/users',
+      '/api/users',
       queryParameters: queryParams,
     );
-    
-    return ApiResponse<List<UserModel>>.fromJson(
-      response.data!,
-      (json) => (json as List<dynamic>)
-          .map((item) => UserModel.fromJson(item as Map<String, dynamic>))
-          .toList(),
-    );
-  }
-  
-  /// Update user profile
-  Future<ApiResponse<UserModel>> updateUserProfile(
-    int userId,
-    Map<String, dynamic> userData,
-  ) async {
-    final response = await _apiClient.put<Map<String, dynamic>>(
-      '/users/$userId',
-      data: userData,
-    );
-    
-    return ApiResponse<UserModel>.fromJson(
-      response.data!,
-      (json) => UserModel.fromJson(json as Map<String, dynamic>),
-    );
-  }
-  
-  /// Update current user profile
-  Future<ApiResponse<UserModel>> updateCurrentUserProfile(
-    Map<String, dynamic> userData,
-  ) async {
-    final response = await _apiClient.put<Map<String, dynamic>>(
-      '/users/me',
-      data: userData,
-    );
-    
-    return ApiResponse<UserModel>.fromJson(
-      response.data!,
-      (json) => UserModel.fromJson(json as Map<String, dynamic>),
-    );
-  }
-  
-  /// Update user status
-  Future<ApiResponse<UserModel>> updateUserStatus(
-    int userId,
-    String status,
-  ) async {
-    final response = await _apiClient.put<Map<String, dynamic>>(
-      '/users/$userId/status',
-      data: {'status': status},
-    );
-    
-    return ApiResponse<UserModel>.fromJson(
-      response.data!,
-      (json) => UserModel.fromJson(json as Map<String, dynamic>),
-    );
-  }
-  
-  /// Get user permissions
-  Future<ApiResponse<List<String>>> getUserPermissions() async {
-    final response = await _apiClient.get<Map<String, dynamic>>(
-      '/users/permissions',
-    );
-    
-    return ApiResponse<List<String>>.fromJson(
-      response.data!,
-      (json) => (json as List<dynamic>).map((e) => e as String).toList(),
-    );
+    return response.data ?? {};
   }
 }

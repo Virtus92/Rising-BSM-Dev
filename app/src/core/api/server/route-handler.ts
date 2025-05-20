@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLogger } from '@/core/logging';
 import { ApiResponse } from '@/core/api/types';
-import { auth } from '@/features/auth/api/middleware/authMiddleware';
+import { auth, authenticateRequest } from '@/features/auth/api/middleware/authMiddleware';
 import { AppError } from '@/core/errors/types/AppError';
 import { UserRole } from '@/domain';
 
@@ -84,45 +84,73 @@ export function routeHandler(
     try {
       // Apply auth middleware if required
       if (options.requiresAuth !== false) {
-        // Create auth handler with correct options
-        const authHandler = auth(
-          async (req, user) => {
-            // This handler is only used internally for auth verification
-            return NextResponse.json({ success: true });
-          },
-          {
-            requireAuth: true,
-            requiredRole: options.requiredRole,
-            requiredPermission: options.requiredPermission 
-              ? Array.isArray(options.requiredPermission)
-                ? options.requiredPermission 
-                : [options.requiredPermission]
-              : undefined
+        try {
+          // Get authentication result directly
+          const authResult = await authenticateRequest(request);
+          
+          // If auth failed, return the error response
+          if (!authResult.success) {
+            const duration = Date.now() - startTime;
+            logger.info(`API Auth rejected: ${method} ${url}`, {
+              requestId,
+              method,
+              url,
+              status: authResult.statusCode || 401,
+              duration: `${duration}ms`
+            });
+            
+            // Return consistent error response
+            return NextResponse.json({
+              success: false,
+              error: authResult.error || 'Authentication required',
+              code: 'AUTHENTICATION_REQUIRED',
+              message: authResult.message || 'Authentication required',
+              statusCode: authResult.statusCode || 401
+            }, { status: authResult.statusCode || 401 });
           }
-        );
-        
-        // Apply auth middleware
-        const authResult = await authHandler(request, context);
-        
-        // If auth failed (status is not 200), return the error response
-        if (authResult.status !== 200) {
-          const duration = Date.now() - startTime;
-          logger.info(`API Auth rejected: ${method} ${url}`, {
-            requestId,
-            method,
-            url,
-            status: authResult.status,
-            duration: `${duration}ms`
+          
+          // Authentication successful - attach user info to request
+          if (authResult.user) {
+            // Explicitly set auth properties on request object
+            if (!request.auth) {
+              // Create auth object if it doesn't exist
+              Object.defineProperty(request, 'auth', {
+                value: {
+                  userId: authResult.user.id,
+                  role: authResult.user.role,
+                  user: authResult.user
+                },
+                writable: true,
+                enumerable: true
+              });
+            } else {
+              // Update existing auth object
+              request.auth.userId = authResult.user.id;
+              request.auth.role = authResult.user.role;
+              request.auth.user = authResult.user;
+            }
+            
+            // Also set headers for backup authentication propagation
+            request.headers.set('X-Auth-User-ID', authResult.user.id.toString());
+            if (authResult.user.role) {
+              request.headers.set('X-Auth-User-Role', authResult.user.role);
+            }
+          }
+        } catch (authError) {
+          // Handle auth errors gracefully
+          logger.error(`Auth middleware error: ${method} ${url}`, {
+            error: authError instanceof Error ? authError.message : String(authError),
+            stack: authError instanceof Error ? authError.stack : undefined,
+            requestId
           });
           
-          // Return consistent error response
           return NextResponse.json({
             success: false,
-            error: 'Authentication required',
-            code: 'AUTHENTICATION_REQUIRED',
-            message: 'Authentication required',
-            statusCode: 401
-          }, { status: 401 });
+            error: 'Authentication error',
+            code: 'AUTHENTICATION_ERROR',
+            message: authError instanceof Error ? authError.message : 'Authentication error occurred',
+            statusCode: 500
+          }, { status: 500 });
         }
       }
       

@@ -41,9 +41,11 @@ class _SplashScreenState extends State<SplashScreen> {  @override
       },
       child: Scaffold(
         backgroundColor: Theme.of(context).colorScheme.primary,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
             children: [
               // Logo
               Container(
@@ -86,6 +88,8 @@ class _SplashScreenState extends State<SplashScreen> {  @override
                 ),
               ),
             ],
+          ),
+            ),
           ),
         ),
       ),

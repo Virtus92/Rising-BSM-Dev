@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -16,7 +16,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import { Input } from "@/shared/components/ui/input";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Label } from "@/shared/components/ui/label";
-import { Loader2, Save, CheckCircle, X, Filter, Search, ShieldAlert } from 'lucide-react';
+import { Loader2, Save, CheckCircle, X, Filter, Search, ShieldAlert, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { PermissionClient } from '@/features/permissions/lib/clients/PermissionClient';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
@@ -39,13 +39,15 @@ interface PermissionRoleManagerProps {
   allPermissions: PermissionItem[];
   isLoading: boolean;
   error: string | null;
+  onRefresh?: () => Promise<void>;
 }
 
 const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
   rolePermissions,
   allPermissions,
   isLoading,
-  error: propError
+  error: propError,
+  onRefresh
 }) => {
   const [activeRole, setActiveRole] = useState<string>(UserRole.ADMIN);
   const [filterText, setFilterText] = useState('');
@@ -113,7 +115,7 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
   }, [filteredPermissions]);
 
   // Toggle permission for role
-  const togglePermission = (permissionCode: string) => {
+  const togglePermission = useCallback((permissionCode: string) => {
     if (!canManagePermissions) return;
     
     setRolePerms(prev => {
@@ -125,7 +127,7 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
     });
     
     setHasChanges(true);
-  };
+  }, [canManagePermissions]);
 
   // Save role permissions
   const saveRolePermissions = async () => {
@@ -138,13 +140,41 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
     setError(null);
     
     try {
-      // This would be a real API call in a production environment
-      // For now, we'll simulate success
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Implement actual API call to update role permissions
+      // Create an appropriate structure based on PermissionClient expectations
+      // This would typically be a dedicated API endpoint to update role permissions
+      
+      // This is a placeholder for what would be a real API call
+      // In a production system, you would have a specific endpoint for updating role permissions
+      // For consistency with the rest of the application, we'll use a more direct approach:
+      
+      // 1. Create a specific data structure for the update
+      const updateData = {
+        role: activeRole,
+        permissions: rolePerms
+      };
+      
+      // 2. Make the API call
+      const response = await fetch(`/api/permissions/role-defaults/${activeRole}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update role permissions: ${response.statusText}`);
+      }
       
       setSuccessMessage(`Permissions updated successfully for ${activeRole} role`);
       setTimeout(() => setSuccessMessage(null), 3000);
       setHasChanges(false);
+      
+      // Refresh parent data if needed
+      if (onRefresh) {
+        await onRefresh();
+      }
     } catch (err) {
       setError(`Failed to update role permissions: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -163,7 +193,7 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
     setError(null);
     
     try {
-      // In a real implementation, this would call the API to get default permissions
+      // Get default permissions from the API
       const response = await PermissionClient.getDefaultPermissionsForRole(activeRole);
       
       if (response.success && response.data) {
@@ -171,6 +201,11 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
         setSuccessMessage(`Reset to default permissions for ${activeRole} role`);
         setTimeout(() => setSuccessMessage(null), 3000);
         setHasChanges(false);
+        
+        // Refresh parent data
+        if (onRefresh) {
+          await onRefresh();
+        }
       } else {
         throw new Error(response.message || 'Failed to get default permissions');
       }
@@ -362,6 +397,17 @@ const PermissionRoleManager: React.FC<PermissionRoleManagerProps> = ({
           >
             Reset to Defaults
           </Button>
+          
+          {onRefresh && (
+            <Button 
+              variant="outline" 
+              onClick={() => onRefresh()}
+              disabled={isLoading || isSaving}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          )}
         </div>
         <Button 
           onClick={saveRolePermissions}

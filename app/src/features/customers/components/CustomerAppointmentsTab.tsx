@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
 import { formatDate } from '@/features/notifications/utils/date-utils';
 import { AppointmentService } from '@/features/appointments/lib/services';
+import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
 
 // Create an instance of AppointmentService
 const appointmentService = new AppointmentService();
@@ -60,11 +61,16 @@ interface CustomerAppointmentsTabProps {
   customerId: number;
 }
 
+// Extended interface to include additional properties found in API responses but not in the official DTO
+interface ExtendedAppointmentResponseDto extends AppointmentResponseDto {
+  processorName?: string; // Name of the processor/assignee
+}
+
 /**
  * Component to display and manage appointments for a specific customer
  */
 export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = ({ customerId }) => {
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<ExtendedAppointmentResponseDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -106,21 +112,26 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         
         // Handle paginated response format
         if (result && typeof result === 'object') {
-          // Case 1: Response is a paginated object with data array
-          if (result.data && Array.isArray(result.data)) {
+          // Case 1: Response is an array directly (which is the expected format from findByCriteria)
+          if (Array.isArray(result)) {
             // Filter to ensure only appointments for this customer
-            const filteredAppointments = result.data.filter(appointment => 
+            const filteredAppointments = result.filter((appointment: ExtendedAppointmentResponseDto) => 
               appointment.customerId === customerId
             );
             setAppointments(filteredAppointments);
           } 
-          // Case 2: Response is an array directly
-          else if (Array.isArray(result)) {
-            // Filter to ensure only appointments for this customer
-            const filteredAppointments = result.filter(appointment => 
-              appointment.customerId === customerId
-            );
-            setAppointments(filteredAppointments);
+          // Case 2: Response is an object with a data property that is an array
+          else if (result && typeof result === 'object' && 'data' in result) {
+            // Use type assertion to help TypeScript understand the structure
+            const responseWithData = result as { data: ExtendedAppointmentResponseDto[] };
+            
+            if (Array.isArray(responseWithData.data)) {
+              // Case 2: Response is a paginated object with data array
+              const filteredAppointments = responseWithData.data.filter((appointment: ExtendedAppointmentResponseDto) => 
+                appointment.customerId === customerId
+              );
+              setAppointments(filteredAppointments);
+            }
           }
           // Case 3: Unexpected response format
           else {
@@ -528,7 +539,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
     }
   };
   
-  const handleOpenEditModal = (appointment: any) => {
+  const handleOpenEditModal = (appointment: ExtendedAppointmentResponseDto) => {
     // Parse the appointment date and time
     const appointmentDate = new Date(appointment.appointmentDate);
     

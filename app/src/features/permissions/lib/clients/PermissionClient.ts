@@ -49,6 +49,96 @@ export class PermissionClient {
   private static apiClient = ApiClient;
 
   /**
+   * Checks if a user has a specific permission (client-friendly wrapper)
+   * 
+   * @param userId - User ID
+   * @param permission - Permission code
+   * @returns API response indicating whether the user has the permission
+   */
+  static async checkUserPermission(userId: number | string, permission: string): Promise<ApiResponse<boolean>> {
+    try {
+      return await PermissionClient.hasPermission(userId, permission);
+    } catch (error) {
+      logger.error(`Error in checkUserPermission for user ${userId}:`, {
+        error: error instanceof Error ? error.message : String(error),
+        permission
+      });
+      
+      // Return a standardized error response instead of throwing
+      return {
+        success: false,
+        data: false,
+        error: error instanceof Error ? error.message : String(error),
+        message: `Failed to check permission for user ${userId}`,
+        statusCode: error instanceof PermissionClientError ? error.statusCode || 500 : 500
+      };
+    }
+  }
+
+  /**
+   * Checks if a user has any of the specified permissions (batch check)
+   * 
+   * @param userId - User ID
+   * @param permissions - Array of permission codes
+   * @returns API response indicating whether the user has any of the permissions
+   */
+  static async checkUserPermissions(userId: number | string, permissions: string[]): Promise<ApiResponse<{ hasPermission: boolean; permissionResults: { permission: string; hasPermission: boolean; }[] }>> {
+    try {
+      // Create object with proper fields explicitly
+      const data = {
+        userId: Number(userId),
+        permissions: permissions.map(p => p.toLowerCase().trim())
+      };
+      
+      // Use the special TokenManager utility for permission checks
+      const { default: TokenManager } = await import('@/core/initialization/TokenManager');
+      const { token, headers } = await TokenManager.getTokenForPermissionCheck();
+      
+      // Log the token status for debugging
+      logger.debug('Using token for batch permission check', {
+        hasToken: !!token,
+        tokenLength: token ? token.length : 0,
+        hasAuthHeader: !!headers['Authorization'],
+        userId
+      });
+
+      // Always include auth token explicitly
+      const options = {
+        withAuth: true,
+        headers: {
+          ...headers,
+          'X-Request-ID': `permission-batch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        }
+      };
+      
+      const response = await PermissionClient.apiClient.post<{ hasPermission: boolean; permissionResults: { permission: string; hasPermission: boolean; }[] }>(
+        `/users/permissions/check`,
+        data,
+        options
+      );
+      
+      return response;
+    } catch (error) {
+      logger.error(`Error in checkUserPermissions for user ${userId}:`, {
+        error: error instanceof Error ? error.message : String(error),
+        permissionsCount: permissions.length
+      });
+      
+      // Return a standardized error response instead of throwing
+      return {
+        success: false,
+        data: { 
+          hasPermission: false, 
+          permissionResults: permissions.map(p => ({ permission: p, hasPermission: false }))
+        },
+        error: error instanceof Error ? error.message : String(error),
+        message: `Failed to check permissions for user ${userId}`,
+        statusCode: error instanceof PermissionClientError ? error.statusCode || 500 : 500
+      };
+    }
+  }
+
+  /**
    * Creates query parameters from an object
    */
   private static createQueryParams(params: Record<string, any> = {}): string {
@@ -615,13 +705,27 @@ export class PermissionClient {
     }
       
       try {
-        // Create request options
+        // Use the special TokenManager utility for permission checks
+        const { default: TokenManager } = await import('@/core/initialization/TokenManager');
+        const { token, headers } = await TokenManager.getTokenForPermissionCheck();
+        
+        // Log the token status for debugging
+        logger.debug('Using token for permission check', {
+          hasToken: !!token,
+          tokenLength: token ? token.length : 0,
+          hasAuthHeader: !!headers['Authorization'],
+          hasUserIdHeader: !!headers['X-Auth-User-ID'],
+          permission: normalizedPermission,
+          userId,
+          operationId
+        });
+
+        // Create request options with explicit auth token
         const options = {
-          includeAuthToken: true, // Always include auth token
+          withAuth: true, // Standard way
           requestId: `permission-check-${userId}-${operationId}`,
           headers: {
-            'Cache-Control': 'no-cache',
-            'X-Request-Time': new Date().toISOString(),
+            ...headers,
             'X-Request-ID': `permission-${operationId}`
           },
           skipCache: true, // Don't use API cache for permission checks
@@ -629,7 +733,9 @@ export class PermissionClient {
         };
         
         logger.debug(`Checking permission via API '${normalizedPermission}' for user ${userId}`, {
-          operationId
+          operationId,
+          hasAuthToken: !!token,
+          tokenLength: token ? token.length : 0
         });
         
         // Add timeout protection to prevent hanging requests

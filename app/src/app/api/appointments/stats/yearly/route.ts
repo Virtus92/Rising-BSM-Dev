@@ -19,7 +19,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
   try {
     // Get URL parameters
     const url = new URL(request.url);
-    const years = parseInt(url.searchParams.get('years') || '3', 10);
+    const years = parseInt(url.searchParams.get('years') || '5', 10); // Default to 5 years for better visualization
     
     const serviceFactory = getServiceFactory();
     const appointmentService = serviceFactory.createAppointmentService();
@@ -36,6 +36,8 @@ export const GET = routeHandler(async (request: NextRequest) => {
     if (appointmentsResponse && appointmentsResponse.data) {
       appointments = appointmentsResponse.data;
     }
+    
+    logger.info(`Generating yearly stats for ${appointments.length} appointments`);
     
     // Generate yearly stats using our utility function
     const yearlyStats = generateYearlyStats(
@@ -58,15 +60,26 @@ export const GET = routeHandler(async (request: NextRequest) => {
       const cancelled = periodAppointments.filter(a => a.status === AppointmentStatus.CANCELLED).length;
       const planned = periodAppointments.filter(a => a.status === AppointmentStatus.PLANNED).length;
       const confirmed = periodAppointments.filter(a => a.status === AppointmentStatus.CONFIRMED).length;
+      const rescheduled = periodAppointments.filter(a => a.status === AppointmentStatus.RESCHEDULED).length;
       
       return {
         ...stat,
-        appointments: stat.count,
+        period: stat.period, // Ensure period is explicitly included
+        count: stat.count,   // Keep original count
+        appointments: stat.count, // Alias count as appointments for compatibility
         completed,
         cancelled,
         planned,
-        confirmed
+        confirmed,
+        rescheduled,
+        year: parseInt(stat.period, 10) // Ensure year is a number
       };
+    });
+    
+    // Log what we're returning for debugging
+    logger.info('Yearly stats generated', { 
+      count: enrichedStats.length,
+      sample: enrichedStats.length > 0 ? JSON.stringify(enrichedStats[0]).substring(0, 200) : 'No data' 
     });
     
     return formatSuccess(
@@ -79,9 +92,15 @@ export const GET = routeHandler(async (request: NextRequest) => {
       stack: error instanceof Error ? error.stack : undefined
     });
     
+    // Return a more detailed error for debugging purposes
     return formatError(
-      error instanceof Error ? error.message : 'Failed to retrieve yearly appointment statistics',
-      500
+      error instanceof Error ? error : 'Failed to retrieve yearly appointment statistics',
+      500,
+      'STATS_ERROR',
+      {
+        details: error instanceof Error ? error.stack : 'Unknown error',
+        endpoint: '/api/appointments/stats/yearly'
+      }
     );
   }
 }, {

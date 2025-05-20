@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -46,7 +46,13 @@ import { usePermissions } from '@/features/permissions/providers/PermissionProvi
 import { useRouter } from 'next/navigation';
 import { UserPermissions } from '@/features/users/components/UserPermissions';
 
-const PermissionUserAssignment: React.FC = () => {
+interface PermissionUserAssignmentProps {
+  onPermissionsChanged?: () => Promise<void>;
+}
+
+const PermissionUserAssignment: React.FC<PermissionUserAssignmentProps> = ({ 
+  onPermissionsChanged 
+}) => {
   const [users, setUsers] = useState<UserDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,13 +67,8 @@ const PermissionUserAssignment: React.FC = () => {
   const canViewUsers = hasPermission(SystemPermission.USERS_VIEW);
   const router = useRouter();
 
-  // Fetch users on component mount
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   // Function to fetch users
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     if (!canViewUsers) {
       setError('You do not have permission to view users');
       setIsLoading(false);
@@ -93,7 +94,26 @@ const PermissionUserAssignment: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [canViewUsers, setError, setIsLoading, setUsers]);
+
+  // Refresh user list whenever changes are saved (exposed for parent component)
+  const refreshUserList = useCallback(async () => {
+    await fetchUsers();
+  }, [fetchUsers]);
+  
+  // Fetch users on component mount
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+  
+  // When parent indicates permission changes, refresh the user list
+  useEffect(() => {
+    if (onPermissionsChanged) {
+      // Call once when the component mounts
+      refreshUserList();
+    }
+    // No cleanup function needed here
+  }, [onPermissionsChanged, refreshUserList]);
 
   // Filter users based on search query
   const filteredUsers = React.useMemo(() => {
@@ -124,6 +144,11 @@ const PermissionUserAssignment: React.FC = () => {
         setSuccessMessage(`Permissions updated successfully for ${selectedUser.name}`);
         setTimeout(() => setSuccessMessage(null), 3000);
         setShowPermissionsDialog(false);
+        
+        // Notify parent of permission changes
+        if (onPermissionsChanged) {
+          await onPermissionsChanged();
+        }
       } else {
         setError(response.message || 'Failed to update permissions');
       }

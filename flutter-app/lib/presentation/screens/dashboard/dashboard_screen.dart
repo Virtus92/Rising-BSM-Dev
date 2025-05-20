@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/notification/notification_bloc.dart';
+import 'dashboard_home_screen.dart';
 
 /// Dashboard screen that contains the main navigation and content
 class DashboardScreen extends StatefulWidget {
@@ -23,6 +25,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // Load notifications
+    context.read<NotificationBloc>().add(LoadNotifications());
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _updateSelectedIndexBasedOnRoute();
   }
   
@@ -84,12 +93,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         appBar: AppBar(
           title: _getTitle(),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              onPressed: () {
-                // TODO: Implement notifications page
-              },
-            ),
+            _buildNotificationButton(),
             PopupMenuButton<String>(
               onSelected: (value) {
                 if (value == 'logout') {
@@ -117,7 +121,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ),
-        body: widget.child,
+        body: _currentIndex == 0 && GoRouterState.of(context).uri.toString() == '/dashboard'
+            ? const DashboardHomeScreen() // Use our custom home screen when on dashboard
+            : widget.child, // Otherwise use the routed content
         bottomNavigationBar: NavigationBar(
           selectedIndex: _currentIndex,
           onDestinationSelected: _onDestinationSelected,
@@ -153,6 +159,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
   
+  Widget _buildNotificationButton() {
+    return BlocBuilder<NotificationBloc, NotificationState>(
+      builder: (context, state) {
+        final unreadCount = state is NotificationsLoaded 
+            ? state.notifications.where((n) => !n.isRead).length 
+            : 0;
+            
+        return Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined),
+              onPressed: () {
+                context.go('/notifications');
+              },
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 14,
+                    minHeight: 14,
+                  ),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : '$unreadCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+  
   Widget _getTitle() {
     final String location = GoRouterState.of(context).uri.toString();
     
@@ -168,6 +219,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return const Text('Profile');
     } else if (location.contains('/settings')) {
       return const Text('Settings');
+    } else if (location.contains('/notifications')) {
+      return const Text('Notifications');
     }
     
     return const Text('Rising BSM');

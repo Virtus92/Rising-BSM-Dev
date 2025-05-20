@@ -23,39 +23,22 @@ export const GET = routeHandler(async (request: NextRequest) => {
     const serviceFactory = getServiceFactory();
     const appointmentService = serviceFactory.createAppointmentService();
     
-    // Get all appointments
+    // Get all appointments - simplify data retrieval
     const appointmentsResponse = await appointmentService.findAll({
       limit: 1000, // High limit to get all appointments
       context: {
         userId: request.auth?.userId
-      },
-      // Add custom options as additional property using type assertion
-      ...({
-        includeDetails: false // Optimize by excluding details
-      })
+      }
     });
     
     // Safely extract appointment data from response
     let appointments: AppointmentResponseDto[] = [];
     
-    if (appointmentsResponse) {
-      // Use type assertion to avoid 'never' type issues
-      const typedResponse = appointmentsResponse as Record<string, any>;
-      
-      if (typedResponse.success) {
-        if (typedResponse.data && Array.isArray(typedResponse.data)) {
-          appointments = typedResponse.data;
-        } else if (typedResponse.data && typeof typedResponse.data === 'object') {
-          const typedData = typedResponse.data as Record<string, any>;
-          if (typedData.data && Array.isArray(typedData.data)) {
-            appointments = typedData.data;
-          }
-        }
-      }
+    if (appointmentsResponse && appointmentsResponse.data) {
+      appointments = appointmentsResponse.data;
     }
     
-    // Log appointments count for debugging
-    console.log(`Generating monthly stats for ${appointments.length} appointments`);
+    logger.info(`Generating monthly stats for ${appointments.length} appointments`);
     
     // Generate monthly stats using our utility function
     const monthlyStats = generateMonthlyStats(
@@ -78,16 +61,32 @@ export const GET = routeHandler(async (request: NextRequest) => {
       const cancelled = periodAppointments.filter(a => a.status === AppointmentStatus.CANCELLED).length;
       const planned = periodAppointments.filter(a => a.status === AppointmentStatus.PLANNED).length;
       const confirmed = periodAppointments.filter(a => a.status === AppointmentStatus.CONFIRMED).length;
+      const rescheduled = periodAppointments.filter(a => a.status === AppointmentStatus.RESCHEDULED).length;
+      
+      // Make sure we extract the month name correctly
+      const monthParts = stat.period.split(' ');
+      const month = monthParts[0];
+      const year = monthParts[1] || new Date().getFullYear().toString();
       
       return {
         ...stat,
-        month: stat.period.split(' ')[0], // Extract month name
-        appointments: stat.count,
+        month, // Extract month name
+        year,  // Include year explicitly
+        period: stat.period, // Keep the original period
+        count: stat.count,  // Keep the original count
+        appointments: stat.count, // Alias count as appointments for compatibility
         completed,
         cancelled,
         planned,
-        confirmed
+        confirmed,
+        rescheduled
       };
+    });
+    
+    // Log what we're returning for debugging
+    logger.info('Monthly stats generated', { 
+      count: enrichedStats.length,
+      sample: enrichedStats.length > 0 ? JSON.stringify(enrichedStats[0]).substring(0, 200) : 'No data' 
     });
     
     return formatSuccess(
@@ -100,10 +99,8 @@ export const GET = routeHandler(async (request: NextRequest) => {
       stack: error instanceof Error ? error.stack : undefined
     });
     
-    return formatError(
-      error instanceof Error ? error.message : 'Failed to retrieve monthly appointment statistics',
-      500
-    );
+    // Return a more detailed error for debugging purposes using details instead of endpoint
+    return formatError(error as Error);
   }
 }, {
   // Secure this endpoint

@@ -11,7 +11,8 @@ const logger = getLogger();
 
 // In-memory blacklist cache to reduce database calls
 const memoryBlacklist = new Set<string>();
-let lastBlacklistUpdate = 0;
+// Initialize to current timestamp instead of Unix epoch (0)
+let lastBlacklistUpdate = Date.now();
 const BLACKLIST_CACHE_TTL = 60000; // 1 minute
 let refreshPromise: Promise<void> | null = null; // Store promise for concurrent requests
 
@@ -48,7 +49,8 @@ export async function isTokenBlacklisted(token: string): Promise<boolean> {
     if (now - lastBlacklistUpdate > BLACKLIST_CACHE_TTL) {
       logger.debug('Refreshing blacklist cache due to TTL expiration', {
         lastUpdate: new Date(lastBlacklistUpdate).toISOString(),
-        ttlSeconds: BLACKLIST_CACHE_TTL / 1000
+        ttlSeconds: BLACKLIST_CACHE_TTL / 1000,
+        ageSeconds: Math.round((now - lastBlacklistUpdate) / 1000)
       });
       
       await refreshBlacklist();
@@ -199,7 +201,8 @@ async function refreshBlacklist(): Promise<void> {
       lastBlacklistUpdate = Date.now();
       
       logger.debug('Token blacklist refreshed', {
-        count: memoryBlacklist.size
+        count: memoryBlacklist.size,
+        timestampUpdated: new Date(lastBlacklistUpdate).toISOString()
       });
     } catch (error) {
       logger.error('Error refreshing token blacklist:', {
@@ -234,9 +237,28 @@ export async function refreshBlacklistCache(): Promise<void> {
   await refreshBlacklist();
 }
 
+/**
+ * Get the current blacklist status for diagnostics
+ */
+export function getBlacklistStatus(): { 
+  lastUpdate: Date, 
+  ttlSeconds: number, 
+  cacheSize: number,
+  isExpired: boolean 
+} {
+  const now = Date.now();
+  return {
+    lastUpdate: new Date(lastBlacklistUpdate),
+    ttlSeconds: BLACKLIST_CACHE_TTL / 1000,
+    cacheSize: memoryBlacklist.size,
+    isExpired: (now - lastBlacklistUpdate) > BLACKLIST_CACHE_TTL
+  };
+}
+
 // Export default for dynamic imports
 export default {
   isTokenBlacklisted,
   blacklistToken,
-  refreshBlacklistCache
+  refreshBlacklistCache,
+  getBlacklistStatus
 };

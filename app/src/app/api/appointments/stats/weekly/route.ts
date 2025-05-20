@@ -38,6 +38,8 @@ export const GET = routeHandler(async (request: NextRequest) => {
       appointments = appointmentsResponse.data;
     }
     
+    logger.info(`Generating weekly stats for ${appointments.length} appointments`);
+    
     // Generate weekly stats using our utility function
     const weeklyStats = generateWeeklyStats(
       appointments,
@@ -70,12 +72,20 @@ export const GET = routeHandler(async (request: NextRequest) => {
         week,
         label: stat.period,
         count: stat.count,
+        period: stat.period, // Ensure period property is explicitly set
+        appointments: stat.count, // Alias count as appointments for compatibility
         completed,
         cancelled,
         planned,
         confirmed,
         rescheduled
       };
+    });
+    
+    // Log what we're returning for debugging
+    logger.info('Weekly stats generated', { 
+      count: enrichedStats.length,
+      sample: enrichedStats.length > 0 ? JSON.stringify(enrichedStats[0]).substring(0, 200) : 'No data' 
     });
     
     return formatSuccess(enrichedStats, 'Weekly appointment statistics retrieved successfully');
@@ -85,9 +95,15 @@ export const GET = routeHandler(async (request: NextRequest) => {
       stack: error instanceof Error ? error.stack : undefined
     });
     
+    // Return a more detailed error for debugging purposes
     return formatError(
-      error instanceof Error ? error.message : 'Server error while retrieving appointment statistics',
-      500
+      error instanceof Error ? error : 'Server error while retrieving weekly appointment statistics',
+      500,
+      'STATS_ERROR',
+      {
+        details: error instanceof Error ? error.stack : 'Unknown error',
+        endpoint: '/api/appointments/stats/weekly'
+      }
     );
   }
 }, {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm, ControllerRenderProps, FieldPath, FormProvider } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -49,13 +49,6 @@ const formSchema = z.object({
   ]),
   newsletter: z.boolean(),
   note: z.string().optional(),
-  createAppointment: z.boolean(),
-  appointmentTitle: z.string().optional(),
-  appointmentDate: z.string().optional(),
-  appointmentTime: z.string().optional(),
-  appointmentDuration: z.coerce.number().optional(),
-  appointmentLocation: z.string().optional(),
-  appointmentDescription: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -68,15 +61,11 @@ interface ConvertToCustomerFormProps {
 /**
  * Form for converting a contact request to a customer
  */
-/**
- * Form for converting a contact request to a customer
- */
 export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
   request,
   onClose,
 }) => {
   const [isConverting, setIsConverting] = useState(false);
-  const [showAppointmentFields, setShowAppointmentFields] = useState(false);
   const { toast } = useToast();
 
   // Default values from the request
@@ -91,21 +80,12 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
     country: 'Germany',
     type: CustomerType.PRIVATE,
     newsletter: false,
-    createAppointment: false,
-    appointmentTitle: `Appointment with ${request.name || ''}`,
-    appointmentDescription: request.message || '',
   };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues,
   });
-
-  const watchCreateAppointment = form.watch('createAppointment');
-  // Update state when createAppointment changes
-  React.useEffect(() => {
-    setShowAppointmentFields(watchCreateAppointment);
-  }, [watchCreateAppointment]);
 
   const router = useRouter();
 
@@ -125,70 +105,23 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
           postalCode: data.postalCode ? data.postalCode.trim() : undefined,
           city: data.city ? data.city.trim() : undefined,
           country: data.country.trim(),
-          type: data.type, // Will be converted to CustomerType enum in the backend
+          type: data.type,
           newsletter: data.newsletter,
         },
         note: data.note ? data.note.trim() : undefined,
-        createAppointment: data.createAppointment,
+        createAppointment: false, // Always false - appointments are only created from customers
       };
-
-      // If creating an appointment, add appointment data
-      if (data.createAppointment) {
-        if (!data.appointmentDate || !data.appointmentTime) {
-          toast({
-            title: "Error",
-            description: "Appointment date and time are required",
-            variant: "error"
-          });
-          setIsConverting(false);
-          return;
-        }
-
-        // Format the appointment date properly by combining date and time
-        const dateString = data.appointmentDate;
-        const timeString = data.appointmentTime;
-        const appointmentDateTime = new Date(`${dateString}T${timeString}`);
-
-        // Validate the date is valid
-        if (isNaN(appointmentDateTime.getTime())) {
-          toast({
-            title: "Error",
-            description: "Invalid appointment date or time format",
-            variant: "error"
-          });
-          setIsConverting(false);
-          return;
-        }
-
-        convertData.appointmentData = {
-          title: data.appointmentTitle?.trim() || `Appointment with ${data.name}`,
-          appointmentDate: appointmentDateTime.toISOString(),
-          duration: data.appointmentDuration || 60,
-          location: data.appointmentLocation?.trim(),
-          description: data.appointmentDescription?.trim(),
-        };
-      }
 
       // Use the RequestService to convert the request to a customer
-      // Add context to avoid foreign key constraint error
-      console.log("Converting request to customer with data:", convertData);
-      
-      const contextData = { 
-        userId: 1, // Use a valid user ID here
-        context: { userId: 1 }
-      };
-      
-      const response = await RequestService.convertToCustomer(convertData, contextData);
-      console.log("Convert response:", response);
+      const response = await RequestService.convertToCustomer(convertData);
       
       if (response.success) {
         toast({
           title: "Success",
-          description: data.createAppointment 
-            ? "Customer created with appointment" 
-            : "Customer created successfully",
+          description: "Customer created successfully",
           variant: "success"
         });
+        
         // Close dialog and trigger refresh
         onClose();
         // Force a router refresh to show the updated data
@@ -404,130 +337,6 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
               </FormItem>
             )}
           />
-
-          <Separator />
-
-          {/* Create Appointment */}
-          <FormField
-            control={form.control}
-            name="createAppointment"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>Create Appointment</FormLabel>
-                  <FormDescription>
-                    Create an appointment for this customer
-                  </FormDescription>
-                </div>
-              </FormItem>
-            )}
-          />
-
-          {/* Appointment fields (only show if appointment should be created) */}
-          {showAppointmentFields && (
-            <div className="space-y-3 mt-3 border p-3 rounded-md">
-              <FormField
-                control={form.control}
-                name="appointmentTitle"
-                render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentTitle"> }) => (
-                  <FormItem>
-                    <FormLabel>Appointment Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Appointment title" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <FormField
-                  control={form.control}
-                  name="appointmentDate"
-                  render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentDate"> }) => (
-                    <FormItem>
-                      <FormLabel>Date *</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} required={showAppointmentFields} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="appointmentTime"
-                  render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentTime"> }) => (
-                    <FormItem>
-                      <FormLabel>Time *</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} required={showAppointmentFields} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <FormField
-                  control={form.control}
-                  name="appointmentDuration"
-                  render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentDuration"> }) => (
-                    <FormItem>
-                      <FormLabel>Duration (minutes)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="60"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="appointmentLocation"
-                  render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentLocation"> }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Location" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="appointmentDescription"
-                render={({ field }: { field: ControllerRenderProps<FormValues, "appointmentDescription"> }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Appointment description"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          )}
         </div>
 
         <div className="flex justify-end gap-2">

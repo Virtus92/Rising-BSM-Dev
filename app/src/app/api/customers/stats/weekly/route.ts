@@ -6,10 +6,11 @@ import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { generateWeeklyStats } from '@/shared/utils/statistics-utils';
 import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
-import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
+import { CommonStatus } from '@/domain/enums/CommonEnums';
 
 /**
  * GET /api/customers/stats/weekly
+ * 
  * Returns weekly customer statistics
  */
 export const GET = routeHandler(async (request: NextRequest) => {
@@ -47,10 +48,10 @@ export const GET = routeHandler(async (request: NextRequest) => {
     // Enrich with additional data needed for the UI
     const enrichedStats = weeklyStats.map(stat => {
       // Filter customers for this period
-      const periodCustomers = customers.filter(cust => {
-        const creationDate = new Date(cust.createdAt);
-        return creationDate >= new Date(stat.startDate) && 
-               creationDate <= new Date(stat.endDate);
+      const periodCustomers = customers.filter(customer => {
+        const customerDate = new Date(customer.createdAt);
+        return customerDate >= new Date(stat.startDate) && 
+               customerDate <= new Date(stat.endDate);
       });
       
       // Count by status
@@ -60,20 +61,14 @@ export const GET = routeHandler(async (request: NextRequest) => {
       // Extract week number from period string (e.g., "Week 15")
       const week = parseInt(stat.period.replace('Week ', ''), 10);
       
-      // Count customers by type
-      const privateCustomers = periodCustomers.filter(c => c.type === CustomerType.PRIVATE).length;
-      const businessCustomers = periodCustomers.filter(c => c.type === CustomerType.BUSINESS).length;
-      
       return {
         ...stat,
         weekKey: `${stat.year}-W${week.toString().padStart(2, '0')}`,
         week,
         label: stat.period,
-        count: stat.count,
+        customers: stat.count,
         active,
-        inactive,
-        privateCustomers,
-        businessCustomers
+        inactive
       };
     });
     

@@ -66,8 +66,11 @@ export async function createUserHandler(request: NextRequest): Promise<NextRespo
       ipAddress: request.headers.get('x-forwarded-for') || 'unknown'
     };
     
+    // Remove confirmPassword from data before sending to service
+    const { confirmPassword, ...cleanData } = data as any;
+    
     // Create the user
-    const newUser = await userService.create(data, { context });
+    const newUser = await userService.create(cleanData, { context });
     
     return formatResponse.success(newUser, 'User created successfully', 201);
   } catch (error) {

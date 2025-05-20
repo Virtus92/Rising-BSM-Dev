@@ -1,82 +1,120 @@
 // This file should only be used in server contexts
 import 'server-only';
 import { PrismaClient } from '@prisma/client';
+import { getLogger } from '@/core/logging';
 
 /**
  * Prisma Client Singleton
  * 
- * This file provides a unified singleton instance of PrismaClient with error handling.
+ * This file provides a unified singleton instance of PrismaClient with 
+ * connection pooling, error handling, and performance optimizations.
  */
+
+const logger = getLogger();
 
 declare global {
   // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined;
 }
 
-/**
- * Flag to track initialization attempts to avoid infinite loops
- */
-let initializationAttempted = false;
+// Connection pool configuration
+const POOL_TIMEOUT = parseInt(process.env.DATABASE_POOL_TIMEOUT || '10', 10);
+const CONNECTION_LIMIT = parseInt(process.env.DATABASE_CONNECTION_LIMIT || '10', 10);
+const IDLE_TIMEOUT = parseInt(process.env.DATABASE_IDLE_TIMEOUT || '300', 10); // 5 minutes
 
 /**
  * Create and configure PrismaClient with proper error handling
+ * and connection pooling for optimal performance
  */
-const createPrismaClient = () => {
+function createPrismaClient(): PrismaClient {
+  logger.info('Initializing PrismaClient with connection pooling');
+  
+  // Get database URL from environment with fallback
+  let dbUrl = process.env.DATABASE_URL;
+  
+  // Add connection pooling parameters if not already present
+  if (dbUrl && !dbUrl.includes('connection_limit')) {
+    const separator = dbUrl.includes('?') ? '&' : '?';
+    dbUrl = `${dbUrl}${separator}connection_limit=${CONNECTION_LIMIT}&pool_timeout=${POOL_TIMEOUT}&idle_timeout=${IDLE_TIMEOUT}`;
+  }
+  
   try {
-    // Add validation to ensure Prisma client is actually available
-    if (!PrismaClient) {
-      throw new Error('PrismaClient constructor is not available');
-    }
-    
-    return new PrismaClient({
-      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    // Create new PrismaClient with optimized configuration
+    const client = new PrismaClient({
+      log: [
+        { level: 'query', emit: 'event' },
+        { level: 'error', emit: 'stdout' },
+        { level: 'warn', emit: 'stdout' },
+      ],
       datasources: {
         db: {
-          url: process.env.DATABASE_URL || 'postgresql://postgres.qkhermeufcstwtlyttpo:postgres@aws-0-eu-central-1.pooler.supabase.com:5432/postgres?schema=public&connection_limit=5&pool_timeout=10'
+          url: dbUrl
         },
       },
-    });
-  } catch (error) {
-    // Avoid infinite recursion
-    if (initializationAttempted) {
-      console.error('Failed to initialize Prisma client again:', error);
-      throw new Error('Prisma client initialization failed repeatedly. Please ensure Prisma is properly installed and generated.');
-    }
+     });
     
-    // Only try auto-fix once
-    initializationAttempted = true;
-    
-    console.error('Error creating Prisma client:', error);
-    console.log('Attempting to fix by regenerating Prisma client...');
-    
-    // This is a last-resort message - we can't regenerate the client at runtime in the browser
-    try {
-      // Cannot use child_process in browser environment
-      console.error('Cannot regenerate Prisma client in the browser environment.');
-      console.error('Please run `npx prisma generate` manually in your terminal.');
+    // Set up query performance monitoring in development
+    if (process.env.NODE_ENV === 'development') {
+      const slowQueryThreshold = 500; // ms
       
-      // Just throw a clear error to indicate the problem
-      throw new Error('PrismaClient initialization failed. Please run `npx prisma generate` manually in your terminal.');
-    } catch (regenerationError) {
-      console.error('Failed to regenerate Prisma client:', regenerationError);
-      throw new Error('Could not initialize or regenerate Prisma client. Please run `npx prisma generate` manually.');
+      client.$on('query', (e) => {
+        const queryStart = performance.now();
+        
+        // Log query details after completion
+        // We use setTimeout to ensure the query has finished before measuring duration
+        setTimeout(() => {
+          const duration = Math.round(performance.now() - queryStart);
+          
+          // Log slow queries
+          if (duration > slowQueryThreshold) {
+            logger.warn('Slow database query detected', {
+              query: e.query.substring(0, 100) + (e.query.length > 100 ? '...' : ''),
+              params: JSON.stringify(e.params).substring(0, 50),
+              duration: `${duration}ms`
+            });
+          }
+        }, 0);
+      });
     }
+    
+    // Enable metrics
+    logger.debug('PrismaClient initialized with connection pooling', {
+      connectionLimit: CONNECTION_LIMIT,
+      poolTimeout: POOL_TIMEOUT,
+      idleTimeout: IDLE_TIMEOUT
+    });
+    
+    return client;
+  } catch (error) {
+    logger.error('Failed to initialize PrismaClient', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    throw new Error('Database connection failed. Please check your database configuration.');
   }
-};
+}
 
-// Use the global instance or create a new one with error handling
+// Use global instance in development to prevent too many connections
+// Use a new instance in production for better isolation
 let prismaInstance: PrismaClient;
 
-try {
-  prismaInstance = global.prisma || createPrismaClient();
-  
-  // In development, save the instance in the global object
-  if (process.env.NODE_ENV !== 'production') {
-    global.prisma = prismaInstance;
+if (process.env.NODE_ENV === 'production') {
+  prismaInstance = createPrismaClient();
+} else {
+  // In development, reuse the existing instance to avoid connection issues during hot reloading
+  if (!global.prisma) {
+    global.prisma = createPrismaClient();
   }
-} catch (error) {
-  console.error('Failed to initialize Prisma client:', error);
-  throw new Error('Prisma client initialization failed. Please ensure Prisma is properly installed and generated.');
+  prismaInstance = global.prisma;
+}
+
+// Register shutdown handler to close connections gracefully
+if (typeof process !== 'undefined') {
+  process.on('beforeExit', async () => {
+    logger.info('Closing database connections on shutdown');
+    await prismaInstance.$disconnect();
+  });
 }
 
 export const prisma = prismaInstance;

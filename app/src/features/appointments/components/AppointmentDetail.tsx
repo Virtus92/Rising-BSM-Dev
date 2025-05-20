@@ -157,7 +157,7 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
           setAppointment(response.data as AppointmentDetailResponseDto);
         } else {
           // Always refetch to ensure we have the latest data
-          const updatedResponse = await AppointmentClient.getById(validId);
+          const updatedResponse = await AppointmentClient.getAppointment(validId);
           if (updatedResponse.success && updatedResponse.data) {
             setAppointment(updatedResponse.data as AppointmentDetailResponseDto);
           }
@@ -183,7 +183,7 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
         return;
       }
       
-      const response = await AppointmentClient.updateStatus(validId, { status });
+      const response = await AppointmentClient.updateAppointmentStatus(validId, { status });
       
       if (response.success && response.data) {
         // Check if the response includes complete appointment data
@@ -192,7 +192,7 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
           setAppointment(response.data as AppointmentDetailResponseDto);
         } else {
           // Always refetch to ensure we have the latest data
-          const updatedResponse = await AppointmentClient.getById(validId);
+          const updatedResponse = await AppointmentClient.getAppointment(validId);
           if (updatedResponse.success && updatedResponse.data) {
             setAppointment(updatedResponse.data as AppointmentDetailResponseDto);
           } else {

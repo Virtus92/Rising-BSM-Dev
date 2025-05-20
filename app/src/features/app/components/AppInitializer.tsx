@@ -3,13 +3,15 @@
 /**
  * AppInitializer Component
  *
- * Handles application initialization with proper service ordering and dependency resolution.
+ * Centralized application initialization with proper service ordering,
+ * dependency resolution, and database connection management.
  */
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { getLogger } from '@/core/logging';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { ServiceRegistry } from '@/core/initialization/ServiceRegistry';
 import AuthService from '@/features/auth/core';
 
 const logger = getLogger();
@@ -21,13 +23,19 @@ export interface AppInitializerProps {
   options?: {
     timeout?: number;
     debug?: boolean;
+    services?: string[];
   };
 }
 
 /**
  * AppInitializer - Ensures all core services are initialized before rendering the application
+ * with proper dependency management and database connection pooling
  */
-export default function AppInitializer({ children, fallback, options = {} }: AppInitializerProps) {
+export default function AppInitializer({ 
+  children, 
+  fallback, 
+  options = {} 
+}: AppInitializerProps) {
   // State
   const [initialized, setInitialized] = useState(false);
   const [initPhase, setInitPhase] = useState<string>('start');
@@ -41,6 +49,7 @@ export default function AppInitializer({ children, fallback, options = {} }: App
   // Options
   const timeout = options.timeout || 30000;
   const debug = options.debug || false;
+  const services = options.services || [];
   
   // Skip initialization for auth pages
   const isAuthPage = pathname?.startsWith('/auth/') || false;
@@ -135,10 +144,10 @@ export default function AppInitializer({ children, fallback, options = {} }: App
       return;
     }
     
-    // Check for stalled initialization - increase timeout to 60 seconds
+    // Check for stalled initialization - 1 minute timeout
     const isStalled = state.initializing && 
-                     state.timestamp && 
-                     (Date.now() - state.timestamp > 60000);
+      state.timestamp && 
+      (Date.now() - state.timestamp > 60000);
     
     if (state.initializing && !isStalled) {
       // Already initializing, wait for it
@@ -184,70 +193,92 @@ export default function AppInitializer({ children, fallback, options = {} }: App
     updateInitState({ initializing: true, phase: 'start', timestamp: Date.now() });
     setInitPhase('start');
 
-    // Initialize application
+    // Initialize application using the new ServiceRegistry
     const initApp = async () => {
       const initId = `init-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       logger.debug(`Starting initialization with ID: ${initId}`);
       try {
         logger.info('Starting application initialization', { initId });
 
-        // Phase 1: Initialize auth service
+        // Phase 1: Register core services with ServiceRegistry
+        setInitPhase('registering-services');
+        updateInitState({ phase: 'registering-services' });
+        
+        // Register auth service
+        if (!ServiceRegistry.isRegistered('auth')) {
+          ServiceRegistry.register('auth', AuthService, {
+            dependencies: []
+          });
+        }
+        
+        // Phase 2: Initialize auth service
         setInitPhase('auth');
         updateInitState({ phase: 'auth' });
         
         logger.info('Initializing authentication service', { initId });
-        const authResult = await AuthService.initialize({ force: true });
+        await ServiceRegistry.initialize('auth', { force: true });
         
-        if (!authResult) {
-          logger.warn('Auth service initialization failed');
-        } else {
-          logger.info('Auth service initialized successfully');
+        // Check if specific services need to be initialized
+        if (services.length > 0) {
+          setInitPhase('custom-services');
+          updateInitState({ phase: 'custom-services' });
+          
+          logger.info('Initializing custom services', { services });
+          
+          // Initialize each specified service
+          for (const service of services) {
+            if (!ServiceRegistry.isRegistered(service)) {
+              logger.warn(`Service ${service} is not registered, skipping`);
+              continue;
+            }
+            
+            await ServiceRegistry.initialize(service);
+          }
         }
         
-        // Phase 2: Load permissions if authenticated
+        // Phase 3: Load permissions if authenticated
         if (isAuthenticated && user && permissions) {
-          // Always force permission loading
           setInitPhase('permissions');
           updateInitState({ phase: 'permissions' });
           
           logger.info('Loading permissions', { initId, userId: user?.id });
           
-          // Direct call to load permissions - no fallbacks or retries
           try {
-            // IMPORTANT FIX: Always force refresh permissions to ensure they're loaded
             const permResult = await permissions.loadPermissions();
             if (!permResult) {
               logger.warn('Permission loading returned false', { userId: user?.id });
             }
             
-            // Log the permissions count for debugging
             logger.info('Permissions loaded successfully', { 
               initId, 
               userId: user?.id,
-              permissionsCount: permissions.permissions.length,
-              permissions: permissions.permissions.slice(0, 10).map(p => p.code) 
+              permissionsCount: permissions.permissions.length
             });
           } catch (permError) {
-            // Log error and let it fail properly
             logger.error('Error loading permissions:', {
               error: permError instanceof Error ? permError.message : String(permError),
               stack: permError instanceof Error ? permError.stack : undefined
             });
             
-            // No fallbacks, no retries - just propagate the error
             throw permError;
           }
         }
         
-        // Phase 3: Initialization complete
+        // Phase 4: Initialization complete
         setInitPhase('complete');
         updateInitState({ initializing: false, initialized: true, phase: 'complete' });
         setInitialized(true);
         
-        logger.info('Application initialization completed successfully', { initId });
+        logger.info('Application initialization completed successfully', { 
+          initId,
+          serviceStatus: ServiceRegistry.getInitializationStatus()
+        });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error('Application initialization failed', { error: errorMessage });
+        logger.error('Application initialization failed', { 
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined
+        });
         
         // Update state
         setInitError(errorMessage);
@@ -271,7 +302,7 @@ export default function AppInitializer({ children, fallback, options = {} }: App
         updateInitState({ initializing: false });
       }
     };
-  }, [initialized, isAuthPage, isAuthenticated, user, permissions, timeout, debug]);
+  }, [initialized, isAuthPage, isAuthenticated, user, permissions, timeout, debug, services]);
 
   // If on auth page, don't wait for initialization
   if (isAuthPage) {

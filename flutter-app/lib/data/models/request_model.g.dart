@@ -7,56 +7,61 @@ part of 'request_model.dart';
 // **************************************************************************
 
 RequestModel _$RequestModelFromJson(Map<String, dynamic> json) => RequestModel(
-      id: (json['id'] as num).toInt(),
-      name: json['name'] as String,
-      email: json['email'] as String,
-      phone: json['phone'] as String?,
-      service: json['service'] as String,
-      message: json['message'] as String,
+      id: json['id'] as int,
+      title: json['title'] as String,
+      description: json['description'] as String,
       status: json['status'] as String,
-      processorId: (json['processorId'] as num?)?.toInt(),
-      customerId: (json['customerId'] as num?)?.toInt(),
-      appointmentId: (json['appointmentId'] as num?)?.toInt(),
-      source: json['source'] as String?,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      priority: json['priority'] as String,
+      customerId: json['customerId'] as int?,
+      assignedTo: json['assignedTo'] as int?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdBy: json['createdBy'] as int?,
+      updatedBy: json['updatedBy'] as int?,
+      customer: json['customer'] == null
+          ? null
+          : CustomerModel.fromJson(json['customer'] as Map<String, dynamic>),
+      assignedToUser: json['assignedToUser'] == null
+          ? null
+          : UserModel.fromJson(json['assignedToUser'] as Map<String, dynamic>),
       notes: (json['notes'] as List<dynamic>?)
           ?.map((e) => RequestNoteModel.fromJson(e as Map<String, dynamic>))
           .toList(),
-      requestData: (json['requestData'] as List<dynamic>?)
-          ?.map((e) => RequestDataModel.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      data: json['data'] == null
+          ? null
+          : RequestDataModel.fromJson(json['data'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$RequestModelToJson(RequestModel instance) =>
     <String, dynamic>{
       'id': instance.id,
-      'name': instance.name,
-      'email': instance.email,
-      'phone': instance.phone,
-      'service': instance.service,
-      'message': instance.message,
+      'title': instance.title,
+      'description': instance.description,
       'status': instance.status,
-      'processorId': instance.processorId,
+      'priority': instance.priority,
       'customerId': instance.customerId,
-      'appointmentId': instance.appointmentId,
-      'source': instance.source,
-      'metadata': instance.metadata,
+      'assignedTo': instance.assignedTo,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
+      'createdBy': instance.createdBy,
+      'updatedBy': instance.updatedBy,
+      'customer': instance.customer,
+      'assignedToUser': instance.assignedToUser,
       'notes': instance.notes,
-      'requestData': instance.requestData,
+      'data': instance.data,
     };
 
 RequestNoteModel _$RequestNoteModelFromJson(Map<String, dynamic> json) =>
     RequestNoteModel(
-      id: (json['id'] as num).toInt(),
-      requestId: (json['requestId'] as num).toInt(),
+      id: json['id'] as int,
+      requestId: json['requestId'] as int,
       note: json['note'] as String,
-      createdBy: (json['createdBy'] as num).toInt(),
+      createdBy: json['createdBy'] as int,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
+      user: json['user'] == null
+          ? null
+          : UserModel.fromJson(json['user'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$RequestNoteModelToJson(RequestNoteModel instance) =>
@@ -67,14 +72,14 @@ Map<String, dynamic> _$RequestNoteModelToJson(RequestNoteModel instance) =>
       'createdBy': instance.createdBy,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
+      'user': instance.user,
     };
 
 RequestDataModel _$RequestDataModelFromJson(Map<String, dynamic> json) =>
     RequestDataModel(
-      id: (json['id'] as num).toInt(),
-      requestId: (json['requestId'] as num).toInt(),
-      key: json['key'] as String,
-      value: json['value'] as String,
+      id: json['id'] as int,
+      requestId: json['requestId'] as int,
+      data: json['data'] as Map<String, dynamic>,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
@@ -83,8 +88,7 @@ Map<String, dynamic> _$RequestDataModelToJson(RequestDataModel instance) =>
     <String, dynamic>{
       'id': instance.id,
       'requestId': instance.requestId,
-      'key': instance.key,
-      'value': instance.value,
+      'data': instance.data,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
     };

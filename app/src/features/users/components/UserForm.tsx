@@ -179,7 +179,11 @@ export const UserForm: React.FC<UserFormProps> = ({
       return;
     }
     
-    await onSubmit(formData);
+    // Create a clean copy of the form data without confirmPassword
+    // to prevent Prisma errors
+    const { confirmPassword, ...cleanData } = formData;
+    
+    await onSubmit(cleanData);
   };
   
   // Validate form fields

@@ -2,12 +2,11 @@
  * Centralized Authentication Middleware
  * 
  * Single source of truth for route authentication in Next.js App Router.
- * Properly handles authentication with no fallbacks or workarounds.
+ * Properly handles authentication with strict error handling.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getLogger } from '@/core/logging';
-import AuthService from '@/features/auth/core/AuthService';
 import authErrorHandler, { AuthError } from '@/features/auth/utils/AuthErrorHandler.server';
 import { AuthErrorType } from '@/types/types/auth';
 import { UserRole } from '@/domain';
@@ -43,44 +42,28 @@ export type AuthHandler = (
 ) => Promise<NextResponse>;
 
 /**
- * Extract token from request with improved logging
+ * Extract token from request with consistent logic and better debugging
  */
 export async function extractAuthToken(request: NextRequest): Promise<string | null> {
   const requestId = request.headers.get('X-Request-ID') || crypto.randomUUID().substring(0, 8);
   
-  // Check Authorization header first
+  // Check Authorization header first (highest priority)
   const authHeader = request.headers.get('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
-    logger.debug('Found token in Authorization header', {
-      requestId,
-      tokenLength: token.length,
-      tokenPrefix: token.substring(0, 10) + '...'
-    });
-    return token;
-  }
-  
-  // Check for token in request body
-  try {
-    // Try to clone the request to avoid consuming the body
-    const clonedRequest = request.clone();
-    const body = await clonedRequest.json().catch(() => null);
-    
-    if (body?.token && typeof body.token === 'string') {
-      logger.debug('Found token in request body', {
+    if (token && token.trim() !== '') {
+      logger.debug('Found token in Authorization header', {
         requestId,
-        tokenLength: body.token.length,
-        tokenPrefix: body.token.substring(0, 10) + '...'
+        tokenLength: token.length,
+        tokenPrefix: token.substring(0, 10) + '...'
       });
-      return body.token;
+      return token;
     }
-  } catch (e) {
-    // Ignore parsing errors, continue checking other sources
+    logger.debug('Empty token in Authorization header', { requestId });
   }
   
-  // Check all possible cookie names
-  // Important: Add js_token first to prioritize it, as it's specifically set for JavaScript access
-  const cookieNames = ['js_token', 'auth_token', 'access_token', 'api_auth_token'];
+  // Check cookies - prioritize js_token which is specifically for JavaScript access
+  const cookieNames = ['js_token', 'auth_token', 'access_token'];
   
   for (const cookieName of cookieNames) {
     const cookieToken = request.cookies.get(cookieName)?.value;
@@ -94,56 +77,63 @@ export async function extractAuthToken(request: NextRequest): Promise<string | n
     }
   }
   
-  // Check for refresh token cookie - we might be able to use it for token validation
-  const refreshToken = request.cookies.get('refresh_token')?.value;
-  if (refreshToken) {
-    logger.debug('Found refresh token but no access token', {
-      requestId,
-      refreshTokenLength: refreshToken.length
-    });
-    // We don't return the refresh token as it's not a valid access token
-    // But we log it for debugging purposes
+  // Check for token in request body for POST/PUT requests
+  if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
+    try {
+      // Clone request to avoid consuming body
+      const clonedRequest = request.clone();
+      const contentType = request.headers.get('content-type');
+      
+      // Only try to parse JSON content
+      if (contentType?.includes('application/json')) {
+        const body = await clonedRequest.json().catch(() => null);
+        
+        if (body?.token && typeof body.token === 'string') {
+          logger.debug('Found token in request body', {
+            requestId,
+            tokenLength: body.token.length,
+            tokenPrefix: body.token.substring(0, 10) + '...'
+          });
+          return body.token;
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
   }
   
-  // Log that no token was found with more details
+  // Log that no token was found
   logger.debug('No authentication token found in request', {
     requestId,
-    hasAuthHeader: !!authHeader,
-    authHeaderFormat: authHeader ? (authHeader.startsWith('Bearer ') ? 'valid' : 'invalid') : 'missing',
-    cookieExists: cookieNames.some(name => !!request.cookies.get(name)),
-    refreshTokenExists: !!request.cookies.get('refresh_token'),
-    allCookies: [...request.cookies.getAll()].map(c => c.name),
     url: request.url,
-    method: request.method
+    method: request.method,
+    hasAuthHeader: !!authHeader,
+    cookiesFound: [...request.cookies.getAll()].map(c => c.name),
+    headers: Object.fromEntries([...request.headers.entries()].filter(
+      ([key]) => !['cookie', 'authorization'].includes(key.toLowerCase())
+    ))
   });
   
   return null;
 }
 
 /**
- * Decode and validate JWT token - no workarounds, fail on invalid
+ * Decode and validate JWT token with strict validation
  */
 async function decodeAndValidateToken(token: string): Promise<{ valid: boolean; userId?: number; role?: string; error?: Error; serverValidated?: boolean }> {
   try {
-    // Log token details to help debug
-    logger.debug('Validating token', { 
-      tokenLength: token?.length || 0,
-      tokenPrefix: token?.substring(0, 10) || 'none'
-    });
-    
+    // Basic validation
     if (!token || token.trim() === '') {
-      logger.error('Empty token provided for validation');
-      return { valid: false };
+      return { valid: false, error: new Error('Empty token provided') };
     }
     
-    // Ensure token has valid JWT format
+    // Check token format
     const parts = token.split('.');
     if (parts.length !== 3) {
-      logger.error('Invalid token format', { partsCount: parts.length });
-      return { valid: false };
+      return { valid: false, error: new Error('Invalid token format') };
     }
     
-    // Parse token directly
+    // Decode token
     const decoded = jwtDecode<{
       sub: string | number;
       exp: number;
@@ -153,19 +143,17 @@ async function decodeAndValidateToken(token: string): Promise<{ valid: boolean; 
       name?: string;
     }>(token);
     
-    // Check required fields
+    // Validate required claims
     if (!decoded.sub) {
-      logger.error('Token missing subject claim');
-      return { valid: false };
+      return { valid: false, error: new Error('Token missing subject claim') };
     }
     
     if (!decoded.exp) {
-      logger.error('Token missing expiration claim');
-      return { valid: false };
+      return { valid: false, error: new Error('Token missing expiration claim') };
     }
     
     // Check expiration
-    const now = Date.now() / 1000;
+    const now = Math.floor(Date.now() / 1000);
     const expiresAt = decoded.exp;
     
     // Log token details for debugging
@@ -176,103 +164,102 @@ async function decodeAndValidateToken(token: string): Promise<{ valid: boolean; 
       isExpired: now >= expiresAt
     });
     
-    // Be strict about expiration - no grace period
+    // Strict expiration check
     if (now >= expiresAt) {
-      logger.error('Token has expired', { 
-        now: new Date(now * 1000).toISOString(),
-        expiry: new Date(expiresAt * 1000).toISOString(),
-        timeRemaining: `${Math.round(expiresAt - now)} seconds`
-      });
-      return { valid: false };
+      return { 
+        valid: false, 
+        error: new Error(`Token expired at ${new Date(expiresAt * 1000).toISOString()}`)
+      };
     }
     
-    // Extract user ID
+    // Extract user ID with validation
     let userId: number;
     if (typeof decoded.sub === 'number') {
       userId = decoded.sub;
     } else {
       userId = parseInt(decoded.sub, 10);
-      if (isNaN(userId)) {
-        logger.error('Invalid user ID in token', { sub: decoded.sub });
-        return { valid: false };
+      if (isNaN(userId) || userId <= 0) {
+        return { 
+          valid: false, 
+          error: new Error(`Invalid user ID in token: ${decoded.sub}`)
+        };
       }
     }
     
-    // Verify the token signature on the server
-    try {
-      // Separate server-side and client-side validation paths
-      if (typeof window === 'undefined') {
-        // Server-side: use jsonwebtoken to verify
-        try {
-          const { verify } = await import('jsonwebtoken');
-          const { securityConfig } = await import('@/core/config/SecurityConfig');
-          
-          // Get JWT secret from config
-          const jwtSecret = securityConfig.getJwtSecret();
-          
-          // Verify token with JWT secret and audience/issuer
-          verify(token, jwtSecret, {
-            audience: securityConfig.getJwtAudience(),
-            issuer: securityConfig.getJwtIssuer()
-          });
-          
-          // If verification passes, token is valid
-          logger.debug('Server-side JWT verification passed', { userId });
-          
-          // Check token in database to ensure it's not revoked
-          const { default: tokenBlacklist } = await import('@/features/auth/utils/tokenBlacklist');
-          const isBlacklisted = await tokenBlacklist.isTokenBlacklisted(token);
-          
-          if (isBlacklisted) {
-            logger.warn('Token is blacklisted or revoked', { userId });
-            return { valid: false };
-          }
-        } catch (jwtError) {
-          logger.error('Server JWT verification failed', { 
-            error: jwtError instanceof Error ? jwtError.message : String(jwtError),
-            tokenPrefix: token.substring(0, 10) + '...'
-          });
-          return { valid: false };
+    // Server-side validation with signature check
+    if (typeof window === 'undefined') {
+      try {
+        // Load verification tools
+        const { verify } = await import('jsonwebtoken');
+        const { securityConfig } = await import('@/core/config/SecurityConfig');
+        
+        // Get config
+        const jwtSecret = securityConfig.getJwtSecret();
+        const audience = securityConfig.getJwtAudience();
+        const issuer = securityConfig.getJwtIssuer();
+        
+        // Verify token with all options
+        verify(token, jwtSecret, {
+          audience,
+          issuer,
+          complete: true
+        });
+        
+        // Check blacklist
+        const { default: tokenBlacklist } = await import('@/features/auth/utils/tokenBlacklist');
+        const isBlacklisted = await tokenBlacklist.isTokenBlacklisted(token);
+        
+        if (isBlacklisted) {
+          return { 
+            valid: false, 
+            error: new Error('Token is revoked or blacklisted'),
+            serverValidated: true
+          };
         }
-      } else {
-        // Client-side: perform best-effort validation
-        // We've already checked expiration and format above
-        // Additional validation could be performed with a dedicated endpoint
-        logger.debug('Client-side token validation passed', { userId });
+        
+        // Mark as server-validated
+        logger.debug('Server-side JWT verification passed', { userId });
+        return {
+          valid: true,
+          userId,
+          role: decoded.role,
+          serverValidated: true
+        };
+      } catch (jwtError) {
+        return { 
+          valid: false, 
+          error: jwtError as Error,
+          serverValidated: true
+        };
       }
-      
-      // Return successful validation
+    } else {
+      // Client-side validation (limited to expiration check)
       return {
         valid: true,
         userId,
-        role: decoded.role
+        role: decoded.role,
+        serverValidated: false
       };
-    } catch (validationError) {
-      logger.error('Token validation error', {
-        error: validationError instanceof Error ? validationError.message : String(validationError),
-        stack: validationError instanceof Error ? validationError.stack : undefined
-      });
-      return { valid: false };
     }
   } catch (error) {
-    logger.error('Token decode error:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
-    });
-    return { valid: false };
+    return { 
+      valid: false, 
+      error: error as Error
+    };
   }
 }
 
 /**
- * Authenticate request - proper implementation with clear errors
+ * Authenticate request with proper error handling and diagnostics
  */
 export async function authenticateRequest(request: NextRequest): Promise<AuthResult> {
+  const requestId = request.headers.get('X-Request-ID') || crypto.randomUUID().substring(0, 8);
+  
   try {
-    // Extract token first
+    // Extract token
     const token = await extractAuthToken(request);
     
     if (!token) {
-      logger.debug('No authentication token provided');
       return {
         success: false,
         error: 'No authentication token provided',
@@ -282,59 +269,46 @@ export async function authenticateRequest(request: NextRequest): Promise<AuthRes
       };
     }
     
-    // Always validate the token properly with the server
+    // Validate token
     const verificationResult = await decodeAndValidateToken(token);
     
     if (!verificationResult.valid || !verificationResult.userId) {
+      logger.debug('Token validation failed', {
+        requestId,
+        error: verificationResult.error?.message || 'Unknown validation error',
+        serverValidated: verificationResult.serverValidated
+      });
+      
       return {
         success: false,
-        error: 'Invalid or expired token',
+        error: verificationResult.error?.message || 'Invalid or expired token',
         message: 'Authentication failed',
         statusCode: 401,
         status: 401,
       };
     }
     
-    // Create user information directly from verification result
-    // This eliminates the dependency on AuthService.getUser() which
-    // was causing errors due to missing implementation
+    // Create user information directly from token validation
     const user = {
       id: verificationResult.userId,
-      email: '',  // We don't have this from token validation
+      email: '',  // Will be populated later if available
       role: verificationResult.role || 'USER'
     };
     
-    // Optionally try to get more user details if available
-    try {
-      // Only attempt to use AuthService if we're in a client context
-      if (typeof window !== 'undefined') {
-        // Dynamically import AuthService to prevent circular dependencies
-        const { default: AuthService } = await import('@/features/auth/core/AuthService');
-        
-        // Check if AuthService has the user info
-        const authUser = AuthService.getUser?.();
-        
-        // Only use if it matches the verified user ID
-        if (authUser && authUser.id === verificationResult.userId) {
-          user.email = authUser.email || '';
-          user.role = authUser.role || verificationResult.role || 'USER';
-        }
-      }
-    } catch (userError) {
-      // Log but continue with basic user info
-      logger.debug('Could not enhance user information', {
-        error: userError instanceof Error ? userError.message : String(userError),
-        userId: verificationResult.userId
-      });
-    }
-    
     // Successfully authenticated
+    logger.debug('Authentication successful', {
+      requestId,
+      userId: user.id,
+      role: user.role,
+      serverValidated: verificationResult.serverValidated
+    });
+    
     return {
       success: true,
       user,
     };
   } catch (error) {
-    // Create a standardized error
+    // Standardize error format
     let errorMsg = 'Authentication failed';
     let statusCode = 401;
     
@@ -346,8 +320,11 @@ export async function authenticateRequest(request: NextRequest): Promise<AuthRes
     }
     
     logger.error('Authentication error:', {
+      requestId,
       error: errorMsg,
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
+      url: request.url,
+      method: request.method
     });
     
     return {
@@ -375,24 +352,26 @@ export function withAuth(
 ): (request: NextRequest, context?: any) => Promise<NextResponse> {
   // Return a new handler function
   return async (request: NextRequest, context?: any): Promise<NextResponse> => {
+    const requestId = request.headers.get('X-Request-ID') || crypto.randomUUID().substring(0, 8);
+    
     try {
       // Skip auth check if not required
       if (options.requireAuth === false) {
         return await handler(request, null);
       }
       
-      // Authenticate request - this correctly uses the async extractAuthToken function
+      // Authenticate request
       const authResult = await authenticateRequest(request);
       
       if (!authResult.success) {
-        // Create a proper error response
+        // Create proper error response
         const error = authErrorHandler.createError(
           authResult.message || authResult.error || 'Authentication failed',
           AuthErrorType.AUTH_REQUIRED,
           {
+            requestId,
             requestUrl: request.url,
-            requestMethod: request.method,
-            error: authResult.error
+            requestMethod: request.method
           }
         );
         
@@ -400,19 +379,20 @@ export function withAuth(
       }
       
       // Check role if required
-      if (options.requiredRole) {
+      if (options.requiredRole && authResult.user) {
         // Handle both single role and array of roles
         const requiredRoles = Array.isArray(options.requiredRole) 
           ? options.requiredRole 
           : [options.requiredRole];
         
-        const userRole = authResult.user?.role;
+        const userRole = authResult.user.role;
         const hasRequiredRole = userRole && requiredRoles.includes(userRole as UserRole);
         
         if (!hasRequiredRole) {
           const roleStr = requiredRoles.join(', ');
           logger.error('User lacks required role', {
-            userId: authResult.user?.id,
+            requestId,
+            userId: authResult.user.id,
             userRole,
             requiredRoles
           });
@@ -421,8 +401,8 @@ export function withAuth(
             `Required role not found. Expected one of: ${roleStr}`,
             AuthErrorType.PERMISSION_DENIED,
             {
-              requiredRoles: requiredRoles,
-              userRole: userRole
+              requiredRoles,
+              userRole
             }
           );
           
@@ -433,12 +413,12 @@ export function withAuth(
       // Check permissions if required
       if (options.requiredPermission && options.requiredPermission.length > 0 && authResult.user?.id) {
         try {
-          // Use userData object to avoid type issues
           const userData = { userId: authResult.user.id };
-          const hasPermission = await checkPermissions(userData, options.requiredPermission);
+          const hasPermission = await checkPermissions(userData, options.requiredPermission, requestId);
           
           if (!hasPermission) {
             logger.error('User lacks required permissions', {
+              requestId,
               userId: authResult.user.id,
               requiredPermissions: options.requiredPermission
             });
@@ -455,6 +435,7 @@ export function withAuth(
           }
         } catch (error) {
           logger.error('Error checking permissions:', {
+            requestId,
             error: error instanceof Error ? error.message : String(error),
             stack: error instanceof Error ? error.stack : undefined,
             userId: authResult.user.id,
@@ -464,16 +445,14 @@ export function withAuth(
           const permError = authErrorHandler.createError(
             'Error checking permissions',
             AuthErrorType.PERMISSION_DENIED,
-            {
-              error: error instanceof Error ? error.message : String(error)
-            }
+            { error: error instanceof Error ? error.message : String(error) }
           );
+          
           return permError.toResponse();
         }
       }
       
-      // Create a modified request with user info attached
-      // Convert to AuthInfo type expected by route handlers
+      // Verify user exists in auth result
       if (!authResult.user) {
         const error = authErrorHandler.createError(
           'Authentication succeeded but user information is missing',
@@ -482,10 +461,7 @@ export function withAuth(
         return error.toResponse();
       }
       
-      // Instead of creating a new request, modify the existing one
-      // This ensures all properties are preserved correctly
-      
-      // Attach auth info
+      // Create auth info object
       const authInfo = {
         userId: authResult.user.id,
         email: authResult.user.email,
@@ -493,23 +469,36 @@ export function withAuth(
         name: authResult.user.name
       };
       
-      // Add auth property directly to the original request object
-      // This ensures it's properly propagated throughout the request lifecycle
-      Object.defineProperty(request, 'auth', {
-        value: authInfo,
-        writable: false,
-        enumerable: true,
-        configurable: false
+      // Attach user authentication info to request
+      // First, check if auth property already exists to avoid errors
+      if (!request.auth) {
+        Object.defineProperty(request, 'auth', {
+          value: authInfo,
+          writable: true, // Make writable to avoid issues
+          enumerable: true,
+          configurable: true
+        });
+      } else {
+        // Update existing auth object safely
+        request.auth = { ...request.auth, ...authInfo };
+      }
+      
+      // Log auth attachment for debugging
+      logger.debug('Attached auth data to request', {
+        requestId,
+        userId: authInfo.userId,
+        role: authInfo.role,
+        hasAuth: !!request.auth
       });
       
-      // Add a custom header for additional verification
-      // This can be checked if Object.defineProperty fails in some environments
+      // Also set headers for backup authentication propagation
       request.headers.set('X-Auth-User-ID', authResult.user.id.toString());
+      request.headers.set('X-Auth-User-Role', authResult.user.role || 'USER');
       
-      // Execute the handler with the authenticated request
+      // Execute handler with authenticated request
       return await handler(request, authResult.user);
     } catch (error) {
-      // Create a standardized error response
+      // Handle errors
       let statusCode = 500;
       let errorMessage = 'Internal server error';
       
@@ -522,17 +511,21 @@ export function withAuth(
       }
       
       logger.error('Auth middleware error:', {
+        requestId,
         error: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
         url: request.url,
         method: request.method
       });
       
-      // Create an error using authErrorHandler
+      // Create standardized error response
       const authError = authErrorHandler.createError(
         errorMessage,
         AuthErrorType.AUTH_FAILED,
-        { originalError: error instanceof Error ? error.name : 'unknown' },
+        { 
+          requestId,
+          originalError: error instanceof Error ? error.name : 'unknown'
+        },
         statusCode
       );
       
@@ -542,49 +535,134 @@ export function withAuth(
 }
 
 /**
- * Check if user has required permissions - proper implementation with no fallbacks
+ * Check if user has required permissions with proper error handling
  */
-async function checkPermissions(userData: Record<string, any>, requiredPermissions: string[]): Promise<boolean> {
+async function checkPermissions(
+  userData: Record<string, any>, 
+  requiredPermissions: string[],
+  requestId?: string
+): Promise<boolean> {
   try {
+    // Validate inputs
     if (!requiredPermissions || requiredPermissions.length === 0) {
       return true; // No permissions required
     }
     
     if (!userData || !userData.userId) {
-      logger.error('Cannot check permissions - no user ID provided');
+      logger.error('Cannot check permissions - no user ID provided', { requestId });
       return false;
     }
     
-    // Make API call to check permissions
-    const response = await fetch(`/api/users/permissions/check`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId: userData.userId,
-        permissions: requiredPermissions,
-      }),
-    });
+    // Determine base URL for API calls
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     
-    if (!response.ok) {
-      logger.error('Permission check API call failed', {
-        userId: userData.userId,
-        permissions: requiredPermissions,
-        status: response.status
+    // Set up auth headers for permission check
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Auth-User-ID': userData.userId.toString(),
+      'X-Request-ID': requestId || crypto.randomUUID().substring(0, 8)
+    };
+    
+    // Use batch endpoint for efficiency
+    const batchUrl = `${baseUrl}/api/users/permissions/check`;
+    
+    try {
+      const batchResponse = await fetch(batchUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          userId: userData.userId,
+          permissions: requiredPermissions,
+        }),
       });
-      return false;
+      
+      if (batchResponse.ok) {
+        const data = await batchResponse.json();
+        
+        if (data.success && data.data && data.data.hasPermission) {
+          logger.debug('Permission check successful - user has required permissions', {
+            requestId,
+            userId: userData.userId,
+            permissionResults: data.data.permissionResults
+          });
+          return true;
+        }
+        
+        // If batch check returns success: false, user doesn't have permissions
+        logger.debug('User lacks required permissions (batch check)', {
+          requestId,
+          userId: userData.userId,
+          requiredPermissions
+        });
+        return false;
+      }
+      
+      // If batch endpoint fails, check permissions individually
+      logger.warn('Batch permission check failed, checking individually', {
+        requestId,
+        userId: userData.userId,
+        status: batchResponse.status
+      });
+    } catch (error) {
+      logger.warn('Error in batch permission check, falling back to individual checks', {
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+        userId: userData.userId
+      });
     }
     
-    const data = await response.json();
-    return data.success && data.hasPermission;
-  } catch (error) {
-    logger.error('Error checking permissions:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      userId: userData.userId
+    // Individual permission checks
+    for (const permission of requiredPermissions) {
+      try {
+        const params = new URLSearchParams();
+        params.append('userId', userData.userId.toString());
+        params.append('permission', permission);
+        
+        const url = `${baseUrl}/api/users/permissions/check?${params.toString()}`;
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.success && data.data === true) {
+            logger.debug(`User has permission: ${permission}`, {
+              requestId,
+              userId: userData.userId
+            });
+            return true;
+          }
+        }
+      } catch (error) {
+        logger.warn(`Error checking permission ${permission}:`, {
+          requestId,
+          error: error instanceof Error ? error.message : String(error),
+          userId: userData.userId
+        });
+      }
+    }
+    
+    // If we get here, the user doesn't have any of the required permissions
+    logger.debug('User lacks all required permissions', {
+      requestId,
+      userId: userData.userId,
+      requiredPermissions
     });
     return false;
+  } catch (error) {
+    logger.error('Error in permission checking process:', {
+      requestId,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: userData?.userId,
+      requiredPermissions
+    });
+    
+    // Throw rather than silently failing
+    throw error;
   }
 }
 
@@ -595,7 +673,7 @@ export function getUserFromRequest(request: NextRequest): any {
   return (request).auth || null;
 }
 
-// Export utility functions for use in route handler
+// Export utility functions
 export { decodeAndValidateToken };
 
 // Main export

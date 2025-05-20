@@ -6,6 +6,7 @@ import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
+import { UserRole } from '@/domain/enums/UserEnums';
 
 type RequestParams = {
   params: {
@@ -16,7 +17,7 @@ type RequestParams = {
 /**
  * POST /api/requests/[id]/assign
  * 
- * Weist eine Kontaktanfrage einem Benutzer zu.
+ * Assigns a contact request to a user with proper permission checks.
  */
 export const POST = routeHandler(
   await withPermission(
@@ -43,13 +44,40 @@ export const POST = routeHandler(
         userRole: req.auth?.role
       };
       
-      // Get request service
+      // Get request service and user service
       const requestService = serviceFactory.createRequestService();
+      const userService = serviceFactory.createUserService();
       
-      // Assign request to user
-      const updatedRequest = await requestService.assignRequest(requestId, userId, note, { context });
-      
-      return formatResponse.success(updatedRequest, 'Request assigned successfully');
+      // Verify user exists and has proper permissions
+      try {
+        const user = await userService.getById(userId);
+        
+        if (!user) {
+          return formatResponse.error('User not found', 404);
+        }
+        
+        // Check if user has appropriate permissions to process requests
+        const permissionService = serviceFactory.createPermissionService();
+        const userPermissions = await permissionService.getUserPermissions(userId);
+        
+        // Check if user can view and edit requests
+        const canProcessRequests = userPermissions.permissions.some((p: string) => 
+          p === SystemPermission.REQUESTS_VIEW || 
+          p === SystemPermission.REQUESTS_EDIT
+        );
+        
+        if (!canProcessRequests && user.role !== UserRole.ADMIN) {
+          return formatResponse.error('User does not have permission to process requests', 403);
+        }
+        
+        // Assign request to user
+        const updatedRequest = await requestService.assignRequest(requestId, userId, note, { context });
+        
+        return formatResponse.success(updatedRequest, 'Request assigned successfully');
+      } catch (error) {
+        logger.error('Error assigning request:', error as Error);
+        return formatResponse.error('Failed to assign request', 500);
+      }
     },
     SystemPermission.REQUESTS_ASSIGN
   ),

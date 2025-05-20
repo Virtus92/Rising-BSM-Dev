@@ -138,7 +138,7 @@ export class UserClient {
    * @param params - Optional filter parameters
    * @returns API response
    */
-  static async getUsers(params: Record<string, any> = {}): Promise<ApiResponse<PaginationResult<UserResponseDto>>> {
+  static async getUsers(params: Record<string, any> = {}, headers: Record<string, string> = {}): Promise<ApiResponse<PaginationResult<UserResponseDto>>> {
     try {
       // Process parameters first, before creating any Promises
       const queryString = UserClient.createQueryParams(params);
@@ -146,7 +146,7 @@ export class UserClient {
       
       // Create the API request and return it directly without intermediate awaits
       // This prevents Function.prototype.apply errors in the Promise chain
-      return ApiClient.get<PaginationResult<UserResponseDto>>(url);
+      return ApiClient.get<PaginationResult<UserResponseDto>>(url, { headers });
     } catch (error: unknown) {
       console.error('Error in UserClient.getUsers:', error);
       const errorObj = error as Record<string, any>;
@@ -220,7 +220,27 @@ export class UserClient {
    * @returns API response
    */
   static async createUser(data: CreateUserDto): Promise<ApiResponse<UserResponseDto>> {
-    return await UserClient.apiRequest<UserResponseDto>('post', USERS_API_URL, data);
+    try {
+      // Remove confirmPassword if present to prevent Prisma errors
+      const { confirmPassword, ...cleanData } = data as any;
+      
+      // Make the API request
+      const response = await UserClient.apiRequest<UserResponseDto>('post', USERS_API_URL, cleanData);
+      
+      // Log the complete response for debugging
+      console.log('UserClient.createUser response:', JSON.stringify(response));
+      
+      return response;
+    } catch (error) {
+      console.error('Error in UserClient.createUser:', error as Error);
+      return {
+        success: false,
+        data: null,
+        error: error instanceof Error ? error.message : 'Failed to create user',
+        message: 'User creation failed',
+        statusCode: 500
+      };
+    }
   }
   
   /**

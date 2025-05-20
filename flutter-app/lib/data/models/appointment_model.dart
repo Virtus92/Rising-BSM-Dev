@@ -2,6 +2,7 @@
 import 'package:json_annotation/json_annotation.dart';
 
 import 'customer_model.dart';
+import 'user_model.dart';
 
 part 'appointment_model.g.dart';
 
@@ -32,6 +33,7 @@ class AppointmentModel {
   
   final CustomerModel? customer;
   final List<AppointmentNoteModel>? notes;
+  final UserModel? createdByUser;
 
   const AppointmentModel({
     required this.id,
@@ -47,6 +49,7 @@ class AppointmentModel {
     required this.updatedAt,
     this.customer,
     this.notes,
+    this.createdByUser,
   });
 
   // Getters for status types
@@ -95,6 +98,8 @@ class AppointmentNoteModel {
   
   @JsonKey(name: 'updatedAt')
   final DateTime updatedAt;
+  
+  final UserModel? user;
 
   const AppointmentNoteModel({
     required this.id,
@@ -103,6 +108,7 @@ class AppointmentNoteModel {
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
+    this.user,
   });
 
   factory AppointmentNoteModel.fromJson(Map<String, dynamic> json) => 

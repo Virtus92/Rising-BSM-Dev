@@ -2,6 +2,8 @@ import '../../core/errors/api_exception.dart';
 import '../../core/storage/storage_service.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../models/auth_model.dart';
+import '../models/auth_request_models.dart';
+import '../models/auth_response_models.dart';
 import '../models/user_model.dart';
 import '../sources/auth_api.dart';
 
@@ -17,19 +19,34 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final response = await _authApi.login(credentials);
       
-      if (!response.success || response.data == null) {
+      final Map<String, dynamic> responseData = response;
+      
+      if (!responseData['success'] || responseData['data'] == null) {
+        final error = responseData['error'] as Map<String, dynamic>?;
         throw ApiException(
-          code: response.error?.code ?? 'LOGIN_FAILED',
-          message: response.error?.message ?? 'Login failed',
+          code: error?['code'] ?? 'LOGIN_FAILED',
+          message: error?['message'] ?? 'Login failed',
           statusCode: 401,
         );
       }
       
-      // Store tokens and user data
-      await storeTokens(response.data!.tokens);
-      await storeUserData(response.data!.user);
+      final data = responseData['data'] as Map<String, dynamic>;
+      final tokensData = data['tokens'] as Map<String, dynamic>;
+      final userData = data['user'] as Map<String, dynamic>;
       
-      return response.data!;
+      final tokens = AuthTokens(
+        accessToken: tokensData['accessToken'] as String,
+        refreshToken: tokensData['refreshToken'] as String,
+        expiresIn: tokensData['expiresIn'] as int? ?? 900,
+      );
+      
+      final user = UserModel.fromJson(userData);
+      
+      // Store tokens and user data
+      await storeTokens(tokens);
+      await storeUserData(user);
+      
+      return AuthResponse(tokens: tokens, user: user);
     } catch (e) {
       if (e is ApiException) {
         rethrow;
@@ -47,19 +64,34 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final response = await _authApi.register(request);
       
-      if (!response.success || response.data == null) {
+      final Map<String, dynamic> responseData = response;
+      
+      if (!responseData['success'] || responseData['data'] == null) {
+        final error = responseData['error'] as Map<String, dynamic>?;
         throw ApiException(
-          code: response.error?.code ?? 'REGISTRATION_FAILED',
-          message: response.error?.message ?? 'Registration failed',
+          code: error?['code'] ?? 'REGISTRATION_FAILED',
+          message: error?['message'] ?? 'Registration failed',
           statusCode: 400,
         );
       }
       
-      // Store tokens and user data
-      await storeTokens(response.data!.tokens);
-      await storeUserData(response.data!.user);
+      final data = responseData['data'] as Map<String, dynamic>;
+      final tokensData = data['tokens'] as Map<String, dynamic>;
+      final userData = data['user'] as Map<String, dynamic>;
       
-      return response.data!;
+      final tokens = AuthTokens(
+        accessToken: tokensData['accessToken'] as String,
+        refreshToken: tokensData['refreshToken'] as String,
+        expiresIn: tokensData['expiresIn'] as int? ?? 900,
+      );
+      
+      final user = UserModel.fromJson(userData);
+      
+      // Store tokens and user data
+      await storeTokens(tokens);
+      await storeUserData(user);
+      
+      return AuthResponse(tokens: tokens, user: user);
     } catch (e) {
       if (e is ApiException) {
         rethrow;
@@ -75,9 +107,9 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<AuthTokens> refreshToken() async {
     try {
-      final String? refreshToken = await _storageService.getRefreshToken();
+      final String? refreshTokenValue = await _storageService.getRefreshToken();
       
-      if (refreshToken == null) {
+      if (refreshTokenValue == null) {
         throw ApiException(
           code: 'REFRESH_TOKEN_MISSING',
           message: 'Refresh token is missing',
@@ -85,20 +117,31 @@ class AuthRepositoryImpl implements AuthRepository {
         );
       }
       
-      final response = await _authApi.refreshToken(refreshToken);
+      final response = await _authApi.refreshToken(refreshTokenValue);
       
-      if (!response.success || response.data == null) {
+      final Map<String, dynamic> responseData = response;
+      
+      if (!responseData['success'] || responseData['data'] == null) {
+        final error = responseData['error'] as Map<String, dynamic>?;
         throw ApiException(
-          code: response.error?.code ?? 'TOKEN_REFRESH_FAILED',
-          message: response.error?.message ?? 'Token refresh failed',
+          code: error?['code'] ?? 'TOKEN_REFRESH_FAILED',
+          message: error?['message'] ?? 'Token refresh failed',
           statusCode: 401,
         );
       }
       
-      // Store new tokens
-      await storeTokens(response.data!);
+      final data = responseData['data'] as Map<String, dynamic>;
       
-      return response.data!;
+      final tokens = AuthTokens(
+        accessToken: data['accessToken'] as String,
+        refreshToken: data['refreshToken'] as String,
+        expiresIn: data['expiresIn'] as int? ?? 900,
+      );
+      
+      // Store new tokens
+      await storeTokens(tokens);
+      
+      return tokens;
     } catch (e) {
       if (e is ApiException) {
         rethrow;
@@ -149,7 +192,8 @@ class AuthRepositoryImpl implements AuthRepository {
       
       // Validate token with the server
       final response = await _authApi.validateToken();
-      return response.success && response.data == true;
+      final responseData = response as Map<String, dynamic>;
+      return responseData['success'] == true && responseData['data'] == true;
     } catch (e) {
       return false;
     }
@@ -160,10 +204,13 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final response = await _authApi.changePassword(request);
       
-      if (!response.success) {
+      final Map<String, dynamic> responseData = response;
+      
+      if (!responseData['success']) {
+        final error = responseData['error'] as Map<String, dynamic>?;
         throw ApiException(
-          code: response.error?.code ?? 'PASSWORD_CHANGE_FAILED',
-          message: response.error?.message ?? 'Password change failed',
+          code: error?['code'] ?? 'PASSWORD_CHANGE_FAILED',
+          message: error?['message'] ?? 'Password change failed',
           statusCode: 400,
         );
       }
@@ -185,10 +232,13 @@ class AuthRepositoryImpl implements AuthRepository {
       final request = ForgotPasswordRequest(email: email);
       final response = await _authApi.forgotPassword(request);
       
-      if (!response.success) {
+      final Map<String, dynamic> responseData = response;
+      
+      if (!responseData['success']) {
+        final error = responseData['error'] as Map<String, dynamic>?;
         throw ApiException(
-          code: response.error?.code ?? 'PASSWORD_RESET_REQUEST_FAILED',
-          message: response.error?.message ?? 'Password reset request failed',
+          code: error?['code'] ?? 'PASSWORD_RESET_REQUEST_FAILED',
+          message: error?['message'] ?? 'Password reset request failed',
           statusCode: 400,
         );
       }
@@ -209,10 +259,13 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final response = await _authApi.resetPassword(request);
       
-      if (!response.success) {
+      final Map<String, dynamic> responseData = response;
+      
+      if (!responseData['success']) {
+        final error = responseData['error'] as Map<String, dynamic>?;
         throw ApiException(
-          code: response.error?.code ?? 'PASSWORD_RESET_FAILED',
-          message: response.error?.message ?? 'Password reset failed',
+          code: error?['code'] ?? 'PASSWORD_RESET_FAILED',
+          message: error?['message'] ?? 'Password reset failed',
           statusCode: 400,
         );
       }

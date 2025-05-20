@@ -1,12 +1,11 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
 
 import '../../data/models/auth_model.dart';
 import '../config/env_config.dart';
 import '../errors/api_exception.dart';
-import '../mocks/mock_api_handler.dart';
-import '../mocks/mock_config_service.dart';
+import '../errors/network_exception.dart';
+import '../network/connectivity_service.dart';
+import '../network/network_interceptor.dart';
 import '../storage/storage_service.dart';
 import 'api_client_interface.dart';
 
@@ -15,19 +14,25 @@ class ApiClient implements ApiClientInterface {
   late final Dio _dio;
   final EnvConfig _config;
   StorageService? _storageService;
-  MockApiHandler? _mockApiHandler;
-  final MockConfigService _mockConfig = MockConfigService();
+  ConnectivityService? _connectivityService;
 
   ApiClient(this._config) {
     _dio = _createDio();
     _setupInterceptors();
   }
+  
+  // Set the connectivity service
+  void setConnectivityService(ConnectivityService connectivityService) {
+    _connectivityService = connectivityService;
+    // Add network interceptor when connectivity service is set
+    if (_connectivityService != null) {
+      _dio.interceptors.add(NetworkInterceptor(_connectivityService!));
+    }
+  }
 
   // Set the storage service - called after dependency injection setup
   void setStorageService(StorageService storageService) {
     _storageService = storageService;
-    // Initialize mock API handler when storage service is set
-    _mockApiHandler = MockApiHandler(storageService);
   }
 
   // Create and configure Dio instance
@@ -83,41 +88,6 @@ class ApiClient implements ApiClientInterface {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // Handle mock API requests if enabled
-    if (_mockConfig.useMockApi && _mockApiHandler != null) {
-      try {
-        // Debug logging for mock request
-        print('📲 Mock API Request: ${options.method} ${options.path}');
-        
-        // Extract data safely
-        Map<String, dynamic>? requestData;
-        if (options.data is Map<String, dynamic>) {
-          requestData = options.data as Map<String, dynamic>;
-        } else if (options.data is String) {
-          try {
-            // Try to parse JSON
-            requestData = json.decode(options.data as String) as Map<String, dynamic>?;
-          } catch (_) {
-            // Not a valid JSON string, ignore
-          }
-        }
-        
-        final mockResponse = await _mockApiHandler!.handleRequest(
-          options.path,
-          options.method,
-          requestData,
-          options.queryParameters,
-        );
-        
-        print('📬 Mock API Response: ${mockResponse.statusCode}');
-        return handler.resolve(mockResponse);
-      } catch (e) {
-        print('❌ Error in mock handler: $e');
-        print('Falling back to real API');
-        // Continue with real API if mock fails
-      }
-    }
-
     // Skip token for login, registration, and public endpoints
     if (_isPublicEndpoint(options.path)) {
       return handler.next(options);
@@ -151,101 +121,36 @@ class ApiClient implements ApiClientInterface {
       
       if (needsRefresh && _storageService != null) {
         try {
-          // Check if we should use mock auth for token refresh
-          if (_mockConfig.useMockAuth && _mockApiHandler != null) {            // Use mock refresh
-            final refreshToken = await _storageService!.getRefreshToken();
-            if (refreshToken != null && refreshToken.isNotEmpty) {
-              final mockResponse = await _mockApiHandler!.handleRequest(
-                '/auth/refresh',
-                'POST',
-                {'refreshToken': refreshToken},
-                null,
-              );
+          // Get the refresh token
+          final refreshToken = await _storageService!.getRefreshToken();
+          if (refreshToken != null && refreshToken.isNotEmpty) {
+            // Create a new dio instance to avoid interceptors loop
+            final refreshDio = Dio(BaseOptions(
+              baseUrl: _config.apiBaseUrl,
+              connectTimeout: Duration(milliseconds: _config.apiTimeout),
+              receiveTimeout: Duration(milliseconds: _config.apiTimeout),
+              contentType: Headers.jsonContentType,
+            ));
+            
+            // Send refresh token request
+            final refreshResponse = await refreshDio.post(
+              '/auth/refresh',
+              data: {'refreshToken': refreshToken},
+              options: Options(headers: {'Content-Type': 'application/json'})
+            );
+            
+            if (refreshResponse.statusCode == 200 && 
+                refreshResponse.data != null) {
+              // Extract tokens from response with proper type safety
+              final responseData = refreshResponse.data as Map<String, dynamic>;
               
-              if (mockResponse.statusCode == 200 && 
-                  mockResponse.data != null && 
-                  mockResponse.data is Map<String, dynamic> &&
-                  mockResponse.data['success'] == true) {
-                
-                // Extract tokens from mock response
-                final responseData = mockResponse.data as Map<String, dynamic>;
-                if (responseData.containsKey('data') && responseData['data'] is Map<String, dynamic>) {
-                  final data = responseData['data'] as Map<String, dynamic>;
-                  
-                  // Safely extract token data with null checks
-                  final accessTokenValue = data['accessToken'];
-                  final refreshTokenValue = data['refreshToken'];
-                  final expiresInValue = data['expiresIn'];
-                  
-                  final newAccessToken = accessTokenValue is String ? accessTokenValue : null;
-                  final newRefreshToken = refreshTokenValue is String ? refreshTokenValue : null;
-                  final expiresIn = expiresInValue is int ? expiresInValue : 900; // Default 15 minutes
-                  
-                  if (newAccessToken == null || newRefreshToken == null) {
-                    print('❌ Invalid token data in mock response');
-                    return handler.next(err);
-                  }
-                
-                  // Store new tokens
-                  await _storageService!.storeTokens(
-                    AuthTokens(
-                      accessToken: newAccessToken,
-                      refreshToken: newRefreshToken,
-                      expiresIn: expiresIn,
-                    )
-                  );
-                    // Retry the original request with new token
-                  final originalRequest = err.requestOptions;
-                  originalRequest.headers['Authorization'] = 'Bearer $newAccessToken';
-                  
-                  try {
-                    // Execute request with new token
-                    final response = await _dio.fetch(originalRequest);
-                    
-                    // Return successful response
-                    return handler.resolve(response);
-                  } catch (retryError) {
-                    // If retry fails, continue with normal error handling
-                    print('Mock request retry failed after token refresh: $retryError');
-                  }
-                }
-              }
-            }
-          } else {
-            // Regular (non-mock) token refresh logic
-            // Get the refresh token
-            final refreshToken = await _storageService!.getRefreshToken();
-            if (refreshToken != null && refreshToken.isNotEmpty) {
-              // Create a new dio instance to avoid interceptors loop
-              final refreshDio = Dio(BaseOptions(
-                baseUrl: _config.apiBaseUrl,
-                connectTimeout: Duration(milliseconds: _config.apiTimeout),
-              ));
-              
-              // Send refresh token request
-              final refreshResponse = await refreshDio.post(
-                '/api/auth/refresh',
-                data: {'refreshToken': refreshToken},
-                options: Options(headers: {'Content-Type': 'application/json'})
-              );
-                if (refreshResponse.statusCode == 200 && 
-                  refreshResponse.data != null && 
-                  refreshResponse.data['success'] == true) {
-                // Extract tokens from response with proper type safety
-                if (refreshResponse.data is! Map<String, dynamic> || 
-                    !refreshResponse.data.containsKey('data') || 
-                    refreshResponse.data['data'] is! Map<String, dynamic>) {
-                  print('❌ Invalid token refresh response format');
-                  return handler.next(err);
-                }
-                  
-                final responseData = refreshResponse.data as Map<String, dynamic>;
+              if (responseData['success'] == true && responseData['data'] != null) {
                 final data = responseData['data'] as Map<String, dynamic>;
                 
                 // Safely extract token data with null checks
                 final accessTokenValue = data['accessToken'];
                 final refreshTokenValue = data['refreshToken'];
-                final expiresInValue = data['expiresIn'];
+                final expiresInValue = data['expiresIn'] ?? 900;
                 
                 final newAccessToken = accessTokenValue is String ? accessTokenValue : null;
                 final newRefreshToken = refreshTokenValue is String ? refreshTokenValue : null;
@@ -255,7 +160,7 @@ class ApiClient implements ApiClientInterface {
                   print('❌ Missing token data in refresh response');
                   return handler.next(err);
                 }
-                
+              
                 // Store new tokens
                 await _storageService!.storeTokens(
                   AuthTokens(
@@ -279,6 +184,8 @@ class ApiClient implements ApiClientInterface {
                   // If retry fails, continue with normal error handling
                   print('Request retry failed after token refresh: $retryError');
                 }
+              } else {
+                print('❌ Invalid token refresh response');
               }
             }
           }
@@ -384,25 +291,6 @@ class ApiClient implements ApiClientInterface {
   // Get the underlying Dio instance
   @override
   Dio get dio => _dio;
-  
-  /// Enable or disable mock API functionality
-  @override
-  void enableMockApi(bool enable) {
-    _mockConfig.setMockApi(enable);
-  }
-  
-  /// Enable or disable mock authentication
-  @override
-  void enableMockAuth(bool enable) {
-    _mockConfig.setMockAuth(enable);
-  }
-    /// Get the current mock API status
-  @override
-  bool get useMockApi => _mockConfig.useMockApi;
-  
-  /// Get the current mock authentication status
-  @override
-  bool get useMockAuth => _mockConfig.useMockAuth;
 
   // HTTP Methods
 

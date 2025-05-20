@@ -16,16 +16,17 @@ type RequestParams = {
 /**
  * POST /api/requests/[id]/notes
  * 
- * Adds a note to a request.
+ * Adds a note to a request with proper user information.
  */
 export const POST = routeHandler(
-  // Fix: Keep the await here to match your implementation requirements
   await withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
 
-      const requestId = parseInt(params.id);
+      // Properly await params - use correct approach
+      const { id } = await params;
+      const requestId = parseInt(id);
       if (isNaN(requestId)) {
         return formatResponse.error('Invalid request ID', 400);
       }
@@ -39,21 +40,38 @@ export const POST = routeHandler(
         return formatResponse.error('Note text is required', 400);
       }
       
-      // Create context for service calls
+      // Create context for service calls with userId
+      const userId = req.auth?.userId || 0;
       const context = {
-        userId: req.auth?.userId,
+        userId: userId,
         userRole: req.auth?.role
       };
       
       try {
-        // Get request service
+        // Get request service and user service
         const requestService = serviceFactory.createRequestService();
+        const userService = serviceFactory.createUserService();
         
-        // Add note to request
+        // Get user information - let it fail properly if there's an issue
+        let userName;
+        
+        if (userId) {
+          // Using findById method from IUserService
+          const user = await userService.findById(userId);
+          if (user && user.name) {
+            userName = user.name;
+          } else {
+            return formatResponse.error('User not found or missing name', 404);
+          }
+        } else {
+          return formatResponse.error('User ID is required', 400);
+        }
+        
+        // Add note with explicit user information
         const newNote = await requestService.addNote(
           requestId,
-          req.auth?.userId || 0,
-          req.auth?.name || 'Unknown User',
+          userId,
+          userName,
           noteText,
           { context }
         );
@@ -79,16 +97,17 @@ export const POST = routeHandler(
 /**
  * GET /api/requests/[id]/notes
  * 
- * Retrieves all notes for a request.
+ * Retrieves all notes for a request with proper user names.
  */
 export const GET = routeHandler(
-  // Fix: Keep the await here to match your implementation requirements
   await withPermission(
     async (req: NextRequest, { params }: RequestParams) => {
       const logger = getLogger();
       const serviceFactory = getServiceFactory();
       
-      const requestId = parseInt(params.id);
+      // Properly await params - use correct approach
+      const { id } = await params;
+      const requestId = parseInt(id);
       if (isNaN(requestId)) {
         return formatResponse.error('Invalid request ID', 400);
       }
@@ -113,17 +132,20 @@ export const GET = routeHandler(
         const detailedRequest = await requestService.findRequestById(requestId, { context });
         const notes = detailedRequest.notes || [];
         
-        // Format notes for response
-        const formattedNotes = notes.map(note => ({
-          id: note.id,
-          requestId: note.requestId,
-          userId: note.userId,
-          userName: note.userName || 'Unknown User',
-          text: note.text,
-          createdAt: note.createdAt,
-          updatedAt: note.updatedAt || note.createdAt,
-          formattedDate: new Date(note.createdAt).toLocaleString()
-        }));
+        // Format notes for response - No fallbacks
+        const formattedNotes = notes.map(note => {
+          // If userName is missing, let it be null to expose the issue
+          return {
+            id: note.id,
+            requestId: note.requestId,
+            userId: note.userId,
+            userName: note.userName,
+            text: note.text,
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt || note.createdAt,
+            formattedDate: new Date(note.createdAt).toLocaleString()
+          };
+        });
         
         return formatResponse.success(formattedNotes, 'Notes retrieved successfully');
       } catch (error) {

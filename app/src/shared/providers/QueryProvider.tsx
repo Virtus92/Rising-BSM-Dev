@@ -2,7 +2,11 @@
 
 import React, { useState, ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+// Use dynamic import for ReactQueryDevtools to avoid server-side issues
+const ReactQueryDevtools = process.env.NODE_ENV === 'development'
+  ? React.lazy(() => import('@tanstack/react-query-devtools').then(mod => ({ default: mod.ReactQueryDevtools })))
+  : () => null;
 
 /**
  * Provider für die React Query-Konfiguration
@@ -35,8 +39,12 @@ export function QueryProvider({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       {children}
       
-      {/* Devtools nur in Entwicklungsumgebung anzeigen */}
-      {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
+      {/* Devtools nur in Entwicklungsumgebung anzeigen - mit Suspense für das lazy loading */}
+      {process.env.NODE_ENV === 'development' && (
+        <React.Suspense fallback={null}>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </React.Suspense>
+      )}
     </QueryClientProvider>
   );
 }

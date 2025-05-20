@@ -181,13 +181,30 @@ export class UserServiceClient implements IUserService {
    */
   async create(data: CreateUserDto, options?: ServiceOptions): Promise<UserResponseDto> {
     try {
-      const response = await UserClient.createUser(data);
+      // Remove confirmPassword if present to prevent Prisma errors
+      const { confirmPassword, ...cleanData } = data as any;
       
+      const response = await UserClient.createUser(cleanData);
+      
+      console.log('UserServiceClient.create response:', JSON.stringify(response));
+      
+      // Ensure we have proper data format
       if (response.success && response.data) {
+        // Make sure the response has an ID before returning
+        if (!response.data.id) {
+          console.error('User creation succeeded but returned invalid data without ID');
+          throw new Error('API returned success without valid user data');
+        }
         return response.data;
       }
       
-      throw new Error(response.message || 'Failed to create user');
+      // If we get a success response but no data, throw a meaningful error
+      if (response.success) {
+        console.warn('UserClient.createUser returned success but no data');
+        throw new Error('Server returned success but no user data');
+      }
+      
+      throw new Error(response.error || response.message || 'Failed to create user');
     } catch (error) {
       console.error('Error in UserServiceClient.create:', error);
       throw error;
@@ -199,7 +216,10 @@ export class UserServiceClient implements IUserService {
    */
   async update(id: number, data: UpdateUserDto, options?: ServiceOptions): Promise<UserResponseDto> {
     try {
-      const response = await UserClient.updateUser(id, data);
+      // Remove confirmPassword if present to prevent Prisma errors
+      const { confirmPassword, ...cleanData } = data as any;
+      
+      const response = await UserClient.updateUser(id, cleanData);
       
       if (response.success && response.data) {
         return response.data;
@@ -230,11 +250,20 @@ export class UserServiceClient implements IUserService {
    */
   async findUsers(filters: UserFilterParamsDto, options?: ServiceOptions): Promise<PaginationResult<UserResponseDto>> {
     try {
-      const response = await UserClient.getUsers(filters);
+      // Include auth headers in request if options.userId is provided
+      const customHeaders: Record<string, string> = {};
+      if (options?.userId) {
+        customHeaders['X-Auth-User-ID'] = options.userId.toString();
+      }
+      
+      const response = await UserClient.getUsers(filters, customHeaders);
       
       if (response.success && response.data) {
         return response.data;
       }
+      
+      // Log specific error for debugging
+      console.error('UserClient.getUsers returned unsuccessful response:', response.error);
       
       return {
         data: [],

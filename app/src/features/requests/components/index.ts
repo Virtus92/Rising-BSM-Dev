@@ -5,7 +5,6 @@
  */
 
 export { ConvertToCustomerForm } from './ConvertToCustomerForm';
-export { CreateAppointmentForm } from './CreateAppointmentForm';
 export { LinkToCustomerForm } from './LinkToCustomerForm';
 export { RequestDetail } from './RequestDetail';
 export { RequestDetailTabs } from './RequestDetailTabs';

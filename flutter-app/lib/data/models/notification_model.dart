@@ -1,72 +1,98 @@
-// Notification model representing a system or user notification
 import 'package:json_annotation/json_annotation.dart';
+import 'package:flutter/material.dart';
 
 part 'notification_model.g.dart';
 
 @JsonSerializable()
 class NotificationModel {
   final int id;
+  final String title;
+  final String message;
+  final String type;
+  
+  @JsonKey(name: 'isRead')
+  final bool isRead;
   
   @JsonKey(name: 'userId')
-  final int? userId;
+  final int userId;
   
-  @JsonKey(name: 'referenceId')
-  final int? referenceId;
+  @JsonKey(name: 'entityId')
+  final int? entityId;
   
-  @JsonKey(name: 'referenceType')
-  final String? referenceType;
-  
-  final String type;
-  final String title;
-  final String? message;
-  final String? description;
-  final bool read;
+  @JsonKey(name: 'entityType')
+  final String? entityType;
   
   @JsonKey(name: 'createdAt')
   final DateTime createdAt;
   
-  @JsonKey(name: 'updatedAt')
-  final DateTime updatedAt;
+  @JsonKey(name: 'readAt')
+  final DateTime? readAt;
+  
+  final Map<String, dynamic>? data;
 
   const NotificationModel({
     required this.id,
-    this.userId,
-    this.referenceId,
-    this.referenceType,
-    required this.type,
     required this.title,
-    this.message,
-    this.description,
-    required this.read,
+    required this.message,
+    required this.type,
+    required this.isRead,
+    required this.userId,
+    this.entityId,
+    this.entityType,
     required this.createdAt,
-    required this.updatedAt,
+    this.readAt,
+    this.data,
   });
 
-  // Check if notification is related to a specific entity
-  bool get hasReference => referenceId != null && referenceType != null;
-  
-  // Helper to get appropriate icon based on notification type
-  String getIconAsset() {
-    switch (type) {
-      case 'appointment':
-        return 'assets/icons/calendar.svg';
-      case 'request':
-        return 'assets/icons/request.svg';
-      case 'customer':
-        return 'assets/icons/customer.svg';
-      case 'user':
-        return 'assets/icons/user.svg';
-      case 'system':
-        return 'assets/icons/system.svg';
-      case 'alert':
-        return 'assets/icons/alert.svg';
-      default:
-        return 'assets/icons/notification.svg';
-    }
+  // Create a copy with updated fields
+  NotificationModel copyWith({
+    int? id,
+    String? title,
+    String? message,
+    String? type,
+    bool? isRead,
+    int? userId,
+    int? entityId,
+    String? entityType,
+    DateTime? createdAt,
+    DateTime? readAt,
+    Map<String, dynamic>? data,
+  }) {
+    return NotificationModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      message: message ?? this.message,
+      type: type ?? this.type,
+      isRead: isRead ?? this.isRead,
+      userId: userId ?? this.userId,
+      entityId: entityId ?? this.entityId,
+      entityType: entityType ?? this.entityType,
+      createdAt: createdAt ?? this.createdAt,
+      readAt: readAt ?? this.readAt,
+      data: data ?? this.data,
+    );
   }
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) => 
       _$NotificationModelFromJson(json);
-
+      
   Map<String, dynamic> toJson() => _$NotificationModelToJson(this);
+  
+  // Get icon based on notification type
+  IconData getIcon() {
+    switch (type) {
+      case 'request':
+        return Icons.question_answer;
+      case 'appointment':
+        return Icons.calendar_today;
+      case 'customer':
+        return Icons.people;
+      case 'user':
+        return Icons.person;
+      case 'system':
+        return Icons.notifications_active;
+      default:
+        return Icons.notifications;
+    }
+  }
 }

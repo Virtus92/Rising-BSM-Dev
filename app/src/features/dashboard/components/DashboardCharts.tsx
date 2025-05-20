@@ -152,7 +152,7 @@ export const DashboardCharts = () => {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <div>
             <CardTitle>Analytics Dashboard</CardTitle>
-            <CardDescription>Statistics over time</CardDescription>
+            <CardDescription>Statistics over time ({timeFrame})</CardDescription>
           </div>
           <Button 
             variant="ghost" 
@@ -164,21 +164,60 @@ export const DashboardCharts = () => {
           </Button>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 grid gap-4 md:grid-cols-2">
+            <Tabs 
+              value={timeFrame} 
+              onValueChange={handleTimeFrameChange}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="weekly">Weekly</TabsTrigger>
+                <TabsTrigger value="monthly">Monthly</TabsTrigger>
+                <TabsTrigger value="yearly">Yearly</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          
           <div className="flex items-center justify-center flex-col h-[350px] w-full">
             <AlertCircle className="h-12 w-12 mb-4 text-amber-500" />
             <p className="text-lg font-medium">No statistics data available</p>
             <p className="text-muted-foreground text-center mb-4">
-              {error ? error : "You don't have access to statistics data for the selected time period."}
+              {error ? error : `No data available for the ${timeFrame} view. Try selecting a different time period.`}
             </p>
-            <Button 
-              variant="outline" 
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="mt-2"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh Data
-            </Button>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button 
+                variant="outline" 
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Refresh Data
+              </Button>
+              {timeFrame === 'monthly' && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleTimeFrameChange('weekly')}
+                >
+                  Try Weekly View
+                </Button>
+              )}
+              {timeFrame === 'weekly' && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleTimeFrameChange('monthly')}
+                >
+                  Try Monthly View
+                </Button>
+              )}
+              {(timeFrame === 'weekly' || timeFrame === 'monthly') && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleTimeFrameChange('yearly')}
+                >
+                  Try Yearly View
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -212,13 +251,17 @@ export const DashboardCharts = () => {
                 name="Requests" 
                 radius={[4, 4, 0, 0]}
                 maxBarSize={50}
+                isAnimationActive={true}
+                animationDuration={500}
               />
               <Bar 
                 dataKey="appointments" 
                 fill={COLORS.appointments} 
                 name="Appointments" 
                 radius={[4, 4, 0, 0]}
-                maxBarSize={50} 
+                maxBarSize={50}
+                isAnimationActive={true}
+                animationDuration={500}
               />
               <Bar 
                 dataKey="customers" 
@@ -226,6 +269,8 @@ export const DashboardCharts = () => {
                 name="Customers" 
                 radius={[4, 4, 0, 0]}
                 maxBarSize={50}
+                isAnimationActive={true}
+                animationDuration={500}
               />
               <Bar 
                 dataKey="users" 
@@ -233,6 +278,8 @@ export const DashboardCharts = () => {
                 name="Users" 
                 radius={[4, 4, 0, 0]}
                 maxBarSize={50}
+                isAnimationActive={true}
+                animationDuration={500}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -264,6 +311,8 @@ export const DashboardCharts = () => {
                 strokeWidth={2}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
+                isAnimationActive={true}
+                animationDuration={500}
               />
               <Line 
                 type="monotone" 
@@ -273,6 +322,8 @@ export const DashboardCharts = () => {
                 strokeWidth={2}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
+                isAnimationActive={true}
+                animationDuration={500}
               />
               <Line 
                 type="monotone" 
@@ -282,6 +333,8 @@ export const DashboardCharts = () => {
                 strokeWidth={2}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
+                isAnimationActive={true}
+                animationDuration={500}
               />
               <Line 
                 type="monotone" 
@@ -291,6 +344,8 @@ export const DashboardCharts = () => {
                 strokeWidth={2}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
+                isAnimationActive={true}
+                animationDuration={500}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -339,6 +394,8 @@ export const DashboardCharts = () => {
                 fillOpacity={1} 
                 fill="url(#colorRequests)" 
                 name="Requests"
+                isAnimationActive={true}
+                animationDuration={500}
               />
               <Area 
                 type="monotone" 
@@ -347,6 +404,8 @@ export const DashboardCharts = () => {
                 fillOpacity={1} 
                 fill="url(#colorAppointments)" 
                 name="Appointments"
+                isAnimationActive={true}
+                animationDuration={500}
               />
               <Area 
                 type="monotone" 
@@ -355,6 +414,8 @@ export const DashboardCharts = () => {
                 fillOpacity={1} 
                 fill="url(#colorCustomers)" 
                 name="Customers"
+                isAnimationActive={true}
+                animationDuration={500}
               />
               <Area 
                 type="monotone" 
@@ -363,6 +424,8 @@ export const DashboardCharts = () => {
                 fillOpacity={1} 
                 fill="url(#colorUsers)" 
                 name="Users"
+                isAnimationActive={true}
+                animationDuration={500}
               />
             </AreaChart>
           </ResponsiveContainer>

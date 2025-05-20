@@ -11,7 +11,7 @@ import { RequestStatus } from '@/domain/enums/CommonEnums';
 /**
  * GET /api/requests/stats/weekly
  * 
- * Returns weekly contact request statistics for the current year
+ * Returns weekly request statistics
  */
 export const GET = routeHandler(async (request: NextRequest) => {
   const logger = getLogger();
@@ -41,7 +41,7 @@ export const GET = routeHandler(async (request: NextRequest) => {
     // Generate weekly stats using our utility function
     const weeklyStats = generateWeeklyStats(
       requests,
-      (req: RequestResponseDto) => req.createdAt,
+      (request: RequestResponseDto) => request.createdAt,
       targetWeeks
     );
     
@@ -49,17 +49,16 @@ export const GET = routeHandler(async (request: NextRequest) => {
     const enrichedStats = weeklyStats.map(stat => {
       // Filter requests for this period
       const periodRequests = requests.filter(req => {
-        const createdDate = new Date(req.createdAt);
-        return createdDate >= new Date(stat.startDate) && 
-               createdDate <= new Date(stat.endDate);
+        const requestDate = new Date(req.createdAt);
+        return requestDate >= new Date(stat.startDate) && 
+               requestDate <= new Date(stat.endDate);
       });
       
       // Count by status
-      const newRequests = periodRequests.filter(r => r.status === RequestStatus.NEW).length;
-      const inProgress = periodRequests.filter(r => r.status === RequestStatus.IN_PROGRESS).length;
       const completed = periodRequests.filter(r => r.status === RequestStatus.COMPLETED).length;
+      const inProgress = periodRequests.filter(r => r.status === RequestStatus.IN_PROGRESS).length;
+      const newRequests = periodRequests.filter(r => r.status === RequestStatus.NEW).length;
       const cancelled = periodRequests.filter(r => r.status === RequestStatus.CANCELLED).length;
-      const convertedToCustomer = periodRequests.filter(r => r.customerId !== null && r.customerId !== undefined).length;
       
       // Extract week number from period string (e.g., "Week 15")
       const week = parseInt(stat.period.replace('Week ', ''), 10);
@@ -69,13 +68,11 @@ export const GET = routeHandler(async (request: NextRequest) => {
         weekKey: `${stat.year}-W${week.toString().padStart(2, '0')}`,
         week,
         label: stat.period,
-        total: stat.count,
-        new: newRequests,
-        inProgress,
+        requests: stat.count,
         completed,
-        cancelled,
-        convertedToCustomer,
-        conversionRate: stat.count > 0 ? (convertedToCustomer / stat.count) : 0
+        inProgress,
+        new: newRequests,
+        cancelled
       };
     });
     

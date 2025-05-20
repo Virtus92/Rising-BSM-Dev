@@ -6,7 +6,7 @@ This document provides a comprehensive technical overview of the Rising-BSM auth
 
 ### AuthService (`AuthService.ts`)
 
-The AuthService is the centralized implementation of IAuthService that serves as the single source of truth for authentication. It replaces all separate token management functionality, providing a unified interface for authentication operations.
+AuthService is the centralized implementation of IAuthService that serves as the single source of truth for authentication. It provides a unified interface for all authentication operations.
 
 **Key Responsibilities:**
 - Token management (acquisition, validation, refresh)
@@ -68,15 +68,12 @@ Middleware for securing API routes and enforcing authentication requirements.
 **Usage Example:**
 ```typescript
 // Creating a secured API route
-export const GET = withAuth(
+export const GET = routeHandler(
   async (request, user) => {
     // Your route logic here
     return NextResponse.json({ success: true, data: {...} });
   },
-  {
-    requireAuth: true,
-    requiredRole: UserRole.ADMIN
-  }
+  { requiresAuth: true }
 );
 ```
 
@@ -108,7 +105,15 @@ The system implements a robust error handling approach:
 **Error Normalization:**
 - Various error formats are converted to `AuthError`
 - Error messages are standardized for consistency
-- Error responses follow a predictable format
+- Error responses follow a predictable format:
+  ```json
+  {
+    "success": false,
+    "data": null,
+    "error": "Detailed error message",
+    "statusCode": 401
+  }
+  ```
 
 ### 3. Permission System
 
@@ -155,3 +160,38 @@ The authentication system implements several security best practices:
 - **Error Messages**: Non-leaking error messages that don't expose sensitive info
 - **Refresh Token Rotation**: New refresh tokens on each refresh
 - **Automatic Token Expiration**: Time-based expiration with proper cleanup
+
+## Service Integration
+
+The authentication system is integrated with other services through:
+
+1. **ServiceFactory**: Creates AuthService instances with proper dependencies
+2. **API Client**: Uses AuthService for obtaining and refreshing tokens
+3. **Route Handler**: Uses authentication middleware for securing routes
+4. **Permission System**: Integrates with permission checking for authorization
+
+## Client-Side Integration
+
+Client-side integration is achieved through:
+
+1. **AuthProvider**: React context provider for authentication state
+2. **useAuth Hook**: React hook for accessing authentication functionality
+3. **withAuth HOC**: Higher-order component for protecting pages
+
+**Example:**
+```tsx
+function ProfilePage() {
+  const { user, isAuthenticated, signOut } = useAuth();
+  
+  if (!isAuthenticated) {
+    return <p>Please log in to view your profile.</p>;
+  }
+  
+  return (
+    <div>
+      <h1>Welcome, {user.name}</h1>
+      <button onClick={signOut}>Logout</button>
+    </div>
+  );
+}
+```

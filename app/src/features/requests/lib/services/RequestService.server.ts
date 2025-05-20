@@ -871,7 +871,7 @@ export class RequestServiceImpl implements IRequestService {
     try {
       // Handle overloaded parameters
       let userId: number;
-      let userName: string;
+      let userName: string = '';
       let text: string;
       let options: ServiceOptions | undefined;
       
@@ -882,7 +882,23 @@ export class RequestServiceImpl implements IRequestService {
         
         // Get user from context - use safe defaults if context is missing
         userId = options?.context?.userId || 0;
-        userName = options?.context?.userName || 'System';
+        
+        // Try to get the user's name from the repository if possible
+        if (userId && userId > 0) {
+          try {
+            const user = await this.userRepository.findById(userId);
+            if (user && user.name) {
+              userName = user.name;
+            } else {
+              userName = options?.context?.userName || 'System';
+            }
+          } catch (userError) {
+            this.logger.warn(`Failed to get user name for note: ${userError}`);
+            userName = options?.context?.userName || 'System';
+          }
+        } else {
+          userName = options?.context?.userName || 'System';
+        }
       }
       // Second overload (id, userId, userName, text, options)
       else {
@@ -894,9 +910,25 @@ export class RequestServiceImpl implements IRequestService {
           options = optionsOrUndefined;
         } else {
           // In case userNameOrOptions is actually options
-          userName = 'System';
           text = textOrUndefined || '';
           options = userNameOrOptions as ServiceOptions;
+          
+          // Try to get the user's name from the repository if possible
+          if (userId && userId > 0) {
+            try {
+              const user = await this.userRepository.findById(userId);
+              if (user && user.name) {
+                userName = user.name;
+              } else {
+                userName = 'System';
+              }
+            } catch (userError) {
+              this.logger.warn(`Failed to get user name for note: ${userError}`);
+              userName = 'System';
+            }
+          } else {
+            userName = 'System';
+          }
         }
       }
       
@@ -907,7 +939,7 @@ export class RequestServiceImpl implements IRequestService {
       
       this.logger.debug(`Adding note to request with ID ${id}`, { userId, userName, text, options });
       
-      // Add note with sanitized parameters
+      // Add note with sanitized parameters - ensure we always have a valid userName
       const createdNote = await this.repository.addNote(id, userId || 0, userName || 'System', text);
       
       if (!createdNote) {

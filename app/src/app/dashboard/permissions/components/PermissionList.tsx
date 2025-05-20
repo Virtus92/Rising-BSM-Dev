@@ -20,13 +20,14 @@ import {
 } from "@/shared/components/ui/select";
 import { Separator } from "@/shared/components/ui/separator";
 import { Badge } from "@/shared/components/ui/badge";
-import { Loader2, Search, Filter, Plus, Info, CheckCircle, X, Edit } from 'lucide-react';
+import { Loader2, Search, Filter, Plus, Info, CheckCircle, X, Edit, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { PermissionClient } from '@/features/permissions/lib/clients';
 
 // Type definition for permission item
 interface PermissionItem {
@@ -40,12 +41,14 @@ interface PermissionListProps {
   permissions: PermissionItem[];
   isLoading: boolean;
   error: string | null;
+  onRefresh?: () => Promise<void>;
 }
 
 const PermissionList: React.FC<PermissionListProps> = ({ 
   permissions, 
   isLoading,
-  error: propError 
+  error: propError,
+  onRefresh
 }) => {
   const [filterText, setFilterText] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -114,8 +117,17 @@ const PermissionList: React.FC<PermissionListProps> = ({
         return;
       }
       
-      // Simulate API call for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Create the actual permission using PermissionClient
+      const response = await PermissionClient.createPermission({
+        code: newPermission.code,
+        name: newPermission.name,
+        description: newPermission.description,
+        category: newPermission.category
+      });
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to create permission');
+      }
       
       // Close dialog and reset form
       setCreateDialogOpen(false);
@@ -128,6 +140,11 @@ const PermissionList: React.FC<PermissionListProps> = ({
       
       setSuccessMessage('Permission created successfully');
       setTimeout(() => setSuccessMessage(null), 3000);
+      
+      // Refresh the permissions list
+      if (onRefresh) {
+        await onRefresh();
+      }
     } catch (err) {
       setError(`Failed to create permission: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -153,8 +170,22 @@ const PermissionList: React.FC<PermissionListProps> = ({
         return;
       }
       
-      // Simulate API call for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Find the permission by code
+      const findResponse = await PermissionClient.getPermissionByCode(selectedPermission.code);
+      if (!findResponse.success || !findResponse.data) {
+        throw new Error(`Permission not found: ${selectedPermission.code}`);
+      }
+      
+      // Update the permission
+      const response = await PermissionClient.updatePermission(findResponse.data.id, {
+        name: selectedPermission.name,
+        description: selectedPermission.description,
+        category: selectedPermission.category
+      });
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to update permission');
+      }
       
       // Close dialog
       setEditDialogOpen(false);
@@ -162,6 +193,11 @@ const PermissionList: React.FC<PermissionListProps> = ({
       
       setSuccessMessage('Permission updated successfully');
       setTimeout(() => setSuccessMessage(null), 3000);
+      
+      // Refresh the permissions list
+      if (onRefresh) {
+        await onRefresh();
+      }
     } catch (err) {
       setError(`Failed to update permission: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -211,15 +247,27 @@ const PermissionList: React.FC<PermissionListProps> = ({
                 View and manage all available permissions in the system
               </CardDescription>
             </div>
-            {canManagePermissions && (
-              <Button 
-                onClick={() => setCreateDialogOpen(true)}
-                disabled={isLoading}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Permission
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {onRefresh && (
+                <Button 
+                  variant="outline"
+                  onClick={() => onRefresh()}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              )}
+              {canManagePermissions && (
+                <Button 
+                  onClick={() => setCreateDialogOpen(true)}
+                  disabled={isLoading}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Permission
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">

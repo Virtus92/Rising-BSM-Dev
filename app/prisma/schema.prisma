@@ -95,6 +95,7 @@ model Permission {
   createdBy   Int?
   updatedBy   Int?
   users       UserPermission[]
+  roles       RolePermission[]  // Add this relation
 
   @@index([code])
   @@index([category])
@@ -104,13 +105,29 @@ model UserPermission {
   id           Int        @id @default(autoincrement())
   userId       Int
   permissionId Int
-  grantedAt    DateTime   @default(now())
+  grantedAt    DateTime?  @default(now())
   grantedBy    Int?
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@unique([userId, permissionId])
   @@index([userId])
+  @@index([permissionId])
+}
+
+
+model RolePermission {
+  id           Int        @id @default(autoincrement())
+  role         String     @db.VarChar(50)
+  permissionId Int
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  createdBy    Int?
+  updatedBy    Int?
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@index([role])
   @@index([permissionId])
 }
 

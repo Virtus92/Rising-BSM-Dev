@@ -6,6 +6,9 @@ import { NotificationClient } from '@/features/notifications/lib/clients';
 import { NotificationResponseDto, NotificationFilterParamsDto } from '@/domain/dtos/NotificationDtos';
 import { createBaseListUtility, BaseListUtility } from '@/shared/utils/list/baseListUtils';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
+import { getLogger } from '@/core/logging';
+
+const logger = getLogger();
 
 /**
  * Extended interface for notification list operations
@@ -38,13 +41,81 @@ interface UseNotificationsProps {
   pollInterval?: number;
 }
 
-// Global singleton to track active instances and API calls
-const NOTIFICATIONS_STATE = {
-  lastFetchTime: 0,
-  activeInstanceIds: new Set<string>(),
-  requestInProgress: false,
-  cachedUnreadCount: 0
-};
+// Use a singleton state object instead of global variables for better encapsulation
+class NotificationsStateManager {
+  private static instance: NotificationsStateManager;
+  
+  private lastFetchTime = 0;
+  private activeInstanceIds = new Set<string>();
+  private requestInProgress = false;
+  private cachedUnreadCount = 0;
+  private mainInstanceId: string | null = null;
+  private hmrCount = 0;
+  
+  private constructor() {}
+  
+  public static getInstance(): NotificationsStateManager {
+    if (!this.instance) {
+      this.instance = new NotificationsStateManager();
+    }
+    return this.instance;
+  }
+  
+  public getLastFetchTime(): number { return this.lastFetchTime; }
+  public setLastFetchTime(time: number): void { this.lastFetchTime = time; }
+  
+  public isRequestInProgress(): boolean { return this.requestInProgress; }
+  public setRequestInProgress(inProgress: boolean): void { this.requestInProgress = inProgress; }
+  
+  public getCachedUnreadCount(): number { return this.cachedUnreadCount; }
+  public setCachedUnreadCount(count: number): void { this.cachedUnreadCount = count; }
+  
+  public addInstance(id: string): void {
+    this.activeInstanceIds.add(id);
+    // Set main instance if this is the first one
+    if (!this.mainInstanceId) {
+      this.mainInstanceId = id;
+      logger.debug(`[Notifications] Set ${id} as main polling instance`);
+    }
+  }
+  
+  public removeInstance(id: string): void {
+    this.activeInstanceIds.delete(id);
+    
+    // If the main instance was removed, select a new one
+    if (this.mainInstanceId === id && this.activeInstanceIds.size > 0) {
+      this.mainInstanceId = [...this.activeInstanceIds][0];
+      logger.debug(`[Notifications] New main polling instance: ${this.mainInstanceId}`);
+    } else if (this.activeInstanceIds.size === 0) {
+      this.mainInstanceId = null;
+    }
+  }
+  
+  public isMainInstance(id: string): boolean {
+    return this.mainInstanceId === id;
+  }
+  
+  public getInstanceCount(): number {
+    return this.activeInstanceIds.size;
+  }
+  
+  public incrementHmrCount(): number {
+    return ++this.hmrCount;
+  }
+  
+  public getHmrCount(): number {
+    return this.hmrCount;
+  }
+  
+  public reset(): void {
+    this.requestInProgress = false;
+    this.lastFetchTime = 0;
+    logger.debug('[Notifications] State manager reset');
+  }
+}
+
+// Get the singleton instance
+const notificationsState = NotificationsStateManager.getInstance();
 
 /**
  * Hook for managing notification list with the unified list utilities
@@ -54,11 +125,12 @@ export const useNotifications = ({
   unreadOnly = false,
   page = 1,
   autoFetch = true,
-  pollInterval
+  pollInterval = 315
 }: UseNotificationsProps = {}): UseNotificationsResult => {
   // Always call hooks in the same order
   const { toast } = useToast();
   const { isAuthenticated, user } = useAuth();
+  const logger = getLogger();
   
   // All refs first - helps maintain consistent hook order
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,6 +139,7 @@ export const useNotifications = ({
   const authReadyRef = useRef(false);
   const instanceId = useRef(`notification-instance-${Date.now()}-${Math.random().toString(36).substring(7)}`);
   const baseListRef = useRef<BaseListUtility<NotificationResponseDto, NotificationFilterParamsDto> | null>(null);
+  const effectiveIntervalRef = useRef<number>(pollInterval);
   
   // Store the authentication state in a ref to avoid dependency issues
   const authStateRef = useRef({ isAuthenticated, user });
@@ -88,9 +161,6 @@ export const useNotifications = ({
     
     // Skip API calls if not authenticated
     if (!authReadyRef.current || !isAuthenticated || !user) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Notifications] Skipping fetch - auth not ready. AuthReady: ${authReadyRef.current}, Authenticated: ${isAuthenticated}`);
-      }
       return {
         success: false,
         message: 'Not authenticated',
@@ -107,10 +177,7 @@ export const useNotifications = ({
     }
     
     // If a request is already in progress, return cached data
-    if (NOTIFICATIONS_STATE.requestInProgress) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Notifications] Request already in progress, returning cached data`);
-      }
+    if (notificationsState.isRequestInProgress()) {
       return {
         success: true,
         message: 'Request in progress, using cached data',
@@ -128,11 +195,8 @@ export const useNotifications = ({
     
     // If last fetch was less than 5 seconds ago, throttle
     const now = Date.now();
-    const timeSinceLastFetch = now - NOTIFICATIONS_STATE.lastFetchTime;
-    if (NOTIFICATIONS_STATE.lastFetchTime > 0 && timeSinceLastFetch < 5000) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Notifications] Throttling, last fetch was ${timeSinceLastFetch}ms ago`);
-      }
+    const timeSinceLastFetch = now - notificationsState.getLastFetchTime();
+    if (notificationsState.getLastFetchTime() > 0 && timeSinceLastFetch < 5000) {
       return {
         success: true,
         message: 'Throttled - using cached data',
@@ -149,13 +213,9 @@ export const useNotifications = ({
     }
     
     try {
-      NOTIFICATIONS_STATE.requestInProgress = true;
-      NOTIFICATIONS_STATE.lastFetchTime = now;
+      notificationsState.setRequestInProgress(true);
+      notificationsState.setLastFetchTime(now);
       fetchAttemptsRef.current += 1;
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Notifications] Fetching from ${instanceId.current}`, filters);
-      }
       
       // Add timeout to prevent hanging requests
       const controller = new AbortController();
@@ -171,7 +231,7 @@ export const useNotifications = ({
       // Clear timeout when done
       const cleanup = () => {
         clearTimeout(timeoutId);
-        NOTIFICATIONS_STATE.requestInProgress = false;
+        notificationsState.setRequestInProgress(false);
       };
       
       // Await with timeout protection
@@ -180,13 +240,14 @@ export const useNotifications = ({
         cleanup();
         
         // If successful, update cached unread count
-        if (result.success && result.data) {
+        if (result.success) {
+          // Extract data correctly whether it's in data.data or directly in data
+          const notifications = Array.isArray(result.data) ? result.data : 
+                           result.data?.data && Array.isArray(result.data.data) ? result.data.data : [];
+          
           // Count unread items
-          if (Array.isArray(result.data)) {
-            NOTIFICATIONS_STATE.cachedUnreadCount = result.data.filter(
-              item => !item.isRead
-            ).length;
-          }
+          const unreadCount = notifications.filter((item: NotificationResponseDto) => !item.isRead).length;
+          notificationsState.setCachedUnreadCount(unreadCount);
         }
         
         return result;
@@ -194,9 +255,9 @@ export const useNotifications = ({
         cleanup();
         
         if (error instanceof DOMException && error.name === 'AbortError') {
-          console.warn('[Notifications] Request aborted due to timeout');
+          logger.warn('[Notifications] Request aborted due to timeout');
         } else {
-          console.error('[Notifications] Error fetching:', error);
+          logger.error('[Notifications] Error fetching:', error as Error);
           
           // Don't show errors for the first few attempts or aborted requests
           if (fetchAttemptsRef.current > 3 && !(error instanceof DOMException && error.name === 'AbortError')) {
@@ -224,8 +285,8 @@ export const useNotifications = ({
         };
       }
     } catch (err) {
-      console.error('[Notifications] Error in fetchFunction:', err);
-      NOTIFICATIONS_STATE.requestInProgress = false;
+      logger.error('[Notifications] Error in fetchFunction:', err as Error);
+      notificationsState.setRequestInProgress(false);
       
       // Return empty result instead of throwing
       return {
@@ -272,14 +333,14 @@ export const useNotifications = ({
   // Calculate unread count using useMemo to avoid direct property access
   const unreadCount = useMemo(() => {
     if (!baseList?.items) {
-      return NOTIFICATIONS_STATE.cachedUnreadCount;
+      return notificationsState.getCachedUnreadCount();
     }
     
     const count = baseList.items
       .filter(notification => !notification.isRead)
       .length;
       
-    return count || NOTIFICATIONS_STATE.cachedUnreadCount;
+    return count || notificationsState.getCachedUnreadCount();
   }, [baseList?.items]);
   
   // Handle auto-fetch based on authentication status with improved reliability
@@ -299,28 +360,30 @@ export const useNotifications = ({
       return;
     }
     
+    // Register this instance in the global state
+    notificationsState.addInstance(instanceId.current);
+    
     // Always do an initial fetch when authenticated and auto-fetch is enabled
     if (autoFetch && !didInitialFetchRef.current) {
       // Delay initial fetch to avoid too many simultaneous requests
-      const offset = Math.min(1000 + (NOTIFICATIONS_STATE.activeInstanceIds.size * 300), 5000);
+      const offset = Math.min(1000 + (notificationsState.getInstanceCount() * 300), 5000);
       
       const initialFetchTimer = setTimeout(() => {
         if (authStateRef.current.isAuthenticated && authStateRef.current.user && baseListRef.current) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`[Notifications] Initial fetch for ${instanceId.current}`);
-          }
+          logger.debug(`[Notifications] Initial fetch for ${instanceId.current}`);
+          
           // Set this flag before the fetch to prevent duplicates
           didInitialFetchRef.current = true;
           
           // Perform the fetch
           baseListRef.current.refetch().catch(err => {
-            console.error('[Notifications] Initial fetch error:', err);
+            logger.error('[Notifications] Initial fetch error:', err as Error);
           });
         }
       }, offset);
       
-      // Set up polling if requested
-      if (pollInterval && pollInterval > 0) {
+      // Only set up polling for the main instance
+      if (notificationsState.isMainInstance(instanceId.current)) {
         setupPolling();
       }
       
@@ -330,10 +393,13 @@ export const useNotifications = ({
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
+        
+        // Unregister this instance
+        notificationsState.removeInstance(instanceId.current);
       };
     }
-    // Just set up polling without initial fetch
-    else if (pollInterval && pollInterval > 0) {
+    // Just set up polling without initial fetch if needed
+    else if (notificationsState.isMainInstance(instanceId.current)) {
       setupPolling();
       
       return () => {
@@ -341,44 +407,49 @@ export const useNotifications = ({
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
+        
+        // Unregister this instance
+        notificationsState.removeInstance(instanceId.current);
       };
     }
     
+    return () => {
+      // Unregister this instance
+      notificationsState.removeInstance(instanceId.current);
+    };
+    
     // Function to set up polling with improved reliability
     function setupPolling() {
-      // Stagger poll intervals to avoid all instances polling at the same time
-      // Use a deterministic offset based on instanceId to maintain consistency across renders
-      const hash = instanceId.current.split('-').pop() || '';
-      const hashNumber = parseInt(hash, 36) || 0;
-      const deterministicOffset = (hashNumber % 100) * 300; // 0-30 seconds based on instance hash
-      const effectivePollInterval = Math.max((pollInterval || 60000) + deterministicOffset, 60000); // Minimum 60s
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Notifications] Setting up poll interval: ${Math.round(effectivePollInterval / 1000)}s for ${instanceId.current}`);
+      // Clear any existing interval
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
+      
+      // Set a minimum poll interval of 60 seconds
+      const effectivePollInterval = Math.max(pollInterval * 1000, 60000); 
+      effectiveIntervalRef.current = effectivePollInterval;
+      
+      logger.debug(`[Notifications] Setting up poll interval: ${Math.round(effectivePollInterval / 1000)}s for ${instanceId.current}`);
       
       intervalRef.current = setInterval(() => {
         const { isAuthenticated, user } = authStateRef.current;
         if (isAuthenticated && user && baseListRef.current) {
           // Only refetch if no request is in progress and we've waited at least 5 seconds
           const now = Date.now();
-          const timeSinceLastFetch = now - NOTIFICATIONS_STATE.lastFetchTime;
+          const timeSinceLastFetch = now - notificationsState.getLastFetchTime();
           
-          if (!NOTIFICATIONS_STATE.requestInProgress && timeSinceLastFetch >= 5000) {
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`[Notifications] Poll interval triggered for ${instanceId.current} after ${Math.round(timeSinceLastFetch/1000)}s`);
-            }
+          if (!notificationsState.isRequestInProgress() && timeSinceLastFetch >= 5000) {
+            logger.debug(`[Notifications] Poll interval triggered for ${instanceId.current} after ${Math.round(timeSinceLastFetch/1000)}s`);
             
             // Use a try-catch to prevent errors from stopping the polling
             try {
               baseListRef.current.refetch().catch(err => {
-                console.error('[Notifications] Poll refetch error:', err);
+                logger.error('[Notifications] Poll refetch error:', err as Error);
               });
             } catch (error) {
-              console.error('[Notifications] Error in polling interval:', error);
+              logger.error('[Notifications] Error in polling interval:', error as Error);
             }
-          } else if (process.env.NODE_ENV === 'development' && NOTIFICATIONS_STATE.requestInProgress) {
-            console.log(`[Notifications] Skipping poll due to request in progress`);
           }
         }
       }, effectivePollInterval);
@@ -387,28 +458,21 @@ export const useNotifications = ({
   
   // Track this hook instance for debugging with improved HMR handling
   useEffect(() => {
-    if (!NOTIFICATIONS_STATE.activeInstanceIds.has(instanceId.current)) {
-      NOTIFICATIONS_STATE.activeInstanceIds.add(instanceId.current);
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Notifications] Instance ${instanceId.current} mounted. Total: ${NOTIFICATIONS_STATE.activeInstanceIds.size}`);
-      }
-    }
+    // Register this instance when mounted
+    logger.debug(`[Notifications] Instance ${instanceId.current} mounted. Total: ${notificationsState.getInstanceCount() + 1}`);
     
     // Handle HMR scenario - set up custom event listeners
     const handleHmrEvent = () => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Notifications] HMR event detected for ${instanceId.current}, refreshing state`);
-      }
+      logger.debug(`[Notifications] HMR event detected for ${instanceId.current}, refreshing state`);
       
       // Reset state when HMR occurs
-      NOTIFICATIONS_STATE.requestInProgress = false;
-      NOTIFICATIONS_STATE.lastFetchTime = 0;
+      notificationsState.reset();
+      notificationsState.incrementHmrCount();
       
       // Trigger a refresh if component is still mounted
       if (baseListRef.current) {
         baseListRef.current.refetch().catch(err => {
-          console.error('[Notifications] HMR refetch error:', err);
+          logger.error('[Notifications] HMR refetch error:', err as Error);
         });
       }
     };
@@ -421,11 +485,8 @@ export const useNotifications = ({
       // Cleanup event listeners and instance tracking
       window.removeEventListener('hmr-reload', handleHmrEvent);
       window.removeEventListener('fast-refresh-reload', handleHmrEvent);
-      NOTIFICATIONS_STATE.activeInstanceIds.delete(instanceId.current);
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Notifications] Instance ${instanceId.current} unmounted. Remaining: ${NOTIFICATIONS_STATE.activeInstanceIds.size}`);
-      }
+      logger.debug(`[Notifications] Instance ${instanceId.current} unmounted. Remaining: ${notificationsState.getInstanceCount() - 1}`);
     };
   }, []);
   
@@ -457,7 +518,7 @@ export const useNotifications = ({
         return false;
       }
     } catch (err) {
-      console.error('Error marking notification as read:', err);
+      logger.error('Error marking notification as read:', err as Error);
       toast?.({ 
         title: 'Error',
         description: 'An unexpected error occurred',
@@ -484,7 +545,7 @@ export const useNotifications = ({
         baseListRef.current.setItems(updatedItems);
         
         // Update cached count
-        NOTIFICATIONS_STATE.cachedUnreadCount = 0;
+        notificationsState.setCachedUnreadCount(0);
         
         toast?.({ 
           title: 'Success',
@@ -502,7 +563,7 @@ export const useNotifications = ({
         return false;
       }
     } catch (err) {
-      console.error('Error marking all notifications as read:', err);
+      logger.error('Error marking all notifications as read:', err as Error);
       toast?.({ 
         title: 'Error',
         description: 'An unexpected error occurred',
@@ -530,7 +591,8 @@ export const useNotifications = ({
         
         // Update cached unread count if needed
         if (baseListRef.current.items.find(item => item.id === id)?.isRead === false) {
-          NOTIFICATIONS_STATE.cachedUnreadCount = Math.max(0, NOTIFICATIONS_STATE.cachedUnreadCount - 1);
+          const newCount = Math.max(0, notificationsState.getCachedUnreadCount() - 1);
+          notificationsState.setCachedUnreadCount(newCount);
         }
         
         toast?.({ 
@@ -549,7 +611,7 @@ export const useNotifications = ({
         return false;
       }
     } catch (err) {
-      console.error('Error deleting notification:', err);
+      logger.error('Error deleting notification:', err as Error);
       toast?.({ 
         title: 'Error',
         description: 'An unexpected error occurred',
@@ -566,40 +628,43 @@ export const useNotifications = ({
     try {
       // Skip if not authenticated or baseListRef is not initialized
       if (!authReadyRef.current || !isAuthenticated || !user) {
-        return NOTIFICATIONS_STATE.cachedUnreadCount;
+        return notificationsState.getCachedUnreadCount();
       }
       
       // Make sure baseListRef.current exists
       if (!baseListRef.current) {
-        return NOTIFICATIONS_STATE.cachedUnreadCount;
+        return notificationsState.getCachedUnreadCount();
       }
       
       // Check if we should throttle
       const now = Date.now();
-      if (now - NOTIFICATIONS_STATE.lastFetchTime < 5000) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[Notifications] Throttling unread count fetch');
-        }
+      if (now - notificationsState.getLastFetchTime() < 5000) {
+        logger.debug('[Notifications] Throttling unread count fetch');
         
         // Safely get the current unread count with defensive null checks
         const items = baseListRef.current.items || [];
-        return items.filter(item => !item.isRead).length || NOTIFICATIONS_STATE.cachedUnreadCount;
+        return items.filter(item => !item.isRead).length || notificationsState.getCachedUnreadCount();
+      }
+      
+      // Only the main instance should fetch
+      if (!notificationsState.isMainInstance(instanceId.current)) {
+        logger.debug('[Notifications] Delegating unread count fetch to main instance');
+        return notificationsState.getCachedUnreadCount();
       }
       
       // Use the baseList's refetch method which will properly update the internal state
-      // Fix void promise by ignoring the result - we just need to update the state
       await baseListRef.current.refetch().catch(err => {
-        console.error('[Notifications] Unread count fetch error:', err);
+        logger.error('[Notifications] Unread count fetch error:', err as Error);
       });
       
       // Ensure items exists with a default empty array
       const items = baseListRef.current.items || [];
       const newCount = items.filter(item => !item.isRead).length;
-      NOTIFICATIONS_STATE.cachedUnreadCount = newCount;
+      notificationsState.setCachedUnreadCount(newCount);
       return newCount;
     } catch (err) {
-      console.error('Error fetching unread notification count:', err);
-      return NOTIFICATIONS_STATE.cachedUnreadCount;
+      logger.error('Error fetching unread notification count:', err as Error);
+      return notificationsState.getCachedUnreadCount();
     }
   }, []);  // No dependencies - auth state accessed via ref
   
@@ -609,7 +674,7 @@ export const useNotifications = ({
     const defaultValue: UseNotificationsResult = {
       items: [],
       notifications: [],
-      unreadCount: NOTIFICATIONS_STATE.cachedUnreadCount,
+      unreadCount: notificationsState.getCachedUnreadCount(),
       filters: {
         page,
         limit,
@@ -667,12 +732,21 @@ export const useNotifications = ({
     limit,
     unreadOnly,
     baseListRef.current?.items,
-    baseListRef.current?.isLoading, // Changed from loading to isLoading to match the BaseListUtility interface
+    baseListRef.current?.isLoading,
     baseListRef.current?.error,
   ]);
 
   return notificationResult;
 };
+
+// Register HMR handler
+if (typeof module !== 'undefined' && (module as any).hot) {
+  (module as any).hot.dispose(() => {
+    // Reset notification state during HMR
+    notificationsState.reset();
+    logger.debug('[Notifications] HMR dispose handler: Reset notification state');
+  });
+}
 
 // Add default export for compatibility with import statements
 export default useNotifications;

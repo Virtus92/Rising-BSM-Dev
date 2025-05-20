@@ -14,11 +14,11 @@ core/
 ├── db/                  # Database connection and utilities
 ├── errors/              # Error handling and formatting
 ├── factories/           # Service and repository factories
+├── initialization/      # Application initialization utilities
 ├── logging/             # Logging services and utilities
 ├── repositories/        # Base repository abstractions
 ├── security/            # Security utilities (password hashing, etc.)
 ├── services/            # Base service abstractions
-├── types/               # Common type definitions
 └── validation/          # Validation utilities
 ```
 
@@ -44,12 +44,15 @@ await ApiClient.initialize();
 const response = await ApiClient.get('/users');
 
 // Server-side route handler usage
-import { RouteHandler } from '@/core/api/server';
+import { routeHandler } from '@/core/api/server/route-handler';
 
-export const GET = RouteHandler(async (req) => {
-  // Handle GET request
-  return { success: true, data: { /* response data */ } };
-});
+export const GET = routeHandler(
+  async (req) => {
+    // Handle GET request
+    return { success: true, data: { /* response data */ } };
+  },
+  { requiresAuth: true }
+);
 ```
 
 ### Bootstrap Module
@@ -74,6 +77,7 @@ await bootstrap();
 The Config module provides access to application configuration settings.
 
 - **ConfigService**: Singleton service for accessing configuration values
+- **SecurityConfig**: Security-related configuration
 
 **Usage Example**:
 
@@ -111,21 +115,22 @@ The Errors module provides standardized error handling and formatting.
 
 - **AppError**: Base error class
 - **ValidationError**, **NotFoundError**, etc.: Specialized error classes
-- **errorHandler**: Middleware for consistent error handling
 - **formatResponse**: Utility for formatting API responses
 
 **Usage Example**:
 
 ```typescript
-import { AppError, ValidationError, errorHandler } from '@/core/errors';
+import { AppError, ValidationError } from '@/core/errors/types';
+import { formatResponse } from '@/core/errors';
 
 // Create an error
 throw new ValidationError('Invalid input', 'VALIDATION_ERROR', { field: 'Invalid value' });
 
-// Use error handler middleware
-export const GET = errorHandler(async (req) => {
-  // Route implementation
-});
+// Format a success response
+return formatResponse.success(data, 'Operation successful');
+
+// Format an error response
+return formatResponse.error('An error occurred', 500);
 ```
 
 ### Factories Module
@@ -139,7 +144,6 @@ The Factories module provides factories for creating service and repository inst
 **Usage Example**:
 
 ```typescript
-
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 
 // Get service factory
@@ -147,6 +151,26 @@ const serviceFactory = getServiceFactory();
 
 // Create a service
 const userService = serviceFactory.createUserService();
+```
+
+### Initialization Module
+
+The Initialization module handles application initialization and service registry.
+
+- **ServiceRegistry**: Registry for service instances
+- **TokenManager**: Management of authentication tokens
+- **SharedTokenCache**: Shared cache for tokens
+
+**Usage Example**:
+
+```typescript
+import { ServiceRegistry } from '@/core/initialization/ServiceRegistry';
+
+// Register a service
+ServiceRegistry.register('userService', userService);
+
+// Get a service
+const userService = ServiceRegistry.get('userService');
 ```
 
 ### Logging Module
@@ -178,10 +202,14 @@ The Repositories module provides base repository abstractions.
 
 ```typescript
 import { PrismaRepository } from '@/core/repositories';
+import { db } from '@/core/db';
 
-export class UserRepository extends PrismaRepository<User, Prisma.UserDelegate> {
-  constructor() {
-    super(db.user);
+export class UserRepository extends PrismaRepository<User> {
+  constructor(
+    logger,
+    errorHandler
+  ) {
+    super(db, 'user', logger, errorHandler);
   }
 }
 ```
@@ -190,9 +218,8 @@ export class UserRepository extends PrismaRepository<User, Prisma.UserDelegate> 
 
 The Security module provides security utilities.
 
-- **hashPassword()**: Function to hash passwords
-- **verifyPassword()**: Function to verify passwords
-- **generateSecureToken()**: Function to generate secure tokens
+- **password-utils**: Functions to hash and verify passwords
+- **password-validation**: Functions to validate password strength
 
 **Usage Example**:
 
@@ -229,7 +256,7 @@ export class UserService extends BaseService implements IUserService {
 The Validation module provides validation utilities.
 
 - **ValidationService**: Service for validating data
-- **validateUserCreate()**, **validateUserUpdate()**: Specialized validation functions
+- **userValidation**: Validation functions for user data
 
 **Usage Example**:
 
@@ -251,7 +278,7 @@ const result = validationService.validate(data, schema);
 ## Best Practices
 
 1. **Use Factories**: Always use factories to create services and repositories.
-2. **Error Handling**: Use the provided error classes and error handler middleware.
+2. **Error Handling**: Use the provided error classes and formatResponse utility.
 3. **Logging**: Use the provided logger instead of console.log/error.
 4. **Configuration**: Use the ConfigService for accessing configuration values.
 5. **Environment Detection**: Use the ConfigService methods for environment detection.

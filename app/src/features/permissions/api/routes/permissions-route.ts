@@ -30,9 +30,20 @@ export async function getPermissionsHandler(req: NextRequest): Promise<NextRespo
     // Create permission service
     const permissionService = serviceFactory.createPermissionService();
     
+    // User ID handling with better error messaging
+    const userId = req.auth?.userId;
+    if (!userId) {
+      logger.warn('No user ID found in auth object for permission request', {
+        authObject: req.auth ? 'present' : 'missing',
+        headers: Object.fromEntries([...req.headers.entries()].filter(entry => entry[0].startsWith('x-auth')))
+      });
+      
+      throw new Error('Authentication required - User ID not found in request');
+    }
+    
     // Get permissions through the service
     const result = await permissionService.findPermissions(filterParams, {
-      context: { userId: req.auth?.userId }
+      context: { userId }
     });
     
     return formatResponse.success(result, 'Permissions retrieved successfully');

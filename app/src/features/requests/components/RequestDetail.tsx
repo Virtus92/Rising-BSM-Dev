@@ -14,12 +14,6 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Textarea } from '@/shared/components/ui/textarea';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/shared/components/ui/tooltip';
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -49,14 +43,12 @@ import {
 import {
   Mail,
   Phone,
-  Calendar,
   Clock,
   User,
   MessageCircle,
   UserPlus,
   LinkIcon,
   Trash2,
-  CheckCircle,
   AlertCircle,
   Loader2,
   ArrowLeft,
@@ -68,7 +60,6 @@ import { RequestStatusUpdateDto } from '@/domain/dtos/RequestDtos';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
 import { ConvertToCustomerForm } from './ConvertToCustomerForm';
 import { LinkToCustomerForm } from './LinkToCustomerForm';
-import { CreateAppointmentForm } from './CreateAppointmentForm';
 import Link from 'next/link';
 
 interface RequestDetailProps {
@@ -86,7 +77,6 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
     isLoading,
     isError,
     updateStatus,
-    assignRequest,
     addNote,
     deleteRequest,
     isUpdatingStatus,
@@ -98,7 +88,6 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
-  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [statusNote, setStatusNote] = useState('');
 
@@ -156,6 +145,8 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
     setNewStatus('');
     setStatusNote('');
   };
+  
+  const isCustomerLinked = !!request.customerId;
 
   return (
     <div className="space-y-6">
@@ -215,7 +206,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                   <span className="text-amber-500">Not assigned</span>
                 </div>
               )}
-              {request.customerName && (
+              {request.customerName ? (
                 <div className="flex items-center">
                   <UserCheck className="h-4 w-4 mr-2 text-muted-foreground" />
                   <span>
@@ -228,21 +219,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                     </Link>
                   </span>
                 </div>
-              )}
-              {request.appointmentTitle && (
-                <div className="flex items-center">
-                  <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>
-                    Appointment: {' '}
-                    <Link 
-                      href={`/dashboard/appointments/${request.appointmentId}`}
-                      className="text-primary hover:underline"
-                    >
-                      {request.appointmentTitle}
-                    </Link>
-                  </span>
-                </div>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -259,6 +236,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
               Edit Request
             </Button>
           </Link>
+          
           {/* Status Dialog */}
           <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
             <DialogTrigger asChild>
@@ -309,22 +287,15 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
             </DialogContent>
           </Dialog>
 
-          {/* Convert/Link/Appointment Buttons */}
-          <TooltipProvider>
+          {/* Convert to Customer Button - only show if not linked */}
+          {!isCustomerLinked && (
             <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DialogTrigger asChild>
-                    <Button variant="default">
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Convert to Customer
-                    </Button>
-                  </DialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Convert this request to a new customer
-                </TooltipContent>
-              </Tooltip>
+              <DialogTrigger asChild>
+                <Button variant="default">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Convert to Customer
+                </Button>
+              </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Convert to Customer</DialogTitle>
@@ -336,78 +307,39 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                   request={request}
                   onClose={() => {
                     setConvertDialogOpen(false);
-                    // Router refresh is now handled in component
+                    window.location.reload();
                   }}
                 />
               </DialogContent>
             </Dialog>
-          </TooltipProvider>
+          )}
 
-          <TooltipProvider>
-            <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <LinkIcon className="h-4 w-4 mr-2" />
-                      Link to Customer
-                    </Button>
-                  </DialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Link with existing customer
-                </TooltipContent>
-              </Tooltip>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Link to Customer</DialogTitle>
-                  <DialogDescription>
-                    Link this request with an existing customer.
-                  </DialogDescription>
-                </DialogHeader>
-                <LinkToCustomerForm
-                  requestId={request.id}
-                  onClose={() => {
-                    setLinkDialogOpen(false);
-                    // Router refresh is now handled in component
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          </TooltipProvider>
-
-          <TooltipProvider>
-            <Dialog open={appointmentDialogOpen} onOpenChange={setAppointmentDialogOpen}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Create Appointment
-                    </Button>
-                  </DialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Create appointment for this request
-                </TooltipContent>
-              </Tooltip>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Create Appointment</DialogTitle>
-                  <DialogDescription>
-                    Create an appointment for this contact request.
-                  </DialogDescription>
-                </DialogHeader>
-                <CreateAppointmentForm
-                  request={request}
-                  onClose={() => {
-                    setAppointmentDialogOpen(false);
-                    // Router refresh is now handled in component
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          </TooltipProvider>
+          {/* Link to Customer Button - always show */}
+          <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <LinkIcon className="h-4 w-4 mr-2" />
+                {isCustomerLinked ? 'Change Customer' : 'Link to Customer'}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>{isCustomerLinked ? 'Change Linked Customer' : 'Link to Customer'}</DialogTitle>
+                <DialogDescription>
+                  {isCustomerLinked 
+                    ? 'Change which customer this request is linked to.'
+                    : 'Link this request with an existing customer.'}
+                </DialogDescription>
+              </DialogHeader>
+              <LinkToCustomerForm
+                requestId={request.id}
+                onClose={() => {
+                  setLinkDialogOpen(false);
+                  window.location.reload();
+                }}
+              />
+            </DialogContent>
+          </Dialog>
 
           {/* Delete Button */}
           <AlertDialog>
@@ -419,10 +351,9 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Really delete?</AlertDialogTitle>
+                <AlertDialogTitle>Delete Request</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Do you really want to delete this request? 
-                  This action cannot be undone.
+                  This action cannot be undone. This will permanently delete the request.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -448,7 +379,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
         </CardFooter>
       </Card>
 
-      {/* Tabs for notes and further info */}
+      {/* Tabs for notes */}
       <Tabs defaultValue="notes" className="w-full">
         <TabsList>
           <TabsTrigger value="notes" className="flex items-center">
@@ -468,12 +399,12 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
             <CardContent>
               {/* Notes List */}
               <div className="space-y-4 mb-6">
-                {request.notes?.length === 0 ? (
+                {!request.notes || request.notes.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No notes available.
                   </p>
                 ) : (
-                  request.notes?.map((note) => (
+                  request.notes.map((note) => (
                     <div key={note.id} className="p-3 rounded-md bg-muted">
                       <div className="flex justify-between mb-2">
                         <div className="font-medium flex items-center">

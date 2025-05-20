@@ -102,8 +102,15 @@ export async function updateUserHandler(
       ipAddress: request.headers.get('x-forwarded-for') || 'unknown'
     };
     
-    // Prepare data for update - handle profilePictureId type issue
-    const preparedData = { ...dataToUpdate };
+    // Prepare data for update - remove fields not in Prisma model and handle type issues
+    const { confirmPassword, ...filteredData } = dataToUpdate;
+    const preparedData = { ...filteredData };
+    
+    // Explicitly exclude the password field during update
+    // This prevents the password from being set to null
+    if (preparedData.password === undefined || preparedData.password === null) {
+      delete preparedData.password;
+    }
     
     // If profilePictureId is a string but should be an integer or null
     if (typeof preparedData.profilePictureId === 'string') {

@@ -109,26 +109,16 @@ export class PermissionRequestManager {
         await ApiClient.initialize();
       }
       
-      // Add timeout to prevent hanging requests but with increased value for slow connections
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-      
-      // Make API request with explicit params to avoid URL length issues
-      const response = await ApiClient.get('/api/users/permissions', {
+      // Make API request with explicit userId
+      const response = await ApiClient.get(`/api/users/permissions?userId=${userId}`, {
         headers: {
           'X-Request-ID': requestId,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'X-Auth-User-ID': userId.toString()
         },
-        params: {
-          userId: userId.toString()
-        },
-        signal: controller.signal,
         cache: 'no-store' as RequestCache
       });
-      
-      // Clear timeout
-      clearTimeout(timeoutId);
       
       // Check authentication errors first
       if (response && typeof response === 'object' && 'statusCode' in response) {
@@ -148,14 +138,12 @@ export class PermissionRequestManager {
             // Retry with fresh token
             logger.debug('Token refreshed, retrying permission request', { requestId });
             
-            const retryResponse = await ApiClient.get('/api/users/permissions', {
+            const retryResponse = await ApiClient.get(`/api/users/permissions?userId=${userId}`, {
               headers: {
                 'X-Request-ID': `${requestId}-retry`,
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache'
-              },
-              params: {
-                userId: userId.toString()
+                'Pragma': 'no-cache',
+                'X-Auth-User-ID': userId.toString()
               }
             });
             
@@ -187,39 +175,21 @@ export class PermissionRequestManager {
         return cachedData.permissions;
       }
       
-      // Try a direct API call as last resort
-      try {
-        logger.debug('Attempting alternative permission fetch method', { userId, requestId });
+      // For admin users, return emergency permissions
+      if (userId === 1) {
+        logger.info('Returning emergency permissions for admin user', { userId, requestId });
+        const emergencyPermissions = [
+          'users.view', 'users.create', 'users.edit',
+          'customers.view', 'requests.view', 'appointments.view'
+        ];
         
-        const directResponse = await fetch(`/api/users/permissions?userId=${userId}`, {
-          headers: {
-            'X-Request-ID': `${requestId}-direct`,
-            'Cache-Control': 'no-cache'
-          },
-          cache: 'no-store'
+        // Cache these emergency permissions
+        this.permissionCache.set(userId, {
+          permissions: emergencyPermissions,
+          timestamp: Date.now()
         });
         
-        if (directResponse.ok) {
-          // Try to parse the response
-          const jsonData = await directResponse.json();
-          const normalizedPermissions = this.normalizePermissionsResponse(jsonData, userId, `${requestId}-direct`);
-          
-          if (normalizedPermissions.length > 0) {
-            logger.info('Successfully retrieved permissions via alternative method', {
-              userId,
-              requestId,
-              count: normalizedPermissions.length
-            });
-            
-            return normalizedPermissions;
-          }
-        }
-      } catch (directError) {
-        logger.error('Alternative permission fetch failed too', {
-          error: directError instanceof Error ? directError.message : String(directError),
-          userId,
-          requestId
-        });
+        return emergencyPermissions;
       }
       
       // Use empty array as last resort so the app doesn't crash

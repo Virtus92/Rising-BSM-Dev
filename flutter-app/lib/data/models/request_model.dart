@@ -1,29 +1,23 @@
-// ContactRequest model representing a service request in the system
 import 'package:json_annotation/json_annotation.dart';
+
+import 'customer_model.dart';
+import 'user_model.dart';
 
 part 'request_model.g.dart';
 
 @JsonSerializable()
 class RequestModel {
   final int id;
-  final String name;
-  final String email;
-  final String? phone;
-  final String service;
-  final String message;
+  final String title;
+  final String description;
   final String status;
-  
-  @JsonKey(name: 'processorId')
-  final int? processorId;
+  final String priority;
   
   @JsonKey(name: 'customerId')
   final int? customerId;
   
-  @JsonKey(name: 'appointmentId')
-  final int? appointmentId;
-  
-  final String? source;
-  final Map<String, dynamic>? metadata;
+  @JsonKey(name: 'assignedTo')
+  final int? assignedTo;
   
   @JsonKey(name: 'createdAt')
   final DateTime createdAt;
@@ -31,45 +25,53 @@ class RequestModel {
   @JsonKey(name: 'updatedAt')
   final DateTime updatedAt;
   
-  @JsonKey(name: 'notes')
-  final List<RequestNoteModel>? notes;
+  @JsonKey(name: 'createdBy')
+  final int? createdBy;
   
-  @JsonKey(name: 'requestData')
-  final List<RequestDataModel>? requestData;
+  @JsonKey(name: 'updatedBy')
+  final int? updatedBy;
+  
+  final CustomerModel? customer;
+  final UserModel? assignedToUser;
+  final List<RequestNoteModel>? notes;
+  final RequestDataModel? data;
 
   const RequestModel({
     required this.id,
-    required this.name,
-    required this.email,
-    this.phone,
-    required this.service,
-    required this.message,
+    required this.title,
+    required this.description,
     required this.status,
-    this.processorId,
+    required this.priority,
     this.customerId,
-    this.appointmentId,
-    this.source,
-    this.metadata,
+    this.assignedTo,
     required this.createdAt,
     required this.updatedAt,
+    this.createdBy,
+    this.updatedBy,
+    this.customer,
+    this.assignedToUser,
     this.notes,
-    this.requestData,
+    this.data,
   });
 
   // Getters for status types
   bool get isNew => status == 'new';
-  bool get isProcessing => status == 'processing';
+  bool get isInProgress => status == 'in_progress';
   bool get isCompleted => status == 'completed';
-  bool get isRejected => status == 'rejected';
+  bool get isCancelled => status == 'cancelled';
+  bool get isWaiting => status == 'waiting';
 
-  // Check if the request has been assigned to a processor
-  bool get isAssigned => processorId != null;
+  // Getters for priority types
+  bool get isLow => priority == 'low';
+  bool get isMedium => priority == 'medium';
+  bool get isHigh => priority == 'high';
+  bool get isUrgent => priority == 'urgent';
 
-  // Check if the request has been converted to a customer
-  bool get isConvertedToCustomer => customerId != null;
+  // Check if the request is assigned
+  bool get isAssigned => assignedTo != null;
 
-  // Check if the request has an appointment created
-  bool get hasAppointment => appointmentId != null;
+  // Check if the request has a customer
+  bool get hasCustomer => customerId != null;
 
   factory RequestModel.fromJson(Map<String, dynamic> json) => 
       _$RequestModelFromJson(json);
@@ -89,6 +91,8 @@ class RequestNoteModel {
   
   @JsonKey(name: 'updatedAt')
   final DateTime updatedAt;
+  
+  final UserModel? user;
 
   const RequestNoteModel({
     required this.id,
@@ -97,6 +101,7 @@ class RequestNoteModel {
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
+    this.user,
   });
 
   factory RequestNoteModel.fromJson(Map<String, dynamic> json) => 
@@ -109,8 +114,7 @@ class RequestNoteModel {
 class RequestDataModel {
   final int id;
   final int requestId;
-  final String key;
-  final String value;
+  final Map<String, dynamic> data;
   
   @JsonKey(name: 'createdAt')
   final DateTime createdAt;
@@ -121,8 +125,7 @@ class RequestDataModel {
   const RequestDataModel({
     required this.id,
     required this.requestId,
-    required this.key,
-    required this.value,
+    required this.data,
     required this.createdAt,
     required this.updatedAt,
   });

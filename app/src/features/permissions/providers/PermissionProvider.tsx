@@ -319,42 +319,60 @@ const loadPermissions = useCallback(async (options?: { force?: boolean, maxRetri
   return false;
 }, [isAuthenticated, user, permissionCache]);
 
-  // Load permissions when authenticated with improved initialization
+    // Load permissions when authenticated with improved initialization
 useEffect(() => {
   // Skip if auth is not initialized
   if (!user || !isAuthenticated) {
-  setPermissions([]);
-  permissionCache.clear();
-  setError(null);
-  setIsLoading(false);
-  setIsInitialized(true); // Mark as initialized even with empty permissions
-  return;
+    setPermissions([]);
+    permissionCache.clear();
+    setError(null);
+    setIsLoading(false);
+    setIsInitialized(true); // Mark as initialized even with empty permissions
+    return;
   }
   
   // Add diagnostic info for tracking
   logger.debug('Auth state changed in PermissionProvider', {
-  isAuthenticated,
-  userId: user?.id,
-  permissionsCount: permissions.length,
-  isInitialized,
+    isAuthenticated,
+    userId: user?.id,
+    permissionsCount: permissions.length,
+    isInitialized,
   });
+  
+  // Set loading state immediately
+  setIsLoading(true);
   
   // Track initialization attempts
   const loadPermissionsWithRetry = async () => {
     try {
-    logger.info('Loading permissions for authenticated user', {
-    userId: user?.id,
-    isInitialized,
-      permissionsCount: permissions.length
-    });
-    
-  // First try - always force refresh to ensure we have correct permissions
-  const result = await loadPermissions({ force: true, maxRetries: 2 });
-  
-  if (!result) {
-      // If first attempt failed and we have no permissions, set a timer to retry in 5 seconds
-        if (permissions.length === 0) {
-          logger.warn('Initial permission load failed, scheduling retry in 5s', {
+      logger.info('Loading permissions for authenticated user', {
+        userId: user?.id,
+        isInitialized,
+        permissionsCount: permissions.length
+      });
+      
+      // First try - always force refresh to ensure we have correct permissions
+      const result = await loadPermissions({ force: true, maxRetries: 3 });
+      
+      if (!result && permissions.length === 0) {
+        // Add basic admin permissions if user is admin to prevent being locked out
+        if (user?.role === 'admin') {
+          logger.info('Adding basic admin permissions after failed load', { userId: user.id });
+          
+          const basicAdminPermissions: Permission[] = [
+            'users.view', 'users.create', 'users.edit', 'users.delete',
+            'customers.view', 'requests.view', 'appointments.view'
+          ].map(code => ({
+            id: 0,
+            code,
+            name: code,
+            description: 'Emergency admin permission'
+          }));
+          
+          setPermissions(basicAdminPermissions);
+        } else {
+          // Schedule a retry after a delay
+          logger.warn('Initial permission load failed, scheduling retry in 3s', {
             userId: user?.id
           });
           
@@ -368,7 +386,7 @@ useEffect(() => {
                 });
               });
             }
-          }, 5000);
+          }, 3000);
         }
       }
     } catch (error) {
@@ -379,18 +397,20 @@ useEffect(() => {
     } finally {
       // Always mark as initialized to prevent loading spinner
       setIsInitialized(true);
+      setIsLoading(false);
     }
   };
   
   // Automatically load permissions when authenticated and not initialized
   // This ensures permissions are always loaded when the component mounts
-  if (isAuthenticated && (!isInitialized || permissions.length === 0)) {
+  if (isAuthenticated) {
     loadPermissionsWithRetry();
   } else {
     // Always ensure initialized flag is set
     setIsInitialized(true);
+    setIsLoading(false);
   }
-}, [isAuthenticated, user, permissionCache, permissions.length, isInitialized, loadPermissions]);
+}, [isAuthenticated, user, permissionCache, loadPermissions]);
   
   // Add HMR detection to force permission reload with improved handling
   useEffect(() => {

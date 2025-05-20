@@ -50,8 +50,8 @@ Rising-BSM is currently in early development (Version 0.6). While core functiona
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/Rising-BSM.git
-   cd Rising-BSM/app
+   git clone https://github.com/virtus92/Rising-BSM-dev.git
+   cd Rising-BSM-dev/app
    ```
 
 2. Install dependencies:

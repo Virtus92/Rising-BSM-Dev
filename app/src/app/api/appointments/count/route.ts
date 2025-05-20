@@ -28,10 +28,10 @@ export const GET = routeHandler(
         const { searchParams } = new URL(request.url);
         const filters = {
           status: searchParams.get('status') || undefined,
-          startDate: searchParams.get('startDate') 
+          startDate: searchParams.has('startDate') 
             ? new Date(searchParams.get('startDate') as string) 
             : undefined,
-          endDate: searchParams.get('endDate') 
+          endDate: searchParams.has('endDate') 
             ? new Date(searchParams.get('endDate') as string) 
             : undefined,
           customerId: searchParams.has('customerId') 
@@ -40,67 +40,25 @@ export const GET = routeHandler(
         };
         
         // Get count from service with any filters
-        try {
-          const result = await appointmentService.count({
-            context,
-            filters
-          });
-          
-          // Ensure we have a proper count response
-          let count = 0;
-          
-          if (result && typeof result === 'object' && 'count' in result) {
-            count = result.count as number;
-          } else if (typeof result === 'number') {
-            count = result;
-          } else if (result && typeof result === 'object') {
-            // Use type assertion to avoid 'never' type issues
-            const resultObj = result as Record<string, any>;
-            if ('total' in resultObj) {
-              count = resultObj.total;
-            }
-          }
-          
-          return formatResponse.success({ count }, 'Appointment count retrieved successfully');
-        } catch (serviceError) {
-          logger.warn('Error retrieving appointment count from service, trying repository directly:', {
-            error: serviceError instanceof Error ? serviceError.message : String(serviceError)
-          });
-          
-          // Fallback to using repository directly
-          const repositoryResult = await appointmentService.getRepository().count(filters);
-          
-          // Ensure we have a proper count response even from repository
-          let count = 0;
-          
-          if (typeof repositoryResult === 'number') {
-            count = repositoryResult;
-          } else if (repositoryResult && typeof repositoryResult === 'object') {
-            if ('count' in repositoryResult) {
-              count = repositoryResult.count as number;
-            } else if ('total' in repositoryResult) {
-              count = repositoryResult.total as number;
-            }
-          }
-          
-          return formatResponse.success({ count }, 'Appointment count retrieved through fallback method');
-        }
-      } catch (error) {
-        logger.error('Error counting appointments:', {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined
+        const result = await appointmentService.count({
+          context,
+          filters
         });
         
-        return formatResponse.error(
-          error instanceof Error ? error.message : 'Failed to retrieve appointment count',
-          500
-        );
+        // Ensure we always respond with a consistent format
+        // The response format is { success: true, data: { count: number } }
+        const count = typeof result === 'number' ? result : 0;
+        
+        return formatResponse.success({ count }, 'Appointment count retrieved successfully');
+      } catch (error) {
+        logger.error('Error counting appointments:', error instanceof Error ? error : new Error(String(error)));
+        
+        throw error;
       }
     },
     SystemPermission.APPOINTMENTS_VIEW
   ),
   {
-    // Secure this endpoint
     requiresAuth: true
   }
 );

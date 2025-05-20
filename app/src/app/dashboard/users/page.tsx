@@ -102,7 +102,7 @@ export default function UsersPage() {
       
       const response = await UserService.createUser(updatedData);
       
-      if (response.success) {
+      if (response.success && response.data) {
         setSuccess(true);
         
         // Close dialog after a delay
@@ -112,11 +112,11 @@ export default function UsersPage() {
           window.location.reload();
         }, 1500);
       } else {
-        setError(response.message || 'Failed to create user');
+        setError(response.error || response.message || 'Failed to create user');
       }
     } catch (err) {
-      console.error('Error creating user:', err);
-      setError('An unexpected error occurred');
+      console.error('Failed to create user:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
     }

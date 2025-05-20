@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -50,49 +50,63 @@ export default function PermissionsPage() {
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchPermissionData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
+  // Create a memoized fetch function to improve performance and allow reuse
+  const fetchPermissionData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Fetch permissions and role permissions in parallel for better performance
+      const [allPermsResponse, rolePermissionsData] = await Promise.all([
         // Get all permissions
-        const allPerms = await PermissionClient.getPermissions({
-          limit: 100
-        });
+        PermissionClient.getPermissions({
+          limit: 250 // Increased limit to ensure all permissions are retrieved
+        }),
         
-        if (allPerms.success && allPerms.data) {
-          const permCodes = allPerms.data.data.map(p => p.code);
-          const definitions = createPermissionDefinitionList(permCodes);
-          setPermissionDefinitions(definitions);
-        }
-        
-        // Get role permissions
-        const roleData: Record<string, string[]> = {};
-        
-        for (const role of Object.values(UserRole)) {
-          try {
-            const response = await PermissionClient.getDefaultPermissionsForRole(role);
-            if (response.success && response.data) {
-              roleData[role] = response.data;
+        // Get role permissions for all roles
+        (async () => {
+          const roleData: Record<string, string[]> = {};
+          
+          await Promise.all(Object.values(UserRole).map(async (role) => {
+            try {
+              const response = await PermissionClient.getDefaultPermissionsForRole(role);
+              if (response.success && response.data) {
+                roleData[role] = response.data;
+              }
+            } catch (err) {
+              console.error(`Error loading permissions for role ${role}:`, err);
+              // Continue with other roles - don't let one role failure stop everything
             }
-          } catch (error) {
-            console.error(`Error loading permissions for role ${role}:`, error);
-          }
-        }
-        
-        setRolePermissions(roleData);
-        
-      } catch (error) {
-        console.error('Error loading permission data:', error);
-        setError('Failed to load permission data. Please try again.');
-      } finally {
-        setIsLoading(false);
+          }));
+          
+          return roleData;
+        })()
+      ]);
+      
+      // Process permissions data
+      if (allPermsResponse.success && allPermsResponse.data) {
+        const permCodes = allPermsResponse.data.data.map(p => p.code);
+        const definitions = createPermissionDefinitionList(permCodes);
+        setPermissionDefinitions(definitions);
+      } else {
+        throw new Error(allPermsResponse.message || 'Failed to get permissions');
       }
-    };
-    
-    fetchPermissionData();
+      
+      // Set role permissions
+      setRolePermissions(rolePermissionsData);
+      
+    } catch (err) {
+      console.error('Error loading permission data:', err);
+      setError(`Failed to load permission data: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+  
+  // Fetch permissions on component mount
+  useEffect(() => {
+    fetchPermissionData();
+  }, [fetchPermissionData]);
 
   return (
     <div className="container max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
@@ -280,7 +294,8 @@ export default function PermissionsPage() {
           <PermissionList 
             permissions={permissionDefinitions} 
             isLoading={isLoading} 
-            error={error} 
+            error={error}
+            onRefresh={fetchPermissionData} 
           />
         </TabsContent>
         
@@ -290,11 +305,12 @@ export default function PermissionsPage() {
             allPermissions={permissionDefinitions}
             isLoading={isLoading}
             error={error}
+            onRefresh={fetchPermissionData}
           />
         </TabsContent>
         
         <TabsContent value="users" className="space-y-4">
-          <PermissionUserAssignment />
+          <PermissionUserAssignment onPermissionsChanged={fetchPermissionData} />
         </TabsContent>
         
         <TabsContent value="settings" className="space-y-4">

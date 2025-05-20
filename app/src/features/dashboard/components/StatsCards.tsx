@@ -19,11 +19,11 @@ export const StatsCards = () => {
     refreshStats
   } = useDashboardStats();
 
-  // Default stats items with proper loading and error handling
+  // Define stats items configuration
   const statsItems = [
     {
       title: 'Total Users',
-      count: userCount ?? 0,
+      count: userCount,
       icon: Users,
       color: 'text-blue-500',
       bgColor: 'bg-blue-50 dark:bg-blue-950',
@@ -31,7 +31,7 @@ export const StatsCards = () => {
     },
     {
       title: 'Total Customers',
-      count: customerCount ?? 0,
+      count: customerCount,
       icon: UserPlus,
       color: 'text-green-500',
       bgColor: 'bg-green-50 dark:bg-green-950',
@@ -39,15 +39,15 @@ export const StatsCards = () => {
     },
     {
       title: 'Total Requests',
-      count: requestCount ?? 0,
+      count: requestCount,
       icon: FileText,
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-50 dark:bg-yellow-950',
       borderColor: 'border-yellow-100 dark:border-yellow-900'
     },
     {
-      title: 'Upcoming Appointments',
-      count: appointmentCount ?? 0,
+      title: 'Appointments',
+      count: appointmentCount,
       icon: Calendar,
       color: 'text-purple-500',
       bgColor: 'bg-purple-50 dark:bg-purple-950',
@@ -79,21 +79,22 @@ export const StatsCards = () => {
     );
   }
   
-  // Check if all stats are zero/null, which likely means no permissions
-  const hasNoData = [
+  // Check if any of the statistics loaded correctly
+  const hasAnyData = [
     userCount, 
     customerCount, 
     requestCount, 
     appointmentCount
-  ].every(count => count === 0 || count === null);
+  ].some(count => count > 0);
   
-  if (hasNoData && !error) {
+  // Show a message if we have no data but no error (permissions issue or empty system)
+  if (!hasAnyData && !error) {
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center text-amber-500">
             <AlertCircle className="h-5 w-5 mr-2" />
-            <p>No statistics available for your current role</p>
+            <p>No statistics available. You may need additional permissions or the system may be empty.</p>
           </div>
           <Button 
             variant="outline" 
@@ -116,7 +117,7 @@ export const StatsCards = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-muted-foreground">--</div>
+                <div className="text-2xl font-bold">{item.count}</div>
               </CardContent>
             </Card>
           ))}
@@ -132,7 +133,7 @@ export const StatsCards = () => {
         <div className="flex justify-between items-center">
           <div className="flex items-center text-red-500">
             <AlertCircle className="h-5 w-5 mr-2" />
-            <p>Failed to load statistics</p>
+            <p>Failed to load statistics: {error.message}</p>
           </div>
           <Button 
             variant="outline" 

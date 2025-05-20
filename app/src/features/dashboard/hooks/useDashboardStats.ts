@@ -1,19 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/shared/hooks/useToast';
-import { UserService } from '@/features/users/lib/services/UserService';
-import { RequestService } from '@/features/requests/lib/services/RequestService';
-import { AppointmentService } from '@/features/appointments/lib/services/AppointmentService';
-import { CustomerService } from '@/features/customers/lib/services/CustomerService.client';
+import { getLogger } from '@/core/logging';
 import { ApiResponse } from '@/core/api/ApiClient';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import AuthService from '@/features/auth/core/AuthService';
 
-// Define API response types for count endpoints
-interface CountResponse {
-  count: number;
-}
+// Get logger instance
+const logger = getLogger();
 
-// Define a more specific type for the state, excluding refreshStats initially
+// Define a more specific type for the state
 type StatsData = {
   userCount: number;
   customerCount: number;
@@ -32,92 +27,40 @@ type UseDashboardStatsReturn = StatsState & {
 };
 
 /**
- * Safely extracts count value from various response formats
- * Enhanced with more robust error handling and support for different API response structures
- * 
- * @param response API response object
- * @returns Extracted count or 0 if not found
+ * Extracts count value from API response
  */
 const extractCount = (response: ApiResponse<any>): number => {
   if (!response) {
-    console.warn('extractCount called with undefined/null response');
+    logger.warn('extractCount called with undefined/null response');
     return 0;
   }
   
   if (!response.success) {
-    console.warn('Unsuccessful API response:', response.message);
+    logger.warn('Unsuccessful API response:');
     return 0;
   }
   
   if (!response.data) {
-    console.warn('Missing data in API response:', response.message);
+    logger.warn('Missing data in API response:');
     return 0;
   }
   
-  // Log response structure for debugging
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Extracting count from response structure:', 
-      typeof response.data === 'object' ? 
-        Object.keys(response.data) : typeof response.data);
-  }
+  // Get actual response structure to understand data format
+  const dataType = typeof response.data;
   
   // Handle direct number response
-  if (typeof response.data === 'number') {
+  if (dataType === 'number') {
     return response.data;
   }
   
-  // Handle object with count property (most common format after our fixes)
-  if (typeof response.data === 'object' && response.data !== null) {
-    // Direct count property (our standardized format)
+  // Standard API response format: { count: number }
+  if (dataType === 'object' && response.data !== null) {
     if ('count' in response.data && typeof response.data.count === 'number') {
       return response.data.count;
     }
-    
-    // Alternative total property
-    if ('total' in response.data && typeof response.data.total === 'number') {
-      return response.data.total;
-    }
-    
-    // Handle pagination response
-    if ('pagination' in response.data && 
-        typeof response.data.pagination === 'object' && 
-        response.data.pagination !== null) {
-      if ('total' in response.data.pagination && 
-          typeof response.data.pagination.total === 'number') {
-        return response.data.pagination.total;
-      }
-    }
-    
-    // Handle nested data property with count
-    if ('data' in response.data && typeof response.data.data === 'object' &&
-        response.data.data !== null) {
-      
-      // Check for count in nested data
-      if ('count' in response.data.data && 
-          typeof response.data.data.count === 'number') {
-        return response.data.data.count;
-      }
-      
-      // Check for total in nested data
-      if ('total' in response.data.data && 
-          typeof response.data.data.total === 'number') {
-        return response.data.data.total;
-      }
-      
-      // If nested data is an array, return its length
-      if (Array.isArray(response.data.data)) {
-        return response.data.data.length;
-      }
-    }
-    
-    // Handle array response
-    if (Array.isArray(response.data)) {
-      return response.data.length;
-    }
   }
   
-  // We couldn't find a count value
-  console.warn('Could not extract count from response:', response);
+  // If we can't extract a count, return 0
   return 0;
 };
 
@@ -130,7 +73,7 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   
   // Initialize state with default values
-  console.log('using dashboardStats hook');
+  logger.debug('Using dashboardStats hook');
   const [state, setState] = useState<StatsState>({
     userCount: 0,
     customerCount: 0,
@@ -149,11 +92,11 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
   // Track last successful fetch time to prevent excessive refresh
   const lastFetchTimeRef = useRef(0);
 
-  // Extract fetchStats as a separate callback with debounce protection
+  // Extract fetchStats as a separate callback
   const fetchStats = useCallback(async (showErrors = false) => {
     // Don't attempt to fetch if not authenticated
     if (!isAuthenticated) {
-      console.log('User is not authenticated, skipping dashboard stats fetch');
+      logger.info('User is not authenticated, skipping dashboard stats fetch');
       if (isMountedRef.current) {
         setState(prev => ({ 
           ...prev, 
@@ -164,17 +107,17 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
       return;
     }
     
-    console.log('Fetching dashboard stats...');
+    logger.info('Fetching dashboard stats...');
     // Don't allow multiple simultaneous fetches
     if (isFetchingRef.current) {
-      console.log('Already fetching stats, skipping duplicate request');
+      logger.debug('Already fetching stats, skipping duplicate request');
       return;
     }
     
     // Throttle refreshes (minimum 5 seconds between refreshes)
     const now = Date.now();
     if (now - lastFetchTimeRef.current < 5000 && lastFetchTimeRef.current !== 0) {
-      console.log('Throttling stats fetch - too soon since last fetch');
+      logger.debug('Throttling stats fetch - too soon since last fetch');
       return;
     }
     
@@ -187,74 +130,69 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     }
     
     try {
-      // Ensure API client is initialized before making requests
-      const { ApiClient } = await import('@/core/api/ApiClient');
-      await ApiClient.initialize().catch(err => console.warn('API init warning:', err));
+      // Make direct API calls to count endpoints
+      const usersPromise = fetch('/api/users/count', { 
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
       
-      // Safely get the service methods - use static methods correctly
-      const services = {
-        user: typeof UserService.count === 'function' ? () => UserService.count() : (() => Promise.resolve({ success: false, data: null })),
-        customer: typeof CustomerService.count === 'function' ? () => CustomerService.count() : (() => Promise.resolve({ success: false, data: null })),
-        request: typeof RequestService.count === 'function' ? () => RequestService.count() : (() => Promise.resolve({ success: false, data: null })),
-        // AppointmentService is an instance class, not static
-        appointment: async () => {
-          const appointmentService = new AppointmentService();
-          return { success: true, data: { count: await appointmentService.count() } };
-        }
-      };
+      const customersPromise = fetch('/api/customers/count', { 
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
       
-      // Use Promise.allSettled with dedicated count endpoints with error catching for each call
+      const requestsPromise = fetch('/api/requests/count', { 
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      
+      const appointmentsPromise = fetch('/api/appointments/count', { 
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      
+      // Wait for all promises to settle
       const [usersResponse, customersResponse, requestsResponse, appointmentsResponse] = 
         await Promise.allSettled([
-          services.user().catch(err => ({ success: false, data: { count: 0 }, message: err.message })),
-          services.customer().catch(err => ({ success: false, data: { count: 0 }, message: err.message })),
-          services.request().catch(err => ({ success: false, data: { count: 0 }, message: err.message })),
-          services.appointment().catch(err => ({ success: false, data: { count: 0 }, message: err.message }))
+          usersPromise,
+          customersPromise,
+          requestsPromise,
+          appointmentsPromise
         ]);
-
-      // Log raw responses for debugging
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Raw count responses:', {
-          users: usersResponse.status === 'fulfilled' ? usersResponse.value : 'rejected',
-          customers: customersResponse.status === 'fulfilled' ? customersResponse.value : 'rejected',
-          requests: requestsResponse.status === 'fulfilled' ? requestsResponse.value : 'rejected',
-          appointments: appointmentsResponse.status === 'fulfilled' ? appointmentsResponse.value : 'rejected',
-        });
-      }
-
+      
       // Track successful fetch time
       lastFetchTimeRef.current = Date.now();
 
       if (isMountedRef.current) {
-        const processCountResponse = (response: PromiseSettledResult<any>, entityName: string): number => {
-          if (response.status === 'rejected') {
-            console.error(`Failed to fetch ${entityName} count:`, response.reason);
-            return 0;
-          }
-          
-          try {
-            // Extract the count using the comprehensive extraction utility
-            const count = extractCount(response.value);
-            
-            if (count === 0 && response.value?.success) {
-              // Double-check with stricter extraction if we got 0 but the API call was successful
-              console.warn(`Got 0 for ${entityName} count despite successful API call:`, response.value);
-            }
-            
-            return count;
-          } catch (err) {
-            console.error(`Error processing ${entityName} count:`, err);
-            return 0;
-          }
-        };
-          
-        const userCount = processCountResponse(usersResponse, 'users');
-        const customerCount = processCountResponse(customersResponse, 'customers');
-        const requestCount = processCountResponse(requestsResponse, 'requests');
-        const appointmentCount = processCountResponse(appointmentsResponse, 'appointments');
-
-        // Log processed counts
-        console.log('Processed counts:', { userCount, customerCount, requestCount, appointmentCount });
+        // Parse responses and extract counts
+        let userCount = 0;
+        let customerCount = 0;
+        let requestCount = 0;
+        let appointmentCount = 0;
+        
+        // Process users response
+        if (usersResponse.status === 'fulfilled' && usersResponse.value.ok) {
+          const data = await usersResponse.value.json();
+          userCount = data.data?.count || 0;
+        }
+        
+        // Process customers response
+        if (customersResponse.status === 'fulfilled' && customersResponse.value.ok) {
+          const data = await customersResponse.value.json();
+          customerCount = data.data?.count || 0;
+        }
+        
+        // Process requests response
+        if (requestsResponse.status === 'fulfilled' && requestsResponse.value.ok) {
+          const data = await requestsResponse.value.json();
+          requestCount = data.data?.count || 0;
+        }
+        
+        // Process appointments response
+        if (appointmentsResponse.status === 'fulfilled' && appointmentsResponse.value.ok) {
+          const data = await appointmentsResponse.value.json();
+          appointmentCount = data.data?.count || 0;
+        }
 
         // Update state with fetched data
         setState(prev => ({
@@ -269,7 +207,9 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
       }
 
       // Check if all requests failed
-      const allFailed = [usersResponse, customersResponse, requestsResponse, appointmentsResponse].every(r => r.status === 'rejected');
+      const allFailed = [usersResponse, customersResponse, requestsResponse, appointmentsResponse]
+        .every(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
+        
       if (allFailed && isMountedRef.current) {
         const error = new Error('Failed to fetch all dashboard statistics.');
         setState(prev => ({
@@ -287,7 +227,7 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
         }
       }
     } catch (error) {
-      console.error('Failed to fetch dashboard stats', error as Error);
+      logger.error('Failed to fetch dashboard stats', error instanceof Error ? error : new Error(String(error)));
       if (isMountedRef.current) {
         setState(prev => ({
           ...prev,
@@ -307,7 +247,7 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
       // Clear fetching flag
       isFetchingRef.current = false;
     }
-  }, [toast, isAuthenticated]); // No need for isAuthLoading in dependencies
+  }, [toast, isAuthenticated]);
 
   // Function to manually refresh stats with visible feedback
   const refreshStats = useCallback(async () => {
@@ -319,7 +259,7 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
         variant: 'success'
       });
     } catch (error) {
-      console.error('Failed to manually refresh stats:', error as Error);
+      logger.error('Failed to manually refresh stats:', error instanceof Error ? error : new Error(String(error)));
       // Error handling and toasts are already in fetchStats with showErrors=true
     }
   }, [fetchStats, toast]);
@@ -344,14 +284,14 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     }
     
     // Subscribe to auth initialization to trigger fetch when auth is ready
-    console.log('Dashboard stats: Subscribing to auth initialization events');
+    logger.debug('Dashboard stats: Subscribing to auth initialization events');
     
     // Function to handle authentication initialization completion
     const handleAuthInit = (status: any) => {
-      console.log('Dashboard stats: Auth initialization completed', status);
+      logger.debug('Dashboard stats: Auth initialization completed', status);
       
       if (status.isAuthenticated && isMountedRef.current) {
-        console.log('Dashboard stats: Auth ready and user authenticated, fetching stats');
+        logger.debug('Dashboard stats: Auth ready and user authenticated, fetching stats');
         setTimeout(() => {
           if (isMountedRef.current) {
             fetchStats();
@@ -359,7 +299,7 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
         }, 500);
       } else if (isMountedRef.current) {
         // No authentication, set not loading but with error
-        console.log('Dashboard stats: Auth ready but user not authenticated');
+        logger.debug('Dashboard stats: Auth ready but user not authenticated');
         setState(prev => ({
           ...prev,
           loading: false,
@@ -383,33 +323,28 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     // Only set up interval if component is mounted and user is authenticated
     if (!isMountedRef.current || !isAuthenticated) return;
     
-    console.log('Setting up dashboard stats refresh interval (5 minutes)');
+    logger.debug('Setting up dashboard stats refresh interval (5 minutes)');
     
     // Create a reference to the fetch function that doesn't change between renders
     const stableFetchStats = () => {
       // Only fetch if component is still mounted and not already fetching
       if (isMountedRef.current && !isFetchingRef.current && isAuthenticated) {
-        console.log('Interval-triggered stats refresh');
-        // Wrap in try-catch to ensure interval isn't broken by errors
-        try {
-          fetchStats().catch(err => {
-            console.error('Error in interval refresh:', err);
-          });
-        } catch (error) {
-          console.error('Error in interval refresh (caught):', error);
-        }
+        logger.debug('Interval-triggered stats refresh');
+        fetchStats().catch(err => {
+          logger.error('Error in interval refresh:', err instanceof Error ? err : new Error(String(err)));
+        });
       }
     };
     
-    // Set to 5 minutes (300000ms) instead of 10 seconds
+    // Set to 5 minutes (300000ms)
     const intervalId = setInterval(stableFetchStats, 300000); 
     
     // Clean up interval on unmount
     return () => {
-      console.log('Clearing dashboard stats refresh interval');
+      logger.debug('Clearing dashboard stats refresh interval');
       clearInterval(intervalId);
     }; 
-  }, [fetchStats, isAuthenticated]); // Add auth dependency
+  }, [fetchStats, isAuthenticated]);
 
   // Return the state and the refresh function
   return { ...state, refreshStats };
