@@ -64,7 +64,7 @@ export function createAppointmentEntity(partial: Partial<Appointment> = {}): App
     updatedAt: partial.updatedAt ?? new Date(),
     createdBy: partial.createdBy ?? 0,
     updatedBy: partial.updatedBy ?? 0,
-    notes: partial.notes ?? [],
+    notes: partial.notes,
     customerName: partial.customerName ?? '',
     customer: partial.customer ? createCustomerEntity(partial.customer) : undefined
   });
@@ -88,7 +88,7 @@ export function createRequestEntity(partial: Partial<ContactRequest> = {}): Cont
     source: partial.source ?? undefined,
     createdAt: partial.createdAt ?? new Date(),
     updatedAt: partial.updatedAt ?? new Date(),
-    notes: partial.notes ?? [],
+    notes: partial.notes,
     customerId: partial.customerId ?? undefined,
     processorId: partial.processorId ?? undefined,
     appointmentId: partial.appointmentId ?? undefined,

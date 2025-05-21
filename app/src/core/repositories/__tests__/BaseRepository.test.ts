@@ -157,7 +157,7 @@ class TestRepository extends BaseRepository<TestEntity> {
     const limit = options?.limit || 10;
     
     // Explicitly call mapToDomainEntity to ensure it runs during tests
-    jest.spyOn(this, 'mapToDomainEntity').mockImplementation(entity => ({
+    jest.spyOn(this as any, 'mapToDomainEntity').mockImplementation((entity: any) => ({
       id: entity.id,
       name: entity.name,
       createdAt: new Date(entity.createdAt),

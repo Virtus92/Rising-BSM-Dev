@@ -77,7 +77,7 @@ class TestService extends BaseService<TestEntity, TestCreateDto, TestUpdateDto, 
       const mapErrorImpl = this.errorHandler.mapError as any;
       if (!mapErrorImpl.originalImpl) {
         mapErrorImpl.originalImpl = mapErrorImpl;
-        this.errorHandler.mapError = jest.fn().mockImplementation((error) => { throw error; });
+        this.errorHandler.mapError = jest.fn().mockImplementation((error: any) => { throw error; });
       }
     }
     
@@ -352,7 +352,7 @@ describe('BaseService', () => {
       mockValidator.validate.mockReturnValue({ isValid: true, errors: [] });
 
       // Setup repository mock to return created entity
-      mockRepository.create.mockImplementation(data => 
+      mockRepository.create.mockImplementation((data: Partial<TestEntity>) => 
         Promise.resolve({
           id: 1,
           ...data,
