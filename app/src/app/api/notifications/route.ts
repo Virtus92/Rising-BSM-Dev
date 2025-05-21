@@ -25,7 +25,11 @@ export const GET = routeHandler(async (request: NextRequest) => {
       userId: request.auth?.userId,
       limit: searchParams.has('limit') ? parseInt(searchParams.get('limit') as string) : 10,
       page: searchParams.has('page') ? parseInt(searchParams.get('page') as string) : 1,
-      unreadOnly: searchParams.get('unreadOnly') === 'true'
+      unreadOnly: searchParams.get('unreadOnly') === 'true',
+      cursor: searchParams.get('cursor') || undefined,
+      sortField: searchParams.get('sortField') || 'createdAt',
+      sortDirection: (searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc',
+      type: searchParams.get('type') as any || undefined
     };
     
     // Get notification service

@@ -192,7 +192,6 @@ describe('DtoFactory', () => {
       expect(dto.id).toBe(0);
       expect(dto.userId).toBe(0);
       expect(dto.title).toBe('');
-      expect(dto.content).toBe('');
       expect(dto.message).toBe('');
       expect(dto.type).toBe(NotificationType.INFO);
       expect(dto.isRead).toBe(false);
@@ -210,7 +209,6 @@ describe('DtoFactory', () => {
         id: 42,
         userId: 10,
         title: 'Test Notification',
-        content: 'Test content',
         message: 'Test message',
         type: NotificationType.WARNING,
         isRead: true,
@@ -227,7 +225,6 @@ describe('DtoFactory', () => {
       expect(dto.id).toBe(42);
       expect(dto.userId).toBe(10);
       expect(dto.title).toBe('Test Notification');
-      expect(dto.content).toBe('Test content');
       expect(dto.message).toBe('Test message');
       expect(dto.type).toBe(NotificationType.WARNING);
       expect(dto.isRead).toBe(true);

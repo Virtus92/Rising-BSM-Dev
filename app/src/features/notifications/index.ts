@@ -12,5 +12,20 @@ export * from './lib';
 
 // Export hooks, components, and utilities
 export * from './hooks';
+// Export enhanced hooks
+export { useNotifications as useNotificationsNew } from './hooks/useNotifications.new';
+
+// Export components
 export * from './components';
+// Export enhanced components
+export { NotificationVirtualList } from './components/NotificationVirtualList';
+export { NotificationBadge as EnhancedNotificationBadge } from './components/NotificationBadge.enhanced';
+
+// Export utilities
 export * from './utils';
+
+// Export context and providers
+export * from './providers/NotificationProvider';
+
+// Export layouts
+export * from './layouts/NotificationLayout';

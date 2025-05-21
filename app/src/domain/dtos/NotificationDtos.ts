@@ -2,65 +2,58 @@ import { BaseResponseDto, BaseFilterParamsDto } from './BaseDto';
 import { NotificationType } from '../enums/CommonEnums';
 
 /**
- * DTO für eine Benachrichtigung
+ * DTO for a notification response
  */
 export interface NotificationResponseDto extends BaseResponseDto {
   /**
-   * Benutzer-ID des Empfängers
+   * User ID of the recipient
    */
   userId: number;
   
   /**
-   * Titel der Benachrichtigung
+   * Title of the notification
    */
   title: string;
   
   /**
-   * Nachrichtentext
+   * Message content of the notification
    */
   message: string;
   
   /**
-   * Benachrichtigungsinhalt (falls 'message' nicht verfügbar ist)
-   */
-  content: string;
-  
-  /**
-   * Typ der Benachrichtigung
+   * Type of the notification
    */
   type: NotificationType;
   
   /**
-   * Ob die Benachrichtigung gelesen wurde
+   * Whether the notification has been read
    */
   isRead: boolean;
   
   /**
-   * ID des referenzierten Kunden
+   * Referenced customer ID
    */
   customerId?: number;
   
   /**
-   * ID des referenzierten Termins
+   * Referenced appointment ID
    */
   appointmentId?: number;
   
   /**
-   * ID der referenzierten Kontaktanfrage
+   * Referenced contact request ID
    */
   contactRequestId?: number;
   
   /**
-   * Optionaler Link für weitere Aktionen
+   * Optional link for further actions
    */
   link?: string;
   
   /**
-   * Formatiertes Datum
+   * Formatted date for display
    */
   formattedDate?: string;
-
-  filter?: NotificationFilterParamsDto;
 }
 
 /**
@@ -159,21 +152,36 @@ export interface DeleteAllNotificationsResponseDto {
 }
 
 /**
- * Filterparameter für Benachrichtigungen
+ * Filter parameters for notifications
  */
 export interface NotificationFilterParamsDto extends BaseFilterParamsDto {
   /**
-   * Benutzer-ID
+   * User ID
    */
   userId?: number;
   
   /**
-   * Benachrichtigungstyp
+   * Notification type
    */
   type?: NotificationType;
   
   /**
-   * Ob nur ungelesene Benachrichtigungen abgerufen werden sollen
+   * Whether to retrieve only unread notifications
    */
   unreadOnly?: boolean;
+  
+  /**
+   * Cursor for pagination (typically the ID of the last item in previous page)
+   */
+  cursor?: string;
+  
+  /**
+   * Direction of sorting: 'asc' or 'desc'
+   */
+  sortDirection?: 'asc' | 'desc';
+  
+  /**
+   * Field to sort by
+   */
+  sortField?: string;
 }

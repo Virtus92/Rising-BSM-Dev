@@ -42,7 +42,7 @@ const NotificationCard = ({ item, onActionClick }: BaseCardProps<EnhancedNotific
     <BaseCard
       item={item}
       title={item.title}
-      description={item.message || item.content || 'No content'}
+      description={item.message || 'No content'}
       className={`border-l-4 ${!item.isRead ? EntityColors.notifications.border : 'border-l-gray-200 dark:border-l-gray-700'}`}
       badges={[
         {
@@ -214,7 +214,7 @@ export default function NotificationList({
           </div>
           <div>
             <div className="font-medium">{notification.title}</div>
-            <div className="text-sm text-muted-foreground line-clamp-1">{notification.message || notification.content}</div>
+            <div className="text-sm text-muted-foreground line-clamp-1">{notification.message}</div>
           </div>
         </div>
       ),

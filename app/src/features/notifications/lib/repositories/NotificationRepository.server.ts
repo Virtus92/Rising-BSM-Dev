@@ -11,6 +11,7 @@ import { ILoggingService } from '@/core/logging/ILoggingService';
 import { IErrorHandler } from '@/core/errors/';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 import { NotificationType, CommonStatus } from '@/domain/enums/CommonEnums';
+import { NotificationPaginationResult } from '../types/pagination';
 
 export class NotificationRepository extends PrismaRepository<Notification, number> implements INotificationRepository {
   /**
@@ -162,12 +163,15 @@ export class NotificationRepository extends PrismaRepository<Notification, numbe
   }
 
   /**
-   * Find notifications with filtering
+   * Find notifications with advanced filtering and cursor-based pagination
+   * @param filters Filter and pagination parameters
+   * @returns Paginated result with notifications
    */
-  async findNotifications(filters: NotificationFilterParamsDto): Promise<PaginationResult<Notification>> {
+  async findNotifications(filters: NotificationFilterParamsDto): Promise<NotificationPaginationResult> {
     try {
       const where: any = {};
       
+      // Build the where clause based on filters
       if (filters.userId) {
         where.userId = filters.userId;
       }
@@ -180,28 +184,66 @@ export class NotificationRepository extends PrismaRepository<Notification, numbe
         where.read = false;
       }
       
+      // Handle cursor-based pagination if cursor is provided
+      if (filters.cursor) {
+        try {
+          const cursorId = parseInt(filters.cursor);
+          if (!isNaN(cursorId)) {
+            where.id = { lt: cursorId };
+          }
+        } catch (e) {
+          this.logger.warn('Invalid cursor provided', { cursor: filters.cursor });
+        }
+      }
+      
+      // Determine sorting
+      const sortField = filters.sortField || 'createdAt';
+      const sortDirection = filters.sortDirection || 'desc';
+      const orderBy: Record<string, 'asc' | 'desc'> = {
+        [sortField]: sortDirection
+      };
+      
+      // Support traditional pagination for backward compatibility
       const page = filters.page || 1;
       const limit = filters.limit || 10;
-      const skip = (page - 1) * limit;
       
+      // If we're using cursor-based pagination, we don't need skip
+      const skip = filters.cursor ? 0 : (page - 1) * limit;
+      
+      // Make database queries in parallel
       const [total, notifications] = await Promise.all([
         this.prisma.notification.count({ where }),
         this.prisma.notification.findMany({
           where,
-          orderBy: { createdAt: 'desc' },
+          orderBy,
           skip,
-          take: limit
+          take: limit + 1 // Fetch one extra for cursor
         })
       ]);
       
+      // Determine if there are more results
+      const hasMore = notifications.length > limit;
+      const items = hasMore ? notifications.slice(0, limit) : notifications;
+      
+      // Get the cursor for the next page
+      const nextCursor = hasMore && items.length > 0 
+        ? String(items[items.length - 1].id) 
+        : null;
+      
+      // Map to domain entities
+      const domainItems = items.map(n => this.mapToDomainEntity(n));
+      
+      // Return with enhanced pagination information
       return {
-        data: notifications.map(n => this.mapToDomainEntity(n)),
+        data: domainItems,
         pagination: {
           page,
           limit,
           total,
           totalPages: Math.ceil(total / limit)
-        }
+        },
+        hasMore,
+        nextCursor
       };
     } catch (error) {
       this.logger.error('Error in NotificationRepository.findNotifications', { error, filters });

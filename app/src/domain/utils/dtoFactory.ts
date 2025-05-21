@@ -120,7 +120,6 @@ export function createNotificationResponseDto(partial: Partial<NotificationRespo
     id: partial.id ?? 0,
     userId: partial.userId ?? 0,
     title: partial.title ?? '',
-    content: partial.content ?? '',
     message: partial.message ?? '',
     type: partial.type ?? NotificationType.INFO,
     isRead: partial.isRead ?? false,

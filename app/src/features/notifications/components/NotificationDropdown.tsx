@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNotifications, UseNotificationsResult } from '@/features/notifications/hooks/useNotifications';
 import { NotificationResponseDto } from '@/domain/dtos/NotificationDtos';
 import { formatRelativeTime } from '@/shared/utils/date-utils';
@@ -42,6 +42,9 @@ export default function NotificationDropdown({
     isLoading
   } = notifications;
 
+  // Keep track of notifications that are being processed
+  const [processingIds, setProcessingIds] = useState<Record<number, string>>({});
+
   // Get notification icon based on type
   const getNotificationIcon = (notification: NotificationResponseDto) => {
     switch (notification.type) {
@@ -58,6 +61,72 @@ export default function NotificationDropdown({
     }
   };
 
+  // Handle marking a notification as read
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      setProcessingIds(prev => ({ ...prev, [id]: 'reading' }));
+      const success = await markAsRead(id);
+      
+      if (success) {
+        // We'll let the refetch handle updating the UI
+        await refetch();
+      }
+      
+      setProcessingIds(prev => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      setProcessingIds(prev => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      });
+    }
+  };
+
+  // Handle deleting a notification
+  const handleDeleteNotification = async (id: number) => {
+    try {
+      setProcessingIds(prev => ({ ...prev, [id]: 'deleting' }));
+      const success = await deleteNotification(id);
+      
+      if (success) {
+        // We'll let the refetch handle updating the UI
+        await refetch();
+      }
+      
+      setProcessingIds(prev => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      });
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      setProcessingIds(prev => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      });
+    }
+  };
+
+  // Handle marking all notifications as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const success = await markAllAsRead();
+      
+      if (success) {
+        // Refresh the notifications after marking all as read
+        await refetch();
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
   return (
     <div className="p-2 w-full">
       <div className="flex justify-between items-center p-2 border-b">
@@ -66,7 +135,7 @@ export default function NotificationDropdown({
           <Button
             variant="ghost"
             size="sm"
-            onClick={markAllAsRead}
+            onClick={handleMarkAllAsRead}
             className="h-8 text-sm"
           >
             <CheckCheck className="h-3.5 w-3.5 mr-1" />
@@ -95,7 +164,7 @@ export default function NotificationDropdown({
                     {notification.title}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {notification.message || notification.content}
+                    {notification.message}
                   </div>
                   <div className="flex justify-between items-center mt-1">
                     <div className="text-xs text-muted-foreground">
@@ -107,18 +176,26 @@ export default function NotificationDropdown({
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6"
-                          onClick={() => markAsRead(notification.id)}
+                          onClick={() => handleMarkAsRead(notification.id)}
+                          disabled={!!processingIds[notification.id]}
                         >
-                          <Check className="h-3.5 w-3.5" />
+                          {processingIds[notification.id] === 'reading' ? 
+                            <span className="h-3.5 w-3.5 animate-pulse">...</span> : 
+                            <Check className="h-3.5 w-3.5" />
+                          }
                         </Button>
                       )}
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 text-red-500"
-                        onClick={() => deleteNotification(notification.id)}
+                        onClick={() => handleDeleteNotification(notification.id)}
+                        disabled={!!processingIds[notification.id]}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        {processingIds[notification.id] === 'deleting' ? 
+                          <span className="h-3.5 w-3.5 animate-pulse">...</span> : 
+                          <Trash2 className="h-3.5 w-3.5" />
+                        }
                       </Button>
                     </div>
                   </div>

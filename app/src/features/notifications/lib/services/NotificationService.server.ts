@@ -16,6 +16,7 @@ import { IErrorHandler } from '@/core/errors';
 import { ServiceOptions } from '@/domain/services/IBaseService';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 import { NotificationType } from '@/domain/enums/CommonEnums';
+import { NotificationPaginationResult } from '../types/pagination';
 
 /**
  * Service for notifications
@@ -161,10 +162,19 @@ export class NotificationService extends BaseService<
           })
         : await this.repository.findAll(repoOptions);
       
+      // Extract any extra pagination metadata that might be present from the result
+      // Using type assertion to tell TypeScript that result has these properties
+      const notificationResult = result as NotificationPaginationResult;
+      const extras = {
+        hasMore: notificationResult.hasMore,
+        nextCursor: notificationResult.nextCursor
+      };
+
       // Map entities to DTOs
       return {
         data: result.data.map(notification => this.toDTO(notification)),
-        pagination: result.pagination
+        pagination: result.pagination,
+        ...extras  // Include extras if they exist
       };
     } catch (error) {
       this.logger.error(`Error in ${this.constructor.name}.findAll`, { 
@@ -485,7 +495,6 @@ export class NotificationService extends BaseService<
         userId: 0,
         title: '',
         message: '',
-        content: '',
         type: NotificationType.INFO,
         isRead: false,
         createdAt: new Date().toISOString(),
@@ -513,8 +522,6 @@ export class NotificationService extends BaseService<
       userId: entity.userId || 0,
       title: entity.title,
       message: entity.message || '',
-      // Ensure content matches message for compatibility
-      content: entity.message || '',
       type: entity.type,
       isRead: entity.isRead,
       customerId: entity.customerId,
