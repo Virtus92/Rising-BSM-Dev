@@ -8,6 +8,12 @@ const nextConfig = {
     'jose'
   ],
   
+  // Use the new ESLint configuration
+  eslint: {
+    ignoreDuringBuilds: false,
+    dirs: ['src']
+  },
+  
   // Configure server actions
   experimental: {
     serverActions: {
@@ -19,13 +25,8 @@ const nextConfig = {
   // Keep all auth-related and database-related code in NodeJS runtime
   output: 'standalone',
   
-  // Next.js 15.3.1 uses serverExternalPackages at the top level
-  serverExternalPackages: [
-    'jsonwebtoken',
-    'bcryptjs',
-    '@prisma/client',
-    'jose'
-  ],
+  // Remove duplicate serverExternalPackages declaration
+
   
   webpack: (config) => {
     config.resolve.fallback = {

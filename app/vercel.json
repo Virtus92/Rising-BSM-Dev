@@ -1,0 +1,17 @@
+{
+  "buildCommand": "npm run prisma:generate && npm run build",
+  "installCommand": "npm install",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "public": false,
+  "env": {
+    "DATABASE_URL": "YOUR_DATABASE_URL"
+  }
+}

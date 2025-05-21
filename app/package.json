@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
+    "build": "node scripts/ensure-prisma-client.js && npx prisma generate && next build",
     "start": "next start",
     "dev": "next dev",
     "lint": "next lint",
@@ -11,13 +11,14 @@
     "test:watch": " jest --watch --config jest.config.mjs",
     "test:ci": "jest --ci --coverage --config jest.config.mjs",
     "db:migrate": "npx prisma migrate deploy",
-    "db:migrate:dev": "NODE_ENV=development npx prisma migrate dev",
+    "db:migrate:dev": "cross-env NODE_ENV=development npx prisma migrate dev",
     "db:seed": "node scripts/seed.js",
     "db:studio": "npx prisma studio",
     "prisma:generate": "npx prisma generate",
     "format": "prettier --write .",
     "clean": "node scripts/clean-build.js",
-    "rebuild": "npm run clean && npm run build"
+    "rebuild": "npm run clean && npm run build",
+    "postinstall": "npx prisma generate"
   },
   "prisma": {
     "seed": "node scripts/seed.js"
@@ -55,6 +56,7 @@
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "crypto-browserify": "^3.12.1",
+    "cross-env": "^7.0.3",
     "fs": "^0.0.1-security",
     "jose": "^6.0.10",
     "js-cookie": "^3.0.5",
