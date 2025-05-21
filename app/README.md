@@ -29,13 +29,13 @@ Rising BSM is built using modern, production-ready technologies:
 - **Styling**: Tailwind CSS, Radix UI components
 - **State Management**: React Query, React Context
 - **API**: RESTful API built with Next.js API routes
-- **Database**: Prisma ORM
+- **Database**: Prisma ORM with PostgreSQL
 - **Authentication**: JWT with refresh token rotation
 - **Authorization**: Custom permission-based system
 
 ## Project Structure
 
-The project follows a feature-based architecture where code is organized by domain rather than technical function.
+The project follows a feature-based architecture where code is organized by domain rather than technical function. For a detailed overview of the architecture, see [Architecture Overview](docs/architecture-overview.md).
 
 ```
 app/src/
@@ -53,45 +53,133 @@ Each feature module is self-contained with its own components, hooks, services, 
 ### Prerequisites
 
 - Node.js 18.x or later
-- npm or yarn
-- PostgreSQL (recommended) or other supported database
+- npm 8.x or later (or yarn)
+- PostgreSQL 13.x or later
+- Git
 
 ### Installation
 
-1. Clone the repository:
-   ```
+1. **Clone the repository**:
+   ```bash
    git clone https://github.com/your-username/Rising-BSM.git
    cd Rising-BSM/app
    ```
 
-2. Install dependencies:
-   ```
+2. **Install dependencies**:
+   ```bash
    npm install
    ```
 
-3. Set up environment variables:
-   ```
+3. **Set up environment variables**:
+   ```bash
    cp .env.example .env
    ```
-   Edit `.env.local` with your database credentials and other configuration.
-   When you use the development server, copy also to env.bak
+   
+   Edit `.env` with your database credentials and other configuration:
+   ```
+   # Database Configuration
+   DATABASE_URL=postgresql://username:password@localhost:5432/rising_bsm
+   
+   # Authentication
+   JWT_SECRET=your-secret-key-at-least-32-characters
+   JWT_EXPIRY=3600  # 1 hour in seconds
+   REFRESH_TOKEN_EXPIRY=2592000  # 30 days in seconds
+   
+   # Application Settings
+   NEXT_PUBLIC_API_URL=http://localhost:3000/api
+   ```
 
-4. Run database migrations:
+4. **Set up your database**:
+   
+   Make sure PostgreSQL is running, then create a new database:
+   ```bash
+   createdb rising_bsm
    ```
-   npm run db:migrate
-   ```
+   
+   Or use a PostgreSQL client to create the database.
 
-5. Seed the database (optional):
+5. **Run database migrations**:
+   ```bash
+   npx prisma migrate dev
    ```
+   
+   This will apply all migrations and generate the Prisma client.
+
+6. **Seed the database** (optional, but recommended for development):
+   ```bash
    npm run db:seed
    ```
+   
+   This will create default users, permissions, and sample data.
 
-6. Start the development server:
-   ```
+7. **Start the development server**:
+   ```bash
    npm run dev
    ```
 
-7. Access the application at `http://localhost:3000`
+8. **Access the application** at `http://localhost:3000`
+
+   Default admin credentials (if you ran the seed script):
+   - Email: admin@example.com
+   - Password: Admin123!
+
+### Docker Development Setup
+
+For development with Docker:
+
+1. **Build and start the containers**:
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Run migrations inside the container**:
+   ```bash
+   docker-compose exec app npx prisma migrate dev
+   ```
+
+3. **Seed the database**:
+   ```bash
+   docker-compose exec app npm run db:seed
+   ```
+
+4. **Access the application** at `http://localhost:3000`
+
+## Troubleshooting
+
+### Database Connection Issues
+
+- **Prisma Migration Errors**: 
+  - Ensure PostgreSQL is running
+  - Check your DATABASE_URL in the `.env` file
+  - Try running `npx prisma db push` to sync the schema without migrations
+  - For detailed logs: `npx prisma migrate dev --create-only`
+
+- **PostgreSQL Authentication Errors**:
+  - Ensure your user has permission to create databases and tables
+  - Double-check your database credentials in `.env`
+
+### Authentication Issues
+
+- **JWT Token Errors**:
+  - Ensure JWT_SECRET is set in `.env`
+  - Clear browser cookies and try again
+  - Check server logs for token validation errors
+
+- **Unable to Login**:
+  - Verify the user exists in the database
+  - Reset the admin password using the seed script: `npm run db:seed -- --reset-admin`
+
+### Development Server Issues
+
+- **Build Errors**:
+  - Clear the Next.js cache: `rm -rf .next`
+  - Reinstall dependencies: `rm -rf node_modules && npm install`
+  - Run with verbose logging: `npm run dev -- --verbose`
+
+- **Runtime Errors**:
+  - Check browser console for client-side errors
+  - Check server logs for server-side errors
+  - Ensure all environment variables are set correctly
 
 ## Documentation
 
@@ -101,6 +189,12 @@ For detailed documentation on each module and feature, please check the individu
 - [Domain Models](src/domain/README.md)
 - [Features](src/features/README.md)
 - [API Documentation](src/app/api/README.md)
+
+Additional documentation:
+- [Architecture Overview](docs/architecture-overview.md)
+- [Authentication System](docs/authentication-system.md)
+- [Permissions System](docs/permissions-system.md)
+- [Runtime Configuration](RUNTIME.md)
 
 ## Contributing
 

@@ -121,13 +121,13 @@ export default function DiagnosticsPage() {
       description: 'Test permission manager',
       run: async () => {
         const userId = AuthService.getUser()?.id;
+        const userRole = AuthService.getUser()?.role || 'user';
         if (!userId) {
           throw new Error('Not authenticated');
         }
         
         const permManager = PermissionRequestManager.getInstance();
-        const requestId = `test-${Date.now()}`;
-        const permissions = await permManager.getPermissions(userId, requestId);
+        const permissions = await permManager.getAllPermissions(userId, userRole);
         
         return {
           permissionCount: permissions.length,

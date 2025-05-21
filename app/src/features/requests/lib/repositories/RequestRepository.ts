@@ -342,15 +342,43 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         });
 
         // Create log entry
-        await this.prisma.requestLog.create({
-          data: {
-            requestId: data.requestId,
-            userId: request.processorId || 0,
-            userName: 'System',
-            action: LogActionType.CONVERT,
-            details: data.note || `Customer ${customer.name} was created from request`
+        // Check if processorId exists - if not, don't include userId in the log creation
+        if (request.processorId) {
+          await this.prisma.requestLog.create({
+            data: {
+              requestId: data.requestId,
+              userId: request.processorId,
+              userName: 'System',
+              action: LogActionType.CONVERT,
+              details: data.note || `Customer ${customer.name} was created from request`
+            }
+          });
+        } else {
+          // Create log without userId to avoid foreign key constraint violation
+          this.logger.debug('Creating request log without userId - no processor assigned');
+          
+          // Find a fallback user (first admin) to use for logging
+          const adminUser = await this.prisma.user.findFirst({
+            where: { role: 'admin' },
+            select: { id: true, name: true }
+          });
+          
+          if (adminUser) {
+            // Use admin user for the log
+            await this.prisma.requestLog.create({
+              data: {
+                requestId: data.requestId,
+                userId: adminUser.id,
+                userName: adminUser.name || 'Admin',
+                action: LogActionType.CONVERT,
+                details: data.note || `Customer ${customer.name} was created from request (system)`
+              }
+            });
+          } else {
+            // Skip log creation if no valid user can be found
+            this.logger.warn('Skipped request log creation - no valid user found and no processor assigned');
           }
-        });
+        }
 
         let appointment;
         // Create appointment if desired
@@ -446,15 +474,43 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         });
 
         // Create log entry
-        await this.prisma.requestLog.create({
-          data: {
-            requestId,
-            userId: updatedRequest.processorId || 0,
-            userName: 'System',
-            action: LogActionType.LINK,
-            details: note || `Linked with customer ${customer.name}`
+        // Check if processorId exists - if not, find a valid user for logging
+        if (updatedRequest.processorId) {
+          await this.prisma.requestLog.create({
+            data: {
+              requestId,
+              userId: updatedRequest.processorId,
+              userName: 'System',
+              action: LogActionType.LINK,
+              details: note || `Linked with customer ${customer.name}`
+            }
+          });
+        } else {
+          // Create log without userId to avoid foreign key constraint violation
+          this.logger.debug('Creating request log without userId - no processor assigned');
+          
+          // Find a fallback user (first admin) to use for logging
+          const adminUser = await this.prisma.user.findFirst({
+            where: { role: 'admin' },
+            select: { id: true, name: true }
+          });
+          
+          if (adminUser) {
+            // Use admin user for the log
+            await this.prisma.requestLog.create({
+              data: {
+                requestId,
+                userId: adminUser.id,
+                userName: adminUser.name || 'Admin',
+                action: LogActionType.LINK,
+                details: note || `Linked with customer ${customer.name} (system)`
+              }
+            });
+          } else {
+            // Skip log creation if no valid user can be found
+            this.logger.warn('Skipped request log creation - no valid user found and no processor assigned');
           }
-        });
+        }
 
         return this.mapToDomainEntity(updatedRequest);
       });
@@ -542,15 +598,43 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
         });
 
         // Create log entry
-        await this.prisma.requestLog.create({
-          data: {
-            requestId,
-            userId: request.processorId || 0,
-            userName: 'System',
-            action: LogActionType.CREATE,
-            details: note || `Appointment ${appointment.title} created`
+        // Check if processorId exists - if not, find a valid user for logging
+        if (request.processorId) {
+          await this.prisma.requestLog.create({
+            data: {
+              requestId,
+              userId: request.processorId,
+              userName: 'System',
+              action: LogActionType.CREATE,
+              details: note || `Appointment ${appointment.title} created`
+            }
+          });
+        } else {
+          // Create log without userId to avoid foreign key constraint violation
+          this.logger.debug('Creating request log without userId - no processor assigned');
+          
+          // Find a fallback user (first admin) to use for logging
+          const adminUser = await this.prisma.user.findFirst({
+            where: { role: 'admin' },
+            select: { id: true, name: true }
+          });
+          
+          if (adminUser) {
+            // Use admin user for the log
+            await this.prisma.requestLog.create({
+              data: {
+                requestId,
+                userId: adminUser.id,
+                userName: adminUser.name || 'Admin',
+                action: LogActionType.CREATE,
+                details: note || `Appointment ${appointment.title} created (system)`
+              }
+            });
+          } else {
+            // Skip log creation if no valid user can be found
+            this.logger.warn('Skipped request log creation - no valid user found and no processor assigned');
           }
-        });
+        }
 
         return appointment;
       });

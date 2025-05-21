@@ -1,7 +1,7 @@
 /**
- * Permission Cache Service
+ * PermissionCache.ts
  * 
- * A robust implementation for caching permission check results
+ * A clean implementation for caching permission check results
  * to improve performance and reduce database load.
  */
 
@@ -19,31 +19,44 @@ interface CacheEntry {
  * for better maintainability and encapsulation
  */
 class PermissionCacheService {
-  private cache: Map<string, CacheEntry> = new Map();
-  private permissionsCache: Map<number, string[]> = new Map();
-  private readonly DEFAULT_TTL_SECONDS = 300; // 5 minutes
+  // Cache for individual permission checks
+  private permissionCheckCache: Map<string, CacheEntry> = new Map();
+  
+  // Cache for user permissions
+  private userPermissionsCache: Map<number, { permissions: string[], timestamp: number }> = new Map();
+  
+  // Cache for role permissions
+  private rolePermissionsCache: Map<string, { permissions: string[], timestamp: number }> = new Map();
+  
+  // Cache TTLs
+  private readonly PERMISSION_CHECK_TTL = 300; // 5 minutes for individual checks
+  private readonly USER_PERMISSIONS_TTL = 300; // 5 minutes for user permissions
+  private readonly ROLE_PERMISSIONS_TTL = 600; // 10 minutes for role permissions (change less frequently)
   
   /**
    * Cache a single permission check result
    * 
-   * @param key Cache key (userId:permission format)
+   * @param userId User ID
+   * @param permission Permission code
    * @param value Permission check result
    * @param ttlSeconds Optional TTL in seconds
    */
-  public cachePermissionResult(key: string, value: boolean, ttlSeconds?: number): void {
-    if (!key) {
-      throw new Error('Invalid key provided to permission cache');
+  public cachePermissionCheck(userId: number, permission: string, value: boolean, ttlSeconds?: number): void {
+    if (!userId || !permission) {
+      throw new Error('Invalid parameters provided to permission cache');
     }
     
-    const ttl = ttlSeconds || this.DEFAULT_TTL_SECONDS;
+    const normalizedPermission = permission.trim().toLowerCase();
+    const key = `${userId}:${normalizedPermission}`;
+    const ttl = ttlSeconds || this.PERMISSION_CHECK_TTL;
     const expiry = Date.now() + (ttl * 1000);
     
-    this.cache.set(key, { value, expiry });
+    this.permissionCheckCache.set(key, { value, expiry });
     
-    logger.debug(`Permission result cached: ${key} = ${value}`, {
-      key,
+    logger.debug(`Permission check cached: ${key} = ${value}`, {
+      userId,
+      permission: normalizedPermission,
       value,
-      expiryTime: new Date(expiry).toISOString(),
       ttlSeconds: ttl
     });
   }
@@ -51,22 +64,26 @@ class PermissionCacheService {
   /**
    * Get a cached permission check result
    * 
-   * @param key Cache key (userId:permission format)
+   * @param userId User ID
+   * @param permission Permission code
    * @returns The cached value or undefined if not found or expired
    */
-  public getPermissionResult(key: string): boolean | undefined {
-    if (!key) {
+  public getPermissionCheck(userId: number, permission: string): boolean | undefined {
+    if (!userId || !permission) {
       return undefined;
     }
     
-    const entry = this.cache.get(key);
+    const normalizedPermission = permission.trim().toLowerCase();
+    const key = `${userId}:${normalizedPermission}`;
+    const entry = this.permissionCheckCache.get(key);
+    
     if (!entry) {
       return undefined;
     }
     
     // Check if entry has expired
     if (entry.expiry < Date.now()) {
-      this.cache.delete(key);
+      this.permissionCheckCache.delete(key);
       return undefined;
     }
     
@@ -74,7 +91,7 @@ class PermissionCacheService {
   }
   
   /**
-   * Cache all permissions for a user
+   * Cache permissions for a user
    * 
    * @param userId User ID
    * @param permissions Array of permission codes
@@ -84,21 +101,58 @@ class PermissionCacheService {
       throw new Error(`Invalid userId provided to permission cache: ${userId}`);
     }
     
-    // Store the permissions array
-    this.permissionsCache.set(userId, [...permissions]);
-    
-    // Also cache individual permission results for fast lookups
-    for (const permission of permissions) {
-      const normalizedPermission = permission.toLowerCase().trim();
-      const key = `${userId}:${normalizedPermission}`;
-      this.cachePermissionResult(key, true);
+    if (!Array.isArray(permissions)) {
+      throw new Error('Permissions must be an array');
     }
     
-    logger.debug(`Cached ${permissions.length} permissions for user ${userId}`);
+    // Normalize permissions
+    const normalizedPermissions = permissions.map(p => p.trim().toLowerCase());
+    
+    // Store the permissions array
+    this.userPermissionsCache.set(userId, {
+      permissions: normalizedPermissions,
+      timestamp: Date.now()
+    });
+    
+    // Also cache individual permission checks for fast lookups
+    for (const permission of normalizedPermissions) {
+      this.cachePermissionCheck(userId, permission, true);
+    }
+    
+    logger.debug(`Cached ${normalizedPermissions.length} permissions for user ${userId}`);
   }
   
   /**
-   * Get all cached permissions for a user
+   * Cache permissions for a role
+   * 
+   * @param role Role name
+   * @param permissions Array of permission codes
+   */
+  public cacheRolePermissions(role: string, permissions: string[]): void {
+    if (!role) {
+      throw new Error('Invalid role provided to permission cache');
+    }
+    
+    if (!Array.isArray(permissions)) {
+      throw new Error('Permissions must be an array');
+    }
+    
+    const normalizedRole = role.trim().toLowerCase();
+    
+    // Normalize permissions
+    const normalizedPermissions = permissions.map(p => p.trim().toLowerCase());
+    
+    // Store the permissions array
+    this.rolePermissionsCache.set(normalizedRole, {
+      permissions: normalizedPermissions,
+      timestamp: Date.now()
+    });
+    
+    logger.debug(`Cached ${normalizedPermissions.length} permissions for role ${normalizedRole}`);
+  }
+  
+  /**
+   * Get cached permissions for a user
    * 
    * @param userId User ID
    * @returns Array of permission codes or undefined if not cached
@@ -108,7 +162,46 @@ class PermissionCacheService {
       return undefined;
     }
     
-    return this.permissionsCache.get(userId);
+    const entry = this.userPermissionsCache.get(userId);
+    
+    if (!entry) {
+      return undefined;
+    }
+    
+    // Check if entry has expired
+    if (Date.now() - entry.timestamp > this.USER_PERMISSIONS_TTL * 1000) {
+      this.userPermissionsCache.delete(userId);
+      return undefined;
+    }
+    
+    return entry.permissions;
+  }
+  
+  /**
+   * Get cached permissions for a role
+   * 
+   * @param role Role name
+   * @returns Array of permission codes or undefined if not cached
+   */
+  public getRolePermissions(role: string): string[] | undefined {
+    if (!role) {
+      return undefined;
+    }
+    
+    const normalizedRole = role.trim().toLowerCase();
+    const entry = this.rolePermissionsCache.get(normalizedRole);
+    
+    if (!entry) {
+      return undefined;
+    }
+    
+    // Check if entry has expired
+    if (Date.now() - entry.timestamp > this.ROLE_PERMISSIONS_TTL * 1000) {
+      this.rolePermissionsCache.delete(normalizedRole);
+      return undefined;
+    }
+    
+    return entry.permissions;
   }
   
   /**
@@ -122,13 +215,13 @@ class PermissionCacheService {
     }
     
     // Remove from permissions cache
-    this.permissionsCache.delete(userId);
+    this.userPermissionsCache.delete(userId);
     
-    // Find and delete all permission entries for this user
+    // Find and delete all permission check entries for this user
     const prefix = `${userId}:`;
-    for (const key of this.cache.keys()) {
+    for (const key of this.permissionCheckCache.keys()) {
       if (key.startsWith(prefix)) {
-        this.cache.delete(key);
+        this.permissionCheckCache.delete(key);
       }
     }
     
@@ -136,12 +229,46 @@ class PermissionCacheService {
   }
   
   /**
-   * Clear all cache entries
+   * Invalidate cache for a specific role
+   * 
+   * @param role Role name
    */
-  public clearCache(): void {
-    this.cache.clear();
-    this.permissionsCache.clear();
-    logger.debug('Permission cache cleared');
+  public invalidateRoleCache(role: string): void {
+    if (!role) {
+      return;
+    }
+    
+    const normalizedRole = role.trim().toLowerCase();
+    this.rolePermissionsCache.delete(normalizedRole);
+    
+    logger.debug(`Permission cache invalidated for role ${normalizedRole}`);
+  }
+  
+  /**
+   * Clear all user-specific permission caches
+   */
+  public clearUserCaches(): void {
+    this.userPermissionsCache.clear();
+    this.permissionCheckCache.clear();
+    logger.debug('User permission caches cleared');
+  }
+  
+  /**
+   * Clear all role permission caches
+   */
+  public clearRoleCaches(): void {
+    this.rolePermissionsCache.clear();
+    logger.debug('Role permission caches cleared');
+  }
+  
+  /**
+   * Clear all caches
+   */
+  public clearAllCaches(): void {
+    this.permissionCheckCache.clear();
+    this.userPermissionsCache.clear();
+    this.rolePermissionsCache.clear();
+    logger.debug('All permission caches cleared');
   }
   
   /**
@@ -149,35 +276,41 @@ class PermissionCacheService {
    */
   public getStats(): Record<string, any> {
     const now = Date.now();
-    const entries = Array.from(this.cache.entries());
     
-    // Count active vs expired entries
-    const activeEntries = entries.filter(([_, entry]) => entry.expiry >= now);
-    const expiredEntries = entries.filter(([_, entry]) => entry.expiry < now);
+    // Count active vs expired entries in permission check cache
+    const checkEntries = Array.from(this.permissionCheckCache.entries());
+    const activeCheckEntries = checkEntries.filter(([_, entry]) => entry.expiry >= now);
+    const expiredCheckEntries = checkEntries.filter(([_, entry]) => entry.expiry < now);
     
-    // Group by user
-    const userStats: Record<string, { permissions: number, ttlRemaining: number }> = {};
-    for (const [key, entry] of activeEntries) {
-      const userId = key.split(':')[0];
-      if (!userStats[userId]) {
-        userStats[userId] = { permissions: 0, ttlRemaining: 0 };
-      }
-      userStats[userId].permissions++;
-      
-      // Track the minimum TTL remaining for this user
-      const ttlRemaining = Math.floor((entry.expiry - now) / 1000);
-      if (userStats[userId].ttlRemaining === 0 || ttlRemaining < userStats[userId].ttlRemaining) {
-        userStats[userId].ttlRemaining = ttlRemaining;
-      }
-    }
+    // Count active vs expired entries in user permissions cache
+    const userEntries = Array.from(this.userPermissionsCache.entries());
+    const activeUserEntries = userEntries.filter(([_, entry]) => (now - entry.timestamp) < (this.USER_PERMISSIONS_TTL * 1000));
+    const expiredUserEntries = userEntries.filter(([_, entry]) => (now - entry.timestamp) >= (this.USER_PERMISSIONS_TTL * 1000));
+    
+    // Count active vs expired entries in role permissions cache
+    const roleEntries = Array.from(this.rolePermissionsCache.entries());
+    const activeRoleEntries = roleEntries.filter(([_, entry]) => (now - entry.timestamp) < (this.ROLE_PERMISSIONS_TTL * 1000));
+    const expiredRoleEntries = roleEntries.filter(([_, entry]) => (now - entry.timestamp) >= (this.ROLE_PERMISSIONS_TTL * 1000));
     
     return {
-      totalEntries: this.cache.size,
-      totalUserCaches: this.permissionsCache.size,
-      activeEntries: activeEntries.length,
-      expiredEntries: expiredEntries.length,
-      userStats,
-      defaultTtlSeconds: this.DEFAULT_TTL_SECONDS
+      permissionCheckCache: {
+        totalEntries: this.permissionCheckCache.size,
+        activeEntries: activeCheckEntries.length,
+        expiredEntries: expiredCheckEntries.length,
+        ttlSeconds: this.PERMISSION_CHECK_TTL
+      },
+      userPermissionsCache: {
+        totalEntries: this.userPermissionsCache.size,
+        activeEntries: activeUserEntries.length,
+        expiredEntries: expiredUserEntries.length,
+        ttlSeconds: this.USER_PERMISSIONS_TTL
+      },
+      rolePermissionsCache: {
+        totalEntries: this.rolePermissionsCache.size,
+        activeEntries: activeRoleEntries.length,
+        expiredEntries: expiredRoleEntries.length,
+        ttlSeconds: this.ROLE_PERMISSIONS_TTL
+      }
     };
   }
 }

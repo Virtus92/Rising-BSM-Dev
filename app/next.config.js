@@ -1,5 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // External packages at top level as per Next.js 15.3.1 requirements
+  serverExternalPackages: [
+    'jsonwebtoken',
+    'bcryptjs',
+    '@prisma/client',
+    'jose'
+  ],
+  
   // Configure server actions
   experimental: {
     serverActions: {

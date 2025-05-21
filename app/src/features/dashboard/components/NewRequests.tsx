@@ -6,21 +6,47 @@ import { useRouter } from 'next/navigation';
 import { 
   FileText,
   RefreshCw, 
-  Calendar, 
+  Phone,
+  Mail,
   UserPlus, 
   MessageSquare, 
-  Edit, 
   Check,
   X, 
   ChevronRight, 
   Loader2,
   AlertCircle,
-  Shield
+  ArrowRight,
+  ExternalLink,
+  CheckCircle,
+  ChevronDown
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter
+} from '@/shared/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Textarea } from '@/shared/components/ui/textarea';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
 import { RequestResponseDto } from '@/domain/dtos/RequestDtos';
 import RequestClient from '@/features/requests/lib/clients/RequestClient';
@@ -31,10 +57,22 @@ import { usePermissions } from '@/features/permissions/providers/PermissionProvi
 import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
 
 /**
+ * Enum representing different process steps in the request handling workflow
+ */
+enum ProcessStep {
+  NONE,
+  INFO_REVIEW,
+  CONTACT_INFO,
+  CUSTOMER_CONVERSION,
+  SUCCESS
+}
+
+/**
  * NewRequests Component
  * 
  * Displays recent service requests with user-friendly action buttons
- * and clean layout for optimal usability.
+ * and clean layout for optimal usability. Includes a multi-step process flow
+ * for handling new customer requests.
  */
 export const NewRequests = () => {
   // Initialize logger
@@ -45,6 +83,27 @@ export const NewRequests = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState<number | null>(null);
+  
+  // Process flow state
+  const [activeRequestId, setActiveRequestId] = useState<number | null>(null);
+  const [activeRequest, setActiveRequest] = useState<RequestResponseDto | null>(null);
+  const [processStep, setProcessStep] = useState<ProcessStep>(ProcessStep.NONE);
+  const [processingNote, setProcessingNote] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<RequestStatus | ''>('');
+  
+  // Customer list for dropdown
+  const [customers, setCustomers] = useState<Array<{id: number, name: string}>>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  
+  // Add Note dialog state
+  const [isAddNoteDialogOpen, setIsAddNoteDialogOpen] = useState(false);
+  const [noteRequestId, setNoteRequestId] = useState<number | null>(null);
+  const [noteText, setNoteText] = useState('');
+  
+  // Status change dialog state
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [statusRequestId, setStatusRequestId] = useState<number | null>(null);
   
   // Add permission check
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
@@ -167,6 +226,65 @@ export const NewRequests = () => {
       }
     };
   }, [canViewRequests, permissionsLoading]);
+
+  // Load request details when activeRequestId changes
+  useEffect(() => {
+    if (activeRequestId && processStep !== ProcessStep.NONE) {
+      fetchRequestDetails(activeRequestId);
+    }
+  }, [activeRequestId]);
+
+  // Load customers when conversion dialog opens
+  useEffect(() => {
+    if (processStep === ProcessStep.CUSTOMER_CONVERSION) {
+      fetchCustomers();
+    }
+  }, [processStep]);
+  
+  // Fetch customers for dropdown
+  const fetchCustomers = async () => {
+    setIsLoadingCustomers(true);
+    try {
+      // Import the CustomerClient
+      const { default: CustomerClient } = await import('@/features/customers/lib/clients/CustomerClient');
+      const response = await CustomerClient.getCustomers({ 
+        limit: 20, 
+        sortBy: 'name',
+        sortDirection: 'asc'
+      });
+      
+      if (response.success && response.data) {
+        // Extract customer data from response
+        let customerList: any[] = [];
+        if (Array.isArray(response.data)) {
+          customerList = response.data;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          customerList = response.data.data;
+        }
+        
+        setCustomers(customerList.map(customer => ({
+          id: customer.id,
+          name: customer.name
+        })));
+      } else {
+        console.error('Failed to load customers:', response.error || 'Unknown error');
+        toast({
+          title: 'Error',
+          description: 'Failed to load customers. Please try again.',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load customers. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoadingCustomers(false);
+    }
+  };
   
   // Fetch requests from API with robust authentication handling
   const fetchRequests = async (showLoading = true) => {
@@ -261,6 +379,35 @@ export const NewRequests = () => {
       setIsLoading(false);
     }
   };
+
+  // Fetch request details for the active request
+  const fetchRequestDetails = async (requestId: number) => {
+    try {
+      setIsActionLoading(requestId);
+      const response = await RequestClient.getRequestById(requestId);
+      
+      if (response.success && response.data) {
+        setActiveRequest(response.data);
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to load request details. Please try again.',
+          variant: 'destructive'
+        });
+        resetProcessFlow();
+      }
+    } catch (error) {
+      console.error('Error fetching request details:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load request details. Please try again.',
+        variant: 'destructive'
+      });
+      resetProcessFlow();
+    } finally {
+      setIsActionLoading(null);
+    }
+  };
   
   // Process API response and extract request data
   const processResponse = (response: any) => {
@@ -312,101 +459,292 @@ export const NewRequests = () => {
     router.push(`/dashboard/requests/${requestId}`);
   };
   
-  // Handle editing a request
-  const handleEditRequest = (requestId: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    router.push(`/dashboard/requests/${requestId}/edit`);
-  };
-  
-  // Add a note to a request
-  const handleAddNote = async (requestId: number, e: React.MouseEvent) => {
+  // Start the request processing flow
+  const handleStartProcess = (requestId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    const note = prompt('Enter a note for this request:');
-    if (note && note.trim()) {
-      setIsActionLoading(requestId);
+    setActiveRequestId(requestId);
+    setProcessStep(ProcessStep.INFO_REVIEW);
+    setProcessingNote('');
+    setSelectedCustomerId(null);
+    setSelectedStatus('');
+  };
+
+  // Open note dialog
+  const handleOpenNoteDialog = (requestId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNoteRequestId(requestId);
+    setNoteText('');
+    setIsAddNoteDialogOpen(true);
+  };
+
+  // Open status change dialog
+  const handleOpenStatusDialog = (requestId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setStatusRequestId(requestId);
+    setSelectedStatus('');
+    setIsStatusDialogOpen(true);
+  };
+
+  // Add a note to the request
+  const handleAddNote = async () => {
+    if (!noteRequestId || !noteText.trim()) return;
+    
+    setIsActionLoading(noteRequestId);
+    
+    try {
+      const response = await RequestClient.addNote(noteRequestId, noteText);
       
-      try {
-        const response = await RequestClient.addNote(requestId, note);
-        
-        if (response.success) {
-          toast({
-            title: 'Note added',
-            description: 'Note has been added successfully',
-            variant: 'success'
-          });
-          fetchRequests(false);
-        } else {
-          toast({
-            title: 'Failed to add note',
-            description: response.message || 'An error occurred',
-            variant: 'destructive'
-          });
-        }
-      } catch (error) {
-        console.error('Error adding note:', error);
+      if (response.success) {
         toast({
-          title: 'Error',
-          description: 'Failed to add note. Please try again.',
+          title: 'Note added',
+          description: 'Note has been added successfully',
+          variant: 'success'
+        });
+        setIsAddNoteDialogOpen(false);
+        setNoteText('');
+        setNoteRequestId(null);
+        
+        // Refresh request list
+        fetchRequests(false);
+      } else {
+        toast({
+          title: 'Failed to add note',
+          description: response.message || 'An error occurred',
           variant: 'destructive'
         });
-      } finally {
-        setIsActionLoading(null);
       }
+    } catch (error) {
+      console.error('Error adding note:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add note. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsActionLoading(null);
     }
   };
-  
-  // Update request status
-  const handleUpdateStatus = async (requestId: number, status: RequestStatus, e: React.MouseEvent) => {
-    e.stopPropagation();
+
+  // Add a process note in the workflow
+  const handleAddProcessNote = async () => {
+    if (!activeRequestId || !processingNote.trim()) return;
     
-    const statusLabel = status === RequestStatus.IN_PROGRESS ? 'in progress' : 
-                         status === RequestStatus.COMPLETED ? 'completed' : 
-                         status === RequestStatus.CANCELLED ? 'cancelled' : status.toLowerCase();
+    setIsActionLoading(activeRequestId);
     
-    if (confirm(`Are you sure you want to mark this request as ${statusLabel}?`)) {
-      setIsActionLoading(requestId);
+    try {
+      const response = await RequestClient.addNote(activeRequestId, processingNote);
       
-      try {
-        const response = await RequestClient.updateStatus(requestId, { status });
-        
-        if (response.success) {
-          toast({
-            title: 'Status updated',
-            description: `Request marked as ${statusLabel}`,
-            variant: 'success'
-          });
-          fetchRequests(false);
-        } else {
-          toast({
-            title: 'Failed to update status',
-            description: response.message || 'An error occurred',
-            variant: 'destructive'
-          });
-        }
-      } catch (error) {
-        console.error('Error updating status:', error);
+      if (response.success) {
         toast({
-          title: 'Error',
-          description: 'Failed to update status. Please try again.',
+          title: 'Note added',
+          description: 'Note has been added successfully',
+          variant: 'success'
+        });
+        setProcessingNote('');
+        
+        // Refresh request details
+        fetchRequestDetails(activeRequestId);
+      } else {
+        toast({
+          title: 'Failed to add note',
+          description: response.message || 'An error occurred',
           variant: 'destructive'
         });
-      } finally {
-        setIsActionLoading(null);
       }
+    } catch (error) {
+      console.error('Error adding note:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add note. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsActionLoading(null);
     }
   };
-  
-  // Convert request to customer
-  const handleConvertToCustomer = (requestId: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    router.push(`/dashboard/requests/${requestId}?tab=convert`);
+
+  // Link request to a customer
+  const handleLinkToCustomer = async () => {
+    if (!activeRequestId || !selectedCustomerId) return;
+    
+    setIsActionLoading(activeRequestId);
+    
+    try {
+      const response = await RequestClient.linkToCustomer(
+        activeRequestId, 
+        selectedCustomerId, 
+        processingNote || 'Request linked to customer'
+      );
+      
+      if (response.success) {
+        toast({
+          title: 'Request linked',
+          description: 'Request has been linked to the customer',
+          variant: 'success'
+        });
+        
+        // Move to success step
+        setProcessStep(ProcessStep.SUCCESS);
+        
+        // Refresh request list in the background
+        fetchRequests(false);
+      } else {
+        toast({
+          title: 'Failed to link request',
+          description: response.message || 'An error occurred',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('Error linking request to customer:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to link request to customer. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsActionLoading(null);
+    }
   };
-  
-  // Schedule appointment for request
-  const handleScheduleAppointment = (requestId: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    router.push(`/dashboard/requests/${requestId}?tab=appointment`);
+
+  // Convert request to a new customer
+  const handleConvertToCustomer = async () => {
+    if (!activeRequestId || !activeRequest) return;
+    
+    setIsActionLoading(activeRequestId);
+    
+    try {
+      const response = await RequestClient.convertToCustomer(
+        activeRequestId, 
+        {
+          requestId: activeRequestId,
+          customerData: {
+            name: activeRequest.name,
+            email: activeRequest.email,
+            phone: activeRequest.phone || '',
+          },
+          note: processingNote || 'Converted from request'
+        }
+      );
+      
+      if (response.success) {
+        toast({
+          title: 'Request converted',
+          description: 'Request has been converted to a customer',
+          variant: 'success'
+        });
+        
+        if (response.data?.customerId) {
+          setSelectedCustomerId(response.data.customerId);
+        }
+        
+        // Move to success step
+        setProcessStep(ProcessStep.SUCCESS);
+        
+        // Refresh request list in the background
+        fetchRequests(false);
+      } else {
+        toast({
+          title: 'Failed to convert request',
+          description: response.message || 'An error occurred',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('Error converting request to customer:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to convert request to customer. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsActionLoading(null);
+    }
+  };
+
+  // Handle status change from modal
+  const handleStatusChange = async () => {
+    if (!statusRequestId || !selectedStatus) return;
+    
+    setIsActionLoading(statusRequestId);
+    
+    try {
+      const response = await RequestClient.updateStatus(
+        statusRequestId, 
+        { 
+          status: selectedStatus as RequestStatus,
+        }
+      );
+      
+      if (response.success) {
+        toast({
+          title: 'Status updated',
+          description: `Request status has been updated to ${selectedStatus}`,
+          variant: 'success'
+        });
+        
+        setIsStatusDialogOpen(false);
+        setStatusRequestId(null);
+        setSelectedStatus('');
+        
+        // Refresh request list
+        fetchRequests(false);
+      } else {
+        toast({
+          title: 'Failed to update status',
+          description: response.message || 'An error occurred',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update status. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsActionLoading(null);
+    }
+  };
+
+  // Go to the next step in the process flow
+  const handleNextStep = () => {
+    if (processStep === ProcessStep.INFO_REVIEW) {
+      setProcessStep(ProcessStep.CUSTOMER_CONVERSION);
+    } else if (processStep === ProcessStep.CONTACT_INFO) {
+      setProcessStep(ProcessStep.CUSTOMER_CONVERSION);
+    }
+  };
+
+  // Handle when need more information is confirmed
+  const handleNeedMoreInfo = () => {
+    setProcessStep(ProcessStep.CONTACT_INFO);
+  };
+
+  // Navigate to customer page 
+  const handleGoToCustomer = () => {
+    if (selectedCustomerId) {
+      resetProcessFlow();
+      router.push(`/dashboard/customers/${selectedCustomerId}`);
+    } else if (activeRequest?.customerId) {
+      resetProcessFlow();
+      router.push(`/dashboard/customers/${activeRequest.customerId}`);
+    } else {
+      resetProcessFlow();
+      router.push(`/dashboard/customers`);
+    }
+  };
+
+  // Reset the process flow state
+  const resetProcessFlow = () => {
+    setActiveRequestId(null);
+    setActiveRequest(null);
+    setProcessStep(ProcessStep.NONE);
+    setProcessingNote('');
+    setSelectedCustomerId(null);
+    setSelectedStatus('');
   };
   
   // Format date for display
@@ -564,184 +902,502 @@ export const NewRequests = () => {
 
   // Normal state with requests
   return (
-    <Card className="h-full">
-      <CardHeader className="flex justify-between items-center pb-2">
-        <CardTitle className="flex items-center">
-          <FileText className="mr-2 h-5 w-5 text-purple-500" />
-          New Requests
-        </CardTitle>
-        <div className="flex space-x-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => fetchRequests()}
-            className="h-9 w-9 p-0 flex items-center justify-center"
-            title="Refresh"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="divide-y divide-slate-200 dark:divide-slate-700">
-          {requests.map((request) => (
-            <div 
-              key={request.id} 
-              onClick={() => handleViewRequest(request.id)}
-              className="hover:bg-slate-50 dark:hover:bg-slate-800/50 p-4 cursor-pointer transition-colors"
+    <>
+      <Card className="h-full">
+        <CardHeader className="flex justify-between items-center pb-2">
+          <CardTitle className="flex items-center">
+            <FileText className="mr-2 h-5 w-5 text-purple-500" />
+            New Requests
+          </CardTitle>
+          <div className="flex space-x-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => fetchRequests()}
+              className="h-9 w-9 p-0 flex items-center justify-center"
+              title="Refresh"
             >
-              {/* Request info */}
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className="font-medium text-sm md:text-base text-slate-900 dark:text-white flex items-center gap-2">
-                    {request.name}
-                    {getStatusBadge(request.status)}
-                  </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {request.service || 'Service Request'}
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="divide-y divide-slate-200 dark:divide-slate-700">
+            {requests.map((request) => (
+              <div 
+                key={request.id} 
+                onClick={() => handleViewRequest(request.id)}
+                className="hover:bg-slate-50 dark:hover:bg-slate-800/50 p-4 cursor-pointer transition-colors"
+              >
+                {/* Request info */}
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-medium text-sm md:text-base text-slate-900 dark:text-white flex items-center gap-2">
+                      {request.name}
+                      {getStatusBadge(request.status)}
+                    </h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {request.service || 'Service Request'}
+                    </p>
+                  </div>
+                  <div className="text-xs text-right">
+                    <div className="font-medium text-slate-700 dark:text-slate-300">
+                      {formatDate(request.createdAt)}
+                    </div>
+                    <div className="text-slate-500 dark:text-slate-400">
+                      {formatTime(request.createdAt)}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Message preview */}
+                <div className="mb-4">
+                  <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2">
+                    {request.message}
                   </p>
                 </div>
-                <div className="text-xs text-right">
-                  <div className="font-medium text-slate-700 dark:text-slate-300">
-                    {formatDate(request.createdAt)}
+                
+                {/* Action buttons - all three buttons are shown at the same level */}
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {isActionLoading === request.id ? (
+                    <div className="w-full flex items-center justify-center py-2">
+                      <Loader2 className="h-5 w-5 text-purple-500 animate-spin mr-2" />
+                      <span className="text-sm text-slate-600 dark:text-slate-400">Processing...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <PermissionGuard permission={SystemPermission.REQUESTS_EDIT}>
+                        <Button 
+                          variant="outline"
+                          size="sm" 
+                          className="h-9 px-3 border-blue-200 hover:border-blue-300 dark:border-blue-800 dark:hover:border-blue-700"
+                          onClick={(e) => handleStartProcess(request.id, e)}
+                        >
+                          <Play className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-1.5" />
+                          <span className="text-blue-600 dark:text-blue-400">Start</span>
+                        </Button>
+                      </PermissionGuard>
+                      
+                      <PermissionGuard permission={SystemPermission.REQUESTS_EDIT}>
+                        <Button 
+                          variant="outline"
+                          size="sm" 
+                          className="h-9 px-3 border-amber-200 hover:border-amber-300 dark:border-amber-800 dark:hover:border-amber-700"
+                          onClick={(e) => handleOpenNoteDialog(request.id, e)}
+                        >
+                          <MessageSquare className="h-4 w-4 text-amber-600 dark:text-amber-400 mr-1.5" />
+                          <span className="text-amber-600 dark:text-amber-400">Add Note</span>
+                        </Button>
+                      </PermissionGuard>
+                      
+                      <PermissionGuard permission={SystemPermission.REQUESTS_EDIT}>
+                        <Button 
+                          variant="outline"
+                          size="sm" 
+                          className="h-9 px-3 border-green-200 hover:border-green-300 dark:border-green-800 dark:hover:border-green-700"
+                          onClick={(e) => handleOpenStatusDialog(request.id, e)}
+                        >
+                          <ChevronDown className="h-4 w-4 text-green-600 dark:text-green-400 mr-1.5" />
+                          <span className="text-green-600 dark:text-green-400">Change Status</span>
+                        </Button>
+                      </PermissionGuard>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="p-4 text-center border-t border-slate-200 dark:border-slate-700">
+            <Button 
+              variant="link" 
+              onClick={() => router.push('/dashboard/requests')}
+              className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 flex items-center mx-auto"
+            >
+              View all requests
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step 1: Info Review Dialog */}
+      <Dialog open={processStep === ProcessStep.INFO_REVIEW} onOpenChange={(isOpen) => !isOpen && resetProcessFlow()}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Request Information</DialogTitle>
+            <DialogDescription>
+              Review the request information before proceeding
+            </DialogDescription>
+          </DialogHeader>
+          
+          {activeRequest && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-slate-500">Name</Label>
+                  <div className="font-medium">{activeRequest.name}</div>
+                </div>
+                <div>
+                  <Label className="text-sm text-slate-500">Service</Label>
+                  <div className="font-medium">{activeRequest.service}</div>
+                </div>
+                <div>
+                  <Label className="text-sm text-slate-500">Email</Label>
+                  <div className="font-medium">{activeRequest.email}</div>
+                </div>
+                <div>
+                  <Label className="text-sm text-slate-500">Phone</Label>
+                  <div className="font-medium">{activeRequest.phone || 'Not provided'}</div>
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-sm text-slate-500">Message</Label>
+                  <div className="mt-1 text-sm p-3 bg-slate-50 dark:bg-slate-800 rounded-md">
+                    {activeRequest.message}
                   </div>
-                  <div className="text-slate-500 dark:text-slate-400">
-                    {formatTime(request.createdAt)}
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-sm text-slate-500">Created</Label>
+                  <div className="font-medium">
+                    {formatDate(activeRequest.createdAt)} at {formatTime(activeRequest.createdAt)}
                   </div>
                 </div>
               </div>
               
-              {/* Message preview */}
-              <div className="mb-4">
-                <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2">
-                  {request.message}
-                </p>
-              </div>
-              
-              {/* Action buttons - larger and more visible */}
-              <div className="flex flex-wrap gap-2 mt-4">
-                {isActionLoading === request.id ? (
-                  <div className="w-full flex items-center justify-center py-2">
-                    <Loader2 className="h-5 w-5 text-purple-500 animate-spin mr-2" />
-                    <span className="text-sm text-slate-600 dark:text-slate-400">Processing...</span>
-                  </div>
-                ) : (
-                  <TooltipProvider>
-                    <PermissionGuard permission={SystemPermission.REQUESTS_EDIT}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-9 px-3 border-blue-200 hover:border-blue-300 dark:border-blue-800 dark:hover:border-blue-700"
-                            onClick={(e) => handleUpdateStatus(request.id, RequestStatus.IN_PROGRESS, e)}
-                          >
-                            <Play className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-1.5" />
-                            <span className="text-blue-600 dark:text-blue-400">Start</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Mark as in progress</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </PermissionGuard>
-                    
-                    <PermissionGuard permission={SystemPermission.REQUESTS_EDIT}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-9 px-3 border-green-200 hover:border-green-300 dark:border-green-800 dark:hover:border-green-700"
-                            onClick={(e) => handleUpdateStatus(request.id, RequestStatus.COMPLETED, e)}
-                          >
-                            <Check className="h-4 w-4 text-green-600 dark:text-green-400 mr-1.5" />
-                            <span className="text-green-600 dark:text-green-400">Complete</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Mark as completed</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </PermissionGuard>
-                    
-                    <PermissionGuard permission={SystemPermission.REQUESTS_EDIT}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-9 px-3 border-amber-200 hover:border-amber-300 dark:border-amber-800 dark:hover:border-amber-700"
-                            onClick={(e) => handleAddNote(request.id, e)}
-                          >
-                            <MessageSquare className="h-4 w-4 text-amber-600 dark:text-amber-400 mr-1.5" />
-                            <span className="text-amber-600 dark:text-amber-400">Note</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Add a note</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </PermissionGuard>
-                    
-                    <div className="grow"></div> {/* Spacer */}
-                    
-                    <PermissionGuard permission={SystemPermission.CUSTOMERS_CREATE}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-9 px-3 border-indigo-200 hover:border-indigo-300 dark:border-indigo-800 dark:hover:border-indigo-700"
-                            onClick={(e) => handleConvertToCustomer(request.id, e)}
-                          >
-                            <UserPlus className="h-4 w-4 text-indigo-600 dark:text-indigo-400 mr-1.5" />
-                            <span className="text-indigo-600 dark:text-indigo-400">Convert</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Convert to customer</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </PermissionGuard>
-                    
-                    <PermissionGuard permission={SystemPermission.APPOINTMENTS_CREATE}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-9 px-3 border-purple-200 hover:border-purple-300 dark:border-purple-800 dark:hover:border-purple-700"
-                            onClick={(e) => handleScheduleAppointment(request.id, e)}
-                          >
-                            <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400 mr-1.5" />
-                            <span className="text-purple-600 dark:text-purple-400">Schedule</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Schedule appointment</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </PermissionGuard>
-                  </TooltipProvider>
-                )}
+              <div className="text-center pt-4">
+                <h3 className="font-medium text-lg mb-2">Do you need more information?</h3>
+                <div className="flex justify-center gap-4">
+                  <Button variant="outline" onClick={handleNeedMoreInfo}>
+                    Yes, contact customer
+                  </Button>
+                  <Button onClick={handleNextStep}>
+                    No, continue processing
+                  </Button>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-        
-        <div className="p-4 text-center border-t border-slate-200 dark:border-slate-700">
-          <Button 
-            variant="link" 
-            onClick={() => router.push('/dashboard/requests')}
-            className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 flex items-center mx-auto"
-          >
-            View all requests
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Step 2: Contact Information Dialog */}
+      <Dialog open={processStep === ProcessStep.CONTACT_INFO} onOpenChange={(isOpen) => !isOpen && resetProcessFlow()}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Contact Information</DialogTitle>
+            <DialogDescription>
+              Use the contact details below to reach out to the customer
+            </DialogDescription>
+          </DialogHeader>
+          
+          {activeRequest && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-1 gap-6">
+                <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-md space-y-3">
+                  <div>
+                    <Label className="text-sm text-slate-500">Customer Name</Label>
+                    <div className="font-medium">{activeRequest.name}</div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm text-slate-500">Email</Label>
+                      <div className="flex items-center mt-1">
+                        <span className="font-medium mr-2">{activeRequest.email}</span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={() => window.open(`mailto:${activeRequest.email}?subject=Regarding your ${activeRequest.service} request`)}
+                        >
+                          <Mail className="h-3.5 w-3.5 mr-1" />
+                          Send Email
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {activeRequest.phone && (
+                      <div>
+                        <Label className="text-sm text-slate-500">Phone</Label>
+                        <div className="flex items-center mt-1">
+                          <span className="font-medium mr-2">{activeRequest.phone}</span>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="h-8 px-2 text-xs"
+                            onClick={() => window.open(`tel:${activeRequest.phone}`)}
+                          >
+                            <Phone className="h-3.5 w-3.5 mr-1" />
+                            Call
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm text-slate-500">Service</Label>
+                    <div className="font-medium">{activeRequest.service}</div>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm text-slate-500">Message</Label>
+                    <div className="mt-1 text-sm p-3 bg-white dark:bg-slate-700 rounded-md">
+                      {activeRequest.message}
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="processingNote">Add Note</Label>
+                  <Textarea 
+                    id="processingNote" 
+                    placeholder="Add notes about your contact with the customer"
+                    value={processingNote}
+                    onChange={(e) => setProcessingNote(e.target.value)}
+                    className="mt-1"
+                    rows={3}
+                  />
+                </div>
+              </div>
+              
+              <DialogFooter className="flex justify-between items-center">
+                <Button 
+                  variant="outline"
+                  onClick={handleAddProcessNote}
+                  disabled={!processingNote.trim() || isActionLoading === activeRequestId}
+                >
+                  {isActionLoading === activeRequestId ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Note'
+                  )}
+                </Button>
+                <Button onClick={handleNextStep}>
+                  Next Step
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Step 3: Customer Conversion Dialog */}
+      <Dialog open={processStep === ProcessStep.CUSTOMER_CONVERSION} onOpenChange={(isOpen) => !isOpen && resetProcessFlow()}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Convert to Customer</DialogTitle>
+            <DialogDescription>
+              Link this request to an existing customer or create a new customer
+            </DialogDescription>
+          </DialogHeader>
+          
+          {activeRequest && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-slate-500">Name</Label>
+                  <div className="font-medium">{activeRequest.name}</div>
+                </div>
+                <div>
+                  <Label className="text-sm text-slate-500">Email</Label>
+                  <div className="font-medium">{activeRequest.email}</div>
+                </div>
+              </div>
+              
+              <div className="space-y-4 pt-2">
+                <div>
+                  <Label htmlFor="customerId">Link to Existing Customer</Label>
+                  <div className="flex gap-3 mt-1">
+                    <Select 
+                      value={selectedCustomerId?.toString() || ""} 
+                      onValueChange={(value) => setSelectedCustomerId(parseInt(value))}
+                      disabled={isLoadingCustomers}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a customer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isLoadingCustomers ? (
+                          <div className="flex items-center justify-center py-2">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            <span>Loading customers...</span>
+                          </div>
+                        ) : customers.length > 0 ? (
+                          customers.map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id.toString()}>
+                              {customer.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="px-2 py-2 text-sm">No customers found</div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={handleLinkToCustomer}
+                      disabled={!selectedCustomerId || isLoadingCustomers}
+                    >
+                      Link Customer
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="pt-2">
+                  <p className="text-sm text-slate-500 mb-2">Or create a new customer from this request</p>
+                  <Button
+                    onClick={handleConvertToCustomer}
+                    variant="outline"
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Convert to New Customer
+                  </Button>
+                </div>
+                
+                <div>
+                  <Label htmlFor="processingNote">Add Note</Label>
+                  <Textarea 
+                    id="processingNote" 
+                    placeholder="Add processing notes"
+                    value={processingNote}
+                    onChange={(e) => setProcessingNote(e.target.value)}
+                    className="mt-1"
+                    rows={3}
+                  />
+                  {processingNote.trim() && (
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={handleAddProcessNote}
+                      disabled={isActionLoading === activeRequestId}
+                    >
+                      {isActionLoading === activeRequestId ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Note'
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Step 4: Success Dialog */}
+      <Dialog open={processStep === ProcessStep.SUCCESS} onOpenChange={(isOpen) => !isOpen && resetProcessFlow()}>
+        <DialogContent className="max-w-md">
+          <div className="flex flex-col items-center justify-center py-6">
+            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-full mb-4">
+              <CheckCircle className="h-10 w-10 text-green-500" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Success!</h2>
+            <p className="text-center text-slate-600 dark:text-slate-400 mb-6">
+              The request has been processed successfully.
+            </p>
+            <Button onClick={handleGoToCustomer}>
+              Go to Customer
+              <ExternalLink className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Note Dialog */}
+      <Dialog open={isAddNoteDialogOpen} onOpenChange={setIsAddNoteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Note</DialogTitle>
+            <DialogDescription>
+              Add a note to this request
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <Textarea 
+              id="noteText" 
+              placeholder="Enter your note here..."
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              rows={4}
+            />
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddNoteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddNote} 
+              disabled={!noteText.trim() || isActionLoading === noteRequestId}
+            >
+              {isActionLoading === noteRequestId ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Note'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Status Dialog */}
+      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Status</DialogTitle>
+            <DialogDescription>
+              Update the status of this request
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as RequestStatus)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={RequestStatus.NEW}>New</SelectItem>
+                <SelectItem value={RequestStatus.IN_PROGRESS}>In Progress</SelectItem>
+                <SelectItem value={RequestStatus.COMPLETED}>Completed</SelectItem>
+                <SelectItem value={RequestStatus.CANCELLED}>Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleStatusChange} 
+              disabled={!selectedStatus || isActionLoading === statusRequestId}
+            >
+              {isActionLoading === statusRequestId ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Status'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

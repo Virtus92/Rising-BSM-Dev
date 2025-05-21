@@ -70,8 +70,6 @@ export function useEnhancedPermissions() {
       return [];
     }
     
-    // Skip loading if already cached and not forced - handled inside getPermissions now
-    
     try {
       setLoading(true);
       setError(null);
@@ -80,7 +78,10 @@ export function useEnhancedPermissions() {
       const requestId = `user-permissions-${user.id}-${Date.now()}`;
       
       // Get permissions through the manager
-      const userPermissions = await permissionManager.getPermissions(user.id, requestId, { force: options?.force });
+      const userPermissions = await permissionManager.getAllPermissions(
+        user.id, 
+        user.role || 'user'
+      );
       
       setPermissions(userPermissions);
       setLoading(false);
@@ -113,7 +114,7 @@ export function useEnhancedPermissions() {
    * Check if permissions are cached to avoid unnecessary loading
    */
   const hasCachedPermissions = useCallback((): boolean => {
-    return !!user?.id && permissionManager.hasCachedPermissions(user.id);
+    return !!user?.id && permissionManager.hasUserPermissionsCached(user.id);
   }, [user?.id, permissionManager]);
   
   /**
@@ -121,7 +122,7 @@ export function useEnhancedPermissions() {
    */
   const clearCache = useCallback((): void => {
     if (user?.id) {
-      permissionManager.clearCache(user.id);
+      permissionManager.clearUserCache(user.id);
     }
   }, [user?.id, permissionManager]);
   

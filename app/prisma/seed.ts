@@ -5,18 +5,18 @@ import { faker } from '@faker-js/faker';
 import * as bcrypt from 'bcryptjs';
 
 // Lade Umgebungsvariablen aus .env Dateien
-const envLocalPath = path.resolve(process.cwd(), '.env.local');
+const envLocalPath = path.resolve(process.cwd(), '.env');
 const envPath = path.resolve(process.cwd(), '.env');
 
 try {
   if (require('fs').existsSync(envLocalPath)) {
-    console.log('Loading environment from .env.local');
+    console.log('Loading environment from .env');
     dotenv.config({ path: envLocalPath });
   } else if (require('fs').existsSync(envPath)) {
     console.log('Loading environment from .env');
     dotenv.config({ path: envPath });
   } else {
-    console.log('No .env or .env.local file found, using existing environment variables');
+    console.log('No .env or .env file found, using existing environment variables');
   }
 } catch (error) {
   console.log('Error loading environment variables:', error as Error);

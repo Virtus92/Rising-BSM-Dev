@@ -68,7 +68,7 @@ export const DashboardSidebar = () => {
       permission: SystemPermission.USERS_VIEW,
     },
     { 
-      label: 'Customer Manaegement',
+      label: 'Customer Management',
       icon: UserPlus,
       href: '/dashboard/customers',
       permission: SystemPermission.CUSTOMERS_VIEW,
@@ -240,7 +240,7 @@ export const DashboardSidebar = () => {
       {/* Footer - Version info */}
       <div className="p-4 border-t border-slate-200 dark:border-slate-800 text-center">
         <div className="text-xs text-slate-500 dark:text-slate-500">
-          Rising BSM v1.0.0
+          Rising BSM v0.7.0
         </div>
       </div>
     </div>

@@ -34,14 +34,19 @@ COPY package*.json ./
 RUN npm ci --only=production
 
 # Install runtime dependencies
-RUN apk --no-cache add curl bash && \
+RUN apk --no-cache add curl bash openssl && \
     chmod 755 /bin/bash
 
 # Copy prisma
 COPY prisma ./prisma/
-# Copy entry point script
+
+# Copy entry point script and make it executable
 COPY docker-entrypoint.sh ./
 RUN chmod +x /app/docker-entrypoint.sh
+
+# Copy seed script
+COPY scripts ./scripts/
+RUN chmod +x /app/scripts/seed.js
 
 # Copy built app from builder stage
 COPY --from=builder /app/public ./public

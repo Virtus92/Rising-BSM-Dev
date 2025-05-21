@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 # Colors for console output
@@ -10,26 +10,28 @@ NC='\033[0m' # No Color
 echo -e "${YELLOW}Generating Prisma Client...${NC}"
 npx prisma generate
 
-# Robuste Migrationsstrategie - einfach und zuverlässig
+# Robust migration strategy - simple and reliable
 echo -e "${YELLOW}Initiating database migrations...${NC}"
 
-# WICHTIG: Warten auf die Datenbank
+# Wait for database
 echo -e "${YELLOW}Waiting for database connection...${NC}"
 sleep 3
 
+# Try to apply initial migration if needed
 npx prisma migrate resolve --applied "20231003123456_initial_migration" || true
-# Simpler Direkt-Ansatz: Versuche npx prisma db pull - wenn es einen Fehler gibt, brauchen wir eine Migration
+
+# Check if we need to create a migration
 echo -e "${YELLOW}Checking database schema...${NC}"
 if ! npx prisma db pull --print > /dev/null 2>&1; then
   echo -e "${RED}Schema and database are not aligned. Creating migration...${NC}"
-  # Erstelle eine Migration mit einem Namen basierend auf dem Zeitstempel
+  # Create a migration with a timestamp-based name
   MIGRATION_NAME="schema_sync_$(date +%Y%m%d%H%M%S)"
   NODE_ENV=development npx prisma migrate dev --name "$MIGRATION_NAME" --create-only
 else
   echo -e "${GREEN}Schema and database are aligned. No migration needed.${NC}"
 fi
 
-# Wende alle verfügbaren Migrationen an
+# Apply all available migrations
 echo -e "${YELLOW}Applying migrations...${NC}"
 npx prisma migrate deploy
 

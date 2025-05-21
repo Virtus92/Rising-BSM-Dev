@@ -1,5 +1,6 @@
 import { ContactRequest } from '../ContactRequest';
 import { RequestStatus } from '../../enums/CommonEnums';
+import { RequestData } from '../RequestData';
 
 describe('ContactRequest', () => {
   let contactRequest: ContactRequest;
@@ -108,37 +109,55 @@ describe('ContactRequest', () => {
     });
     
     it('getDataByCategory should filter requestData by category', () => {
+      // Create test data with the correct RequestData structure
       contactRequest.requestData = [
-        { id: 1, requestId: 1, key: 'field1', value: 'value1', category: 'category1' } as any,
-        { id: 2, requestId: 1, key: 'field2', value: 'value2', category: 'category1' } as any,
-        { id: 3, requestId: 1, key: 'field3', value: 'value3', category: 'category2' } as any
+        new RequestData({ 
+          id: 1, 
+          requestId: 1, 
+          label: 'field1', 
+          data: 'value1', 
+          category: 'category1' 
+        }),
+        new RequestData({ 
+          id: 2, 
+          requestId: 1, 
+          label: 'field2', 
+          data: 'value2', 
+          category: 'category1' 
+        }),
+        new RequestData({ 
+          id: 3, 
+          requestId: 1, 
+          label: 'field3', 
+          data: 'value3', 
+          category: 'category2' 
+        })
       ];
       
       const category1Data = contactRequest.getDataByCategory('category1');
       expect(category1Data).toHaveLength(2);
-      expect(category1Data[0].key).toBe('field1');
-      expect(category1Data[1].key).toBe('field2');
+      expect(category1Data[0].label).toBe('field1');
+      expect(category1Data[1].label).toBe('field2');
       
       const category2Data = contactRequest.getDataByCategory('category2');
       expect(category2Data).toHaveLength(1);
-      expect(category2Data[0].key).toBe('field3');
+      expect(category2Data[0].label).toBe('field3');
       
       const nonExistentCategory = contactRequest.getDataByCategory('category3');
       expect(nonExistentCategory).toHaveLength(0);
     });
     
     it('addMetadata should add key-value pairs to metadata', () => {
-      contactRequest.metadata = {};
       
       contactRequest.addMetadata('key1', 'value1');
-      expect(contactRequest.metadata.key1).toBe('value1');
+      expect(contactRequest.metadata?.key1).toBe('value1');
       
       contactRequest.addMetadata('key2', { nestedKey: 'nestedValue' });
-      expect(contactRequest.metadata.key2).toEqual({ nestedKey: 'nestedValue' });
+      expect(contactRequest.metadata?.key2).toEqual({ nestedKey: 'nestedValue' });
       
       // Should overwrite existing keys
       contactRequest.addMetadata('key1', 'newValue');
-      expect(contactRequest.metadata.key1).toBe('newValue');
+      expect(contactRequest.metadata?.key1).toBe('newValue');
     });
     
     it('addMetadata should create metadata object if not exists', () => {
@@ -156,8 +175,9 @@ describe('ContactRequest', () => {
       
       contactRequest.addProcessingStep('agent1', 'classify', 'success');
       
-      expect(contactRequest.metadata.processingSteps).toHaveLength(1);
-      expect(contactRequest.metadata.processingSteps[0]).toEqual({
+      expect(contactRequest.metadata.processingSteps).toBeDefined();
+      expect(contactRequest.metadata.processingSteps?.length).toBe(1);
+      expect(contactRequest.metadata.processingSteps?.[0]).toEqual({
         agentId: 'agent1',
         timestamp: now.toISOString(),
         action: 'classify',
@@ -167,20 +187,19 @@ describe('ContactRequest', () => {
       // Add another step
       contactRequest.addProcessingStep('agent2', 'extract', 'partial');
       
-      expect(contactRequest.metadata.processingSteps).toHaveLength(2);
-      expect(contactRequest.metadata.processingSteps[1].agentId).toBe('agent2');
+      expect(contactRequest.metadata.processingSteps?.length).toBe(2);
+      expect(contactRequest.metadata.processingSteps?.[1].agentId).toBe('agent2');
       
       jest.useRealTimers();
     });
     
     it('addProcessingStep should create metadata and processingSteps array if not exists', () => {
-      contactRequest.metadata = undefined;
       
       contactRequest.addProcessingStep('agent1', 'classify', 'success');
       
       expect(contactRequest.metadata).toBeDefined();
-      expect(contactRequest.metadata?.processingSteps).toBeInstanceOf(Array);
-      expect(contactRequest.metadata?.processingSteps).toHaveLength(1);
+      expect(Array.isArray(contactRequest.metadata?.processingSteps)).toBe(true);
+      expect(contactRequest.metadata?.processingSteps?.length).toBe(1);
     });
   });
   
@@ -316,7 +335,15 @@ describe('ContactRequest', () => {
   describe('toObject', () => {
     it('should convert to plain object with all properties except requestData', () => {
       contactRequest.metadata = { processed: true };
-      contactRequest.requestData = [{ id: 1, requestId: 1, key: 'field1', value: 'value1', category: 'category1' } as any];
+      contactRequest.requestData = [
+        new RequestData({ 
+          id: 1, 
+          requestId: 1, 
+          label: 'field1', 
+          data: 'value1', 
+          category: 'category1' 
+        })
+      ];
       
       const obj = contactRequest.toObject();
       

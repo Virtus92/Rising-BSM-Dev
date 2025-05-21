@@ -102,7 +102,7 @@ return import('@/features/permissions/lib/utils/permissionCacheUtils')
 * Checks if a user has a specific permission
 * Direct database check with proper error handling - NO FALLBACKS
 */
-export async function hasPermission(userId: number | undefined, permission: string): Promise<boolean> {
+export async function hasPermission(userId: number | undefined, permission: string, role?: string): Promise<boolean> {
   // Input validation with proper error handling
   if (userId === undefined || userId === null) {
     logger.warn('Permission check attempted without valid user ID', { permission });
@@ -122,6 +122,12 @@ export async function hasPermission(userId: number | undefined, permission: stri
       stack: new Error().stack
     });
     return false; // Invalid permission means deny access
+  }
+  
+  // Early admin role bypass - admins have all permissions
+  if (role && role.toLowerCase() === 'admin') {
+    logger.debug(`Admin user ${userId} granted permission: ${permission}`, { userId, role });
+    return true;
   }
 
   // Normalize permission code for consistent comparison
@@ -275,12 +281,13 @@ export interface PermissionCheckResult {
  * @returns Permission check result
  */
 export async function checkPermission(
-  request: NextRequest | { auth?: { userId: number; name?: string } },
+  request: NextRequest | { auth?: { userId: number; name?: string; role: string; } },
   permission: string | string[]
 ): Promise<PermissionCheckResult> {
   try {
     // Get user ID from auth
     const userId = request.auth?.userId;
+    const role = request.auth?.role;
     
     if (!userId) {
       return {
@@ -303,7 +310,7 @@ export async function checkPermission(
       const checkPromises = permission.map(async (perm) => {
         try {
           // Our improved hasPermission never throws, so this is safer now
-          const hasPermResult = await hasPermission(userId, perm);
+          const hasPermResult = await hasPermission(userId, perm, request.auth?.role);
           return { permission: perm, hasPermission: hasPermResult };
         } catch (error) {
           // This shouldn't happen anymore, but handle it just in case
@@ -357,7 +364,7 @@ export async function checkPermission(
     }
     
     // Check single permission - our new implementation never throws
-    const hasPermResult = await hasPermission(userId, permission);
+    const hasPermResult = await hasPermission(userId, permission, request.auth?.role);
     
     if (hasPermResult) {
       return {
@@ -419,6 +426,7 @@ export function withPermission(
     try {
       // Get user ID from auth
       const userId = request.auth?.userId;
+      const userRole = request.auth?.role;
       
       if (!userId) {
         logger.warn('Authentication required for protected route', {
@@ -434,12 +442,23 @@ export function withPermission(
         }.toString());
       }
       
+      // Special case for admin users - they always have permission
+      if (userRole && userRole.toLowerCase() === 'admin') {
+        // Admin bypass - proceed to handler directly
+        logger.debug(`Admin user ${userId} automatically granted permission: ${permission}`, { 
+          userId, 
+          userRole, 
+          url: request.url 
+        });
+        return await handler(request, request.auth, context);
+      }
+      
       // If permission is an array, check each permission
       if (Array.isArray(permission)) {
         // Check each permission individually without throwing
         for (const perm of permission) {
           try {
-            const hasPermResult = await hasPermission(userId, perm);
+            const hasPermResult = await hasPermission(userId, perm, request.auth?.role);
             
             if (hasPermResult) {
               // Permission granted, proceed to handler
@@ -474,7 +493,7 @@ export function withPermission(
       } else {
         // Check single permission without throwing
         try {
-          const hasPermResult = await hasPermission(userId, permission);
+          const hasPermResult = await hasPermission(userId, permission, request.auth?.role);
           
           if (!hasPermResult) {
             logger.info(`Permission denied (${permission}) for user ${userId}`, {

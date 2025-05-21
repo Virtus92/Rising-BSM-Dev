@@ -79,7 +79,6 @@ export async function GET(request: NextRequest) {
         permissions: cachedPermissions.length <= 10 
           ? cachedPermissions.join(', ')
           : cachedPermissions.slice(0, 10).join(', ') + '...',
-        userPermissionsCount: 0,
         duration,
         source: 'cache'
       });
@@ -87,7 +86,11 @@ export async function GET(request: NextRequest) {
       // Return cached permissions
       return NextResponse.json({
         success: true,
-        data: cachedPermissions,
+        data: {
+          permissions: cachedPermissions,
+          userId: userId,
+          role: user.role || 'user' // Include user's role
+        },
         message: 'Permissions retrieved successfully'
       }, { status: 200 });
     }
@@ -173,82 +176,68 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Get user permissions with strict type checking
-    let userPermissions: UserPermissionsResponseDto;
+    // Step 1: Get role permissions
+    let rolePermissions: string[] = [];
     try {
-      userPermissions = await permissionService.getUserPermissions(userId, {
+      rolePermissions = await permissionService.getDefaultPermissionsForRole(
+        targetUser.role || 'user',
+        { context: { userId: currentUserId } }
+      );
+      
+      logger.debug(`Loaded ${rolePermissions.length} role permissions for user ${userId} with role ${targetUser.role || 'user'}`);
+    } catch (error) {
+      logger.error('Error retrieving role permissions:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        userId,
+        role: targetUser.role
+      });
+      // Continue with empty role permissions
+    }
+    
+    // Step 2: Get user-specific permissions
+    let userSpecificPermissions: string[] = [];
+    try {
+      // Get user permissions
+      const userPermissions = await permissionService.getUserPermissions(userId, {
         context: { userId: currentUserId }
       });
       
-      // Validate the structure immediately to fail fast if data is invalid
-      if (!userPermissions || typeof userPermissions !== 'object') {
-        throw new Error(`Invalid permissions response: ${JSON.stringify(userPermissions)}`);
+      if (userPermissions && Array.isArray(userPermissions.permissions)) {
+        userSpecificPermissions = userPermissions.permissions;
       }
       
-      if (!Array.isArray(userPermissions.permissions)) {
-        throw new Error(`permissions is not an array: ${JSON.stringify(userPermissions)}`);
-      }
-      
+      logger.debug(`Loaded ${userSpecificPermissions.length} user-specific permissions for user ${userId}`);
     } catch (error) {
-      logger.error('Error retrieving user permissions:', {
+      logger.error('Error retrieving user-specific permissions:', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
         userId,
         currentUserId
       });
-      throw authErrorHandler.createError(
-        'Failed to retrieve user permissions',
-        AuthErrorType.PERMISSION_CHECK_FAILED,
-        { userId, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      // Continue with empty user permissions
     }
     
-    // Ensure we have a valid permissions array - strictly enforce the contract
-    if (!Array.isArray(userPermissions.permissions)) {
-      logger.error('Invalid permissions data format', {
-        userId,
-        receivedType: typeof userPermissions.permissions,
-        receivedValue: JSON.stringify(userPermissions.permissions)
-      });
-      
-      throw authErrorHandler.createError(
-        'Invalid permissions data format from service',
-        AuthErrorType.INTERNAL_ERROR,
-        { 
-          userId,
-          receivedType: typeof userPermissions.permissions,
-          receivedValue: JSON.stringify(userPermissions)
-        },
-        500
-      );
-    }
-    
-    // CRITICAL FIX: Return permissions in a consistent format
-    // We need to return both the permissions array AND the role for proper processing
-    
-    // Ensure we have the right data format
-    const formattedPermissions = {
-      permissions: Array.isArray(userPermissions.permissions) ? userPermissions.permissions : [],
-      userId: userId,
-      role: userPermissions.role || targetUser.role || 'user' // Fallback to user's role if not in permissions
-    };
-    
+    // Step 3: Combine permissions (removing duplicates)
+    const combinedPermissions = Array.from(new Set([...rolePermissions, ...userSpecificPermissions]));
+
     // Store in cache for future requests
-    permissionCache.cachePermissions(userId, formattedPermissions.permissions);
+    permissionCache.cachePermissions(userId, combinedPermissions);
     
     // Calculate performance metrics
     const endTime = performance.now();
     const duration = Math.round(endTime - startTime);
     
     // Log comprehensive data for debugging 
-    logger.info(`Retrieved ${formattedPermissions.permissions.length} permissions for user ${userId} from database`, {
+    logger.info(`Retrieved ${combinedPermissions.length} total permissions for user ${userId}`, {
       userId,
-      role: formattedPermissions.role,
-      permissionCount: formattedPermissions.permissions.length,
-      permissions: formattedPermissions.permissions.length <= 10 
-        ? formattedPermissions.permissions.join(', ')
-        : formattedPermissions.permissions.slice(0, 10).join(', ') + '...',
+      role: targetUser.role,
+      rolePermissionCount: rolePermissions.length,
+      userPermissionCount: userSpecificPermissions.length,
+      totalPermissionCount: combinedPermissions.length,
+      permissions: combinedPermissions.length <= 10 
+        ? combinedPermissions.join(', ')
+        : combinedPermissions.slice(0, 10).join(', ') + '...',
       duration,
       source: 'database'
     });
@@ -256,7 +245,11 @@ export async function GET(request: NextRequest) {
     // Return consistent format with all required fields
     return NextResponse.json({
       success: true,
-      data: formattedPermissions,
+      data: {
+        permissions: combinedPermissions,
+        userId: userId,
+        role: targetUser.role || 'user'
+      },
       message: 'Permissions retrieved successfully'
     }, { status: 200 });
   });

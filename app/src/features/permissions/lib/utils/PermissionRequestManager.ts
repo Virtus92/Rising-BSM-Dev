@@ -3,9 +3,9 @@
 /**
  * PermissionRequestManager
  * 
- * A robust manager for permission requests with proper caching to reduce
- * network traffic and improve performance. No fallbacks or workarounds -
- * focuses on consistent behavior and proper error propagation.
+ * A streamlined manager for permission requests with proper caching
+ * to reduce network traffic and improve performance. Implements a clean
+ * approach with consistent behavior and proper error handling.
  */
 
 import { getLogger } from '@/core/logging';
@@ -18,13 +18,24 @@ const logger = getLogger();
  */
 export class PermissionRequestManager {
   private static instance: PermissionRequestManager;
-  private permissionCache: Map<number, { permissions: string[], timestamp: number }>;
-  private requestsInProgress: Map<number, Promise<string[]>>;
-  private readonly cacheTTL: number = 300000; // 5 minutes
+  
+  // Separate caches for role-based and user-specific permissions
+  private rolePermissionCache: Map<string, { permissions: string[], timestamp: number }>;
+  private userPermissionCache: Map<number, { permissions: string[], timestamp: number }>;
+  
+  // Track in-progress requests to prevent duplicates
+  private roleRequestsInProgress: Map<string, Promise<string[]>>;
+  private userRequestsInProgress: Map<number, Promise<string[]>>;
+  
+  // Cache TTLs
+  private readonly roleCacheTTL: number = 600000; // 10 minutes for role permissions
+  private readonly userCacheTTL: number = 300000; // 5 minutes for user-specific permissions
   
   private constructor() {
-    this.permissionCache = new Map();
-    this.requestsInProgress = new Map();
+    this.rolePermissionCache = new Map();
+    this.userPermissionCache = new Map();
+    this.roleRequestsInProgress = new Map();
+    this.userRequestsInProgress = new Map();
   }
   
   // Singleton access
@@ -36,43 +47,137 @@ export class PermissionRequestManager {
   }
   
   /**
-   * Check if the permissions for a user are cached
+   * Check if the role permissions are cached
    */
-  public hasCachedPermissions(userId: number): boolean {
-    if (!userId) return false;
+  public hasRolePermissionsCached(role: string): boolean {
+    if (!role) return false;
     
-    const cacheEntry = this.permissionCache.get(userId);
+    const normalizedRole = role.toLowerCase();
+    const cacheEntry = this.rolePermissionCache.get(normalizedRole);
     if (!cacheEntry) return false;
     
     // Check if cache is still valid
     const now = Date.now();
-    return (now - cacheEntry.timestamp) < this.cacheTTL;
+    return (now - cacheEntry.timestamp) < this.roleCacheTTL;
+  }
+  
+  /**
+   * Check if the user-specific permissions are cached
+   */
+  public hasUserPermissionsCached(userId: number): boolean {
+    if (!userId) return false;
+    
+    const cacheEntry = this.userPermissionCache.get(userId);
+    if (!cacheEntry) return false;
+    
+    // Check if cache is still valid
+    const now = Date.now();
+    return (now - cacheEntry.timestamp) < this.userCacheTTL;
+  }
+  
+  /**
+   * Clear all permission caches
+   */
+  public clearAllCaches(): void {
+    this.rolePermissionCache.clear();
+    this.userPermissionCache.clear();
+    this.roleRequestsInProgress.clear();
+    this.userRequestsInProgress.clear();
+    logger.debug('All permission caches cleared');
   }
   
   /**
    * Clear the cache for a specific user
    */
-  public clearCache(userId: number): void {
+  public clearUserCache(userId: number): void {
     if (userId) {
-      this.permissionCache.delete(userId);
-      logger.debug(`Cleared permission cache for user ${userId}`);
+      this.userPermissionCache.delete(userId);
+      logger.debug(`Cleared user permission cache for user ${userId}`);
     }
   }
   
   /**
-   * Get permissions for a user with proper caching
-   * No fallbacks - errors are propagated
+   * Clear the cache for a specific role
    */
-  public async getPermissions(userId: number, requestId: string, options?: { force?: boolean }): Promise<string[]> {
+  public clearRoleCache(role: string): void {
+    if (role) {
+      const normalizedRole = role.toLowerCase();
+      this.rolePermissionCache.delete(normalizedRole);
+      logger.debug(`Cleared role permission cache for role ${normalizedRole}`);
+    }
+  }
+  
+  /**
+   * Get role-based permissions with proper caching
+   */
+  public async getRolePermissions(role: string, requestId: string, options?: { force?: boolean }): Promise<string[]> {
+    // Validate role
+    if (!role) {
+      logger.error('Invalid role provided to getRolePermissions', { requestId });
+      throw new Error('Invalid role provided to getRolePermissions');
+    }
+    
+    const normalizedRole = role.toLowerCase();
+    
+    // Return from cache if available and not forced to refresh
+    if (!options?.force && this.hasRolePermissionsCached(normalizedRole)) {
+      const cachedData = this.rolePermissionCache.get(normalizedRole);
+      
+      if (cachedData && Array.isArray(cachedData.permissions)) {
+        logger.debug(`Using cached permissions for role ${normalizedRole}`, { 
+          requestId,
+          permissionCount: cachedData.permissions.length,
+          cacheAge: Date.now() - (cachedData.timestamp || 0)
+        });
+        return cachedData.permissions;
+      }
+    }
+    
+    // Check if there's already a request in progress for this role
+    const existingRequest = this.roleRequestsInProgress.get(normalizedRole);
+    if (existingRequest && !options?.force) {
+      logger.debug(`Request for role ${normalizedRole} permissions already in progress, reusing promise`, { requestId });
+      return existingRequest;
+    }
+    
+    // Create new request promise
+    const permissionPromise = this.fetchRolePermissions(normalizedRole, requestId);
+    
+    // Store the promise to prevent duplicate requests
+    this.roleRequestsInProgress.set(normalizedRole, permissionPromise);
+    
+    try {
+      // Await the promise to handle errors properly
+      const permissions = await permissionPromise;
+      return permissions;
+    } catch (error) {
+      // Log error but don't swallow it
+      logger.error(`Error getting permissions for role ${normalizedRole}`, {
+        error: error instanceof Error ? error.message : String(error),
+        requestId
+      });
+      
+      // Remove from in-progress map on error
+      this.roleRequestsInProgress.delete(normalizedRole);
+      
+      // Rethrow so calling code can handle
+      throw error;
+    }
+  }
+  
+  /**
+   * Get user-specific permissions with proper caching
+   */
+  public async getUserPermissions(userId: number, requestId: string, options?: { force?: boolean }): Promise<string[]> {
     // Validate userId
     if (!userId) {
-      logger.error('Invalid userId provided to getPermissions', { requestId });
-      throw new Error('Invalid user ID provided to getPermissions');
+      logger.error('Invalid userId provided to getUserPermissions', { requestId });
+      throw new Error('Invalid user ID provided to getUserPermissions');
     }
     
     // Return from cache if available and not forced to refresh
-    if (!options?.force && this.hasCachedPermissions(userId)) {
-      const cachedData = this.permissionCache.get(userId);
+    if (!options?.force && this.hasUserPermissionsCached(userId)) {
+      const cachedData = this.userPermissionCache.get(userId);
       
       if (cachedData && Array.isArray(cachedData.permissions)) {
         logger.debug(`Using cached permissions for user ${userId}`, { 
@@ -85,17 +190,17 @@ export class PermissionRequestManager {
     }
     
     // Check if there's already a request in progress for this user
-    const existingRequest = this.requestsInProgress.get(userId);
+    const existingRequest = this.userRequestsInProgress.get(userId);
     if (existingRequest && !options?.force) {
       logger.debug(`Request for user ${userId} permissions already in progress, reusing promise`, { requestId });
       return existingRequest;
     }
     
     // Create new request promise
-    const permissionPromise = this.fetchPermissions(userId, requestId);
+    const permissionPromise = this.fetchUserPermissions(userId, requestId);
     
     // Store the promise to prevent duplicate requests
-    this.requestsInProgress.set(userId, permissionPromise);
+    this.userRequestsInProgress.set(userId, permissionPromise);
     
     try {
       // Await the promise to handle errors properly
@@ -109,7 +214,7 @@ export class PermissionRequestManager {
       });
       
       // Remove from in-progress map on error
-      this.requestsInProgress.delete(userId);
+      this.userRequestsInProgress.delete(userId);
       
       // Rethrow so calling code can handle
       throw error;
@@ -117,10 +222,64 @@ export class PermissionRequestManager {
   }
   
   /**
-   * Fetch permissions from API with robust error handling and response normalization
-   * No fallbacks or workarounds - errors are propagated properly
+   * Fetch role permissions from API
    */
-  private async fetchPermissions(userId: number, requestId: string): Promise<string[]> {
+  private async fetchRolePermissions(role: string, requestId: string): Promise<string[]> {
+    try {
+      logger.debug(`Fetching permissions for role ${role}`, { requestId });
+      
+      // Ensure ApiClient is initialized
+      if (!ApiClient.isInitialized()) {
+        logger.debug('ApiClient not initialized, initializing now', { requestId });
+        await ApiClient.initialize();
+      }
+      
+      // Make API request with auth headers
+      const headers: Record<string, string> = {
+        'X-Request-ID': requestId,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      };
+      
+      const response = await ApiClient.get(`/api/permissions/role-defaults/${role}`, {
+        headers,
+        withAuth: true,
+        cache: 'no-store' as RequestCache
+      });
+      
+      // Process response
+      const permissions = this.normalizePermissionsResponse(response, role, requestId);
+      
+      // Cache the permissions
+      if (permissions.length > 0) {
+        this.rolePermissionCache.set(role.toLowerCase(), {
+          permissions,
+          timestamp: Date.now()
+        });
+      }
+      
+      return permissions;
+    } catch (error) {
+      // Detailed error logging
+      logger.error(`Error fetching permissions for role ${role}`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        role,
+        requestId
+      });
+      
+      // Propagate the error - no fallbacks
+      throw error;
+    } finally {
+      // Clean up when request is done
+      this.roleRequestsInProgress.delete(role.toLowerCase());
+    }
+  }
+  
+  /**
+   * Fetch user permissions from API
+   */
+  private async fetchUserPermissions(userId: number, requestId: string): Promise<string[]> {
     try {
       logger.debug(`Fetching permissions for user ${userId}`, { requestId });
       
@@ -129,9 +288,6 @@ export class PermissionRequestManager {
         logger.debug('ApiClient not initialized, initializing now', { requestId });
         await ApiClient.initialize();
       }
-      
-      // Use the token manager to ensure we have a valid token
-      const { default: TokenManager } = await import('@/core/initialization/TokenManager');
       
       // Make API request with auth headers
       const headers: Record<string, string> = {
@@ -147,82 +303,14 @@ export class PermissionRequestManager {
         cache: 'no-store' as RequestCache
       });
       
-      // Check for auth errors
-      if (response && typeof response === 'object' && response.statusCode !== undefined) {
-        if (response.statusCode === 401 || response.statusCode === 403) {
-          logger.warn(`Authentication error when fetching permissions: ${response.statusCode}`, {
-            userId,
-            requestId,
-            statusCode: response.statusCode,
-            error: response.error || response.message
-          });
-          
-          // Try to refresh token and retry exactly once
-          const refreshed = await TokenManager.refreshToken({ force: true });
-          
-          if (refreshed) {
-            // Retry with fresh token
-            logger.debug('Token refreshed, retrying permission request', { requestId });
-            
-            const retryResponse = await ApiClient.get(`/api/users/permissions?userId=${userId}`, {
-              headers: {
-                'X-Request-ID': `${requestId}-retry`,
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'X-Auth-User-ID': userId.toString()
-              },
-              withAuth: true
-            });
-            
-            // If retry fails with auth error, throw proper error
-            if (retryResponse.statusCode === 401 || retryResponse.statusCode === 403) {
-              logger.error('Authentication failed after token refresh', {
-                userId,
-                requestId: `${requestId}-retry`,
-                statusCode: retryResponse.statusCode
-              });
-              throw new Error('Authentication required to fetch permissions');
-            }
-            
-            // Process retry response
-            const permissions = this.normalizePermissionsResponse(retryResponse, userId, `${requestId}-retry`);
-            
-            // Cache the permissions
-            if (permissions.length > 0) {
-              this.permissionCache.set(userId, {
-                permissions,
-                timestamp: Date.now()
-              });
-            }
-            
-            return permissions;
-          } else {
-            // Token refresh failed
-            logger.error('Token refresh failed when fetching permissions', { userId, requestId });
-            throw new Error('Authentication required to fetch permissions');
-          }
-        } else if (response.statusCode >= 400) {
-          // Other error status codes
-          logger.error(`API error when fetching permissions: ${response.statusCode}`, {
-            userId,
-            requestId,
-            statusCode: response.statusCode,
-            error: response.error || response.message
-          });
-          throw new Error(`Failed to fetch permissions: ${response.error || response.message || 'Unknown error'}`);
-        }
-      }
-      
-      // Process response normally
+      // Process response
       const permissions = this.normalizePermissionsResponse(response, userId, requestId);
       
       // Cache the permissions
-      if (permissions.length > 0) {
-        this.permissionCache.set(userId, {
-          permissions,
-          timestamp: Date.now()
-        });
-      }
+      this.userPermissionCache.set(userId, {
+        permissions,
+        timestamp: Date.now()
+      });
       
       return permissions;
     } catch (error) {
@@ -238,7 +326,7 @@ export class PermissionRequestManager {
       throw error;
     } finally {
       // Clean up when request is done
-      this.requestsInProgress.delete(userId);
+      this.userRequestsInProgress.delete(userId);
     }
   }
   
@@ -246,9 +334,9 @@ export class PermissionRequestManager {
    * Normalize permissions response to standard string array format
    * Consistent processing with proper error handling
    */
-  private normalizePermissionsResponse(response: any, userId: number, requestId: string): string[] {
+  private normalizePermissionsResponse(response: any, idOrRole: number | string, requestId: string): string[] {
     // Log the raw response for debugging
-    logger.debug(`Normalizing permissions response for user ${userId}:`, {
+    logger.debug(`Normalizing permissions response:`, {
       requestId,
       responseType: typeof response,
       isArray: Array.isArray(response),
@@ -257,27 +345,27 @@ export class PermissionRequestManager {
     });
     
     try {
+      // Check for error response
+      if (response && typeof response === 'object' && 'success' in response && response.success === false) {
+        logger.error('API returned error response for permissions', {
+          idOrRole,
+          requestId,
+          error: response.error || response.message,
+          statusCode: response.statusCode
+        });
+        throw new Error(`API error: ${response.error || response.message || 'Unknown error'}`);
+      }
+      
       // Handle different response formats in order of preference
       
       // Case 1: Standard API response format with success and data
       if (response && typeof response === 'object' && 'success' in response && 'data' in response) {
-        // Check for error response
-        if (response.success === false) {
-          logger.error('API returned error response for permissions', {
-            userId,
-            requestId,
-            error: response.error || response.message,
-            statusCode: response.statusCode
-          });
-          throw new Error(`API error: ${response.error || response.message || 'Unknown error'}`);
-        }
-        
         const data = response.data;
         
         // Case 1.1: data is array of strings
         if (Array.isArray(data)) {
           logger.debug('Response data is an array', { dataLength: data.length });
-          return this.sanitizePermissions(data, userId, requestId);
+          return this.sanitizePermissions(data, requestId);
         }
         
         // Case 1.2: data contains permissions array
@@ -286,14 +374,14 @@ export class PermissionRequestManager {
             permissionsLength: data.permissions.length,
             role: data.role || 'unknown'
           });
-          return this.sanitizePermissions(data.permissions, userId, requestId);
+          return this.sanitizePermissions(data.permissions, requestId);
         }
       }
       
       // Case 2: Direct array response
       if (Array.isArray(response)) {
         logger.debug('Response is a direct array', { responseLength: response.length });
-        return this.sanitizePermissions(response, userId, requestId);
+        return this.sanitizePermissions(response, requestId);
       }
       
       // Case 3: Object with direct permissions property
@@ -301,29 +389,29 @@ export class PermissionRequestManager {
         logger.debug('Response has direct permissions property', {
           permissionsLength: response.permissions.length
         });
-        return this.sanitizePermissions(response.permissions, userId, requestId);
+        return this.sanitizePermissions(response.permissions, requestId);
       }
       
       // We couldn't find permissions in a standard format
-      // Log the error with detailed information
       logger.error('Unable to extract permissions from response in standard format', {
-        userId,
+        idOrRole,
         requestId,
         responseType: typeof response,
-        responseKeys: response && typeof response === 'object' ? Object.keys(response) : 'N/A',
-        dataType: response && typeof response === 'object' && response.data ? typeof response.data : 'N/A',
-        dataKeys: response && typeof response === 'object' && response.data && typeof response.data === 'object' ? 
-          Object.keys(response.data) : 'N/A'
+        responseKeys: response && typeof response === 'object' ? Object.keys(response) : 'N/A'
       });
       
-      // Throw an error to propagate the problem
-      throw new Error('Invalid permission response format - could not extract permissions');
+      // Return empty array instead of throwing
+      logger.warn('Returning empty permissions array due to unrecognized response format', { 
+        idOrRole, 
+        requestId 
+      });
+      return [];
     } catch (error) {
       // Log error and propagate
       logger.error('Error normalizing permissions response:', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        userId,
+        idOrRole,
         requestId
       });
       
@@ -335,25 +423,23 @@ export class PermissionRequestManager {
    * Sanitize and validate permissions
    * Ensures we only work with valid string permissions
    */
-  private sanitizePermissions(permissionsArray: any[], userId: number, requestId: string): string[] {
+  private sanitizePermissions(permissionsArray: any[], requestId: string): string[] {
     // Validate and sanitize permissions
     const validPermissions = permissionsArray
       .filter(Boolean) // Remove any null/undefined values
-      .filter(p => typeof p === 'string') // Ensure all are strings
-      .map(p => p.trim().toLowerCase()) // Trim whitespace and lowercase for consistency
+      .filter(p => typeof p === 'string' || (typeof p === 'object' && p !== null && 'code' in p)) // Ensure all are strings or have code property
+      .map(p => typeof p === 'string' ? p.trim().toLowerCase() : p.code.trim().toLowerCase()) // Extract codes and normalize
       .filter(p => p.length > 0); // Remove empty strings
     
     if (validPermissions.length === 0 && permissionsArray.length > 0) {
       // We had input but nothing valid came out
       logger.warn('No valid string permissions found in array', {
-        userId,
         requestId,
         inputLength: permissionsArray.length,
         inputTypes: permissionsArray.map(p => typeof p).join(', ')
       });
     } else {
       logger.debug(`Successfully extracted ${validPermissions.length} permissions`, {
-        userId,
         requestId
       });
     }
@@ -362,115 +448,35 @@ export class PermissionRequestManager {
   }
   
   /**
-   * Check if user has a specific permission with proper error handling
+   * Get all permissions for a user by combining role and user-specific permissions
    */
-  public async hasPermission(userId: number, permissionCode: string): Promise<boolean> {
-    try {
-      // Input validation
-      if (!userId) {
-        throw new Error('Invalid user ID provided to hasPermission');
-      }
-      
-      if (!permissionCode) {
-        throw new Error('Invalid permission code provided to hasPermission');
-      }
-      
-      // Normalize permission code
-      const normalizedPermission = permissionCode.trim().toLowerCase();
-      
-      // Generate a request ID for tracing
-      const requestId = `perm-check-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-      
-      // Get all permissions
-      const permissions = await this.getPermissions(userId, requestId);
-      
-      // Check if the permission exists
-      return permissions.includes(normalizedPermission);
-    } catch (error) {
-      logger.error(`Permission check failed for ${permissionCode}`, {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        userId,
-        permissionCode
-      });
-      
-      // Propagate the error
-      throw error;
+  public async getAllPermissions(userId: number, role: string): Promise<string[]> {
+    if (!userId || !role) {
+      throw new Error('User ID and role are required');
     }
-  }
-  
-  /**
-   * Check if user has any of the permissions
-   */
-  public async hasAnyPermission(userId: number, permissionCodes: string[]): Promise<boolean> {
+    
+    // Generate request IDs
+    const roleRequestId = `role-perms-${role}-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    const userRequestId = `user-perms-${userId}-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    
     try {
-      // Input validation
-      if (!userId) {
-        throw new Error('Invalid user ID provided to hasAnyPermission');
-      }
+      // Fetch both sets of permissions in parallel
+      const [rolePermissions, userPermissions] = await Promise.all([
+        this.getRolePermissions(role, roleRequestId),
+        this.getUserPermissions(userId, userRequestId)
+      ]);
       
-      if (!permissionCodes || !Array.isArray(permissionCodes) || permissionCodes.length === 0) {
-        throw new Error('Invalid permission codes provided to hasAnyPermission');
-      }
+      // Combine and deduplicate
+      const combinedPermissions = new Set([...rolePermissions, ...userPermissions]);
       
-      // Normalize permission codes
-      const normalizedPermissions = permissionCodes.map(code => code.trim().toLowerCase());
-      
-      // Generate a request ID for tracing
-      const requestId = `perm-check-any-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-      
-      // Get all permissions
-      const permissions = await this.getPermissions(userId, requestId);
-      
-      // Check if any permission codes match
-      return normalizedPermissions.some(code => permissions.includes(code));
+      // Convert back to array
+      return Array.from(combinedPermissions);
     } catch (error) {
-      logger.error(`hasAnyPermission check failed`, {
+      logger.error('Error getting combined permissions', {
         error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
         userId,
-        permissionCodes
+        role
       });
-      
-      // Propagate the error
-      throw error;
-    }
-  }
-  
-  /**
-   * Check if user has all of the permissions
-   */
-  public async hasAllPermissions(userId: number, permissionCodes: string[]): Promise<boolean> {
-    try {
-      // Input validation
-      if (!userId) {
-        throw new Error('Invalid user ID provided to hasAllPermissions');
-      }
-      
-      if (!permissionCodes || !Array.isArray(permissionCodes) || permissionCodes.length === 0) {
-        throw new Error('Invalid permission codes provided to hasAllPermissions');
-      }
-      
-      // Normalize permission codes
-      const normalizedPermissions = permissionCodes.map(code => code.trim().toLowerCase());
-      
-      // Generate a request ID for tracing
-      const requestId = `perm-check-all-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-      
-      // Get all permissions
-      const permissions = await this.getPermissions(userId, requestId);
-      
-      // Check if all permission codes match
-      return normalizedPermissions.every(code => permissions.includes(code));
-    } catch (error) {
-      logger.error(`hasAllPermissions check failed`, {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        userId,
-        permissionCodes
-      });
-      
-      // Propagate the error
       throw error;
     }
   }

@@ -15,11 +15,145 @@ import permissionValidator from '../utils/permissionValidation';
 const logger = getLogger();
 
 /**
+ * Ensure default role permissions are set up for each role
+ */
+async function ensureRolePermissions(): Promise<void> {
+  logger.info('Setting up default role permissions');
+  
+  // Check if RolePermission table exists
+  try {
+    await db.rolePermission.count();
+  } catch (error) {
+    logger.error('RolePermission table not accessible:', error as Error);
+    throw new Error('RolePermission table not accessible');
+  }
+  
+  // Get all permissions from the database
+  const allPermissions = await db.permission.findMany();
+  const permissionMap = new Map(allPermissions.map(p => [p.code, p.id]));
+  
+  // Define default permissions for each role
+  const rolePermissions: Record<string, string[]> = {
+    admin: Object.values(SystemPermission), // All permissions for admin
+    manager: [
+      // Basic permissions
+      SystemPermission.DASHBOARD_ACCESS,
+      SystemPermission.PROFILE_VIEW,
+      SystemPermission.PROFILE_EDIT,
+      
+      // Customer permissions
+      SystemPermission.CUSTOMERS_VIEW,
+      SystemPermission.CUSTOMERS_CREATE,
+      SystemPermission.CUSTOMERS_EDIT,
+      
+      // Request permissions
+      SystemPermission.REQUESTS_VIEW,
+      SystemPermission.REQUESTS_CREATE,
+      SystemPermission.REQUESTS_EDIT,
+      SystemPermission.REQUESTS_ASSIGN,
+      
+      // Appointment permissions
+      SystemPermission.APPOINTMENTS_VIEW,
+      SystemPermission.APPOINTMENTS_CREATE,
+      SystemPermission.APPOINTMENTS_EDIT,
+      
+      // User permissions
+      SystemPermission.USERS_VIEW,
+      
+      // Settings view only
+      SystemPermission.SETTINGS_VIEW,
+    ],
+    employee: [
+      // Basic permissions
+      SystemPermission.DASHBOARD_ACCESS,
+      SystemPermission.PROFILE_VIEW,
+      SystemPermission.PROFILE_EDIT,
+      
+      // Limited customer permissions
+      SystemPermission.CUSTOMERS_VIEW,
+      
+      // Limited request permissions
+      SystemPermission.REQUESTS_VIEW,
+      SystemPermission.REQUESTS_CREATE,
+      
+      // Limited appointment permissions
+      SystemPermission.APPOINTMENTS_VIEW,
+      SystemPermission.APPOINTMENTS_CREATE,
+    ],
+    user: [
+      // Basic permissions only
+      SystemPermission.DASHBOARD_ACCESS,
+      SystemPermission.PROFILE_VIEW,
+      SystemPermission.PROFILE_EDIT,
+    ]
+  };
+  
+  // Process each role
+  const roleResults: Record<string, { success: boolean; count: number; error?: string }> = {};
+  
+  for (const [role, permissions] of Object.entries(rolePermissions)) {
+    try {
+      // Get existing role permissions
+      const existingRolePermissions = await db.rolePermission.findMany({
+        where: { role: role.toLowerCase() },
+        select: { permissionId: true }
+      });
+      
+      const existingPermissionIds = new Set(existingRolePermissions.map(rp => rp.permissionId));
+      
+      // Get valid permission IDs for this role that don't already exist
+      const permissionsToCreate = permissions
+        .filter(code => permissionMap.has(code)) // Valid permission
+        .map(code => permissionMap.get(code)!)
+        .filter(id => !existingPermissionIds.has(id)); // Not already assigned
+      
+      if (permissionsToCreate.length > 0) {
+        // Create the role permissions in a transaction
+        await db.$transaction(async (tx) => {
+          const now = new Date();
+          
+          // Create each permission
+          for (const permissionId of permissionsToCreate) {
+            await tx.rolePermission.create({
+              data: {
+                role: role.toLowerCase(),
+                permissionId,
+                createdAt: now,
+                updatedAt: now
+              }
+            });
+          }
+        });
+      }
+      
+      roleResults[role] = {
+        success: true,
+        count: permissionsToCreate.length
+      };
+      
+      logger.info(`Created ${permissionsToCreate.length} role permissions for ${role}`);
+    } catch (error) {
+      logger.error(`Failed to set up role permissions for ${role}:`, error as Error);
+      roleResults[role] = {
+        success: false,
+        count: 0,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+  
+  // Log results
+  const successCount = Object.values(roleResults).filter(r => r.success).length;
+  logger.info(`Role permissions setup completed: ${successCount}/${Object.keys(roleResults).length} roles processed successfully`);
+}
+
+/**
  * Initialize the permission system during startup
  * This ensures:
  * 1. All system permissions are created in the database
- * 2. Admin users have the required permissions
- * 3. Permission cache is cleared on startup
+ * 2. Default role permissions are set up properly
+ * 3. Admin users have the required permissions
+ * 4. Permission cache is cleared on startup
  */
 export async function initializePermissionSystem(): Promise<{
   success: boolean;
@@ -76,7 +210,10 @@ export async function initializePermissionSystem(): Promise<{
       }
     }
     
-    // 3. Verify admin users have the correct permissions
+    // 3. Initialize default role permissions for all roles
+    await ensureRolePermissions();
+    
+    // 4. Verify admin users have the correct permissions
     // Get all users with ADMIN role
     const adminUsers = await db.user.findMany({
       where: { role: UserRole.ADMIN }

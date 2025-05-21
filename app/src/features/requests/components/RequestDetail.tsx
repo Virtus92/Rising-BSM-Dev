@@ -307,7 +307,6 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
                   request={request}
                   onClose={() => {
                     setConvertDialogOpen(false);
-                    window.location.reload();
                   }}
                 />
               </DialogContent>
@@ -334,9 +333,9 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
               <LinkToCustomerForm
                 requestId={request.id}
                 onClose={() => {
-                  setLinkDialogOpen(false);
+                setLinkDialogOpen(false);
                   window.location.reload();
-                }}
+                  }}
               />
             </DialogContent>
           </Dialog>

@@ -25,7 +25,7 @@ import {
 import { Separator } from '@/shared/components/ui/separator';
 import { ConvertToCustomerDto, RequestDetailResponseDto } from '@/domain/dtos/RequestDtos';
 import { useToast } from '@/shared/hooks/useToast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle, ExternalLink } from 'lucide-react';
 import { RequestService } from '@/features/requests/lib/services';
 import { useRouter } from 'next/navigation';
 import { CustomerType } from '@/domain/enums/CommonEnums';
@@ -66,7 +66,10 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
   onClose,
 }) => {
   const [isConverting, setIsConverting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [createdCustomerId, setCreatedCustomerId] = useState<number | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   // Default values from the request
   const defaultValues: Partial<FormValues> = {
@@ -86,8 +89,6 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
     resolver: zodResolver(formSchema),
     defaultValues,
   });
-
-  const router = useRouter();
 
   const onSubmit = async (data: FormValues) => {
     try {
@@ -122,10 +123,13 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
           variant: "success"
         });
         
-        // Close dialog and trigger refresh
-        onClose();
-        // Force a router refresh to show the updated data
-        router.refresh();
+        // Extract the customer ID from the response and save it
+        if (response.data?.customer?.id) {
+          setCreatedCustomerId(response.data.customer.id);
+        }
+        
+        // Show success dialog
+        setShowSuccess(true);
       } else {
         console.error("API Error:", response);
         toast({
@@ -145,6 +149,35 @@ export const ConvertToCustomerForm: React.FC<ConvertToCustomerFormProps> = ({
       setIsConverting(false);
     }
   };
+  
+  // Handle navigation to the created customer
+  const handleGoToCustomer = () => {
+    if (createdCustomerId) {
+      router.push(`/dashboard/customers/${createdCustomerId}`);
+    } else {
+      onClose();
+      router.refresh();
+    }
+  };
+
+  // If showing success UI
+  if (showSuccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-6 text-center">
+        <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-full mb-4">
+          <CheckCircle className="h-10 w-10 text-green-500" />
+        </div>
+        <h2 className="text-xl font-semibold mb-2">Success!</h2>
+        <p className="text-center text-slate-600 dark:text-slate-400 mb-6">
+          The request has been converted to a customer successfully.
+        </p>
+        <Button onClick={handleGoToCustomer}>
+          Go to Customer
+          <ExternalLink className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <FormProvider {...form}>

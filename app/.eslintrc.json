@@ -1,7 +1,22 @@
 {
+  "root": true,
   "extends": ["next/core-web-vitals"],
   "parserOptions": {
     "project": "./tsconfig.json"
   },
-  "root": true
+  "rules": {
+    "@next/next/no-html-link-for-pages": "off",
+    "@typescript-eslint/no-explicit-any": "warn"
+  },
+  "ignorePatterns": [
+    ".next/**/*",
+    "node_modules/**/*",
+    "**/*.js",
+    "**/*.mjs"
+  ],
+  "settings": {
+    "next": {
+      "rootDir": "src/app"
+    }
+  }
 }

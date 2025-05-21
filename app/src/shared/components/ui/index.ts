@@ -5,3 +5,4 @@ export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
 export { Badge, badgeVariants } from './badge';
 export { Skeleton } from './skeleton';
 export { Pagination } from './pagination';
+export { VisuallyHidden } from './visually-hidden';

@@ -80,18 +80,17 @@ export const GET = routeHandler(async (req: NextRequest) => {
 
   // Check cache for permission result
   const numUserId = Number(userId);
-  const cacheKey = `${numUserId}:${normalizedPermission}`;
-  const cachedResult = permissionCache.getPermissionResult(cacheKey);
+  const cachedCheck = permissionCache.getPermissionCheck(numUserId, normalizedPermission);
   
-  if (cachedResult !== undefined) {
+  if (cachedCheck !== undefined) {
     logger.debug('Permission check result from cache', {
       requestId,
       userId: numUserId,
       permission: normalizedPermission,
-      result: cachedResult
+      result: cachedCheck
     });
     
-    return formatResponse.success(cachedResult, cachedResult 
+    return formatResponse.success(cachedCheck, cachedCheck 
       ? `User has permission: ${normalizedPermission}` 
       : `User does not have permission: ${normalizedPermission}`
     );
@@ -120,7 +119,7 @@ export const GET = routeHandler(async (req: NextRequest) => {
     ]);
     
     // Cache the result
-    permissionCache.cachePermissionResult(cacheKey, hasPermission);
+    permissionCache.cachePermissionCheck(numUserId, normalizedPermission, hasPermission);
     
     // Log the check for audit purposes
     logger.debug('Permission check complete:', {
@@ -226,21 +225,20 @@ export const POST = routeHandler(async (req: NextRequest) => {
     const permissionResults = await Promise.all(
       permissions.map(async (permission) => {
         const normalizedPermission = permission.toLowerCase().trim();
-        const cacheKey = `${numUserId}:${normalizedPermission}`;
         
         // Check cache first
-        const cachedResult = permissionCache.getPermissionResult(cacheKey);
-        if (cachedResult !== undefined) {
+        const cachedCheck = permissionCache.getPermissionCheck(numUserId, normalizedPermission);
+        if (cachedCheck !== undefined) {
           logger.debug('Using cached permission result for batch check', {
             requestId,
             userId: numUserId,
             permission: normalizedPermission,
-            result: cachedResult
+            result: cachedCheck
           });
           
           return {
             permission: normalizedPermission,
-            hasPermission: cachedResult
+            hasPermission: cachedCheck
           };
         }
         
@@ -253,7 +251,7 @@ export const POST = routeHandler(async (req: NextRequest) => {
           );
           
           // Cache the result
-          permissionCache.cachePermissionResult(cacheKey, hasPermission);
+          permissionCache.cachePermissionCheck(numUserId, normalizedPermission, hasPermission);
           
           return {
             permission: normalizedPermission,
