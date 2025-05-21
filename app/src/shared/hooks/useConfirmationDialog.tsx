@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import { useToast } from './useToast';
+import React, { useCallback, useState } from 'react';
+import { toast } from 'react-hot-toast';
 
 interface ConfirmDialogOptions {
   title: string;
@@ -19,7 +19,6 @@ interface ConfirmDialogOptions {
  * In a real app, you'd likely use a modal dialog component
  */
 export function useConfirmationDialog() {
-  const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<ConfirmDialogOptions | null>(null);
 
@@ -27,17 +26,16 @@ export function useConfirmationDialog() {
     setOptions(options);
     setIsOpen(true);
     
-    // In a real app, this would display a modal
-    // For now, we'll just use toast notifications
-    toast({
-      title: options.title,
-      description: options.description,
-      variant: options.variant === 'destructive' ? 'destructive' : 'default',
-      action: (
-        <div className="flex space-x-2">
+    // Use toast with a custom component
+    toast.custom((t) => (
+      <div className="bg-white p-4 rounded shadow-lg border">
+        <h3 className="font-medium">{options.title}</h3>
+        <p className="text-sm text-gray-500 mt-1">{options.description}</p>
+        <div className="flex space-x-2 mt-3">
           <button 
-            className="px-3 py-1 bg-primary text-primary-foreground rounded"
+            className="px-3 py-1 bg-blue-500 text-white rounded"
             onClick={() => {
+              toast.dismiss(t.id);
               setIsOpen(false);
               options.onConfirm();
             }}
@@ -45,8 +43,9 @@ export function useConfirmationDialog() {
             {options.confirmText || 'Confirm'}
           </button>
           <button 
-            className="px-3 py-1 bg-secondary text-secondary-foreground rounded"
+            className="px-3 py-1 bg-gray-200 text-gray-800 rounded"
             onClick={() => {
+              toast.dismiss(t.id);
               setIsOpen(false);
               if (options.onCancel) options.onCancel();
             }}
@@ -54,9 +53,11 @@ export function useConfirmationDialog() {
             {options.cancelText || 'Cancel'}
           </button>
         </div>
-      )
+      </div>
+    ), {
+      duration: 50000, // Long duration to allow user to make a choice
     });
-  }, [toast]);
+  }, []);
 
   return {
     openConfirmDialog,
