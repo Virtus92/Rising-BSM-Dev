@@ -221,8 +221,27 @@ export class CustomerRepository extends PrismaRepository<Customer> implements IC
         ];
       }
       
-      // Add additional filters
-      if (filters.status) where.status = filters.status;
+      // Add status filter with case-insensitive handling
+      if (filters.status) {
+      // Handle both uppercase and lowercase status values for compatibility
+      where.OR = where.OR || [];
+      const statusConditions = [
+        { status: filters.status }, // Exact match
+        { status: filters.status.toLowerCase() }, // Lowercase fallback
+        { status: filters.status.toUpperCase() }  // Uppercase fallback
+      ];
+      
+      if (where.OR.length > 0) {
+        // If OR already exists, wrap in AND
+        where.AND = [
+          { OR: where.OR },
+          { OR: statusConditions }
+        ];
+        delete where.OR;
+      } else {
+        where.OR = statusConditions;
+      }
+    }
       if (filters.type) where.type = filters.type;
       if (filters.city) where.city = { contains: filters.city, mode: 'insensitive' };
       if (filters.postalCode) where.postalCode = { contains: filters.postalCode, mode: 'insensitive' };
@@ -239,9 +258,9 @@ export class CustomerRepository extends PrismaRepository<Customer> implements IC
         orderBy[filters.sortBy] = filters.sortDirection || 'desc';
       } else {
         orderBy.createdAt = 'desc';
-      }
-      
-      // Execute queries
+        }
+        
+    // Execute queries
       const [total, customers] = await Promise.all([
         // Count query for total
         this.prisma.customer.count({ where }),

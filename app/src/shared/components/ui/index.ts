@@ -5,4 +5,6 @@ export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
 export { Badge, badgeVariants } from './badge';
 export { Skeleton } from './skeleton';
 export { Pagination } from './pagination';
+export { PaginationControl, type PaginationControlProps } from './pagination-control';
+export { SimplePagination, type SimplePaginationProps } from './simple-pagination';
 export { VisuallyHidden } from './visually-hidden';

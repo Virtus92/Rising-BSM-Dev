@@ -674,11 +674,24 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
       // Force the ID to be a number for Prisma
       const prismaId: number = numericId;
 
-      this.logger.debug(`Finding appointment with ID ${numericId}`);
+      this.logger.debug(`Finding appointment with ID ${numericId} including all relations`);
       
-      // Get the appointment
+      // CRITICAL FIX: Get the appointment WITH customer relation included in the query
       const appointment = await this.prisma.appointment.findUnique({
-        where: { id: prismaId }
+        where: { id: prismaId },
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              company: true,
+              status: true,
+              type: true
+            }
+          }
+        }
       });
       
       if (!appointment) {
@@ -686,22 +699,17 @@ export class AppointmentRepository extends PrismaRepository<Appointment, number>
         return null;
       }
       
-      // Map to domain entity
+      // Map to domain entity with embedded customer data
       const appointmentEntity = this.mapToDomainEntity(appointment);
       
-      // Add customer data if a customer ID is present
-      if (appointment.customerId) {
-        const customerData = await this.loadCustomerData(appointment.customerId);
-        if (customerData) {
-          (appointmentEntity).customer = customerData;
-          // Ensure customerName is also set for consistency
-          (appointmentEntity).customerName = customerData.name;
-        }
-      }
+      // CRITICAL FIX: Customer data is now included in the appointment object from Prisma
+      // The mapToDomainEntity method will handle this automatically
       
-      // Separately load notes
+      // Load notes separately
       const notes = await this.findNotes(prismaId);
       (appointmentEntity).notes = notes;
+      
+      this.logger.debug(`Successfully loaded appointment ${numericId} with customer: ${appointmentEntity.customerName || 'None'}`);
       
       return appointmentEntity;
     } catch (error) {

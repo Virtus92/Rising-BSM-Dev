@@ -17,20 +17,46 @@ function LoginForm() {
   const [rememberMe, setRememberMe] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  const { signIn } = useAuth();
+  const { signIn, isAuthenticated, isInitialized } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get('returnUrl') || '/dashboard';
   
+  // Use logger for consistent logging
+  const logger = getLogger();
+  
+  // Force AuthService initialization on login page load to check existing tokens
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        logger.debug('Login page: Initializing AuthService to check existing tokens');
+        const { default: AuthService } = await import('@/features/auth/core/AuthService');
+        await AuthService.initialize({ force: true });
+        logger.debug('Login page: AuthService initialization complete');
+      } catch (error) {
+        logger.error('Login page: Failed to initialize AuthService', {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    };
+    
+    initializeAuth();
+  }, []);
+  
+  // Check if user is already authenticated and redirect
+  useEffect(() => {
+    // Only check after auth is initialized
+    if (isInitialized && isAuthenticated) {
+      logger.info('User already authenticated, redirecting to dashboard');
+      router.push(returnUrl);
+    }
+  }, [isInitialized, isAuthenticated, router, returnUrl]);
+  
   // Reset error message when inputs change
   useEffect(() => {
     if (errorMessage) setErrorMessage(null);
   }, [email, password, errorMessage]);
-
-  
-  // Use logger for consistent logging
-  const logger = getLogger();
   
   // Streamlined authentication verification and redirect flow
   const verifyAuthAndRedirect = async () => {

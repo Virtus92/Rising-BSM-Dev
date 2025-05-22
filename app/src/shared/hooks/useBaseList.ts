@@ -81,6 +81,7 @@ export interface UseBaseListResult<T, F extends BaseFilterParamsDto> {
   setFilters: (filters: F) => void;
   setPage: (page: number) => void;
   setLimit: (limit: number) => void;
+  setPageSize: (pageSize: number) => void;
   resetFilters: () => void;
   refetch: () => Promise<void>;
   setSort: (field: keyof F | string, direction: 'asc' | 'desc') => void;
@@ -901,6 +902,15 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
     updateFilters({ limit: limit, page: 1 } as Partial<F>);
   }, [updateFilters, state.filters.limit]);
   
+  const setPageSize = useCallback((pageSize: number) => {
+    // Skip if pageSize hasn't changed
+    if (pageSize === state.filters.limit) {
+      return;
+    }
+    
+    updateFilters({ limit: pageSize, page: 1 } as Partial<F>);
+  }, [updateFilters, state.filters.limit]);
+  
   const setSort = useCallback((field: keyof F | string, direction: 'asc' | 'desc') => {
     // Skip if sort hasn't changed
     if (field === state.filters.sortBy && direction === state.filters.sortDirection) {
@@ -1009,6 +1019,7 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
     // Convenience methods
     setPage,
     setLimit,
+    setPageSize,
     setSort,
     setSearch,
     

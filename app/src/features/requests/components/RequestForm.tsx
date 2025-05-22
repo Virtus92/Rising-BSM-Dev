@@ -21,12 +21,30 @@ interface RequestFormProps {
   onSubmit: (data: UpdateRequestDto) => Promise<RequestResponseDto | null>;
   mode: 'create' | 'edit';
   onCancel?: () => void;
+  // Modal integration props
+  isLoading?: boolean;
+  error?: string | null;
+  success?: boolean;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
 }
 
 /**
  * Form for creating and editing requests
  */
-export default function RequestForm({ initialData = {}, onSubmit, mode, onCancel }: RequestFormProps) {
+export default function RequestForm({ 
+  initialData = {}, 
+  onSubmit, 
+  mode, 
+  onCancel,
+  isLoading: externalIsLoading,
+  error: externalError,
+  success: externalSuccess,
+  title,
+  description,
+  submitLabel
+}: RequestFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [hasChanges, setHasChanges] = useState(false);
@@ -106,6 +124,13 @@ export default function RequestForm({ initialData = {}, onSubmit, mode, onCancel
     checkForChanges();
   };
 
+  // Use external states when available, fallback to internal states
+  const isFormLoading = externalIsLoading ?? submitting;
+  const formError = externalError ?? (Object.keys(errors).length > 0 ? Object.values(errors)[0] : null);
+  const formSuccess = externalSuccess ?? false;
+  const formTitle = title ?? (mode === 'create' ? 'Create New Request' : 'Edit Request');
+  const formSubmitLabel = submitLabel ?? (mode === 'create' ? 'Create Request' : 'Update Request');
+
   // Function to cancel and go back
   const handleCancel = () => {
     if (hasChanges) {
@@ -149,16 +174,19 @@ export default function RequestForm({ initialData = {}, onSubmit, mode, onCancel
             <ArrowLeft className="h-5 w-5" />
           </button>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {mode === 'create' ? 'Create New Request' : 'Edit Request'}
+            {formTitle}
           </h2>
+          {description && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
+          )}
         </div>
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={submitting}
+          disabled={isFormLoading}
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? (
+          {isFormLoading ? (
             <>
               <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
               Saving...
@@ -166,7 +194,7 @@ export default function RequestForm({ initialData = {}, onSubmit, mode, onCancel
           ) : (
             <>
               <Save className="h-4 w-4 mr-2" />
-              Save
+              {formSubmitLabel}
             </>
           )}
         </button>
@@ -174,6 +202,18 @@ export default function RequestForm({ initialData = {}, onSubmit, mode, onCancel
 
       {/* Form */}
       <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="p-6">
+        {/* Error and Success States */}
+        {formError && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 p-4 rounded-md mb-6">
+            {formError}
+          </div>
+        )}
+        
+        {formSuccess && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 p-4 rounded-md mb-6">
+            Request {mode === 'create' ? 'created' : 'updated'} successfully!
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Request Information</h3>

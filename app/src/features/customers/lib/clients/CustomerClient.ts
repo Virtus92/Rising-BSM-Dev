@@ -68,9 +68,12 @@ export class CustomerClient {
       
       // Build URL and make the request
       const queryString = queryParams.toString();
-      const url = `${CUSTOMERS_API_URL}${queryString ? `?${queryString}` : ''}`;
+      const url = `/api/customers${queryString ? `?${queryString}` : ''}`;
       
-      return await ApiClient.get(url);
+    
+    const response = await ApiClient.get(url);
+    
+    return response;
     } catch (error: unknown) {
       console.error('Failed to fetch customers:', error as Error);
       throw new ApiRequestError(

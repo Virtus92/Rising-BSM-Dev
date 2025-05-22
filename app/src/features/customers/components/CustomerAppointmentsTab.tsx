@@ -1,10 +1,40 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, Clock, MapPin, AlertCircle, Edit, Trash2, Plus, Loader2, User, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { 
+  Calendar, 
+  Clock, 
+  MapPin, 
+  AlertCircle, 
+  Edit, 
+  Trash2, 
+  Plus, 
+  Loader2, 
+  User, 
+  ChevronDown, 
+  CheckCircle2,
+  RefreshCw,
+  ExternalLink
+} from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Badge } from '@/shared/components/ui/badge';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { AppointmentStatus } from '@/domain/enums/CommonEnums';
+import { formatDate } from '@/shared/utils/date-utils';
+import { AppointmentService } from '@/features/appointments/lib/services';
+import { AppointmentClient } from '@/features/appointments/lib/clients';
+import { AppointmentResponseDto, CreateAppointmentDto, UpdateAppointmentDto } from '@/domain/dtos/AppointmentDtos';
+import { useToast } from '@/shared/hooks/useToast';
+import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
+import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
+import { PermissionGuard } from '@/shared/components/PermissionGuard';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { AppointmentModalForm } from '@/features/appointments/components/AppointmentModalForm';
+import { FormModal, ConfirmationModal } from '@/shared/components/BaseModal';
+import { useModal } from '@/shared/hooks/useModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,180 +43,234 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel
 } from '@/shared/components/ui/dropdown-menu';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { AppointmentStatus } from '@/domain/enums/CommonEnums';
-import { formatDate } from '@/features/notifications/utils/date-utils';
-import { AppointmentService } from '@/features/appointments/lib/services';
-import { AppointmentResponseDto } from '@/domain/dtos/AppointmentDtos';
-
-// Create an instance of AppointmentService
-const appointmentService = new AppointmentService();
-import { useToast } from '@/shared/hooks/useToast';
-import { Skeleton } from '@/shared/components/ui/skeleton';
-import { PermissionGuard } from '@/shared/components/PermissionGuard';
-import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/shared/components/ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/shared/components/ui/dialog';
-import { Input } from '@/shared/components/ui/input';
-import { Label } from '@/shared/components/ui/label';
-import { Textarea } from '@/shared/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/shared/components/ui/select';
-import { format } from 'date-fns';
 
 interface CustomerAppointmentsTabProps {
   customerId: number;
 }
 
-// Extended interface to include additional properties found in API responses but not in the official DTO
-interface ExtendedAppointmentResponseDto extends AppointmentResponseDto {
-  processorName?: string; // Name of the processor/assignee
-}
-
 /**
- * Component to display and manage appointments for a specific customer
+ * CustomerAppointmentsTab - Fixed modal rendering issue
+ * Ensures modals are always rendered regardless of appointments state
  */
 export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = ({ customerId }) => {
-  const [appointments, setAppointments] = useState<ExtendedAppointmentResponseDto[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentResponseDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [changingStatusId, setChangingStatusId] = useState<number | null>(null);
-  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
-  const [isAppointmentEditModalOpen, setIsAppointmentEditModalOpen] = useState(false);
-  const [currentEditAppointment, setCurrentEditAppointment] = useState<number | null>(null);
-  const [isCreatingAppointment, setIsCreatingAppointment] = useState(false);
-  const [isEditingAppointment, setIsEditingAppointment] = useState(false);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [appointmentForm, setAppointmentForm] = useState({
-    title: '',
-    appointmentDate: format(new Date(), 'yyyy-MM-dd'),
-    appointmentTime: format(new Date(), 'HH:mm'),
-    duration: 60,
-    location: '',
-    description: '',
-    status: AppointmentStatus.PLANNED,
-  });
+  const [appointmentService] = useState(() => new AppointmentService());
+  
+  // Separate modal states to avoid conflicts with parent component modals
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'delete' | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentResponseDto | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalSuccess, setModalSuccess] = useState(false);
+  
+  // Use individual modal for better control
+  const modal = useModal();
+  
   const { toast } = useToast();
   const router = useRouter();
+  
+  // Get permissions
+  const { hasPermission } = usePermissions();
+  const canCreateAppointments = hasPermission(API_PERMISSIONS.APPOINTMENTS.CREATE);
+  const canEditAppointments = hasPermission(API_PERMISSIONS.APPOINTMENTS.UPDATE);
+  const canDeleteAppointments = hasPermission(API_PERMISSIONS.APPOINTMENTS.DELETE);
 
   // Fetch customer appointments
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // Store the API call in a variable first before awaiting it
-        // This prevents issues with Function.prototype.apply on Promise objects
-        const apiCall = appointmentService.findByCriteria({
-          customerId: customerId
-        });
-        
-        // Now await the promise
-        const result = await apiCall;
-        
-        // Handle paginated response format
-        if (result && typeof result === 'object') {
-          // Case 1: Response is an array directly (which is the expected format from findByCriteria)
-          if (Array.isArray(result)) {
-            // Filter to ensure only appointments for this customer
-            const filteredAppointments = result.filter((appointment: ExtendedAppointmentResponseDto) => 
-              appointment.customerId === customerId
-            );
-            setAppointments(filteredAppointments);
-          } 
-          // Case 2: Response is an object with a data property that is an array
-          else if (result && typeof result === 'object' && 'data' in result) {
-            // Use type assertion to help TypeScript understand the structure
-            const responseWithData = result as { data: ExtendedAppointmentResponseDto[] };
-            
-            if (Array.isArray(responseWithData.data)) {
-              // Case 2: Response is a paginated object with data array
-              const filteredAppointments = responseWithData.data.filter((appointment: ExtendedAppointmentResponseDto) => 
-                appointment.customerId === customerId
-              );
-              setAppointments(filteredAppointments);
-            }
-          }
-          // Case 3: Unexpected response format
-          else {
-            console.warn('Unexpected appointment response format:', result);
-            setAppointments([]);
-          }
-        } else {
-          console.warn('Invalid appointments response:', result);
-          setAppointments([]);
-        }
-      } catch (err) {
-        setError('Failed to load appointments');
-        console.error('Error fetching appointments:', err);
-        setAppointments([]); // Set empty array on error
-      } finally {
-        setIsLoading(false);
+  const fetchAppointments = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const result = await appointmentService.findByCriteria({
+        customerId: customerId
+      });
+      
+      if (Array.isArray(result)) {
+        setAppointments(result);
+      } else {
+        setAppointments([]);
       }
-    };
+    } catch (err) {
+      setError('Failed to load appointments');
+      console.error('Error fetching appointments:', err);
+      setAppointments([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [customerId, appointmentService]);
 
+  useEffect(() => {
     if (customerId) {
       fetchAppointments();
     }
-  }, [customerId]);
+  }, [customerId, fetchAppointments]);
+
+  // Handle appointment form submission
+  const handleAppointmentSubmit = useCallback(async (data: CreateAppointmentDto | UpdateAppointmentDto) => {
+    setModalError(null);
+    setModalSuccess(false);
+    setIsSubmitting(true);
+    
+    try {
+      let response;
+      
+      if (modalMode === 'create') {
+        const createData = { ...data, customerId } as CreateAppointmentDto;
+        response = await AppointmentClient.createAppointment(createData);
+      } else if (modalMode === 'edit' && selectedAppointment) {
+        response = await AppointmentClient.updateAppointment(selectedAppointment.id, data as UpdateAppointmentDto);
+      }
+      
+      if (response?.success) {
+        setModalSuccess(true);
+        setModalError(null);
+        
+        toast({
+          title: 'Success',
+          description: `Appointment ${modalMode === 'create' ? 'created' : 'updated'} successfully`,
+          variant: 'success'
+        });
+        
+        // Refresh the appointments list
+        await fetchAppointments();
+        
+        // Close modal after a delay
+        setTimeout(() => {
+          closeModal();
+          // Redirect to the appointment detail page for new appointments
+          if (modalMode === 'create' && response.data?.id) {
+            router.push(`/dashboard/appointments/${response.data.id}`);
+          }
+        }, 1500);
+        
+        return response.data || null;
+      } else {
+        setModalError(`Failed to ${modalMode} appointment`);
+        setModalSuccess(false);
+        return null;
+      }
+    } catch (err) {
+      console.error(`Error ${modalMode}ing appointment:`, err);
+      setModalError('An unexpected error occurred');
+      setModalSuccess(false);
+      return null;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [modalMode, selectedAppointment, customerId, toast, router, fetchAppointments]);
+
+  // Handle appointment deletion
+  const handleAppointmentDelete = useCallback(async () => {
+    if (!selectedAppointment) return;
+    
+    setModalError(null);
+    setIsSubmitting(true);
+    
+    try {
+      const response = await AppointmentClient.deleteAppointment(selectedAppointment.id);
+      
+      if (response.success) {
+        toast({
+          title: 'Success',
+          description: `Appointment "${selectedAppointment.title}" has been deleted`,
+          variant: 'success'
+        });
+        
+        // Refresh the appointments list
+        await fetchAppointments();
+        closeModal();
+      } else {
+        setModalError('Failed to delete appointment');
+      }
+    } catch (err) {
+      console.error('Error deleting appointment:', err);
+      setModalError('An unexpected error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [selectedAppointment, toast, fetchAppointments]);
+
+  // Open modal functions
+  const openCreateModal = useCallback(() => {
+    console.log('Opening create modal for customer:', customerId);
+    setModalMode('create');
+    setSelectedAppointment(null);
+    setModalError(null);
+    setModalSuccess(false);
+    setIsSubmitting(false);
+    modal.openModal();
+  }, [modal, customerId]);
+
+  const openEditModal = useCallback((appointment: AppointmentResponseDto) => {
+    setModalMode('edit');
+    setSelectedAppointment(appointment);
+    setModalError(null);
+    setModalSuccess(false);
+    setIsSubmitting(false);
+    modal.openModal();
+  }, [modal]);
+
+  const openDeleteModal = useCallback((appointment: AppointmentResponseDto) => {
+    setModalMode('delete');
+    setSelectedAppointment(appointment);
+    setModalError(null);
+    setModalSuccess(false);
+    setIsSubmitting(false);
+    modal.openModal();
+  }, [modal]);
+
+  // Close modal function
+  const closeModal = useCallback(() => {
+    modal.closeModal();
+    setTimeout(() => {
+      setModalMode(null);
+      setSelectedAppointment(null);
+      setModalError(null);
+      setModalSuccess(false);
+      setIsSubmitting(false);
+    }, 150);
+  }, [modal]);
+
+  // Handle list actions
+  const handleListAction = useCallback((action: string, appointment?: AppointmentResponseDto) => {
+    console.log('Handle list action called:', action, 'for customer:', customerId);
+    switch (action) {
+      case 'create':
+        openCreateModal();
+        break;
+      case 'edit':
+        if (appointment && canEditAppointments) {
+          openEditModal(appointment);
+        }
+        break;
+      case 'view':
+        if (appointment) {
+          router.push(`/dashboard/appointments/${appointment.id}`);
+        }
+        break;
+      case 'delete':
+        if (appointment && canDeleteAppointments) {
+          openDeleteModal(appointment);
+        }
+        break;
+    }
+  }, [openCreateModal, openEditModal, openDeleteModal, canEditAppointments, canDeleteAppointments, router, customerId]);
 
   // Handle appointment status change
   const handleStatusChange = async (id: number, newStatus: AppointmentStatus) => {
     try {
       setChangingStatusId(id);
       
-      // First try using updateStatus with more appropriate endpoint
+      let response;
       try {
-        const response = await appointmentService.updateStatus(id, newStatus);
-        
-        if (response) {
-          // Update local state
-          setAppointments(appointments.map(appointment => 
-            appointment.id === id 
-              ? { ...appointment, status: newStatus } 
-              : appointment
-          ));
-          
-          toast({
-            title: 'Status updated',
-            description: `Appointment status changed to ${newStatus}`,
-            variant: 'success'
-          });
-          return;
-        }
+        response = await appointmentService.updateStatus(id, newStatus);
       } catch (error) {
-        console.warn('Error with updateStatus, falling back to update:', error as Error);
-        // Continue to fallback
+        console.warn('Error with updateStatus, falling back to update:', error);
+        response = await appointmentService.update(id, { status: newStatus });
       }
-      
-      // Fall back to regular update method if updateStatus fails
-      const response = await appointmentService.update(id, { status: newStatus as AppointmentStatus });
       
       if (response) {
         // Update local state
@@ -209,7 +293,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
         });
       }
     } catch (error) {
-      console.error('Error updating appointment status:', error as Error);
+      console.error('Error updating appointment status:', error);
       toast({
         title: 'Update failed',
         description: 'An error occurred while updating the status',
@@ -220,844 +304,370 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
     }
   };
 
-  // Handle appointment deletion
-  const handleDelete = async (id: number) => {
-    try {
-      setIsDeleting(true);
-      const response = await appointmentService.delete(id);
-      
-      if (response) {
-        // Remove deleted appointment from state
-        setAppointments(appointments.filter(appointment => appointment.id !== id));
-        
-        toast({
-          title: 'Appointment deleted',
-          description: 'The appointment has been successfully deleted',
-          variant: 'success'
-        });
-      } else {
-        toast({
-          title: 'Delete failed',
-          description: 'Failed to delete appointment',
-          variant: 'error'
-        });
-      }
-    } catch (error) {
-      console.error('Error deleting appointment:', error as Error);
-      toast({
-        title: 'Delete failed',
-        description: 'An error occurred while deleting the appointment',
-        variant: 'error'
-      });
-    } finally {
-      setIsDeleting(false);
-      setDeleteId(null);
-    }
-  };
-
   // Render status badge with appropriate color
   const renderStatusBadge = (status: string) => {
-    const baseClasses = "text-xs font-medium px-2.5 py-0.5 rounded-full";
-    
     switch (status) {
       case AppointmentStatus.PLANNED:
-        return <span className={`${baseClasses} bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300`}>Planned</span>;
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Planned</Badge>;
       case AppointmentStatus.CONFIRMED:
-        return <span className={`${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300`}>Confirmed</span>;
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Confirmed</Badge>;
       case AppointmentStatus.COMPLETED:
-        return <span className={`${baseClasses} bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300`}>Completed</span>;
+        return <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">Completed</Badge>;
       case AppointmentStatus.CANCELLED:
-        return <span className={`${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300`}>Cancelled</span>;
+        return <Badge variant="destructive">Cancelled</Badge>;
       case AppointmentStatus.RESCHEDULED:
-        return <span className={`${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300`}>Rescheduled</span>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">Rescheduled</Badge>;
       default:
-        return <span className={`${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300`}>{status}</span>;
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i} className="mb-4">
-            <CardHeader className="pb-2">
-              <Skeleton className="h-6 w-1/3" />
-              <Skeleton className="h-4 w-1/4 mt-1" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
+  // Get modal title and description
+  const getModalInfo = () => {
+    switch (modalMode) {
+      case 'create':
+        return {
+          title: 'Create New Appointment',
+          description: 'Schedule a new appointment for this customer'
+        };
+      case 'edit':
+        return {
+          title: 'Edit Appointment',
+          description: `Update appointment: ${selectedAppointment?.title}`
+        };
+      case 'delete':
+        return {
+          title: 'Delete Appointment',
+          description: `Are you sure you want to delete "${selectedAppointment?.title}"? This action cannot be undone.`
+        };
+      default:
+        return {
+          title: 'Appointment',
+          description: ''
+        };
+    }
+  };
 
-  // Error state
-  if (error) {
-    return (
-      <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4 mb-4">
-        <div className="flex">
-          <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
-          <div>
-            <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
-              Error loading appointments
-            </h3>
-            <div className="mt-2 text-sm text-red-700 dark:text-red-400">
-              <p>{error}</p>
-            </div>
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.location.reload()}
-              >
-                Try again
-              </Button>
+  const modalInfo = getModalInfo();
+
+  // Render content based on state - but always render modals at the end
+  const renderContent = () => {
+    // Loading state
+    if (isLoading) {
+      return (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-9 w-32" />
+          </div>
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-6 w-1/3" />
+                <Skeleton className="h-4 w-1/4 mt-1" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      );
+    }
+
+    // Error state
+    if (error) {
+      return (
+        <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
+          <div className="flex">
+            <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
+                Error loading appointments
+              </h3>
+              <div className="mt-2 text-sm text-red-700 dark:text-red-400">
+                <p>{error}</p>
+              </div>
+              <div className="mt-4 flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchAppointments}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try again
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/dashboard/appointments')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View all appointments
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  // Empty state
-  if (appointments.length === 0) {
-    return (
-      <div className="text-center py-10">
-        <Calendar className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-          No appointments yet
-        </h3>
-        <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-          This customer doesn't have any appointments scheduled. Create one to track your meetings.
-        </p>
-        <PermissionGuard permission={SystemPermission.APPOINTMENTS_CREATE}>
-          <Button
-            onClick={() => setIsAppointmentModalOpen(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create new appointment
-          </Button>
-        </PermissionGuard>
-      </div>
-    );
-  }
+    // Empty state
+    if (appointments.length === 0) {
+      return (
+        <div className="text-center py-10">
+          <Calendar className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            No appointments yet
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
+            This customer doesn't have any appointments scheduled. Create one to track your meetings.
+          </p>
+          <div className="flex justify-center space-x-3">
+            <PermissionGuard permission={SystemPermission.APPOINTMENTS_CREATE}>
+              <Button
+                onClick={() => {
+                  console.log('Empty state create button clicked for customer:', customerId);
+                  handleListAction('create');
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create appointment
+              </Button>
+            </PermissionGuard>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/dashboard/appointments')}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              View all appointments
+            </Button>
+          </div>
+        </div>
+      );
+    }
 
-  // Sort appointments by date (most recent first)
-  // First ensure appointments is an array and has items before attempting to sort
-  const sortedAppointments = Array.isArray(appointments) && appointments.length > 0 
-    ? [...appointments].sort((a, b) => {
-        return new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime();
-      })
-    : [];
-
-  // Form validation and submission
-  const validateAppointmentForm = () => {
-    const errors: Record<string, string> = {};
-    
-    if (!appointmentForm.title?.trim()) {
-      errors.title = 'Title is required';
-    }
-    
-    if (!appointmentForm.appointmentDate) {
-      errors.appointmentDate = 'Date is required';
-    }
-    
-    if (!appointmentForm.appointmentTime) {
-      errors.appointmentTime = 'Time is required';
-    }
-    
-    if (!appointmentForm.duration) {
-      errors.duration = 'Duration is required';
-    } else if (appointmentForm.duration < 15) {
-      errors.duration = 'Duration must be at least 15 minutes';
-    }
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleAppointmentInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    
-    if (name === 'duration') {
-      const numericValue = parseInt(value, 10);
-      setAppointmentForm(prev => ({
-        ...prev,
-        [name]: isNaN(numericValue) ? 0 : numericValue
-      }));
-    } else {
-      setAppointmentForm(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
-    
-    // Clear validation error
-    if (formErrors[name]) {
-      setFormErrors(prev => {
-        const updated = { ...prev };
-        delete updated[name];
-        return updated;
-      });
-    }
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setAppointmentForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear validation error
-    if (formErrors[name]) {
-      setFormErrors(prev => {
-        const updated = { ...prev };
-        delete updated[name];
-        return updated;
-      });
-    }
-  };
-
-  const handleCreateAppointment = async () => {
-    if (!validateAppointmentForm()) {
-      return;
-    }
-    
-    setIsCreatingAppointment(true);
-    
-    try {
-      const formData = {
-        ...appointmentForm,
-        customerId: customerId
-      };
-      
-      const response = await appointmentService.create(formData);
-      
-      if (response) {
-        toast({
-          title: 'Success',
-          description: 'Appointment created successfully',
-          variant: 'success'
-        });
-        
-        // Add the new appointment to the list
-        setAppointments([response, ...appointments]);
-        
-        // Close the modal and reset form
-        setIsAppointmentModalOpen(false);
-        setAppointmentForm({
-          title: '',
-          appointmentDate: format(new Date(), 'yyyy-MM-dd'),
-          appointmentTime: format(new Date(), 'HH:mm'),
-          duration: 60,
-          location: '',
-          description: '',
-          status: AppointmentStatus.PLANNED,
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to create appointment',
-          variant: 'error'
-        });
-      }
-    } catch (error) {
-      console.error('Error creating appointment:', error as Error);
-      toast({
-        title: 'Error',
-        description: 'An error occurred while creating the appointment',
-        variant: 'error'
-      });
-    } finally {
-      setIsCreatingAppointment(false);
-    }
-  };
-  
-  const handleEditAppointment = async () => {
-    if (!validateAppointmentForm() || !currentEditAppointment) {
-      return;
-    }
-    
-    setIsEditingAppointment(true);
-    
-    try {
-      // Format the date and time properly for the API
-      const dateTime = `${appointmentForm.appointmentDate}T${appointmentForm.appointmentTime}`;
-      
-      const formData = {
-        title: appointmentForm.title,
-        appointmentDate: dateTime,
-        duration: appointmentForm.duration,
-        location: appointmentForm.location,
-        description: appointmentForm.description,
-        status: appointmentForm.status,
-        customerId: customerId
-      };
-      
-      const response = await appointmentService.update(currentEditAppointment, formData);
-      
-      if (response) {
-        toast({
-          title: 'Success',
-          description: 'Appointment updated successfully',
-          variant: 'success'
-        });
-        
-        // Update the appointment in the list
-        setAppointments(appointments.map(appointment => 
-          appointment.id === currentEditAppointment 
-            ? response
-            : appointment
-        ));
-        
-        // Close the modal
-        setIsAppointmentEditModalOpen(false);
-        setCurrentEditAppointment(null);
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to update appointment',
-          variant: 'error'
-        });
-      }
-    } catch (error) {
-      console.error('Error updating appointment:', error as Error);
-      toast({
-        title: 'Error',
-        description: 'An error occurred while updating the appointment',
-        variant: 'error'
-      });
-    } finally {
-      setIsEditingAppointment(false);
-    }
-  };
-  
-  const handleOpenEditModal = (appointment: ExtendedAppointmentResponseDto) => {
-    // Parse the appointment date and time
-    const appointmentDate = new Date(appointment.appointmentDate);
-    
-    // Set the form data
-    setAppointmentForm({
-      title: appointment.title,
-      appointmentDate: format(appointmentDate, 'yyyy-MM-dd'),
-      appointmentTime: format(appointmentDate, 'HH:mm'),
-      duration: appointment.duration || 60,
-      location: appointment.location || '',
-      description: appointment.description || '',
-      status: appointment.status || AppointmentStatus.PLANNED,
+    // Sort appointments by date (most recent first)
+    const sortedAppointments = [...appointments].sort((a, b) => {
+      return new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime();
     });
-    
-    // Set the current appointment ID
-    setCurrentEditAppointment(appointment.id);
-    
-    // Open the edit modal
-    setIsAppointmentEditModalOpen(true);
-  };
 
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">
-          Appointments ({appointments.length})
-        </h2>
-        <PermissionGuard permission={SystemPermission.APPOINTMENTS_CREATE}>
-          <Button
-            size="sm"
-            onClick={() => setIsAppointmentModalOpen(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Appointment
-          </Button>
-        </PermissionGuard>
-      </div>
-      
-      {/* Appointment Creation Modal */}
-      <Dialog open={isAppointmentModalOpen} onOpenChange={setIsAppointmentModalOpen}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Create New Appointment</DialogTitle>
-            <DialogDescription>
-              Schedule a new appointment for this customer.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">
-                Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="title"
-                name="title"
-                value={appointmentForm.title}
-                onChange={handleAppointmentInputChange}
-                placeholder="Appointment title"
-                disabled={isCreatingAppointment}
-              />
-              {formErrors.title && (
-                <p className="text-red-500 text-sm mt-1">{formErrors.title}</p>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="appointmentDate">
-                  Date <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-                  <Input
-                    id="appointmentDate"
-                    name="appointmentDate"
-                    type="date"
-                    value={appointmentForm.appointmentDate}
-                    onChange={handleAppointmentInputChange}
-                    className="pl-10"
-                    disabled={isCreatingAppointment}
-                  />
-                </div>
-                {formErrors.appointmentDate && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.appointmentDate}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="appointmentTime">
-                  Time <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-                  <Input
-                    id="appointmentTime"
-                    name="appointmentTime"
-                    type="time"
-                    value={appointmentForm.appointmentTime}
-                    onChange={handleAppointmentInputChange}
-                    className="pl-10"
-                    disabled={isCreatingAppointment}
-                  />
-                </div>
-                {formErrors.appointmentTime && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.appointmentTime}</p>
-                )}
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="duration">
-                  Duration (minutes) <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="duration"
-                  name="duration"
-                  type="number"
-                  min="15"
-                  step="15"
-                  value={appointmentForm.duration}
-                  onChange={handleAppointmentInputChange}
-                  disabled={isCreatingAppointment}
-                />
-                {formErrors.duration && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.duration}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={appointmentForm.status}
-                  onValueChange={(value) => handleSelectChange('status', value)}
-                  disabled={isCreatingAppointment}
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.values(AppointmentStatus).map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                name="location"
-                value={appointmentForm.location}
-                onChange={handleAppointmentInputChange}
-                placeholder="Appointment location"
-                disabled={isCreatingAppointment}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={appointmentForm.description}
-                onChange={handleAppointmentInputChange}
-                placeholder="Appointment details or notes"
-                rows={3}
-                disabled={isCreatingAppointment}
-              />
-            </div>
+    // Appointments list
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-lg font-semibold">
+              Appointments ({appointments.length})
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Manage appointments for this customer
+            </p>
           </div>
-          
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsAppointmentModalOpen(false)}
-              disabled={isCreatingAppointment}
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchAppointments}
+              disabled={isLoading}
             >
-              Cancel
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
             </Button>
-            <Button 
-              onClick={handleCreateAppointment}
-              disabled={isCreatingAppointment}
-            >
-              {isCreatingAppointment ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Create Appointment
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Appointment Edit Modal */}
-      <Dialog open={isAppointmentEditModalOpen} onOpenChange={setIsAppointmentEditModalOpen}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Edit Appointment</DialogTitle>
-            <DialogDescription>
-              Update the details of this appointment.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">
-                Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="title"
-                name="title"
-                value={appointmentForm.title}
-                onChange={handleAppointmentInputChange}
-                placeholder="Appointment title"
-                disabled={isEditingAppointment}
-              />
-              {formErrors.title && (
-                <p className="text-red-500 text-sm mt-1">{formErrors.title}</p>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="appointmentDate">
-                  Date <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-                  <Input
-                    id="appointmentDate"
-                    name="appointmentDate"
-                    type="date"
-                    value={appointmentForm.appointmentDate}
-                    onChange={handleAppointmentInputChange}
-                    className="pl-10"
-                    disabled={isEditingAppointment}
-                  />
-                </div>
-                {formErrors.appointmentDate && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.appointmentDate}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="appointmentTime">
-                  Time <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-                  <Input
-                    id="appointmentTime"
-                    name="appointmentTime"
-                    type="time"
-                    value={appointmentForm.appointmentTime}
-                    onChange={handleAppointmentInputChange}
-                    className="pl-10"
-                    disabled={isEditingAppointment}
-                  />
-                </div>
-                {formErrors.appointmentTime && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.appointmentTime}</p>
-                )}
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="duration">
-                  Duration (minutes) <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="duration"
-                  name="duration"
-                  type="number"
-                  min="15"
-                  step="15"
-                  value={appointmentForm.duration}
-                  onChange={handleAppointmentInputChange}
-                  disabled={isEditingAppointment}
-                />
-                {formErrors.duration && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.duration}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={appointmentForm.status}
-                  onValueChange={(value) => handleSelectChange('status', value)}
-                  disabled={isEditingAppointment}
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.values(AppointmentStatus).map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                name="location"
-                value={appointmentForm.location}
-                onChange={handleAppointmentInputChange}
-                placeholder="Appointment location"
-                disabled={isEditingAppointment}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={appointmentForm.description}
-                onChange={handleAppointmentInputChange}
-                placeholder="Appointment details or notes"
-                rows={3}
-                disabled={isEditingAppointment}
-              />
-            </div>
+            <PermissionGuard permission={SystemPermission.APPOINTMENTS_CREATE}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  console.log('Header create button clicked for customer:', customerId);
+                  handleListAction('create');
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Appointment
+              </Button>
+            </PermissionGuard>
           </div>
-          
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setIsAppointmentEditModalOpen(false);
-                setCurrentEditAppointment(null);
-              }}
-              disabled={isEditingAppointment}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleEditAppointment}
-              disabled={isEditingAppointment}
-            >
-              {isEditingAppointment ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                <>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Update Appointment
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <div className="space-y-4">
-        {sortedAppointments.map((appointment) => (
-          <Card key={appointment.id} className="mb-4">
-            <CardHeader className="pb-2 flex flex-row items-start justify-between">
-              <div>
-                <CardTitle className="text-lg">
-                  <Link 
-                    href={`/dashboard/appointments/${appointment.id}`}
-                    className="hover:text-primary hover:underline"
-                  >
-                    {appointment.title}
-                  </Link>
-                </CardTitle>
-                <CardDescription>
-                  {appointment.description && appointment.description.length > 60
-                    ? `${appointment.description.substring(0, 60)}...`
-                    : appointment.description}
-                </CardDescription>
-              </div>
-              <div className="flex flex-col items-end space-y-2">
-                {renderStatusBadge(appointment.status)}
-                <PermissionGuard permission={SystemPermission.APPOINTMENTS_EDIT}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-7 px-2 text-xs mt-1"
-                        disabled={changingStatusId === appointment.id}
+        </div>
+        
+        <div className="space-y-4">
+          {sortedAppointments.map((appointment) => (
+            <Card key={appointment.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">
+                      <Link 
+                        href={`/dashboard/appointments/${appointment.id}`}
+                        className="hover:text-primary hover:underline"
                       >
-                        {changingStatusId === appointment.id ? (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                          <ChevronDown className="h-3 w-3 mr-1" />
-                        )}
-                        Change Status
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      
-                      {Object.values(AppointmentStatus).map((status) => (
-                        <DropdownMenuItem
-                          key={status}
-                          disabled={appointment.status === status}
-                          className={appointment.status === status ? 'bg-muted cursor-default' : ''}
-                          onClick={() => appointment.status !== status && handleStatusChange(appointment.id, status)}
-                        >
-                          {appointment.status === status && (
-                            <CheckCircle2 className="h-4 w-4 mr-2 text-primary" />
-                          )}
-                          <span className={appointment.status === status ? 'font-medium ml-6' : ''}>
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
-                          </span>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </PermissionGuard>
-              </div>
-            </CardHeader>
-            <CardContent className="pb-2">
-              <div className="grid gap-2">
-                <div className="flex items-center text-sm">
-                  <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                  <span>
-                    {formatDate(new Date(appointment.appointmentDate))}
-                  </span>
-                  {appointment.duration && (
-                    <>
-                      <Clock className="h-4 w-4 ml-4 mr-2 text-gray-500" />
-                      <span>{appointment.duration} minutes</span>
-                    </>
+                        {appointment.title}
+                      </Link>
+                    </CardTitle>
+                    {appointment.description && (
+                      <CardDescription className="mt-1">
+                        {appointment.description.length > 80
+                          ? `${appointment.description.substring(0, 80)}...`
+                          : appointment.description}
+                      </CardDescription>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end space-y-2">
+                    {renderStatusBadge(appointment.status)}
+                    <PermissionGuard permission={SystemPermission.APPOINTMENTS_EDIT}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 px-3"
+                            disabled={changingStatusId === appointment.id}
+                          >
+                            {changingStatusId === appointment.id ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <ChevronDown className="h-3 w-3 mr-1" />
+                            )}
+                            Actions
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          
+                          {Object.values(AppointmentStatus).map((status) => (
+                            <DropdownMenuItem
+                              key={status}
+                              disabled={appointment.status === status}
+                              className={appointment.status === status ? 'bg-muted cursor-default' : ''}
+                              onClick={() => appointment.status !== status && handleStatusChange(appointment.id, status)}
+                            >
+                              {appointment.status === status && (
+                                <CheckCircle2 className="h-4 w-4 mr-2 text-primary" />
+                              )}
+                              <span className={appointment.status === status ? 'font-medium ml-6' : ''}>
+                                {status.charAt(0).toUpperCase() + status.slice(1)}
+                              </span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </PermissionGuard>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="pb-3">
+                <div className="grid gap-3">
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    <span>{formatDate(new Date(appointment.appointmentDate))}</span>
+                    {appointment.duration && (
+                      <>
+                        <Clock className="h-4 w-4 ml-4 mr-2" />
+                        <span>{appointment.duration} minutes</span>
+                      </>
+                    )}
+                  </div>
+                  
+                  {appointment.location && (
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4 mr-2" />
+                      <span>{appointment.location}</span>
+                    </div>
                   )}
                 </div>
-                {appointment.location && (
-                  <div className="flex items-center text-sm">
-                    <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                    <span>{appointment.location}</span>
-                  </div>
-                )}
-                {appointment.processorName && (
-                  <div className="flex items-center text-sm">
-                    <User className="h-4 w-4 mr-2 text-gray-500" />
-                    <span>Assigned to: {appointment.processorName}</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end pt-2 items-center p-6">
-              <div className="flex space-x-2">
-                <PermissionGuard permission={SystemPermission.APPOINTMENTS_EDIT}>
+              </CardContent>
+              
+              <CardFooter className="pt-3 border-t">
+                <div className="flex justify-end space-x-2 w-full">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 px-2 text-gray-500"
-                    onClick={() => handleOpenEditModal(appointment)}
+                    onClick={() => router.push(`/dashboard/appointments/${appointment.id}`)}
                   >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
+                    View Details
                   </Button>
-                </PermissionGuard>
-                <PermissionGuard permission={SystemPermission.APPOINTMENTS_DELETE}>
-                  <AlertDialog open={deleteId === appointment.id} onOpenChange={(open) => !open && setDeleteId(null)}>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
-                        onClick={() => setDeleteId(appointment.id)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently delete this appointment. This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-red-600 hover:bg-red-700 text-white"
-                          onClick={() => handleDelete(appointment.id)}
-                          disabled={isDeleting}
-                        >
-                          {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </PermissionGuard>
-              </div>
-            </CardFooter>
-          </Card>
-        ))}
+                  <PermissionGuard permission={SystemPermission.APPOINTMENTS_EDIT}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleListAction('edit', appointment)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  </PermissionGuard>
+                  <PermissionGuard permission={SystemPermission.APPOINTMENTS_DELETE}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                      onClick={() => handleListAction('delete', appointment)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </PermissionGuard>
+                </div>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
       </div>
-    </div>
+    );
+  };
+
+  return (
+    <>
+      {/* Render content */}
+      {renderContent()}
+      
+      {/* ALWAYS render modals - regardless of appointment state */}
+      {/* Create/Edit Appointment Modal */}
+      {(modalMode === 'create' || modalMode === 'edit') && (
+        <FormModal
+          isOpen={modal.isOpen}
+          onClose={closeModal}
+          title={modalInfo.title}
+          description={modalInfo.description}
+          isSubmitting={isSubmitting}
+          error={modalError}
+          success={modalSuccess}
+          size="lg"
+          showDefaultActions={false}
+        >
+          <AppointmentModalForm
+            initialData={modalMode === 'edit' ? selectedAppointment : { customerId }}
+            onSubmit={handleAppointmentSubmit}
+            mode={modalMode === 'create' ? 'create' : 'edit'}
+            isLoading={isSubmitting}
+            error={modalError}
+            success={modalSuccess}
+            onCancel={closeModal}
+          />
+        </FormModal>
+      )}
+      
+      {/* Delete Appointment Modal */}
+      {modalMode === 'delete' && (
+        <ConfirmationModal
+          isOpen={modal.isOpen}
+          onClose={closeModal}
+          title={modalInfo.title}
+          message={modalInfo.description}
+          variant="destructive"
+          confirmLabel="Delete Appointment"
+          onConfirm={handleAppointmentDelete}
+          isConfirming={isSubmitting}
+          error={modalError}
+        />
+      )}
+    </>
   );
 };
 

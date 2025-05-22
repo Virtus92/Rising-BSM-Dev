@@ -22,6 +22,7 @@ export interface RequestListProps {
   initialFilters?: Partial<RequestFilterParamsDto>;
   onCreateClick?: () => void;
   showCreateButton?: boolean;
+  onActionClick?: (action: string, request?: RequestDto) => void;
 }
 
 // Enhanced request type to include any additional properties needed for action handling
@@ -112,7 +113,8 @@ const RequestCard = ({ item, onActionClick }: CardProps<EnhancedRequestDto>) => 
 export const RequestList: React.FC<RequestListProps> = ({ 
   initialFilters = {}, 
   onCreateClick, 
-  showCreateButton 
+  showCreateButton,
+  onActionClick
 }) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -161,21 +163,26 @@ export const RequestList: React.FC<RequestListProps> = ({
   
   // Handle card action clicks
   const handleCardAction = useCallback((action: string, request: EnhancedRequestDto) => {
-    switch (action) {
-      case 'view':
-        router.push(`/dashboard/requests/${request.id}`);
-        break;
-      case 'edit':
-        router.push(`/dashboard/requests/${request.id}/edit`);
-        break;
-      case 'delete':
-        setRequestToDelete({ 
-          id: Number(request.id), 
-          name: request.name 
-        });
-        break;
+    if (onActionClick) {
+      onActionClick(action, request);
+    } else {
+      // Fallback to old behavior
+      switch (action) {
+        case 'view':
+          router.push(`/dashboard/requests/${request.id}`);
+          break;
+        case 'edit':
+          router.push(`/dashboard/requests/${request.id}/edit`);
+          break;
+        case 'delete':
+          setRequestToDelete({ 
+            id: Number(request.id), 
+            name: request.name 
+          });
+          break;
+      }
     }
-  }, [router]);
+  }, [onActionClick, router]);
   
   // Define columns for the table view
   const columns: ColumnDef<EnhancedRequestDto>[] = [
@@ -217,7 +224,7 @@ export const RequestList: React.FC<RequestListProps> = ({
         variant="outline" 
         size="icon" 
         title="View Details"
-        onClick={() => router.push(`/dashboard/requests/${request.id}`)}
+        onClick={() => handleCardAction('view', request)}
       >
         <Eye className="h-4 w-4" />
       </Button>
@@ -226,7 +233,7 @@ export const RequestList: React.FC<RequestListProps> = ({
         variant="outline" 
         size="icon" 
         title="Edit Request"
-        onClick={() => router.push(`/dashboard/requests/${request.id}/edit`)}
+        onClick={() => handleCardAction('edit', request)}
       >
         <Edit className="h-4 w-4" />
       </Button>
@@ -235,15 +242,12 @@ export const RequestList: React.FC<RequestListProps> = ({
         variant="destructive" 
         size="icon" 
         title="Delete Request"
-        onClick={() => setRequestToDelete({ 
-          id: Number(request.id), 
-          name: request.name 
-        })}
+        onClick={() => handleCardAction('delete', request)}
       >
         <Trash2 className="h-4 w-4" />
       </Button>
     </div>
-  ), [router]);
+  ), [handleCardAction]);
   
   // Create active filters array for display
   const activeFilters = [];

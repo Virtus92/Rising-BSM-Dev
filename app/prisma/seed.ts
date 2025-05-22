@@ -161,9 +161,9 @@ async function main() {
           postalCode: faker.location.zipCode(),
           city: faker.location.city(),
           country: 'Deutschland',
-          type: Math.random() > 0.5 ? 'private' : 'business',
+          type: Math.random() > 0.5 ? 'PRIVATE' : 'BUSINESS',
           newsletter: faker.datatype.boolean(),
-          status: 'active',
+          status: 'ACTIVE',
           createdBy: adminUser.id
         }
       })
@@ -184,7 +184,7 @@ async function main() {
         duration: faker.number.int({ min: 30, max: 120 }),
         location: faker.helpers.arrayElement(['Büro', 'Online-Meeting', 'Beim Kunden', 'Café']),
         description: faker.lorem.sentences(2),
-        status: faker.helpers.arrayElement(['planned', 'confirmed', 'completed', 'cancelled']),
+        status: faker.helpers.arrayElement(['PLANNED', 'CONFIRMED', 'COMPLETED', 'CANCELLED']),
         createdBy: faker.helpers.arrayElement([adminUser.id, employeeUser.id]) as number
       }
     });
@@ -275,7 +275,7 @@ async function main() {
   const contactRequests: any[] = [];
   for (let i = 0; i < 10; i++) {
     const services = ['Website-Entwicklung', 'SEO-Optimierung', 'Online-Marketing', 'App-Entwicklung', 'IT-Beratung'];
-    const statuses = ['new', 'in_progress', 'completed', 'cancelled'];
+    const statuses = ['NEW', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
     
     // Bei manchen Kontaktanfragen bereits einen Customer und Appointment verknüpfen
     const shouldLinkToCustomer = i < 5;
@@ -348,7 +348,7 @@ async function main() {
     });
     
     // Für bearbeitete Anfragen weitere Logs hinzufügen
-    if (contactRequest.status !== 'new') {
+    if (contactRequest.status !== 'NEW') {
       await prisma.requestLog.create({
         data: {
           requestId: contactRequest.id,

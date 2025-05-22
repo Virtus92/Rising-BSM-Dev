@@ -67,6 +67,7 @@ export interface BaseListUtility<T, F extends BaseFilterParamsDto> {
   setFilters: (filters: F) => void;
   setPage: (page: number) => void;
   setLimit: (limit: number) => void;
+  setPageSize: (pageSize: number) => void;
   resetFilters: (partialFilters?: Partial<F>) => void;
   refetch: () => Promise<void>;
   setSort: (field: string, direction: 'asc' | 'desc') => void;
@@ -221,6 +222,8 @@ export function enhanceBaseListResult<T, F extends BaseFilterParamsDto>(
     },
     // Include the setItems method
     setItems: baseList.setItems,
+    // Include setPageSize method (alias for setLimit)
+    setPageSize: baseList.setPageSize || baseList.setLimit,
     // Include setFetchFunction if baseList has it
     setFetchFunction: (baseList).setFetchFunction
   };

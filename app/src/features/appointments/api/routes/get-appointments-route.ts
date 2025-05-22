@@ -44,15 +44,15 @@ export async function getAppointmentsHandler(
     const sortBy = request.nextUrl.searchParams.get('sortBy') || undefined;
     const sortDirection = (request.nextUrl.searchParams.get('sortDirection') as 'asc' | 'desc') || undefined;
   
-  // Extract customerId parameter if present
-  const customerId = request.nextUrl.searchParams.get('customerId') 
-    ? parseInt(request.nextUrl.searchParams.get('customerId') || '0', 10) 
-    : undefined;
+    // Extract customerId parameter if present
+    const customerId = request.nextUrl.searchParams.get('customerId') 
+      ? parseInt(request.nextUrl.searchParams.get('customerId') || '0', 10) 
+      : undefined;
     
     // Get appointment service
     const appointmentService = serviceFactory.createAppointmentService();
     
-    // Get appointments list
+    // CRITICAL FIX: Always include customer relations for complete appointment data
     const result = await appointmentService.getAll({
       page,
       limit,
@@ -61,6 +61,12 @@ export async function getAppointmentsHandler(
         sortBy,
         sortDirection,
         customerId // Add customerId to filters
+      },
+      // Always include customer relation for complete data
+      relations: ['customer'],
+      context: {
+        userId: request.auth.userId,
+        ipAddress: request.headers.get('x-forwarded-for') || 'unknown'
       }
     });
     

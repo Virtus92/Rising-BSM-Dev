@@ -2,12 +2,12 @@
  * Allgemeiner Status für verschiedene Entitäten
  */
 export enum CommonStatus {
-  ACTIVE = "active",
-  INACTIVE = "inactive",
-  PENDING = "pending",
-  ARCHIVED = "archived",
-  SUSPENDED = "suspended",
-  DELETED = "deleted"
+  ACTIVE = "ACTIVE",
+  INACTIVE = "INACTIVE", 
+  PENDING = "PENDING",
+  ARCHIVED = "ARCHIVED",
+  SUSPENDED = "SUSPENDED",
+  DELETED = "DELETED"
 }
 
 /**
@@ -27,34 +27,35 @@ export enum CustomerStatus {
  * Terminstatus
  */
 export enum AppointmentStatus {
-  PLANNED = "planned",
-  CONFIRMED = "confirmed",
-  CANCELLED = "cancelled",
-  IN_PROGRESS = "in_progress",
-  COMPLETED = "completed",
-  RESCHEDULED = "rescheduled",
-  SCHEDULED = "scheduled"
+  PLANNED = "PLANNED",
+  CONFIRMED = "CONFIRMED",
+  CANCELLED = "CANCELLED",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
+  RESCHEDULED = "RESCHEDULED",
+  SCHEDULED = "SCHEDULED",
+  NO_SHOW = "NO_SHOW"
 }
 
 /**
  * Kundentyp
  */
 export enum CustomerType {
-  PRIVATE = "private",
-  BUSINESS = "business",
-  INDIVIDUAL = "individual",
-  GOVERNMENT = "government",
-  NON_PROFIT = "non_profit"
+  PRIVATE = "PRIVATE",
+  BUSINESS = "BUSINESS",
+  INDIVIDUAL = "INDIVIDUAL",
+  GOVERNMENT = "GOVERNMENT",
+  NON_PROFIT = "NON_PROFIT"
 }
 
 /**
  * Anfragestatus
  */
 export enum RequestStatus {
-  NEW = "new",
-  IN_PROGRESS = "in_progress",
-  COMPLETED = "completed",
-  CANCELLED = "cancelled"
+  NEW = "NEW",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED"
 }
 
 /**

@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { CustomerList } from '@/features/customers/components/CustomerList';
 import CustomerForm from '@/features/customers/components/CustomerForm';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
-// Make sure we're using the client-side service
+import { EntityPageLayout } from '@/shared/components/EntityPageLayout';
+import { FormModal, ConfirmationModal } from '@/shared/components/BaseModal';
+import { useEntityModal } from '@/shared/hooks/useModal';
 import { CustomerService } from '@/features/customers/lib/services/CustomerService.client';
-import { CreateCustomerDto, CustomerResponseDto, UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
+import { CreateCustomerDto, CustomerResponseDto, UpdateCustomerDto, CustomerDto } from '@/domain/dtos/CustomerDtos';
 import { useToast } from '@/shared/hooks/useToast';
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
@@ -15,196 +16,260 @@ import { NoPermissionView } from '@/shared/components/NoPermissionView';
 
 export default function CustomersPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
   
   // Get permissions
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const canViewCustomers = hasPermission(API_PERMISSIONS.CUSTOMERS.VIEW);
   const canCreateCustomers = hasPermission(API_PERMISSIONS.CUSTOMERS.CREATE);
+  const canEditCustomers = hasPermission(API_PERMISSIONS.CUSTOMERS.UPDATE);
+  const canDeleteCustomers = hasPermission(API_PERMISSIONS.CUSTOMERS.DELETE);
   
-  // Dialog states
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
-  // Form states
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  
-  // Detect mobile devices
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    // Set initial value
-    handleResize();
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  // Use the entity modal hook
+  const modal = useEntityModal<CustomerDto>();
 
-  // Direct handling of modal opening based on URL parameters
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Check URL parameters from the hook
-      const modalParam = searchParams?.get('modal');
-      
-      // Check if modal should be opened
-      const shouldOpenModal = modalParam === 'new';
-      
-      if (shouldOpenModal) {
-        setIsDialogOpen(true);
-        
-        // Update the URL to remove the query parameters without page reload
-        const params = new URLSearchParams(window.location.search);
-        let shouldUpdateUrl = false;
-        
-        if (params.has('modal')) {
-          params.delete('modal');
-          shouldUpdateUrl = true;
-        }
-        
-        if (shouldUpdateUrl) {
-          const newUrl = window.location.pathname + 
-                        (params.toString() ? `?${params.toString()}` : '');
-          window.history.replaceState({}, '', newUrl);
-        }
-      }
-    }
-  }, [searchParams]);
-
-  // Handle customer creation
-  const handleCreateCustomer = async (data: CreateCustomerDto | UpdateCustomerDto): Promise<CustomerResponseDto | null> => {
-    setError(null);
-    setSuccess(false);
-    setIsSubmitting(true);
+  // Handle customer form submission
+  const handleCustomerSubmit = useCallback(async (data: CreateCustomerDto | UpdateCustomerDto) => {
+    modal.setError(null);
+    modal.setSuccess(false);
+    modal.setIsSubmitting(true);
     
     try {
-      // Format and validate the data before sending
-      const formattedData: CreateCustomerDto = {
-        ...data,
-        // Ensure required name property is never undefined
-        name: data.name || '',
-        // Field mapping happens in the CustomerService, but we'll ensure it here too
-        postalCode: data.zipCode || data.postalCode
-      };
-
-      const response = await CustomerService.createCustomer(formattedData);
+      let response;
       
-      if (response.success) {
-        setSuccess(true);
-        setError(null);
+      if (modal.action?.type === 'create') {
+        // Format and validate the data before sending
+        const formattedData: CreateCustomerDto = {
+          ...data,
+          // Ensure required name property is never undefined
+          name: data.name || '',
+          // Field mapping happens in the CustomerService, but we'll ensure it here too
+          postalCode: data.zipCode || data.postalCode
+        };
         
-        // Add customer note if there's one entered
-        if (data.notes && response.data?.id) {
-          try {
-            // Add a delay to ensure the customer is properly created first
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-            const noteResponse = await CustomerService.addCustomerNote(
-              response.data.id, 
-              data.notes
-            );
-            
-            if (noteResponse.success) {
-              console.log('Note added successfully', noteResponse);
-            } else {
-              console.error('Failed to add note:', noteResponse.message);
+        response = await CustomerService.createCustomer(formattedData);
+        
+        if (response.success) {
+          // Add customer note if there's one entered
+          if (data.notes && response.data?.id) {
+            try {
+              // Add a delay to ensure the customer is properly created first
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+              const noteResponse = await CustomerService.addCustomerNote(
+                response.data.id, 
+                data.notes
+              );
+              
+              if (noteResponse.success) {
+                console.log('Note added successfully', noteResponse);
+              } else {
+                console.error('Failed to add note:', noteResponse.message);
+              }
+            } catch (noteError) {
+              console.error('Error adding note:', noteError);
             }
-          } catch (noteError) {
-            console.error('Error adding note:', noteError);
           }
         }
+      } else if (modal.action?.type === 'edit' && modal.action.item) {
+        // Handle edit
+        const updateData: UpdateCustomerDto = {
+          ...data,
+          name: data.name || '',
+          postalCode: data.zipCode || data.postalCode
+        };
+        
+        response = await CustomerService.updateCustomer(modal.action.item.id, updateData);
+      }
+      
+      if (response?.success) {
+        modal.setSuccess(true);
+        modal.setError(null);
         
         // Show success toast
         toast({
           title: 'Success',
-          description: 'Customer created successfully',
+          description: `Customer ${modal.action?.type === 'create' ? 'created' : 'updated'} successfully`,
           variant: 'success'
         });
         
-        // Close dialog after a delay
+        // Close modal after a delay
         setTimeout(() => {
-          setIsDialogOpen(false);
-          // Redirect to the customer detail page
-          if (response.data?.id) {
+          modal.closeModal();
+          // Redirect to the customer detail page for new customers
+          if (modal.action?.type === 'create' && response.data?.id) {
             router.push(`/dashboard/customers/${response.data.id}`);
-          } else {
-            // Fallback to reload if for some reason we don't have an ID
-            window.location.reload();
           }
         }, 1500);
         
         return response.data || null;
       } else {
-        setError(response.message || 'Failed to create customer');
-        setSuccess(false);
+        modal.setError(response?.message || `Failed to ${modal.action?.type} customer`);
+        modal.setSuccess(false);
         return null;
       }
     } catch (err) {
-      console.error('Error creating customer:', err);
-      setError('An unexpected error occurred');
-      setSuccess(false);
+      console.error(`Error ${modal.action?.type}ing customer:`, err);
+      modal.setError('An unexpected error occurred');
+      modal.setSuccess(false);
       return null;
     } finally {
-      setIsSubmitting(false);
+      modal.setIsSubmitting(false);
+    }
+  }, [modal, toast, router]);
+
+  // Handle customer deletion
+  const handleCustomerDelete = useCallback(async () => {
+    if (!modal.action?.item) return;
+    
+    modal.setError(null);
+    modal.setIsSubmitting(true);
+    
+    try {
+      const response = await CustomerService.deleteCustomer(modal.action.item.id);
+      
+      if (response.success) {
+        toast({
+          title: 'Success',
+          description: `Customer ${modal.action.item.name} has been deleted`,
+          variant: 'success'
+        });
+        
+        modal.closeModal();
+      } else {
+        modal.setError(response.message || 'Failed to delete customer');
+      }
+    } catch (err) {
+      console.error('Error deleting customer:', err);
+      modal.setError('An unexpected error occurred');
+    } finally {
+      modal.setIsSubmitting(false);
+    }
+  }, [modal, toast]);
+
+  // Handle list actions
+  const handleListAction = useCallback((action: string, customer?: CustomerDto) => {
+    switch (action) {
+      case 'create':
+        modal.openCreateModal();
+        break;
+      case 'edit':
+        if (customer && canEditCustomers) {
+          modal.openEditModal(customer);
+        }
+        break;
+      case 'view':
+        if (customer) {
+          router.push(`/dashboard/customers/${customer.id}`);
+        }
+        break;
+      case 'delete':
+        if (customer && canDeleteCustomers) {
+          modal.openDeleteModal(customer);
+        }
+        break;
+    }
+  }, [modal, canEditCustomers, canDeleteCustomers, router]);
+
+  // Get modal title and description
+  const getModalInfo = () => {
+    switch (modal.action?.type) {
+      case 'create':
+        return {
+          title: 'Add New Customer',
+          description: 'Enter the customer\'s information below'
+        };
+      case 'edit':
+        return {
+          title: 'Edit Customer',
+          description: `Update information for ${modal.action.item?.name}`
+        };
+      case 'delete':
+        return {
+          title: 'Delete Customer',
+          description: `Are you sure you want to delete ${modal.action.item?.name}? This action cannot be undone.`
+        };
+      default:
+        return {
+          title: 'Customer',
+          description: ''
+        };
     }
   };
 
-  // Handle create customer click
-  const handleCreateClick = () => {
-    setIsDialogOpen(true);
-  };
-
-  // Handle dialog close
-  const handleDialogClose = () => {
-    setIsDialogOpen(false);
-    setError(null);
-    setSuccess(false);
-  };
+  const modalInfo = getModalInfo();
   
   return (
-    <div className="space-y-6 p-4 sm:p-6">
-      {/* Check if user has permission to view customers */}
-      {!permissionsLoading && !canViewCustomers ? (
+    <EntityPageLayout
+      canView={canViewCustomers}
+      isPermissionLoading={permissionsLoading}
+      noPermissionView={
         <NoPermissionView 
           title="Access Denied"
           message="You don't have permission to view customers."
           permissionNeeded={API_PERMISSIONS.CUSTOMERS.VIEW}
         />
-      ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-          <CustomerList 
-            onCreateClick={canCreateCustomers ? handleCreateClick : undefined}
-            showCreateButton={canCreateCustomers} 
+      }
+    >
+      <CustomerList 
+        onCreateClick={canCreateCustomers ? () => handleListAction('create') : undefined}
+        showCreateButton={canCreateCustomers}
+        onActionClick={handleListAction}
+      />
+      
+      {/* Create/Edit Customer Modal */}
+      {(modal.action?.type === 'create' || modal.action?.type === 'edit') && (
+        <FormModal
+          isOpen={modal.isOpen}
+          onClose={modal.closeModal}
+          title={modalInfo.title}
+          description={modalInfo.description}
+          isSubmitting={modal.isSubmitting}
+          error={modal.error}
+          success={modal.success}
+          size="lg"
+          showDefaultActions={false}
+        >
+          <CustomerForm
+            initialData={modal.action?.type === 'edit' && modal.action.item ? {
+              ...modal.action.item,
+              // Ensure dates are strings for form compatibility
+              createdAt: typeof modal.action.item.createdAt === 'string' 
+                ? modal.action.item.createdAt 
+                : modal.action.item.createdAt?.toISOString?.() || '',
+              updatedAt: typeof modal.action.item.updatedAt === 'string' 
+                ? modal.action.item.updatedAt 
+                : modal.action.item.updatedAt?.toISOString?.() || '',
+              // Convert notes string to undefined for form compatibility
+              notes: undefined // Let the form handle notes separately
+            } : {}}
+            onSubmit={handleCustomerSubmit}
+            mode={modal.action?.type === 'create' ? 'create' : 'edit'}
+            isLoading={modal.isSubmitting}
+            error={modal.error}
+            success={modal.success}
+            title={modalInfo.title}
+            description={modalInfo.description}
+            submitLabel={modal.action?.type === 'create' ? 'Create Customer' : 'Update Customer'}
+            onCancel={modal.closeModal}
           />
-        </div>
+        </FormModal>
       )}
       
-      {/* Create Customer Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className={`${isMobile ? 'sm:max-w-[100%] p-4' : 'sm:max-w-[600px]'} max-h-[90vh] overflow-y-auto`}>
-          <DialogHeader className="sticky top-0 bg-white dark:bg-gray-950 z-10 pb-4">
-            <DialogTitle>Add New Customer</DialogTitle>
-            <DialogDescription>Enter the customer's information below</DialogDescription>
-          </DialogHeader>
-          
-          <CustomerForm
-            initialData={{}}
-            onSubmit={handleCreateCustomer}
-            mode="create"
-            isLoading={isSubmitting}
-            error={error}
-            success={success}
-            title="Add New Customer"
-            description="Create a new customer account"
-            submitLabel="Create Customer"
-            onCancel={handleDialogClose}
-          />
-        </DialogContent>
-      </Dialog>
-    </div>
+      {/* Delete Customer Modal */}
+      {modal.action?.type === 'delete' && (
+        <ConfirmationModal
+          isOpen={modal.isOpen}
+          onClose={modal.closeModal}
+          title={modalInfo.title}
+          message={modalInfo.description}
+          variant="destructive"
+          confirmLabel="Delete Customer"
+          onConfirm={handleCustomerDelete}
+          isConfirming={modal.isSubmitting}
+          error={modal.error}
+        />
+      )}
+    </EntityPageLayout>
   );
 }

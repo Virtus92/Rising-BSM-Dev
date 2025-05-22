@@ -10,14 +10,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/shared/components/ui/table';
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious 
-} from '@/shared/components/ui/pagination';
+import { SimplePagination } from '@/shared/components/ui/simple-pagination';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Badge } from '@/shared/components/ui/badge';
@@ -95,6 +88,7 @@ export interface BaseListComponentProps<T> {
   
   // ----- Actions -----
   onPageChange: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   onSearchChange?: (search: string) => void;
   onSortChange?: (column: string, direction: 'asc' | 'desc') => void;
   onCreateClick?: () => void;
@@ -158,6 +152,7 @@ export function BaseListComponent<T extends {}>({
   
   // Actions
   onPageChange,
+  onPageSizeChange,
   onSearchChange,
   onSortChange,
   onCreateClick,
@@ -273,18 +268,23 @@ export function BaseListComponent<T extends {}>({
     }
     
     return (
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-3">
-          {title && <h2 className="text-2xl font-semibold">{title}</h2>}
-          {headerActions && <div className="mt-1">{headerActions}</div>}
+          {title && (
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{title}</h1>
+              <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+            </div>
+          )}
+          {headerActions && <div className="flex items-center gap-2">{headerActions}</div>}
         </div>
         
-        <div className="flex items-center gap-2 mt-2 sm:mt-0 self-end sm:self-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {onCreateClick && showCreateButton && (
             <Button 
               onClick={onCreateClick} 
               size="sm"
-              className="shadow-sm hover:shadow-md transition-shadow"
+              className="shadow-sm hover:shadow-md transition-all duration-200 bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto"
             >
               <Plus className="mr-2 h-4 w-4" />
               {createButtonLabel}
@@ -302,7 +302,7 @@ export function BaseListComponent<T extends {}>({
     }
     
     return (
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
         {showSearch && onSearchChange && (
           <div className="relative flex-1">
             <Input
@@ -310,7 +310,7 @@ export function BaseListComponent<T extends {}>({
               value={searchTerm}
               onChange={handleSearchInputChange}
               onKeyDown={handleSearchKeyDown}
-              className="pr-10 focus-visible:ring-2 focus-visible:ring-offset-1"
+              className="pr-10 focus-visible:ring-2 focus-visible:ring-offset-1 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
             />
             <div className="absolute right-2.5 top-2.5 text-muted-foreground">
               <Search className="h-4 w-4" />
@@ -318,9 +318,9 @@ export function BaseListComponent<T extends {}>({
           </div>
         )}
         
-        <div className="flex gap-2 mb-0 sm:mb-0">
+        <div className="flex gap-2 flex-wrap">
           {toolbarActions && (
-            <div>{toolbarActions}</div>
+            <div className="flex gap-2">{toolbarActions}</div>
           )}
 
           {onFilterToggle && (
@@ -328,20 +328,20 @@ export function BaseListComponent<T extends {}>({
               variant={showFilters ? "default" : "outline"}
               size="sm"
               onClick={onFilterToggle}
-              className="whitespace-nowrap hover:shadow-sm transition-shadow"
+              className="whitespace-nowrap hover:shadow-sm transition-all duration-200"
             >
               <Filter className="h-4 w-4 mr-1.5" />
-              Filters
+              Filters {showFilters && <span className="ml-1 text-xs">(Active)</span>}
             </Button>
           )}
           
           {!forceCardView && CardComponent && (
-            <div className="hidden sm:flex h-9 border rounded-md overflow-hidden shadow-sm">
+            <div className="hidden sm:flex h-9 border rounded-lg overflow-hidden shadow-sm bg-white dark:bg-gray-900">
               <Button
                 variant={viewMode === 'table' ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('table')}
-                className="rounded-r-none border-0 px-3"
+                className="rounded-r-none border-0 px-3 hover:bg-gray-100 dark:hover:bg-gray-800"
                 title="Table View"
               >
                 <LayoutList className="h-4 w-4" />
@@ -350,7 +350,7 @@ export function BaseListComponent<T extends {}>({
                 variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('cards')}
-                className="rounded-l-none border-0 px-3"
+                className="rounded-l-none border-0 px-3 hover:bg-gray-100 dark:hover:bg-gray-800"
                 title="Card View"
               >
                 <FileText className="h-4 w-4" />
@@ -364,7 +364,7 @@ export function BaseListComponent<T extends {}>({
               size="sm"
               onClick={onRefresh}
               title="Refresh"
-              className="hover:shadow-sm transition-shadow"
+              className="hover:shadow-sm transition-all duration-200"
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -432,28 +432,32 @@ export function BaseListComponent<T extends {}>({
   
   // Render table view
   const renderTable = useCallback(() => (
-    <div className="rounded-md border overflow-hidden">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900 shadow-sm">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
             {columns.map((column, index) => (
               <TableHead 
                 key={index}
-                className={column.sortable && onSortChange && column.accessorKey ? "cursor-pointer hover:bg-muted/50" : ""}
+                className={`font-semibold text-gray-900 dark:text-gray-100 ${
+                  column.sortable && onSortChange && column.accessorKey 
+                    ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150" 
+                    : ""
+                }`}
                 onClick={() => {
                   if (column.sortable && onSortChange && column.accessorKey) {
                     handleSortClick(column.accessorKey as string);
                   }
                 }}
               >
-                <div className="flex items-center">
+                <div className="flex items-center gap-1">
                   {column.header}
                   {column.sortable && onSortChange && column.accessorKey && 
                     getSortIcon(column.accessorKey as string)}
                 </div>
               </TableHead>
             ))}
-            {rowActions && <TableHead className="text-right">Actions</TableHead>}
+            {rowActions && <TableHead className="text-right font-semibold text-gray-900 dark:text-gray-100">Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -461,16 +465,24 @@ export function BaseListComponent<T extends {}>({
             <TableRow>
               <TableCell 
                 colSpan={columns.length + (rowActions ? 1 : 0)}
-                className="h-24 text-center"
+                className="h-32 text-center text-gray-500 dark:text-gray-400"
               >
-                No results found
+                <div className="flex flex-col items-center gap-2">
+                  <FileText className="h-8 w-8 text-gray-300 dark:text-gray-600" />
+                  <span>No results found</span>
+                </div>
               </TableCell>
             </TableRow>
           ) : (
-            items.map((item) => (
-              <TableRow key={keyExtractor(item)}>
+            items.map((item, itemIndex) => (
+              <TableRow 
+                key={keyExtractor(item)}
+                className={`border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors duration-150 ${
+                  itemIndex % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50/30 dark:bg-gray-800/10'
+                }`}
+              >
                 {columns.map((column, index) => (
-                  <TableCell key={index}>
+                  <TableCell key={index} className="text-gray-900 dark:text-gray-100">
                     {column.cell 
                       ? column.cell(item) 
                       : column.accessorKey 
@@ -531,100 +543,20 @@ export function BaseListComponent<T extends {}>({
     // Always render pagination if we have items, even with only one page
     if (!totalPages) return null;
     
-    // Calculate visible page range
-    const maxButtons = 5;
-    const halfMaxButtons = Math.floor(maxButtons / 2);
-    
-    let startPage = Math.max(1, currentPage - halfMaxButtons);
-    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-    
-    if (endPage - startPage < maxButtons - 1) {
-      startPage = Math.max(1, endPage - maxButtons + 1);
-    }
-    
-    const pageNumbers = Array.from(
-      { length: endPage - startPage + 1 },
-      (_, i) => startPage + i
-    );
-    
     return (
-      <div className="mt-6 border-t pt-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="text-sm text-muted-foreground">
-          Showing <span className="font-medium">{totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to{' '}
-          <span className="font-medium">{Math.min(currentPage * pageSize, totalItems)}</span> of{' '}
-          <span className="font-medium">{totalItems}</span> items
-        </div>
-        
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious 
-                onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-                aria-disabled={currentPage === 1}
-                className={`${currentPage === 1 ? "pointer-events-none opacity-50" : ""} hover:bg-accent transition-colors`}
-              />
-            </PaginationItem>
-            
-            {startPage > 1 && (
-              <>
-                <PaginationItem>
-                  <PaginationLink 
-                    onClick={() => onPageChange(1)}
-                    className="hover:bg-accent transition-colors"
-                  >
-                    1
-                  </PaginationLink>
-                </PaginationItem>
-                {startPage > 2 && (
-                  <PaginationItem>
-                    <span className="px-2">...</span>
-                  </PaginationItem>
-                )}
-              </>
-            )}
-            
-            {pageNumbers.map(page => (
-              <PaginationItem key={page}>
-                <PaginationLink 
-                  isActive={page === currentPage}
-                  onClick={() => onPageChange(page)}
-                  className={page === currentPage ? "font-bold" : "hover:bg-accent transition-colors"}
-                >
-                  {page}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
-            
-            {endPage < totalPages && (
-              <>
-                {endPage < totalPages - 1 && (
-                  <PaginationItem>
-                    <span className="px-2">...</span>
-                  </PaginationItem>
-                )}
-                <PaginationItem>
-                  <PaginationLink 
-                    onClick={() => onPageChange(totalPages)}
-                    className="hover:bg-accent transition-colors"
-                  >
-                    {totalPages}
-                  </PaginationLink>
-                </PaginationItem>
-              </>
-            )}
-            
-            <PaginationItem>
-              <PaginationNext 
-                onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-                aria-disabled={currentPage === totalPages}
-                className={`${currentPage === totalPages ? "pointer-events-none opacity-50" : ""} hover:bg-accent transition-colors`}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+      <div className="mt-6 border-t pt-4">
+        <SimplePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={onPageChange}
+          maxVisiblePages={5}
+          showInfo={true}
+        />
       </div>
     );
-  }, [currentPage, onPageChange, pageSize, totalItems, totalPages]);
+  }, [currentPage, totalPages, totalItems, pageSize, onPageChange]);
   
   // ----- COMPONENT STATE RENDERING -----
   

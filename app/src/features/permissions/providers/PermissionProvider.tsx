@@ -88,7 +88,13 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
    * Normalize permission code for consistent checking
    */
   const normalizePermissionCode = useCallback((code: string): string => {
+    try{
     return code.trim().toLowerCase();
+    } catch(error) {
+      logger.error('Error in PermissionProvider: Code is undefined', error as Error)
+      console.log(code);
+      return code;
+    }
   }, []);
 
   /**

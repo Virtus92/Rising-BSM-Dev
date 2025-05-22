@@ -19,6 +19,9 @@ export interface UseCustomersResult extends BaseListUtility<CustomerDto, Custome
   filterByType: (type: CustomerType | undefined) => void;
   filterByStatus: (status: CommonStatus | undefined) => void;
   filterByLocation: (city?: string, country?: string) => void;
+  
+  // Add setPageSize method
+  setPageSize: (pageSize: number) => void;
 }
 
 /**
@@ -32,55 +35,94 @@ export const useCustomers = (initialFilters?: Partial<CustomerFilterParamsDto>):
     return await CustomerService.getCustomers(filters);
   }, []);
   
-  // Map UI sort field to actual database column
+  // Map UI sort field to actual database column - this needs to match exactly what the server expects
   const mapSortFieldToColumn = (field: string): string => {
     const fieldMap: Record<string, string> = {
-      'sortBy': 'name', // Default to name if sortBy is passed
+      // UI field -> Database column mapping
       'name': 'name',
-      'email': 'email',
+      'email': 'email', 
       'phone': 'phone',
+      'company': 'company',
+      'city': 'city',
+      'country': 'country',
+      'postalCode': 'postalCode',
       'type': 'type',
       'status': 'status',
+      'newsletter': 'newsletter',
       'createdAt': 'createdAt',
-      'updatedAt': 'updatedAt'
+      'updatedAt': 'updatedAt',
+      // Default fallback
+      'id': 'createdAt'
     };
     
-    return fieldMap[field] || 'name';
+    return fieldMap[field] || 'createdAt';
   };
 
   // Use the base list utility
   const baseList = createBaseListUtility<CustomerDto, CustomerFilterParamsDto>({
     fetchFunction: async (filters) => {
-      // Map the sortBy field to an actual database column before sending to API
-      const mappedFilters = {...filters};
-      if (mappedFilters.sortBy) {
-        mappedFilters.sortBy = mapSortFieldToColumn(mappedFilters.sortBy as string);
+      // Log filters for debugging (only in development)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('useCustomers: Processing filters:', filters);
       }
       
-      // Ensure we don't modify the sort direction
-      // This is critical - client and server must agree on direction
+      // Map the sortBy field to an actual database column before sending to API
+      const mappedFilters = { ...filters };
+      if (mappedFilters.sortBy) {
+        const originalSortBy = mappedFilters.sortBy;
+        mappedFilters.sortBy = mapSortFieldToColumn(mappedFilters.sortBy as string);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`useCustomers: Mapped sortBy from '${originalSortBy}' to '${mappedFilters.sortBy}'`);
+        }
+      }
+      
+      // Ensure we have valid sort direction
+      if (mappedFilters.sortDirection && !['asc', 'desc'].includes(mappedFilters.sortDirection)) {
+        mappedFilters.sortDirection = 'desc';
+      }
+      
+      // Validate and fix pagination
+      if (mappedFilters.page && mappedFilters.page < 1) {
+        mappedFilters.page = 1;
+      }
+      if (mappedFilters.limit && (mappedFilters.limit < 1 || mappedFilters.limit > 100)) {
+        mappedFilters.limit = 10;
+      }
+      
+      // Log the final mapped filters
       if (process.env.NODE_ENV === 'development') {
-        console.log('Mapped customer filters:', mappedFilters);
+        console.log('useCustomers: Final mapped filters:', mappedFilters);
       }
       
       try {
-        // Create the API call promise first but don't await it yet
-        // This prevents Function.prototype.apply errors on Promise objects
+        // Make the API call
         const apiCall = CustomerService.getCustomers(mappedFilters);
+        const response = await apiCall;
         
-        // Now await the promise
-        return await apiCall;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('useCustomers: API response:', response);
+        }
+        
+        return response;
       } catch (err) {
         console.error('Error in useCustomers fetchFunction:', err);
         throw err;
       }
     },
-    initialFilters: initialFilters as CustomerFilterParamsDto,
-    defaultSortField: 'sortBy' as keyof CustomerFilterParamsDto,
-    defaultSortDirection: 'asc',
+    initialFilters: {
+      page: 1,
+      limit: 10,
+      sortBy: 'createdAt',
+      sortDirection: 'desc',
+      ...initialFilters
+    } as CustomerFilterParamsDto,
+    defaultSortField: 'createdAt',
+    defaultSortDirection: 'desc',
     syncWithUrl: true,
     urlFilterConfig: {
       numeric: ['page', 'limit'] as Array<keyof CustomerFilterParamsDto>,
+      boolean: ['newsletter', 'includeDeleted'] as Array<keyof CustomerFilterParamsDto>,
       enum: {
         type: Object.values(CustomerType),
         status: Object.values(CommonStatus),

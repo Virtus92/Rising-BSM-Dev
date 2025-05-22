@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { EntityColors, getStatusBadgeColor } from '@/shared/utils/entity-colors';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
@@ -9,9 +9,13 @@ import { Button } from '@/shared/components/ui/button';
 import { BaseListComponent, ColumnDef, CardProps } from '@/shared/components/data/BaseListComponent';
 import { BaseCard, BaseCardProps } from '@/shared/components/data/BaseCard';
 import { useUsers } from '../hooks/useUsers';
-import { UserFilterParamsDto } from '@/domain/dtos/UserDtos';
+import { UserFilterParamsDto, UserDto } from '@/domain/dtos/UserDtos';
 import { UserRole, UserStatus } from '@/domain/enums/UserEnums';
 import { DeleteConfirmationDialog } from '@/shared/components/DeleteConfirmationDialog';
+import { EntityCreateModal, useEntityModal } from '@/shared/components/EntityCreateModal';
+import { UserForm, UserFormData } from '@/features/users/components/UserForm';
+import { UserService } from '@/features/users/lib/services/UserService';
+import { useToast } from '@/shared/hooks/useToast';
 import { 
   Edit, 
   Trash2, 
@@ -20,10 +24,11 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  UserPlus,
   User as UserIcon,
   Users as UsersIcon,
-  Filter as FilterIcon
+  Filter as FilterIcon,
+  Plus,
+  UserPlus
 } from 'lucide-react';
 import { getPaginationProps } from '@/shared/utils/list/baseListUtils';
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
@@ -35,6 +40,13 @@ export interface UserListProps {
   initialFilters?: Partial<UserFilterParamsDto>;
   onCreateClick?: () => void;
   showCreateButton?: boolean;
+  onActionClick?: (action: string, user?: UserDto) => void;
+  // Enhanced prop for external modal control
+  externalModalState?: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess?: () => void;
+  };
 }
 
 // Enhanced user type with currentUser property
@@ -118,7 +130,7 @@ const UserCard = ({ item, onActionClick }: BaseCardProps<EnhancedUser>) => {
           className: getRoleColor(item.role)
         }
       ]}
-      className={`border-l-4 ${EntityColors.users.border}`}
+      className={`border-l-4 ${EntityColors.users.border} transition-all duration-200 hover:shadow-md hover:border-l-8`}
       fields={[
         {
           label: 'Email',
@@ -143,7 +155,7 @@ const UserCard = ({ item, onActionClick }: BaseCardProps<EnhancedUser>) => {
             size="sm"
             onClick={() => onActionClick?.('view', item)}
             disabled={isDeleted}
-            className={`flex-1 ${EntityColors.users.text}`}
+            className={`flex-1 ${EntityColors.users.text} hover:bg-purple-50 dark:hover:bg-purple-950/10`}
           >
             <Eye className="h-4 w-4 mr-1.5" />
             View
@@ -153,7 +165,7 @@ const UserCard = ({ item, onActionClick }: BaseCardProps<EnhancedUser>) => {
             size="sm"
             onClick={() => onActionClick?.('edit', item)}
             disabled={isDeleted}
-            className={`flex-1 ${EntityColors.users.text}`}
+            className={`flex-1 ${EntityColors.users.text} hover:bg-purple-50 dark:hover:bg-purple-950/10`}
           >
             <Edit className="h-4 w-4 mr-1.5" />
             Edit
@@ -163,7 +175,7 @@ const UserCard = ({ item, onActionClick }: BaseCardProps<EnhancedUser>) => {
             size="sm"
             onClick={() => onActionClick?.('delete', item)}
             disabled={isDeleted || isCurrentUser}
-            className="flex-1"
+            className="flex-1 hover:bg-red-600 dark:hover:bg-red-600"
           >
             <Trash2 className="h-4 w-4 mr-1.5" />
             Delete
@@ -177,37 +189,46 @@ const UserCard = ({ item, onActionClick }: BaseCardProps<EnhancedUser>) => {
 // ----- Main Component -----
 
 /**
- * User list component using our new baseList implementation
+ * Enhanced user list component with integrated modal support
  */
-export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreateClick, showCreateButton = true }) => {
-  // Get permissions
+export const UserList: React.FC<UserListProps> = ({ 
+  initialFilters = {}, 
+  onCreateClick, 
+  showCreateButton = true,
+  onActionClick,
+  externalModalState 
+}) => {
+  const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const canEditUsers = hasPermission(API_PERMISSIONS.USERS.UPDATE);
   const canDeleteUsers = hasPermission(API_PERMISSIONS.USERS.DELETE);
+  const canCreateUsers = hasPermission(API_PERMISSIONS.USERS.CREATE);
   const router = useRouter();
   
-  // Provide a default implementation if onCreateClick is not provided
-  const defaultCreateClick = useCallback(() => {
-    // Use the modal approach by default
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('openNewUserModal', 'true');
-      router.push('/dashboard/users');
-    }
-  }, [router]);
+  // Modal state management
+  const { isOpen, openModal, closeModal } = useEntityModal();
   
-  // Use the provided onCreateClick or fall back to the default
-  const handleCreateClick = onCreateClick || defaultCreateClick;
+  // Modal should be controlled externally if provided
+  const modalIsOpen = externalModalState?.isOpen ?? isOpen;
+  const handleModalClose = externalModalState?.onClose ?? closeModal;
+  
+  // Form states
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState(false);
+  
+  // List states
   const [showFilters, setShowFilters] = useState(false);
   const [userToDelete, setUserToDelete] = useState<{ id: number, name: string } | null>(null);
   
-  // Use our new useUsers hook implementation
+  // Use the users hook
   const { 
     users, 
     isLoading, 
     error, 
     pagination, 
     activeFilters,
-    filters, // Added to fix undefined references
+    filters,
     setPage,
     setSearch,
     setSort,
@@ -225,34 +246,102 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
     isCurrentUser: user.id === currentUserId
   }));
 
+  // Handle user creation
+  const handleCreateUser = async (data: UserFormData) => {
+    setFormError(null);
+    setFormSuccess(false);
+    setIsSubmitting(true);
+    
+    try {
+      const updatedData = {
+        ...data,
+        role: data.role as UserRole,
+        password: data.password || '',
+        profilePictureId: data.profilePictureId !== undefined ? String(data.profilePictureId) : undefined,
+      };
+      
+      const response = await UserService.createUser(updatedData);
+      
+      if (response.success && response.data) {
+        setFormSuccess(true);
+        
+        toast({
+          title: 'Success',
+          description: 'User created successfully',
+          variant: 'success'
+        });
+        
+        // Call external success callback if provided
+        if (externalModalState?.onSuccess) {
+          externalModalState.onSuccess();
+        }
+        
+        // Close modal after a delay
+        setTimeout(() => {
+          handleModalClose();
+          refetch(); // Refresh the list
+        }, 1500);
+      } else {
+        setFormError(response.error || response.message || 'Failed to create user');
+      }
+    } catch (err) {
+      console.error('Failed to create user:', err);
+      setFormError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Handle delete confirmation
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
     
     const success = await deleteUser(userToDelete.id);
     if (success) {
-      // Toast notification for successful deletion
-      if (typeof window !== 'undefined' && window.console) {
-        console.log(`User '${userToDelete.name}' deleted successfully`);
-      }
+      toast({
+        title: 'Success',
+        description: `User '${userToDelete.name}' deleted successfully`,
+        variant: 'success'
+      });
     }
     setUserToDelete(null);
   };
   
   // Handle card action clicks
   const handleCardAction = useCallback((action: string, user: EnhancedUser) => {
-    switch (action) {
-      case 'view':
-        router.push(`/dashboard/users/${user.id}`);
-        break;
-      case 'edit':
-        router.push(`/dashboard/users/edit/${user.id}`);
-        break;
-      case 'delete':
-        setUserToDelete({ id: Number(user.id), name: user.name });
-        break;
+    if (onActionClick) {
+      onActionClick(action, user as UserDto);
+    } else {
+      // Fallback to old behavior
+      switch (action) {
+        case 'view':
+          router.push(`/dashboard/users/${user.id}`);
+          break;
+        case 'edit':
+          router.push(`/dashboard/users/${user.id}/edit`);
+          break;
+        case 'delete':
+          setUserToDelete({ id: Number(user.id), name: user.name });
+          break;
+      }
     }
-  }, [router]);
+  }, [onActionClick, router]);
+
+  // Handle create click
+  const handleCreateClick = useCallback(() => {
+    if (onCreateClick) {
+      onCreateClick();
+    } else {
+      openModal();
+    }
+  }, [onCreateClick, openModal]);
+
+  // Handle modal close with cleanup
+  const handleModalCloseWithCleanup = useCallback(() => {
+    handleModalClose();
+    setFormError(null);
+    setFormSuccess(false);
+  }, [handleModalClose]);
 
   // Define columns for the table view
   const columns: ColumnDef<EnhancedUser>[] = [
@@ -261,8 +350,10 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
       accessorKey: 'name',
       cell: (user) => (
         <div className="flex items-center">
-          <Avatar className="h-10 w-10 mr-3 bg-primary text-primary-foreground">
-            <AvatarFallback>{getUserAvatar(user.name)}</AvatarFallback>
+          <Avatar className="h-10 w-10 mr-3 bg-purple-600 text-white">
+            <AvatarFallback className="bg-purple-600 text-white">
+              {getUserAvatar(user.name)}
+            </AvatarFallback>
             {user.profilePicture && (
               <AvatarImage src={user.profilePicture} alt={user.name} />
             )}
@@ -304,6 +395,7 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
             user.status === UserStatus.SUSPENDED ? 'outline' : 
             'destructive'
           }
+          className="shadow-sm"
         >
           {user.status}
         </Badge>
@@ -323,8 +415,9 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
           variant="outline" 
           size="icon" 
           title="View User"
-          onClick={() => router.push(`/dashboard/users/${user.id}`)}
+          onClick={() => handleCardAction('view', user)}
           disabled={isDeleted}
+          className="hover:bg-purple-50 dark:hover:bg-purple-950/10"
         >
           <Eye className="h-4 w-4" />
         </Button>
@@ -333,8 +426,9 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
           variant="outline" 
           size="icon" 
           title="Edit User"
-          onClick={() => router.push(`/dashboard/users/edit/${user.id}`)}
+          onClick={() => handleCardAction('edit', user)}
           disabled={isDeleted || !canEditUsers}
+          className="hover:bg-purple-50 dark:hover:bg-purple-950/10"
         >
           <Edit className="h-4 w-4" />
         </Button>
@@ -343,26 +437,32 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
           variant="destructive" 
           size="icon" 
           title="Delete User"
-          onClick={() => setUserToDelete({ id: Number(user.id), name: user.name })}
+          onClick={() => handleCardAction('delete', user)}
           disabled={isDeleted || isCurrentUser || !canDeleteUsers}
+          className="hover:bg-red-600 dark:hover:bg-red-600"
         >
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
     );
-  }, [router]);
+  }, [handleCardAction, canEditUsers, canDeleteUsers]);
   
   // Enhanced filter panel with better styling and user-themed colors
   const filterPanel = (
-    <div className="p-5 border rounded-md mb-4 space-y-5 bg-white dark:bg-gray-800 shadow-sm">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div className="p-6 border rounded-lg mb-6 space-y-6 bg-white dark:bg-gray-800 shadow-sm border-purple-200 dark:border-purple-800">
+      <div className="flex items-center gap-2 mb-4">
+        <FilterIcon className="h-5 w-5 text-purple-600" />
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Filter Users</h3>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <label className="text-sm font-medium flex items-center gap-2">
-            <UsersIcon className="h-4 w-4 text-blue-600" />
+            <UsersIcon className="h-4 w-4 text-purple-600" />
             Role
           </label>
           <select 
-            className="w-full border rounded-md p-2 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+            className="w-full border rounded-md p-3 focus:border-purple-500 focus:ring focus:ring-purple-200 focus:ring-opacity-50 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
             value={filters.role || ''} 
             onChange={(e) => setRoleFilter(e.target.value ? e.target.value as UserRole : undefined)}
           >
@@ -375,11 +475,11 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
         
         <div className="space-y-2">
           <label className="text-sm font-medium flex items-center gap-2">
-            <FilterIcon className="h-4 w-4 text-blue-600" />
+            <CheckCircle className="h-4 w-4 text-purple-600" />
             Status
           </label>
           <select 
-            className="w-full border rounded-md p-2 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+            className="w-full border rounded-md p-3 focus:border-purple-500 focus:ring focus:ring-purple-200 focus:ring-opacity-50 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
             value={filters.status || ''} 
             onChange={(e) => setStatusFilter(e.target.value ? e.target.value as UserStatus : undefined)}
           >
@@ -391,26 +491,25 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
         </div>
       </div>
       
-      <div className="flex justify-end space-x-3 pt-2">
+      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
         <Button 
           variant="outline" 
-          className={EntityColors.users.text}
+          className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/10"
           onClick={clearAllFilters}
         >
-          Reset
+          Reset Filters
         </Button>
         
         <Button 
-          className={EntityColors.users.primary}
+          className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
           onClick={() => setShowFilters(false)}
         >
-          Apply
+          Apply Filters
         </Button>
       </div>
     </div>
   );
 
-  // Use the provided onCreateClick prop instead of hardcoding navigation
   return (
     <>
       <BaseListComponent<EnhancedUser>
@@ -418,7 +517,7 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
         items={enhancedUsers}
         isLoading={isLoading}
         error={error || null}
-        {...getPaginationProps(pagination)} // Extract pagination props
+        {...getPaginationProps(pagination)}
         
         // Configuration
         columns={columns}
@@ -430,7 +529,7 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
         searchPlaceholder="Search users by name or email..."
         emptyStateMessage="No users found"
         createButtonLabel="Add New User"
-        showCreateButton={showCreateButton}
+        showCreateButton={showCreateButton && canCreateUsers}
         
         // Active filters
         activeFilters={activeFilters}
@@ -439,7 +538,7 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
         onPageChange={setPage}
         onSearchChange={setSearch}
         onSortChange={setSort}
-        onCreateClick={handleCreateClick}
+        onCreateClick={canCreateUsers ? handleCreateClick : undefined}
         onRefresh={() => refetch()}
         onFilterToggle={() => setShowFilters(!showFilters)}
         onClearAllFilters={clearAllFilters}
@@ -455,7 +554,40 @@ export const UserList: React.FC<UserListProps> = ({ initialFilters = {}, onCreat
         
         // Row actions
         rowActions={rowActions}
+        
+        // Enhanced styling
+        className="bg-gradient-to-br from-purple-50/50 to-white dark:from-purple-950/10 dark:to-gray-900"
       />
+      
+      {/* Create User Modal - only show if not externally controlled */}
+      {!externalModalState && (
+        <EntityCreateModal
+          isOpen={modalIsOpen}
+          onClose={handleModalCloseWithCleanup}
+          title="Add New User"
+          description="Create a new user account with the required information"
+          isSubmitting={isSubmitting}
+          maxWidth="sm:max-w-[700px]"
+        >
+          <UserForm
+            onSubmit={handleCreateUser}
+            initialData={{
+              name: '',
+              email: '',
+              role: UserRole.USER,
+              phone: ''
+            }}
+            isLoading={isSubmitting}
+            error={formError}
+            success={formSuccess}
+            title="Add New User"
+            description="Create a new user account"
+            submitLabel="Create User"
+            showPassword={true}
+            onCancel={handleModalCloseWithCleanup}
+          />
+        </EntityCreateModal>
+      )}
       
       {/* Delete confirmation dialog */}
       {userToDelete && (

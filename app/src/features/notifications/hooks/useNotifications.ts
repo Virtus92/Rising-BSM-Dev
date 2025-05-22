@@ -701,6 +701,7 @@ export const useNotifications = ({
       updateFilters: () => {},
       setPage: () => {},
       setLimit: () => {},
+      setPageSize: () => {},
       resetFilters: () => {},
       setSort: () => {},
       setSearch: () => {},

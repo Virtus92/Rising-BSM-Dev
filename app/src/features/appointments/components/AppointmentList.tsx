@@ -21,6 +21,7 @@ interface AppointmentListProps {
   initialFilters?: Partial<AppointmentFilterParamsDto>;
   onCreateClick?: () => void;
   showCreateButton?: boolean;
+  onActionClick?: (action: string, appointment?: AppointmentDto) => void;
 }
 
 // Card component for mobile view - defined outside the main component to ensure stable reference
@@ -113,7 +114,8 @@ const AppointmentCard = ({ item, onActionClick }: CardProps<AppointmentDto>) => 
 export const AppointmentList: React.FC<AppointmentListProps> = ({ 
   initialFilters,
   onCreateClick,
-  showCreateButton = true
+  showCreateButton = true,
+  onActionClick
 }) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -129,6 +131,7 @@ export const AppointmentList: React.FC<AppointmentListProps> = ({
     filters,
     updateFilters,
     setPage,
+    setPageSize,
     setSearch,
     deleteAppointment,
     refetch 
@@ -194,21 +197,26 @@ export const AppointmentList: React.FC<AppointmentListProps> = ({
   
   // Handle card action clicks
   const handleCardAction = useCallback((action: string, appointment: AppointmentDto) => {
-    switch (action) {
-      case 'view':
-        router.push(`/dashboard/appointments/${appointment.id}`);
-        break;
-      case 'edit':
-        router.push(`/dashboard/appointments/edit/${appointment.id}`);
-        break;
-      case 'delete':
-        setAppointmentToDelete({ 
-          id: Number(appointment.id), 
-          title: appointment.title 
-        });
-        break;
+    if (onActionClick) {
+      onActionClick(action, appointment);
+    } else {
+      // Fallback to old behavior
+      switch (action) {
+        case 'view':
+          router.push(`/dashboard/appointments/${appointment.id}`);
+          break;
+        case 'edit':
+          router.push(`/dashboard/appointments/edit/${appointment.id}`);
+          break;
+        case 'delete':
+          setAppointmentToDelete({ 
+            id: Number(appointment.id), 
+            title: appointment.title 
+          });
+          break;
+      }
     }
-  }, [router]);
+  }, [onActionClick, router]);
   
   // Define columns for the table view
   const columns: ColumnDef<AppointmentDto>[] = [
@@ -250,7 +258,7 @@ export const AppointmentList: React.FC<AppointmentListProps> = ({
         variant="outline" 
         size="icon" 
         title="View Details"
-        onClick={() => router.push(`/dashboard/appointments/${appointment.id}`)}
+        onClick={() => handleCardAction('view', appointment)}
         className={EntityColors.appointments.text}
       >
         <Eye className="h-4 w-4" />
@@ -260,7 +268,7 @@ export const AppointmentList: React.FC<AppointmentListProps> = ({
         variant="outline" 
         size="icon" 
         title="Edit Appointment"
-        onClick={() => router.push(`/dashboard/appointments/edit/${appointment.id}`)}
+        onClick={() => handleCardAction('edit', appointment)}
         className={EntityColors.appointments.text}
       >
         <Edit className="h-4 w-4" />
@@ -270,15 +278,12 @@ export const AppointmentList: React.FC<AppointmentListProps> = ({
         variant="destructive" 
         size="icon" 
         title="Delete Appointment"
-        onClick={() => setAppointmentToDelete({ 
-          id: Number(appointment.id), 
-          title: appointment.title 
-        })}
+        onClick={() => handleCardAction('delete', appointment)}
       >
         <Trash2 className="h-4 w-4" />
       </Button>
     </div>
-  ), [router]);
+  ), [handleCardAction]);
   
   // Create active filters array for display
   const activeFilters = [];
@@ -352,6 +357,7 @@ export const AppointmentList: React.FC<AppointmentListProps> = ({
         
         // Actions
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
         onSearchChange={setSearch}
         onSortChange={handleSortChange}
         onCreateClick={onCreateClick || (() => router.push('/dashboard/appointments/create'))}

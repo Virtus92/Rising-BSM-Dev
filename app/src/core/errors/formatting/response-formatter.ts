@@ -26,6 +26,7 @@ export const formatResponse = {
       success: true,
       data,
       message,
+      error: null,
       timestamp: new Date().toISOString()
     }, { status });
   },

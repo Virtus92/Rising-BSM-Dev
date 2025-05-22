@@ -48,8 +48,15 @@ export async function getAppointmentHandler(
     // Get appointment service
     const appointmentService = serviceFactory.createAppointmentService();
     
-    // Get appointment by ID
-    const appointment = await appointmentService.getById(id);
+    // CRITICAL FIX: Use getAppointmentDetails instead of getById to ensure customer relations
+    const appointment = await appointmentService.getAppointmentDetails(id, {
+      context: {
+        userId: request.auth.userId,
+        ipAddress: request.headers.get('x-forwarded-for') || 'unknown'
+      },
+      // Always include customer relation for complete data
+      relations: ['customer', 'notes']
+    });
     
     if (!appointment) {
       return formatResponse.error('Appointment not found', 404);
