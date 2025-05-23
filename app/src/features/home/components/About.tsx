@@ -160,7 +160,7 @@ const About = () => {
             </div>
             
             <a 
-              href="https://github.com/Virtus92/Rising-BSM-release"
+              href="https://github.com/Virtus92/Rising-BSM"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center px-6 py-3 bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white rounded-lg shadow-md transition-all"

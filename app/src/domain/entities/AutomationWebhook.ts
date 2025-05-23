@@ -16,7 +16,10 @@ export enum AutomationEntityType {
 export enum AutomationOperation {
   CREATE = 'create',
   UPDATE = 'update',
-  DELETE = 'delete'
+  DELETE = 'delete',
+  STATUS_CHANGED = 'status_changed',
+  ASSIGNED = 'assigned',
+  COMPLETED = 'completed'
 }
 
 /**

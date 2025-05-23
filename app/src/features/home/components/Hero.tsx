@@ -84,7 +84,7 @@ const Hero = () => {
               </Link>
               
               <a 
-                href="https://github.com/Virtus92/Rising-BSM-release" 
+                href="https://github.com/Virtus92/Rising-BSM" 
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white px-6 py-3 rounded-lg shadow-md transition flex items-center justify-center space-x-2 text-lg"

@@ -1,27 +1,18 @@
 /**
- * Service factory helpers for automation feature
+ * Get Automation Service Instance
+ * 
+ * Server-side helper to get the automation service instance
  */
 
-import { getAutomationService as getAutomationServiceFromFactory } from '@/core/factories/serviceFactory.server';
+import { getServiceFactory } from '@/core/factories/index.server';
 import { IAutomationService } from '@/domain/services/IAutomationService';
 
 /**
- * Gets the automation service instance
- * FIXED: Returns Promise to ensure service is properly initialized
+ * Get automation service instance
+ * 
+ * @returns Promise<IAutomationService>
  */
 export async function getAutomationService(): Promise<IAutomationService> {
-  try {
-    const service = getAutomationServiceFromFactory();
-    
-    // Ensure service is properly initialized
-    if (!service) {
-      throw new Error('Automation service not available');
-    }
-    
-    return service;
-  } catch (error) {
-    // Log error and re-throw
-    console.error('Failed to get automation service:', error);
-    throw error;
-  }
+  const factory = getServiceFactory();
+  return factory.createAutomationService();
 }

@@ -14,6 +14,9 @@ export { toggleWebhookRoute } from './toggle-webhook-route';
 export { testWebhookRoute } from './test-webhook-route';
 export { debugWebhookRoute } from './debug-webhook-route';
 export { diagnoseWebhookRoute } from './diagnose-webhook-route';
+export { getTemplateVariablesRoute } from './get-template-variables-route';
+export { previewTemplateRoute } from './preview-template-route';
+export { getDefaultTemplateRoute } from './get-default-template-route';
 
 // Schedule routes
 export { createScheduleRoute } from './create-schedule-route';

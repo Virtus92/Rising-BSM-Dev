@@ -227,6 +227,32 @@ export interface IAutomationService extends IBaseService<
     nextRun?: Date;
     errors?: string[];
   }>;
+
+  // ============================================================================
+  // TEMPLATE HELPER METHODS
+  // ============================================================================
+
+  /**
+   * Get available variables for entity type
+   */
+  getAvailableVariables(entityType: AutomationEntityType): Promise<{
+    entityVariables: string[];
+    systemVariables: string[];
+  }>;
+
+  /**
+   * Get default template for entity type and operation
+   */
+  getDefaultTemplateForEntity(entityType: AutomationEntityType, operation: AutomationOperation): Promise<Record<string, any>>;
+
+  /**
+   * Preview template with sample data
+   */
+  previewTemplate(
+    template: Record<string, any>,
+    entityType: AutomationEntityType,
+    operation: AutomationOperation
+  ): Promise<string>;
 }
 
 /**

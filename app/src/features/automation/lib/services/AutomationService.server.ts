@@ -28,10 +28,10 @@ import {
 } from '@/domain/dtos/AutomationDtos';
 import { ILoggingService } from '@/core/logging/ILoggingService';
 import { AppError } from '@/types/errors';
-import { buildPayloadFromTemplate } from '../utils/payload-template';
-import { validateWebhookConfig, testWebhookConnection } from '../utils/webhook-validator';
-import { testWebhookConnectionEnhanced, validateWebhookUrlEnhanced } from '../utils/webhook-validator.enhanced';
+import { buildPayload, validateTemplate, getDefaultTemplate, ENTITY_VARIABLES, SYSTEM_VARIABLES } from '../utils/payload-template';
+import { validateWebhookConfig } from '../utils/webhook-validator';
 import { validateCronExpression, describeCronExpression, getNextRunTime } from '../utils/cron-parser';
+import { executeWebhook, testWebhookUrl } from '../utils/webhook-executor';
 
 /**
  * Server-side implementation of the AutomationService
@@ -75,8 +75,13 @@ export class AutomationService extends BaseService<
     try {
       this.logger.info('Creating new webhook', { data, createdBy });
       
+      // Use default template if none provided
+      if (!data.payloadTemplate || Object.keys(data.payloadTemplate).length === 0) {
+        data.payloadTemplate = getDefaultTemplate(data.entityType, data.operation);
+      }
+      
       // Validate webhook configuration
-      const validation = validateWebhookConfig({
+      const urlValidation = validateWebhookConfig({
         name: data.name,
         webhookUrl: data.webhookUrl,
         headers: data.headers,
@@ -85,8 +90,14 @@ export class AutomationService extends BaseService<
         retryDelaySeconds: data.retryDelaySeconds
       });
       
-      if (!validation.isValid) {
-        throw new AppError(`Webhook validation failed: ${validation.errors.join(', ')}`, 400);
+      if (!urlValidation.isValid) {
+        throw new AppError(`Webhook validation failed: ${urlValidation.errors.join(', ')}`, 400);
+      }
+      
+      // Validate template
+      const templateValidation = validateTemplate(data.payloadTemplate);
+      if (!templateValidation.isValid) {
+        throw new AppError(`Template validation failed: ${templateValidation.errors.join(', ')}`, 400);
       }
       
       // Create webhook entity
@@ -238,69 +249,31 @@ export class AutomationService extends BaseService<
 
   async testWebhook(data: TestWebhookDto): Promise<TestWebhookResponseDto> {
     try {
-      this.logger.info('Testing webhook with enhanced validation', { 
+      this.logger.info('Testing webhook', { 
         url: data.webhookUrl,
         hasHeaders: !!data.headers && Object.keys(data.headers).length > 0
       });
       
-      // First, perform enhanced URL validation
-      const urlValidation = validateWebhookUrlEnhanced(data.webhookUrl);
-      
-      if (!urlValidation.isValid) {
-        this.logger.warn('Webhook URL validation failed', {
-          url: data.webhookUrl,
-          errors: urlValidation.errors,
-          warnings: urlValidation.warnings
-        });
-        
-        return {
-          success: false,
-          responseStatus: 400,
-          responseBody: '',
-          executionTimeMs: 0,
-          errorMessage: `Validation failed: ${urlValidation.errors.join(', ')}`
-        };
-      }
-      
-      // Log service type and recommendations
-      this.logger.info('Webhook service identified', {
-        serviceType: urlValidation.serviceType,
-        warnings: urlValidation.warnings,
-        recommendations: urlValidation.recommendations
-      });
-      
-      // Perform enhanced connection test
-      const result = await testWebhookConnectionEnhanced(
-        data.webhookUrl, 
+      // Test the webhook URL
+      const result = await testWebhookUrl(
+        data.webhookUrl,
         data.headers,
-        undefined // Let the function generate appropriate test payload
+        data.payload
       );
       
-      // Log detailed test results with actual URL used
       this.logger.info('Webhook test completed', {
-        url: data.webhookUrl,  // Original URL
+        url: data.webhookUrl,
         success: result.success,
-        status: result.statusCode,
-        serviceType: result.serviceType,
-        methodUsed: result.methodUsed,
+        statusCode: result.statusCode,
         responseTime: result.responseTime
       });
       
-      // Return a clean, flat structure
       return {
         success: result.success,
         responseStatus: result.statusCode || 0,
         responseBody: result.responseBody || '',
         executionTimeMs: result.responseTime,
-        errorMessage: result.error,
-        // Add additional metadata as separate fields
-        serviceType: result.serviceType,
-        methodUsed: result.methodUsed,
-        validation: {
-          warnings: urlValidation.warnings,
-          recommendations: urlValidation.recommendations,
-          errors: []
-        }
+        errorMessage: result.error
       };
       
     } catch (error) {
@@ -609,15 +582,32 @@ export class AutomationService extends BaseService<
       
       const result = await this.executionRepository.findWithFilters(filters || {});
       
+      // Ensure we have valid data
+      const executions = result?.data || [];
+      const mappedExecutions = executions.map(execution => {
+        try {
+          return mapExecutionToResponseDto(execution);
+        } catch (e) {
+          this.logger.warn('Failed to map execution', { execution, error: e });
+          return null;
+        }
+      }).filter(Boolean) as ExecutionResponseDto[];
+      
       return {
-        data: result.data.map(execution => mapExecutionToResponseDto(execution)),
-        total: result.total,
-        page: result.page,
-        pageSize: result.pageSize
+        data: mappedExecutions,
+        total: result?.total || 0,
+        page: result?.page || filters?.page || 1,
+        pageSize: result?.pageSize || filters?.limit || 10
       };
     } catch (error) {
       this.logger.error('Error getting executions', { error, filters });
-      throw new AppError('Failed to get executions', 500);
+      // Return empty result instead of throwing
+      return {
+        data: [],
+        total: 0,
+        page: filters?.page || 1,
+        pageSize: filters?.limit || 10
+      };
     }
   }
 
@@ -714,15 +704,8 @@ export class AutomationService extends BaseService<
     try {
       this.logger.debug('Getting automation dashboard data');
       
-      const [
-        totalWebhooks,
-        activeWebhooks,
-        totalSchedules,
-        activeSchedules,
-        executionStats,
-        recentExecutions,
-        topFailedAutomations
-      ] = await Promise.all([
+      // Use Promise.allSettled to handle individual failures gracefully
+      const results = await Promise.allSettled([
         this.webhookRepository.count(),
         this.webhookRepository.countActive(),
         this.scheduleRepository.count(),
@@ -732,15 +715,31 @@ export class AutomationService extends BaseService<
         this.executionRepository.getTopFailedAutomations(5)
       ]);
       
+      // Extract values with defaults for failed promises
+      const totalWebhooks = results[0].status === 'fulfilled' ? results[0].value : 0;
+      const activeWebhooks = results[1].status === 'fulfilled' ? results[1].value : 0;
+      const totalSchedules = results[2].status === 'fulfilled' ? results[2].value : 0;
+      const activeSchedules = results[3].status === 'fulfilled' ? results[3].value : 0;
+      
+      const executionStats = results[4].status === 'fulfilled' ? results[4].value : {
+        totalExecutions: 0,
+        successfulExecutions: 0,
+        failedExecutions: 0,
+        successRate: 0
+      };
+      
+      const recentExecutions = results[5].status === 'fulfilled' ? results[5].value : [];
+      const topFailedAutomations = results[6].status === 'fulfilled' ? results[6].value : [];
+      
       return {
         totalWebhooks,
         activeWebhooks,
         totalSchedules,
         activeSchedules,
-        totalExecutions: executionStats.totalExecutions,
-        successfulExecutions: executionStats.successfulExecutions,
-        failedExecutions: executionStats.failedExecutions,
-        successRate: executionStats.successRate,
+        totalExecutions: executionStats.totalExecutions || 0,
+        successfulExecutions: executionStats.successfulExecutions || 0,
+        failedExecutions: executionStats.failedExecutions || 0,
+        successRate: executionStats.successRate || 0,
         recentExecutions: recentExecutions.map(execution => mapExecutionToResponseDto(execution)),
         topFailedAutomations: topFailedAutomations.map(item => ({
           id: item.automationId,
@@ -751,7 +750,19 @@ export class AutomationService extends BaseService<
       };
     } catch (error) {
       this.logger.error('Error getting dashboard data', { error });
-      throw new AppError('Failed to get dashboard data', 500);
+      // Return empty dashboard data instead of throwing
+      return {
+        totalWebhooks: 0,
+        activeWebhooks: 0,
+        totalSchedules: 0,
+        activeSchedules: 0,
+        totalExecutions: 0,
+        successfulExecutions: 0,
+        failedExecutions: 0,
+        successRate: 0,
+        recentExecutions: [],
+        topFailedAutomations: []
+      };
     }
   }
 
@@ -927,74 +938,194 @@ export class AutomationService extends BaseService<
   }
 
   // ============================================================================
+  // TEMPLATE HELPER METHODS
+  // ============================================================================
+
+  async getAvailableVariables(entityType: AutomationEntityType): Promise<{
+    entityVariables: string[];
+    systemVariables: string[];
+  }> {
+    return {
+      entityVariables: ENTITY_VARIABLES[entityType] || [],
+      systemVariables: SYSTEM_VARIABLES
+    };
+  }
+
+  async getDefaultTemplateForEntity(entityType: AutomationEntityType, operation: AutomationOperation): Promise<Record<string, any>> {
+    return getDefaultTemplate(entityType, operation);
+  }
+
+  async previewTemplate(
+    template: Record<string, any>,
+    entityType: AutomationEntityType,
+    operation: AutomationOperation
+  ): Promise<string> {
+    try {
+      // Generate sample data
+      const sampleData = this.generateSampleData(entityType);
+      
+      // Build payload
+      const payload = buildPayload(template, sampleData, {
+        entityType,
+        operation,
+        webhookName: 'Sample Webhook',
+        webhookId: 1
+      });
+      
+      // Return formatted JSON
+      return JSON.stringify(payload, null, 2);
+    } catch (error) {
+      this.logger.error('Error previewing template', { error });
+      return '{"error": "Failed to preview template"}';
+    }
+  }
+
+  private generateSampleData(entityType: AutomationEntityType): any {
+    const now = new Date();
+    
+    switch (entityType) {
+      case AutomationEntityType.USER:
+        return {
+          id: 123,
+          email: 'john.doe@example.com',
+          username: 'johndoe',
+          firstName: 'John',
+          lastName: 'Doe',
+          role: 'admin',
+          status: 'active',
+          lastLogin: now.toISOString(),
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString()
+        };
+        
+      case AutomationEntityType.CUSTOMER:
+        return {
+          id: 456,
+          name: 'Acme Corporation',
+          email: 'contact@acme.com',
+          phone: '+1-555-1234',
+          company: 'Acme Corp',
+          notes: 'Important client',
+          status: 'active',
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+          createdBy: 123
+        };
+        
+      case AutomationEntityType.APPOINTMENT:
+        return {
+          id: 789,
+          title: 'Project Review Meeting',
+          description: 'Quarterly project review',
+          startDate: now.toISOString(),
+          endDate: new Date(now.getTime() + 3600000).toISOString(),
+          location: 'Conference Room A',
+          status: 'scheduled',
+          customerId: 456,
+          customerName: 'Acme Corporation',
+          customerEmail: 'contact@acme.com',
+          userId: 123,
+          userName: 'John Doe',
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString()
+        };
+        
+      case AutomationEntityType.REQUEST:
+        return {
+          id: 321,
+          name: 'Jane Smith',
+          email: 'jane@example.com',
+          phone: '+1-555-5678',
+          subject: 'Website Redesign',
+          message: 'We need a complete website redesign...',
+          service: 'Web Development',
+          budget: '$10,000 - $25,000',
+          urgency: 'high',
+          status: 'new',
+          source: 'website',
+          customerId: null,
+          assignedTo: null,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString()
+        };
+        
+      default:
+        return {
+          id: 999,
+          type: entityType,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString()
+        };
+    }
+  }
+
+  // ============================================================================
   // PRIVATE HELPER METHODS
   // ============================================================================
 
   private async executeWebhook(webhook: AutomationWebhook, entityData: any, entityId?: number): Promise<AutomationExecution> {
     const startTime = Date.now();
     
-    // Create execution record
-    const execution = new AutomationExecution({
-      automationType: AutomationType.WEBHOOK,
-      automationId: webhook.id,
-      entityId,
-      entityType: webhook.entityType,
-      status: AutomationExecutionStatus.SUCCESS,
-      executedAt: new Date(),
-      retryAttempt: 0
-    });
-    
     try {
-      // Build payload from template
-      const payload = buildPayloadFromTemplate(webhook.payloadTemplate, entityData, webhook.entityType, webhook.operation);
-      
-      
-      // Make HTTP request
-      const response = await fetch(webhook.webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Rising-BSM-Automation/1.0',
-          ...webhook.headers
+      // Execute webhook using simplified executor
+      const result = await executeWebhook(
+        {
+          id: webhook.id,
+          name: webhook.name,
+          webhookUrl: webhook.webhookUrl,
+          headers: webhook.headers,
+          payloadTemplate: webhook.payloadTemplate,
+          entityType: webhook.entityType,
+          operation: webhook.operation
         },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30000) // 30 second timeout
+        entityData,
+        entityId
+      );
+      
+      // Create execution record
+      const execution = new AutomationExecution({
+        automationType: AutomationType.WEBHOOK,
+        automationId: webhook.id,
+        entityId,
+        entityType: webhook.entityType,
+        status: result.success ? AutomationExecutionStatus.SUCCESS : AutomationExecutionStatus.FAILED,
+        responseStatus: result.statusCode,
+        responseBody: result.responseBody,
+        errorMessage: result.error,
+        executionTimeMs: result.responseTime,
+        executedAt: new Date(),
+        retryAttempt: 0
       });
       
-      const executionTime = Date.now() - startTime;
-      const responseBody = await response.text();
+      // Save execution record
+      const savedExecution = await this.executionRepository.create(execution);
       
-      if (response.ok) {
-        execution.markAsSuccessful(response.status, responseBody, executionTime);
-      } else {
-        execution.markAsFailed(
-          `HTTP ${response.status}: ${response.statusText}`,
-          response.status,
-          responseBody,
-          executionTime
-        );
-      }
+      this.logger.info('Webhook executed', {
+        webhookId: webhook.id,
+        executionId: savedExecution.id,
+        status: savedExecution.status,
+        executionTime: savedExecution.executionTimeMs
+      });
+      
+      return savedExecution;
     } catch (error) {
       const executionTime = Date.now() - startTime;
-      execution.markAsFailed(
-        error instanceof Error ? error.message : 'Unknown error',
-        undefined,
-        undefined,
-        executionTime
-      );
+      
+      // Create failed execution record
+      const execution = new AutomationExecution({
+        automationType: AutomationType.WEBHOOK,
+        automationId: webhook.id,
+        entityId,
+        entityType: webhook.entityType,
+        status: AutomationExecutionStatus.FAILED,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        executionTimeMs: executionTime,
+        executedAt: new Date(),
+        retryAttempt: 0
+      });
+      
+      return await this.executionRepository.create(execution);
     }
-    
-    // Save execution record
-    const savedExecution = await this.executionRepository.create(execution);
-    
-    this.logger.info('Webhook executed', {
-      webhookId: webhook.id,
-      executionId: savedExecution.id,
-      status: savedExecution.status,
-      executionTime: savedExecution.executionTimeMs
-    });
-    
-    return savedExecution;
   }
 
   private async executeScheduledJob(schedule: AutomationSchedule): Promise<AutomationExecution> {

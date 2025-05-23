@@ -72,7 +72,7 @@ const CTA = () => {
               </Link>
               
               <a 
-                href="https://github.com/Virtus92/Rising-BSM-release" 
+                href="https://github.com/Virtus92/Rising-BSM" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="bg-indigo-700 hover:bg-indigo-800 text-white px-8 py-4 rounded-lg shadow-lg transition-all transform hover:-translate-y-1 font-medium text-lg flex items-center justify-center"
@@ -143,7 +143,7 @@ const CTA = () => {
             </div>
             
             <div className="font-mono text-green-400 mb-4">
-              <span className="text-slate-500">$</span> git clone https://github.com/Virtus92/Rising-BSM-release.git
+              <span className="text-slate-500">$</span> git clone https://github.com/Virtus92/Rising-BSM.git
             </div>
             
             <div className="font-mono text-green-400 mb-4">

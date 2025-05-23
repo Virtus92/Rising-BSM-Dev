@@ -138,7 +138,7 @@ const FAQ = () => {
               Have more questions? We're here to help!
             </p>
             <a 
-              href="https://github.com/Virtus92/Rising-BSM-release/discussions"
+              href="https://github.com/Virtus92/Rising-BSM/discussions"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-md transition-all"
