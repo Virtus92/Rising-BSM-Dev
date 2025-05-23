@@ -20,7 +20,6 @@ import { RequestService } from '@/features/requests/lib/services/RequestService.
 import { ActivityLogService } from '@/features/activity/lib/services/ActivityLogService.client';
 import { PermissionService } from '@/features/permissions/lib/services/PermissionService.client';
 import { RequestDataService } from '@/features/requests/lib/services/RequestDataService.client';
-import { N8NIntegrationService } from '@/features/requests/lib/n8n/N8NIntegrationService.client';
 import { NotificationService } from '@/features/notifications/lib/services/NotificationService.client';
 import { UserService } from '@/features/users/lib/services/UserService';
 
@@ -35,7 +34,7 @@ import { INotificationService } from '@/domain/services/INotificationService';
 import { IRefreshTokenService } from '@/domain/services/IRefreshTokenService';
 import { IPermissionService } from '@/domain/services/IPermissionService';
 import { IRequestDataService } from '@/domain/services/IRequestDataService';
-import { IN8NIntegrationService } from '@/domain/services/IN8NIntegrationService';
+import { IAutomationService } from '@/domain/services/IAutomationService';
 import { getValidationService } from '../validation';
 import errorHandler from '../errors/error-handler';
 
@@ -55,7 +54,7 @@ export class ServiceFactory implements IServiceFactory {
   private notificationService?: INotificationService;
   private permissionService?: IPermissionService;
   private requestDataService?: IRequestDataService;
-  private n8nService?: IN8NIntegrationService;
+  private automationService?: IAutomationService;
 
   /**
    * Private constructor for singleton pattern
@@ -169,14 +168,19 @@ export class ServiceFactory implements IServiceFactory {
     return this.requestDataService;
   }
 
+
   /**
-   * Creates an instance of N8NIntegrationService
+   * Creates an instance of AutomationService
+   * Note: This is a client-side placeholder. 
+   * Server-side implementation should import the actual AutomationService
    */
-  public createN8NIntegrationService(): IN8NIntegrationService {
-    if (!this.n8nService) {
-      this.n8nService = new N8NIntegrationService();
+  public createAutomationService(): IAutomationService {
+    if (!this.automationService) {
+      // For client-side, we could create a minimal implementation or throw an error
+      // indicating that automation service should be used server-side only
+      throw new Error('AutomationService is only available server-side. Use AutomationClient instead.');
     }
-    return this.n8nService;
+    return this.automationService;
   }
 
   /**
@@ -200,7 +204,7 @@ export class ServiceFactory implements IServiceFactory {
     this.notificationService = undefined;
     this.permissionService = undefined;
     this.requestDataService = undefined;
-    this.n8nService = undefined;
+    this.automationService = undefined;
   }
 }
 
@@ -252,8 +256,8 @@ export function getRequestDataService(): IRequestDataService {
   return getServiceFactory().createRequestDataService();
 }
 
-export function getN8NIntegrationService(): IN8NIntegrationService {
-  return getServiceFactory().createN8NIntegrationService();
+export function getAutomationService(): IAutomationService {
+  return getServiceFactory().createAutomationService();
 }
 
 export function getSecurityConfig(): SecurityConfig {

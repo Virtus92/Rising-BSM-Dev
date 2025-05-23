@@ -22,7 +22,10 @@ import {
   getRequestRepository,
   getNotificationRepository,
   getPermissionRepository,
-  getRequestDataRepository
+  getRequestDataRepository,
+  getAutomationWebhookRepository,
+  getAutomationScheduleRepository,
+  getAutomationExecutionRepository
 } from './repositoryFactory.server';
 
 // Services
@@ -33,10 +36,10 @@ import { RequestServiceImpl } from '@/features/requests/lib/services/RequestServ
 import { ActivityLogService } from '@/features/activity/lib/services/ActivityLogService';
 import { PermissionService } from '@/features/permissions/lib/services/PermissionService';
 import { RequestDataService } from '@/features/requests/lib/services/RequestDataService';
-import { N8NIntegrationService } from '@/features/requests/lib/n8n/N8NIntegrationService';
 import { UserService } from '@/features/users/lib/services/UserService.server';
 import { NotificationService } from '@/features/notifications/lib/services/NotificationService.server';
 import { RefreshTokenServiceServer } from '@/features/auth/lib/services/RefreshTokenService.server';
+import { AutomationService } from '@/features/automation/lib/services/AutomationService.server';
 // Use dynamic import for NotificationService to avoid circular dependencies
 
 // Interfaces
@@ -50,7 +53,8 @@ import { INotificationService } from '@/domain/services/INotificationService';
 import { IRefreshTokenService } from '@/domain/services/IRefreshTokenService';
 import { IPermissionService } from '@/domain/services/IPermissionService';
 import { IRequestDataService } from '@/domain/services/IRequestDataService';
-import { IN8NIntegrationService } from '@/domain/services/IN8NIntegrationService';
+
+import { IAutomationService } from '@/domain/services/IAutomationService';
 import { RefreshToken } from '@/domain/entities/RefreshToken';
 import { PermissionRepository } from '@/features/permissions/lib';
 
@@ -70,8 +74,9 @@ export class ServiceFactory implements IServiceFactory {
   private notificationService?: NotificationService;
   private permissionService?: PermissionService;
   private requestDataService?: RequestDataService;
-  private n8nIntegrationService?: N8NIntegrationService;
+
   private refreshTokenService?: RefreshTokenServiceServer;
+  private automationService?: AutomationService;
 
   /**
    * Private constructor for singleton pattern
@@ -183,21 +188,7 @@ export class ServiceFactory implements IServiceFactory {
     return this.requestDataService!;
   }
 
-  /**
-   * Creates an N8NIntegrationService instance
-   */
-  public createN8NIntegrationService(): IN8NIntegrationService {
-    if (!this.n8nIntegrationService) {
-      this.n8nIntegrationService = new N8NIntegrationService(
-        getRequestRepository(),
-        getRequestDataRepository(),
-        getLogger(),
-        getErrorHandler(),
-        configService
-      );
-    }
-    return this.n8nIntegrationService!;
-  }
+
 
   /**
    * Creates an instance of ActivityLogService
@@ -242,6 +233,23 @@ export class ServiceFactory implements IServiceFactory {
   }
 
     /**
+   * Creates an instance of AutomationService
+   */
+  public createAutomationService(): IAutomationService {
+    if (!this.automationService) {
+      this.automationService = new AutomationService(
+        getAutomationWebhookRepository(),
+        getAutomationScheduleRepository(),
+        getAutomationExecutionRepository(),
+        getLogger(),
+        getValidationService(),
+        getErrorHandler()
+      );
+    }
+    return this.automationService as IAutomationService;
+  }
+
+  /**
    * Creates a Permission Service instance
    */
   public createPermissionService(): IPermissionService {
@@ -277,7 +285,8 @@ export class ServiceFactory implements IServiceFactory {
     this.notificationService = undefined;
     this.permissionService = undefined;
     this.requestDataService = undefined;
-    this.n8nIntegrationService = undefined;
+
+    this.automationService = undefined;
   }
   
   /**
@@ -320,9 +329,7 @@ export function getRequestDataService(): IRequestDataService {
   return getServiceFactory().createRequestDataService();
 }
 
-export function getN8NIntegrationService(): IN8NIntegrationService {
-  return getServiceFactory().createN8NIntegrationService();
-}
+
 
 export function getActivityLogService(): IActivityLogService {
   return getServiceFactory().createActivityLogService();
@@ -338,6 +345,10 @@ export function getRefreshTokenService(): IRefreshTokenService {
 
 export function getPermissionService(): IPermissionService {
   return getServiceFactory().createPermissionService();
+}
+
+export function getAutomationService(): IAutomationService {
+  return getServiceFactory().createAutomationService();
 }
 
 export function resetServices(): void {

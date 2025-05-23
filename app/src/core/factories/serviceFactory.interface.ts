@@ -15,7 +15,7 @@ import { INotificationService } from '@/domain/services/INotificationService';
 import { IRefreshTokenService } from '@/domain/services/IRefreshTokenService';
 import { IPermissionService } from '@/domain/services/IPermissionService';
 import { IRequestDataService } from '@/domain/services/IRequestDataService';
-import { IN8NIntegrationService } from '@/domain/services/IN8NIntegrationService';
+import { IAutomationService } from '@/domain/services/IAutomationService';
 
 /**
  * Interface for the ServiceFactory class
@@ -34,7 +34,8 @@ export interface IServiceFactory {
   createRefreshTokenService(): IRefreshTokenService;
   createPermissionService(): IPermissionService;
   createRequestDataService(): IRequestDataService;
-  createN8NIntegrationService(): IN8NIntegrationService;
+
+  createAutomationService(): IAutomationService;
   createSecurityConfig(): SecurityConfig;
   resetServices(): void;
 }
@@ -53,5 +54,6 @@ export type {
   IRefreshTokenService,
   IPermissionService,
   IRequestDataService,
-  IN8NIntegrationService
+
+  IAutomationService
 };

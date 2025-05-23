@@ -15,6 +15,7 @@ import {
   Shield,
   ChevronDown,
   BarChart2,
+  Zap,
 } from 'lucide-react';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
@@ -84,6 +85,12 @@ export const DashboardSidebar = () => {
       icon: Calendar,
       href: '/dashboard/appointments',
       permission: SystemPermission.APPOINTMENTS_VIEW
+    },
+    { 
+      label: 'Automation',
+      icon: Zap,
+      href: '/dashboard/automation',
+      permission: SystemPermission.AUTOMATION_VIEW
     },
     { 
       label: 'My Profile',

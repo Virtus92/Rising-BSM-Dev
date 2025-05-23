@@ -21,7 +21,7 @@ export const formatResponse = {
    * @param status HTTP status code (default: 200)
    * @returns Formatted success response
    */
-  success<T>(data: T, message?: string, status: number = 200): NextResponse<SuccessResponse<T>> {
+  success<T>(data: T, message?: string, status: number = 200): NextResponse {
     return NextResponse.json({
       success: true,
       data,
@@ -45,7 +45,7 @@ export const formatResponse = {
     statusCode: number = 500, 
     errorCode?: string, 
     details?: any
-  ): NextResponse<ErrorResponse> {
+  ): NextResponse {
     // Extract information from error object
     const message = error instanceof Error ? error.message : error;
     const code = error instanceof AppError 
@@ -77,7 +77,7 @@ export const formatResponse = {
       });
     }
     
-    return NextResponse.json({
+    const response: ErrorResponse = {
       success: false,
       data: null,
       message,
@@ -86,7 +86,9 @@ export const formatResponse = {
         details: errorDetails
       },
       timestamp: new Date().toISOString()
-    }, { status });
+    };
+    
+    return NextResponse.json(response, { status });
   },
   
   /**
@@ -101,7 +103,7 @@ export const formatResponse = {
     message: string = 'Resource not found', 
     errorCode: string = 'NOT_FOUND', 
     details?: any
-  ): NextResponse<ErrorResponse> {
+  ): NextResponse {
     return this.error(
       new NotFoundError(message, errorCode, details)
     );
@@ -119,7 +121,7 @@ export const formatResponse = {
     message: string = 'Authentication required', 
     errorCode: string = 'AUTHENTICATION_REQUIRED', 
     details?: any
-  ): NextResponse<ErrorResponse> {
+  ): NextResponse {
     return this.error(
       new AuthenticationError(message, errorCode, details)
     );
@@ -137,7 +139,7 @@ export const formatResponse = {
     message: string = 'Permission denied', 
     errorCode: string = 'PERMISSION_DENIED', 
     details?: any
-  ): NextResponse<ErrorResponse> {
+  ): NextResponse {
     return this.error(
       new PermissionError(message, errorCode, details)
     );
@@ -155,7 +157,7 @@ export const formatResponse = {
     errors: Record<string, string[]> | string[] | any,
     message: string = 'Validation failed',
     errorCode: string = 'VALIDATION_ERROR'
-  ): NextResponse<ErrorResponse> {
+  ): NextResponse {
     return this.error(
       new ValidationError(message, errorCode, { errors })
     );
@@ -168,7 +170,7 @@ export const formatResponse = {
     message: string = 'Invalid request data', 
     errorCode: string = 'VALIDATION_ERROR', 
     details?: any
-  ): NextResponse<ErrorResponse> {
+  ): NextResponse {
     return this.error(
       new ValidationError(message, errorCode, details)
     );
@@ -190,7 +192,7 @@ export const formatResponse = {
     page: number,
     limit: number,
     message?: string
-  ): NextResponse<SuccessResponse<PaginatedResponse<T>>> {
+  ): NextResponse {
     const totalPages = Math.ceil(total / limit);
     
     return this.success({

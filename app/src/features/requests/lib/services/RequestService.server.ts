@@ -202,6 +202,7 @@ export class RequestServiceImpl implements IRequestService {
   private logger: ILoggingService;
   private validationService: IValidationService;
   private errorHandler: IErrorHandler;
+  private automationService?: any; // IAutomationService
 
   /**
    * Constructor
@@ -227,6 +228,13 @@ export class RequestServiceImpl implements IRequestService {
     this.logger = logger || getLogger();
     this.validationService = validationService || require('@/core/validation').getValidationService();
     this.errorHandler = errorHandler || require('@/core/errors').getErrorHandler();
+    
+    // Get automation service for webhook triggers
+    try {
+      this.automationService = serverFactories.getAutomationService();
+    } catch (error) {
+      this.logger.warn('AutomationService not available, webhooks will not be triggered', error as Error);
+    }
     
     this.logger.debug('Server-side RequestService initialized');
   }
@@ -545,6 +553,25 @@ export class RequestServiceImpl implements IRequestService {
       // Create request
       const createdRequest = await this.repository.create(requestEntity as ContactRequest);
       
+      // Trigger webhooks for request creation
+      if (this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'request', // entityType (matches AutomationEntityType.REQUEST)
+            'create', // operation
+            createdRequest, // entityData
+            createdRequest.id // entityId
+          );
+          this.logger.info('Webhook triggered for request creation', { requestId: createdRequest.id });
+        } catch (webhookError) {
+          // Log error but don't fail the request creation
+          this.logger.error('Failed to trigger webhook for request creation', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            requestId: createdRequest.id
+          });
+        }
+      }
+      
       // Add initial note if provided
       if (data.note && createdRequest.id) {
         await this.addNote(createdRequest.id, data.note, options);
@@ -621,6 +648,25 @@ export class RequestServiceImpl implements IRequestService {
       
       // Update request
       const updatedRequest = await this.repository.update(id, requestEntity);
+      
+      // Trigger webhooks for request update
+      if (this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'request', // entityType (matches AutomationEntityType.REQUEST)
+            'update', // operation
+            updatedRequest, // entityData
+            updatedRequest.id // entityId
+          );
+          this.logger.info('Webhook triggered for request update', { requestId: updatedRequest.id });
+        } catch (webhookError) {
+          // Log error but don't fail the request update
+          this.logger.error('Failed to trigger webhook for request update', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            requestId: updatedRequest.id
+          });
+        }
+      }
       
       // Add note if provided
       if (data.note) {
@@ -1224,7 +1270,28 @@ export class RequestServiceImpl implements IRequestService {
       }
       
       // Delete request
-      return await this.repository.delete(id);
+      const result = await this.repository.delete(id);
+      
+      // Trigger webhooks for request deletion
+      if (result && this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'request', // entityType (matches AutomationEntityType.REQUEST)
+            'delete', // operation
+            request, // entityData (the request we fetched earlier)
+            id // entityId
+          );
+          this.logger.info('Webhook triggered for request deletion', { requestId: id });
+        } catch (webhookError) {
+          // Log error but don't fail the request deletion
+          this.logger.error('Failed to trigger webhook for request deletion', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            requestId: id
+          });
+        }
+      }
+      
+      return result;
     } catch (error) {
       this.logger.error(`Error deleting request with ID ${id}:`, {
         error: error instanceof Error ? error.message : String(error),

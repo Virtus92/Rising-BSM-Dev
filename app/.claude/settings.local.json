@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(mkdir:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

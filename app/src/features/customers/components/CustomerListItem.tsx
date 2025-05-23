@@ -2,6 +2,7 @@
 
 import { User, Building2 } from 'lucide-react';
 import { CustomerResponseDto } from '@/domain/dtos/CustomerDtos';
+import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
 
 interface CustomerListItemProps {
   customer: CustomerResponseDto;
@@ -17,19 +18,19 @@ const CustomerListItem: React.FC<CustomerListItemProps> = ({ customer, onClick }
     const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
     
     switch (customer.status) {
-      case 'active':
+      case CommonStatus.ACTIVE:
         return (
           <span className={`${baseClasses} bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400`}>
             {customer.statusLabel || 'Aktiv'}
           </span>
         );
-      case 'inactive':
+      case CommonStatus.INACTIVE:
         return (
           <span className={`${baseClasses} bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400`}>
             {customer.statusLabel || 'Inaktiv'}
           </span>
         );
-      case 'deleted':
+      case CommonStatus.DELETED:
         return (
           <span className={`${baseClasses} bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400`}>
             {customer.statusLabel || 'Gelöscht'}
@@ -53,7 +54,7 @@ const CustomerListItem: React.FC<CustomerListItemProps> = ({ customer, onClick }
         {/* Kunde (Name und evtl. Firma) */}
         <div className="col-span-5 md:col-span-3 flex items-center">
           <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center mr-3">
-            {customer.type === 'business' ? (
+            {customer.type === CustomerType.BUSINESS ? (
               <Building2 className="h-5 w-5 text-gray-600 dark:text-gray-400" aria-hidden="true" />
             ) : (
               <User className="h-5 w-5 text-gray-600 dark:text-gray-400" aria-hidden="true" />

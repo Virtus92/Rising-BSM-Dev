@@ -243,12 +243,22 @@ export class UserService implements IUserService {
   private logger: ILoggingService;
   private validator: IValidationService;
   private errorHandler: IErrorHandler;
+  private automationService?: any; // IAutomationService
 
   constructor() {
     this.userRepository = getUserRepository();
     this.logger = getLogger();
     this.validator = getValidationService();
     this.errorHandler = getErrorHandler();
+    
+    // Get automation service for webhook triggers
+    try {
+      const { getAutomationService } = require('@/core/factories');
+      this.automationService = getAutomationService();
+    } catch (error) {
+      this.logger.warn('AutomationService not available, webhooks will not be triggered', error as Error);
+    }
+    
     this.logger.debug('Server-side UserService initialized');
   }
 
@@ -409,6 +419,26 @@ export class UserService implements IUserService {
 
       // Create user
       const user = await this.userRepository.create(userData);
+      
+      // Trigger webhooks for user creation
+      if (this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'user', // entityType (matches AutomationEntityType.USER)
+            'create', // operation
+            user, // entityData
+            user.id // entityId
+          );
+          this.logger.info('Webhook triggered for user creation', { userId: user.id });
+        } catch (webhookError) {
+          // Log error but don't fail the user creation
+          this.logger.error('Failed to trigger webhook for user creation', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            userId: user.id
+          });
+        }
+      }
+      
       return this.mapToUserResponseDto(user);
     } catch (error) {
       this.logger.error('Error in UserService.create:', error as Error);
@@ -477,6 +507,26 @@ export class UserService implements IUserService {
 
       // Update user
       const updatedUser = await this.userRepository.update(id, updatedData);
+      
+      // Trigger webhooks for user update
+      if (this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'user', // entityType (matches AutomationEntityType.USER)
+            'update', // operation
+            updatedUser, // entityData
+            updatedUser.id // entityId
+          );
+          this.logger.info('Webhook triggered for user update', { userId: updatedUser.id });
+        } catch (webhookError) {
+          // Log error but don't fail the user update
+          this.logger.error('Failed to trigger webhook for user update', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            userId: updatedUser.id
+          });
+        }
+      }
+      
       return this.mapToUserResponseDto(updatedUser);
     } catch (error) {
       this.logger.error(`Error in UserService.update(${id}):`, error as Error);
@@ -738,8 +788,32 @@ export class UserService implements IUserService {
         options?.ip || ''
       );
 
+      // Get user data before deletion for webhook
+      const user = await this.userRepository.findById(userId);
+      
       // Perform hard delete
-      return await this.userRepository.hardDelete(userId);
+      const result = await this.userRepository.hardDelete(userId);
+      
+      // Trigger webhooks for user deletion
+      if (result && user && this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'user', // entityType (matches AutomationEntityType.USER)
+            'delete', // operation
+            user, // entityData (the user we fetched earlier)
+            userId // entityId
+          );
+          this.logger.info('Webhook triggered for user deletion', { userId });
+        } catch (webhookError) {
+          // Log error but don't fail the user deletion
+          this.logger.error('Failed to trigger webhook for user deletion', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            userId
+          });
+        }
+      }
+      
+      return result;
     } catch (error) {
       this.logger.error(`Error in UserService.hardDelete(${userId}):`, error as Error);
       throw this.errorHandler.handleApiError(error instanceof Error ? error : new Error(String(error)));

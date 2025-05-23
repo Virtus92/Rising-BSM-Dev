@@ -4,6 +4,37 @@
  */
 
 /**
+ * Base Application Error
+ * Used throughout the application for consistent error handling
+ */
+export class AppError extends Error {
+  public readonly statusCode: number;
+  public readonly code: string;
+  public readonly isOperational: boolean;
+  public readonly details?: any;
+
+  constructor(
+    message: string,
+    statusCode: number = 500,
+    code: string = 'INTERNAL_ERROR',
+    isOperational: boolean = true,
+    details?: any
+  ) {
+    super(message);
+    this.name = this.constructor.name;
+    this.statusCode = statusCode;
+    this.code = code;
+    this.isOperational = isOperational;
+    this.details = details;
+    
+    // Maintains proper stack trace
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+}
+
+/**
  * Authentication error types
  */
 export enum AuthErrorType {
