@@ -45,8 +45,8 @@ describe('RefreshToken', () => {
     
     it('should convert date strings to Date objects', () => {
       const token = new RefreshToken({
-        expiresAt: tomorrow.toISOString(),
-        revokedAt: yesterday.toISOString()
+        expiresAt: tomorrow,
+        revokedAt: yesterday
       });
       
       expect(token.expiresAt).toBeInstanceOf(Date);

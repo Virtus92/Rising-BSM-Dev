@@ -43,12 +43,7 @@ export async function verifyUserHandler(request: NextRequest): Promise<NextRespo
         logger.debug(`POST request with userId: ${userId || 'none'} (${requestId})`);
       } catch (parseError) {
         logger.error(`Error parsing request body (${requestId}):`, parseError instanceof Error ? parseError.message : 'Unknown error');
-        return formatResponse.error({
-          name: 'ParseError',
-          message: 'Invalid request body - could not parse JSON',
-          code: 'invalid_request',
-          requestId
-        } as Error, 400);
+        return formatResponse.error('Invalid request body - could not parse JSON', 400, 'invalid_request');
       }
     }
     

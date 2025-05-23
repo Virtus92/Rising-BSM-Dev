@@ -642,7 +642,7 @@ export const CustomerAppointmentsTab: React.FC<CustomerAppointmentsTabProps> = (
           showDefaultActions={false}
         >
           <AppointmentModalForm
-            initialData={modalMode === 'edit' ? selectedAppointment : { customerId }}
+            initialData={modalMode === 'edit' ? selectedAppointment || undefined : { customerId }}
             onSubmit={handleAppointmentSubmit}
             mode={modalMode === 'create' ? 'create' : 'edit'}
             isLoading={isSubmitting}

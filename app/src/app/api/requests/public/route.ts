@@ -57,8 +57,8 @@ export const POST = routeHandler(async (request: NextRequest) => {
       ipAddress: ipAddress.split(',')[0]
     };
     
-    // Create the request
-    const newRequest = await requestService.create(requestData, { context });
+    // Create the request using createRequest method to ensure webhooks are triggered
+    const newRequest = await requestService.createRequest(requestData, { context });
     
     // Success response
     return formatResponse.success({

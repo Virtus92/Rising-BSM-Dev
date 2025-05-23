@@ -33,6 +33,7 @@ export class AppointmentService implements IAppointmentService {
   private logger: ILoggingService;
   private validationService: IValidationService;
   private errorHandler: IErrorHandler;
+  private automationService?: any; // IAutomationService
 
   /**
    * Constructor
@@ -56,6 +57,13 @@ export class AppointmentService implements IAppointmentService {
       this.logger = logger || require('@/core/logging').getLogger();
       this.validationService = validationService || require('@/core/validation').getValidationService();
       this.errorHandler = errorHandler || require('@/core/errors').getErrorHandler();
+      
+      // Get automation service for webhook triggers
+      try {
+        this.automationService = require('@/core/factories').getAutomationService();
+      } catch (error) {
+        this.logger.warn('AutomationService not available, webhooks will not be triggered', error as Error);
+      }
       
       this.logger.debug('Server-side AppointmentService initialized');
     } catch (error) {
@@ -291,6 +299,25 @@ export class AppointmentService implements IAppointmentService {
       // Create appointment
       const createdAppointment = await this.repository.create(appointmentEntity as Appointment);
       
+      // Trigger webhooks for appointment creation
+      if (this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'appointment', // entityType (matches AutomationEntityType.APPOINTMENT)
+            'create', // operation
+            createdAppointment, // entityData
+            createdAppointment.id // entityId
+          );
+          this.logger.info('Webhook triggered for appointment creation', { appointmentId: createdAppointment.id });
+        } catch (webhookError) {
+          // Log error but don't fail the appointment creation
+          this.logger.error('Failed to trigger webhook for appointment creation', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            appointmentId: createdAppointment.id
+          });
+        }
+      }
+      
       // Add initial note if provided
       if (data.note && createdAppointment.id) {
         await this.addNote(createdAppointment.id, data.note, options);
@@ -349,6 +376,25 @@ export class AppointmentService implements IAppointmentService {
       
       // Update appointment
       const updatedAppointment = await this.repository.update(id, appointmentEntity);
+      
+      // Trigger webhooks for appointment update
+      if (this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'appointment', // entityType (matches AutomationEntityType.APPOINTMENT)
+            'update', // operation
+            updatedAppointment, // entityData
+            updatedAppointment.id // entityId
+          );
+          this.logger.info('Webhook triggered for appointment update', { appointmentId: updatedAppointment.id });
+        } catch (webhookError) {
+          // Log error but don't fail the appointment update
+          this.logger.error('Failed to trigger webhook for appointment update', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            appointmentId: updatedAppointment.id
+          });
+        }
+      }
       
       // Add note if provided
       if (data.note) {
@@ -434,7 +480,28 @@ export class AppointmentService implements IAppointmentService {
       }
       
       // Delete appointment
-      return await this.repository.delete(id);
+      const result = await this.repository.delete(id);
+      
+      // Trigger webhooks for appointment deletion
+      if (result && this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'appointment', // entityType (matches AutomationEntityType.APPOINTMENT)
+            'delete', // operation
+            appointment, // entityData (the appointment we fetched earlier)
+            id // entityId
+          );
+          this.logger.info('Webhook triggered for appointment deletion', { appointmentId: id });
+        } catch (webhookError) {
+          // Log error but don't fail the appointment deletion
+          this.logger.error('Failed to trigger webhook for appointment deletion', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            appointmentId: id
+          });
+        }
+      }
+      
+      return result;
     } catch (error) {
       this.logger.error(`Error deleting appointment with ID ${id}:`, {
         error: error instanceof Error ? error.message : String(error),

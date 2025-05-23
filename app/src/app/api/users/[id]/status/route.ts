@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { routeHandler } from '@/core/api/route-handler';
 import { prisma } from '@/core/db/index';
@@ -16,28 +16,30 @@ const logger = getLogger();
  * Requires USERS_EDIT permission
  */
 export const PATCH = requirePermission(SystemPermission.USERS_EDIT)(
-  routeHandler(async (req: NextRequest) => {
-    // Extract ID from URL path
-    const userId = parseInt(req.nextUrl.pathname.split('/')[3]);
-    if (isNaN(userId)) {
-      return formatResponse.error('Invalid user ID', 400);
-    }
-
-    // Get request body
-    const body = await req.json();
-    const { status } = body;
-
-    if (!status || !Object.values(UserStatus).includes(status as UserStatus)) {
-      return formatResponse.error('Invalid status value', 400);
-    }
-
-    // Check if status is user-manageable
-    if (!isUserManageableStatus(status as UserStatus)) {
-      return formatResponse.error('This status cannot be set manually', 400);
-    }
-
+  async (req: NextRequest): Promise<NextResponse> => {
     try {
-      // Permission is already checked by middleware
+      // Extract ID from URL path
+      const pathParts = req.nextUrl.pathname.split('/');
+      const idIndex = pathParts.indexOf('users') + 1;
+      const userIdString = pathParts[idIndex];
+      
+      const userId = parseInt(userIdString);
+      if (isNaN(userId)) {
+        return formatResponse.error('Invalid user ID', 400);
+      }
+
+      // Get request body
+      const body = await req.json();
+      const { status } = body;
+
+      if (!status || !Object.values(UserStatus).includes(status as UserStatus)) {
+        return formatResponse.error('Invalid status value', 400);
+      }
+
+      // Check if status is user-manageable
+      if (!isUserManageableStatus(status as UserStatus)) {
+        return formatResponse.error('This status cannot be set manually', 400);
+      }
 
       // Check if user exists
       const user = await prisma.user.findUnique({
@@ -73,12 +75,12 @@ export const PATCH = requirePermission(SystemPermission.USERS_EDIT)(
       });
     } catch (error) {
       logger.error('Error updating user status:', error instanceof Error ? error.message : String(error), {
-        userId,
         stack: error instanceof Error ? error.stack : undefined
       });
+      
       return formatResponse.error('Failed to update user status', 500);
     }
-  })
+  }
 );
 
 export const dynamic = 'force-dynamic';

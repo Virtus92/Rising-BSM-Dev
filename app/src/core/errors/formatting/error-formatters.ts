@@ -16,7 +16,7 @@ import { AppError } from '../types/AppError';
  * @param status HTTP status code (default: 200)
  * @returns Formatted success response
  */
-export function formatSuccess<T>(data: T, message?: string, status: number = 200): NextResponse<SuccessResponse<T>> {
+export function formatSuccess<T>(data: T, message?: string, status: number = 200): NextResponse {
   return formatResponse.success(data, message, status);
 }
 
@@ -34,7 +34,7 @@ export function formatError(
   statusCode: number = 500, 
   errorCode?: string, 
   details?: any
-): NextResponse<ErrorResponse> {
+): NextResponse {
   return formatResponse.error(error, statusCode, errorCode, details);
 }
 
@@ -50,7 +50,7 @@ export function formatNotFound(
   message: string = 'Resource not found', 
   errorCode: string = 'NOT_FOUND', 
   details?: any
-): NextResponse<ErrorResponse> {
+): NextResponse {
   return formatResponse.notFound(message, errorCode, details);
 }
 
@@ -66,7 +66,7 @@ export function formatValidationError(
   errors: Record<string, string[]> | string[] | any,
   message: string = 'Validation failed',
   errorCode: string = 'VALIDATION_ERROR'
-): NextResponse<ErrorResponse> {
+): NextResponse {
   return formatResponse.badRequest(message, errorCode, { errors });
 }
 
@@ -82,7 +82,7 @@ export function formatUnauthorized(
   message: string = 'Authentication required', 
   errorCode: string = 'AUTHENTICATION_REQUIRED', 
   details?: any
-): NextResponse<ErrorResponse> {
+): NextResponse {
   return formatResponse.unauthorized(message, errorCode, details);
 }
 
@@ -98,7 +98,7 @@ export function formatForbidden(
   message: string = 'Permission denied', 
   errorCode: string = 'PERMISSION_DENIED', 
   details?: any
-): NextResponse<ErrorResponse> {
+): NextResponse {
   return formatResponse.forbidden(message, errorCode, details);
 }
 
@@ -118,6 +118,6 @@ export function formatPaginated<T>(
   page: number,
   limit: number,
   message?: string
-): NextResponse<SuccessResponse<PaginatedResponse<T>>> {
+): NextResponse {
   return formatResponse.paginated(items, total, page, limit, message);
 }

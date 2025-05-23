@@ -44,6 +44,12 @@ model User {
   profilePictureFile File?             @relation("ProfilePicture", fields: [profilePictureId], references: [id])
   requestData       RequestData[]      // Added relation
   requestDataHistory RequestDataHistory[] // Added relation
+  
+  // Automation relations
+  createdWebhooks   AutomationWebhook[] @relation("WebhookCreator")
+  updatedWebhooks   AutomationWebhook[] @relation("WebhookUpdater")
+  createdSchedules  AutomationSchedule[] @relation("ScheduleCreator")
+  updatedSchedules  AutomationSchedule[] @relation("ScheduleUpdater")
 
   @@index([email])
   @@index([name])
@@ -389,6 +395,86 @@ model Notification {
   updatedAt     DateTime  @updatedAt
   createdBy     Int?
   updatedBy     Int?
+}
+
+//==============================================================================
+// AUTOMATION SYSTEM
+//==============================================================================
+
+model AutomationWebhook {
+  id                Int       @id @default(autoincrement())
+  name              String    @db.VarChar(100)
+  description       String?   @db.Text
+  entityType        String    @db.VarChar(50)  // 'user', 'customer', 'appointment', 'request'
+  operation         String    @db.VarChar(20)  // 'create', 'update', 'delete'
+  webhookUrl        String    @db.VarChar(500)
+  headers           Json      @default("{}")
+  payloadTemplate   Json      @default("{}")
+  active            Boolean   @default(true)
+  retryCount        Int       @default(3)
+  retryDelaySeconds Int       @default(30)
+  createdAt         DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime  @updatedAt @db.Timestamp(6)
+  createdBy         Int?
+  updatedBy         Int?
+  
+  // Relations
+  creator           User?     @relation("WebhookCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updater           User?     @relation("WebhookUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  
+  @@index([entityType])
+  @@index([operation])
+  @@index([active])
+  @@index([createdBy])
+}
+
+model AutomationSchedule {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(100)
+  description     String?   @db.Text
+  cronExpression  String    @db.VarChar(100)
+  webhookUrl      String    @db.VarChar(500)
+  headers         Json      @default("{}")
+  payload         Json      @default("{}")
+  timezone        String    @default("UTC") @db.VarChar(50)
+  active          Boolean   @default(true)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  createdAt       DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamp(6)
+  createdBy       Int?
+  updatedBy       Int?
+  
+  // Relations
+  creator         User?     @relation("ScheduleCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updater         User?     @relation("ScheduleUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  
+  @@index([active])
+  @@index([nextRunAt])
+  @@index([createdBy])
+}
+
+model AutomationExecution {
+  id                Int       @id @default(autoincrement())
+  automationType    String    @db.VarChar(20)  // 'webhook', 'schedule'
+  automationId      Int
+  entityId          Int?
+  entityType        String?   @db.VarChar(50)
+  status            String    @db.VarChar(20)  // 'success', 'failed', 'retrying'
+  responseStatus    Int?
+  responseBody      String?   @db.Text
+  errorMessage      String?   @db.Text
+  executionTimeMs   Int?
+  executedAt        DateTime  @default(now()) @db.Timestamp(6)
+  retryAttempt      Int       @default(0)
+  
+  // Relations - Note: This is a polymorphic relationship based on automationType
+  // No foreign key constraints since automationId can reference either webhooks or schedules
+  
+  @@index([automationType, automationId])
+  @@index([status])
+  @@index([executedAt])
+  @@index([entityType, entityId])
 }
 
 //==============================================================================

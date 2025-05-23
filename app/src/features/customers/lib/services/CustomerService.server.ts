@@ -34,6 +34,7 @@ export class CustomerService implements ICustomerService {
   private logger: ILoggingService;
   private validationService: IValidationService;
   private errorHandler: IErrorHandler;
+  private automationService?: any; // IAutomationService
 
   /**
    * Constructor
@@ -49,6 +50,13 @@ export class CustomerService implements ICustomerService {
     this.logger = logger || require('@/core/logging').getLogger();
     this.validationService = validationService || require('@/core/validation').getValidationService();
     this.errorHandler = errorHandler || require('@/core/errors').getErrorHandler();
+    
+    // Get automation service for webhook triggers
+    try {
+      this.automationService = require('@/core/factories').getAutomationService();
+    } catch (error) {
+      this.logger.warn('AutomationService not available, webhooks will not be triggered', error as Error);
+    }
     
     this.logger.debug('Server-side CustomerService initialized');
   }
@@ -374,6 +382,25 @@ export class CustomerService implements ICustomerService {
       // Create customer
       const createdCustomer = await this.repository.create(customerEntity as Customer);
       
+      // Trigger webhooks for customer creation
+      if (this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'customer', // entityType (matches AutomationEntityType.CUSTOMER)
+            'create', // operation
+            createdCustomer, // entityData
+            createdCustomer.id // entityId
+          );
+          this.logger.info('Webhook triggered for customer creation', { customerId: createdCustomer.id });
+        } catch (webhookError) {
+          // Log error but don't fail the customer creation
+          this.logger.error('Failed to trigger webhook for customer creation', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            customerId: createdCustomer.id
+          });
+        }
+      }
+      
       // Add initial note if provided
       if (data.notes && createdCustomer.id) {
         await this.addNote(createdCustomer.id, data.notes, options);
@@ -443,6 +470,25 @@ export class CustomerService implements ICustomerService {
       
       // Update customer
       const updatedCustomer = await this.repository.update(id, customerEntity);
+      
+      // Trigger webhooks for customer update
+      if (this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'customer', // entityType (matches AutomationEntityType.CUSTOMER)
+            'update', // operation
+            updatedCustomer, // entityData
+            updatedCustomer.id // entityId
+          );
+          this.logger.info('Webhook triggered for customer update', { customerId: updatedCustomer.id });
+        } catch (webhookError) {
+          // Log error but don't fail the customer update
+          this.logger.error('Failed to trigger webhook for customer update', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            customerId: updatedCustomer.id
+          });
+        }
+      }
       
       // Add note if provided
       if (data.notes) {
@@ -529,7 +575,28 @@ export class CustomerService implements ICustomerService {
       }
       
       // Delete customer
-      return await this.repository.delete(id);
+      const result = await this.repository.delete(id);
+      
+      // Trigger webhooks for customer deletion
+      if (result && this.automationService) {
+        try {
+          await this.automationService.triggerWebhook(
+            'customer', // entityType (matches AutomationEntityType.CUSTOMER)
+            'delete', // operation
+            customer, // entityData (the customer we fetched earlier)
+            id // entityId
+          );
+          this.logger.info('Webhook triggered for customer deletion', { customerId: id });
+        } catch (webhookError) {
+          // Log error but don't fail the customer deletion
+          this.logger.error('Failed to trigger webhook for customer deletion', {
+            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+            customerId: id
+          });
+        }
+      }
+      
+      return result;
     } catch (error) {
       this.logger.error(`Error deleting customer with ID ${id}:`, {
         error: error instanceof Error ? error.message : String(error),

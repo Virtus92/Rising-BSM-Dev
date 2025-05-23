@@ -21,6 +21,9 @@ import { NotificationRepository } from '@/features/notifications/lib/repositorie
 import { RefreshTokenRepository } from '@/features/auth/lib/repositories/RefreshTokenRepository';
 import { PermissionRepository } from '@/features/permissions/lib/repositories/PermissionRepository';
 import { RequestDataRepository } from '@/features/requests/lib/repositories/RequestDataRepository';
+import { AutomationWebhookRepository } from '@/features/automation/lib/repositories/AutomationWebhookRepository';
+import { AutomationScheduleRepository } from '@/features/automation/lib/repositories/AutomationScheduleRepository';
+import { AutomationExecutionRepository } from '@/features/automation/lib/repositories/AutomationExecutionRepository';
 
 // Interfaces
 import { IUserRepository } from '@/domain/repositories/IUserRepository';
@@ -32,6 +35,11 @@ import { INotificationRepository } from '@/domain/repositories/INotificationRepo
 import { IRefreshTokenRepository } from '@/domain/repositories/IRefreshTokenRepository';
 import { IPermissionRepository } from '@/domain/repositories/IPermissionRepository';
 import { IRequestDataRepository } from '@/domain/repositories/IRequestDataRepository';
+import { 
+  IAutomationWebhookRepository,
+  IAutomationScheduleRepository,
+  IAutomationExecutionRepository
+} from '@/domain/repositories/IAutomationRepository';
 
 /**
  * RepositoryFactory class for uniform creation of repositories
@@ -49,6 +57,9 @@ export class RepositoryFactory {
   private refreshTokenRepository?: RefreshTokenRepository;
   private permissionRepository?: PermissionRepository;
   private requestDataRepository?: RequestDataRepository;
+  private automationWebhookRepository?: AutomationWebhookRepository;
+  private automationScheduleRepository?: AutomationScheduleRepository;
+  private automationExecutionRepository?: AutomationExecutionRepository;
 
   /**
    * Private constructor for singleton pattern
@@ -201,6 +212,51 @@ export class RepositoryFactory {
   }
 
   /**
+   * Creates an instance of AutomationWebhookRepository
+   */
+  public createAutomationWebhookRepository(): IAutomationWebhookRepository {
+    if (!this.automationWebhookRepository) {
+      const prisma = getPrismaClient();
+      this.automationWebhookRepository = new AutomationWebhookRepository(
+        prisma,
+        getLogger(),
+        getErrorHandler()
+      );
+    }
+    return this.automationWebhookRepository;
+  }
+
+  /**
+   * Creates an instance of AutomationScheduleRepository
+   */
+  public createAutomationScheduleRepository(): IAutomationScheduleRepository {
+    if (!this.automationScheduleRepository) {
+      const prisma = getPrismaClient();
+      this.automationScheduleRepository = new AutomationScheduleRepository(
+        prisma,
+        getLogger(),
+        getErrorHandler()
+      );
+    }
+    return this.automationScheduleRepository;
+  }
+
+  /**
+   * Creates an instance of AutomationExecutionRepository
+   */
+  public createAutomationExecutionRepository(): IAutomationExecutionRepository {
+    if (!this.automationExecutionRepository) {
+      const prisma = getPrismaClient();
+      this.automationExecutionRepository = new AutomationExecutionRepository(
+        prisma,
+        getLogger(),
+        getErrorHandler()
+      );
+    }
+    return this.automationExecutionRepository;
+  }
+
+  /**
    * Resets all repository instances
    */
   public resetRepositories(): void {
@@ -213,6 +269,9 @@ export class RepositoryFactory {
     this.refreshTokenRepository = undefined;
     this.permissionRepository = undefined;
     this.requestDataRepository = undefined;
+    this.automationWebhookRepository = undefined;
+    this.automationScheduleRepository = undefined;
+    this.automationExecutionRepository = undefined;
   }
 }
 
@@ -258,6 +317,18 @@ export function getPermissionRepository(): IPermissionRepository {
 
 export function getRequestDataRepository(): IRequestDataRepository {
   return getRepositoryFactory().createRequestDataRepository();
+}
+
+export function getAutomationWebhookRepository(): IAutomationWebhookRepository {
+  return getRepositoryFactory().createAutomationWebhookRepository();
+}
+
+export function getAutomationScheduleRepository(): IAutomationScheduleRepository {
+  return getRepositoryFactory().createAutomationScheduleRepository();
+}
+
+export function getAutomationExecutionRepository(): IAutomationExecutionRepository {
+  return getRepositoryFactory().createAutomationExecutionRepository();
 }
 
 export function resetRepositories(): void {

@@ -10,7 +10,8 @@ export enum PermissionCategory {
   SETTINGS = "Settings",
   PROFILE = "Profile",
   NOTIFICATIONS = "Notifications",
-  PERMISSIONS = "Permissions"
+  PERMISSIONS = "Permissions",
+  AUTOMATION = "Automation"
 }
 
 /**
@@ -81,6 +82,13 @@ export enum SystemPermission {
   PERMISSIONS_VIEW = "permissions.view",
   PERMISSIONS_MANAGE = "permissions.manage",
   
+  // Automation permissions
+  AUTOMATION_VIEW = "automation.view",
+  AUTOMATION_CREATE = "automation.create",
+  AUTOMATION_EDIT = "automation.edit",
+  AUTOMATION_DELETE = "automation.delete",
+  AUTOMATION_MANAGE = "automation.manage",
+  
   // IMPORTANT: This is added to fix references in code
   // This permission is used in routes, so must be defined here
   SYSTEM_ADMIN = "system.admin"
@@ -144,7 +152,12 @@ export function getPermissionsForRole(role: string): string[] {
         // Settings
         SystemPermission.SETTINGS_VIEW,
         // Permission management (limited)
-        SystemPermission.PERMISSIONS_VIEW
+        SystemPermission.PERMISSIONS_VIEW,
+        // Automation management
+        SystemPermission.AUTOMATION_VIEW,
+        SystemPermission.AUTOMATION_CREATE,
+        SystemPermission.AUTOMATION_EDIT,
+        SystemPermission.AUTOMATION_DELETE
       ];
       
     case 'staff':
