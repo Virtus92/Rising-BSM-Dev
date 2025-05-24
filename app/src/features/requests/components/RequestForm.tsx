@@ -2,12 +2,18 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Save, ArrowLeft, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/card';
+import { Save, ArrowLeft, Loader2, User, Mail, Phone, FileText, MessageCircle, AlertCircle } from 'lucide-react';
 import { RequestResponseDto, UpdateRequestDto } from '@/domain/dtos/RequestDtos';
 import { useRequestForm } from '@/features/requests/hooks/useRequestForm';
 import { useToast } from '@/shared/hooks/useToast';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
+import { Button } from '@/shared/components/ui/button';
+import { Label } from '@/shared/components/ui/label';
+import { Input } from '@/shared/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { EntityColors } from '@/shared/utils/entity-colors';
 import {
   Select,
   SelectContent,
@@ -16,39 +22,39 @@ import {
   SelectValue,
 } from '@/shared/components/ui/select';
 
-interface RequestFormProps {
+export interface RequestFormProps {
   initialData?: Partial<RequestResponseDto>;
   onSubmit: (data: UpdateRequestDto) => Promise<RequestResponseDto | null>;
   mode: 'create' | 'edit';
-  onCancel?: () => void;
-  // Modal integration props
   isLoading?: boolean;
   error?: string | null;
   success?: boolean;
   title?: string;
   description?: string;
   submitLabel?: string;
+  onCancel?: () => void;
 }
 
 /**
- * Form for creating and editing requests
+ * Formular zum Erstellen und Bearbeiten von Anfragen
  */
 export default function RequestForm({ 
   initialData = {}, 
   onSubmit, 
   mode, 
-  onCancel,
-  isLoading: externalIsLoading,
-  error: externalError,
-  success: externalSuccess,
-  title,
+  isLoading = false,
+  error = null,
+  success = false,
+  title = mode === 'create' ? 'Create New Request' : 'Edit Request',
   description,
-  submitLabel
+  submitLabel = mode === 'create' ? 'Create Request' : 'Save Changes',
+  onCancel
 }: RequestFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [hasChanges, setHasChanges] = useState(false);
   const [showConfirmLeave, setShowConfirmLeave] = useState(false);
+  const [activeTab, setActiveTab] = useState('basic');
 
   const {
     name, setName,
@@ -57,9 +63,9 @@ export default function RequestForm({
     service, setService,
     message, setMessage,
     status, setStatus,
-    errors,
-    submitting,
-    handleSubmit,
+    errors: formErrors,
+    submitting: formSubmitting,
+    handleSubmit: formSubmit,
     updateField
   } = useRequestForm({
     initialData,
@@ -67,21 +73,14 @@ export default function RequestForm({
       try {
         const result = await onSubmit(data);
         if (result) {
-          const successMessage = mode === 'create' 
-            ? 'Request created successfully' 
-            : 'Request updated successfully';
-            
-          toast({
-            title: 'Success',
-            description: successMessage,
-            variant: 'success'
-          });
-          
-          // After saving, navigate to detail page or list
-          if (mode === 'create') {
-            router.push(`/dashboard/requests/${result.id}`);
-          } else {
-            router.push(`/dashboard/requests/${initialData.id}`);
+          // Only navigate if we're not in a modal
+          if (!onCancel) {
+            // Nach dem Speichern zur Detailseite oder Liste navigieren
+            if (mode === 'create') {
+              router.push(`/dashboard/requests/${result.id}`);
+            } else {
+              router.push(`/dashboard/requests/${initialData.id}`);
+            }
           }
           
           return result;
@@ -90,6 +89,7 @@ export default function RequestForm({
         return null;
       } catch (error) {
         console.error('Form submission error:', error as Error);
+        
         toast({
           title: 'Error',
           description: error instanceof Error ? error.message : 'An error occurred',
@@ -100,6 +100,13 @@ export default function RequestForm({
       }
     }
   });
+  
+  // Use provided loading/error states or fallback to form states
+  const submitting = isLoading || formSubmitting;
+  const errors = error ? { general: error, ...formErrors } : formErrors;
+  
+  // Only use the parent success prop for consistent state management
+  const showSuccess = success;
 
   // Function to check if changes have been made
   const checkForChanges = useCallback(() => {
@@ -124,16 +131,9 @@ export default function RequestForm({
     checkForChanges();
   };
 
-  // Use external states when available, fallback to internal states
-  const isFormLoading = externalIsLoading ?? submitting;
-  const formError = externalError ?? (Object.keys(errors).length > 0 ? Object.values(errors)[0] : null);
-  const formSuccess = externalSuccess ?? false;
-  const formTitle = title ?? (mode === 'create' ? 'Create New Request' : 'Edit Request');
-  const formSubmitLabel = submitLabel ?? (mode === 'create' ? 'Create Request' : 'Update Request');
-
-  // Function to cancel and go back
+  // Funktion zum Abbrechen und Zurückgehen
   const handleCancel = () => {
-    if (hasChanges) {
+    if (hasChanges && !onCancel) {
       setShowConfirmLeave(true);
     } else {
       if (onCancel) {
@@ -148,274 +148,185 @@ export default function RequestForm({
     }
   };
 
-  // Function to confirm leaving despite changes
-  const confirmLeave = () => {
-    setShowConfirmLeave(false);
-    if (onCancel) {
-      onCancel();
-    } else {
-      if (mode === 'edit' && initialData.id) {
-        router.push(`/dashboard/requests/${initialData.id}`);
-      } else {
-        router.push('/dashboard/requests');
-      }
-    }
-  };
-
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
-      {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <button 
+    <Card className="w-full border shadow-sm hover:shadow-md transition-all">
+      <form onSubmit={(e) => { e.preventDefault(); formSubmit(); }}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-orange-600" />
+            {title}
+          </CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </CardHeader>
+
+        <CardContent>
+          {errors.general && (
+            <div className="bg-red-50 p-3 rounded-md text-red-800 text-sm mb-4">
+              {errors.general}
+            </div>
+          )}
+          
+          {showSuccess && (
+            <div className="bg-green-50 p-3 rounded-md text-green-800 text-sm mb-4">
+              Operation completed successfully!
+            </div>
+          )}
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-2 md:w-[400px] mb-4">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="details">Request Details</TabsTrigger>
+            </TabsList>
+            <TabsContent value="basic" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-orange-600" />
+                    Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={name}
+                    onChange={(e) => handleFieldChange('name', e.target.value)}
+                    placeholder="Full name"
+                    required
+                    className={errors.name ? "border-red-500" : ""}
+                  />
+                  {errors.name && (
+                    <p className="text-sm text-red-600">{errors.name}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 text-orange-600" />
+                    Email <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => handleFieldChange('email', e.target.value)}
+                    placeholder="example@domain.com"
+                    required
+                    className={errors.email ? "border-red-500" : ""}
+                  />
+                  {errors.email && (
+                    <p className="text-sm text-red-600">{errors.email}</p>
+                  )}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-orange-600" />
+                    Phone
+                  </Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => handleFieldChange('phone', e.target.value)}
+                    placeholder="+43 123 456789"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="status" className="flex items-center gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 text-orange-600" />
+                    Status
+                  </Label>
+                  <Select 
+                    value={status} 
+                    onValueChange={(value) => handleFieldChange('status', value)}
+                  >
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={RequestStatus.NEW}>New</SelectItem>
+                      <SelectItem value={RequestStatus.IN_PROGRESS}>In Progress</SelectItem>
+                      <SelectItem value={RequestStatus.COMPLETED}>Completed</SelectItem>
+                      <SelectItem value={RequestStatus.CANCELLED}>Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="details" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="service" className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-orange-600" />
+                  Service <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="service"
+                  name="service"
+                  value={service}
+                  onChange={(e) => handleFieldChange('service', e.target.value)}
+                  placeholder="Service requested"
+                  required
+                  className={errors.service ? "border-red-500" : ""}
+                />
+                {errors.service && (
+                  <p className="text-sm text-red-600">{errors.service}</p>
+                )}
+              </div>
+
+
+              <div className="space-y-2">
+                <Label htmlFor="message" className="flex items-center gap-1.5">
+                  <MessageCircle className="h-3.5 w-3.5 text-orange-600" />
+                  Message <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="message"
+                  name="message"
+                  rows={6}
+                  value={message}
+                  onChange={(e) => handleFieldChange('message', e.target.value)}
+                  placeholder="Describe your request in detail..."
+                  required
+                  className={errors.message ? "border-red-500" : ""}
+                />
+                {errors.message && (
+                  <p className="text-sm text-red-600">{errors.message}</p>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+
+        <CardFooter className="flex justify-between">
+          <Button 
+            type="button" 
+            variant="outline" 
             onClick={handleCancel}
-            className="mr-2 p-1 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {formTitle}
-          </h2>
-          {description && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isFormLoading}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isFormLoading ? (
-            <>
-              <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              {formSubmitLabel}
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Form */}
-      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="p-6">
-        {/* Error and Success States */}
-        {formError && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 p-4 rounded-md mb-6">
-            {formError}
-          </div>
-        )}
-        
-        {formSuccess && (
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 p-4 rounded-md mb-6">
-            Request {mode === 'create' ? 'created' : 'updated'} successfully!
-          </div>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Request Information</h3>
-            
-            {/* Name */}
-            <div className="mb-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                value={name}
-                onChange={(e) => handleFieldChange('name', e.target.value)}
-                className={`w-full px-3 py-2 border ${
-                  errors.name ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                } rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white`}
-                placeholder="Full Name"
-                required
-              />
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
-              )}
-            </div>
-            
-            {/* Email */}
-            <div className="mb-4">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Email <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={email}
-                onChange={(e) => handleFieldChange('email', e.target.value)}
-                className={`w-full px-3 py-2 border ${
-                  errors.email ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                } rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white`}
-                placeholder="email@example.com"
-                required
-              />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
-              )}
-            </div>
-            
-            {/* Phone */}
-            <div className="mb-4">
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Phone
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => handleFieldChange('phone', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white"
-                placeholder="+43 123 456789"
-              />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Request Details</h3>
-            
-            {/* Service */}
-            <div className="mb-4">
-              <label htmlFor="service" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Service <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="service"
-                name="service"
-                type="text"
-                value={service}
-                onChange={(e) => handleFieldChange('service', e.target.value)}
-                className={`w-full px-3 py-2 border ${
-                  errors.service ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                } rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white`}
-                placeholder="Requested Service"
-                required
-              />
-              {errors.service && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.service}</p>
-              )}
-            </div>
-            
-            {/* Status */}
-            <div className="mb-4">
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Status
-              </label>
-              <Select 
-                value={status} 
-                onValueChange={(value) => handleFieldChange('status', value)}
-              >
-                <SelectTrigger id="status" className="w-full">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={RequestStatus.NEW}>New</SelectItem>
-                  <SelectItem value={RequestStatus.IN_PROGRESS}>In Progress</SelectItem>
-                  <SelectItem value={RequestStatus.COMPLETED}>Completed</SelectItem>
-                  <SelectItem value={RequestStatus.CANCELLED}>Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        {/* Message */}
-        <div className="mt-6">
-          <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Message</h3>
-          <textarea
-            id="message"
-            name="message"
-            rows={4}
-            value={message}
-            onChange={(e) => handleFieldChange('message', e.target.value)}
-            className={`w-full px-3 py-2 border ${
-              errors.message ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-            } rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-slate-900 dark:text-white`}
-            placeholder="Request message..."
-            required
-          ></textarea>
-          {errors.message && (
-            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.message}</p>
-          )}
-        </div>
-
-        {/* Buttons */}
-        <div className="mt-8 flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            disabled={submitting}
+            className={EntityColors.requests?.text || ""}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button 
             type="submit"
             disabled={submitting}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={EntityColors.requests?.primary || "bg-orange-600 hover:bg-orange-700"}
           >
             {submitting ? (
               <>
-                <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4 inline" />
-                Saving...
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
               </>
-            ) : (
-              'Save'
-            )}
-          </button>
-        </div>
+            ) : submitLabel}
+          </Button>
+        </CardFooter>
       </form>
 
-      {/* Confirmation dialog */}
-      {showConfirmLeave && (
-        <div className="fixed z-50 inset-0 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
-            </div>
-            
-            <div className="inline-block align-bottom bg-white dark:bg-slate-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white dark:bg-slate-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                      Unsaved Changes
-                    </h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        You have unsaved changes. Are you sure you want to leave this page? All unsaved changes will be lost.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 dark:bg-slate-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={confirmLeave}
-                >
-                  Leave
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => setShowConfirmLeave(false)}
-                >
-                  Back to Form
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </Card>
   );
 }

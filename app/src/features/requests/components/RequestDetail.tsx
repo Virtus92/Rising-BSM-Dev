@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useRequest } from '../hooks/useRequest';
 import { useRouter } from 'next/navigation';
 import {
@@ -56,11 +56,16 @@ import {
   Edit,
 } from 'lucide-react';
 import { formatDate } from '@/features/notifications/components/utils/date-utils';
-import { RequestStatusUpdateDto } from '@/domain/dtos/RequestDtos';
+import { RequestStatusUpdateDto, UpdateRequestDto } from '@/domain/dtos/RequestDtos';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
 import { ConvertToCustomerForm } from './ConvertToCustomerForm';
 import { LinkToCustomerForm } from './LinkToCustomerForm';
 import Link from 'next/link';
+import { FormModal } from '@/shared/components/BaseModal';
+import { useEntityModal } from '@/shared/hooks/useModal';
+import RequestForm from './RequestForm';
+import { useToast } from '@/shared/hooks/useToast';
+import { RequestService } from '@/features/requests/lib/services/RequestService.client';
 
 interface RequestDetailProps {
   id: number;
@@ -72,6 +77,7 @@ interface RequestDetailProps {
  */
 export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
   const router = useRouter();
+  const { toast } = useToast();
   const {
     request,
     isLoading,
@@ -82,7 +88,11 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
     isUpdatingStatus,
     isAddingNote,
     isDeleting,
+    refetch,
   } = useRequest(id);
+
+  // Use the entity modal hook for edit functionality
+  const editModal = useEntityModal<any>();
 
   const [noteText, setNoteText] = useState('');
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
@@ -90,6 +100,52 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [statusNote, setStatusNote] = useState('');
+
+  // Handle request form submission for edit
+  const handleEditSubmit = useCallback(async (data: UpdateRequestDto) => {
+    editModal.setError(null);
+    editModal.setSuccess(false);
+    editModal.setIsSubmitting(true);
+    
+    try {
+      const response = await RequestService.updateRequest(id, data);
+      
+      if (response?.success) {
+        editModal.setSuccess(true);
+        editModal.setError(null);
+        
+        // Show success toast
+        toast({
+          title: 'Success',
+          description: 'Request updated successfully',
+          variant: 'success'
+        });
+        
+        // Refresh the request data
+        if (refetch) {
+          await refetch();
+        }
+        
+        // Close modal after a delay
+        setTimeout(() => {
+          editModal.closeModal();
+        }, 1500);
+        
+        return response.data || null;
+      } else {
+        editModal.setError(response?.message || 'Failed to update request');
+        editModal.setSuccess(false);
+        return null;
+      }
+    } catch (err) {
+      console.error('Error updating request:', err);
+      editModal.setError('An unexpected error occurred');
+      editModal.setSuccess(false);
+      return null;
+    } finally {
+      editModal.setIsSubmitting(false);
+    }
+  }, [id, editModal, toast, refetch]);
 
   if (isLoading) {
     return (
@@ -230,12 +286,13 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
         </CardContent>
         <CardFooter className="flex flex-wrap gap-2 pt-2">
           {/* Edit Button */}
-          <Link href={`/dashboard/requests/${request.id}/edit`}>
-            <Button variant="outline">
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Request
-            </Button>
-          </Link>
+          <Button 
+            variant="outline" 
+            onClick={() => editModal.openEditModal(request)}
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Request
+          </Button>
           
           {/* Status Dialog */}
           <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
@@ -444,6 +501,34 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ id, onBack }) => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Request Modal */}
+      {editModal.action?.type === 'edit' && request && (
+        <FormModal
+          isOpen={editModal.isOpen}
+          onClose={editModal.closeModal}
+          title="Edit Request"
+          description={`Update request from ${request.name}`}
+          isSubmitting={editModal.isSubmitting}
+          error={editModal.error}
+          success={editModal.success}
+          size="lg"
+          showDefaultActions={false}
+        >
+          <RequestForm
+            initialData={request}
+            onSubmit={handleEditSubmit}
+            mode="edit"
+            isLoading={editModal.isSubmitting}
+            error={editModal.error}
+            success={editModal.success}
+            title="Edit Request"
+            description={`Update request from ${request.name}`}
+            submitLabel="Update Request"
+            onCancel={editModal.closeModal}
+          />
+        </FormModal>
+      )}
     </div>
   );
 };

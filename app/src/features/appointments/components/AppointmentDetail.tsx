@@ -29,8 +29,11 @@ import {
   Tag,
   Loader2
 } from 'lucide-react';
-import { AppointmentDetailResponseDto } from '@/domain/dtos/AppointmentDtos';
+import { AppointmentDetailResponseDto, UpdateAppointmentDto } from '@/domain/dtos/AppointmentDtos';
 import { format } from 'date-fns';
+import { FormModal } from '@/shared/components/BaseModal';
+import { useEntityModal } from '@/shared/hooks/useModal';
+import AppointmentModalForm from './AppointmentModalForm';
 
 // Status configuration for appointments
 const appointmentStatusConfig = {
@@ -68,6 +71,9 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
   const [isSubmittingNote, setIsSubmittingNote] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
+  // Use the entity modal hook for edit functionality
+  const editModal = useEntityModal<any>();
   
   // Permissions
   const canEdit = hasPermission(SystemPermission.APPOINTMENTS_EDIT);
@@ -290,6 +296,55 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
       });
     }
   };
+
+  // Handle appointment form submission for edit
+  const handleEditSubmit = useCallback(async (data: UpdateAppointmentDto) => {
+    editModal.setError(null);
+    editModal.setSuccess(false);
+    editModal.setIsSubmitting(true);
+    
+    try {
+      if (!validId) {
+        editModal.setError('Invalid appointment ID');
+        return null;
+      }
+      
+      const response = await AppointmentClient.updateAppointment(validId, data);
+      
+      if (response?.success) {
+        editModal.setSuccess(true);
+        editModal.setError(null);
+        
+        // Show success toast
+        toast({
+          title: 'Success',
+          description: 'Appointment updated successfully',
+          variant: 'success'
+        });
+        
+        // Refresh the appointment data
+        await fetchAppointment();
+        
+        // Close modal after a delay
+        setTimeout(() => {
+          editModal.closeModal();
+        }, 1500);
+        
+        return response.data || null;
+      } else {
+        editModal.setError(response?.message || 'Failed to update appointment');
+        editModal.setSuccess(false);
+        return null;
+      }
+    } catch (err) {
+      console.error('Error updating appointment:', err);
+      editModal.setError('An unexpected error occurred');
+      editModal.setSuccess(false);
+      return null;
+    } finally {
+      editModal.setIsSubmitting(false);
+    }
+  }, [validId, editModal, toast, fetchAppointment]);
 
   if (!appointment && !isLoading && !error) {
     return null;
@@ -631,15 +686,16 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
   ];
 
   return (
-    <DetailPageLayout
-      title={appointment?.title || 'Appointment'}
-      subtitle={appointment?.service}
-      statusBadge={statusBadge}
-      onBack={() => router.push('/dashboard/appointments')}
-      editLink={canEdit ? `/dashboard/appointments/edit/${id}` : undefined}
-      canEdit={canEdit}
-      canDelete={canDelete}
-      onDelete={handleDeleteAppointment}
+    <>
+      <DetailPageLayout
+        title={appointment?.title || 'Appointment'}
+        subtitle={appointment?.service}
+        statusBadge={statusBadge}
+        onBack={() => router.push('/dashboard/appointments')}
+        onEdit={canEdit && appointment ? () => editModal.openEditModal(appointment) : undefined}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        onDelete={handleDeleteAppointment}
       currentStatus={appointment?.status}
       statusOptions={statusOptions}
       onStatusChange={handleStatusChange}
@@ -656,10 +712,36 @@ export const AppointmentDetail = ({ id }: { id: string | number }) => {
       deleteDescription={`Are you sure you want to delete "${appointment?.title}"? This action cannot be undone.`}
       showDeleteDialog={showDeleteDialog}
       setShowDeleteDialog={setShowDeleteDialog}
-      isLoading={isLoading}
-      error={error}
-      maxWidth="7xl"
-    />
+        isLoading={isLoading}
+        error={error}
+        maxWidth="7xl"
+      />
+
+      {/* Edit Appointment Modal */}
+      {editModal.action?.type === 'edit' && appointment && (
+        <FormModal
+          isOpen={editModal.isOpen}
+          onClose={editModal.closeModal}
+          title="Edit Appointment"
+          description={`Update appointment: ${appointment.title}`}
+          isSubmitting={editModal.isSubmitting}
+          error={editModal.error}
+          success={editModal.success}
+          size="lg"
+          showDefaultActions={false}
+        >
+          <AppointmentModalForm
+            initialData={appointment}
+            onSubmit={handleEditSubmit}
+            mode="edit"
+            isLoading={editModal.isSubmitting}
+            error={editModal.error}
+            success={editModal.success}
+            onCancel={editModal.closeModal}
+          />
+        </FormModal>
+      )}
+    </>
   );
 };
 

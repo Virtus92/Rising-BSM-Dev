@@ -4,7 +4,7 @@
 
 Rising BSM is an open-source project designed to provide a foundation for efficient development of personal AI assistants that handle requests, customer management, and appointment scheduling.
 
-![Rising BSM Dashboard](public/images/dashboard-preview.jpg)
+![Rising BSM Dashboard](app/public/images/dashboard-preview.webp)
 
 ## Overview
 
@@ -185,10 +185,10 @@ For development with Docker:
 
 For detailed documentation on each module and feature, please check the individual README files in their respective directories:
 
-- [Core Framework](src/core/README.md)
-- [Domain Models](src/domain/README.md)
-- [Features](src/features/README.md)
-- [API Documentation](src/app/api/README.md)
+- [Core Framework](app/src/core/README.md)
+- [Domain Models](app/src/domain/README.md)
+- [Features](app/src/features/README.md)
+- [API Documentation](app/src/app/api/README.md)
 
 Additional documentation:
 - [Architecture Overview](docs/architecture-overview.md)

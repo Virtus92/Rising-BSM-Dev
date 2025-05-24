@@ -115,7 +115,7 @@ const Hero = () => {
                   <div className="h-4"></div>
                 </div>
                 <Image
-                  src="/images/dashboard-preview.jpg"
+                  src="/images/dashboard-preview.webp"
                   alt="Rising BSM Dashboard Preview"
                   width={600}
                   height={400}

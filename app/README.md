@@ -4,7 +4,7 @@
 
 Rising BSM is an open-source project designed to provide a foundation for efficient development of personal AI assistants that handle requests, customer management, and appointment scheduling.
 
-![Rising BSM Dashboard](public/images/dashboard-preview.jpg)
+![Rising BSM Dashboard](public/images/dashboard-preview.webp)
 
 ## Overview
 

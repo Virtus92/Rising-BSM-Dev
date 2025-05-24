@@ -308,14 +308,20 @@ export class AutomationService extends BaseService<
       
       this.logger.info(`Found ${webhooks.length} webhooks to trigger`, { entityType, operation });
       
-      // Execute webhooks asynchronously
-      const promises = webhooks.map(webhook => 
-        this.executeWebhook(webhook, entityData, entityId).catch(error => {
-          this.logger.error('Error executing webhook', { error, webhookId: webhook.id });
-        })
-      );
-      
-      await Promise.allSettled(promises);
+      // Execute webhooks synchronously to ensure execution records are created
+      for (const webhook of webhooks) {
+        try {
+          await this.executeWebhook(webhook, entityData, entityId);
+          this.logger.info('Webhook executed successfully', { webhookId: webhook.id, entityType, operation });
+        } catch (error) {
+          this.logger.error('Error executing webhook', { 
+            error: error instanceof Error ? error.message : String(error),
+            webhookId: webhook.id,
+            entityType,
+            operation
+          });
+        }
+      }
     } catch (error) {
       this.logger.error('Error triggering webhooks', { error, entityType, operation });
       // Don't throw error to avoid breaking the main operation

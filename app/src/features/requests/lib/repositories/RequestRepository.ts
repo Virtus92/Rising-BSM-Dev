@@ -1003,10 +1003,12 @@ export class RequestRepository extends PrismaRepository<ContactRequest> implemen
     
     result.updatedAt = new Date();
     
-    // Ensure service field is always present in create operations
-    if (!domainEntity.id && !result.service) {
-      // If service is missing, use source or fallback to 'Consultation'
-      result.service = domainEntity.source || 'Consultation';
+    // Ensure service field is preserved properly
+    if (domainEntity.service !== undefined) {
+      result.service = domainEntity.service;
+    } else if (!domainEntity.id && !result.service) {
+      // Only use fallback for new records without a service
+      result.service = 'Consultation';
     }
     
     // Log fields being removed for troubleshooting

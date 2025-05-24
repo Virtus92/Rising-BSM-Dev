@@ -1,6 +1,6 @@
 For a complete implementation, the following images should be placed in the public/images directory:
 
-1. dashboard-preview.jpg - A screenshot of the application dashboard
+1. dashboard-preview.webp - A screenshot of the application dashboard
 2. ai-assistant.jpg - An image showing the AI assistant functionality
 3. customer-management.jpg - An image showing the customer management interface
 4. appointment-scheduling.jpg - An image showing the appointment scheduling interface

@@ -2,6 +2,7 @@
 import 'server-only';
 
 import { ContactRequest } from '@/domain/entities/ContactRequest';
+import { AutomationEntityType, AutomationOperation } from '@/domain/entities/AutomationWebhook';
 import { 
   RequestResponseDto, 
   RequestDetailResponseDto, 
@@ -557,8 +558,8 @@ export class RequestServiceImpl implements IRequestService {
       if (this.automationService) {
         try {
           await this.automationService.triggerWebhook(
-            'request', // entityType (matches AutomationEntityType.REQUEST)
-            'create', // operation
+            AutomationEntityType.REQUEST, // Use proper enum value
+            AutomationOperation.CREATE, // Use proper enum value
             createdRequest, // entityData
             createdRequest.id // entityId
           );
@@ -653,8 +654,8 @@ export class RequestServiceImpl implements IRequestService {
       if (this.automationService) {
         try {
           await this.automationService.triggerWebhook(
-            'request', // entityType (matches AutomationEntityType.REQUEST)
-            'update', // operation
+            AutomationEntityType.REQUEST, // Use proper enum value
+            AutomationOperation.UPDATE, // Use proper enum value
             updatedRequest, // entityData
             updatedRequest.id // entityId
           );
@@ -1276,8 +1277,8 @@ export class RequestServiceImpl implements IRequestService {
       if (result && this.automationService) {
         try {
           await this.automationService.triggerWebhook(
-            'request', // entityType (matches AutomationEntityType.REQUEST)
-            'delete', // operation
+            AutomationEntityType.REQUEST, // Use proper enum value
+            AutomationOperation.DELETE, // Use proper enum value
             request, // entityData (the request we fetched earlier)
             id // entityId
           );
