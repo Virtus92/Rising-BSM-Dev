@@ -1,0 +1,6 @@
+**/.venv
+**/.pytest_cache
+**/.github
+**/htmlcov
+**/coverage.xml
+**.coverage
