@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import Link from 'next/link';
-import { Facebook, Instagram, Twitter, Linkedin, ArrowUp, Mail, Phone, MapPin, Github, Heart } from 'lucide-react';
+import { Facebook, Instagram, Twitter, Linkedin, ArrowUp, Mail, Phone, MapPin, Github, Heart, Users, Calendar, MessageSquare, BarChart3, BookOpen, FileText, Shield, Headphones, ExternalLink, Star, ChevronRight, LayoutDashboard } from 'lucide-react';
 import { useSettings } from '@/shared/contexts/SettingsContext';
 
 /**

@@ -4,7 +4,7 @@
 
 Rising BSM is an open-source project designed to provide a foundation for efficient development of personal AI assistants that handle requests, customer management, and appointment scheduling.
 
-![Rising BSM Dashboard](app/public/images/dashboard-preview.webp)
+![Rising BSM Dashboard](app/public/images/screenshots/dashboard/Mainpage.png)
 
 ## Overview
 
@@ -32,6 +32,112 @@ Rising BSM is built using modern, production-ready technologies:
 - **Database**: Prisma ORM with PostgreSQL
 - **Authentication**: JWT with refresh token rotation
 - **Authorization**: Custom permission-based system
+
+## Screenshots
+
+Explore the comprehensive Rising BSM platform through these detailed screenshots:
+
+### 📊 Dashboard & Analytics
+
+The dashboard provides a comprehensive overview of your business at a glance. Track key metrics, monitor upcoming appointments, manage new requests, and access quick actions all from one centralized location.
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="app/public/images/screenshots/dashboard/Statistics.png" alt="Business Analytics" width="500">
+        <br>
+        <sub><b>Statistics Page</b> - Detailed analytics with charts and metrics</sub>
+      </td>
+    </tr>
+  </table>
+</div>
+
+### 👥 Customer Management (CRM)
+
+Powerful customer relationship management with complete profiles, interaction history, and easy management tools. Keep track of all customer data in one organized system.
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="app/public/images/screenshots/customers/CustomerList.png" alt="Customer Directory" width="400">
+        <br>
+        <sub><b>Customer Directory</b> - Searchable list with filters</sub>
+      </td>
+      <td align="center">
+        <img src="app/public/images/screenshots/customers/CustomerDetail.png" alt="Customer Profile" width="400">
+        <br>
+        <sub><b>Customer Profile</b> - Detailed view with history</sub>
+      </td>
+    </tr>
+  </table>
+</div>
+
+### 🔐 User & Permission Management
+
+Advanced user administration with role-based access control (RBAC) and granular permission settings. Ensure security and proper access levels across your organization.
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="app/public/images/screenshots/users/UsersList.png" alt="User Management" width="400">
+        <br>
+        <sub><b>User Management</b> - Overview of all system users</sub>
+      </td>
+      <td align="center">
+        <img src="app/public/images/screenshots/users/UserPermissions.png" alt="Permission Control" width="400">
+        <br>
+        <sub><b>Permission Control</b> - Fine-grained access management</sub>
+      </td>
+    </tr>
+  </table>
+</div>
+
+### ⚡ Automation & Integration
+
+Seamless integration capabilities with webhook support and automated workflows. Connect Rising BSM with your existing tools and automate repetitive tasks.
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="app/public/images/screenshots/automation/Automation.png" alt="Automation Hub" width="500">
+        <br>
+        <sub><b>Automation Hub</b> - Manage webhooks and integrations</sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="app/public/images/screenshots/automation/CreateWebhook2.png" alt="Webhook Creation" width="500">
+        <br>
+        <sub><b>Webhook Configuration</b> - Easy setup for external integrations</sub>
+      </td>
+    </tr>
+  </table>
+</div>
+
+### 📋 Service Request & Appointment Management
+
+Efficiently handle service requests from submission to resolution. Convert requests to appointments and manage your schedule with ease.
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="app/public/images/screenshots/requests/RequestDetail.png" alt="Request Management" width="400">
+        <br>
+        <sub><b>Request Details</b> - Track and manage service requests</sub>
+      </td>
+      <td align="center">
+        <img src="app/public/images/screenshots/requests/AppointmentDetail.png" alt="Appointment System" width="400">
+        <br>
+        <sub><b>Appointment Management</b> - Schedule and track appointments</sub>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ## Project Structure
 

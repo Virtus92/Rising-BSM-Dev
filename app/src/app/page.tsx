@@ -3,6 +3,7 @@ import Header from '@/shared/components/layout/Header';
 import Footer from '@/shared/components/layout/Footer';
 import Hero from '@/features/home/components/Hero';
 import Features from '@/features/home/components/Features';
+import ScreenshotShowcase from '@/features/home/components/ScreenshotShowcase';
 import About from '@/features/home/components/About';
 import RequestShowcase from '@/features/home/components/RequestShowcase';
 import CTA from '@/features/home/components/CTA';
@@ -26,6 +27,7 @@ export default function Home() {
       <Header />
       <Hero />
       <Features />
+      <ScreenshotShowcase />
       <About />
       <RequestShowcase />
       <FAQ />

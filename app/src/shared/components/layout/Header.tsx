@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Moon, Sun, ChevronDown, Star, Sparkles, Code, Shield, Users, Calendar } from 'lucide-react';
+import { Menu, X, Moon, Sun, ChevronDown, Star, Sparkles, Code, Shield, Users, Calendar, GitBranch, FileText, HeadphonesIcon, BookOpen, MessageSquare, LayoutDashboard, Bell, BarChart3 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { useSettings } from '@/shared/contexts/SettingsContext';
@@ -73,27 +73,39 @@ const Header = () => {
   // Products megamenu data
   const products = [
     {
-      icon: <Star className="h-5 w-5 text-amber-500" />,
+      icon: <Users className="h-5 w-5 text-blue-500" />,
       name: "Customer Management",
-      description: "Comprehensive CRM with customer profiles",
+      description: "Complete CRM with profiles & history",
       path: "/#features"
     },
     {
       icon: <Calendar className="h-5 w-5 text-indigo-500" />,
-      name: "Appointment Scheduling",
-      description: "Smart calendar with automated reminders",
+      name: "Appointment System",
+      description: "Smart scheduling with reminders",
       path: "/#features"
     },
     {
-      icon: <Sparkles className="h-5 w-5 text-emerald-500" />,
+      icon: <MessageSquare className="h-5 w-5 text-emerald-500" />,
+      name: "Request Handling",
+      description: "Track & manage service requests",
+      path: "/#features"
+    },
+    {
+      icon: <BarChart3 className="h-5 w-5 text-purple-500" />,
+      name: "Analytics Dashboard",
+      description: "Real-time insights & reports",
+      path: "/#features"
+    },
+    {
+      icon: <Bell className="h-5 w-5 text-amber-500" />,
       name: "Smart Notifications",
-      description: "Automated alerts for important events",
+      description: "Automated alerts & updates",
       path: "/#features"
     },
     {
       icon: <Shield className="h-5 w-5 text-rose-500" />,
-      name: "Role-Based Access",
-      description: "Granular permissions system for teams",
+      name: "Security & Permissions",
+      description: "Role-based access control",
       path: "/#features"
     }
   ];
@@ -110,8 +122,11 @@ const Header = () => {
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 shrink-0">
-            <div className="relative overflow-hidden rounded-full w-8 h-8 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-green-400">
-              <span className="font-bold text-white text-sm">R</span>
+            <div className="relative">
+              <div className="relative overflow-hidden rounded-lg w-10 h-10 flex items-center justify-center bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg shadow-indigo-500/20">
+                <LayoutDashboard className="h-5 w-5 text-white" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-slate-900"></div>
             </div>
             <span className={`text-xl font-bold transition-colors duration-300 ${
               isScrolled || isMenuOpen || pathname !== '/' 
@@ -125,55 +140,6 @@ const Header = () => {
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center h-full">
             <ul className="flex h-full">
-              <li className="relative h-full">
-                <button 
-                  onMouseEnter={() => setShowProducts(true)}
-                  onMouseLeave={() => setShowProducts(false)}
-                  onClick={() => setShowProducts(!showProducts)}
-                  className={`h-full flex items-center px-4 font-medium transition-colors duration-300 ${
-                    isScrolled || pathname !== '/' 
-                      ? 'text-slate-700 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-400' 
-                      : 'text-white/90 hover:text-white'
-                  }`}
-                >
-                  Products
-                  <ChevronDown className={`ml-1 h-4 w-4 transition-transform duration-300 ${showProducts ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {/* Products Dropdown (Mega Menu) */}
-                <AnimatePresence>
-                  {showProducts && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      transition={{ duration: 0.2 }}
-                      onMouseEnter={() => setShowProducts(true)}
-                      onMouseLeave={() => setShowProducts(false)}
-                      className="absolute top-full left-0 w-[32rem] pt-2 group"
-                    >
-                      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 grid grid-cols-2 gap-4">
-                        {products.map((product, idx) => (
-                          <Link 
-                            key={idx}
-                            href={product.path}
-                            className="flex p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors duration-300"
-                          >
-                            <div className="shrink-0 mr-4 h-10 w-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                              {product.icon}
-                            </div>
-                            <div>
-                              <h3 className="font-medium text-slate-900 dark:text-white mb-1">{product.name}</h3>
-                              <p className="text-sm text-slate-500 dark:text-slate-400">{product.description}</p>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </li>
-              
               <li>
                 <button 
                   onClick={() => scrollToSection('features')}
@@ -231,32 +197,44 @@ const Header = () => {
                         <div className="space-y-1">
                           <Link
                             href="/#faq"
-                            className="block px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
+                            className="flex items-center px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
                             onClick={() => setShowResources(false)}
                           >
+                            <BookOpen className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
                             FAQ
                           </Link>
                           <Link
-                            href="/#request"
-                            className="block px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
+                            href="/#screenshots"
+                            className="flex items-center px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
                             onClick={() => setShowResources(false)}
                           >
+                            <Star className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
+                            Screenshots
+                          </Link>
+                          <Link
+                            href="/#request"
+                            className="flex items-center px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
+                            onClick={() => setShowResources(false)}
+                          >
+                            <FileText className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
                             Request Demo
                           </Link>
                           <Link
-                            href="https://github.com"
+                            href="https://github.com/your-username/Rising-BSM"
                             target="_blank"
-                            className="block px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
+                            className="flex items-center px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
                             onClick={() => setShowResources(false)}
                           >
+                            <GitBranch className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
                             GitHub Repository
                           </Link>
                           <hr className="my-1 border-slate-200 dark:border-slate-700" />
                           <Link
                             href="/contact"
-                            className="block px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
+                            className="flex items-center px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
                             onClick={() => setShowResources(false)}
                           >
+                            <HeadphonesIcon className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
                             Contact Support
                           </Link>
                         </div>
@@ -370,15 +348,15 @@ const Header = () => {
                             <Link 
                               key={idx}
                               href={product.path}
-                              className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800"
+                              className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200"
                               onClick={() => setIsMenuOpen(false)}
                             >
-                              <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3">
+                              <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3 flex-shrink-0">
                                 {product.icon}
                               </div>
-                              <div>
-                                <h4 className="font-medium text-slate-900 dark:text-white">{product.name}</h4>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">{product.description}</p>
+                              <div className="min-w-0">
+                                <h4 className="font-medium text-sm text-slate-900 dark:text-white">{product.name}</h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{product.description}</p>
                               </div>
                             </Link>
                           ))}
@@ -431,31 +409,43 @@ const Header = () => {
                         >
                           <Link
                             href="/#faq"
-                            className="block px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            className="flex items-center px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                             onClick={() => setIsMenuOpen(false)}
                           >
+                            <BookOpen className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
                             FAQ
                           </Link>
                           <Link
-                            href="/#request"
-                            className="block px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            href="/#screenshots"
+                            className="flex items-center px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                             onClick={() => setIsMenuOpen(false)}
                           >
+                            <Star className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
+                            Screenshots
+                          </Link>
+                          <Link
+                            href="/#request"
+                            className="flex items-center px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            onClick={() => setIsMenuOpen(false)}
+                          >
+                            <FileText className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
                             Request Demo
                           </Link>
                           <Link
-                            href="https://github.com"
+                            href="https://github.com/your-username/Rising-BSM"
                             target="_blank"
-                            className="block px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            className="flex items-center px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                             onClick={() => setIsMenuOpen(false)}
                           >
+                            <GitBranch className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
                             GitHub Repository
                           </Link>
                           <Link
                             href="/contact"
-                            className="block px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            className="flex items-center px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                             onClick={() => setIsMenuOpen(false)}
                           >
+                            <HeadphonesIcon className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
                             Contact Support
                           </Link>
                         </motion.div>

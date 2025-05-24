@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Users, Calendar, MessageSquare, BarChart3, Settings, Bell, Search, Shield } from 'lucide-react';
 
@@ -44,7 +44,6 @@ const Features = () => {
       title: "AI-Powered Assistants",
       description: "Leverage cutting-edge AI technology to handle customer queries, automate responses, and provide personalized experiences.",
       icon: <MessageSquare className="w-6 h-6" />,
-      image: "/images/ai-assistant.jpg",
       color: "from-blue-600 to-indigo-600",
       bgColor: "bg-blue-100 dark:bg-blue-900/20",
       points: [
@@ -58,7 +57,6 @@ const Features = () => {
       title: "Customer Management",
       description: "Efficiently manage customer relationships with comprehensive profiles, interaction history, and segmentation capabilities.",
       icon: <Users className="w-6 h-6" />,
-      image: "/images/customer-management.jpg",
       color: "from-green-600 to-emerald-600",
       bgColor: "bg-green-100 dark:bg-green-900/20",
       points: [
@@ -72,7 +70,6 @@ const Features = () => {
       title: "Appointment Scheduling",
       description: "Streamline your booking process with a flexible, automated scheduling system that integrates with your calendar.",
       icon: <Calendar className="w-6 h-6" />,
-      image: "/images/appointment-scheduling.jpg",
       color: "from-amber-500 to-orange-600",
       bgColor: "bg-amber-100 dark:bg-amber-900/20",
       points: [
@@ -86,7 +83,6 @@ const Features = () => {
       title: "Analytics & Insights",
       description: "Gain valuable insights from your data with powerful analytics tools that help you make informed business decisions.",
       icon: <BarChart3 className="w-6 h-6" />,
-      image: "/images/analytics-dashboard.jpg",
       color: "from-purple-600 to-violet-600",
       bgColor: "bg-purple-100 dark:bg-purple-900/20",
       points: [
@@ -149,18 +145,33 @@ const Features = () => {
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
-          {/* Feature image */}
+          {/* Feature visual */}
           <div className="md:col-span-3 order-2 md:order-1">
             <div className="relative">
               <div className={`absolute inset-0 rounded-2xl blur-2xl opacity-20 ${features[activeTab].bgColor}`}></div>
-              <div className="relative rounded-2xl overflow-hidden shadow-xl border border-slate-200 dark:border-slate-700">
-                <Image
-                  src={features[activeTab].image}
-                  alt={features[activeTab].title}
-                  width={600}
-                  height={400}
-                  className="w-full h-auto object-cover"
-                />
+              <div className={`relative rounded-2xl overflow-hidden bg-gradient-to-br ${features[activeTab].color} p-12 shadow-xl border border-slate-200 dark:border-slate-700`}>
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-white/20">
+                    {React.cloneElement(features[activeTab].icon, { className: 'w-48 h-48' })}
+                  </div>
+                </div>
+                <div className="absolute top-8 left-8 right-8">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
+                      {features[activeTab].icon}
+                    </div>
+                    <h3 className="text-white text-xl font-semibold">
+                      {features[activeTab].title}
+                    </h3>
+                  </div>
+                </div>
+                <div className="absolute bottom-8 left-8 right-8">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                    <p className="text-white/90 text-sm">
+                      View real screenshots in our gallery below
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

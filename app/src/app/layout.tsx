@@ -5,7 +5,7 @@ import { PermissionProvider } from '@/features/permissions/providers/PermissionP
 import { ToastProvider } from '@/shared/providers/ToastProvider';
 import { ThemeProvider } from '@/shared/providers/ThemeProvider';
 import { QueryProvider } from '@/shared/providers/QueryProvider';
-import { AppInitializer } from '@/features/app';
+
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -28,9 +28,7 @@ export default function RootLayout({
             <ToastProvider>
               <AuthProvider>
                 <PermissionProvider>
-                  <AppInitializer>
-                    {children}
-                  </AppInitializer>
+                  {children}
                 </PermissionProvider>
               </AuthProvider>
             </ToastProvider>

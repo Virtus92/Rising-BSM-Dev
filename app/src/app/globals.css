@@ -100,10 +100,10 @@
     @apply leading-7 my-4;
   }
   ul {
-    @apply list-disc pl-6 my-4;
+    @apply list-none my-4;
   }
   ol {
-    @apply list-decimal pl-6 my-4;
+    @apply list-none my-4;
   }
   li {
     @apply mb-1;
