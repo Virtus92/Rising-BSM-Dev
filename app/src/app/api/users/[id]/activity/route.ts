@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { routeHandler } from '@/core/api/server/route-handler';
-import { prisma } from '@/core/db/index';
+import { getUserService } from '@/core/factories/serviceFactory.server';
 import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { getLogger } from '@/core/logging';
@@ -41,39 +41,26 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Get user service
+    const userService = getUserService();
+    
     // Check if user exists
-    const userExists = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true }
-    });
-
-    if (!userExists) {
+    const user = await userService.getById(userId);
+    if (!user) {
       logger.warn(`Activity requested for non-existent user ID: ${userId}`);
       return formatResponse.error('User not found', 404);
     }
 
     // Get activity logs for the user
-    const [activities, totalCount] = await Promise.all([
-      prisma.userActivity.findMany({
-        where: {
-          userId: userId
-        },
-        orderBy: {
-          timestamp: 'desc'
-        },
-        take: limit,
-        skip: offset
-      }),
-      prisma.userActivity.count({
-        where: {
-          userId: userId
-        }
-      })
-    ]);
+    const activities = await userService.getUserActivity(userId, limit * page);
+    
+    // Paginate the results
+    const paginatedActivities = activities.slice(offset, offset + limit);
+    const totalCount = activities.length;
 
     // Format the response
     return formatResponse.success({
-      data: activities,
+      data: paginatedActivities,
       pagination: {
         total: totalCount,
         page,

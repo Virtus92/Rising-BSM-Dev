@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { routeHandler } from '@/core/api/route-handler';
-import { prisma } from '@/core/db/index';
+import { getUserService } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { getLogger } from '@/core/logging';
 import { UserStatus, isUserManageableStatus } from '@/domain/enums/UserEnums';
@@ -41,10 +41,11 @@ export const PATCH = requirePermission(SystemPermission.USERS_EDIT)(
         return formatResponse.error('This status cannot be set manually', 400);
       }
 
+      // Get user service
+      const userService = getUserService();
+      
       // Check if user exists
-      const user = await prisma.user.findUnique({
-        where: { id: userId }
-      });
+      const user = await userService.getById(userId);
 
       if (!user) {
         logger.warn(`Status update attempted for non-existent user ID: ${userId}`);
@@ -56,15 +57,12 @@ export const PATCH = requirePermission(SystemPermission.USERS_EDIT)(
         return formatResponse.error('You cannot change your own status', 403);
       }
 
-      // Update user status
-      const updatedUser = await prisma.user.update({
-        where: { id: userId },
-        data: {
-          status: status,
-          updatedAt: new Date(),
-          updatedBy: req.auth?.userId
-        }
-      });
+      // Update user status using the service
+      const updatedUser = await userService.updateStatus(
+        userId, 
+        { status: status as UserStatus },
+        { userId: req.auth?.userId }
+      );
 
       return formatResponse.success({
         message: 'User status updated successfully',

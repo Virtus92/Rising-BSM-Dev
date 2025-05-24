@@ -239,6 +239,43 @@ export const SystemPermissionMap: Record<string, PermissionDefinition> = {
     action: PermissionAction.MANAGE
   },
   
+  // Automation permissions
+  [SystemPermission.AUTOMATION_VIEW]: {
+    code: SystemPermission.AUTOMATION_VIEW,
+    name: 'View Automation',
+    description: 'Can view automation webhooks and schedules',
+    category: PermissionCategory.AUTOMATION,
+    action: PermissionAction.VIEW
+  },
+  [SystemPermission.AUTOMATION_CREATE]: {
+    code: SystemPermission.AUTOMATION_CREATE,
+    name: 'Create Automation',
+    description: 'Can create new automation webhooks and schedules',
+    category: PermissionCategory.AUTOMATION,
+    action: PermissionAction.CREATE
+  },
+  [SystemPermission.AUTOMATION_EDIT]: {
+    code: SystemPermission.AUTOMATION_EDIT,
+    name: 'Edit Automation',
+    description: 'Can edit existing automation webhooks and schedules',
+    category: PermissionCategory.AUTOMATION,
+    action: PermissionAction.EDIT
+  },
+  [SystemPermission.AUTOMATION_DELETE]: {
+    code: SystemPermission.AUTOMATION_DELETE,
+    name: 'Delete Automation',
+    description: 'Can delete automation webhooks and schedules',
+    category: PermissionCategory.AUTOMATION,
+    action: PermissionAction.DELETE
+  },
+  [SystemPermission.AUTOMATION_MANAGE]: {
+    code: SystemPermission.AUTOMATION_MANAGE,
+    name: 'Manage Automation',
+    description: 'Can manage all automation features including execution',
+    category: PermissionCategory.AUTOMATION,
+    action: PermissionAction.MANAGE
+  },
+  
   // System administration
   [SystemPermission.SYSTEM_ADMIN]: {
     code: SystemPermission.SYSTEM_ADMIN,

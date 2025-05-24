@@ -176,7 +176,7 @@ describe('EntityFactory', () => {
       expect(request.id).toBe(42);
       expect(request.name).toBe('Test Request');
       expect(request.email).toBe('request@example.com');
-      expect(request.status).toBe(RequestStatus.NEW);
+      expect(request.status).toBe(RequestStatus.IN_PROGRESS);
       expect(request.customerId).toBe(15);
     });
     

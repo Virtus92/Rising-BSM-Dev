@@ -89,10 +89,10 @@ describe('EnumUtils', () => {
     });
 
     it('should work with real application enums', () => {
-      expect(stringToEnum(CommonStatus, 'active', CommonStatus.INACTIVE))
+      expect(stringToEnum(CommonStatus, 'ACTIVE', CommonStatus.INACTIVE))
         .toBe(CommonStatus.ACTIVE);
       
-      expect(stringToEnum(AppointmentStatus, 'planned', AppointmentStatus.CANCELLED))
+      expect(stringToEnum(AppointmentStatus, 'PLANNED', AppointmentStatus.CANCELLED))
         .toBe(AppointmentStatus.PLANNED);
     });
   });

@@ -1,16 +1,37 @@
-// Import testing library extensions
+// Client-side test setup
 require('@testing-library/jest-dom');
 
-// Set up environment variables for tests
+// Polyfills for jsdom environment
+const { TextEncoder, TextDecoder } = require('util');
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
+// Mock MSW for client tests (we don't need it here)
+jest.mock('msw', () => ({
+  rest: {},
+  setupServer: () => ({
+    listen: jest.fn(),
+    resetHandlers: jest.fn(),
+    close: jest.fn(),
+  }),
+}));
+
+// Crypto polyfill for client tests
+const crypto = require('crypto');
+Object.defineProperty(global, 'crypto', {
+  value: {
+    randomUUID: () => crypto.randomUUID(),
+    getRandomValues: (arr) => crypto.getRandomValues(arr),
+  },
+});
+
+// Environment variables for client tests
 process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = 'test-secret';
-process.env.NEXTAUTH_SECRET = 'test-nextauth-secret';
-process.env.NEXTAUTH_URL = 'http://localhost:3000';
 process.env.NEXT_PUBLIC_API_URL = 'http://localhost:3000/api';
 
-// Mock Next.js modules
+// Mock Next.js client-side modules
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({
+  useRouter: jest.fn(() => ({
     push: jest.fn(),
     replace: jest.fn(),
     back: jest.fn(),
@@ -19,30 +40,17 @@ jest.mock('next/navigation', () => ({
     pathname: '/',
     query: {},
     asPath: '/',
-  }),
+  })),
   useSearchParams: () => ({
     get: jest.fn(),
   }),
   usePathname: () => '/',
 }));
 
-// Mock next/headers
-jest.mock('next/headers', () => ({
-  cookies: () => ({
-    get: jest.fn(),
-    set: jest.fn(),
-    delete: jest.fn(),
-  }),
-  headers: () => new Map(),
-}));
-
-// Mock server-only
-jest.mock('server-only', () => ({}));
-
-// Global fetch mock
+// Global fetch mock for client tests
 global.fetch = jest.fn();
 
-// Window matchMedia mock
+// Browser API mocks
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: jest.fn().mockImplementation(query => ({
@@ -57,7 +65,6 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// IntersectionObserver mock
 global.IntersectionObserver = class IntersectionObserver {
   constructor() {}
   disconnect() {}
@@ -65,7 +72,6 @@ global.IntersectionObserver = class IntersectionObserver {
   unobserve() {}
 };
 
-// ResizeObserver mock
 global.ResizeObserver = class ResizeObserver {
   constructor() {}
   disconnect() {}

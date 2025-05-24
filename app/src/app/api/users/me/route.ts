@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { getPrismaClient } from '@/core/db/prisma/client';
+import { getUserService } from '@/core/factories/serviceFactory.server';
 import { formatResponse } from '@/core/errors';
 import { getLogger } from '@/core/logging';
 
 // Get the current user profile using the auth cookie
 export async function GET(req: NextRequest) {
   const logger = getLogger();
-  const prisma = getPrismaClient();
+  const userService = getUserService();
   
   try {
     // Get auth token from cookie or header - CONSISTENT NAMING
@@ -88,23 +88,9 @@ export async function GET(req: NextRequest) {
           : 'none'
       });
       
-      // Get user from database
+      // Get user from database using UserService
       const userId = parseInt(decoded.sub.toString(), 10);
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          status: true,
-          profilePicture: true,
-          createdAt: true,
-          updatedAt: true,
-          lastLoginAt: true,
-          phone: true
-        }
-      });
+      const user = await userService.getById(userId);
       
       if (!user) {
         logger.warn(`User not found in database for ID: ${userId}`);

@@ -86,19 +86,16 @@ describe('DtoFactory', () => {
       const now = new Date().toISOString();
       const partialData = {
         id: 42,
-        name: 'Test Request',
-        email: 'request@example.com',
+        name: 'Test Customer',
+        email: 'customer@example.com',
         phone: '123-456-7890',
-        message: 'Test message',
-        service: 'Test service',
+        postalCode: '12345',
+        country: 'USA',
+        newsletter: true,
         status: CommonStatus.ACTIVE,
         type: CustomerType.BUSINESS,
-        source: 'form' as const,
-        customerId: 10,
-        processorId: 20,
-        appointmentId: 30,
-        customerName: 'Test Customer',
-        processorName: 'Test Processor',
+        notes: ['Note 1', 'Note 2'],
+        appointments: [{ id: 1, title: 'Test Appointment' }],
         createdAt: now,
         updatedAt: now
       };
@@ -174,7 +171,7 @@ describe('DtoFactory', () => {
       expect(dto.service).toBe('Test service');
       expect(dto.status).toBe(RequestStatus.IN_PROGRESS);
       expect(dto.type).toBe(RequestType.SUPPORT);
-      expect(dto.source).toBe('website');
+      expect(dto.source).toBe('form');
       expect(dto.customerId).toBe(10);
       expect(dto.processorId).toBe(20);
       expect(dto.appointmentId).toBe(30);

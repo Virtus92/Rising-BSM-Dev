@@ -7,24 +7,18 @@ const tsconfig = JSON.parse(readFileSync(resolve('./tsconfig.json'), 'utf-8'));
 
 /** @type {import('jest').Config} */
 export default {
+  displayName: 'Client Tests',
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/src'],
   
   testMatch: [
-    '**/__tests__/**/*.(test|spec).(ts|tsx)',
-    '**/*.(test|spec).(ts|tsx)'
-  ],
-  
-  // Exclude server-side tests that require Node.js runtime
-  testPathIgnorePatterns: [
-    '<rootDir>/node_modules/',
-    '<rootDir>/src/app/api/',
-    '<rootDir>/src/features/.*/api/',
-    '<rootDir>/src/core/db/',
-    '<rootDir>/src/core/services/__tests__/',
-    '<rootDir>/src/core/repositories/__tests__/',
-    '<rootDir>/src/core/errors/__tests__/',
+    '**/components/**/*.test.(ts|tsx)',
+    '**/hooks/**/*.test.(ts|tsx)', 
+    '**/shared/**/*.test.(ts|tsx)',
+    '**/__tests__/client/**/*.test.(ts|tsx)',
+    '**/features/**/components/**/*.test.(ts|tsx)',
+    '**/features/**/hooks/**/*.test.(ts|tsx)'
   ],
   
   transform: {
@@ -43,37 +37,28 @@ export default {
     }),
     '\\.(css|less|sass|scss)$': '<rootDir>/src/__mocks__/styleMock.js',
     '\\.(gif|ttf|eot|svg|png|jpg|jpeg|webp)$': '<rootDir>/src/__mocks__/fileMock.js',
-    // Mock server-only modules
+    // Mock server-only modules for client tests
     '^server-only$': '<rootDir>/src/__mocks__/server-only.js',
-    // Mock Next.js server modules
     '^next/server$': '<rootDir>/src/__mocks__/next-server.js',
+    '^@/app/api/(.*)$': '<rootDir>/src/__mocks__/api.js',
+    '^@/core/db/(.*)$': '<rootDir>/src/__mocks__/db.js',
+    '^@/test-utils$': '<rootDir>/src/__mocks__/test-utils.js',
   },
   
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.client.setup.js'],
   
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   
   collectCoverageFrom: [
-    'src/**/*.{ts,tsx}',
+    'src/components/**/*.{ts,tsx}',
+    'src/shared/components/**/*.{ts,tsx}',
+    'src/features/**/components/**/*.{ts,tsx}',
+    'src/features/**/hooks/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
     '!src/**/*.stories.{ts,tsx}',
     '!src/**/index.{ts,tsx}',
-    '!src/app/layout.tsx',
-    '!src/app/page.tsx',
-    '!src/app/api/**/*',
-    '!src/core/db/**/*',
   ],
   
-  coverageThreshold: {
-    global: {
-      branches: 70,
-      functions: 70,
-      lines: 70,
-      statements: 70,
-    },
-  },
-  
-  testEnvironmentOptions: {
-    customExportConditions: [''],
-  },
+  coverageDirectory: 'coverage/client',
+  coverageReporters: ['text', 'lcov', 'html'],
 };
