@@ -31,7 +31,7 @@ export interface CustomerFormProps {
 }
 
 /**
- * Formular zum Erstellen und Bearbeiten von Kunden
+ * Form component for creating and editing customers
  */
 export default function CustomerForm({ 
   initialData = {}, 
@@ -40,9 +40,9 @@ export default function CustomerForm({
   isLoading = false,
   error = null,
   success = false,
-  title = mode === 'create' ? 'Neuen Kunden erstellen' : 'Kundendaten bearbeiten',
+  title = mode === 'create' ? 'Create New Customer' : 'Edit Customer',
   description,
-  submitLabel = mode === 'create' ? 'Kunde erstellen' : 'Speichern',
+  submitLabel = mode === 'create' ? 'Create Customer' : 'Save Changes',
   onCancel 
 }: CustomerFormProps) {
   const router = useRouter();
@@ -98,7 +98,7 @@ export default function CustomerForm({
         if (result) {
           // Only navigate if we're not in a modal
           if (!onCancel) {
-            // Nach dem Speichern zur Detailseite oder Liste navigieren
+            // Navigate to detail page or list after saving
             if (mode === 'create') {
               router.push(`/dashboard/customers/${result.id}`);
             } else {
@@ -131,7 +131,7 @@ export default function CustomerForm({
   // Only use the parent success prop for consistent state management
   const showSuccess = success;
 
-  // Funktion zum Überprüfen, ob Änderungen vorgenommen wurden
+  // Function to check if changes have been made
   const checkForChanges = useCallback(() => {
     const hasNameChanged = name !== (initialData.name || '');
     const hasEmailChanged = email !== (initialData.email || '');
@@ -157,7 +157,7 @@ export default function CustomerForm({
     company, vatNumber, customerType, status, newsletter, initialData
   ]);
 
-  // Die checkForChanges-Funktion bei jeder Änderung aufrufen
+  // Call checkForChanges on every field change
   const handleFieldChange = (field: string, value: string | boolean) => {
     if (process.env.NODE_ENV === 'development') {
       if (field === 'type' || field === 'customerType' || field === 'newsletter' || field === 'vatNumber') {
@@ -169,7 +169,7 @@ export default function CustomerForm({
     checkForChanges();
   };
 
-  // Funktion zum Abbrechen und Zurückgehen
+  // Function to cancel and go back
   const handleCancel = () => {
     if (hasChanges && !onCancel) {
       setShowConfirmLeave(true);
@@ -191,7 +191,7 @@ export default function CustomerForm({
       <form onSubmit={(e) => { e.preventDefault(); formSubmit(); }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5 text-blue-600" />
+            <User className="h-5 w-5 text-green-600" />
             {title}
           </CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
@@ -220,7 +220,7 @@ export default function CustomerForm({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="flex items-center gap-1.5">
-                    <User className="h-3.5 w-3.5 text-blue-600" />
+                    <User className="h-3.5 w-3.5 text-green-600" />
                     Name <span className="text-red-500">*</span>
                   </Label>
                   <Input
@@ -239,7 +239,7 @@ export default function CustomerForm({
                 
                 <div className="space-y-2">
                   <Label htmlFor="email" className="flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5 text-blue-600" />
+                    <Mail className="h-3.5 w-3.5 text-green-600" />
                     Email
                   </Label>
                   <Input
@@ -260,7 +260,7 @@ export default function CustomerForm({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone" className="flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-blue-600" />
+                    <Phone className="h-3.5 w-3.5 text-green-600" />
                     Phone
                   </Label>
                   <Input
@@ -275,7 +275,7 @@ export default function CustomerForm({
                 
                 <div className="space-y-2">
                   <Label htmlFor="company" className="flex items-center gap-1.5">
-                    <Building className="h-3.5 w-3.5 text-blue-600" />
+                    <Building className="h-3.5 w-3.5 text-green-600" />
                     Company
                   </Label>
                   <Input
@@ -290,7 +290,7 @@ export default function CustomerForm({
               
               <div className="space-y-2">
                 <Label htmlFor="vatNumber" className="flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5 text-blue-600" />
+                  <FileText className="h-3.5 w-3.5 text-green-600" />
                   VAT Number
                 </Label>
                 <Input
@@ -304,7 +304,7 @@ export default function CustomerForm({
 
               <div className="space-y-2">
                 <Label htmlFor="type" className="flex items-center gap-1.5">
-                  <Tag className="h-3.5 w-3.5 text-blue-600" />
+                  <Tag className="h-3.5 w-3.5 text-green-600" />
                   Customer Type
                 </Label>
                 <Select
@@ -327,7 +327,7 @@ export default function CustomerForm({
 
               <div className="space-y-2">
                 <Label htmlFor="status" className="flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5 text-blue-600" />
+                  <AlertCircle className="h-3.5 w-3.5 text-green-600" />
                   Status
                 </Label>
                 <Select
@@ -348,7 +348,7 @@ export default function CustomerForm({
 
               <div className="space-y-2 flex items-center gap-3">
                 <Label htmlFor="newsletter" className="flex items-center gap-1.5 cursor-pointer">
-                  <Newsletter className="h-3.5 w-3.5 text-blue-600" />
+                  <Newsletter className="h-3.5 w-3.5 text-green-600" />
                   Newsletter Subscription
                 </Label>
                 <Switch
@@ -369,7 +369,7 @@ export default function CustomerForm({
             <TabsContent value="address" className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="address" className="flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                  <MapPin className="h-3.5 w-3.5 text-green-600" />
                   Address
                 </Label>
                 <Input
@@ -384,7 +384,7 @@ export default function CustomerForm({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="postalCode" className="flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                    <MapPin className="h-3.5 w-3.5 text-green-600" />
                     Postal Code
                   </Label>
                   <Input
@@ -398,7 +398,7 @@ export default function CustomerForm({
                 
                 <div className="space-y-2">
                   <Label htmlFor="city" className="flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                    <MapPin className="h-3.5 w-3.5 text-green-600" />
                     City
                   </Label>
                   <Input
@@ -412,7 +412,7 @@ export default function CustomerForm({
                 
                 <div className="space-y-2">
                   <Label htmlFor="country" className="flex items-center gap-1.5">
-                    <Globe className="h-3.5 w-3.5 text-blue-600" />
+                    <Globe className="h-3.5 w-3.5 text-green-600" />
                     Country
                   </Label>
                   <Input
@@ -441,7 +441,7 @@ export default function CustomerForm({
           <Button 
             type="submit"
             disabled={submitting}
-            className={EntityColors.customers?.primary || "bg-blue-600 hover:bg-blue-700"}
+            className={EntityColors.customers?.primary || "bg-green-600 hover:bg-green-700"}
           >
             {submitting ? (
               <>

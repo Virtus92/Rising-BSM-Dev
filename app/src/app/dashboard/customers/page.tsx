@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CustomerList } from '@/features/customers/components/CustomerList';
-import CustomerForm from '@/features/customers/components/CustomerForm';
+import { CustomerFormFields, CustomerFormData } from '@/features/customers/components/CustomerFormFields';
 import { EntityPageLayout } from '@/shared/components/EntityPageLayout';
-import { FormModal, ConfirmationModal } from '@/shared/components/BaseModal';
+import { FormModal, ConfirmationModal } from '@/shared/components/modals';
 import { useEntityModal } from '@/shared/hooks/useModal';
 import { CustomerService } from '@/features/customers/lib/services/CustomerService.client';
 import { CreateCustomerDto, CustomerResponseDto, UpdateCustomerDto, CustomerDto } from '@/domain/dtos/CustomerDtos';
@@ -13,6 +13,7 @@ import { useToast } from '@/shared/hooks/useToast';
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
 import { NoPermissionView } from '@/shared/components/NoPermissionView';
+import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -28,8 +29,43 @@ export default function CustomersPage() {
   // Use the entity modal hook
   const modal = useEntityModal<CustomerDto>();
 
+  // Form state
+  const [formData, setFormData] = useState<CustomerFormData>({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    postalCode: '',
+    country: '',
+    company: '',
+    vatNumber: '',
+    type: CustomerType.PRIVATE,
+    status: CommonStatus.ACTIVE,
+    newsletter: false,
+    notes: ''
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   // Handle customer form submission
-  const handleCustomerSubmit = useCallback(async (data: CreateCustomerDto | UpdateCustomerDto) => {
+  const handleCustomerSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Basic validation
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) {
+      errors.name = 'Name is required';
+    }
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Invalid email format';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    
+    setFormErrors({});
     modal.setError(null);
     modal.setSuccess(false);
     modal.setIsSubmitting(true);
@@ -40,25 +76,25 @@ export default function CustomersPage() {
       if (modal.action?.type === 'create') {
         // Format and validate the data before sending
         const formattedData: CreateCustomerDto = {
-          ...data,
+          ...formData,
           // Ensure required name property is never undefined
-          name: data.name || '',
+          name: formData.name || '',
           // Field mapping happens in the CustomerService, but we'll ensure it here too
-          postalCode: data.zipCode || data.postalCode
+          postalCode: formData.zipCode || formData.postalCode
         };
         
         response = await CustomerService.createCustomer(formattedData);
         
         if (response.success) {
           // Add customer note if there's one entered
-          if (data.notes && response.data?.id) {
+          if (formData.notes && response.data?.id) {
             try {
               // Add a delay to ensure the customer is properly created first
               await new Promise(resolve => setTimeout(resolve, 300));
               
               const noteResponse = await CustomerService.addCustomerNote(
                 response.data.id, 
-                data.notes
+                formData.notes
               );
               
               if (noteResponse.success) {
@@ -74,9 +110,9 @@ export default function CustomersPage() {
       } else if (modal.action?.type === 'edit' && modal.action.item) {
         // Handle edit
         const updateData: UpdateCustomerDto = {
-          ...data,
-          name: data.name || '',
-          postalCode: data.zipCode || data.postalCode
+          ...formData,
+          name: formData.name || '',
+          postalCode: formData.zipCode || formData.postalCode
         };
         
         response = await CustomerService.updateCustomer(modal.action.item.id, updateData);
@@ -116,7 +152,7 @@ export default function CustomersPage() {
     } finally {
       modal.setIsSubmitting(false);
     }
-  }, [modal, toast, router]);
+  }, [modal, toast, router, formData]);
 
   // Handle customer deletion
   const handleCustomerDelete = useCallback(async () => {
@@ -151,10 +187,42 @@ export default function CustomersPage() {
   const handleListAction = useCallback((action: string, customer?: CustomerDto) => {
     switch (action) {
       case 'create':
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          address: '',
+          city: '',
+          postalCode: '',
+          country: '',
+          company: '',
+          vatNumber: '',
+          type: CustomerType.PRIVATE,
+          status: CommonStatus.ACTIVE,
+          newsletter: false,
+          notes: ''
+        });
+        setFormErrors({});
         modal.openCreateModal();
         break;
       case 'edit':
         if (customer && canEditCustomers) {
+          setFormData({
+            name: customer.name || '',
+            email: customer.email || '',
+            phone: customer.phone || '',
+            address: customer.address || '',
+            city: customer.city || '',
+            postalCode: customer.postalCode  || '',
+            country: customer.country || '',
+            company: customer.company || '',
+            vatNumber: customer.vatNumber || '',
+            type: customer.type as CustomerType || CustomerType.PRIVATE,
+            status: customer.status as CommonStatus || CommonStatus.ACTIVE,
+            newsletter: customer.newsletter || false,
+            notes: ''
+          });
+          setFormErrors({});
           modal.openEditModal(customer);
         }
         break;
@@ -228,30 +296,15 @@ export default function CustomersPage() {
           error={modal.error}
           success={modal.success}
           size="lg"
-          showDefaultActions={false}
+          onSubmit={handleCustomerSubmit}
+          onCancel={modal.closeModal}
+          submitLabel={modal.action?.type === 'create' ? 'Create Customer' : 'Update Customer'}
         >
-          <CustomerForm
-            initialData={modal.action?.type === 'edit' && modal.action.item ? {
-              ...modal.action.item,
-              // Ensure dates are strings for form compatibility
-              createdAt: typeof modal.action.item.createdAt === 'string' 
-                ? modal.action.item.createdAt 
-                : modal.action.item.createdAt?.toISOString?.() || '',
-              updatedAt: typeof modal.action.item.updatedAt === 'string' 
-                ? modal.action.item.updatedAt 
-                : modal.action.item.updatedAt?.toISOString?.() || '',
-              // Convert notes string to undefined for form compatibility
-              notes: undefined // Let the form handle notes separately
-            } : {}}
-            onSubmit={handleCustomerSubmit}
-            mode={modal.action?.type === 'create' ? 'create' : 'edit'}
-            isLoading={modal.isSubmitting}
-            error={modal.error}
-            success={modal.success}
-            title={modalInfo.title}
-            description={modalInfo.description}
-            submitLabel={modal.action?.type === 'create' ? 'Create Customer' : 'Update Customer'}
-            onCancel={modal.closeModal}
+          <CustomerFormFields
+            formData={formData}
+            onChange={(updates) => setFormData(prev => ({ ...prev, ...updates }))}
+            errors={formErrors}
+            disabled={modal.isSubmitting}
           />
         </FormModal>
       )}

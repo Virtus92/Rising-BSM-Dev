@@ -1,105 +1,143 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCallback } from 'react';
-import { validateId, isValidId } from '@/shared/utils/validation-utils';
-import { AppointmentClient } from '@/features/appointments/lib/clients';
-import { CustomerClient } from '@/features/customers/lib/clients';
-import { AppointmentStatus } from '@/domain/enums/CommonEnums';
-import { CreateAppointmentDto, UpdateAppointmentDto } from '@/domain/dtos/AppointmentDtos';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/card';
+import { Save, ArrowLeft, Loader2, User, Calendar, Clock, MapPin, FileText, AlertCircle, Timer } from 'lucide-react';
+import { AppointmentResponseDto, CreateAppointmentDto, UpdateAppointmentDto, AppointmentDto } from '@/domain/dtos/AppointmentDtos';
+import { useAppointmentForm } from '@/features/appointments/hooks/useAppointmentForm';
+import { useToast } from '@/shared/hooks/useToast';
 import { Button } from '@/shared/components/ui/button';
-import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
+import { Input } from '@/shared/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/shared/components/ui/select';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from '@/shared/components/ui/card';
-import { ArrowLeft, Calendar, Clock, User, Save } from 'lucide-react';
+import { EntityColors } from '@/shared/utils/entity-colors';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { AppointmentStatus } from '@/domain/enums/CommonEnums';
+import { ApiClient } from '@/core/api/ApiClient';
 import { format } from 'date-fns';
 
-type AppointmentFormProps = {
-  appointmentId?: string | number;
-  isEditMode?: boolean;
-};
+export interface AppointmentFormProps {
+  initialData?: Partial<AppointmentDto>;
+  onSubmit: (data: CreateAppointmentDto | UpdateAppointmentDto) => Promise<AppointmentResponseDto | null>;
+  mode: 'create' | 'edit';
+  isLoading?: boolean;
+  error?: string | null;
+  success?: boolean;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
+  onCancel?: () => void;
+}
 
-export const AppointmentForm: React.FC<AppointmentFormProps> = ({ 
-  appointmentId,
-  isEditMode = false
-}) => {
+/**
+ * Form component for creating and editing appointments
+ */
+export default function AppointmentForm({ 
+  initialData = {}, 
+  onSubmit, 
+  mode, 
+  isLoading = false,
+  error = null,
+  success = false,
+  title = mode === 'create' ? 'Create New Appointment' : 'Edit Appointment',
+  description,
+  submitLabel = mode === 'create' ? 'Create Appointment' : 'Save Changes',
+  onCancel
+}: AppointmentFormProps) {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const { toast } = useToast();
+  const [hasChanges, setHasChanges] = useState(false);
+  const [showConfirmLeave, setShowConfirmLeave] = useState(false);
+  const [activeTab, setActiveTab] = useState('basic');
   
-  // Keep track of ID validation state for consistency
-  const [validatedId, setValidatedId] = useState<number | null>(null);
-  
-  const [formData, setFormData] = useState<CreateAppointmentDto | UpdateAppointmentDto>({
-    title: '',
-    appointmentDate: format(new Date(), 'yyyy-MM-dd'),
-    appointmentTime: format(new Date(), 'HH:mm'),
-    duration: 60,
-    location: '',
-    description: '',
-    status: AppointmentStatus.PLANNED,
-    customerId: undefined,
-    service: ''
-  });
-
-  // Fetch available customers for the dropdown
+  // Customer list state
   const [customers, setCustomers] = useState<{ id: number; name: string; email?: string; phone?: string }[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [customerLoadError, setCustomerLoadError] = useState<string | null>(null);
+
+  const {
+    title: appointmentTitle, setTitle,
+    appointmentDate, setAppointmentDate,
+    appointmentTime, setAppointmentTime,
+    duration, setDuration,
+    location, setLocation,
+    description: appointmentDescription, setDescription,
+    status, setStatus,
+    customerId, setCustomerId,
+    service, setService,
+    errors: formErrors,
+    submitting: formSubmitting,
+    handleSubmit: formSubmit,
+    updateField
+  } = useAppointmentForm({
+    initialData,
+    onSubmit: async (data) => {
+      try {
+        const result = await onSubmit(data);
+        if (result) {
+          // Only navigate if we're not in a modal
+          if (!onCancel) {
+            // Navigate to detail page or list after saving
+            if (mode === 'create') {
+              router.push(`/dashboard/appointments/${result.id}`);
+            } else {
+              router.push(`/dashboard/appointments/${initialData.id}`);
+            }
+          }
+          
+          return result;
+        }
+        
+        return null;
+      } catch (error) {
+        console.error('Form submission error:', error as Error);
+        
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'An error occurred',
+          variant: 'error'
+        });
+        
+        return null;
+      }
+    }
+  });
   
-  // Function to load customers - separate for reusability
+  // Use provided loading/error states or fallback to form states
+  const submitting = isLoading || formSubmitting;
+  const errors = error ? { general: error, ...formErrors } : formErrors;
+  
+  // Only use the parent success prop for consistent state management
+  const showSuccess = success;
+
+  // Function to load customers
   const loadCustomers = useCallback(async () => {
     try {
       setIsLoadingCustomers(true);
       setCustomerLoadError(null);
       
-      // Use CustomerClient to fetch customers
-      const response = await CustomerClient.getCustomers({ 
-        limit: 100, // Get a reasonable number of customers
-        sortBy: 'name',
-        sortDirection: 'asc'
+      const response = await ApiClient.get('/api/customers', { 
+        params: {
+          limit: 100,
+          sortBy: 'name',
+          sortDirection: 'asc',
+          status: 'ACTIVE'
+        }
       });
       
       if (response.success && response.data) {
-        // Process customer data
         let customerData: any[] = [];
         
         // Handle different response formats
         if (Array.isArray(response.data)) {
-          // Direct array of customers
           customerData = response.data;
-        } else if (typeof response.data === 'object' && response.data !== null) {
-          // Paginated response with data property
-          if ('data' in response.data && Array.isArray(response.data.data)) {
-            customerData = response.data.data;
-          } else {
-            // Treat the object itself as a single customer
-            customerData = [response.data];
-          }
-        } else {
-          customerData = [];
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          customerData = response.data.data;
         }
         
-        // Map customer data to a consistent format
-        if (Array.isArray(customerData)) {
+        if (customerData.length > 0) {
           const formattedCustomers = customerData.map(customer => ({
             id: customer.id,
             name: customer.name || `Customer ${customer.id}`,
@@ -107,23 +145,20 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({
             phone: customer.phone
           }));
           
-          // Sort by name for better usability
           formattedCustomers.sort((a, b) => a.name.localeCompare(b.name));
           setCustomers(formattedCustomers);
         } else {
-          console.warn('CustomerClient returned unexpected data format');
           setCustomers([]);
-          setCustomerLoadError('Failed to load customer data properly. Please refresh and try again.');
+          setCustomerLoadError('No customers available. Please create customers first.');
         }
       } else {
-        console.warn('Failed to load customers:', response.message);
         setCustomers([]);
         setCustomerLoadError(`Failed to load customers: ${response.message || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Failed to fetch customers:', error as Error);
+      console.error('Failed to fetch customers:', error);
       setCustomers([]);
-      setCustomerLoadError('Failed to load customers. Please check your connection and try again.');
+      setCustomerLoadError('Failed to load customers. Please try again.');
     } finally {
       setIsLoadingCustomers(false);
     }
@@ -133,396 +168,149 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({
     loadCustomers();
   }, [loadCustomers]);
 
-  // Fetch appointment data if in edit mode
-  useEffect(() => {
-    const fetchAppointmentData = async () => {
-      if (!isEditMode) return;
-      
-      // Skip validation and use the ID directly
-      const numericId = Number(appointmentId);
-      
-      try {
-        setIsLoading(true);
-        const response = await AppointmentClient.getAppointment(numericId);
-        
-        if (response.success && response.data) {
-          const { data } = response;
-          
-          // Format date from ISO string to YYYY-MM-DD
-          let formattedDate = '';
-          if (data.appointmentDate) {
-            try {
-              const dateObj = new Date(data.appointmentDate);
-              formattedDate = format(dateObj, 'yyyy-MM-dd');
-            } catch (error) {
-              console.error('Error formatting date:', error as Error);
-              formattedDate = data.appointmentDate as string;
-            }
-          }
-          
-          setFormData({
-            title: data.title || '',
-            appointmentDate: formattedDate,
-            appointmentTime: data.appointmentTime || '09:00',
-            duration: data.duration || 60,
-            location: data.location || '',
-            description: data.description || '',
-            status: data.status || AppointmentStatus.PLANNED,
-            customerId: data.customerId,
-            service: data.service || ''
-          });
-        } else {
-          setError(response.message || 'Failed to fetch appointment data');
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'An error occurred while fetching appointment data';
-        setError(errorMessage);
-        console.error('Error fetching appointment data:', error as Error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Function to check if changes have been made
+  const checkForChanges = useCallback(() => {
+    const hasTitleChanged = appointmentTitle !== (initialData.title || '');
+    const hasDateChanged = appointmentDate !== (initialData.appointmentDate 
+      ? (typeof initialData.appointmentDate === 'string' 
+          ? initialData.appointmentDate.split('T')[0] 
+          : format(new Date(initialData.appointmentDate), 'yyyy-MM-dd'))
+      : format(new Date(), 'yyyy-MM-dd'));
+    const hasTimeChanged = appointmentTime !== (initialData.appointmentTime || format(new Date(), 'HH:mm'));
+    const hasDurationChanged = duration !== (initialData.duration || 60);
+    const hasLocationChanged = location !== (initialData.location || '');
+    const hasDescriptionChanged = appointmentDescription !== (initialData.description || '');
+    const hasStatusChanged = status !== (initialData.status || AppointmentStatus.PLANNED);
+    const hasCustomerChanged = customerId !== (initialData.customerId);
+    const hasServiceChanged = service !== (initialData.service || '');
+    
+    const changes = hasTitleChanged || hasDateChanged || hasTimeChanged || 
+      hasDurationChanged || hasLocationChanged || hasDescriptionChanged || 
+      hasStatusChanged || hasCustomerChanged || hasServiceChanged;
+    
+    setHasChanges(changes);
+  }, [
+    appointmentTitle, appointmentDate, appointmentTime, duration, location,
+    appointmentDescription, status, customerId, service, initialData
+  ]);
 
-    fetchAppointmentData();
-  }, [isEditMode, appointmentId]);
-
-  const validateForm = (): boolean => {
-    const errors: Record<string, string> = {};
-    
-    if (!formData.title?.trim()) {
-      errors.title = 'Title is required';
-    } else if (formData.title.length < 3) {
-      errors.title = 'Title must be at least 3 characters';
-    } else if (formData.title.length > 100) {
-      errors.title = 'Title must not exceed 100 characters';
-    }
-    
-    if (!formData.appointmentDate) {
-      errors.appointmentDate = 'Date is required';
-    } else {
-      // Validate date format (YYYY-MM-DD)
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(formData.appointmentDate)) {
-        errors.appointmentDate = 'Date must be in YYYY-MM-DD format';
-      }
-    }
-    
-    if (!formData.appointmentTime) {
-      errors.appointmentTime = 'Time is required';
-    } else {
-      // Validate time format (HH:MM)
-      const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-      if (!timeRegex.test(formData.appointmentTime)) {
-        errors.appointmentTime = 'Time must be in HH:MM format';
-      }
-    }
-    
-    if (!formData.duration) {
-      errors.duration = 'Duration is required';
-    } else if (formData.duration < 15) {
-      errors.duration = 'Duration must be at least 15 minutes';
-    } else if (formData.duration > 480) {
-      errors.duration = 'Duration cannot exceed 8 hours (480 minutes)';
-    }
-    
-    if (formData.description && formData.description.length > 1000) {
-      errors.description = 'Description cannot exceed 1000 characters';
-    }
-    
-    if (formData.location && formData.location.length > 200) {
-      errors.location = 'Location cannot exceed 200 characters';
-    }
-    
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+  // Call checkForChanges on every field change
+  const handleFieldChange = (field: string, value: string | number | undefined) => {
+    updateField(field, value);
+    checkForChanges();
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    
-    // Handle numeric fields conversion
-    if (name === 'duration') {
-      // Convert to integer for duration
-      const numericValue = parseInt(value, 10);
-      setFormData(prev => ({
-        ...prev,
-        [name]: isNaN(numericValue) ? 0 : numericValue
-      }));
+  // Function to cancel and go back
+  const handleCancel = () => {
+    if (hasChanges && !onCancel) {
+      setShowConfirmLeave(true);
     } else {
-      // Normal string handling for other fields
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
-    
-    // Clear validation error when field is edited
-    if (validationErrors[name]) {
-      setValidationErrors(prev => {
-        const updated = { ...prev };
-        delete updated[name];
-        return updated;
-      });
-    }
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'customerId' ? 
-        (value && value !== 'no-customer' ? parseInt(value) : undefined) : 
-        value
-    }));
-    
-    // Clear validation error when field is edited
-    if (validationErrors[name]) {
-      setValidationErrors(prev => {
-        const updated = { ...prev };
-        delete updated[name];
-        return updated;
-      });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
-    setIsSubmitting(true);
-    setError(null);
-    
-    try {
-      // Ensure duration is always a number
-      if (typeof formData.duration === 'string') {
-        const parsed = parseInt(formData.duration, 10);
-        formData.duration = isNaN(parsed) ? 60 : parsed;
-      }
-      
-      // Ensure date and time are properly formatted 
-      const processedFormData = {
-        ...formData,
-        appointmentDate: formData.appointmentDate ? formData.appointmentDate.trim() : '',
-        appointmentTime: formData.appointmentTime ? formData.appointmentTime.trim() : '',
-      };
-      
-      // Log for verification
-      console.log('Processed appointment data:', processedFormData, typeof processedFormData.duration);
-      
-      let response;
-      
-      if (isEditMode) {
-        // Use the ID directly without validation for update
-        const numericId = Number(appointmentId);
-        response = await AppointmentClient.updateAppointment(numericId, processedFormData as UpdateAppointmentDto);
+      if (onCancel) {
+        onCancel();
       } else {
-        response = await AppointmentClient.createAppointment(processedFormData as CreateAppointmentDto);
-      }
-      
-      if (response.success) {
-        // Navigate back to appointments list or detail page
-        if (isEditMode) {
-          router.push(`/dashboard/appointments/${appointmentId}`);
-        } else if (response.data && response.data.id) {
-          // If we have the ID of the new appointment, go to its detail page
-          router.push(`/dashboard/appointments/${response.data.id}`);
+        if (mode === 'edit' && initialData.id) {
+          router.push(`/dashboard/appointments/${initialData.id}`);
         } else {
-          // Fallback to the appointments list
           router.push('/dashboard/appointments');
         }
-      } else {
-        setError(response.message || 'Failed to save appointment');
-        
-        // Handle validation errors from API
-        if (response.error && typeof response.error === 'object') {
-          // Convert errors to Record<string, string> format
-          const formattedErrors: Record<string, string> = {};
-          Object.entries(response.error).forEach(([key, value]) => {
-            formattedErrors[key] = Array.isArray(value) ? value.join(', ') : String(value);
-          });
-          setValidationErrors(formattedErrors);
-        }
       }
-    } catch (error) {
-      setError('An error occurred while saving the appointment');
-      console.error(error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <Card className="min-h-[400px] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading appointment data...</p>
-        </div>
-      </Card>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center">
-        <Button variant="secondary" onClick={() => router.back()}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
-      </div>
-
-      <Card>
+    <Card className="w-full border shadow-sm hover:shadow-md transition-all">
+      <form onSubmit={(e) => { e.preventDefault(); formSubmit(); }}>
         <CardHeader>
-          <CardTitle>
-            {isEditMode ? 'Edit Appointment' : 'Create New Appointment'}
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-purple-600" />
+            {title}
           </CardTitle>
-          <CardDescription>
-            {isEditMode 
-              ? 'Update the appointment details below' 
-              : 'Fill in the details to schedule a new appointment'}
-          </CardDescription>
+          {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
-        
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
-            {error && (
-              <div className="bg-destructive/10 text-destructive p-4 rounded-md">
-                {error}
-              </div>
-            )}
+
+        <CardContent>
+          {errors.general && (
+            <div className="bg-red-50 p-3 rounded-md text-red-800 text-sm mb-4">
+              {errors.general}
+            </div>
+          )}
+          
+          {showSuccess && (
+            <div className="bg-green-50 p-3 rounded-md text-green-800 text-sm mb-4">
+              Operation completed successfully!
+            </div>
+          )}
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-2 md:w-[400px] mb-4">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="details">Appointment Details</TabsTrigger>
+            </TabsList>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
+            <TabsContent value="basic" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="title" className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-purple-600" />
+                  Title <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="title"
+                  name="title"
+                  value={appointmentTitle}
+                  onChange={(e) => handleFieldChange('title', e.target.value)}
+                  placeholder="Appointment title"
+                  required
+                  className={errors.title ? "border-red-500" : ""}
+                />
+                {errors.title && (
+                  <p className="text-sm text-red-600">{errors.title}</p>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">
-                    Title <span className="text-red-500">*</span>
+                  <Label htmlFor="appointmentDate" className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-purple-600" />
+                    Date <span className="text-red-500">*</span>
                   </Label>
                   <Input
-                    id="title"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleInputChange}
-                    placeholder="Appointment title"
-                    aria-invalid={Boolean(validationErrors.title)}
+                    id="appointmentDate"
+                    name="appointmentDate"
+                    type="date"
+                    value={appointmentDate}
+                    onChange={(e) => handleFieldChange('appointmentDate', e.target.value)}
+                    required
+                    className={errors.appointmentDate ? "border-red-500" : ""}
                   />
-                  {validationErrors.title && (
-                    <p className="text-destructive text-sm">{validationErrors.title}</p>
+                  {errors.appointmentDate && (
+                    <p className="text-sm text-red-600">{errors.appointmentDate}</p>
                   )}
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="customerId">Customer</Label>
-                  <Select
-                    value={formData.customerId?.toString() || 'no-customer'}
-                    onValueChange={(value) => handleSelectChange('customerId', value)}
-                    disabled={isLoadingCustomers}
-                  >
-                    <SelectTrigger id="customerId">
-                      <SelectValue placeholder="Select a customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {/* Make sure we have a non-empty string for the value */}
-                      <SelectItem value="no-customer">No customer</SelectItem>
-                      {customers.length > 0 ? (
-                        customers.map((customer) => (
-                          <SelectItem key={customer.id} value={customer.id.toString()}>
-                            {customer.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="loading" disabled>
-                          {isLoadingCustomers ? 'Loading customers...' : 'No customers available'}
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {customerLoadError && (
-                    <p className="text-sm text-red-500">{customerLoadError}</p>
-                  )}
-                  {isLoadingCustomers && (
-                    <p className="text-sm text-gray-500">Loading customers...</p>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="service">Service Type</Label>
+                  <Label htmlFor="appointmentTime" className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-purple-600" />
+                    Time <span className="text-red-500">*</span>
+                  </Label>
                   <Input
-                    id="service"
-                    name="service"
-                    value={formData.service}
-                    onChange={handleInputChange}
-                    placeholder="Service type"
+                    id="appointmentTime"
+                    name="appointmentTime"
+                    type="time"
+                    value={appointmentTime}
+                    onChange={(e) => handleFieldChange('appointmentTime', e.target.value)}
+                    required
+                    className={errors.appointmentTime ? "border-red-500" : ""}
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => handleSelectChange('status', value)}
-                  >
-                    <SelectTrigger id="status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.values(AppointmentStatus).map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {errors.appointmentTime && (
+                    <p className="text-sm text-red-600">{errors.appointmentTime}</p>
+                  )}
                 </div>
               </div>
               
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="appointmentDate">
-                      Date <span className="text-red-500">*</span>
-                    </Label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-                      <Input
-                        id="appointmentDate"
-                        name="appointmentDate"
-                        type="date"
-                        value={formData.appointmentDate}
-                        onChange={handleInputChange}
-                        className="pl-10"
-                        aria-invalid={Boolean(validationErrors.appointmentDate)}
-                      />
-                    </div>
-                    {validationErrors.appointmentDate && (
-                      <p className="text-destructive text-sm">{validationErrors.appointmentDate}</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="appointmentTime">
-                      Time <span className="text-red-500">*</span>
-                    </Label>
-                    <div className="relative">
-                      <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-                      <Input
-                        id="appointmentTime"
-                        name="appointmentTime"
-                        type="time"
-                        value={formData.appointmentTime}
-                        onChange={handleInputChange}
-                        className="pl-10"
-                        aria-invalid={Boolean(validationErrors.appointmentTime)}
-                      />
-                    </div>
-                    {validationErrors.appointmentTime && (
-                      <p className="text-destructive text-sm">{validationErrors.appointmentTime}</p>
-                    )}
-                  </div>
-                </div>
-                
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="duration">
+                  <Label htmlFor="duration" className="flex items-center gap-1.5">
+                    <Timer className="h-3.5 w-3.5 text-purple-600" />
                     Duration (minutes) <span className="text-red-500">*</span>
                   </Label>
                   <Input
@@ -531,62 +319,148 @@ export const AppointmentForm: React.FC<AppointmentFormProps> = ({
                     type="number"
                     min="15"
                     step="15"
-                    value={formData.duration}
-                    onChange={handleInputChange}
-                    aria-invalid={Boolean(validationErrors.duration)}
+                    value={duration}
+                    onChange={(e) => handleFieldChange('duration', parseInt(e.target.value) || 60)}
+                    required
+                    className={errors.duration ? "border-red-500" : ""}
                   />
-                  {validationErrors.duration && (
-                    <p className="text-destructive text-sm">{validationErrors.duration}</p>
+                  {errors.duration && (
+                    <p className="text-sm text-red-600">{errors.duration}</p>
                   )}
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    name="location"
-                    value={formData.location || ''}
-                    onChange={handleInputChange}
-                    placeholder="Appointment location"
-                  />
+                  <Label htmlFor="status" className="flex items-center gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 text-purple-600" />
+                    Status
+                  </Label>
+                  <Select 
+                    value={status} 
+                    onValueChange={(value) => handleFieldChange('status', value)}
+                  >
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={AppointmentStatus.PLANNED}>Planned</SelectItem>
+                      <SelectItem value={AppointmentStatus.CONFIRMED}>Confirmed</SelectItem>
+                      <SelectItem value={AppointmentStatus.IN_PROGRESS}>In Progress</SelectItem>
+                      <SelectItem value={AppointmentStatus.COMPLETED}>Completed</SelectItem>
+                      <SelectItem value={AppointmentStatus.CANCELLED}>Cancelled</SelectItem>
+                      <SelectItem value={AppointmentStatus.NO_SHOW}>No Show</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description || ''}
-                onChange={handleInputChange}
-                placeholder="Appointment details or notes"
-                rows={4}
-              />
-            </div>
-          </CardContent>
-          
-          <CardFooter className="flex justify-between">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => router.back()}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {isSubmitting ? 'Saving...' : isEditMode ? 'Update Appointment' : 'Create Appointment'}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-    </div>
-  );
-};
+            </TabsContent>
 
-export default AppointmentForm;
+            <TabsContent value="details" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="customerId" className="flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5 text-purple-600" />
+                  Customer
+                </Label>
+                <Select
+                  value={customerId?.toString() || 'no-customer'}
+                  onValueChange={(value) => handleFieldChange('customerId', value === 'no-customer' ? undefined : parseInt(value))}
+                  disabled={isLoadingCustomers || submitting}
+                >
+                  <SelectTrigger id="customerId">
+                    <SelectValue placeholder={isLoadingCustomers ? "Loading customers..." : "Select a customer"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no-customer">No customer assigned</SelectItem>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id.toString()}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{customer.name}</span>
+                          {customer.email && (
+                            <span className="text-xs text-muted-foreground">{customer.email}</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {customerLoadError && (
+                  <p className="text-sm text-amber-600">{customerLoadError}</p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="service" className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-purple-600" />
+                  Service
+                </Label>
+                <Input
+                  id="service"
+                  name="service"
+                  value={service}
+                  onChange={(e) => handleFieldChange('service', e.target.value)}
+                  placeholder="Service type"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="location" className="flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-purple-600" />
+                  Location
+                </Label>
+                <Input
+                  id="location"
+                  name="location"
+                  value={location}
+                  onChange={(e) => handleFieldChange('location', e.target.value)}
+                  placeholder="Appointment location"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description" className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-purple-600" />
+                  Description
+                </Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  rows={4}
+                  value={appointmentDescription}
+                  onChange={(e) => handleFieldChange('description', e.target.value)}
+                  placeholder="Additional notes or details..."
+                  className={errors.description ? "border-red-500" : ""}
+                />
+                {errors.description && (
+                  <p className="text-sm text-red-600">{errors.description}</p>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+
+        <CardFooter className="flex justify-between">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={handleCancel}
+            disabled={submitting}
+            className={EntityColors.appointments?.text || ""}
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit"
+            disabled={submitting}
+            className={EntityColors.appointments?.primary || "bg-purple-600 hover:bg-purple-700"}
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : submitLabel}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
+}

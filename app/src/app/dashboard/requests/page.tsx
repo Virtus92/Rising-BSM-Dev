@@ -1,14 +1,15 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RequestList } from '@/features/requests/components/RequestList';
-import  RequestForm  from '@/features/requests/components/RequestForm';
+import { RequestFormFields, RequestFormData } from '@/features/requests/components/RequestFormFields';
 import { EntityPageLayout } from '@/shared/components/EntityPageLayout';
-import { FormModal, ConfirmationModal } from '@/shared/components/BaseModal';
+import { FormModal, ConfirmationModal } from '@/shared/components/modals';
 import { useEntityModal } from '@/shared/hooks/useModal';
 import { RequestService } from '@/features/requests/lib/services/RequestService.client';
 import { RequestDto, RequestFilterParamsDto, CreateRequestDto, UpdateRequestDto } from '@/domain/dtos/RequestDtos';
+import { RequestStatus } from '@/domain/enums/CommonEnums';
 import { useToast } from '@/shared/hooks/useToast';
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
@@ -36,8 +37,44 @@ export default function RequestsPage() {
   // Use the entity modal hook
   const modal = useEntityModal<RequestDto>();
 
+  // Form state
+  const [formData, setFormData] = useState<RequestFormData>({
+    name: '',
+    email: '',
+    phone: '',
+    service: '',
+    message: '',
+    status: RequestStatus.NEW
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   // Handle request form submission
-  const handleRequestSubmit = useCallback(async (data: CreateRequestDto | UpdateRequestDto) => {
+  const handleRequestSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Basic validation
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) {
+      errors.name = 'Name is required';
+    }
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Invalid email format';
+    }
+    if (!formData.service.trim()) {
+      errors.service = 'Service is required';
+    }
+    if (!formData.message.trim()) {
+      errors.message = 'Message is required';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    
+    setFormErrors({});
     modal.setError(null);
     modal.setSuccess(false);
     modal.setIsSubmitting(true);
@@ -46,9 +83,9 @@ export default function RequestsPage() {
       let response;
       
       if (modal.action?.type === 'create') {
-        response = await RequestService.createRequest(data as CreateRequestDto);
+        response = await RequestService.createRequest(formData as CreateRequestDto);
       } else if (modal.action?.type === 'edit' && modal.action.item) {
-        response = await RequestService.updateRequest(modal.action.item.id, data as UpdateRequestDto);
+        response = await RequestService.updateRequest(modal.action.item.id, formData as UpdateRequestDto);
       }
       
       if (response?.success) {
@@ -85,7 +122,7 @@ export default function RequestsPage() {
     } finally {
       modal.setIsSubmitting(false);
     }
-  }, [modal, toast, router]);
+  }, [modal, toast, router, formData]);
 
   // Handle request deletion
   const handleRequestDelete = useCallback(async () => {
@@ -121,11 +158,29 @@ export default function RequestsPage() {
     switch (action) {
       case 'create':
         if (canCreateRequests) {
+          setFormData({
+            name: '',
+            email: '',
+            phone: '',
+            service: '',
+            message: '',
+            status: RequestStatus.NEW
+          });
+          setFormErrors({});
           modal.openCreateModal();
         }
         break;
       case 'edit':
         if (request && canEditRequests) {
+          setFormData({
+            name: request.name || '',
+            email: request.email || '',
+            phone: request.phone || '',
+            service: request.service || '',
+            message: request.message || '',
+            status: request.status as RequestStatus || RequestStatus.NEW
+          });
+          setFormErrors({});
           modal.openEditModal(request);
         }
         break;
@@ -200,19 +255,16 @@ export default function RequestsPage() {
           error={modal.error}
           success={modal.success}
           size="lg"
-          showDefaultActions={false}
+          onSubmit={handleRequestSubmit}
+          onCancel={modal.closeModal}
+          submitLabel={modal.action?.type === 'create' ? 'Create Request' : 'Update Request'}
         >
-          <RequestForm
-            initialData={modal.action?.type === 'edit' ? modal.action.item : {}}
-            onSubmit={handleRequestSubmit}
-            mode={modal.action?.type === 'create' ? 'create' : 'edit'}
-            isLoading={modal.isSubmitting}
-            error={modal.error}
-            success={modal.success}
-            title={modalInfo.title}
-            description={modalInfo.description}
-            submitLabel={modal.action?.type === 'create' ? 'Create Request' : 'Update Request'}
-            onCancel={modal.closeModal}
+          <RequestFormFields
+            formData={formData}
+            onChange={(updates) => setFormData(prev => ({ ...prev, ...updates }))}
+            errors={formErrors}
+            disabled={modal.isSubmitting}
+            showStatus={modal.action?.type === 'edit'}
           />
         </FormModal>
       )}

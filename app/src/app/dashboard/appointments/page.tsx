@@ -1,14 +1,16 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppointmentList } from '@/features/appointments/components/AppointmentList';
-import AppointmentModalForm from '@/features/appointments/components/AppointmentModalForm';
+import { AppointmentFormFields, AppointmentFormData } from '@/features/appointments/components/AppointmentFormFields';
 import { EntityPageLayout } from '@/shared/components/EntityPageLayout';
-import { FormModal, ConfirmationModal } from '@/shared/components/BaseModal';
+import { FormModal, ConfirmationModal } from '@/shared/components/modals';
 import { useEntityModal } from '@/shared/hooks/useModal';
 import { AppointmentClient } from '@/features/appointments/lib/clients';
 import { AppointmentDto, AppointmentFilterParamsDto, CreateAppointmentDto, UpdateAppointmentDto } from '@/domain/dtos/AppointmentDtos';
+import { AppointmentStatus } from '@/domain/enums/CommonEnums';
+import { format } from 'date-fns';
 import { useToast } from '@/shared/hooks/useToast';
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
@@ -28,6 +30,20 @@ export default function AppointmentsPage() {
   // Use the entity modal hook
   const modal = useEntityModal<AppointmentDto>();
 
+  // Form state
+  const [formData, setFormData] = useState<AppointmentFormData>({
+    title: '',
+    appointmentDate: format(new Date(), 'yyyy-MM-dd'),
+    appointmentTime: format(new Date(), 'HH:mm'),
+    duration: 60,
+    location: '',
+    description: '',
+    status: AppointmentStatus.PLANNED,
+    customerId: undefined,
+    service: ''
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   // Create a stable appointment filter configuration
   const appointmentFilters = useCallback(() => ({
     sortBy: 'appointmentDate',
@@ -35,7 +51,30 @@ export default function AppointmentsPage() {
   }), []);
 
   // Handle appointment form submission
-  const handleAppointmentSubmit = useCallback(async (data: CreateAppointmentDto | UpdateAppointmentDto) => {
+  const handleAppointmentSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Basic validation
+    const errors: Record<string, string> = {};
+    if (!formData.title.trim()) {
+      errors.title = 'Title is required';
+    }
+    if (!formData.appointmentDate) {
+      errors.appointmentDate = 'Date is required';
+    }
+    if (!formData.appointmentTime) {
+      errors.appointmentTime = 'Time is required';
+    }
+    if (!formData.duration || formData.duration < 15) {
+      errors.duration = 'Duration must be at least 15 minutes';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    
+    setFormErrors({});
     modal.setError(null);
     modal.setSuccess(false);
     modal.setIsSubmitting(true);
@@ -44,9 +83,9 @@ export default function AppointmentsPage() {
       let response;
       
       if (modal.action?.type === 'create') {
-        response = await AppointmentClient.createAppointment(data as CreateAppointmentDto);
+        response = await AppointmentClient.createAppointment(formData as CreateAppointmentDto);
       } else if (modal.action?.type === 'edit' && modal.action.item) {
-        response = await AppointmentClient.updateAppointment(modal.action.item.id, data as UpdateAppointmentDto);
+        response = await AppointmentClient.updateAppointment(modal.action.item.id, formData as UpdateAppointmentDto);
       }
       
       if (response?.success) {
@@ -83,7 +122,7 @@ export default function AppointmentsPage() {
     } finally {
       modal.setIsSubmitting(false);
     }
-  }, [modal, toast, router]);
+  }, [modal, toast, router, formData]);
 
   // Handle appointment deletion
   const handleAppointmentDelete = useCallback(async () => {
@@ -118,10 +157,41 @@ export default function AppointmentsPage() {
   const handleListAction = useCallback((action: string, appointment?: AppointmentDto) => {
     switch (action) {
       case 'create':
+        setFormData({
+          title: '',
+          appointmentDate: format(new Date(), 'yyyy-MM-dd'),
+          appointmentTime: format(new Date(), 'HH:mm'),
+          duration: 60,
+          location: '',
+          description: '',
+          status: AppointmentStatus.PLANNED,
+          customerId: undefined,
+          service: ''
+        });
+        setFormErrors({});
         modal.openCreateModal();
         break;
       case 'edit':
         if (appointment && canEditAppointments) {
+          const appointmentDate = appointment.appointmentDate 
+            ? (typeof appointment.appointmentDate === 'string' 
+                ? appointment.appointmentDate.split('T')[0] 
+                : format(new Date(appointment.appointmentDate), 'yyyy-MM-dd'))
+            : format(new Date(), 'yyyy-MM-dd');
+          const appointmentTime = appointment.appointmentTime || format(new Date(), 'HH:mm');
+          
+          setFormData({
+            title: appointment.title || '',
+            appointmentDate,
+            appointmentTime,
+            duration: appointment.duration || 60,
+            location: appointment.location || '',
+            description: appointment.description || '',
+            status: appointment.status as AppointmentStatus || AppointmentStatus.PLANNED,
+            customerId: appointment.customerId,
+            service: appointment.service || ''
+          });
+          setFormErrors({});
           modal.openEditModal(appointment);
         }
         break;
@@ -196,16 +266,15 @@ export default function AppointmentsPage() {
           error={modal.error}
           success={modal.success}
           size="lg"
-          showDefaultActions={false}
+          onSubmit={handleAppointmentSubmit}
+          onCancel={modal.closeModal}
+          submitLabel={modal.action?.type === 'create' ? 'Create Appointment' : 'Update Appointment'}
         >
-          <AppointmentModalForm
-            initialData={modal.action?.type === 'edit' ? modal.action.item : {}}
-            onSubmit={handleAppointmentSubmit}
-            mode={modal.action?.type === 'create' ? 'create' : 'edit'}
-            isLoading={modal.isSubmitting}
-            error={modal.error}
-            success={modal.success}
-            onCancel={modal.closeModal}
+          <AppointmentFormFields
+            formData={formData}
+            onChange={(updates) => setFormData(prev => ({ ...prev, ...updates }))}
+            errors={formErrors}
+            disabled={modal.isSubmitting}
           />
         </FormModal>
       )}

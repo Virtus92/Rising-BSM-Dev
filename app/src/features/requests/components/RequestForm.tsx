@@ -36,7 +36,7 @@ export interface RequestFormProps {
 }
 
 /**
- * Formular zum Erstellen und Bearbeiten von Anfragen
+ * Form component for creating and editing requests
  */
 export default function RequestForm({ 
   initialData = {}, 
@@ -75,7 +75,7 @@ export default function RequestForm({
         if (result) {
           // Only navigate if we're not in a modal
           if (!onCancel) {
-            // Nach dem Speichern zur Detailseite oder Liste navigieren
+            // Navigate to detail page or list after saving
             if (mode === 'create') {
               router.push(`/dashboard/requests/${result.id}`);
             } else {
