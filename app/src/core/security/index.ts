@@ -25,4 +25,20 @@ export type {
   PasswordGenerationOptions
 } from './validation/password-validation';
 
+// Export rate limiter
+export { 
+  SecurityRateLimiter,
+  apiRateLimiter,
+  authRateLimiter,
+  passwordResetRateLimiter,
+  publicRateLimiter
+} from './rate-limiter';
+
+// Export security monitoring
+export { 
+  securityMonitor,
+  type SecurityEvent,
+  type ThreatAnalysis
+} from './monitoring';
+
 // Export other security utilities as they're added

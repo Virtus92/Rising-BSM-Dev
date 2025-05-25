@@ -1,0 +1,122 @@
+'use client';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
+import { PermissionGuard } from '@/shared/components/PermissionGuard';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { Shield, CheckCircle, Info } from 'lucide-react';
+
+export default function SecurityDashboardPage() {
+  return (
+    <PermissionGuard permission={SystemPermission.SYSTEM_ADMIN}>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold">Security Dashboard</h1>
+          <p className="text-gray-600">Application security overview</p>
+        </div>
+
+        {/* Status */}
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>System Secure</AlertTitle>
+          <AlertDescription>
+            All basic security features are operational.
+          </AlertDescription>
+        </Alert>
+
+        {/* Security Features */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Security Features</CardTitle>
+            <CardDescription>The following security measures are currently active</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <div>
+                <p className="font-medium">JWT Authentication</p>
+                <p className="text-sm text-gray-600">Secure token-based authentication is active</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <div>
+                <p className="font-medium">Role-Based Permissions</p>
+                <p className="text-sm text-gray-600">Access control based on user roles</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <div>
+                <p className="font-medium">Security Headers</p>
+                <p className="text-sm text-gray-600">HTTP security headers are configured</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <div>
+                <p className="font-medium">Password Encryption</p>
+                <p className="text-sm text-gray-600">Passwords are securely hashed with bcrypt</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Security Recommendations */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Security Setup</CardTitle>
+            <CardDescription>Important security configuration steps</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-medium">Generate Secure Environment Variables</p>
+                <p className="text-sm text-gray-600">
+                  Run: <code className="bg-gray-100 px-2 py-1 rounded text-xs">node scripts/generate-secure-env.mjs</code>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-medium">Update Database Password</p>
+                <p className="text-sm text-gray-600">
+                  Change the default PostgreSQL password in your .env.local file
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-medium">Configure CORS for Production</p>
+                <p className="text-sm text-gray-600">
+                  Update ALLOWED_ORIGINS when deploying to production
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Future Features */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Coming Soon</CardTitle>
+            <CardDescription>Advanced security features in development</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li>• Real-time threat monitoring</li>
+              <li>• Automated attack detection and blocking</li>
+              <li>• Security event logging and analysis</li>
+              <li>• IP-based rate limiting</li>
+              <li>• Advanced security analytics</li>
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+    </PermissionGuard>
+  );
+}

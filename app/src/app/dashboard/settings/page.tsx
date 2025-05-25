@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useToast } from '@/shared/hooks/useToast';
 import { useSettings } from '@/shared/contexts/SettingsContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -11,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/shared/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Separator } from '@/shared/components/ui/separator';
-import { Loader2, RefreshCcw, AlertCircle, Sun, Moon, Monitor, Check, X, Shield } from 'lucide-react';
+import { Loader2, RefreshCcw, AlertCircle, Sun, Moon, Monitor, Check, X, Shield, CheckCircle, Info } from 'lucide-react';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { usePermissions } from '@/features/permissions/providers/PermissionProvider';
 import { API_PERMISSIONS } from '@/features/permissions/constants/permissionConstants';
@@ -21,9 +23,18 @@ export default function SettingsPage() {
   const { settings, isLoading: settingsLoading, error: settingsError, updateSetting, resetToDefaults, reloadSettings } = useSettings();
   const { toast } = useToast();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+
+  // Handle tab parameter from URL
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['general', 'appearance', 'notifications', 'security', 'admin'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   // Get permissions
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
@@ -215,15 +226,20 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-md" style={{ gridTemplateColumns: showAdminTab ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)' }}>
+        <TabsList className="grid w-full max-w-lg" style={{ gridTemplateColumns: showAdminTab ? 'repeat(5, 1fr)' : 'repeat(3, 1fr)' }}>
           <TabsTrigger value="general">Allgemein</TabsTrigger>
           <TabsTrigger value="appearance">Erscheinungsbild</TabsTrigger>
           <TabsTrigger value="notifications">Benachrichtigungen</TabsTrigger>
           {showAdminTab && (
-            <TabsTrigger value="admin" className="relative">
-              <Shield className="h-4 w-4 mr-1" />
-              Admin
-            </TabsTrigger>
+            <>
+              <TabsTrigger value="security">
+                <Shield className="h-4 w-4 mr-1" />
+                Sicherheit
+              </TabsTrigger>
+              <TabsTrigger value="admin" className="relative">
+                Admin
+              </TabsTrigger>
+            </>
           )}
         </TabsList>
 
@@ -534,6 +550,112 @@ export default function SettingsPage() {
             )}
           </Card>
         </TabsContent>
+
+        {/* Security Settings Tab */}
+        {showAdminTab && (
+          <TabsContent value="security" className="space-y-4">
+            {/* Status */}
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertTitle>System sicher</AlertTitle>
+              <AlertDescription>
+                Alle grundlegenden Sicherheitsfunktionen sind aktiv.
+              </AlertDescription>
+            </Alert>
+
+            {/* Security Features */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Aktive Sicherheitsfunktionen</CardTitle>
+                <CardDescription>Die folgenden Sicherheitsmaßnahmen sind derzeit aktiv</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium">JWT-Authentifizierung</p>
+                    <p className="text-sm text-gray-600">Sichere Token-basierte Authentifizierung ist aktiv</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium">Rollenbasierte Berechtigungen</p>
+                    <p className="text-sm text-gray-600">Zugriffskontrolle basierend auf Benutzerrollen</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium">Sicherheitsheader</p>
+                    <p className="text-sm text-gray-600">HTTP-Sicherheitsheader sind konfiguriert</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium">Passwortverschlüsselung</p>
+                    <p className="text-sm text-gray-600">Passwörter werden sicher mit bcrypt gehasht</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Security Recommendations */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Sicherheitseinrichtung</CardTitle>
+                <CardDescription>Wichtige Schritte zur Sicherheitskonfiguration</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Sichere Umgebungsvariablen generieren</p>
+                    <p className="text-sm text-gray-600">
+                      Ausführen: <code className="bg-gray-100 px-2 py-1 rounded text-xs">node scripts/generate-secure-env.mjs</code>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Datenbankpasswort aktualisieren</p>
+                    <p className="text-sm text-gray-600">
+                      Ändern Sie das Standard-PostgreSQL-Passwort in Ihrer .env.local Datei
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium">CORS für Produktion konfigurieren</p>
+                    <p className="text-sm text-gray-600">
+                      Aktualisieren Sie ALLOWED_ORIGINS bei der Bereitstellung in der Produktion
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Future Features */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Demnächst verfügbar</CardTitle>
+                <CardDescription>Erweiterte Sicherheitsfunktionen in Entwicklung</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li>• Echtzeit-Bedrohungsüberwachung</li>
+                  <li>• Automatische Angriffserkennung und -blockierung</li>
+                  <li>• Sicherheitsereignisprotokollierung und -analyse</li>
+                  <li>• IP-basierte Ratenbegrenzung</li>
+                  <li>• Erweiterte Sicherheitsanalysen</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

@@ -217,5 +217,4 @@ export function mockAuthContext(user?: any) {
 /**
  * Setup MSW for API mocking
  */
-export { rest } from 'msw';
 export { setupServer } from 'msw/node';

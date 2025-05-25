@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Next.js Middleware
- * 
- * This middleware runs on all API routes to provide consistent security headers
- * and other global configuration.
+ * Minimal middleware for Rising-BSM
+ * Only adds essential security headers without blocking
  */
-export function middleware(request: NextRequest) {
-  // Create the response
+export async function middleware(request: NextRequest) {
+  // Create response
   const response = NextResponse.next();
   
-  // Add security headers to all API responses
+  // Add basic security headers
   response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-Frame-Options', 'SAMEORIGIN');
   response.headers.set('X-XSS-Protection', '1; mode=block');
   
   return response;
 }
 
-// Define which routes this middleware applies to
+// Only apply to API routes to avoid interfering with Next.js
 export const config = {
-  matcher: [
-    // Apply to all API routes
-    '/api/:path*',
-  ],
+  matcher: '/api/:path*'
 };
