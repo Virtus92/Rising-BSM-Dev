@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getLogger } from '@/core/log';
+import { getLogger } from '@/core/logging';
 import { securityMonitor } from '@/core/security/monitoring';
 
 const logger = getLogger();
