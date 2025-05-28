@@ -50,6 +50,12 @@ model User {
   updatedWebhooks   AutomationWebhook[] @relation("WebhookUpdater")
   createdSchedules  AutomationSchedule[] @relation("ScheduleCreator")
   updatedSchedules  AutomationSchedule[] @relation("ScheduleUpdater")
+  
+  // Plugin relations
+  authoredPlugins   Plugin[]             @relation("PluginAuthor")
+  pluginLicenses    PluginLicense[]      @relation("PluginLicenses")
+  pluginInstalls    PluginInstallation[] @relation("PluginInstallations")
+  pluginReviews     PluginReview[]       @relation("PluginReviews")
 
   @@index([email])
   @@index([name])
@@ -499,4 +505,159 @@ model File {
   @@index([type])
   @@index([uploadedBy])
   @@index([path])
+}
+
+//==============================================================================
+// PLUGIN SYSTEM
+//==============================================================================
+
+model Plugin {
+  id              Int       @id @default(autoincrement())
+  uuid            String    @unique @default(uuid())
+  name            String    @unique @db.VarChar(100)
+  displayName     String    @db.VarChar(200)
+  description     String?   @db.Text
+  version         String    @db.VarChar(20)
+  author          String    @db.VarChar(100)
+  authorId        Int
+  status          String    @default("pending") // pending, approved, rejected, suspended
+  type            String    @db.VarChar(50) // ui, api, automation, mixed
+  category        String    @db.VarChar(50)
+  tags            String[]
+  icon            String?
+  screenshots     Json      @default("[]")
+  
+  // Security
+  certificate     String    @db.Text // Plugin certificate
+  publicKey       String    @db.Text // For signature verification
+  checksum        String    @db.VarChar(64)
+  
+  // Monetization
+  pricing         Json      @default("{}") // Pricing tiers
+  trialDays       Int       @default(0)
+  
+  // Technical
+  permissions     Json      @default("[]")
+  dependencies    Json      @default("[]")
+  minAppVersion   String    @db.VarChar(20)
+  maxAppVersion   String?   @db.VarChar(20)
+  
+  // Metadata
+  downloads       Int       @default(0)
+  rating          Float     @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  authorUser      User      @relation("PluginAuthor", fields: [authorId], references: [id])
+  licenses        PluginLicense[]
+  installations   PluginInstallation[]
+  reviews         PluginReview[]
+  
+  @@index([name])
+  @@index([status])
+  @@index([type])
+  @@index([category])
+  @@index([authorId])
+}
+
+model PluginLicense {
+  id              Int       @id @default(autoincrement())
+  licenseKey      String    @unique @db.VarChar(255)
+  pluginId        Int
+  userId          Int
+  type            String    @db.VarChar(50) // trial, basic, premium, enterprise
+  status          String    @default("active") // active, expired, revoked, suspended
+  
+  // License binding
+  hardwareId      String?   @db.VarChar(255) // Hardware fingerprint
+  maxInstalls     Int       @default(1)
+  currentInstalls Int       @default(0)
+  
+  // Validity
+  issuedAt        DateTime  @default(now())
+  expiresAt       DateTime?
+  lastVerified    DateTime?
+  
+  // Usage limits
+  usageLimits     Json      @default("{}")
+  usageData       Json      @default("{}")
+  
+  plugin          Plugin    @relation(fields: [pluginId], references: [id])
+  user            User      @relation("PluginLicenses", fields: [userId], references: [id])
+  installations   PluginInstallation[]
+  
+  @@index([pluginId])
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+}
+
+model PluginInstallation {
+  id              Int       @id @default(autoincrement())
+  pluginId        Int
+  licenseId       Int
+  userId          Int
+  
+  // Installation details
+  installationId  String    @unique @default(uuid())
+  hardwareId      String    @db.VarChar(255)
+  version         String    @db.VarChar(20)
+  status          String    @default("active") // active, inactive, uninstalled
+  
+  // Security
+  encryptionKey   String    @db.Text // Encrypted with user's key
+  lastHeartbeat   DateTime?
+  
+  // Metadata
+  installedAt     DateTime  @default(now())
+  lastActivated   DateTime?
+  uninstalledAt   DateTime?
+  
+  plugin          Plugin    @relation(fields: [pluginId], references: [id])
+  license         PluginLicense @relation(fields: [licenseId], references: [id])
+  user            User      @relation("PluginInstallations", fields: [userId], references: [id])
+  executions      PluginExecution[]
+  
+  @@index([pluginId])
+  @@index([licenseId])
+  @@index([userId])
+  @@index([status])
+  @@index([installationId])
+}
+
+model PluginExecution {
+  id              Int       @id @default(autoincrement())
+  installationId  Int
+  action          String    @db.VarChar(100)
+  status          String    @db.VarChar(20) // success, failed
+  duration        Int?      // milliseconds
+  resourceUsage   Json      @default("{}")
+  errorMessage    String?   @db.Text
+  executedAt      DateTime  @default(now())
+  
+  installation    PluginInstallation @relation(fields: [installationId], references: [id])
+  
+  @@index([installationId])
+  @@index([status])
+  @@index([executedAt])
+}
+
+model PluginReview {
+  id              Int       @id @default(autoincrement())
+  pluginId        Int
+  userId          Int
+  rating          Int       // 1-5
+  title           String?   @db.VarChar(200)
+  comment         String?   @db.Text
+  helpful         Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  plugin          Plugin    @relation(fields: [pluginId], references: [id])
+  user            User      @relation("PluginReviews", fields: [userId], references: [id])
+  
+  @@unique([pluginId, userId])
+  @@index([pluginId])
+  @@index([userId])
+  @@index([rating])
 }

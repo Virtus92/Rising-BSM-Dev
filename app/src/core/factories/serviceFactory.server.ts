@@ -55,6 +55,9 @@ import { IPermissionService } from '@/domain/services/IPermissionService';
 import { IRequestDataService } from '@/domain/services/IRequestDataService';
 
 import { IAutomationService } from '@/domain/services/IAutomationService';
+import { IPluginService } from '@/domain/services/IPluginService';
+import { IPluginLicenseService } from '@/domain/services/IPluginLicenseService';
+import { IPluginInstallationService } from '@/domain/services/IPluginInstallationService';
 import { RefreshToken } from '@/domain/entities/RefreshToken';
 import { PermissionRepository } from '@/features/permissions/lib';
 
@@ -77,6 +80,9 @@ export class ServiceFactory implements IServiceFactory {
 
   private refreshTokenService?: RefreshTokenServiceServer;
   private automationService?: AutomationService;
+  private pluginService?: IPluginService;
+  private pluginLicenseService?: IPluginLicenseService;
+  private pluginInstallationService?: IPluginInstallationService;
 
   /**
    * Private constructor for singleton pattern
@@ -287,8 +293,90 @@ export class ServiceFactory implements IServiceFactory {
     this.requestDataService = undefined;
 
     this.automationService = undefined;
+    this.pluginService = undefined;
+    this.pluginLicenseService = undefined;
+    this.pluginInstallationService = undefined;
   }
   
+  /**
+   * Creates an instance of PluginService
+   */
+  public createPluginService(): IPluginService {
+    if (!this.pluginService) {
+      // Dynamic import to avoid circular dependencies
+      const { PluginRepository } = require('@/features/plugins/lib/repositories/PluginRepository');
+      const { PluginService } = require('@/features/plugins/lib/services/PluginService');
+      const { PluginEncryptionService } = require('@/features/plugins/lib/security/PluginEncryptionService');
+      const { prisma } = require('@/core/db/prisma/client');
+      
+      const repository = new PluginRepository(prisma);
+      const encryptionService = new PluginEncryptionService();
+      
+      this.pluginService = new PluginService(
+        repository,
+        encryptionService,
+        '/app/storage/plugins'
+      );
+    }
+    return this.pluginService!;
+  }
+
+  /**
+   * Creates an instance of PluginLicenseService
+   */
+  public createPluginLicenseService(): IPluginLicenseService {
+    if (!this.pluginLicenseService) {
+      // Dynamic import to avoid circular dependencies
+      const { PluginLicenseRepository } = require('@/features/plugins/lib/repositories/PluginLicenseRepository');
+      const { PluginRepository } = require('@/features/plugins/lib/repositories/PluginRepository');
+      const { PluginLicenseService } = require('@/features/plugins/lib/services/PluginLicenseService');
+      const { PluginEncryptionService } = require('@/features/plugins/lib/security/PluginEncryptionService');
+      const { prisma } = require('@/core/db/prisma/client');
+      
+      const licenseRepository = new PluginLicenseRepository(prisma);
+      const pluginRepository = new PluginRepository(prisma);
+      const encryptionService = new PluginEncryptionService();
+      
+      this.pluginLicenseService = new PluginLicenseService(
+        licenseRepository,
+        pluginRepository,
+        encryptionService,
+        configService.get('SERVER_PUBLIC_KEY') || ''
+      );
+    }
+    return this.pluginLicenseService!;
+  }
+
+  /**
+   * Creates an instance of PluginInstallationService
+   */
+  public createPluginInstallationService(): IPluginInstallationService {
+    if (!this.pluginInstallationService) {
+      // Dynamic import to avoid circular dependencies
+      const { PluginInstallationRepository } = require('@/features/plugins/lib/repositories/PluginInstallationRepository');
+      const { PluginLicenseRepository } = require('@/features/plugins/lib/repositories/PluginLicenseRepository');
+      const { PluginRepository } = require('@/features/plugins/lib/repositories/PluginRepository');
+      const { PluginInstallationService } = require('@/features/plugins/lib/services/PluginInstallationService');
+      const { PluginEncryptionService } = require('@/features/plugins/lib/security/PluginEncryptionService');
+      const { prisma } = require('@/core/db/prisma/client');
+      
+      const installationRepository = new PluginInstallationRepository(prisma);
+      const licenseRepository = new PluginLicenseRepository(prisma);
+      const pluginRepository = new PluginRepository(prisma);
+      const encryptionService = new PluginEncryptionService();
+      
+      this.pluginInstallationService = new PluginInstallationService(
+        installationRepository,
+        licenseRepository,
+        pluginRepository,
+        encryptionService,
+        getLogger(),
+        '/app/storage/plugins'
+      );
+    }
+    return this.pluginInstallationService!;
+  }
+
   /**
    * Create security configuration
    */
@@ -345,6 +433,18 @@ export function getRefreshTokenService(): IRefreshTokenService {
 
 export function getPermissionService(): IPermissionService {
   return getServiceFactory().createPermissionService();
+}
+
+export function getPluginService(): IPluginService {
+  return getServiceFactory().createPluginService();
+}
+
+export function getPluginLicenseService(): IPluginLicenseService {
+  return getServiceFactory().createPluginLicenseService();
+}
+
+export function getPluginInstallationService(): IPluginInstallationService {
+  return getServiceFactory().createPluginInstallationService();
 }
 
 export function getAutomationService(): IAutomationService {

@@ -3,7 +3,9 @@
     "allow": [
       "Bash(mkdir:*)",
       "Bash(npx jest:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

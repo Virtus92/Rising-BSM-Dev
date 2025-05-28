@@ -35,6 +35,9 @@ import { IRefreshTokenService } from '@/domain/services/IRefreshTokenService';
 import { IPermissionService } from '@/domain/services/IPermissionService';
 import { IRequestDataService } from '@/domain/services/IRequestDataService';
 import { IAutomationService } from '@/domain/services/IAutomationService';
+import { IPluginService } from '@/domain/services/IPluginService';
+import { IPluginLicenseService } from '@/domain/services/IPluginLicenseService';
+import { IPluginInstallationService } from '@/domain/services/IPluginInstallationService';
 import { getValidationService } from '../validation';
 import errorHandler from '../errors/error-handler';
 
@@ -55,6 +58,9 @@ export class ServiceFactory implements IServiceFactory {
   private permissionService?: IPermissionService;
   private requestDataService?: IRequestDataService;
   private automationService?: IAutomationService;
+  private pluginService?: IPluginService;
+  private pluginLicenseService?: IPluginLicenseService;
+  private pluginInstallationService?: IPluginInstallationService;
 
   /**
    * Private constructor for singleton pattern
@@ -145,6 +151,33 @@ export class ServiceFactory implements IServiceFactory {
   public createRefreshTokenService(): IRefreshTokenService {
     // Use the AuthService for refresh token operations
     return AuthService as unknown as IRefreshTokenService;
+  }
+
+  /**
+   * Creates an instance of PluginService
+   */
+  public createPluginService(): IPluginService {
+    // Client-side plugin service (if needed) would be implemented here
+    // For now, throw an error as plugins are server-side only
+    throw new Error('PluginService is not available on the client side');
+  }
+
+  /**
+   * Creates an instance of PluginLicenseService
+   */
+  public createPluginLicenseService(): IPluginLicenseService {
+    // Client-side plugin license service (if needed) would be implemented here
+    // For now, throw an error as plugins are server-side only
+    throw new Error('PluginLicenseService is not available on the client side');
+  }
+
+  /**
+   * Creates an instance of PluginInstallationService
+   */
+  public createPluginInstallationService(): IPluginInstallationService {
+    // Client-side plugin installation service (if needed) would be implemented here
+    // For now, throw an error as plugins are server-side only
+    throw new Error('PluginInstallationService is not available on the client side');
   }
 
   /**

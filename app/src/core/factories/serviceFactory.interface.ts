@@ -16,6 +16,9 @@ import { IRefreshTokenService } from '@/domain/services/IRefreshTokenService';
 import { IPermissionService } from '@/domain/services/IPermissionService';
 import { IRequestDataService } from '@/domain/services/IRequestDataService';
 import { IAutomationService } from '@/domain/services/IAutomationService';
+import { IPluginService } from '@/domain/services/IPluginService';
+import { IPluginLicenseService } from '@/domain/services/IPluginLicenseService';
+import { IPluginInstallationService } from '@/domain/services/IPluginInstallationService';
 
 /**
  * Interface for the ServiceFactory class
@@ -36,6 +39,9 @@ export interface IServiceFactory {
   createRequestDataService(): IRequestDataService;
 
   createAutomationService(): IAutomationService;
+  createPluginService(): IPluginService;
+  createPluginLicenseService(): IPluginLicenseService;
+  createPluginInstallationService(): IPluginInstallationService;
   createSecurityConfig(): SecurityConfig;
   resetServices(): void;
 }
@@ -55,5 +61,8 @@ export type {
   IPermissionService,
   IRequestDataService,
 
-  IAutomationService
+  IAutomationService,
+  IPluginService,
+  IPluginLicenseService,
+  IPluginInstallationService
 };

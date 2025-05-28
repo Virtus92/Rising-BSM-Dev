@@ -61,6 +61,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "coffee-script": "^1.12.7",
     "cors": "^2.8.5",
     "cross-env": "^7.0.3",
     "crypto": "^1.0.1",
@@ -71,7 +72,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.284.0",
-    "next": "^15.3.1",
+    "next": "^15.3.2",
     "next-auth": "^4.24.11",
     "next-themes": "^0.2.1",
     "react": "^18.2.0",
@@ -86,6 +87,7 @@
     "stream-browserify": "^3.0.0",
     "tailwind-merge": "^3.2.0",
     "util": "^0.12.5",
+    "vm2": "^3.9.19",
     "zod": "^3.24.2"
   },
   "devDependencies": {

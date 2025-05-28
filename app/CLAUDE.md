@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Overview
+
+Rising-BSM is an AI-powered Business Service Management platform providing a free, open-source alternative to expensive business management solutions. It helps businesses manage customers, appointments, service requests, and integrates with AI capabilities through MCP (Model Context Protocol) server.
+
 ## Commands
 
 ### Development Commands
@@ -15,11 +19,18 @@ npm run build
 # Start production server
 npm start
 
-# Run linter
+# Run linter and fix issues
 npm run lint
+npm run lint:fix
+
+# Run type checking
+npm run typecheck
 
 # Format code
 npm run format
+
+# Clean build artifacts
+npm run clean
 ```
 
 ### Database Commands
@@ -38,50 +49,68 @@ npm run db:studio
 
 # Seed database with test data
 npm run db:seed
+
+# Reset database (caution: destroys all data)
+npm run db:reset
 ```
 
 ### Testing Commands
 ```bash
-# Run tests
+# Run all tests
 npm test
 
 # Run tests in watch mode
 npm run test:watch
 
 # Run tests with coverage
-npm run test:ci
+npm run test:coverage
+
+# Run specific test suites
+npm run test:unit          # Unit tests only
+npm run test:integration   # Integration tests only
+npm run test:e2e          # End-to-end tests
 
 # Run a single test file
 npm test -- path/to/test.test.ts
+
+# Run tests matching a pattern
+npm test -- --testNamePattern="should create customer"
 ```
 
-### Clean and Rebuild
+### Docker Commands
 ```bash
-# Clean build artifacts
-npm run clean
+# Development with Docker
+docker-compose up -d          # Start containers
+docker-compose down          # Stop containers
+docker-compose logs -f app   # View logs
 
-# Clean and rebuild
-npm run rebuild
+# Run commands in container
+docker-compose exec app npm run db:migrate:dev
+docker-compose exec app npm run db:seed
 ```
 
 ## High-Level Architecture
 
-### Overview
-Rising-BSM is a comprehensive business service management platform built with Next.js 15, React 18, and TypeScript. It follows a feature-based architecture with domain-driven design principles.
+### Tech Stack
+- **Frontend**: Next.js 15.x, React 18.x, TypeScript
+- **Styling**: Tailwind CSS, Radix UI components
+- **State Management**: React Query (TanStack Query), React Context
+- **Backend**: Next.js API routes (App Router)
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: JWT with refresh token rotation, HTTP-only cookies
+- **Authorization**: Custom RBAC (Role-Based Access Control) system
+- **Containerization**: Docker with Docker Compose
+- **Additional Components**: 
+  - Flutter mobile app in `/flutter-app`
+  - MCP Server in `/rising_mcp_server` for AI agent integration
 
-### Key Architectural Patterns
+### Architectural Patterns
 
-1. **Feature-Based Architecture**: Code is organized by business capability (features) rather than technical layers. Each feature is self-contained with its own components, hooks, services, and API routes.
-
-2. **Domain-Driven Design**: Clear separation between domain logic (business rules) and infrastructure concerns. Domain models, interfaces, and DTOs define the business contracts.
-
-3. **Service-Repository Pattern**: Services implement business logic while repositories handle data access. This provides a clean abstraction over the database.
-
-4. **Factory Pattern with Dependency Injection**: Services and repositories are created through factories, enabling proper dependency injection and testability.
-
-5. **JWT Authentication with Refresh Tokens**: Secure authentication system with token rotation and HTTP-only cookies.
-
-6. **Role-Based Access Control (RBAC)**: Fine-grained permission system with roles and individual permissions.
+1. **Feature-Based Architecture**: Code organized by business capability rather than technical layers
+2. **Domain-Driven Design**: Clear separation between business logic and infrastructure
+3. **Service-Repository Pattern**: Services handle business logic, repositories handle data access
+4. **Factory Pattern with Dependency Injection**: For creating service/repository instances
+5. **Plugin System Architecture**: Comprehensive system for extending functionality (in development)
 
 ### Project Structure
 ```
@@ -94,12 +123,10 @@ src/
 ```
 
 ### Feature Module Structure
-Each feature follows this structure:
+Each feature follows this consistent structure:
 ```
 features/[feature-name]/
 ├── api/              # API routes and models
-│   ├── models/       # Request/response models
-│   └── routes/       # Route handlers
 ├── components/       # React components
 ├── hooks/            # Custom React hooks
 ├── lib/              # Feature-specific logic
@@ -109,15 +136,12 @@ features/[feature-name]/
 └── index.ts          # Public exports
 ```
 
-### Runtime Considerations
-- **Edge Runtime**: Default for better performance, used for simple operations
-- **Node.js Runtime**: Required for database access (Prisma), bcrypt, and other Node.js-specific operations
-- Routes requiring Node.js must have `export const runtime = 'nodejs';`
+## Critical Implementation Patterns
 
 ### API Response Pattern
-All API routes use a consistent response format:
+**ALWAYS** use this pattern for API responses:
 ```typescript
-import { formatResponse } from '@/core/errors'; // Note: NOT from @/core/api
+import { formatResponse } from '@/core/errors'; // NOT from @/core/api
 import { NextRequest, NextResponse } from 'next/server';
 
 // Success response
@@ -133,79 +157,127 @@ return NextResponse.json(
 );
 ```
 
-### Permission System
-Permissions follow a `category.action` format (e.g., `users.create`, `customers.view`). The system supports both role-based and individual permissions.
+### Runtime Configuration
+- **Edge Runtime**: Default for better performance, used for simple operations
+- **Node.js Runtime**: Required for database access (Prisma), bcrypt, and other Node.js-specific operations
+- Routes requiring Node.js must export: `export const runtime = 'nodejs';`
 
-### Authentication Flow
-1. User logs in with credentials
-2. Server validates and generates JWT + refresh token
-3. Tokens stored as HTTP-only cookies
-4. AuthService manages token refresh automatically
-5. Protected routes check authentication and permissions
+### Route Parameter Handling (Next.js 15)
+Route parameters are now Promises:
+```typescript
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  // ... rest of handler
+}
+```
+
+### Service Factory Usage
+Always use service factories, never instantiate services directly:
+```typescript
+import { serviceFactory } from '@/core/factories';
+
+const userService = await serviceFactory.getUserService();
+const users = await userService.findAll();
+```
+
+### Permission System
+- Permissions follow `category.action` format (e.g., `users.create`, `customers.view`)
+- Always check permissions in API routes
+- Use the PermissionMiddleware for consistent authorization
 
 ### Database Access Pattern
-- Always use Prisma through the repository pattern
-- Never access the database directly from components or API routes
-- Use service factories to get service instances
+- **NEVER** access Prisma directly in API routes or components
+- Always use the repository pattern
 - Repositories extend `PrismaRepository` base class
+- Use transactions for multi-step operations
 
-### Error Handling
-- Use `AppError` for application-specific errors
-- Consistent error formatting with `formatResponse`
-- Comprehensive logging with `LoggingService`
-- Client-friendly error messages
-
-## Key Implementation Notes
+## Key Implementation Guidelines
 
 ### When Creating New Features
-1. Start by defining domain models and interfaces in `domain/`
-2. Create the feature directory structure under `features/`
+1. Define domain models and interfaces in `domain/`
+2. Create feature directory structure under `features/`
 3. Implement repositories extending `PrismaRepository`
-4. Implement services following the existing patterns
+4. Implement services following existing patterns
 5. Create API routes using the `routeHandler` pattern
 6. Build React components and hooks
 7. Export only public APIs through `index.ts`
 
-### Common Patterns to Follow
-- Use existing DTOs directly, don't create duplicate response models
-- Validate enum parameters before passing to services
-- Use service factories, never instantiate services directly
-- Follow the established error handling patterns
-- Add proper TypeScript types for all functions
-- Use the existing permission system for access control
+### Common Pitfalls to Avoid
+- Don't create duplicate response models - use existing DTOs
+- Always validate enum parameters before passing to services
+- Never import from deep paths - use feature exports
+- Don't forget to handle async route parameters in Next.js 15
+- Always wrap `formatResponse` with `NextResponse.json()`
 
-### Next.js 15 Specifics
-- Route parameters are now Promises: `{ params: Promise<{ id: string }> }`
-- Dynamic imports for heavy dependencies in Node.js runtime
-- Server components for static rendering
-- Client components for interactivity
+### Error Handling
+- Use `AppError` for application-specific errors
+- Log errors with `LoggingService` before returning responses
+- Provide user-friendly error messages
+- Include proper HTTP status codes
 
 ### Testing Strategy
 - Unit tests for services and utilities
 - Integration tests for API routes
 - Component tests with React Testing Library
-- Mock external dependencies properly
-
-### Performance Considerations
-- Use Edge runtime where possible for better performance
-- Implement proper caching strategies
-- Optimize database queries with appropriate indexes
-- Use pagination for large data sets
+- Mock database calls in tests
+- Use the test utilities in `src/__mocks__`
 
 ## Recent Major Features
 
+### Plugin System (January 2025)
+A comprehensive plugin architecture with:
+- Secure sandboxed execution
+- License management and anti-piracy
+- Plugin marketplace infrastructure
+- Database schema in place (Plugin, PluginLicense, PluginInstallation)
+- Located in `features/plugins/` (under development)
+
 ### Automation System (January 2025)
-A comprehensive webhook and scheduling system replacing n8n integration:
-- Webhook automation for entity operations (create, update, delete)
+Webhook and scheduling system replacing n8n integration:
+- Webhook automation for entity operations
 - Cron-based scheduling for recurring tasks
 - Execution history and monitoring
-- Service-specific webhook testing (n8n, Slack, Discord, etc.)
+- Service-specific webhook testing
 - Located in `features/automation/`
 
-### Key Lessons from Automation Implementation
-1. Always use `formatResponse` from `@/core/errors`
-2. Wrap `formatResponse` with `NextResponse.json()`
-3. Validate enum query parameters before service calls
-4. Handle webhook testing differently for each service (n8n doesn't support HEAD)
-5. Use proper error status code extraction pattern
-6. Follow existing factory patterns exactly
+### MCP Server Integration
+Model Context Protocol server for AI agents:
+- Resources for read operations
+- Tools for write operations
+- SSE support for real-time events
+- Located in `/rising_mcp_server/`
+
+## Performance Considerations
+- Use Edge runtime where possible
+- Implement proper database indexing
+- Use pagination for large datasets
+- Cache frequently accessed data
+- Optimize bundle size with dynamic imports
+
+## Security Best Practices
+- Never expose sensitive data in responses
+- Validate all input data
+- Use prepared statements (Prisma handles this)
+- Implement rate limiting on sensitive endpoints
+- Keep dependencies updated
+- Use environment variables for secrets
+
+## Development Workflow Tips
+- Run `npm run typecheck` before committing
+- Use `npm run lint:fix` to auto-fix linting issues
+- Check `npm run test:watch` during development
+- Use Prisma Studio (`npm run db:studio`) for database inspection
+- Monitor the server logs for debugging
+
+## Environment Variables
+Key environment variables (see `.env.example` for full list):
+```env
+DATABASE_URL=postgresql://user:pass@localhost:5432/rising_bsm
+JWT_SECRET=your-secret-key-at-least-32-characters
+JWT_EXPIRY=3600
+REFRESH_TOKEN_EXPIRY=2592000
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
+```
