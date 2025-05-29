@@ -58,7 +58,7 @@ class DashboardRepositoryImpl implements DashboardRepository {
   
   // Mock data for testing and initial development
   DashboardData _getMockDashboardData() {
-    final stats = DashboardStatsModel(
+    const stats = DashboardStatsModel(
       totalCustomers: 156,
       totalRequests: 243,
       totalAppointments: 187,

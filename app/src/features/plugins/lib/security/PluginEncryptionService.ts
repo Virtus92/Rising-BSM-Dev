@@ -81,7 +81,7 @@ export class PluginEncryptionService {
     );
     
     // Set auth tag
-    decipher.setAuthTag(authTag);
+    (decipher as any).setAuthTag(authTag);
     
     // Decrypt
     try {

@@ -23,6 +23,7 @@ describe('PluginLicenseService', () => {
       findActiveByUser: jest.fn(),
       findExpiring: jest.fn(),
       updateUsage: jest.fn(),
+      updateUsageData: jest.fn(),
       incrementInstalls: jest.fn(),
       decrementInstalls: jest.fn(),
       updateLastVerified: jest.fn(),
@@ -132,13 +133,13 @@ describe('PluginLicenseService', () => {
 
       // Test trial license
       await service.generateLicense(1, 1, 'trial');
-      expect(createdLicense.usageLimits.apiCalls).toBe(1000);
+      expect(createdLicense.usageLimits?.apiCalls).toBe(1000);
       expect(createdLicense.maxInstalls).toBe(1);
       expect(createdLicense.expiresAt).toBeDefined();
 
       // Test premium license
       await service.generateLicense(1, 1, 'premium');
-      expect(createdLicense.usageLimits.apiCalls).toBe(100000);
+      expect(createdLicense.usageLimits?.apiCalls).toBe(100000);
       expect(createdLicense.maxInstalls).toBe(10);
     });
   });
@@ -212,7 +213,7 @@ describe('PluginLicenseService', () => {
 
       await service.updateUsage(1, 'apiCalls', 50);
 
-      expect(mockLicenseRepository.updateUsage).toHaveBeenCalledWith(1, { apiCalls: 150 });
+      expect(mockLicenseRepository.updateUsageData).toHaveBeenCalledWith(1, { apiCalls: 150 });
     });
 
     it('should reset usage', async () => {
@@ -225,10 +226,11 @@ describe('PluginLicenseService', () => {
 
       await service.resetUsage(1);
 
-      const updateCall = mockLicenseRepository.updateUsage.mock.calls[0];
-      expect(updateCall[1].apiCalls).toBe(0);
-      expect(updateCall[1].storage).toBe(50); // Storage doesn't reset
-      expect(updateCall[1].lastReset).toBeDefined();
+      const updateCall = mockLicenseRepository.updateUsageData.mock.calls[0];
+      const updateData = updateCall[1] as any;
+      expect(updateData.apiCalls).toBe(0);
+      expect(updateData.storage).toBe(50); // Storage doesn't reset
+      expect(updateData.lastReset).toBeDefined();
     });
 
     it('should check usage limit', async () => {

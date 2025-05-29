@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:dio/dio.dart';
 
-import '../../data/models/auth_model.dart';
 import '../storage/storage_service.dart';
 import 'mock_auth_service.dart';
 

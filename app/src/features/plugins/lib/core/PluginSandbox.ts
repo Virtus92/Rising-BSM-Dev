@@ -110,7 +110,11 @@ export class PluginSandbox {
           maxApiCalls: 2500
         };
       default:
-        return baseConfig;
+        return {
+          ...baseConfig,
+          memoryLimit: 100,
+          cpuLimit: 50
+        };
     }
   }
 
@@ -170,7 +174,7 @@ export class PluginSandbox {
     };
   }
 
-  private createRestrictedTimeout(): typeof setTimeout {
+  private createRestrictedTimeout(): any {
     const maxTimeout = this.config.timeoutMs;
     const startTime = this.startTime;
 
@@ -186,7 +190,7 @@ export class PluginSandbox {
     };
   }
 
-  private createRestrictedInterval(): typeof setInterval {
+  private createRestrictedInterval(): any {
     const intervals: NodeJS.Timeout[] = [];
     const maxIntervals = 10;
 
@@ -228,7 +232,7 @@ export class PluginSandbox {
         })
         .join(' ');
 
-      console[level as keyof Console](`[Plugin:${this.plugin.name}]`, message);
+      (console as any)[level](`[Plugin:${this.plugin.name}]`, message);
     };
 
     return {

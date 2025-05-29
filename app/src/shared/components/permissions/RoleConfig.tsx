@@ -84,6 +84,43 @@ export const dashboardNavigation: Record<UserRole, MenuSection[]> = {
       ],
     },
     {
+      title: 'Extensions',
+      items: [
+        {
+          name: 'Plugins',
+          path: '/dashboard/plugins',
+          icon: 'Package',
+          permission: SystemPermission.PLUGIN_VIEW,
+          children: [
+            {
+              name: 'Marketplace',
+              path: '/dashboard/plugins',
+              icon: 'Store',
+              permission: SystemPermission.PLUGIN_VIEW,
+            },
+            {
+              name: 'Installed',
+              path: '/dashboard/plugins/installed',
+              icon: 'Package',
+              permission: SystemPermission.PLUGIN_VIEW,
+            },
+            {
+              name: 'Create Plugin',
+              path: '/dashboard/plugins/create',
+              icon: 'Plus',
+              permission: SystemPermission.PLUGIN_CREATE,
+            }
+          ]
+        },
+        {
+          name: 'Automation',
+          path: '/dashboard/automation',
+          icon: 'Workflow',
+          permission: SystemPermission.AUTOMATION_VIEW,
+        },
+      ],
+    },
+    {
       title: 'Management',
       items: [
         {
@@ -151,6 +188,37 @@ export const dashboardNavigation: Record<UserRole, MenuSection[]> = {
           path: '/dashboard/services',
           icon: 'Briefcase',
           permission: SystemPermission.USERS_VIEW,
+        },
+      ],
+    },
+    {
+      title: 'Extensions',
+      items: [
+        {
+          name: 'Plugins',
+          path: '/dashboard/plugins',
+          icon: 'Package',
+          permission: SystemPermission.PLUGIN_VIEW,
+          children: [
+            {
+              name: 'Marketplace',
+              path: '/dashboard/plugins',
+              icon: 'Store',
+              permission: SystemPermission.PLUGIN_VIEW,
+            },
+            {
+              name: 'Installed',
+              path: '/dashboard/plugins/installed',
+              icon: 'Package',
+              permission: SystemPermission.PLUGIN_VIEW,
+            }
+          ]
+        },
+        {
+          name: 'Automation',
+          path: '/dashboard/automation',
+          icon: 'Workflow',
+          permission: SystemPermission.AUTOMATION_VIEW,
         },
       ],
     },

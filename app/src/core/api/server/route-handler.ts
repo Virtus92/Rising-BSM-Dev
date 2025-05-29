@@ -11,8 +11,35 @@ import { ApiResponse } from '@/core/api/types';
 import { auth, authenticateRequest } from '@/features/auth/api/middleware/authMiddleware';
 import { AppError } from '@/core/errors/types/AppError';
 import { UserRole } from '@/domain';
+import { getPermissionService } from '@/core/factories/serviceFactory.server';
 
 const logger = getLogger();
+
+/**
+ * Check if user has required permissions
+ */
+async function checkUserPermissions(userId: number, requiredPermissions: string[]): Promise<boolean> {
+  try {
+    const permissionService = getPermissionService();
+    
+    // Check each required permission
+    for (const permission of requiredPermissions) {
+      const hasPermission = await permissionService.hasPermission(userId, permission);
+      if (!hasPermission) {
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    logger.error('Error checking user permissions:', {
+      error: error instanceof Error ? error.message : String(error),
+      userId,
+      requiredPermissions
+    });
+    return false;
+  }
+}
 
 // Handler types
 export type RouteHandler = (
@@ -31,12 +58,24 @@ export interface RouteHandlerOptions {
   requiresAuth?: boolean;
   requiredRole?: UserRole | UserRole[];
   requiredPermission?: string | string[];
+  requiredPermissions?: string | string[];  // Support both for backward compatibility
   
   // Cache control
   cacheControl?: string;
   
   // Middleware
   middleware?: MiddlewareFunction[];
+}
+
+// New interface for object-style route handler configuration
+export interface RouteHandlerConfig {
+  requiredPermissions?: string[];
+  requiredPermission?: string | string[];
+  requiresAuth?: boolean;
+  requiredRole?: UserRole | UserRole[];
+  cacheControl?: string;
+  middleware?: MiddlewareFunction[];
+  handler: RouteHandler;
 }
 
 /**
@@ -134,6 +173,34 @@ export function routeHandler(
             request.headers.set('X-Auth-User-ID', authResult.user.id.toString());
             if (authResult.user.role) {
               request.headers.set('X-Auth-User-Role', authResult.user.role);
+            }
+            
+            // Check permissions if required
+            const requiredPerms = options.requiredPermissions || options.requiredPermission;
+            if (requiredPerms) {
+              const permsArray = Array.isArray(requiredPerms) ? requiredPerms : [requiredPerms];
+              const hasPermissions = await checkUserPermissions(authResult.user.id, permsArray);
+              
+              if (!hasPermissions) {
+                const duration = Date.now() - startTime;
+                logger.info(`API Permission denied: ${method} ${url}`, {
+                  requestId,
+                  method,
+                  url,
+                  userId: authResult.user.id,
+                  requiredPermissions: permsArray,
+                  status: 403,
+                  duration: `${duration}ms`
+                });
+                
+                return NextResponse.json({
+                  success: false,
+                  error: 'Permission denied',
+                  code: 'PERMISSION_DENIED',
+                  message: 'You do not have the required permissions to access this resource',
+                  statusCode: 403
+                }, { status: 403 });
+              }
             }
           }
         } catch (authError) {
@@ -276,5 +343,29 @@ export function routeHandler(
   };
 }
 
-// Export for use in API routes
-export default routeHandler;
+// Enhanced createRouteHandler that supports both old and new patterns
+export function createRouteHandler(
+  handlerOrConfig: RouteHandler | RouteHandlerConfig,
+  options?: RouteHandlerOptions
+): (request: NextRequest, context?: any) => Promise<NextResponse> {
+  // Check if first argument is a config object (new pattern)
+  if (typeof handlerOrConfig === 'object' && 'handler' in handlerOrConfig) {
+    const config = handlerOrConfig as RouteHandlerConfig;
+    const handler = config.handler;
+    const routeOptions: RouteHandlerOptions = {
+      requiresAuth: config.requiresAuth,
+      requiredRole: config.requiredRole,
+      requiredPermission: config.requiredPermission || config.requiredPermissions,
+      requiredPermissions: config.requiredPermissions,
+      cacheControl: config.cacheControl,
+      middleware: config.middleware
+    };
+    return routeHandler(handler, routeOptions);
+  }
+  
+  // Old pattern - direct handler function
+  return routeHandler(handlerOrConfig as RouteHandler, options);
+}
+
+// Export for backward compatibility
+export { createRouteHandler as default };

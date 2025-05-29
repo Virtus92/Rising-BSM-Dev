@@ -302,11 +302,11 @@ export class PluginAPIBridge {
     }) as T;
   }
 
-  private checkPermission(plugin: Plugin, permission: string[]): void {
+  private checkPermission(plugin: Plugin, permission: string): void {
     const hasPermission = plugin.permissions.some(p => 
-      p === permission || 
-      p === `${permission.split('.')[0]}.*` ||
-      p === '*'
+      p.code === permission || 
+      p.code === `${permission.split('.')[0]}.*` ||
+      p.code === '*'
     );
     
     if (!hasPermission) {
@@ -398,7 +398,8 @@ export class PluginAPIBridge {
 
   private getGlobalLimit(plugin: Plugin): number {
     // Define limits based on plugin license type
-    const licenseType = plugin.price === 0 ? 'free' : 'premium';
+    const hasPaidTiers = plugin.pricing.basic || plugin.pricing.premium || plugin.pricing.enterprise;
+    const licenseType = hasPaidTiers ? 'premium' : 'free';
     const limits: Record<string, number> = {
       'free': 1000,
       'premium': 10000,

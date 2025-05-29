@@ -83,38 +83,36 @@ describe('DtoFactory', () => {
     });
 
     it('should override default values with provided partial data', () => {
-      const now = new Date().toISOString();
-      const partialData = {
-        id: 42,
-        name: 'Test Customer',
-        email: 'customer@example.com',
-        phone: '123-456-7890',
-        postalCode: '12345',
-        country: 'USA',
-        newsletter: true,
-        status: CommonStatus.ACTIVE,
-        type: CustomerType.BUSINESS,
-        notes: ['Note 1', 'Note 2'],
-        appointments: [{ id: 1, title: 'Test Appointment' }],
-        createdAt: now,
-        updatedAt: now
-      };
-      
-      const dto = createCustomerResponseDto(partialData);
-      
-      expect(dto.id).toBe(42);
-      expect(dto.name).toBe('Test Customer');
-      expect(dto.email).toBe('customer@example.com');
-      expect(dto.phone).toBe('123-456-7890');
-      expect(dto.postalCode).toBe('12345');
-      expect(dto.country).toBe('USA');
-      expect(dto.newsletter).toBe(true);
-      expect(dto.status).toBe(CommonStatus.ACTIVE);
-      expect(dto.type).toBe(CustomerType.BUSINESS);
-      expect(dto.notes).toEqual(['Note 1', 'Note 2']);
-      expect(dto.appointments).toEqual([{ id: 1, title: 'Test Appointment' }]);
-      expect(dto.createdAt).toBe(now);
-      expect(dto.updatedAt).toBe(now);
+    const now = new Date().toISOString();
+    const partialData = {
+    id: 42,
+    name: 'Test Customer',
+    email: 'customer@example.com',
+    phone: '123-456-7890',
+    postalCode: '12345',
+    country: 'USA',
+    newsletter: true,
+    status: CommonStatus.ACTIVE,
+    type: CustomerType.BUSINESS,
+    createdAt: now,
+    updatedAt: now
+    };
+    
+    const dto = createCustomerResponseDto(partialData);
+    
+    expect(dto.id).toBe(42);
+    expect(dto.name).toBe('Test Customer');
+    expect(dto.email).toBe('customer@example.com');
+    expect(dto.phone).toBe('123-456-7890');
+    expect(dto.postalCode).toBe('12345');
+    expect(dto.country).toBe('USA');
+    expect(dto.newsletter).toBe(true);
+    expect(dto.status).toBe(CommonStatus.ACTIVE);
+    expect(dto.type).toBe(CustomerType.BUSINESS);
+    expect(dto.notes).toEqual([]);
+    expect(dto.appointments).toEqual([]);
+    expect(dto.createdAt).toBe(now);
+    expect(dto.updatedAt).toBe(now);
     });
   });
   

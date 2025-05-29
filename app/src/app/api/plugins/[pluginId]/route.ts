@@ -1,150 +1,203 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { formatResponse } from '@/core/errors';
-import { withAuth } from '@/features/auth/middleware';
-import { getPluginService } from '@/core/factories/index.server';
-import { UpdatePluginDto } from '@/domain/dtos/PluginDtos';
+import { NextRequest } from 'next/server';
+import { createRouteHandler } from '@/core/api/server/route-handler';
+import { getPluginService } from '@/core/factories/serviceFactory.server';
 import { z } from 'zod';
-import { getLogger } from '@/core/logging';
+import { AppError } from '@/core/errors';
 
-export const runtime = 'nodejs';
-
-// GET /api/plugins/[pluginId] - Get plugin details
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ pluginId: string }> }
-) {
-  const logger = getLogger();
-  try {
-    const { pluginId } = await params;
-    const id = parseInt(pluginId);
-    
-    if (isNaN(id)) {
-      return NextResponse.json(
-        formatResponse.error('Invalid plugin ID', 400),
-        { status: 400 }
-      );
-    }
-
-    const pluginService = getPluginService();
-    const plugin = await pluginService.getById(id);
-
-    if (!plugin) {
-      return NextResponse.json(
-        formatResponse.error('Plugin not found', 404),
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(
-      formatResponse.success(plugin, 'Plugin retrieved successfully'),
-      { status: 200 }
-    );
-  } catch (error: any) {
-    logger.error('Error retrieving plugin:', error);
-    return NextResponse.json(
-      formatResponse.error(error instanceof Error ? error.message : 'Failed to retrieve plugin', 500),
-      { status: 500 }
-    );
-  }
-}
-
-// PATCH /api/plugins/[pluginId] - Update plugin
 const updatePluginSchema = z.object({
   displayName: z.string().min(3).max(100).optional(),
   description: z.string().optional(),
-  category: z.string().min(3).max(50).optional(),
+  version: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),
+  category: z.string().optional(),
   tags: z.array(z.string()).optional(),
-  icon: z.string().url().optional(),
-  screenshots: z.array(z.string().url()).optional(),
-  pricing: z.record(z.any()).optional(),
-  trialDays: z.number().min(0).max(90).optional(),
-  status: z.enum(['pending', 'approved', 'rejected', 'suspended']).optional(),
-  maxAppVersion: z.string().regex(/^\d+\.\d+\.\d+$/).optional()
+  icon: z.string().optional(),
+  screenshots: z.array(z.string()).optional(),
+  permissions: z.array(z.object({
+    code: z.string(),
+    name: z.string().optional(),
+    description: z.string(),
+    required: z.boolean().optional()
+  })).optional(),
+  dependencies: z.array(z.object({
+    name: z.string(),
+    version: z.string()
+  })).optional(),
+  minAppVersion: z.string().optional(),
+  maxAppVersion: z.string().optional(),
+  pricing: z.object({
+    trial: z.number().optional(),
+    basic: z.number().optional(),
+    premium: z.number().optional(),
+    enterprise: z.number().optional()
+  }).optional(),
+  trialDays: z.number().min(0).max(90).optional()
 });
 
-export const PATCH = withAuth(
-  async (
-    request: NextRequest,
-    { params }: { params: Promise<{ pluginId: string }> }
-  ) => {
-    const logger = getLogger();
-    try {
-      const { pluginId } = await params;
-      const id = parseInt(pluginId);
-      
-      if (isNaN(id)) {
-        return NextResponse.json(
-          formatResponse.error('Invalid plugin ID', 400),
-          { status: 400 }
-        );
-      }
-
-      const body = await request.json();
-      const validatedData = updatePluginSchema.parse(body);
-      
-      const updateDto: UpdatePluginDto = validatedData;
-      const userId = (request as any).auth?.userId;
-
-      const pluginService = getPluginService();
-      const updatedPlugin = await pluginService.updatePlugin(id, updateDto, userId);
-
-      return NextResponse.json(
-        formatResponse.success(updatedPlugin, 'Plugin updated successfully'),
-        { status: 200 }
-      );
-    } catch (error: any) {
-      logger.error('Error updating plugin:', error);
-      if (error instanceof z.ZodError) {
-        return NextResponse.json(
-          formatResponse.error('Invalid plugin data', 400),
-          { status: 400 }
-        );
-      }
-      return NextResponse.json(
-        formatResponse.error(error instanceof Error ? error.message : 'Failed to update plugin', 500),
-        { status: 500 }
-      );
+// GET /api/plugins/[pluginId] - Get a specific plugin
+export const GET = createRouteHandler({
+  requiredPermissions: ['plugin.view'],
+  handler: async (req: NextRequest, context: any) => {
+    const service = getPluginService();
+    const pluginId = parseInt(context.params.pluginId as string);
+    
+    if (isNaN(pluginId)) {
+      throw new AppError('Invalid plugin ID', 400);
     }
-  },
-  {
-    requiredPermission: ['plugins.update']
-  }
-);
-
-// DELETE /api/plugins/[pluginId] - Delete plugin (admin only)
-export const DELETE = withAuth(
-  async (
-    request: NextRequest,
-    { params }: { params: Promise<{ pluginId: string }> }
-  ) => {
-    const logger = getLogger();
-    try {
-      const { pluginId } = await params;
-      const id = parseInt(pluginId);
-      
-      if (isNaN(id)) {
-        return NextResponse.json(
-          formatResponse.error('Invalid plugin ID', 400),
-          { status: 400 }
-        );
-      }
-
-      const pluginService = getPluginService();
-      await pluginService.delete(id);
-
-      return NextResponse.json(
-        formatResponse.success(null, 'Plugin deleted successfully'),
-        { status: 200 }
-      );
-    } catch (error: any) {
-      logger.error('Error deleting plugin:', error);
-      return NextResponse.json(
-        formatResponse.error(error instanceof Error ? error.message : 'Failed to delete plugin', 500),
-        { status: 500 }
-      );
+    
+    const plugin = await service.getById(pluginId);
+    
+    if (!plugin) {
+      throw new AppError('Plugin not found', 404);
     }
-  },
-  {
-    requiredPermission: ['plugins.delete']
+    
+    return {
+      success: true,
+      data: plugin
+    };
   }
-);
+});
+
+// PUT /api/plugins/[pluginId] - Update a plugin
+export const PUT = createRouteHandler({
+  requiredPermissions: ['plugin.update'],
+  handler: async (req: NextRequest, context: any) => {
+    const service = getPluginService();
+    const pluginId = parseInt(context.params.pluginId as string);
+    const body = await req.json();
+    
+    if (isNaN(pluginId)) {
+      throw new AppError('Invalid plugin ID', 400);
+    }
+    
+    // Validate request body
+    const validated = updatePluginSchema.parse(body);
+    
+    // Update plugin
+    const plugin = await service.updatePlugin(pluginId, validated, context.user.id);
+    
+    return {
+      success: true,
+      data: plugin
+    };
+  }
+});
+
+// DELETE /api/plugins/[pluginId] - Delete a plugin
+export const DELETE = createRouteHandler({
+  requiredPermissions: ['plugin.delete'],
+  handler: async (req: NextRequest, context: any) => {
+    const service = getPluginService();
+    const pluginId = parseInt(context.params.pluginId as string);
+    
+    if (isNaN(pluginId)) {
+      throw new AppError('Invalid plugin ID', 400);
+    }
+    
+    // Check if user is admin or plugin author
+    const plugin = await service.getById(pluginId);
+    if (!plugin) {
+      throw new AppError('Plugin not found', 404);
+    }
+    
+    if (plugin.authorId !== context.user.id && !context.user.permissions.includes('admin')) {
+      throw new AppError('Unauthorized to delete this plugin', 403);
+    }
+    
+    const result = await service.delete(pluginId);
+    
+    return {
+      success: true,
+      data: { deleted: result }
+    };
+  }
+});
+
+// POST /api/plugins/[pluginId]/submit - Submit plugin for review
+export const submitForReview = createRouteHandler({
+  requiredPermissions: ['plugin.create'],
+  handler: async (req: NextRequest, context: any) => {
+    const service = getPluginService();
+    const pluginId = parseInt(context.params.pluginId as string);
+    
+    if (isNaN(pluginId)) {
+      throw new AppError('Invalid plugin ID', 400);
+    }
+    
+    await service.submitForReview(pluginId, context.user.id);
+    
+    return {
+      success: true,
+      message: 'Plugin submitted for review'
+    };
+  }
+});
+
+// POST /api/plugins/[pluginId]/approve - Approve a plugin
+export const approvePlugin = createRouteHandler({
+  requiredPermissions: ['plugin.approve'],
+  handler: async (req: NextRequest, context: any) => {
+    const service = getPluginService();
+    const pluginId = parseInt(context.params.pluginId as string);
+    
+    if (isNaN(pluginId)) {
+      throw new AppError('Invalid plugin ID', 400);
+    }
+    
+    await service.approvePlugin(pluginId, context.user.id);
+    
+    return {
+      success: true,
+      message: 'Plugin approved'
+    };
+  }
+});
+
+// POST /api/plugins/[pluginId]/reject - Reject a plugin
+export const rejectPlugin = createRouteHandler({
+  requiredPermissions: ['plugin.approve'],
+  handler: async (req: NextRequest, context: any) => {
+    const service = getPluginService();
+    const pluginId = parseInt(context.params.pluginId as string);
+    const { reason } = await req.json();
+    
+    if (isNaN(pluginId)) {
+      throw new AppError('Invalid plugin ID', 400);
+    }
+    
+    if (!reason) {
+      throw new AppError('Rejection reason is required', 400);
+    }
+    
+    await service.rejectPlugin(pluginId, context.user.id, reason);
+    
+    return {
+      success: true,
+      message: 'Plugin rejected'
+    };
+  }
+});
+
+// POST /api/plugins/[pluginId]/suspend - Suspend a plugin
+export const suspendPlugin = createRouteHandler({
+  requiredPermissions: ['plugin.approve'],
+  handler: async (req: NextRequest, context: any) => {
+    const service = getPluginService();
+    const pluginId = parseInt(context.params.pluginId as string);
+    const { reason } = await req.json();
+    
+    if (isNaN(pluginId)) {
+      throw new AppError('Invalid plugin ID', 400);
+    }
+    
+    if (!reason) {
+      throw new AppError('Suspension reason is required', 400);
+    }
+    
+    await service.suspendPlugin(pluginId, context.user.id, reason);
+    
+    return {
+      success: true,
+      message: 'Plugin suspended'
+    };
+  }
+});

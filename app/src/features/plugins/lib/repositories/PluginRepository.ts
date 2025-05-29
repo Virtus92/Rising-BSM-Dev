@@ -1,14 +1,158 @@
-import { PrismaClient } from '@prisma/client';
 import { PrismaRepository } from '@/core/repositories/PrismaRepository';
 import { IPluginRepository } from '@/domain/repositories/IPluginRepository';
 import { Plugin } from '@/domain/entities/Plugin';
 import { PluginSearchDto } from '@/domain/dtos/PluginDtos';
+import { PrismaClient } from '@prisma/client';
 import { getLogger } from '@/core/logging';
 import { getErrorHandler } from '@/core/errors';
 
-export class PluginRepository extends PrismaRepository<Plugin> implements IPluginRepository {
+export class PluginRepository extends PrismaRepository<Plugin, number> implements IPluginRepository {
   constructor(prisma: PrismaClient) {
-    super(prisma, 'plugin', getLogger(), getErrorHandler());
+    super(prisma, 'plugin' as any, getLogger(), getErrorHandler());
+  }
+
+  async findByName(name: string): Promise<Plugin | null> {
+    const result = await this.prisma.plugin.findUnique({
+      where: { name },
+      include: {
+        authorUser: true,
+        licenses: false,
+        installations: false,
+        reviews: false
+      }
+    });
+    return result ? this.mapToEntity(result) : null;
+  }
+
+  async findByUuid(uuid: string): Promise<Plugin | null> {
+    const result = await this.prisma.plugin.findUnique({
+      where: { uuid },
+      include: {
+        authorUser: true,
+        licenses: false,
+        installations: false,
+        reviews: false
+      }
+    });
+    return result ? this.mapToEntity(result) : null;
+  }
+
+  async findByAuthor(authorId: number): Promise<Plugin[]> {
+    const results = await this.prisma.plugin.findMany({
+      where: { authorId },
+      include: {
+        authorUser: true,
+        licenses: false,
+        installations: false,
+        reviews: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async findByCategory(category: string): Promise<Plugin[]> {
+    const results = await this.prisma.plugin.findMany({
+      where: { category },
+      include: {
+        authorUser: true,
+        licenses: false,
+        installations: false,
+        reviews: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async search(criteria: PluginSearchDto): Promise<{ data: Plugin[]; total: number }> {
+    const where: any = {
+      AND: []
+    };
+
+    // Build search conditions
+    if (criteria.query) {
+      where.AND.push({
+        OR: [
+          { name: { contains: criteria.query, mode: 'insensitive' } },
+          { displayName: { contains: criteria.query, mode: 'insensitive' } },
+          { description: { contains: criteria.query, mode: 'insensitive' } },
+          { tags: { has: criteria.query } }
+        ]
+      });
+    }
+
+    if (criteria.type) {
+      where.AND.push({ type: criteria.type });
+    }
+
+    if (criteria.category) {
+      where.AND.push({ category: criteria.category });
+    }
+
+    if (criteria.status) {
+      where.AND.push({ status: criteria.status });
+    }
+
+    if (criteria.authorId) {
+      where.AND.push({ authorId: criteria.authorId });
+    }
+
+    if (criteria.minRating) {
+      where.AND.push({ rating: { gte: criteria.minRating } });
+    }
+
+    // Clean up empty AND array
+    if (where.AND.length === 0) {
+      delete where.AND;
+    }
+
+    // Execute search with pagination
+    const [data, total] = await Promise.all([
+      this.prisma.plugin.findMany({
+        where,
+        skip: ((criteria.page || 1) - 1) * (criteria.limit || 20),
+        take: criteria.limit || 20,
+        orderBy: this.getOrderBy(criteria.sortBy, criteria.sortDirection),
+        include: {
+          authorUser: true,
+          licenses: false,
+          installations: false,
+          reviews: false
+        }
+      }),
+      this.prisma.plugin.count({ where })
+    ]);
+
+    return {
+      data: data.map(r => this.mapToEntity(r)),
+      total
+    };
+  }
+
+  async getCategories(): Promise<string[]> {
+    const results = await this.prisma.plugin.findMany({
+      distinct: ['category'],
+      select: { category: true },
+      where: { status: 'approved' }
+    });
+    return results.map(r => r.category);
+  }
+
+  async getTags(): Promise<string[]> {
+    const results = await this.prisma.plugin.findMany({
+      where: { status: 'approved' },
+      select: { tags: true }
+    });
+    
+    // Flatten and deduplicate tags
+    const allTags = results.flatMap((r: any) => r.tags);
+    return [...new Set(allTags as string[])];
+  }
+
+  async incrementDownloads(pluginId: number): Promise<void> {
+    await this.prisma.plugin.update({
+      where: { id: pluginId },
+      data: { downloads: { increment: 1 } }
+    });
   }
 
   protected mapToEntity(data: any): Plugin {
@@ -19,7 +163,7 @@ export class PluginRepository extends PrismaRepository<Plugin> implements IPlugi
       displayName: data.displayName,
       description: data.description,
       version: data.version,
-      author: data.author,
+      author: data.authorUser?.name || data.author || '',
       authorId: data.authorId,
       status: data.status,
       type: data.type,
@@ -27,257 +171,141 @@ export class PluginRepository extends PrismaRepository<Plugin> implements IPlugi
       tags: data.tags || [],
       icon: data.icon,
       screenshots: data.screenshots || [],
-      
       certificate: data.certificate,
       publicKey: data.publicKey,
       checksum: data.checksum,
-      
       pricing: data.pricing || {},
-      trialDays: data.trialDays || 0,
-      
+      trialDays: data.trialDays,
       permissions: data.permissions || [],
       dependencies: data.dependencies || [],
       minAppVersion: data.minAppVersion,
       maxAppVersion: data.maxAppVersion,
-      
-      downloads: data.downloads || 0,
-      rating: data.rating || 0,
-      
-      createdAt: new Date(data.createdAt),
-      updatedAt: new Date(data.updatedAt),
-      createdBy: data.createdBy,
-      updatedBy: data.updatedBy
+      downloads: data.downloads,
+      rating: data.rating,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt
     });
   }
 
-  protected getDisplayName(): string {
-    return 'Plugin';
+  protected mapFromEntity(entity: Plugin): any {
+    return {
+      id: entity.id,
+      uuid: entity.uuid,
+      name: entity.name,
+      displayName: entity.displayName,
+      description: entity.description,
+      version: entity.version,
+      authorId: entity.authorId,
+      status: entity.status,
+      type: entity.type,
+      category: entity.category,
+      tags: entity.tags,
+      icon: entity.icon,
+      screenshots: entity.screenshots,
+      certificate: entity.certificate,
+      publicKey: entity.publicKey,
+      checksum: entity.checksum,
+      pricing: entity.pricing,
+      trialDays: entity.trialDays,
+      permissions: entity.permissions,
+      dependencies: entity.dependencies,
+      minAppVersion: entity.minAppVersion,
+      maxAppVersion: entity.maxAppVersion,
+      downloads: entity.downloads,
+      rating: entity.rating
+    };
   }
 
-  protected processCriteria(criteria: Record<string, any>): any {
+  private getOrderBy(sortBy?: string, sortDirection?: 'asc' | 'desc'): any {
+    const direction = sortDirection || 'desc';
+    
+    switch (sortBy) {
+      case 'name':
+        return { name: direction };
+      case 'downloads':
+        return { downloads: direction };
+      case 'rating':
+        return { rating: direction };
+      case 'createdAt':
+        return { createdAt: direction };
+      default:
+        return { createdAt: 'desc' };
+    }
+  }
+
+  // Required abstract method implementations
+  protected async logActivityImplementation(
+    userId: number,
+    actionType: string,
+    details?: string,
+    ipAddress?: string
+  ): Promise<any> {
+    // Plugin activities are logged through the general activity log
+    // This is a no-op for plugins
+    return Promise.resolve();
+  }
+
+  protected processCriteria(criteria: any): any {
+    // Pass through criteria as-is for plugins
     return criteria;
   }
 
-  protected mapToDomainEntity(ormEntity: any): Plugin {
-    return this.mapToEntity(ormEntity);
+  protected mapToDomainEntity(data: any): Plugin {
+    return this.mapToEntity(data);
   }
 
-  protected mapToORMEntity(domainEntity: Partial<Plugin>): any {
-    const { id, createdAt, updatedAt, ...data } = domainEntity;
-    return data;
+  protected mapToORMEntity(entity: Plugin): any {
+    return this.mapFromEntity(entity);
   }
 
-  protected async logActivityImplementation(
-    _userId: number, 
-    _actionType: string, 
-    _details?: string, 
-    _ipAddress?: string
-  ): Promise<any> {
-    // Activity logging not implemented for plugins yet
-    return null;
-  }
-
-  async findByName(name: string): Promise<Plugin | null> {
-    try {
-      const data = await this.model.findUnique({
-        where: { name }
-      });
-      return data ? this.mapToEntity(data) : null;
-    } catch (error) {
-      this.handleError(error as Error);
-      return null;
-    }
-  }
-
-  async findByAuthor(authorId: number): Promise<Plugin[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { authorId }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findByCategory(category: string): Promise<Plugin[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { category }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findApproved(): Promise<Plugin[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { status: 'approved' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async search(criteria: PluginSearchDto): Promise<{ data: Plugin[]; total: number }> {
-    try {
-      const where: any = {};
-
-      if (criteria.query) {
-        where.OR = [
-          { name: { contains: criteria.query, mode: 'insensitive' } },
-          { displayName: { contains: criteria.query, mode: 'insensitive' } },
-          { description: { contains: criteria.query, mode: 'insensitive' } },
-          { tags: { has: criteria.query } }
-        ];
-      }
-
-      if (criteria.category) {
-        where.category = criteria.category;
-      }
-
-      if (criteria.minRating !== undefined) {
-        where.rating = { gte: criteria.minRating };
-      }
-
-      const result = await this.findAll({
-        criteria: where,
-        page: criteria.page,
-        limit: criteria.limit,
-        sort: criteria.sortBy ? {
-          field: criteria.sortBy,
-          direction: criteria.sortOrder || 'desc'
-        } : undefined
-      });
-
-      return {
-        data: result.data,
-        total: result.pagination.total
-      };
-    } catch (error) {
-      this.handleError(error as Error);
-      return { data: [], total: 0 };
-    }
-  }
-
-  async incrementDownloads(id: number): Promise<void> {
-    try {
-      await this.model.update({
-        where: { id },
-        data: {
-          downloads: { increment: 1 }
-        }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async updateRating(pluginId: number, rating: number, reviewCount: number): Promise<void> {
-    try {
-      await this.model.update({
-        where: { id: pluginId },
-        data: {
-          rating: rating,
-          reviewCount: reviewCount
-        }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async findByUuid(uuid: string): Promise<Plugin | null> {
-    try {
-      const data = await this.model.findUnique({
-        where: { uuid }
-      });
-      return data ? this.mapToEntity(data) : null;
-    } catch (error) {
-      this.handleError(error as Error);
-      return null;
-    }
-  }
-
+  // Additional interface methods
   async findByStatus(status: string): Promise<Plugin[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { status }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async getCategories(): Promise<string[]> {
-    try {
-      const data = await this.model.findMany({
-        select: { category: true },
-        distinct: ['category']
-      });
-      return data.map((d: any) => d.category);
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async getTags(): Promise<string[]> {
-    try {
-      const plugins = await this.model.findMany({
-        select: { tags: true }
-      });
-      const tagSet = new Set<string>();
-      plugins.forEach((p: any) => {
-        if (Array.isArray(p.tags)) {
-          p.tags.forEach((t: string) => tagSet.add(t));
-        }
-      });
-      return Array.from(tagSet);
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
+    const results = await this.prisma.plugin.findMany({
+      where: { status },
+      include: {
+        authorUser: true,
+        licenses: false,
+        installations: false,
+        reviews: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
   }
 
   async updateInstallCount(pluginId: number, increment: number): Promise<void> {
-    try {
-      await this.model.update({
-        where: { id: pluginId },
-        data: {
-          downloads: { increment: increment }
+    await this.prisma.plugin.update({
+      where: { id: pluginId },
+      data: {
+        downloads: {
+          increment: increment
         }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
+      }
+    });
   }
 
   async updateRevenue(pluginId: number, amount: number): Promise<void> {
-    try {
-      const current = await this.model.findUnique({
-        where: { id: pluginId }
-      });
-      
-      if (!current) return;
-      
-      const currentRevenue = (current.revenue as number) || 0;
-      await this.model.update({
-        where: { id: pluginId },
-        data: {
-          revenue: currentRevenue + amount
-        }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
+    // Revenue tracking could be implemented with a separate table
+    // For now, we'll log it
+    this.logger.info(`Revenue update for plugin ${pluginId}: ${amount}`);
+  }
+
+  async updateRating(pluginId: number, rating: number, reviewCount: number): Promise<void> {
+    await this.prisma.plugin.update({
+      where: { id: pluginId },
+      data: { rating }
+    });
+  }
+
+  async findApproved(): Promise<Plugin[]> {
+    const results = await this.prisma.plugin.findMany({
+      where: { status: 'approved' },
+      include: {
+        authorUser: true,
+        licenses: false,
+        installations: false,
+        reviews: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
   }
 }

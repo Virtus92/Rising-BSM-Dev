@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/errors/api_exception.dart';
-import '../../../data/models/auth_model.dart';
 import '../../../data/models/auth_request_models.dart';
 import '../../../domain/repositories/auth_repository.dart';
 

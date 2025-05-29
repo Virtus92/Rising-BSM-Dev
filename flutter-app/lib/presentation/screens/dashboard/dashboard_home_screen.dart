@@ -4,8 +4,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../data/models/appointment_model.dart';
-import '../../../data/models/request_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../blocs/appointments/appointment_bloc.dart';
 import '../../blocs/auth/auth_bloc.dart';

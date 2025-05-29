@@ -11,7 +11,8 @@ export enum PermissionCategory {
   PROFILE = "Profile",
   NOTIFICATIONS = "Notifications",
   PERMISSIONS = "Permissions",
-  AUTOMATION = "Automation"
+  AUTOMATION = "Automation",
+  PLUGIN = "Plugin"
 }
 
 /**
@@ -26,7 +27,10 @@ export enum PermissionAction {
   ACCESS = "access",
   APPROVE = "approve",
   REJECT = "reject",
-  ASSIGN = "assign"
+  ASSIGN = "assign",
+  DOWNLOAD = "download",
+  INSTALL = "install",
+  PUBLISH = "publish"
 }
 
 /**
@@ -91,7 +95,18 @@ export enum SystemPermission {
   
   // IMPORTANT: This is added to fix references in code
   // This permission is used in routes, so must be defined here
-  SYSTEM_ADMIN = "system.admin"
+  SYSTEM_ADMIN = "system.admin",
+  
+  // Plugin permissions
+  PLUGIN_VIEW = "plugin.view",
+  PLUGIN_CREATE = "plugin.create",
+  PLUGIN_EDIT = "plugin.edit",
+  PLUGIN_DELETE = "plugin.delete",
+  PLUGIN_APPROVE = "plugin.approve",
+  PLUGIN_PUBLISH = "plugin.publish",
+  PLUGIN_DOWNLOAD = "plugin.download",
+  PLUGIN_INSTALL = "plugin.install",
+  PLUGIN_MANAGE = "plugin.manage"
 }
 
 /**

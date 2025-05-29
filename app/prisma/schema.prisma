@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-  output = "../node_modules/.prisma/client"
+  provider      = "prisma-client-js"
+  output        = "../node_modules/@prisma/client"
   binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
@@ -9,71 +9,65 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//==============================================================================
-// CORE: USERS & AUTHENTICATION
-//==============================================================================
-
 model User {
-  id                Int                @id @default(autoincrement())
-  name              String             @db.VarChar(100)
-  email             String             @unique @db.VarChar(100)
-  password          String             @db.VarChar(100)
-  role              String             @default("employee") @db.VarChar(20)
-  phone             String?            @db.VarChar(30)
-  status            String             @default("active") @db.Text
-  profilePicture    String?            @db.VarChar(255) // Legacy field, keeping for backward compatibility
-  profilePictureId  Int?               // Reference to the File model
-  createdAt         DateTime           @default(now()) @db.Timestamp(6)
-  updatedAt         DateTime           @updatedAt @db.Timestamp(6)
-  createdBy         Int?                             
-  updatedBy         Int?
-  lastLoginAt       DateTime?
-  resetToken        String?
-  resetTokenExpiry  DateTime?
-  settings          UserSettings?
-  activities        UserActivity[]
-  appointments      Appointment[]
-  refreshTokens     RefreshToken[]
-  customerLogs      CustomerLog[]
-  appointmentNotes  AppointmentNote[]
-  appointmentLogs   AppointmentLog[]
-  contactRequests   ContactRequest[]
-  requestNotes      RequestNote[]
-  requestLogs       RequestLog[]
-  permissions       UserPermission[]
-  profilePictureFile File?             @relation("ProfilePicture", fields: [profilePictureId], references: [id])
-  requestData       RequestData[]      // Added relation
-  requestDataHistory RequestDataHistory[] // Added relation
-  
-  // Automation relations
-  createdWebhooks   AutomationWebhook[] @relation("WebhookCreator")
-  updatedWebhooks   AutomationWebhook[] @relation("WebhookUpdater")
-  createdSchedules  AutomationSchedule[] @relation("ScheduleCreator")
-  updatedSchedules  AutomationSchedule[] @relation("ScheduleUpdater")
+  id                 Int                  @id @default(autoincrement())
+  name               String               @db.VarChar(100)
+  email              String               @unique @db.VarChar(100)
+  password           String               @db.VarChar(100)
+  role               String               @default("employee") @db.VarChar(20)
+  phone              String?              @db.VarChar(30)
+  status             String               @default("active")
+  profilePicture     String?              @db.VarChar(255)
+  profilePictureId   Int?
+  createdAt          DateTime             @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime             @updatedAt @db.Timestamp(6)
+  createdBy          Int?
+  updatedBy          Int?
+  lastLoginAt        DateTime?
+  resetToken         String?
+  resetTokenExpiry   DateTime?
+  appointments       Appointment[]
+  appointmentLogs    AppointmentLog[]
+  appointmentNotes   AppointmentNote[]
+  createdSchedules   AutomationSchedule[] @relation("ScheduleCreator")
+  updatedSchedules   AutomationSchedule[] @relation("ScheduleUpdater")
+  createdWebhooks    AutomationWebhook[]  @relation("WebhookCreator")
+  updatedWebhooks    AutomationWebhook[]  @relation("WebhookUpdater")
+  contactRequests    ContactRequest[]
+  customerLogs       CustomerLog[]
+  refreshTokens      RefreshToken[]
+  requestData        RequestData[]
+  requestDataHistory RequestDataHistory[]
+  requestLogs        RequestLog[]
+  requestNotes       RequestNote[]
+  profilePictureFile File?                @relation("ProfilePicture", fields: [profilePictureId], references: [id])
+  activities         UserActivity[]
+  permissions        UserPermission[]
+  settings           UserSettings?
   
   // Plugin relations
-  authoredPlugins   Plugin[]             @relation("PluginAuthor")
-  pluginLicenses    PluginLicense[]      @relation("PluginLicenses")
-  pluginInstalls    PluginInstallation[] @relation("PluginInstallations")
-  pluginReviews     PluginReview[]       @relation("PluginReviews")
+  plugins            Plugin[]           @relation("PluginAuthor")
+  pluginLicenses     PluginLicense[]
+  pluginInstallations PluginInstallation[]
+  pluginReviews      PluginReview[]
 
   @@index([email])
   @@index([name])
   @@index([profilePictureId])
-  @@index([id]) // Add index on id for faster lookups
+  @@index([id])
 }
 
 model UserSettings {
-  id                  Int      @id @default(autoincrement())
-  userId              Int      @unique
-  darkMode            Boolean  @default(false)
-  emailNotifications  Boolean  @default(true)
-  pushNotifications   Boolean  @default(false)
-  language            String   @default("de") @db.VarChar(10)
+  id                   Int      @id @default(autoincrement())
+  userId               Int      @unique
+  darkMode             Boolean  @default(false)
+  emailNotifications   Boolean  @default(true)
+  pushNotifications    Boolean  @default(false)
+  language             String   @default("de") @db.VarChar(10)
   notificationInterval String   @default("immediate") @db.VarChar(20)
-  createdAt           DateTime @default(now()) @db.Timestamp(6)
-  updatedAt           DateTime @updatedAt @db.Timestamp(6)
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt            DateTime @default(now()) @db.Timestamp(6)
+  updatedAt            DateTime @updatedAt @db.Timestamp(6)
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserActivity {
@@ -81,7 +75,7 @@ model UserActivity {
   userId    Int
   timestamp DateTime? @default(now()) @db.Timestamp(6)
   activity  String    @db.VarChar(255)
-  details   String?   @db.Text
+  details   String?
   ipAddress String?   @db.VarChar(255)
   user      User      @relation(fields: [userId], references: [id])
 }
@@ -92,22 +86,18 @@ model UserSession {
   expire DateTime @db.Timestamp(6)
 }
 
-//==============================================================================
-// ROLES & PERMISSIONS
-//==============================================================================
-
 model Permission {
   id          Int              @id @default(autoincrement())
   code        String           @unique @db.VarChar(100)
   name        String           @db.VarChar(100)
-  description String           @db.Text
+  description String
   category    String           @db.VarChar(50)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   createdBy   Int?
   updatedBy   Int?
+  roles       RolePermission[]
   users       UserPermission[]
-  roles       RolePermission[] 
 
   @@index([code])
   @@index([category])
@@ -119,14 +109,13 @@ model UserPermission {
   permissionId Int
   grantedAt    DateTime?  @default(now())
   grantedBy    Int?
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, permissionId])
   @@index([userId])
   @@index([permissionId])
 }
-
 
 model RolePermission {
   id           Int        @id @default(autoincrement())
@@ -153,7 +142,6 @@ model RefreshToken {
   revokedAt       DateTime?
   revokedByIp     String?
   replacedByToken String?
-  
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -168,32 +156,28 @@ model SystemSettings {
   updatedAt   DateTime @updatedAt
 }
 
-//==============================================================================
-// CRM: CUSTOMERS
-//==============================================================================
-
 model Customer {
-  id             Int              @id @default(autoincrement())
-  name           String           @db.VarChar(100)
-  company        String?          @db.VarChar(100)
-  email          String?          @db.VarChar(100)
-  phone          String?          @db.VarChar(30)
-  address        String?          @db.Text
-  postalCode     String?          @db.VarChar(10)
-  city           String?          @db.VarChar(100)
-  country        String           @default("Deutschland") @db.VarChar(100)
-  vatNumber      String?          @db.VarChar(50)
-  notes          String?          @db.Text
-  newsletter     Boolean          @default(false)
-  status         String           @default("active") @db.VarChar(20)
-  type           String           @default("private") @db.VarChar(20)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  createdBy      Int?
-  updatedBy      Int?
-  appointments   Appointment[]
-  logs           CustomerLog[]
+  id              Int              @id @default(autoincrement())
+  name            String           @db.VarChar(100)
+  company         String?          @db.VarChar(100)
+  email           String?          @db.VarChar(100)
+  phone           String?          @db.VarChar(30)
+  address         String?
+  postalCode      String?          @db.VarChar(10)
+  city            String?          @db.VarChar(100)
+  country         String           @default("Deutschland") @db.VarChar(100)
+  vatNumber       String?          @db.VarChar(50)
+  notes           String?
+  newsletter      Boolean          @default(false)
+  status          String           @default("active") @db.VarChar(20)
+  type            String           @default("private") @db.VarChar(20)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  createdBy       Int?
+  updatedBy       Int?
+  appointments    Appointment[]
   contactRequests ContactRequest[]
+  logs            CustomerLog[]
 
   @@index([email])
   @@index([status])
@@ -203,17 +187,13 @@ model CustomerLog {
   id         Int      @id @default(autoincrement())
   customerId Int
   userId     Int?
-  userName   String   @db.Text
-  action     String   @db.Text
-  details    String?  @db.Text
+  userName   String
+  action     String
+  details    String?
   createdAt  DateTime @default(now()) @db.Timestamp(6)
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id])
 }
-
-//==============================================================================
-// SCHEDULING: APPOINTMENTS & CALENDAR
-//==============================================================================
 
 model Appointment {
   id              Int               @id @default(autoincrement())
@@ -222,15 +202,15 @@ model Appointment {
   appointmentDate DateTime          @db.Timestamp(6)
   duration        Int?
   location        String?           @db.VarChar(200)
-  description     String?           @db.Text
+  description     String?
   status          String            @default("planned") @db.VarChar(20)
   createdBy       Int?
   createdAt       DateTime          @default(now()) @db.Timestamp(6)
   updatedAt       DateTime          @updatedAt @db.Timestamp(6)
-  customer        Customer?         @relation(fields: [customerId], references: [id])
   creator         User?             @relation(fields: [createdBy], references: [id])
-  notes           AppointmentNote[]
+  customer        Customer?         @relation(fields: [customerId], references: [id])
   logs            AppointmentLog[]
+  notes           AppointmentNote[]
   contactRequests ContactRequest[]
 
   @@index([customerId])
@@ -243,7 +223,7 @@ model AppointmentNote {
   appointmentId Int
   userId        Int
   userName      String      @db.VarChar(100)
-  text          String      @db.Text
+  text          String
   createdAt     DateTime    @default(now()) @db.Timestamp(6)
   appointment   Appointment @relation(fields: [appointmentId], references: [id])
   user          User        @relation(fields: [userId], references: [id])
@@ -253,94 +233,82 @@ model AppointmentLog {
   id            Int         @id @default(autoincrement())
   appointmentId Int
   userId        Int
-  userName      String      @db.Text
-  action        String      @db.Text
-  details       String?     @db.Text
+  userName      String
+  action        String
+  details       String?
   createdAt     DateTime    @default(now()) @db.Timestamp(6)
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-//==============================================================================
-// CONTACT & REQUESTS
-//==============================================================================
-
 model ContactRequest {
-  id          Int           @id @default(autoincrement())
-  name        String        @db.VarChar(100)
-  email       String        @db.VarChar(100)
-  phone       String?       @db.VarChar(30)
-  service     String        @db.VarChar(50)
-  message     String        @db.Text
-  status      String        @default("new") @db.VarChar(20)
-  processorId Int?
-  customerId  Int?
+  id            Int           @id @default(autoincrement())
+  name          String        @db.VarChar(100)
+  email         String        @db.VarChar(100)
+  phone         String?       @db.VarChar(30)
+  service       String        @db.VarChar(50)
+  message       String
+  status        String        @default("new") @db.VarChar(20)
+  processorId   Int?
+  customerId    Int?
   appointmentId Int?
-  ipAddress   String?       @db.VarChar(255)
-  
-  // New fields for AI processing
-  source      String?       @db.VarChar(50) // E.g., human, chatbot, call-agent
-  metadata    Json?         // For storing AI processing metadata
-  
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt @db.Timestamp(6)
-  
-  // Relations
-  notes       RequestNote[]
-  logs        RequestLog[]
-  requestData RequestData[] // New relation to structured data
-  customer    Customer?     @relation(fields: [customerId], references: [id])
-  appointment Appointment?  @relation(fields: [appointmentId], references: [id])
-  processor   User?         @relation(fields: [processorId], references: [id])
+  ipAddress     String?       @db.VarChar(255)
+  source        String?       @db.VarChar(50)
+  metadata      Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt @db.Timestamp(6)
+  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  processor     User?         @relation(fields: [processorId], references: [id])
+  requestData   RequestData[]
+  logs          RequestLog[]
+  notes         RequestNote[]
 
   @@index([email])
   @@index([status])
   @@index([createdAt])
-  @@index([source]) // New index for filtering by source
+  @@index([source])
 }
 
 model RequestNote {
-  id        Int           @id @default(autoincrement())
+  id        Int            @id @default(autoincrement())
   requestId Int
   userId    Int
-  userName  String        @db.VarChar(100)
-  text      String        @db.Text
-  createdAt DateTime      @default(now()) @db.Timestamp(6)
+  userName  String         @db.VarChar(100)
+  text      String
+  createdAt DateTime       @default(now()) @db.Timestamp(6)
   request   ContactRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  user      User          @relation(fields: [userId], references: [id])
+  user      User           @relation(fields: [userId], references: [id])
 }
 
 model RequestLog {
-  id        Int      @id @default(autoincrement())
+  id        Int            @id @default(autoincrement())
   requestId Int
   userId    Int
-  userName  String   @db.VarChar(255)
-  action    String   @db.VarChar(255)
-  details   String?  @db.Text
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userName  String         @db.VarChar(255)
+  action    String         @db.VarChar(255)
+  details   String?
+  createdAt DateTime       @default(now())
   request   ContactRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// New model for structured request data
 model RequestData {
-  id          Int       @id @default(autoincrement())
+  id          Int                  @id @default(autoincrement())
   requestId   Int
-  category    String    @db.VarChar(50)  // For tab categorization
-  label       String    @db.VarChar(100) // Display name
-  order       Int       @default(0)      // Display order in UI
-  dataType    String    @db.VarChar(50)  // json, text, html, markdown, file, conversation
-  data        Json      // The actual structured data
-  isValid     Boolean   @default(true)   // Validation status
-  processedBy String?   @db.VarChar(50)  // AI agent identifier
-  version     Int       @default(1)      // Version tracking
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  createdById Int?      // User who created this data (if any)
-  
-  // Relations
-  request     ContactRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  category    String               @db.VarChar(50)
+  label       String               @db.VarChar(100)
+  order       Int                  @default(0)
+  dataType    String               @db.VarChar(50)
+  data        Json
+  isValid     Boolean              @default(true)
+  processedBy String?              @db.VarChar(50)
+  version     Int                  @default(1)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  createdById Int?
+  createdBy   User?                @relation(fields: [createdById], references: [id])
+  request     ContactRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
   history     RequestDataHistory[]
 
   @@index([requestId])
@@ -348,169 +316,182 @@ model RequestData {
   @@index([createdById])
 }
 
-// History tracking for request data changes
 model RequestDataHistory {
-  id            Int       @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   requestDataId Int
   data          Json
-  changedBy     String?   @db.VarChar(100) // User or AI agent identifier
-  changeReason  String?   @db.Text
+  changedBy     String?     @db.VarChar(100)
+  changeReason  String?
   version       Int
-  createdAt     DateTime  @default(now())
-  userId        Int?      // User who made this change (if any)
-  
-  // Relations
+  createdAt     DateTime    @default(now())
+  userId        Int?
   requestData   RequestData @relation(fields: [requestDataId], references: [id], onDelete: Cascade)
-  user          User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user          User?       @relation(fields: [userId], references: [id])
 
   @@index([requestDataId])
   @@index([userId])
 }
 
-// Model for storing N8N webhook configurations
 model N8NWebhook {
-  id            Int       @id @default(autoincrement())
-  name          String    @db.VarChar(100)
-  description   String?   @db.Text
-  url           String    @db.VarChar(255)
-  workflowId    String?   @db.VarChar(100)
-  active        Boolean   @default(true)
-  category      String    @db.VarChar(50)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description String?
+  url         String   @db.VarChar(255)
+  workflowId  String?  @db.VarChar(100)
+  active      Boolean  @default(true)
+  category    String   @db.VarChar(50)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@index([category])
   @@index([active])
 }
 
-//==============================================================================
-// NOTIFICATIONS
-//==============================================================================
-
 model Notification {
-  id            Int       @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   userId        Int?
   referenceId   Int?
-  referenceType String?   @db.VarChar(50)
-  type          String    @db.VarChar(20)
-  title         String    @db.VarChar(100)
-  message       String?   @db.Text
-  description   String?   @db.Text
-  read          Boolean   @default(false)
-  createdAt     DateTime  @default(now()) @db.Timestamp(6)
-  updatedAt     DateTime  @updatedAt
+  referenceType String?  @db.VarChar(50)
+  type          String   @db.VarChar(20)
+  title         String   @db.VarChar(100)
+  message       String?
+  description   String?
+  read          Boolean  @default(false)
+  createdAt     DateTime @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime @updatedAt
   createdBy     Int?
   updatedBy     Int?
 }
 
-//==============================================================================
-// AUTOMATION SYSTEM
-//==============================================================================
-
 model AutomationWebhook {
-  id                Int       @id @default(autoincrement())
-  name              String    @db.VarChar(100)
-  description       String?   @db.Text
-  entityType        String    @db.VarChar(50)  // 'user', 'customer', 'appointment', 'request'
-  operation         String    @db.VarChar(20)  // 'create', 'update', 'delete'
-  webhookUrl        String    @db.VarChar(500)
-  headers           Json      @default("{}")
-  payloadTemplate   Json      @default("{}")
-  active            Boolean   @default(true)
-  retryCount        Int       @default(3)
-  retryDelaySeconds Int       @default(30)
-  createdAt         DateTime  @default(now()) @db.Timestamp(6)
-  updatedAt         DateTime  @updatedAt @db.Timestamp(6)
+  id                Int      @id @default(autoincrement())
+  name              String   @db.VarChar(100)
+  description       String?
+  entityType        String   @db.VarChar(50)
+  operation         String   @db.VarChar(20)
+  webhookUrl        String   @db.VarChar(500)
+  headers           Json     @default("{}")
+  payloadTemplate   Json     @default("{}")
+  active            Boolean  @default(true)
+  retryCount        Int      @default(3)
+  retryDelaySeconds Int      @default(30)
+  createdAt         DateTime @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime @updatedAt @db.Timestamp(6)
   createdBy         Int?
   updatedBy         Int?
-  
-  // Relations
-  creator           User?     @relation("WebhookCreator", fields: [createdBy], references: [id], onDelete: SetNull)
-  updater           User?     @relation("WebhookUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
-  
+  creator           User?    @relation("WebhookCreator", fields: [createdBy], references: [id])
+  updater           User?    @relation("WebhookUpdater", fields: [updatedBy], references: [id])
+
   @@index([entityType])
   @@index([operation])
   @@index([active])
   @@index([createdBy])
+  @@index([active], map: "idx_automation_webhook_active")
+  @@index([createdAt(sort: Desc)], map: "idx_automation_webhook_created_at")
+  @@index([entityType, operation, active], map: "idx_automation_webhook_entity_operation")
+  @@index([name], map: "idx_automation_webhook_name")
 }
 
 model AutomationSchedule {
-  id              Int       @id @default(autoincrement())
-  name            String    @db.VarChar(100)
-  description     String?   @db.Text
-  cronExpression  String    @db.VarChar(100)
-  webhookUrl      String    @db.VarChar(500)
-  headers         Json      @default("{}")
-  payload         Json      @default("{}")
-  timezone        String    @default("UTC") @db.VarChar(50)
-  active          Boolean   @default(true)
-  lastRunAt       DateTime?
-  nextRunAt       DateTime?
-  createdAt       DateTime  @default(now()) @db.Timestamp(6)
-  updatedAt       DateTime  @updatedAt @db.Timestamp(6)
-  createdBy       Int?
-  updatedBy       Int?
-  
-  // Relations
-  creator         User?     @relation("ScheduleCreator", fields: [createdBy], references: [id], onDelete: SetNull)
-  updater         User?     @relation("ScheduleUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
-  
+  id             Int       @id @default(autoincrement())
+  name           String    @db.VarChar(100)
+  description    String?
+  cronExpression String    @db.VarChar(100)
+  webhookUrl     String    @db.VarChar(500)
+  headers        Json      @default("{}")
+  payload        Json      @default("{}")
+  timezone       String    @default("UTC") @db.VarChar(50)
+  active         Boolean   @default(true)
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  createdAt      DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamp(6)
+  createdBy      Int?
+  updatedBy      Int?
+  creator        User?     @relation("ScheduleCreator", fields: [createdBy], references: [id])
+  updater        User?     @relation("ScheduleUpdater", fields: [updatedBy], references: [id])
+
   @@index([active])
   @@index([nextRunAt])
   @@index([createdBy])
+  @@index([active], map: "idx_automation_schedule_active")
+  @@index([createdAt(sort: Desc)], map: "idx_automation_schedule_created_at")
+  @@index([name], map: "idx_automation_schedule_name")
+  @@index([nextRunAt, active], map: "idx_automation_schedule_next_run")
 }
 
 model AutomationExecution {
-  id                Int       @id @default(autoincrement())
-  automationType    String    @db.VarChar(20)  // 'webhook', 'schedule'
-  automationId      Int
-  entityId          Int?
-  entityType        String?   @db.VarChar(50)
-  status            String    @db.VarChar(20)  // 'success', 'failed', 'retrying'
-  responseStatus    Int?
-  responseBody      String?   @db.Text
-  errorMessage      String?   @db.Text
-  executionTimeMs   Int?
-  executedAt        DateTime  @default(now()) @db.Timestamp(6)
-  retryAttempt      Int       @default(0)
-  
-  // Relations - Note: This is a polymorphic relationship based on automationType
-  // No foreign key constraints since automationId can reference either webhooks or schedules
-  
+  id              Int      @id @default(autoincrement())
+  automationType  String   @db.VarChar(20)
+  automationId    Int
+  entityId        Int?
+  entityType      String?  @db.VarChar(50)
+  status          String   @db.VarChar(20)
+  responseStatus  Int?
+  responseBody    String?
+  errorMessage    String?
+  executionTimeMs Int?
+  executedAt      DateTime @default(now()) @db.Timestamp(6)
+  retryAttempt    Int      @default(0)
+
   @@index([automationType, automationId])
   @@index([status])
   @@index([executedAt])
   @@index([entityType, entityId])
+  @@index([entityType, entityId], map: "idx_automation_execution_entity")
+  @@index([executedAt(sort: Desc)], map: "idx_automation_execution_executed_at")
+  @@index([status, executedAt(sort: Desc)], map: "idx_automation_execution_stats")
+  @@index([status], map: "idx_automation_execution_status")
+  @@index([automationType, automationId], map: "idx_automation_execution_type_id")
 }
 
-//==============================================================================
-// FILE STORAGE
-//==============================================================================
-
 model File {
-  id            Int       @id @default(autoincrement())
-  filename      String    @db.VarChar(255)
-  originalName  String    @db.VarChar(255)
-  mimeType      String    @db.VarChar(100)
-  path          String    @db.VarChar(255)
-  size          Int
-  type          String    @default("general") @db.VarChar(50)
-  uploadedAt    DateTime  @default(now())
-  uploadedBy    Int?
-  description   String?   @db.Text
-  isDeleted     Boolean   @default(false)
-  deletedAt     DateTime?
-  userProfiles  User[]    @relation("ProfilePicture")
+  id           Int       @id @default(autoincrement())
+  filename     String    @db.VarChar(255)
+  originalName String    @db.VarChar(255)
+  mimeType     String    @db.VarChar(100)
+  path         String    @db.VarChar(255)
+  size         Int
+  type         String    @default("general") @db.VarChar(50)
+  uploadedAt   DateTime  @default(now())
+  uploadedBy   Int?
+  description  String?
+  isDeleted    Boolean   @default(false)
+  deletedAt    DateTime?
+  userProfiles User[]    @relation("ProfilePicture")
 
   @@index([type])
   @@index([uploadedBy])
   @@index([path])
 }
 
-//==============================================================================
-// PLUGIN SYSTEM
-//==============================================================================
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model documents {
+  id        BigInt                 @id @default(autoincrement())
+  content   String?
+  metadata  Json?
+  embedding Unsupported("vector")?
+}
 
+model n8n_api_histories {
+  id         Int    @id @default(autoincrement())
+  session_id String @db.VarChar(255)
+  message    Json
+}
+
+model n8n_chat_histories {
+  id         Int    @id @default(autoincrement())
+  session_id String @db.VarChar(255)
+  message    Json
+}
+
+model n8n_documents_histories {
+  id         Int    @id @default(autoincrement())
+  session_id String @db.VarChar(255)
+  message    Json
+}
+
+// Plugin System Models
 model Plugin {
   id              Int       @id @default(autoincrement())
   uuid            String    @unique @default(uuid())
@@ -521,7 +502,7 @@ model Plugin {
   author          String    @db.VarChar(100)
   authorId        Int
   status          String    @default("pending") // pending, approved, rejected, suspended
-  type            String    @db.VarChar(50) // ui, api, automation, mixed
+  type            String    @db.VarChar(50)
   category        String    @db.VarChar(50)
   tags            String[]
   icon            String?
@@ -547,17 +528,13 @@ model Plugin {
   rating          Float     @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  createdBy       Int?
+  updatedBy       Int?
   
   authorUser      User      @relation("PluginAuthor", fields: [authorId], references: [id])
   licenses        PluginLicense[]
   installations   PluginInstallation[]
   reviews         PluginReview[]
-  
-  @@index([name])
-  @@index([status])
-  @@index([type])
-  @@index([category])
-  @@index([authorId])
 }
 
 model PluginLicense {
@@ -583,13 +560,8 @@ model PluginLicense {
   usageData       Json      @default("{}")
   
   plugin          Plugin    @relation(fields: [pluginId], references: [id])
-  user            User      @relation("PluginLicenses", fields: [userId], references: [id])
+  user            User      @relation(fields: [userId], references: [id])
   installations   PluginInstallation[]
-  
-  @@index([pluginId])
-  @@index([userId])
-  @@index([status])
-  @@index([type])
 }
 
 model PluginInstallation {
@@ -612,52 +584,40 @@ model PluginInstallation {
   installedAt     DateTime  @default(now())
   lastActivated   DateTime?
   uninstalledAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   
   plugin          Plugin    @relation(fields: [pluginId], references: [id])
   license         PluginLicense @relation(fields: [licenseId], references: [id])
-  user            User      @relation("PluginInstallations", fields: [userId], references: [id])
+  user            User      @relation(fields: [userId], references: [id])
   executions      PluginExecution[]
-  
-  @@index([pluginId])
-  @@index([licenseId])
-  @@index([userId])
-  @@index([status])
-  @@index([installationId])
 }
 
 model PluginExecution {
   id              Int       @id @default(autoincrement())
   installationId  Int
   action          String    @db.VarChar(100)
-  status          String    @db.VarChar(20) // success, failed
-  duration        Int?      // milliseconds
+  status          String    @db.VarChar(20)
+  duration        Int?
   resourceUsage   Json      @default("{}")
   errorMessage    String?   @db.Text
   executedAt      DateTime  @default(now())
   
   installation    PluginInstallation @relation(fields: [installationId], references: [id])
-  
-  @@index([installationId])
-  @@index([status])
-  @@index([executedAt])
 }
 
 model PluginReview {
   id              Int       @id @default(autoincrement())
   pluginId        Int
   userId          Int
-  rating          Int       // 1-5
+  rating          Int
   title           String?   @db.VarChar(200)
   comment         String?   @db.Text
   helpful         Int       @default(0)
+  notHelpful      Int       @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
   plugin          Plugin    @relation(fields: [pluginId], references: [id])
-  user            User      @relation("PluginReviews", fields: [userId], references: [id])
-  
-  @@unique([pluginId, userId])
-  @@index([pluginId])
-  @@index([userId])
-  @@index([rating])
+  user            User      @relation(fields: [userId], references: [id])
 }

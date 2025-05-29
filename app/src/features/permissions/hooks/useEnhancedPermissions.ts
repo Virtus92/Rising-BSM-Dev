@@ -126,11 +126,19 @@ export function useEnhancedPermissions() {
     }
   }, [user?.id, permissionManager]);
   
+  /**
+   * Check permission (alias for hasPermission)
+   */
+  const checkPermission = useCallback((permission: string): boolean => {
+    return hasPermission(permission);
+  }, [hasPermission]);
+
   return {
     permissions,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
+    checkPermission,
     loadPermissions,
     hasCachedPermissions,
     clearCache,
@@ -139,4 +147,6 @@ export function useEnhancedPermissions() {
   };
 }
 
+// Export as both named and default exports for flexibility
+export { useEnhancedPermissions as usePermissions };
 export default useEnhancedPermissions;

@@ -1,13 +1,142 @@
-import { PrismaClient } from '@prisma/client';
 import { PrismaRepository } from '@/core/repositories/PrismaRepository';
 import { IPluginInstallationRepository } from '@/domain/repositories/IPluginInstallationRepository';
 import { PluginInstallation } from '@/domain/entities/PluginInstallation';
+import { PrismaClient } from '@prisma/client';
 import { getLogger } from '@/core/logging';
 import { getErrorHandler } from '@/core/errors';
 
-export class PluginInstallationRepository extends PrismaRepository<PluginInstallation> implements IPluginInstallationRepository {
+export class PluginInstallationRepository extends PrismaRepository<PluginInstallation, number> implements IPluginInstallationRepository {
   constructor(prisma: PrismaClient) {
-    super(prisma, 'pluginInstallation', getLogger(), getErrorHandler());
+    super(prisma, 'pluginInstallation' as any, getLogger(), getErrorHandler());
+  }
+
+  async findByInstallationId(installationId: string): Promise<PluginInstallation | null> {
+    const result = await this.prisma.pluginInstallation.findUnique({
+      where: { installationId },
+      include: {
+        plugin: true,
+        license: true,
+        user: true,
+        executions: false
+      }
+    });
+    return result ? this.mapToEntity(result) : null;
+  }
+
+  async findByLicense(licenseId: number): Promise<PluginInstallation[]> {
+    const results = await this.prisma.pluginInstallation.findMany({
+      where: { licenseId },
+      include: {
+        plugin: true,
+        license: true,
+        user: true,
+        executions: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async findActiveByPlugin(pluginId: number): Promise<PluginInstallation[]> {
+    const results = await this.prisma.pluginInstallation.findMany({
+      where: {
+        pluginId,
+        status: 'active'
+      },
+      include: {
+        plugin: true,
+        license: true,
+        user: true,
+        executions: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async findActiveByUser(userId: number): Promise<PluginInstallation[]> {
+    const results = await this.prisma.pluginInstallation.findMany({
+      where: {
+        userId,
+        status: 'active'
+      },
+      include: {
+        plugin: true,
+        license: true,
+        user: true,
+        executions: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async findByHardwareId(hardwareId: string): Promise<PluginInstallation[]> {
+    const results = await this.prisma.pluginInstallation.findMany({
+      where: { hardwareId },
+      include: {
+        plugin: true,
+        license: true,
+        user: true,
+        executions: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async updateHeartbeat(installationId: string): Promise<void> {
+    await this.prisma.pluginInstallation.update({
+      where: { installationId },
+      data: { lastHeartbeat: new Date() }
+    });
+  }
+
+  async deactivate(installationId: string): Promise<void> {
+    await this.prisma.pluginInstallation.update({
+      where: { installationId },
+      data: {
+        status: 'inactive',
+        uninstalledAt: new Date()
+      }
+    });
+  }
+
+  async reactivate(installationId: string): Promise<void> {
+    await this.prisma.pluginInstallation.update({
+      where: { installationId },
+      data: {
+        status: 'active',
+        lastActivated: new Date(),
+        uninstalledAt: null
+      }
+    });
+  }
+
+  async logExecution(
+    installationId: string,
+    action: string,
+    status: string,
+    duration?: number,
+    resourceUsage?: any,
+    errorMessage?: string
+  ): Promise<void> {
+    const installation = await this.prisma.pluginInstallation.findUnique({
+      where: { installationId },
+      select: { id: true }
+    });
+
+    if (!installation) {
+      throw new Error('Installation not found');
+    }
+
+    await this.prisma.pluginExecution.create({
+      data: {
+        installationId: installation.id,
+        action,
+        status,
+        duration,
+        resourceUsage: resourceUsage || {},
+        errorMessage,
+        executedAt: new Date()
+      }
+    });
   }
 
   protected mapToEntity(data: any): PluginInstallation {
@@ -20,323 +149,197 @@ export class PluginInstallationRepository extends PrismaRepository<PluginInstall
       hardwareId: data.hardwareId,
       version: data.version,
       status: data.status,
-      
       encryptionKey: data.encryptionKey,
-      installedAt: new Date(data.installedAt),
-      lastHeartbeat: data.lastHeartbeat ? new Date(data.lastHeartbeat) : undefined,
-      
-      createdAt: new Date(data.createdAt),
-      updatedAt: new Date(data.updatedAt),
-      createdBy: data.createdBy,
-      updatedBy: data.updatedBy
+      lastHeartbeat: data.lastHeartbeat,
+      installedAt: data.installedAt,
+      lastActivated: data.lastActivated,
+      uninstalledAt: data.uninstalledAt,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt
     });
   }
 
-  protected getDisplayName(): string {
-    return 'PluginInstallation';
+  protected mapFromEntity(entity: PluginInstallation): any {
+    return {
+      id: entity.id,
+      pluginId: entity.pluginId,
+      licenseId: entity.licenseId,
+      userId: entity.userId,
+      installationId: entity.installationId,
+      hardwareId: entity.hardwareId,
+      version: entity.version,
+      status: entity.status,
+      encryptionKey: entity.encryptionKey,
+      lastHeartbeat: entity.lastHeartbeat,
+      installedAt: entity.installedAt,
+      lastActivated: entity.lastActivated,
+      uninstalledAt: entity.uninstalledAt
+    };
   }
 
-  protected processCriteria(criteria: Record<string, any>): any {
+  // Required abstract method implementations
+  protected async logActivityImplementation(
+    userId: number,
+    actionType: string,
+    details?: string,
+    ipAddress?: string
+  ): Promise<any> {
+    // Plugin installation activities are logged through the general activity log
+    // This is a no-op for plugin installations
+    return Promise.resolve();
+  }
+
+  protected processCriteria(criteria: any): any {
+    // Pass through criteria as-is for plugin installations
     return criteria;
   }
 
-  protected mapToDomainEntity(ormEntity: any): PluginInstallation {
-    return this.mapToEntity(ormEntity);
+  protected mapToDomainEntity(data: any): PluginInstallation {
+    return this.mapToEntity(data);
   }
 
-  protected mapToORMEntity(domainEntity: Partial<PluginInstallation>): any {
-    const { id, createdAt, updatedAt, ...data } = domainEntity;
-    return data;
+  protected mapToORMEntity(entity: PluginInstallation): any {
+    return this.mapFromEntity(entity);
   }
 
-  protected async logActivityImplementation(
-    _userId: number, 
-    _actionType: string, 
-    _details?: string, 
-    _ipAddress?: string
-  ): Promise<any> {
-    // Activity logging not implemented for plugin installations yet
-    return null;
-  }
-
-  async findByInstallationId(installationId: string): Promise<PluginInstallation | null> {
-    try {
-      const data = await this.model.findUnique({
-        where: { installationId }
-      });
-      return data ? this.mapToEntity(data) : null;
-    } catch (error) {
-      this.handleError(error as Error);
-      return null;
-    }
-  }
-
-  async findByLicense(licenseId: number): Promise<PluginInstallation[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { licenseId },
-        sort: { field: 'installedAt', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findByUser(userId: number): Promise<PluginInstallation[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { userId },
-        sort: { field: 'installedAt', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findByPlugin(pluginId: number): Promise<PluginInstallation[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { pluginId },
-        sort: { field: 'installedAt', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findByHardwareId(hardwareId: string): Promise<PluginInstallation[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { hardwareId },
-        sort: { field: 'installedAt', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findActive(): Promise<PluginInstallation[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { status: 'active' },
-        sort: { field: 'lastActivated', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findStale(maxInactivityMinutes: number): Promise<PluginInstallation[]> {
-    try {
-      const staleTime = new Date();
-      staleTime.setMinutes(staleTime.getMinutes() - maxInactivityMinutes);
-      
-      const result = await this.findAll({
-        criteria: {
-          status: 'active',
-          OR: [
-            { lastHeartbeat: null },
-            { lastHeartbeat: { lt: staleTime } }
-          ]
-        }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async updateHeartbeat(installationId: string): Promise<void> {
-    try {
-      await this.model.update({
-        where: { installationId },
-        data: { lastHeartbeat: new Date() }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async activate(installationId: string): Promise<void> {
-    try {
-      await this.model.update({
-        where: { installationId },
-        data: { 
-          status: 'active',
-          lastActivated: new Date()
-        }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async deactivate(installationId: string): Promise<void> {
-    try {
-      await this.model.update({
-        where: { installationId },
-        data: { status: 'inactive' }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async uninstall(installationId: string): Promise<void> {
-    try {
-      await this.model.update({
-        where: { installationId },
-        data: { 
-          status: 'uninstalled',
-          uninstalledAt: new Date()
-        }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async countByLicense(licenseId: number): Promise<number> {
-    try {
-      return await this.model.count({
-        where: { 
-          licenseId,
-          status: { not: 'uninstalled' }
-        }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-      return 0;
-    }
-  }
-
+  // Additional interface methods
   async findByLicenseKey(licenseKey: string): Promise<PluginInstallation[]> {
-    try {
-      // First find the license by key
-      const license = await this.prisma.pluginLicense.findUnique({
-        where: { licenseKey }
-      });
-      
-      if (!license) return [];
-      
-      const result = await this.findAll({
-        criteria: { licenseId: license.id },
-        sort: { field: 'installedAt', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
+    const results = await this.prisma.pluginInstallation.findMany({
+      where: {
+        license: {
+          licenseKey
+        }
+      },
+      include: {
+        plugin: true,
+        license: true,
+        user: true,
+        executions: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
   }
 
   async findByDeviceFingerprint(fingerprint: string): Promise<PluginInstallation[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { hardwareId: fingerprint },
-        sort: { field: 'installedAt', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
+    return this.findByHardwareId(fingerprint);
   }
 
   async findActiveInstallations(licenseKey: string): Promise<PluginInstallation[]> {
-    try {
-      // First find the license by key
-      const license = await this.prisma.pluginLicense.findUnique({
-        where: { licenseKey }
-      });
-      
-      if (!license) return [];
-      
-      const result = await this.findAll({
-        criteria: { 
-          licenseId: license.id,
-          status: 'active'
+    const results = await this.prisma.pluginInstallation.findMany({
+      where: {
+        license: {
+          licenseKey
         },
-        sort: { field: 'lastHeartbeat', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
+        status: 'active'
+      },
+      include: {
+        plugin: true,
+        license: true,
+        user: true,
+        executions: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
   }
 
   async deactivateInstallation(installationId: string, reason: string): Promise<void> {
-    try {
-      await this.model.update({
-        where: { installationId },
-        data: { 
-          status: 'inactive',
-          deactivatedAt: new Date(),
-          deactivationReason: reason
-        }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
+    await this.deactivate(installationId);
+    // Log the reason if needed
+    this.logger.info(`Installation ${installationId} deactivated: ${reason}`);
   }
 
   async updateLastSeen(installationId: string): Promise<void> {
-    try {
-      await this.model.update({
-        where: { installationId },
-        data: { 
-          lastHeartbeat: new Date(),
-          lastSeen: new Date()
-        }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
+    await this.updateHeartbeat(installationId);
   }
 
   async cleanupExpiredInstallations(beforeDate: Date): Promise<number> {
-    try {
-      // Find installations that haven't been seen before the specified date
-      const staleInstallations = await this.model.findMany({
-        where: {
-          OR: [
-            { lastHeartbeat: { lt: beforeDate } },
-            { lastHeartbeat: null, createdAt: { lt: beforeDate } }
-          ],
-          status: { not: 'uninstalled' }
+    const staleInstallations = await this.prisma.pluginInstallation.findMany({
+      where: {
+        lastHeartbeat: {
+          lt: beforeDate
         },
-        select: { id: true }
-      });
-      
-      if (staleInstallations.length === 0) return 0;
-      
-      // Mark them as expired/inactive
-      const result = await this.model.updateMany({
-        where: {
-          id: { in: staleInstallations.map((i: any) => i.id) }
-        },
-        data: {
-          status: 'expired',
-          expiredAt: new Date()
-        }
-      });
-      
-      return result.count;
-    } catch (error) {
-      this.handleError(error as Error);
+        status: 'active'
+      },
+      select: { installationId: true }
+    });
+
+    if (staleInstallations.length === 0) {
       return 0;
     }
+
+    await this.prisma.pluginInstallation.updateMany({
+      where: {
+        installationId: {
+          in: staleInstallations.map(i => i.installationId)
+        }
+      },
+      data: {
+        status: 'inactive',
+        uninstalledAt: new Date()
+      }
+    });
+
+    return staleInstallations.length;
+  }
+
+  async findByUser(userId: number): Promise<PluginInstallation[]> {
+    const results = await this.prisma.pluginInstallation.findMany({
+      where: { userId },
+      include: {
+        plugin: true,
+        license: true,
+        user: true,
+        executions: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async findActive(): Promise<PluginInstallation[]> {
+    const results = await this.prisma.pluginInstallation.findMany({
+      where: { status: 'active' },
+      include: {
+        plugin: true,
+        license: true,
+        user: true,
+        executions: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async findStale(maxInactivityMinutes: number): Promise<PluginInstallation[]> {
+    const staleDate = new Date();
+    staleDate.setMinutes(staleDate.getMinutes() - maxInactivityMinutes);
+
+    const results = await this.prisma.pluginInstallation.findMany({
+      where: {
+        lastHeartbeat: {
+          lt: staleDate
+        },
+        status: 'active'
+      },
+      include: {
+        plugin: true,
+        license: true,
+        user: true,
+        executions: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async activate(installationId: string): Promise<void> {
+    await this.reactivate(installationId);
+  }
+
+  async uninstall(installationId: string): Promise<void> {
+    await this.prisma.pluginInstallation.update({
+      where: { installationId },
+      data: {
+        status: 'uninstalled',
+        uninstalledAt: new Date()
+      }
+    });
   }
 }

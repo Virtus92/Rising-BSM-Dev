@@ -27,7 +27,7 @@ export interface BaseCardProps<T> {
   // Card content fields
   fields?: {
     label: string;
-    value: string | ((item: T) => string | ReactNode);
+    value: string | ReactNode | ((item: T) => string | ReactNode);
     icon?: ReactNode;
   }[];
   
@@ -39,6 +39,7 @@ export interface BaseCardProps<T> {
     text: string | ((item: T) => string);
     variant?: 'default' | 'secondary' | 'destructive' | 'outline' | null;
     className?: string;
+    icon?: ReactNode;
   }[];
   
   // Additional content
@@ -111,7 +112,8 @@ export function BaseCard<T>({
     ? badges.map(badge => ({
         text: typeof badge.text === 'function' ? badge.text(item) : badge.text,
         variant: badge.variant,
-        className: badge.className
+        className: badge.className,
+        icon: badge.icon
       }))
     : undefined;
   
@@ -153,6 +155,7 @@ export function BaseCard<T>({
                 variant={badge.variant || 'secondary'}
                 className={badge.className}
               >
+                {badge.icon && <span className="mr-1">{badge.icon}</span>}
                 {badge.text}
               </Badge>
             ))}

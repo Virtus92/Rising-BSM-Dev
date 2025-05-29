@@ -183,15 +183,22 @@ describe('CustomerService', () => {
 
       const customer = new Customer({
         id: 1,
-        ...createDto,
+        name: createDto.name!,
+        email: createDto.email,
+        phone: createDto.phone,
+        address: createDto.address,
+        city: createDto.city,
+        country: createDto.country || 'Deutschland',
         status: CommonStatus.ACTIVE,
         type: CustomerType.PRIVATE,
+        newsletter: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
 
-      mockValidationService.validate.mockResolvedValue({
-        result: ValidationResult.SUCCESS,
+      mockValidationService.validate.mockReturnValue({
         isValid: true,
-        errors: undefined,
+        errors: [],
       });
 
       mockRepository.create.mockResolvedValue(customer);
@@ -216,12 +223,11 @@ describe('CustomerService', () => {
         country: 'USA',
       };
 
-      mockValidationService.validate.mockResolvedValue({
-        result: ValidationResult.ERROR,
+      mockValidationService.validate.mockReturnValue({
         isValid: false,
         errors: [
-          { field: 'name', message: 'Name is required', type: 'INVALID' },
-          { field: 'email', message: 'Invalid email format', type: 'INVALID' },
+          'Name is required',
+          'Invalid email format',
         ],
       });
 
@@ -246,15 +252,22 @@ describe('CustomerService', () => {
       });
 
       const updatedCustomer = new Customer({
-        ...existingCustomer,
-        ...updateDto,
+        id: existingCustomer.id,
+        name: updateDto.name || existingCustomer.name,
+        email: existingCustomer.email,
+        phone: updateDto.phone || existingCustomer.phone,
+        type: existingCustomer.type,
+        status: existingCustomer.status,
+        country: existingCustomer.country,
+        newsletter: existingCustomer.newsletter,
+        createdAt: existingCustomer.createdAt,
+        updatedAt: existingCustomer.updatedAt
       });
 
       mockRepository.findById.mockResolvedValue(existingCustomer);
-      mockValidationService.validate.mockResolvedValue({
-        result: ValidationResult.SUCCESS,
+      mockValidationService.validate.mockReturnValue({
         isValid: true,
-        errors: undefined,
+        errors: [],
       });
       mockRepository.update.mockResolvedValue(updatedCustomer);
 
@@ -270,10 +283,9 @@ describe('CustomerService', () => {
 
     it('should throw error when customer not found', async () => {
       mockRepository.findById.mockResolvedValue(null);
-      mockValidationService.validate.mockResolvedValue({
-        result: ValidationResult.SUCCESS,
+      mockValidationService.validate.mockReturnValue({
         isValid: true,
-        errors: undefined,
+        errors: [],
       });
 
       await expect(service.update(999, { name: 'Updated' })).rejects.toThrow();

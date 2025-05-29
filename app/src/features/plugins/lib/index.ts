@@ -47,3 +47,6 @@ export type {
   PluginBundle,
   PluginExecutionResult
 } from './core/types';
+
+// Export plugin client
+export { PluginClient } from './clients/PluginClient';

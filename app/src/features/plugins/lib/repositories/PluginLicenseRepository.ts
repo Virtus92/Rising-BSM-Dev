@@ -1,13 +1,203 @@
-import { PrismaClient } from '@prisma/client';
 import { PrismaRepository } from '@/core/repositories/PrismaRepository';
 import { IPluginLicenseRepository } from '@/domain/repositories/IPluginLicenseRepository';
 import { PluginLicense } from '@/domain/entities/PluginLicense';
+import { PrismaClient } from '@prisma/client';
 import { getLogger } from '@/core/logging';
 import { getErrorHandler } from '@/core/errors';
 
-export class PluginLicenseRepository extends PrismaRepository<PluginLicense> implements IPluginLicenseRepository {
+export class PluginLicenseRepository extends PrismaRepository<PluginLicense, number> implements IPluginLicenseRepository {
   constructor(prisma: PrismaClient) {
-    super(prisma, 'pluginLicense', getLogger(), getErrorHandler());
+    super(prisma, 'pluginLicense' as any, getLogger(), getErrorHandler());
+  }
+
+  async findByLicenseKey(licenseKey: string): Promise<PluginLicense | null> {
+    const result = await this.prisma.pluginLicense.findUnique({
+      where: { licenseKey },
+      include: {
+        plugin: true,
+        user: true,
+        installations: false
+      }
+    });
+    return result ? this.mapToEntity(result) : null;
+  }
+
+  async findByPluginAndCustomer(pluginId: number, customerId: number): Promise<PluginLicense[]> {
+    const results = await this.prisma.pluginLicense.findMany({
+      where: {
+        pluginId,
+        userId: customerId
+      },
+      include: {
+        plugin: true,
+        user: true,
+        installations: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async findActiveByPlugin(pluginId: number): Promise<PluginLicense[]> {
+    const results = await this.prisma.pluginLicense.findMany({
+      where: {
+        pluginId,
+        status: 'active'
+      },
+      include: {
+        plugin: true,
+        user: true,
+        installations: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async findExpiredLicenses(beforeDate: Date): Promise<PluginLicense[]> {
+    const results = await this.prisma.pluginLicense.findMany({
+      where: {
+        expiresAt: {
+          lt: beforeDate
+        },
+        status: 'active'
+      },
+      include: {
+        plugin: true,
+        user: true,
+        installations: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async updateUsageData(licenseId: number, usageData: any): Promise<void> {
+    const current = await this.prisma.pluginLicense.findUnique({
+      where: { id: licenseId },
+      select: { usageData: true }
+    });
+
+    if (!current) {
+      throw new Error('License not found');
+    }
+
+    const merged = {
+      ...(current.usageData as any || {}),
+      ...usageData
+    };
+
+    await this.prisma.pluginLicense.update({
+      where: { id: licenseId },
+      data: { usageData: merged }
+    });
+  }
+
+  async deactivateLicense(licenseId: number, reason: string): Promise<void> {
+    await this.prisma.pluginLicense.update({
+      where: { id: licenseId },
+      data: {
+        status: 'revoked',
+        usageData: {
+          ...(await this.getUsageData(licenseId)),
+          revokedAt: new Date(),
+          revokedReason: reason
+        }
+      }
+    });
+  }
+
+  async incrementInstalls(licenseId: number): Promise<void> {
+    await this.prisma.pluginLicense.update({
+      where: { id: licenseId },
+      data: { currentInstalls: { increment: 1 } }
+    });
+  }
+
+  async decrementInstalls(licenseId: number): Promise<void> {
+    await this.prisma.pluginLicense.update({
+      where: { id: licenseId },
+      data: { currentInstalls: { decrement: 1 } }
+    });
+  }
+
+  async updateLastVerified(licenseId: number): Promise<void> {
+    await this.prisma.pluginLicense.update({
+      where: { id: licenseId },
+      data: { lastVerified: new Date() }
+    });
+  }
+
+  async findByUserAndPlugin(userId: number, pluginId: number): Promise<PluginLicense | null> {
+    const result = await this.prisma.pluginLicense.findFirst({
+      where: {
+        userId,
+        pluginId,
+        status: { in: ['active', 'suspended'] }
+      },
+      include: {
+        plugin: true,
+        user: true,
+        installations: false
+      }
+    });
+    return result ? this.mapToEntity(result) : null;
+  }
+
+  async findByUser(userId: number): Promise<PluginLicense[]> {
+    const results = await this.prisma.pluginLicense.findMany({
+      where: { userId },
+      include: {
+        plugin: true,
+        user: true,
+        installations: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async findActiveByUser(userId: number): Promise<PluginLicense[]> {
+    const results = await this.prisma.pluginLicense.findMany({
+      where: {
+        userId,
+        status: 'active'
+      },
+      include: {
+        plugin: true,
+        user: true,
+        installations: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async findExpiring(days: number): Promise<PluginLicense[]> {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + days);
+
+    const results = await this.prisma.pluginLicense.findMany({
+      where: {
+        expiresAt: {
+          lte: futureDate,
+          gte: new Date()
+        },
+        status: 'active'
+      },
+      include: {
+        plugin: true,
+        user: true,
+        installations: false
+      }
+    });
+    return results.map((r: any) => this.mapToEntity(r));
+  }
+
+  async updateUsage(licenseId: number, field: string, value: number): Promise<void> {
+    const current = await this.getUsageData(licenseId);
+    await this.updateUsageData(licenseId, {
+      [field]: value
+    });
+  }
+
+  async revoke(licenseId: number, reason?: string): Promise<void> {
+    await this.deactivateLicense(licenseId, reason || 'License revoked');
   }
 
   protected mapToEntity(data: any): PluginLicense {
@@ -18,304 +208,68 @@ export class PluginLicenseRepository extends PrismaRepository<PluginLicense> imp
       userId: data.userId,
       type: data.type,
       status: data.status,
-      
       hardwareId: data.hardwareId,
       maxInstalls: data.maxInstalls,
       currentInstalls: data.currentInstalls,
-      
-      issuedAt: new Date(data.issuedAt),
-      expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
-      lastVerified: data.lastVerified ? new Date(data.lastVerified) : undefined,
-      
+      issuedAt: data.issuedAt,
+      expiresAt: data.expiresAt,
+      lastVerified: data.lastVerified,
       usageLimits: data.usageLimits || {},
       usageData: data.usageData || {},
-      
-      createdAt: new Date(data.createdAt),
-      updatedAt: new Date(data.updatedAt),
-      createdBy: data.createdBy,
-      updatedBy: data.updatedBy
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt
     });
   }
 
-  protected getDisplayName(): string {
-    return 'PluginLicense';
+  protected mapFromEntity(entity: PluginLicense): any {
+    return {
+      id: entity.id,
+      licenseKey: entity.licenseKey,
+      pluginId: entity.pluginId,
+      userId: entity.userId,
+      type: entity.type,
+      status: entity.status,
+      hardwareId: entity.hardwareId,
+      maxInstalls: entity.maxInstalls,
+      currentInstalls: entity.currentInstalls,
+      issuedAt: entity.issuedAt,
+      expiresAt: entity.expiresAt,
+      lastVerified: entity.lastVerified,
+      usageLimits: entity.usageLimits,
+      usageData: entity.usageData
+    };
   }
 
-  protected processCriteria(criteria: Record<string, any>): any {
+  private async getUsageData(licenseId: number): Promise<any> {
+    const license = await this.prisma.pluginLicense.findUnique({
+      where: { id: licenseId },
+      select: { usageData: true }
+    });
+    return license?.usageData || {};
+  }
+
+  // Required abstract method implementations
+  protected async logActivityImplementation(
+    userId: number,
+    actionType: string,
+    details?: string,
+    ipAddress?: string
+  ): Promise<any> {
+    // Plugin license activities are logged through the general activity log
+    // This is a no-op for plugin licenses
+    return Promise.resolve();
+  }
+
+  protected processCriteria(criteria: any): any {
+    // Pass through criteria as-is for plugin licenses
     return criteria;
   }
 
-  protected mapToDomainEntity(ormEntity: any): PluginLicense {
-    return this.mapToEntity(ormEntity);
+  protected mapToDomainEntity(data: any): PluginLicense {
+    return this.mapToEntity(data);
   }
 
-  protected mapToORMEntity(domainEntity: Partial<PluginLicense>): any {
-    const { id, createdAt, updatedAt, ...data } = domainEntity;
-    return data;
-  }
-
-  protected async logActivityImplementation(
-    _userId: number, 
-    _actionType: string, 
-    _details?: string, 
-    _ipAddress?: string
-  ): Promise<any> {
-    // Activity logging not implemented for plugin licenses yet
-    return null;
-  }
-
-  async findByLicenseKey(licenseKey: string): Promise<PluginLicense | null> {
-    try {
-      const data = await this.model.findUnique({
-        where: { licenseKey }
-      });
-      return data ? this.mapToEntity(data) : null;
-    } catch (error) {
-      this.handleError(error as Error);
-      return null;
-    }
-  }
-
-  async findByUser(userId: number): Promise<PluginLicense[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { userId }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findByPlugin(pluginId: number): Promise<PluginLicense[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { pluginId },
-        sort: { field: 'issuedAt', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findByUserAndPlugin(userId: number, pluginId: number): Promise<PluginLicense | null> {
-    try {
-      const data = await this.model.findFirst({
-        where: { userId, pluginId },
-        orderBy: { issuedAt: 'desc' }
-      });
-      return data ? this.mapToEntity(data) : null;
-    } catch (error) {
-      this.handleError(error as Error);
-      return null;
-    }
-  }
-
-  async findActiveByUser(userId: number): Promise<PluginLicense[]> {
-    try {
-      const result = await this.findAll({
-        criteria: {
-          userId,
-          status: 'active',
-          OR: [
-            { expiresAt: null },
-            { expiresAt: { gt: new Date() } }
-          ]
-        },
-        sort: { field: 'issuedAt', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findExpiring(daysBeforeExpiry: number): Promise<PluginLicense[]> {
-    try {
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + daysBeforeExpiry);
-      
-      const result = await this.findAll({
-        criteria: {
-          status: 'active',
-          expiresAt: {
-            not: null,
-            lte: expiryDate,
-            gt: new Date()
-          }
-        }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async updateUsage(licenseId: number, field: string, value: number): Promise<void> {
-    try {
-      const current = await this.model.findUnique({
-        where: { id: licenseId }
-      });
-      
-      if (!current) return;
-      
-      const usageData = current.usageData as Record<string, any> || {};
-      usageData[field] = value;
-      usageData.lastUpdated = new Date();
-      
-      await this.model.update({
-        where: { id: licenseId },
-        data: { usageData }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async incrementInstalls(licenseId: number): Promise<void> {
-    try {
-      await this.model.update({
-        where: { id: licenseId },
-        data: { currentInstalls: { increment: 1 } }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async decrementInstalls(licenseId: number): Promise<void> {
-    try {
-      await this.model.update({
-        where: { id: licenseId },
-        data: { currentInstalls: { decrement: 1 } }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async updateLastVerified(licenseId: number): Promise<void> {
-    try {
-      await this.model.update({
-        where: { id: licenseId },
-        data: { lastVerified: new Date() }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async revoke(licenseId: number, reason?: string): Promise<void> {
-    try {
-      await this.model.update({
-        where: { id: licenseId },
-        data: { 
-          status: 'revoked',
-          usageData: {
-            revokedAt: new Date(),
-            revokedReason: reason
-          }
-        }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async findByPluginAndCustomer(pluginId: number, customerId: number): Promise<PluginLicense[]> {
-    try {
-      const result = await this.findAll({
-        criteria: { pluginId, userId: customerId },
-        sort: { field: 'issuedAt', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findActiveByPlugin(pluginId: number): Promise<PluginLicense[]> {
-    try {
-      const result = await this.findAll({
-        criteria: {
-          pluginId,
-          status: 'active',
-          OR: [
-            { expiresAt: null },
-            { expiresAt: { gt: new Date() } }
-          ]
-        },
-        sort: { field: 'issuedAt', direction: 'desc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async findExpiredLicenses(beforeDate: Date): Promise<PluginLicense[]> {
-    try {
-      const result = await this.findAll({
-        criteria: {
-          expiresAt: {
-            not: null,
-            lt: beforeDate
-          },
-          status: { not: 'revoked' }
-        },
-        sort: { field: 'expiresAt', direction: 'asc' }
-      });
-      return result.data;
-    } catch (error) {
-      this.handleError(error as Error);
-      return [];
-    }
-  }
-
-  async updateUsageData(licenseId: number, usageData: any): Promise<void> {
-    try {
-      const current = await this.model.findUnique({
-        where: { id: licenseId }
-      });
-      
-      if (!current) return;
-      
-      const mergedUsage = {
-        ...(current.usageData as Record<string, any>),
-        ...usageData,
-        lastUpdated: new Date()
-      };
-      
-      await this.model.update({
-        where: { id: licenseId },
-        data: { usageData: mergedUsage }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
-
-  async deactivateLicense(licenseId: number, reason: string): Promise<void> {
-    try {
-      await this.model.update({
-        where: { id: licenseId },
-        data: { 
-          status: 'inactive',
-          usageData: {
-            deactivatedAt: new Date(),
-            deactivatedReason: reason
-          }
-        }
-      });
-    } catch (error) {
-      this.handleError(error as Error);
-    }
+  protected mapToORMEntity(entity: PluginLicense): any {
+    return this.mapFromEntity(entity);
   }
 }

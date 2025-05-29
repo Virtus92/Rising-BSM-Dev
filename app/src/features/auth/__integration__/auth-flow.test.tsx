@@ -1,7 +1,7 @@
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders, setupServer, rest, createMockUser } from '@/test-utils';
+import { renderWithProviders, createMockUser, setupServer, http, HttpResponse } from '@/test-utils';
 import  LoginForm from '../components/LoginForm';
 import { AuthProvider } from '../providers/AuthProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -16,13 +16,12 @@ jest.mock('next/navigation', () => ({
 // Setup MSW server
 const server = setupServer(
   // Login endpoint
-  rest.post('/api/auth/login', async (req, res, ctx) => {
-    const { email, password } = await req.json();
+  http.post('/api/auth/login', async ({ request }) => {
+    const body = await request.json() as { email: string; password: string };
     
-    if (email === 'test@example.com' && password === 'Password123') {
-      return res(
-        ctx.status(200),
-        ctx.json({
+    if (body.email === 'test@example.com' && body.password === 'Password123') {
+      return HttpResponse.json(
+        {
           success: true,
           data: {
             user: createMockUser({
@@ -34,82 +33,85 @@ const server = setupServer(
             accessToken: 'mock-access-token',
             refreshToken: 'mock-refresh-token'
           }
-        }),
-        ctx.cookie('auth_token', 'mock-access-token', {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'strict',
-          maxAge: 900 // 15 minutes
-        }),
-        ctx.cookie('refresh_token', 'mock-refresh-token', {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'strict',
-          maxAge: 604800 // 7 days
-        })
+        },
+        {
+          status: 200,
+          headers: {
+            'Set-Cookie': [
+              'auth_token=mock-access-token; HttpOnly; Secure; SameSite=Strict; Max-Age=900',
+              'refresh_token=mock-refresh-token; HttpOnly; Secure; SameSite=Strict; Max-Age=604800'
+            ].join(', ')
+          }
+        }
       );
     }
     
-    return res(
-      ctx.status(401),
-      ctx.json({
+    return HttpResponse.json(
+      {
         success: false,
         message: 'Invalid credentials'
-      })
+      },
+      { status: 401 }
     );
   }),
   
   // Token validation endpoint
-  rest.get('/api/auth/token', (req, res, ctx) => {
-    const authCookie = req.cookies.auth_token;
+  http.get('/api/auth/token', ({ request }) => {
+    const cookies = request.headers.get('cookie') || '';
+    const authCookie = cookies.split(';').find(c => c.trim().startsWith('auth_token='));
+    const token = authCookie?.split('=')[1];
     
-    if (authCookie === 'mock-access-token') {
-      return res(
-        ctx.status(200),
-        ctx.json({
-          success: true,
-          data: {
-            user: createMockUser({
-              id: 1,
-              email: 'test@example.com',
-              name: 'Test User',
-              role: 'user'
-            })
-          }
-        })
-      );
+    if (token === 'mock-access-token') {
+      return HttpResponse.json({
+        success: true,
+        data: {
+          user: createMockUser({
+            id: 1,
+            email: 'test@example.com',
+            name: 'Test User',
+            role: 'user'
+          })
+        }
+      });
     }
     
-    return res(
-      ctx.status(401),
-      ctx.json({
+    return HttpResponse.json(
+      {
         success: false,
         message: 'Not authenticated'
-      })
+      },
+      { status: 401 }
     );
   }),
   
   // Logout endpoint
-  rest.post('/api/auth/logout', (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({
+  http.post('/api/auth/logout', () => {
+    return HttpResponse.json(
+      {
         success: true,
         message: 'Logged out successfully'
-      }),
-      ctx.cookie('auth_token', '', { maxAge: 0 }),
-      ctx.cookie('refresh_token', '', { maxAge: 0 })
+      },
+      {
+        status: 200,
+        headers: {
+          'Set-Cookie': [
+            'auth_token=; Max-Age=0',
+            'refresh_token=; Max-Age=0'
+          ].join(', ')
+        }
+      }
     );
   }),
   
   // Refresh token endpoint
-  rest.post('/api/auth/refresh', (req, res, ctx) => {
-    const refreshCookie = req.cookies.refresh_token;
+  http.post('/api/auth/refresh', ({ request }) => {
+    const cookies = request.headers.get('cookie') || '';
+    const refreshCookie = cookies.split(';').find(c => c.trim().startsWith('refresh_token='));
+    const token = refreshCookie?.split('=')[1];
     
-    if (refreshCookie === 'mock-refresh-token') {
-      return res(
-        ctx.status(200),
-        ctx.json({
+    if (token === 'mock-refresh-token') {
+      return HttpResponse.json(
+        {
           success: true,
           data: {
             user: createMockUser({
@@ -121,28 +123,25 @@ const server = setupServer(
             accessToken: 'new-mock-access-token',
             refreshToken: 'new-mock-refresh-token'
           }
-        }),
-        ctx.cookie('auth_token', 'new-mock-access-token', {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'strict',
-          maxAge: 900
-        }),
-        ctx.cookie('refresh_token', 'new-mock-refresh-token', {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'strict',
-          maxAge: 604800
-        })
+        },
+        {
+          status: 200,
+          headers: {
+            'Set-Cookie': [
+              'auth_token=new-mock-access-token; HttpOnly; Secure; SameSite=Strict; Max-Age=900',
+              'refresh_token=new-mock-refresh-token; HttpOnly; Secure; SameSite=Strict; Max-Age=604800'
+            ].join(', ')
+          }
+        }
       );
     }
     
-    return res(
-      ctx.status(401),
-      ctx.json({
+    return HttpResponse.json(
+      {
         success: false,
         message: 'Invalid refresh token'
-      })
+      },
+      { status: 401 }
     );
   })
 );
@@ -235,8 +234,8 @@ describe('Authentication Flow Integration', () => {
     it('should handle network errors gracefully', async () => {
       // Override the handler to simulate network error
       server.use(
-        rest.post('/api/auth/login', (req, res) => {
-          return res.networkError('Failed to connect');
+        http.post('/api/auth/login', () => {
+          return HttpResponse.error();
         })
       );
       
@@ -297,13 +296,13 @@ describe('Authentication Flow Integration', () => {
       
       // Override token endpoint to simulate expired token
       server.use(
-        rest.get('/api/auth/token', (req, res, ctx) => {
-          return res(
-            ctx.status(401),
-            ctx.json({
+        http.get('/api/auth/token', () => {
+          return HttpResponse.json(
+            {
               success: false,
               message: 'Token expired'
-            })
+            },
+            { status: 401 }
           );
         })
       );
@@ -419,4 +418,4 @@ describe('Authentication Flow Integration', () => {
 });
 
 // Import useAuth hook
-import { useAuth } from '../hooks/useAuthManagement';
+import { useAuth } from '../providers/AuthProvider';

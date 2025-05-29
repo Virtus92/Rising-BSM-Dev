@@ -1,8 +1,6 @@
-import '../../core/api/api_client.dart';
 import '../../core/api/api_client_interface.dart';
 import '../models/auth_model.dart';
 import '../models/auth_request_models.dart';
-import '../models/auth_response_models.dart';
 
 class AuthApi {
   final ApiClientInterface _apiClient;

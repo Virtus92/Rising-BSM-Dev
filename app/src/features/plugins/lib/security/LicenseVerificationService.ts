@@ -55,7 +55,7 @@ export class LicenseVerificationService {
       await this.licenseRepository.updateLastVerified(license.id!);
 
       // 5. Update cache
-      this.cacheLicense(data.licenseKey, license, data.signature);
+      this.cacheLicense(data.licenseKey, license, data.signature || '');
 
       return {
         valid: true,
@@ -129,7 +129,7 @@ export class LicenseVerificationService {
     try {
       const verify = crypto.createVerify('RSA-SHA256');
       verify.update(message);
-      return verify.verify(this.serverPublicKey, data.signature, 'base64');
+      return verify.verify(this.serverPublicKey, data.signature || '', 'base64');
     } catch {
       return false;
     }

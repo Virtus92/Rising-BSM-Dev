@@ -1,5 +1,4 @@
 import '../../data/models/appointment_model.dart';
-import '../../data/models/request_model.dart';
 import '../entities/api_response.dart';
 
 abstract class AppointmentRepository {

@@ -52,4 +52,10 @@ export function getDatabaseFactory(): DatabaseFactory {
   return DatabaseFactory.getInstance();
 }
 export { getRepositoryFactory, RepositoryFactory } from './repositoryFactory.server';
-export { getServiceFactory, ServiceFactory } from './serviceFactory.server';
+export { 
+  getServiceFactory, 
+  ServiceFactory,
+  getPluginService,
+  getPluginLicenseService,
+  getPluginInstallationService
+} from './serviceFactory.server';

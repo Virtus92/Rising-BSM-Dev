@@ -5,7 +5,7 @@ import { getUserService } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { getLogger } from '@/core/logging';
 import { UserStatus, isUserManageableStatus } from '@/domain/enums/UserEnums';
-import { requirePermission } from '@/features/permissions';
+import { requirePermission } from '@/features/permissions/server';
 
 const logger = getLogger();
 

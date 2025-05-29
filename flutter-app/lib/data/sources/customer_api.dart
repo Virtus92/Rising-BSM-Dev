@@ -1,4 +1,3 @@
-import '../../core/api/api_client.dart';
 import '../../core/api/api_client_interface.dart';
 
 class CustomerApi {

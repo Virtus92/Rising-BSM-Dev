@@ -1,6 +1,6 @@
 import { PluginService } from '../services/PluginService';
 import { IPluginRepository } from '@/domain/repositories/IPluginRepository';
-import { Plugin } from '@/domain/entities/Plugin';
+import { Plugin, PluginPermission, PluginDependency } from '@/domain/entities/Plugin';
 import { CreatePluginDto, UpdatePluginDto, PluginSearchDto } from '@/domain/dtos/PluginDtos';
 import { PluginEncryptionService } from '../security/PluginEncryptionService';
 import { AppError } from '@/core/errors';
@@ -69,7 +69,13 @@ describe('PluginService', () => {
         certificate: '',
         checksum: '',
         downloads: 0,
-        rating: 0
+        rating: 0,
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
       }));
 
       const result = await service.createPlugin(createDto, authorId);
@@ -82,7 +88,29 @@ describe('PluginService', () => {
     });
 
     it('should throw error if plugin name already exists', async () => {
-      mockRepository.findByName.mockResolvedValue(new Plugin({ name: 'test-plugin' }));
+      mockRepository.findByName.mockResolvedValue(new Plugin({ 
+        name: 'test-plugin',
+        uuid: 'existing-uuid',
+        displayName: 'Existing Plugin',
+        version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
+        authorId: 1,
+        author: 'Test Author',
+        status: 'pending',
+        publicKey: 'key',
+        certificate: '',
+        checksum: '',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
+      }));
 
       await expect(service.createPlugin(createDto, 1))
         .rejects.toThrow(new AppError('Plugin with this name already exists', 400));
@@ -99,25 +127,62 @@ describe('PluginService', () => {
     it('should update plugin successfully for author', async () => {
       const plugin = new Plugin({
         id: 1,
+        uuid: 'test-uuid',
+        name: 'test-plugin',
+        displayName: 'Test Plugin',
+        version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
         authorId: 1,
+        author: 'Test Author',
         status: 'pending',
-        name: 'test-plugin'
+        publicKey: 'key',
+        certificate: '',
+        checksum: '',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
       });
 
       mockRepository.findById.mockResolvedValue(plugin);
-      mockRepository.update.mockResolvedValue({ ...plugin, ...updateDto });
+      mockRepository.update.mockResolvedValue(new Plugin({ ...plugin, ...updateDto }));
 
       const result = await service.updatePlugin(1, updateDto, 1);
 
       expect(result.displayName).toBe(updateDto.displayName);
-      expect(mockRepository.update).toHaveBeenCalledWith(1, updateDto);
+      expect(mockRepository.update).toHaveBeenCalledWith(1, expect.objectContaining(updateDto));
     });
 
     it('should throw error for unauthorized update', async () => {
       const plugin = new Plugin({
         id: 1,
+        uuid: 'test-uuid',
+        name: 'test-plugin',
+        displayName: 'Test Plugin',
+        version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
         authorId: 1,
-        status: 'pending'
+        author: 'Test Author',
+        status: 'pending',
+        publicKey: 'key',
+        certificate: '',
+        checksum: '',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
       });
 
       mockRepository.findById.mockResolvedValue(plugin);
@@ -129,9 +194,27 @@ describe('PluginService', () => {
     it('should prevent display name change for approved plugins', async () => {
       const plugin = new Plugin({
         id: 1,
+        uuid: 'test-uuid',
+        name: 'test-plugin',
+        displayName: 'Original Name',
+        version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
         authorId: 1,
+        author: 'Test Author',
         status: 'approved',
-        displayName: 'Original Name'
+        publicKey: 'key',
+        certificate: '',
+        checksum: '',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
       });
 
       mockRepository.findById.mockResolvedValue(plugin);
@@ -139,7 +222,7 @@ describe('PluginService', () => {
 
       await service.updatePlugin(1, updateDto, 1);
 
-      const calledWith = mockRepository.update.mock.calls[0][1] as UpdatePluginDto;
+      const calledWith = mockRepository.update.mock.calls[0][1] as any;
       expect(calledWith.displayName).toBeUndefined();
     });
   });
@@ -148,8 +231,27 @@ describe('PluginService', () => {
     it('should submit plugin for review', async () => {
       const plugin = new Plugin({
         id: 1,
+        uuid: 'test-uuid',
+        name: 'test-plugin',
+        displayName: 'Test Plugin',
+        version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
         authorId: 1,
-        status: 'pending'
+        author: 'Test Author',
+        status: 'pending',
+        publicKey: 'key',
+        certificate: '',
+        checksum: '',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
       });
 
       mockRepository.findById.mockResolvedValue(plugin);
@@ -166,8 +268,27 @@ describe('PluginService', () => {
     it('should throw error if bundle not uploaded', async () => {
       const plugin = new Plugin({
         id: 1,
+        uuid: 'test-uuid',
+        name: 'test-plugin',
+        displayName: 'Test Plugin',
+        version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
         authorId: 1,
-        status: 'pending'
+        author: 'Test Author',
+        status: 'pending',
+        publicKey: 'key',
+        certificate: '',
+        checksum: '',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
       });
 
       mockRepository.findById.mockResolvedValue(plugin);
@@ -192,8 +313,54 @@ describe('PluginService', () => {
       };
 
       const plugins = [
-        new Plugin({ id: 1, name: 'test-1' }),
-        new Plugin({ id: 2, name: 'test-2' })
+        new Plugin({ 
+          id: 1, 
+          name: 'test-1',
+          uuid: 'uuid-1',
+          displayName: 'Test 1',
+          version: '1.0.0',
+          type: 'api',
+          category: 'utilities',
+          authorId: 1,
+          author: 'Author',
+          status: 'approved',
+          publicKey: 'key',
+          certificate: '',
+          checksum: '',
+          downloads: 0,
+          rating: 0,
+          minAppVersion: '1.0.0',
+          permissions: [] as PluginPermission[],
+          dependencies: [] as PluginDependency[],
+          tags: [],
+          screenshots: [],
+          pricing: {},
+          trialDays: 0
+        }),
+        new Plugin({ 
+          id: 2, 
+          name: 'test-2',
+          uuid: 'uuid-2',
+          displayName: 'Test 2',
+          version: '1.0.0',
+          type: 'api',
+          category: 'utilities',
+          authorId: 1,
+          author: 'Author',
+          status: 'approved',
+          publicKey: 'key',
+          certificate: '',
+          checksum: '',
+          downloads: 0,
+          rating: 0,
+          minAppVersion: '1.0.0',
+          permissions: [] as PluginPermission[],
+          dependencies: [] as PluginDependency[],
+          tags: [],
+          screenshots: [],
+          pricing: {},
+          trialDays: 0
+        })
       ];
 
       mockRepository.search.mockResolvedValue({
@@ -211,7 +378,30 @@ describe('PluginService', () => {
 
   describe('plugin operations', () => {
     it('should get plugin by name', async () => {
-      const plugin = new Plugin({ id: 1, name: 'test-plugin' });
+      const plugin = new Plugin({ 
+        id: 1, 
+        name: 'test-plugin',
+        uuid: 'test-uuid',
+        displayName: 'Test Plugin',
+        version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
+        authorId: 1,
+        author: 'Author',
+        status: 'approved',
+        publicKey: 'key',
+        certificate: '',
+        checksum: '',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
+      });
       mockRepository.findByName.mockResolvedValue(plugin);
 
       const result = await service.getPluginByName('test-plugin');
@@ -221,7 +411,30 @@ describe('PluginService', () => {
     });
 
     it('should get plugin by UUID', async () => {
-      const plugin = new Plugin({ id: 1, uuid: 'test-uuid' });
+      const plugin = new Plugin({ 
+        id: 1, 
+        uuid: 'test-uuid',
+        name: 'test-plugin',
+        displayName: 'Test Plugin',
+        version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
+        authorId: 1,
+        author: 'Author',
+        status: 'approved',
+        publicKey: 'key',
+        certificate: '',
+        checksum: '',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
+      });
       mockRepository.findByUuid.mockResolvedValue(plugin);
 
       const result = await service.getPluginByUuid('test-uuid');
@@ -232,8 +445,54 @@ describe('PluginService', () => {
 
     it('should get plugins by author', async () => {
       const plugins = [
-        new Plugin({ id: 1, authorId: 1 }),
-        new Plugin({ id: 2, authorId: 1 })
+        new Plugin({ 
+          id: 1, 
+          authorId: 1,
+          name: 'plugin-1',
+          uuid: 'uuid-1',
+          displayName: 'Plugin 1',
+          version: '1.0.0',
+          type: 'api',
+          category: 'utilities',
+          author: 'Author',
+          status: 'approved',
+          publicKey: 'key',
+          certificate: '',
+          checksum: '',
+          downloads: 0,
+          rating: 0,
+          minAppVersion: '1.0.0',
+          permissions: [] as PluginPermission[],
+          dependencies: [] as PluginDependency[],
+          tags: [],
+          screenshots: [],
+          pricing: {},
+          trialDays: 0
+        }),
+        new Plugin({ 
+          id: 2, 
+          authorId: 1,
+          name: 'plugin-2',
+          uuid: 'uuid-2',
+          displayName: 'Plugin 2',
+          version: '1.0.0',
+          type: 'api',
+          category: 'utilities',
+          author: 'Author',
+          status: 'approved',
+          publicKey: 'key',
+          certificate: '',
+          checksum: '',
+          downloads: 0,
+          rating: 0,
+          minAppVersion: '1.0.0',
+          permissions: [] as PluginPermission[],
+          dependencies: [] as PluginDependency[],
+          tags: [],
+          screenshots: [],
+          pricing: {},
+          trialDays: 0
+        })
       ];
       mockRepository.findByAuthor.mockResolvedValue(plugins);
 
@@ -269,8 +528,27 @@ describe('PluginService', () => {
     it('should upload plugin bundle successfully', async () => {
       const plugin = new Plugin({
         id: 1,
+        uuid: 'test-uuid',
+        name: 'test-plugin',
+        displayName: 'Test Plugin',
+        version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
         authorId: 1,
-        name: 'test-plugin'
+        author: 'Author',
+        status: 'pending',
+        publicKey: 'key',
+        certificate: '',
+        checksum: '',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
       });
 
       mockRepository.findById.mockResolvedValue(plugin);
@@ -291,7 +569,27 @@ describe('PluginService', () => {
     it('should throw error for unauthorized upload', async () => {
       const plugin = new Plugin({
         id: 1,
-        authorId: 1
+        uuid: 'test-uuid',
+        name: 'test-plugin',
+        displayName: 'Test Plugin',
+        version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
+        authorId: 1,
+        author: 'Author',
+        status: 'pending',
+        publicKey: 'key',
+        certificate: '',
+        checksum: '',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
       });
 
       mockRepository.findById.mockResolvedValue(plugin);
@@ -305,9 +603,27 @@ describe('PluginService', () => {
     it('should generate signature', async () => {
       const plugin = new Plugin({
         id: 1,
+        uuid: 'test-uuid',
         name: 'test-plugin',
+        displayName: 'Test Plugin',
         version: '1.0.0',
-        checksum: 'test-checksum'
+        type: 'api',
+        category: 'utilities',
+        authorId: 1,
+        author: 'Author',
+        status: 'pending',
+        publicKey: 'key',
+        certificate: '',
+        checksum: 'test-checksum',
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
       });
 
       mockRepository.findById.mockResolvedValue(plugin);
@@ -321,10 +637,27 @@ describe('PluginService', () => {
     it('should verify signature', async () => {
       const plugin = new Plugin({
         id: 1,
+        uuid: 'test-uuid',
         name: 'test-plugin',
+        displayName: 'Test Plugin',
         version: '1.0.0',
+        type: 'api',
+        category: 'utilities',
+        authorId: 1,
+        author: 'Author',
+        status: 'pending',
+        publicKey: 'public-key',
+        certificate: '',
         checksum: 'test-checksum',
-        publicKey: 'public-key'
+        downloads: 0,
+        rating: 0,
+        minAppVersion: '1.0.0',
+        permissions: [] as PluginPermission[],
+        dependencies: [] as PluginDependency[],
+        tags: [],
+        screenshots: [],
+        pricing: {},
+        trialDays: 0
       });
 
       mockRepository.findById.mockResolvedValue(plugin);

@@ -3,7 +3,6 @@ import 'package:dio/dio.dart';
 import '../../data/models/auth_model.dart';
 import '../config/env_config.dart';
 import '../errors/api_exception.dart';
-import '../errors/network_exception.dart';
 import '../network/connectivity_service.dart';
 import '../network/network_interceptor.dart';
 import '../storage/storage_service.dart';

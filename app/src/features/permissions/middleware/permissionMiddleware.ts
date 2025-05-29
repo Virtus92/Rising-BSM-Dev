@@ -1,5 +1,5 @@
 /**
- * Clean Permission Middleware
+ * Clean Permission Middleware - Server Only
  * 
  * Design principles:
  * 1. Direct permission checks - no cache
@@ -7,12 +7,15 @@
  * 3. Integration with auth middleware
  * 4. Type-safe permission checks
  */
+
+// Mark as server-only to prevent client-side imports
+import 'server-only';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getLogger } from '@/core/logging';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { getUserFromRequest } from '@/features/auth/api/middleware/authMiddleware';
-import AuthService from '@/features/auth/core/AuthService';
-import { getPermissionService } from '@/core/factories/serviceFactory';
+import { getPermissionService } from '@/core/factories/serviceFactory.server';
 
 const logger = getLogger();
 
@@ -33,16 +36,8 @@ export function withPermission(
 ) {
   return async (request: NextRequest, context?: any) => {
     try {
-      // Get authenticated user - try both methods for compatibility
-      let user = await getUserFromRequest(request);
-      
-      // If not found via request, try AuthService
-      if (!user) {
-        const isAuthenticated = await AuthService.isAuthenticated();
-        if (isAuthenticated) {
-          user = AuthService.getUser();
-        }
-      }
+      // Get authenticated user from request
+      const user = await getUserFromRequest(request);
       
       if (!user) {
         return NextResponse.json(

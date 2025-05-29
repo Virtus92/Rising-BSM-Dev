@@ -305,7 +305,7 @@ export class ServiceFactory implements IServiceFactory {
     if (!this.pluginService) {
       // Dynamic import to avoid circular dependencies
       const { PluginRepository } = require('@/features/plugins/lib/repositories/PluginRepository');
-      const { PluginService } = require('@/features/plugins/lib/services/PluginService');
+      const { PluginService } = require('@/features/plugins/lib/services/PluginService.server');
       const { PluginEncryptionService } = require('@/features/plugins/lib/security/PluginEncryptionService');
       const { prisma } = require('@/core/db/prisma/client');
       
@@ -314,8 +314,11 @@ export class ServiceFactory implements IServiceFactory {
       
       this.pluginService = new PluginService(
         repository,
-        encryptionService,
-        '/app/storage/plugins'
+        getLogger(),
+        getValidationService(),
+        this.createActivityLogService(),
+        this.createAutomationService(),
+        encryptionService
       );
     }
     return this.pluginService!;

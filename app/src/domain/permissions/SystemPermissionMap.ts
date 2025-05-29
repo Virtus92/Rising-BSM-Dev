@@ -283,6 +283,71 @@ export const SystemPermissionMap: Record<string, PermissionDefinition> = {
     description: 'Full system administration access',
     category: 'System',
     action: 'admin'
+  },
+  
+  // Plugin permissions
+  [SystemPermission.PLUGIN_VIEW]: {
+    code: SystemPermission.PLUGIN_VIEW,
+    name: 'View Plugins',
+    description: 'Can view plugin marketplace and installed plugins',
+    category: PermissionCategory.PLUGIN,
+    action: PermissionAction.VIEW
+  },
+  [SystemPermission.PLUGIN_CREATE]: {
+    code: SystemPermission.PLUGIN_CREATE,
+    name: 'Create Plugins',
+    description: 'Can create and submit new plugins',
+    category: PermissionCategory.PLUGIN,
+    action: PermissionAction.CREATE
+  },
+  [SystemPermission.PLUGIN_EDIT]: {
+    code: SystemPermission.PLUGIN_EDIT,
+    name: 'Edit Plugins',
+    description: 'Can edit existing plugins',
+    category: PermissionCategory.PLUGIN,
+    action: PermissionAction.EDIT
+  },
+  [SystemPermission.PLUGIN_DELETE]: {
+    code: SystemPermission.PLUGIN_DELETE,
+    name: 'Delete Plugins',
+    description: 'Can delete plugins',
+    category: PermissionCategory.PLUGIN,
+    action: PermissionAction.DELETE
+  },
+  [SystemPermission.PLUGIN_APPROVE]: {
+    code: SystemPermission.PLUGIN_APPROVE,
+    name: 'Approve Plugins',
+    description: 'Can approve plugins for marketplace',
+    category: PermissionCategory.PLUGIN,
+    action: PermissionAction.APPROVE
+  },
+  [SystemPermission.PLUGIN_PUBLISH]: {
+    code: SystemPermission.PLUGIN_PUBLISH,
+    name: 'Publish Plugins',
+    description: 'Can publish plugins to marketplace',
+    category: PermissionCategory.PLUGIN,
+    action: PermissionAction.PUBLISH
+  },
+  [SystemPermission.PLUGIN_DOWNLOAD]: {
+    code: SystemPermission.PLUGIN_DOWNLOAD,
+    name: 'Download Plugins',
+    description: 'Can download plugins from marketplace',
+    category: PermissionCategory.PLUGIN,
+    action: PermissionAction.DOWNLOAD
+  },
+  [SystemPermission.PLUGIN_INSTALL]: {
+    code: SystemPermission.PLUGIN_INSTALL,
+    name: 'Install Plugins',
+    description: 'Can install and uninstall plugins',
+    category: PermissionCategory.PLUGIN,
+    action: PermissionAction.INSTALL
+  },
+  [SystemPermission.PLUGIN_MANAGE]: {
+    code: SystemPermission.PLUGIN_MANAGE,
+    name: 'Manage Plugins',
+    description: 'Can manage all plugin features',
+    category: PermissionCategory.PLUGIN,
+    action: PermissionAction.MANAGE
   }
 };
 
@@ -424,6 +489,20 @@ export function getDefaultPermissionsForRole(role: string): string[] {
         SystemPermission.NOTIFICATIONS_VIEW,
         SystemPermission.SETTINGS_VIEW,
         SystemPermission.SETTINGS_EDIT,
+        SystemPermission.AUTOMATION_VIEW,
+        SystemPermission.AUTOMATION_CREATE,
+        SystemPermission.AUTOMATION_EDIT,
+        SystemPermission.AUTOMATION_DELETE,
+        SystemPermission.AUTOMATION_MANAGE,
+        SystemPermission.PLUGIN_VIEW,
+        SystemPermission.PLUGIN_CREATE,
+        SystemPermission.PLUGIN_EDIT,
+        SystemPermission.PLUGIN_DELETE,
+        SystemPermission.PLUGIN_APPROVE,
+        SystemPermission.PLUGIN_PUBLISH,
+        SystemPermission.PLUGIN_DOWNLOAD,
+        SystemPermission.PLUGIN_INSTALL,
+        SystemPermission.PLUGIN_MANAGE,
         SystemPermission.SYSTEM_ADMIN
       ];
     case 'manager':
@@ -443,7 +522,11 @@ export function getDefaultPermissionsForRole(role: string): string[] {
         SystemPermission.APPOINTMENTS_CREATE,
         SystemPermission.APPOINTMENTS_EDIT,
         SystemPermission.NOTIFICATIONS_VIEW,
-        SystemPermission.SETTINGS_VIEW
+        SystemPermission.SETTINGS_VIEW,
+        SystemPermission.AUTOMATION_VIEW,
+        SystemPermission.PLUGIN_VIEW,
+        SystemPermission.PLUGIN_DOWNLOAD,
+        SystemPermission.PLUGIN_INSTALL
       ];
     case 'employee':
       return [

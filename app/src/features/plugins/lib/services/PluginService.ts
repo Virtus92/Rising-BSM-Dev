@@ -1,6 +1,6 @@
 import { IPluginService } from '@/domain/services/IPluginService';
 import { IPluginRepository } from '@/domain/repositories/IPluginRepository';
-import { Plugin } from '@/domain/entities/Plugin';
+import { Plugin, PluginPermission, PluginDependency } from '@/domain/entities/Plugin';
 import {
   PluginDto,
   CreatePluginDto,
@@ -10,6 +10,10 @@ import {
 } from '@/domain/dtos/PluginDtos';
 import { AppError } from '@/core/errors';
 import { PluginEncryptionService } from '../security/PluginEncryptionService';
+import { ServiceOptions } from '@/domain/services/IBaseService';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
+import { ValidationResultDto, ValidationErrorDto } from '@/domain/dtos/ValidationDto';
+import { ValidationErrorType, ValidationResult } from '@/domain/enums/ValidationResults';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -26,17 +30,59 @@ export class PluginService implements IPluginService {
     return plugin ? pluginToDto(plugin) : null;
   }
 
-  async getAll(): Promise<PluginDto[]> {
-    const result = await this.repository.findAll();
-    return result.data.map(p => pluginToDto(p));
+  async getAll(options?: ServiceOptions): Promise<PaginationResult<PluginDto>> {
+    // Create QueryOptions without criteria property
+    const queryOptions: any = {
+      page: options?.page,
+      limit: options?.limit,
+      sort: options?.sort
+    };
+    
+    // If the repository supports criteria as a separate parameter, pass it
+    // Otherwise, we might need to use a different method
+    if (options?.filters) {
+      // Some repositories might accept criteria in the options object
+      queryOptions.criteria = options.filters;
+    }
+    
+    const result = await this.repository.findAll(queryOptions);
+    return {
+      data: result.data.map(p => pluginToDto(p)),
+      pagination: result.pagination
+    };
   }
 
-  async create(plugin: Plugin): Promise<Plugin> {
-    return this.repository.create(plugin);
+  async create(data: CreatePluginDto, options?: ServiceOptions): Promise<PluginDto> {
+    // Transform DTO to entity format
+    const permissions = this.transformPermissionsToEntity(data.permissions || []);
+    const dependencies = this.transformDependenciesToEntity(data.dependencies || []);
+    
+    // Convert DTO to Plugin entity data
+    const pluginData: Partial<Plugin> = {
+      ...data,
+      permissions,
+      dependencies,
+      // Set default values for entity fields not in DTO
+      uuid: crypto.randomUUID(),
+      author: '',
+      status: 'pending',
+      certificate: '',
+      publicKey: '',
+      checksum: '',
+      downloads: 0,
+      rating: 0,
+      screenshots: data.screenshots || [],
+      tags: data.tags || [],
+      pricing: data.pricing || {}
+    };
+    
+    const plugin = await this.repository.create(pluginData);
+    return pluginToDto(plugin);
   }
 
-  async update(id: number, data: Partial<Plugin>): Promise<Plugin> {
-    return this.repository.update(id, data);
+  async update(id: number, data: Partial<Plugin>, options?: ServiceOptions): Promise<PluginDto> {
+    const plugin = await this.repository.update(id, data);
+    return pluginToDto(plugin);
   }
 
   async delete(id: number): Promise<boolean> {
@@ -54,6 +100,10 @@ export class PluginService implements IPluginService {
     const { publicKey, privateKey } = this.encryptionService.generateKeyPair();
     const uuid = crypto.randomUUID();
 
+    // Transform DTOs to entity format
+    const permissions = this.transformPermissionsToEntity(data.permissions || []);
+    const dependencies = this.transformDependenciesToEntity(data.dependencies || []);
+
     // Create plugin entity
     const plugin = new Plugin({
       ...data,
@@ -69,8 +119,8 @@ export class PluginService implements IPluginService {
       screenshots: [],
       tags: data.tags || [],
       pricing: data.pricing || {},
-      permissions: data.permissions || [],
-      dependencies: data.dependencies || []
+      permissions,
+      dependencies
     });
 
     const created = await this.repository.create(plugin);
@@ -97,7 +147,16 @@ export class PluginService implements IPluginService {
       delete data.displayName; // Can't change name after approval
     }
 
-    const updated = await this.repository.update(id, data);
+    // Transform DTOs to entity format if present
+    const updateData: any = { ...data };
+    if (data.permissions) {
+      updateData.permissions = this.transformPermissionsToEntity(data.permissions);
+    }
+    if (data.dependencies) {
+      updateData.dependencies = this.transformDependenciesToEntity(data.dependencies);
+    }
+
+    const updated = await this.repository.update(id, updateData);
     return pluginToDto(updated);
   }
 
@@ -317,5 +376,114 @@ export class PluginService implements IPluginService {
     // This would check actual user permissions
     // For now, returning false
     return false;
+  }
+
+  /**
+   * Transform flexible permission DTOs to entity format
+   */
+  private transformPermissionsToEntity(permissions: any[]): PluginPermission[] {
+    return permissions.map(p => ({
+      code: p.code,
+      name: p.name || p.code, // Default name to code if not provided
+      description: p.description,
+      required: p.required !== undefined ? p.required : false
+    }));
+  }
+
+  /**
+   * Transform flexible dependency DTOs to entity format
+   */
+  private transformDependenciesToEntity(dependencies: any[]): PluginDependency[] {
+    return dependencies.map(d => ({
+      pluginName: d.pluginName || d.name || '', // Support both formats
+      minVersion: d.minVersion || d.version, // Use version as minVersion if no minVersion
+      maxVersion: d.maxVersion
+    }));
+  }
+
+  // Additional methods required by IBaseService
+  async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
+    return this.repository.count(options?.filters || {});
+  }
+
+  async findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<PluginDto[]> {
+    const plugins = await this.repository.findByCriteria(criteria);
+    return plugins.map(p => pluginToDto(p));
+  }
+
+  async validate(data: Partial<Plugin>, isUpdate?: boolean, entityId?: number): Promise<ValidationResultDto> {
+    const errors: string[] = [];
+    
+    if (!isUpdate) {
+      if (!data.name) errors.push('Plugin name is required');
+      if (!data.displayName) errors.push('Display name is required');
+      if (!data.version) errors.push('Version is required');
+      if (!data.type) errors.push('Plugin type is required');
+    }
+    
+    // Validate version format
+    if (data.version && !/^\d+\.\d+\.\d+$/.test(data.version)) {
+      errors.push('Version must be in semantic versioning format (e.g., 1.0.0)');
+    }
+    
+    // Convert string errors to ValidationErrorDto[]
+    const validationErrors: ValidationErrorDto[] = errors.map(error => ({
+      type: ValidationErrorType.INVALID,
+      field: 'general',
+      message: error
+    }));
+    
+    return {
+      result: errors.length === 0 ? ValidationResult.SUCCESS : ValidationResult.ERROR,
+      isValid: errors.length === 0,
+      errors: validationErrors.length > 0 ? validationErrors : undefined
+    };
+  }
+
+  async transaction<R>(callback: (service: IPluginService) => Promise<R>): Promise<R> {
+    return callback(this);
+  }
+
+  async bulkUpdate(ids: number[], data: Partial<Plugin>, options?: ServiceOptions): Promise<number> {
+    let updated = 0;
+    for (const id of ids) {
+      try {
+        await this.update(id, data, options);
+        updated++;
+      } catch (error) {
+        // Continue with other updates
+      }
+    }
+    return updated;
+  }
+
+  toDTO(entity: Plugin): PluginDto {
+    return pluginToDto(entity);
+  }
+
+  fromDTO(dto: Partial<Plugin>): Partial<Plugin> {
+    return dto;
+  }
+
+  async search(searchText: string, options?: ServiceOptions): Promise<PluginDto[]> {
+    const result = await this.searchPlugins({
+      query: searchText,
+      page: options?.page || 1,
+      limit: options?.limit || 20
+    });
+    return result.data;
+  }
+
+  async exists(id: number, options?: ServiceOptions): Promise<boolean> {
+    const plugin = await this.repository.findById(id);
+    return plugin !== null;
+  }
+
+  getRepository(): IPluginRepository {
+    return this.repository;
+  }
+
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<PluginDto>> {
+    return this.getAll(options);
   }
 }

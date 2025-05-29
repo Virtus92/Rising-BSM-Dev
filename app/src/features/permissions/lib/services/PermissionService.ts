@@ -257,9 +257,6 @@ export class PermissionService implements IPermissionService {
   
   /**
    * Gets all permissions for a user with a structured response
-   */
-  /**
-   * Gets all permissions for a user with a structured response
    * Properly handles database connectivity errors without silently falling back
    */
   async getUserPermissions(userId: number, options?: ServiceOptions): Promise<UserPermissionsResponseDto> {
@@ -478,10 +475,6 @@ export class PermissionService implements IPermissionService {
     }
   }
   
-  /**
-   * Gets default permissions for a role directly from database
-   * No fallbacks to hardcoded defaults
-   */
   /**
    * Gets default permissions for a role directly from database
    * No fallbacks - errors are propagated properly

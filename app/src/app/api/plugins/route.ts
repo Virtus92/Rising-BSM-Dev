@@ -1,132 +1,127 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { formatResponse } from '@/core/errors';
-import { withAuth } from '@/features/auth/middleware';
-import { getPluginService } from '@/core/factories/index.server';
-import { PluginSearchDto, CreatePluginDto } from '@/domain/dtos/PluginDtos';
+import { NextRequest } from 'next/server';
+import { createRouteHandler } from '@/core/api/server/route-handler';
+import { getPluginService } from '@/core/factories/serviceFactory.server';
 import { z } from 'zod';
-import { getLogger } from '@/core/logging';
+import { AppError } from '@/core/errors';
 
-// GET /api/plugins - Search/list plugins
 const searchSchema = z.object({
   query: z.string().optional(),
   type: z.enum(['ui', 'api', 'automation', 'mixed']).optional(),
   category: z.string().optional(),
   status: z.string().optional(),
-  minRating: z.number().min(0).max(5).optional(),
-  sortBy: z.enum(['downloads', 'rating', 'name', 'createdAt']).optional(),
-  sortOrder: z.enum(['asc', 'desc']).optional(),
-  page: z.number().positive().optional(),
-  limit: z.number().positive().max(100).optional()
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(100).default(20),
+  sortBy: z.string().optional(),
+  sortDirection: z.enum(['asc', 'desc']).optional()
 });
 
-export const runtime = 'nodejs';
-
-export async function GET(request: NextRequest) {
-  const logger = getLogger();
-  try {
-    const searchParams = Object.fromEntries(request.nextUrl.searchParams);
+// GET /api/plugins - Get all plugins
+export const GET = createRouteHandler({
+  requiredPermissions: ['plugin.view'],
+  handler: async (req: NextRequest, context: any) => {
+    const service = getPluginService();
+    const searchParams = new URL(req.url).searchParams;
     
-    // Parse and validate search parameters
-    const validatedParams = searchSchema.parse({
-      ...searchParams,
-      minRating: searchParams.minRating ? Number(searchParams.minRating) : undefined,
-      page: searchParams.page ? Number(searchParams.page) : undefined,
-      limit: searchParams.limit ? Number(searchParams.limit) : undefined
-    });
-
-    const searchDto: PluginSearchDto = validatedParams;
+    // Parse query parameters
+    const params = {
+      query: searchParams.get('query') || undefined,
+      type: searchParams.get('type') as any || undefined,
+      category: searchParams.get('category') || undefined,
+      status: searchParams.get('status') || undefined,
+      page: parseInt(searchParams.get('page') || '1'),
+      limit: parseInt(searchParams.get('limit') || '20'),
+      sortBy: searchParams.get('sortBy') || undefined,
+      sortDirection: searchParams.get('sortDirection') as any || undefined
+    };
     
-    const pluginService = getPluginService();
-    const result = await pluginService.searchPlugins(searchDto);
-
-    return NextResponse.json(
-      formatResponse.success({
+    // Validate parameters
+    const validated = searchSchema.parse(params);
+    
+    // If search query is provided, use search
+    if (validated.query) {
+      const result = await service.searchPlugins(validated);
+      return {
+        success: true,
         data: result.data,
-        meta: {
+        pagination: {
+          page: validated.page,
+          limit: validated.limit,
           total: result.total,
-          page: searchDto.page || 1,
-          limit: searchDto.limit || 20,
-          totalPages: Math.ceil(result.total / (searchDto.limit || 20))
+          totalPages: Math.ceil(result.total / validated.limit)
         }
-      }, 'Plugins retrieved successfully'),
-      { status: 200 }
-    );
-  } catch (error) {
-    logger.error('Error retrieving plugins:', error as Error);
-    return NextResponse.json(
-      formatResponse.error(error instanceof Error ? error.message : 'Failed to retrieve plugins', 500),
-      { status: 500 }
-    );
+      };
+    }
+    
+    // Otherwise, get all with filters
+    const result = await service.getAll({
+      page: validated.page,
+      limit: validated.limit,
+      filters: {
+        type: validated.type,
+        category: validated.category,
+        status: validated.status
+      },
+      sort: validated.sortBy ? {
+        field: validated.sortBy,
+        direction: validated.sortDirection || 'desc'
+      } : undefined
+    });
+    
+    return {
+      success: true,
+      data: result.data,
+      pagination: result.pagination
+    };
   }
-}
+});
 
-// POST /api/plugins - Create a new plugin (requires authentication)
 const createPluginSchema = z.object({
   name: z.string().min(3).max(50).regex(/^[a-z0-9-]+$/),
   displayName: z.string().min(3).max(100),
   description: z.string().optional(),
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
   type: z.enum(['ui', 'api', 'automation', 'mixed']),
-  category: z.string().min(3).max(50),
+  category: z.string(),
   tags: z.array(z.string()).optional(),
-  icon: z.string().url().optional(),
-  minAppVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
-  maxAppVersion: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),
-  pricing: z.record(z.any()).optional(),
-  trialDays: z.number().min(0).max(90).optional(),
+  icon: z.string().optional(),
+  screenshots: z.array(z.string()).optional(),
   permissions: z.array(z.object({
     code: z.string(),
-    name: z.string(),
+    name: z.string().optional(),
     description: z.string(),
-    required: z.boolean()
+    required: z.boolean().optional()
   })).optional(),
   dependencies: z.array(z.object({
-    pluginName: z.string(),
-    minVersion: z.string().optional(),
-    maxVersion: z.string().optional()
-  })).optional()
+    name: z.string(),
+    version: z.string()
+  })).optional(),
+  minAppVersion: z.string().min(1), // Required field
+  maxAppVersion: z.string().optional(),
+  pricing: z.object({
+    trial: z.number().optional(),
+    basic: z.number().optional(),
+    premium: z.number().optional(),
+    enterprise: z.number().optional()
+  }).optional(),
+  trialDays: z.number().min(0).max(90).optional()
 });
 
-export const POST = withAuth(
-  async (request: NextRequest) => {
-    const logger = getLogger();
-    try {
-      const body = await request.json();
-      const validatedData = createPluginSchema.parse(body);
-      
-      const createDto: CreatePluginDto = validatedData;
-      
-      // Get user ID from auth context
-      const userId = (request as any).auth?.userId;
-      if (!userId) {
-        return NextResponse.json(
-          formatResponse.error('User ID not found in auth context', 401),
-          { status: 401 }
-        );
-      }
-
-      const pluginService = getPluginService();
-      const plugin = await pluginService.createPlugin(createDto, userId);
-
-      return NextResponse.json(
-        formatResponse.success(plugin, 'Plugin created successfully'),
-        { status: 201 }
-      );
-    } catch (error) {
-      logger.error('Error creating plugin:', error as Error);
-      if (error instanceof z.ZodError) {
-        return NextResponse.json(
-          formatResponse.error('Invalid plugin data', 400),
-          { status: 400 }
-        );
-      }
-      return NextResponse.json(
-        formatResponse.error(error instanceof Error ? error.message : 'Failed to create plugin', 500),
-        { status: 500 }
-      );
-    }
-  },
-  {
-    requiredPermission: ['plugins.create']
+// POST /api/plugins - Create a new plugin
+export const POST = createRouteHandler({
+  requiredPermissions: ['plugin.create'],
+  handler: async (req: NextRequest, context: any) => {
+    const service = getPluginService();
+    const body = await req.json();
+    
+    // Validate request body
+    const validated = createPluginSchema.parse(body);
+    
+    // Create plugin
+    const plugin = await service.createPlugin(validated, context.user.id);
+    
+    return {
+      success: true,
+      data: plugin
+    };
   }
-);
+});

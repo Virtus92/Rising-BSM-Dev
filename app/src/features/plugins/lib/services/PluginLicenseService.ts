@@ -6,6 +6,10 @@ import { PluginLicenseDto, VerifyLicenseDto, pluginLicenseToDto } from '@/domain
 import { AppError } from '@/core/errors';
 import { PluginEncryptionService } from '../security/PluginEncryptionService';
 import { LicenseVerificationService } from '../security/LicenseVerificationService';
+import { ServiceOptions } from '@/domain/services/IBaseService';
+import { PaginationResult } from '@/domain/repositories/IBaseRepository';
+import { ValidationResultDto, ValidationErrorDto } from '@/domain/dtos/ValidationDto';
+import { ValidationResult, ValidationErrorType } from '@/domain/enums/ValidationResults';
 
 export class PluginLicenseService implements IPluginLicenseService {
   private verificationService: LicenseVerificationService;
@@ -24,17 +28,33 @@ export class PluginLicenseService implements IPluginLicenseService {
     return license ? pluginLicenseToDto(license) : null;
   }
 
-  async getAll(): Promise<PluginLicenseDto[]> {
-    const result = await this.repository.findAll();
-    return result.data.map(l => pluginLicenseToDto(l));
+  async getAll(options?: ServiceOptions): Promise<PaginationResult<PluginLicenseDto>> {
+    const queryOptions: any = {
+      page: options?.page,
+      limit: options?.limit,
+      sort: options?.sort
+    };
+    
+    // Handle filters separately for repositories that accept criteria
+    if (options?.filters) {
+      queryOptions.criteria = options.filters;
+    }
+    
+    const result = await this.repository.findAll(queryOptions);
+    return {
+      data: result.data.map(l => pluginLicenseToDto(l)),
+      pagination: result.pagination
+    };
   }
 
-  async create(license: PluginLicense): Promise<PluginLicense> {
-    return this.repository.create(license);
+  async create(data: Partial<PluginLicense>, options?: ServiceOptions): Promise<PluginLicenseDto> {
+    const license = await this.repository.create(data);
+    return pluginLicenseToDto(license);
   }
 
-  async update(id: number, data: Partial<PluginLicense>): Promise<PluginLicense> {
-    return this.repository.update(id, data);
+  async update(id: number, data: Partial<PluginLicense>, options?: ServiceOptions): Promise<PluginLicenseDto> {
+    const license = await this.repository.update(id, data);
+    return pluginLicenseToDto(license);
   }
 
   async delete(id: number): Promise<boolean> {
@@ -114,7 +134,8 @@ export class PluginLicenseService implements IPluginLicenseService {
   }
 
   async getPluginLicenses(pluginId: number): Promise<PluginLicenseDto[]> {
-    const licenses = await this.repository.findByPlugin(pluginId);
+    // Use findByCriteria to filter by pluginId
+    const licenses = await this.repository.findByCriteria({ pluginId });
     return licenses.map(l => pluginLicenseToDto(l));
   }
 
@@ -137,7 +158,7 @@ export class PluginLicenseService implements IPluginLicenseService {
     const currentUsage = license.usageData[metric] || 0;
     const newUsage = { [metric]: currentUsage + value };
     
-    await this.repository.updateUsage(licenseId, newUsage);
+    await this.repository.updateUsageData(licenseId, newUsage);
   }
 
   async resetUsage(licenseId: number): Promise<void> {
@@ -152,7 +173,7 @@ export class PluginLicenseService implements IPluginLicenseService {
       lastReset: new Date()
     };
     
-    await this.repository.updateUsage(licenseId, resetUsage);
+    await this.repository.updateUsageData(licenseId, resetUsage);
   }
 
   async checkUsageLimit(licenseId: number, metric: string): Promise<boolean> {
@@ -311,5 +332,99 @@ export class PluginLicenseService implements IPluginLicenseService {
       return expiry;
     }
     return undefined; // No expiration for paid licenses by default
+  }
+
+  // Additional methods required by IBaseService
+  async count(options?: { context?: any; filters?: Record<string, any> }): Promise<number> {
+    return this.repository.count(options?.filters || {});
+  }
+
+  async findByCriteria(criteria: Record<string, any>, options?: ServiceOptions): Promise<PluginLicenseDto[]> {
+    const licenses = await this.repository.findByCriteria(criteria);
+    return licenses.map(l => pluginLicenseToDto(l));
+  }
+
+  async validate(data: Partial<PluginLicense>, isUpdate?: boolean, entityId?: number): Promise<ValidationResultDto> {
+    // Basic validation logic
+    const errors: ValidationErrorDto[] = [];
+    
+    if (!isUpdate) {
+      if (!data.licenseKey) {
+        errors.push({
+          type: ValidationErrorType.REQUIRED,
+          field: 'licenseKey',
+          message: 'License key is required'
+        });
+      }
+      if (!data.pluginId) {
+        errors.push({
+          type: ValidationErrorType.REQUIRED,
+          field: 'pluginId',
+          message: 'Plugin ID is required'
+        });
+      }
+      if (!data.userId) {
+        errors.push({
+          type: ValidationErrorType.REQUIRED,
+          field: 'userId',
+          message: 'User ID is required'
+        });
+      }
+    }
+    
+    return {
+      result: errors.length === 0 ? ValidationResult.SUCCESS : ValidationResult.ERROR,
+      isValid: errors.length === 0,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  }
+
+  async transaction<R>(callback: (service: IPluginLicenseService) => Promise<R>): Promise<R> {
+    // For now, just execute the callback
+    return callback(this);
+  }
+
+  async bulkUpdate(ids: number[], data: Partial<PluginLicense>, options?: ServiceOptions): Promise<number> {
+    let updated = 0;
+    for (const id of ids) {
+      try {
+        await this.update(id, data, options);
+        updated++;
+      } catch (error) {
+        // Continue with other updates
+      }
+    }
+    return updated;
+  }
+
+  toDTO(entity: PluginLicense): PluginLicenseDto {
+    return pluginLicenseToDto(entity);
+  }
+
+  fromDTO(dto: Partial<PluginLicense>): Partial<PluginLicense> {
+    return dto;
+  }
+
+  async search(searchText: string, options?: ServiceOptions): Promise<PluginLicenseDto[]> {
+    const licenses = await this.repository.findByCriteria({
+      OR: [
+        { licenseKey: { contains: searchText } },
+        { type: { contains: searchText } }
+      ]
+    });
+    return licenses.map(l => pluginLicenseToDto(l));
+  }
+
+  async exists(id: number, options?: ServiceOptions): Promise<boolean> {
+    const license = await this.repository.findById(id);
+    return license !== null;
+  }
+
+  getRepository(): IPluginLicenseRepository {
+    return this.repository;
+  }
+
+  async findAll(options?: ServiceOptions): Promise<PaginationResult<PluginLicenseDto>> {
+    return this.getAll(options);
   }
 }

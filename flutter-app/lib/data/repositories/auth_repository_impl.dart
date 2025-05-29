@@ -192,7 +192,7 @@ class AuthRepositoryImpl implements AuthRepository {
       
       // Validate token with the server
       final response = await _authApi.validateToken();
-      final responseData = response as Map<String, dynamic>;
+      final responseData = response;
       return responseData['success'] == true && responseData['data'] == true;
     } catch (e) {
       return false;

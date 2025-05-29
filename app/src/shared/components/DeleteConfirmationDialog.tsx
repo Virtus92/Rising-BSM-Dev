@@ -18,9 +18,11 @@ export interface DeleteConfirmationDialogProps {
   description: string;
   open: boolean;
   onConfirm: () => Promise<void> | void;
-  onClose: () => void;
+  onClose?: () => void;
+  onCancel?: () => void; // Support both onCancel and onClose for backward compatibility
   confirmLabel?: string;
   cancelLabel?: string;
+  itemName?: string; // Support itemName prop used by components
 }
 
 /**
@@ -32,8 +34,10 @@ export function DeleteConfirmationDialog({
   open,
   onConfirm,
   onClose,
+  onCancel,
   confirmLabel = 'Delete',
-  cancelLabel = 'Cancel'
+  cancelLabel = 'Cancel',
+  itemName
 }: DeleteConfirmationDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   
@@ -47,7 +51,7 @@ export function DeleteConfirmationDialog({
   };
   
   return (
-    <AlertDialog open={open} onOpenChange={(isOpen: boolean) => !isOpen && onClose()}>
+    <AlertDialog open={open} onOpenChange={(isOpen: boolean) => !isOpen && (onClose || onCancel)?.()}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

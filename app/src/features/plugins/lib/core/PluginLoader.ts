@@ -1,4 +1,5 @@
-import { VM } from 'vm2';
+// Import secure sandbox implementation
+import { SecurePluginSandbox, VM } from './SecurePluginSandbox';
 import { Plugin } from '@/domain/entities/Plugin';
 import { PluginInstallation } from '@/domain/entities/PluginInstallation';
 import { PluginEncryptionService } from '../security/PluginEncryptionService';
@@ -29,6 +30,10 @@ export class PluginLoader {
     licenseKey: string
   ): Promise<void> {
     try {
+      // Set current plugin context for sandbox
+      this.currentPlugin = plugin;
+      this.currentInstallation = installation;
+
       // 1. Check if already loaded
       if (this.registry.isRegistered(plugin.name, installation.installationId)) {
         this.logger.warn(`Plugin ${plugin.name} already loaded for installation ${installation.installationId}`);
@@ -88,6 +93,10 @@ export class PluginLoader {
     } catch (error) {
       this.logger.error(`Failed to load plugin ${plugin.name}`, error as Error);
       throw error;
+    } finally {
+      // Clean up context
+      this.currentPlugin = undefined;
+      this.currentInstallation = undefined;
     }
   }
 
@@ -143,30 +152,52 @@ export class PluginLoader {
     code: string,
     context: any
   ): Promise<ILoadedPlugin> {
-    const vm = new VM({
-      timeout: 5000, // 5 seconds to load
-      sandbox: context,
-      fixAsync: true,
-      eval: false,
-      wasm: false
-    });
+    // Use SecurePluginSandbox for better isolation
+    const sandbox = new SecurePluginSandbox(
+      this.currentPlugin!,
+      this.currentInstallation!,
+      this.logger
+    );
 
-    // Wrap code to export the plugin
+    // Wrap code to export the plugin with better error handling
     const wrappedCode = `
       (function() {
-        ${code}
+        // Provide a controlled environment
+        const global = {};
+        const window = {};
+        const document = {};
         
-        // The plugin should define a global 'RisingBSMPlugin'
-        if (typeof RisingBSMPlugin === 'undefined') {
-          throw new Error('Plugin must export RisingBSMPlugin');
+        try {
+          ${code}
+          
+          // The plugin should define a global 'RisingBSMPlugin'
+          if (typeof RisingBSMPlugin === 'undefined') {
+            throw new Error('Plugin must export RisingBSMPlugin');
+          }
+          
+          return RisingBSMPlugin;
+        } catch (error) {
+          throw new Error('Plugin loading failed: ' + error.message);
         }
-        
-        return RisingBSMPlugin;
       })()
     `;
 
-    return vm.run(wrappedCode);
+    try {
+      const result = await sandbox.executePlugin(wrappedCode, context);
+      // Clean up worker
+      await sandbox.terminate();
+      return result;
+    } catch (error) {
+      this.logger.error('Plugin execution failed in sandbox', error as Error);
+      // Ensure cleanup on error
+      await sandbox.terminate();
+      throw error;
+    }
   }
+
+  // Add properties to track current plugin being loaded
+  private currentPlugin?: Plugin;
+  private currentInstallation?: PluginInstallation;
 
   private validatePlugin(plugin: any): void {
     if (!plugin || typeof plugin !== 'object') {
@@ -220,20 +251,28 @@ export class PluginLoader {
 
   private createSecureStorage(plugin: Plugin, installation: PluginInstallation) {
     const storageKey = `plugin:${plugin.name}:${installation.installationId}`;
+    // In-memory storage for plugin data (not persistent across sessions)
+    const pluginStorage = new Map<string, any>();
     
     return {
       get: async (key: string) => {
         const fullKey = `${storageKey}:${key}`;
-        // Implementation would use actual storage service
-        return localStorage.getItem(fullKey);
+        const value = pluginStorage.get(fullKey);
+        return value ? JSON.parse(value) : null;
       },
       set: async (key: string, value: any) => {
         const fullKey = `${storageKey}:${key}`;
-        localStorage.setItem(fullKey, JSON.stringify(value));
+        pluginStorage.set(fullKey, JSON.stringify(value));
       },
       delete: async (key: string) => {
         const fullKey = `${storageKey}:${key}`;
-        localStorage.removeItem(fullKey);
+        pluginStorage.delete(fullKey);
+      },
+      clear: async () => {
+        // Clear all storage for this plugin
+        const keysToDelete = Array.from(pluginStorage.keys())
+          .filter(key => key.startsWith(storageKey));
+        keysToDelete.forEach(key => pluginStorage.delete(key));
       }
     };
   }

@@ -323,7 +323,7 @@ class AppComponents {
               onPressed: () => Navigator.of(context).pop(false),
               child: Text(
                 cancelText,
-                style: TextStyle(
+                style: const TextStyle(
                   color: AppDesignSystem.mediumGray,
                   fontWeight: FontWeight.w500,
                 ),

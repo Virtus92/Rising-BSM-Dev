@@ -93,13 +93,26 @@ export interface PluginSearchDto {
   category?: string;
   status?: string;
   minRating?: number;
-  sortBy?: 'downloads' | 'rating' | 'name' | 'createdAt';
+  sortBy?: 'downloads' | 'rating' | 'name' | 'createdAt' | string; // Allow any string for flexibility
   sortOrder?: 'asc' | 'desc';
+  sortDirection?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+  authorId?: number;
 }
 
 // Create Plugin DTOs
+// Support multiple dependency formats for flexibility
+export interface PluginDependencyFlexible {
+  // Legacy format
+  name?: string;
+  version?: string;
+  // New format
+  pluginName?: string;
+  minVersion?: string;
+  maxVersion?: string;
+}
+
 export interface CreatePluginDto {
   name: string;
   displayName: string;
@@ -113,21 +126,40 @@ export interface CreatePluginDto {
   maxAppVersion?: string;
   pricing?: Record<string, any>;
   trialDays?: number;
+  screenshots?: string[];
+  // Support both permission formats for flexibility
   permissions?: Array<{
     code: string;
-    name: string;
+    name?: string;
     description: string;
-    required: boolean;
+    required?: boolean;
   }>;
-  dependencies?: Array<{
-    pluginName: string;
-    minVersion?: string;
-    maxVersion?: string;
-  }>;
+  // Support both dependency formats
+  dependencies?: PluginDependencyFlexible[];
 }
 
-export interface UpdatePluginDto extends Partial<CreatePluginDto> {
+export interface UpdatePluginDto {
+  displayName?: string;
+  description?: string;
+  version?: string;
+  category?: string;
+  tags?: string[];
+  icon?: string;
+  screenshots?: string[];
+  minAppVersion?: string;
+  maxAppVersion?: string;
+  pricing?: Record<string, any>;
+  trialDays?: number;
   status?: 'pending' | 'approved' | 'rejected' | 'suspended';
+  // Support both permission formats for flexibility
+  permissions?: Array<{
+    code: string;
+    name?: string;
+    description: string;
+    required?: boolean;
+  }>;
+  // Support both dependency formats
+  dependencies?: PluginDependencyFlexible[];
 }
 
 export interface PluginPurchaseDto {
@@ -165,6 +197,34 @@ export interface PluginExecutionResult {
   executionTime: number;
   memoryUsed: number;
   apiCallsUsed: number;
+}
+
+export interface GenerateLicenseDto {
+  pluginId: number;
+  userId: number;
+  type: 'trial' | 'basic' | 'premium' | 'enterprise';
+  maxInstalls?: number;
+  expiresAt?: Date;
+  usageLimits?: Record<string, any>;
+}
+
+export interface PluginExecutionDto extends BaseResponseDto {
+  installationId: number;
+  action: string;
+  status: string;
+  duration?: number;
+  resourceUsage: Record<string, any>;
+  errorMessage?: string;
+  executedAt: Date;
+}
+
+export interface PluginBundleDto {
+  pluginId: number;
+  version: string;
+  encryptedBundle: string;
+  signature: string;
+  checksum: string;
+  algorithm: string;
 }
 
 // Helper functions for entity to DTO conversion

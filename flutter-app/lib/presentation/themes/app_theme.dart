@@ -15,9 +15,7 @@ class AppTheme {
         secondary: AppDesignSystem.secondaryColor,
         error: AppDesignSystem.errorColor,
         surface: AppDesignSystem.background,
-        background: AppDesignSystem.background,
         onSurface: AppDesignSystem.black,
-        onBackground: AppDesignSystem.black,
       ),
       scaffoldBackgroundColor: AppDesignSystem.background,
       appBarTheme: AppBarTheme(
@@ -94,8 +92,8 @@ class AppTheme {
         indicatorColor: AppDesignSystem.primaryLight.withOpacity(0.2),
         backgroundColor: AppDesignSystem.white,
         elevation: 3,
-        labelTextStyle: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return AppDesignSystem.labelMedium.copyWith(
               color: AppDesignSystem.primaryColor,
               fontWeight: FontWeight.w600,
@@ -103,8 +101,8 @@ class AppTheme {
           }
           return AppDesignSystem.labelMedium;
         }),
-        iconTheme: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return const IconThemeData(
               color: AppDesignSystem.primaryColor,
             );
@@ -126,9 +124,7 @@ class AppTheme {
         secondary: AppDesignSystem.secondaryColor,
         error: AppDesignSystem.errorColor,
         surface: AppDesignSystem.darkSurface,
-        background: AppDesignSystem.darkBackground,
         onSurface: AppDesignSystem.white,
-        onBackground: AppDesignSystem.white,
       ),
       scaffoldBackgroundColor: AppDesignSystem.darkBackground,
       appBarTheme: AppBarTheme(
@@ -165,11 +161,11 @@ class AppTheme {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppDesignSystem.radiusMedium),
-          borderSide: BorderSide(color: AppDesignSystem.darkCard),
+          borderSide: const BorderSide(color: AppDesignSystem.darkCard),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppDesignSystem.radiusMedium),
-          borderSide: BorderSide(color: AppDesignSystem.darkCard),
+          borderSide: const BorderSide(color: AppDesignSystem.darkCard),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppDesignSystem.radiusMedium),
@@ -196,7 +192,7 @@ class AppTheme {
         labelMedium: AppDesignSystem.labelMedium.copyWith(color: AppDesignSystem.lightGray),
       ),
       fontFamily: 'Poppins',
-      dividerTheme: DividerThemeData(
+      dividerTheme: const DividerThemeData(
         color: AppDesignSystem.darkCard,
         thickness: 1,
         space: 1,
@@ -205,8 +201,8 @@ class AppTheme {
         indicatorColor: AppDesignSystem.primaryDark.withOpacity(0.3),
         backgroundColor: AppDesignSystem.darkSurface,
         elevation: 3,
-        labelTextStyle: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return AppDesignSystem.labelMedium.copyWith(
               color: AppDesignSystem.primaryLight,
               fontWeight: FontWeight.w600,
@@ -214,8 +210,8 @@ class AppTheme {
           }
           return AppDesignSystem.labelMedium.copyWith(color: AppDesignSystem.lightGray);
         }),
-        iconTheme: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return const IconThemeData(
               color: AppDesignSystem.primaryLight,
             );

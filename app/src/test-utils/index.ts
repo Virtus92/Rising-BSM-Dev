@@ -216,5 +216,21 @@ export function mockAuthContext(user?: any) {
 
 /**
  * Setup MSW for API mocking
+ * MSW v2 requires Node.js globals for fetch
  */
-export { setupServer } from 'msw/node';
+import { setupServer } from 'msw/node';
+
+// Polyfill for Node.js environment
+if (typeof globalThis.fetch === 'undefined') {
+  const { fetch, Request, Response, Headers, FormData } = require('undici');
+  Object.assign(globalThis, {
+    fetch,
+    Request,
+    Response,
+    Headers,
+    FormData
+  });
+}
+
+export { setupServer };
+export { http, HttpResponse } from 'msw';

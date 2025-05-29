@@ -1,8 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 
 import 'user_model.dart';
-import 'auth_request_models.dart';
-import 'auth_response_models.dart';
 
 part 'auth_model.g.dart';
 

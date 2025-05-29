@@ -315,6 +315,66 @@ CREATE TABLE "Notification" (
 );
 
 -- CreateTable
+CREATE TABLE "AutomationWebhook" (
+    "id" SERIAL NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "description" TEXT,
+    "entityType" VARCHAR(50) NOT NULL,
+    "operation" VARCHAR(20) NOT NULL,
+    "webhookUrl" VARCHAR(500) NOT NULL,
+    "headers" JSONB NOT NULL DEFAULT '{}',
+    "payloadTemplate" JSONB NOT NULL DEFAULT '{}',
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "retryCount" INTEGER NOT NULL DEFAULT 3,
+    "retryDelaySeconds" INTEGER NOT NULL DEFAULT 30,
+    "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(6) NOT NULL,
+    "createdBy" INTEGER,
+    "updatedBy" INTEGER,
+
+    CONSTRAINT "AutomationWebhook_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AutomationSchedule" (
+    "id" SERIAL NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "description" TEXT,
+    "cronExpression" VARCHAR(100) NOT NULL,
+    "webhookUrl" VARCHAR(500) NOT NULL,
+    "headers" JSONB NOT NULL DEFAULT '{}',
+    "payload" JSONB NOT NULL DEFAULT '{}',
+    "timezone" VARCHAR(50) NOT NULL DEFAULT 'UTC',
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "lastRunAt" TIMESTAMP(3),
+    "nextRunAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(6) NOT NULL,
+    "createdBy" INTEGER,
+    "updatedBy" INTEGER,
+
+    CONSTRAINT "AutomationSchedule_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AutomationExecution" (
+    "id" SERIAL NOT NULL,
+    "automationType" VARCHAR(20) NOT NULL,
+    "automationId" INTEGER NOT NULL,
+    "entityId" INTEGER,
+    "entityType" VARCHAR(50),
+    "status" VARCHAR(20) NOT NULL,
+    "responseStatus" INTEGER,
+    "responseBody" TEXT,
+    "errorMessage" TEXT,
+    "executionTimeMs" INTEGER,
+    "executedAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "retryAttempt" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "AutomationExecution_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "File" (
     "id" SERIAL NOT NULL,
     "filename" VARCHAR(255) NOT NULL,
@@ -330,6 +390,43 @@ CREATE TABLE "File" (
     "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "File_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "documents" (
+    "id" BIGSERIAL NOT NULL,
+    "content" TEXT,
+    "metadata" JSONB,
+    "embedding" vector,
+
+    CONSTRAINT "documents_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "n8n_api_histories" (
+    "id" SERIAL NOT NULL,
+    "session_id" VARCHAR(255) NOT NULL,
+    "message" JSONB NOT NULL,
+
+    CONSTRAINT "n8n_api_histories_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "n8n_chat_histories" (
+    "id" SERIAL NOT NULL,
+    "session_id" VARCHAR(255) NOT NULL,
+    "message" JSONB NOT NULL,
+
+    CONSTRAINT "n8n_chat_histories_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "n8n_documents_histories" (
+    "id" SERIAL NOT NULL,
+    "session_id" VARCHAR(255) NOT NULL,
+    "message" JSONB NOT NULL,
+
+    CONSTRAINT "n8n_documents_histories_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -432,6 +529,78 @@ CREATE INDEX "N8NWebhook_category_idx" ON "N8NWebhook"("category");
 CREATE INDEX "N8NWebhook_active_idx" ON "N8NWebhook"("active");
 
 -- CreateIndex
+CREATE INDEX "AutomationWebhook_entityType_idx" ON "AutomationWebhook"("entityType");
+
+-- CreateIndex
+CREATE INDEX "AutomationWebhook_operation_idx" ON "AutomationWebhook"("operation");
+
+-- CreateIndex
+CREATE INDEX "AutomationWebhook_active_idx" ON "AutomationWebhook"("active");
+
+-- CreateIndex
+CREATE INDEX "AutomationWebhook_createdBy_idx" ON "AutomationWebhook"("createdBy");
+
+-- CreateIndex
+CREATE INDEX "idx_automation_webhook_active" ON "AutomationWebhook"("active");
+
+-- CreateIndex
+CREATE INDEX "idx_automation_webhook_created_at" ON "AutomationWebhook"("createdAt" DESC);
+
+-- CreateIndex
+CREATE INDEX "idx_automation_webhook_entity_operation" ON "AutomationWebhook"("entityType", "operation", "active");
+
+-- CreateIndex
+CREATE INDEX "idx_automation_webhook_name" ON "AutomationWebhook"("name");
+
+-- CreateIndex
+CREATE INDEX "AutomationSchedule_active_idx" ON "AutomationSchedule"("active");
+
+-- CreateIndex
+CREATE INDEX "AutomationSchedule_nextRunAt_idx" ON "AutomationSchedule"("nextRunAt");
+
+-- CreateIndex
+CREATE INDEX "AutomationSchedule_createdBy_idx" ON "AutomationSchedule"("createdBy");
+
+-- CreateIndex
+CREATE INDEX "idx_automation_schedule_active" ON "AutomationSchedule"("active");
+
+-- CreateIndex
+CREATE INDEX "idx_automation_schedule_created_at" ON "AutomationSchedule"("createdAt" DESC);
+
+-- CreateIndex
+CREATE INDEX "idx_automation_schedule_name" ON "AutomationSchedule"("name");
+
+-- CreateIndex
+CREATE INDEX "idx_automation_schedule_next_run" ON "AutomationSchedule"("nextRunAt", "active");
+
+-- CreateIndex
+CREATE INDEX "AutomationExecution_automationType_automationId_idx" ON "AutomationExecution"("automationType", "automationId");
+
+-- CreateIndex
+CREATE INDEX "AutomationExecution_status_idx" ON "AutomationExecution"("status");
+
+-- CreateIndex
+CREATE INDEX "AutomationExecution_executedAt_idx" ON "AutomationExecution"("executedAt");
+
+-- CreateIndex
+CREATE INDEX "AutomationExecution_entityType_entityId_idx" ON "AutomationExecution"("entityType", "entityId");
+
+-- CreateIndex
+CREATE INDEX "idx_automation_execution_entity" ON "AutomationExecution"("entityType", "entityId");
+
+-- CreateIndex
+CREATE INDEX "idx_automation_execution_executed_at" ON "AutomationExecution"("executedAt" DESC);
+
+-- CreateIndex
+CREATE INDEX "idx_automation_execution_stats" ON "AutomationExecution"("status", "executedAt" DESC);
+
+-- CreateIndex
+CREATE INDEX "idx_automation_execution_status" ON "AutomationExecution"("status");
+
+-- CreateIndex
+CREATE INDEX "idx_automation_execution_type_id" ON "AutomationExecution"("automationType", "automationId");
+
+-- CreateIndex
 CREATE INDEX "File_type_idx" ON "File"("type");
 
 -- CreateIndex
@@ -450,10 +619,10 @@ ALTER TABLE "UserSettings" ADD CONSTRAINT "UserSettings_userId_fkey" FOREIGN KEY
 ALTER TABLE "UserActivity" ADD CONSTRAINT "UserActivity_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "UserPermission" ADD CONSTRAINT "UserPermission_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "UserPermission" ADD CONSTRAINT "UserPermission_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "Permission"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "UserPermission" ADD CONSTRAINT "UserPermission_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "Permission"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "UserPermission" ADD CONSTRAINT "UserPermission_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "RolePermission" ADD CONSTRAINT "RolePermission_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "Permission"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -462,16 +631,16 @@ ALTER TABLE "RolePermission" ADD CONSTRAINT "RolePermission_permissionId_fkey" F
 ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CustomerLog" ADD CONSTRAINT "CustomerLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "CustomerLog" ADD CONSTRAINT "CustomerLog_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "CustomerLog" ADD CONSTRAINT "CustomerLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AppointmentNote" ADD CONSTRAINT "AppointmentNote_appointmentId_fkey" FOREIGN KEY ("appointmentId") REFERENCES "Appointment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -480,16 +649,16 @@ ALTER TABLE "AppointmentNote" ADD CONSTRAINT "AppointmentNote_appointmentId_fkey
 ALTER TABLE "AppointmentNote" ADD CONSTRAINT "AppointmentNote_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AppointmentLog" ADD CONSTRAINT "AppointmentLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "AppointmentLog" ADD CONSTRAINT "AppointmentLog_appointmentId_fkey" FOREIGN KEY ("appointmentId") REFERENCES "Appointment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ContactRequest" ADD CONSTRAINT "ContactRequest_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "AppointmentLog" ADD CONSTRAINT "AppointmentLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ContactRequest" ADD CONSTRAINT "ContactRequest_appointmentId_fkey" FOREIGN KEY ("appointmentId") REFERENCES "Appointment"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ContactRequest" ADD CONSTRAINT "ContactRequest_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ContactRequest" ADD CONSTRAINT "ContactRequest_processorId_fkey" FOREIGN KEY ("processorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -501,19 +670,31 @@ ALTER TABLE "RequestNote" ADD CONSTRAINT "RequestNote_requestId_fkey" FOREIGN KE
 ALTER TABLE "RequestNote" ADD CONSTRAINT "RequestNote_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "RequestLog" ADD CONSTRAINT "RequestLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "RequestLog" ADD CONSTRAINT "RequestLog_requestId_fkey" FOREIGN KEY ("requestId") REFERENCES "ContactRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "RequestData" ADD CONSTRAINT "RequestData_requestId_fkey" FOREIGN KEY ("requestId") REFERENCES "ContactRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "RequestLog" ADD CONSTRAINT "RequestLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "RequestData" ADD CONSTRAINT "RequestData_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RequestData" ADD CONSTRAINT "RequestData_requestId_fkey" FOREIGN KEY ("requestId") REFERENCES "ContactRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "RequestDataHistory" ADD CONSTRAINT "RequestDataHistory_requestDataId_fkey" FOREIGN KEY ("requestDataId") REFERENCES "RequestData"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "RequestDataHistory" ADD CONSTRAINT "RequestDataHistory_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AutomationWebhook" ADD CONSTRAINT "AutomationWebhook_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AutomationWebhook" ADD CONSTRAINT "AutomationWebhook_updatedBy_fkey" FOREIGN KEY ("updatedBy") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AutomationSchedule" ADD CONSTRAINT "AutomationSchedule_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AutomationSchedule" ADD CONSTRAINT "AutomationSchedule_updatedBy_fkey" FOREIGN KEY ("updatedBy") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;

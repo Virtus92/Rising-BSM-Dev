@@ -168,22 +168,24 @@ export class PluginExecutor {
     const results = new Map<string, ExecutionResult>();
     const loadedPlugins = this.pluginLoader.getAllLoadedPlugins();
 
-    for (const plugin of loadedPlugins) {
+    for (const [key, loadedPlugin] of loadedPlugins) {
       const handlerName = `on${eventName.charAt(0).toUpperCase()}${eventName.slice(1)}`;
-      const key = `${plugin.plugin.name}:${plugin.installation.installationId}`;
 
-      if (plugin.instance[handlerName]) {
+      // Check if the handler exists on the loaded plugin
+      const handler = (loadedPlugin as any)[handlerName];
+      if (handler && typeof handler === 'function') {
         try {
+          const [pluginName, installationId] = key.split(':');
           const result = await this.execute(
-            plugin.plugin.name,
-            plugin.installation.installationId,
+            pluginName,
+            installationId,
             handlerName,
             [eventData],
             { timeout: 5000 }
           );
           results.set(key, result);
         } catch (error) {
-          this.logger.error(`Failed to execute event handler ${handlerName} for plugin ${key}`, error);
+          this.logger.error(`Failed to execute event handler ${handlerName} for plugin ${key}`, error as Error);
         }
       }
     }
@@ -217,7 +219,8 @@ export class PluginExecutor {
     args: any[],
     context?: Record<string, any>
   ): Promise<any> {
-    const method = loadedPlugin.instance[methodName];
+    // Use type assertion to access dynamic properties
+    const method = (loadedPlugin as any)[methodName];
     
     if (!method || typeof method !== 'function') {
       throw new AppError(`Method ${methodName} not found in plugin`, 404);
@@ -225,7 +228,6 @@ export class PluginExecutor {
 
     // Create execution context
     const executionContext = {
-      ...loadedPlugin.instance.context,
       ...context,
       execution: {
         methodName,
@@ -235,7 +237,7 @@ export class PluginExecutor {
     };
 
     // Bind context and execute
-    const boundMethod = method.bind(loadedPlugin.instance);
+    const boundMethod = method.bind(loadedPlugin);
     return await boundMethod(...args, executionContext);
   }
 
