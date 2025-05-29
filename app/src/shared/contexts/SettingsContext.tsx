@@ -19,7 +19,7 @@ interface SettingsContextType {
 
 // Default settings for fallbacks and initialization
 const defaultSettings: SystemSettings = {
-  companyName: 'Rising BSM',
+  companyName: 'RISING BSM',
   dateFormat: 'dd.MM.yyyy',
   timeFormat: 'HH:mm',
   currency: 'EUR',

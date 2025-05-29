@@ -33,9 +33,9 @@ export default function DashboardPage() {
   // Format greeting based on time of day
   const getGreeting = () => {
     const hour = currentTime.getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (hour < 12) return 'Guten Morgen';
+    if (hour < 18) return 'Guten Tag';
+    return 'Guten Abend';
   };
 
   return (
@@ -51,7 +51,7 @@ export default function DashboardPage() {
           <div className="sm:flex sm:items-center sm:justify-between">
             <div>
               <h1 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center">
-                {getGreeting()}, {user?.name?.split(' ')[0] || 'User'} 
+                {getGreeting()}, {user?.name?.split(' ')[0] || 'Team'} 
                 <span className="inline-flex ml-2 text-amber-500">
                   <motion.div
                     animate={{ rotate: [0, 15, 0, 15, 0] }}
@@ -62,25 +62,25 @@ export default function DashboardPage() {
                 </span>
               </h1>
               <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-                Here's what's happening with your business today.
+                Hier ist Ihre Übersicht für heute - alle Termine und Anfragen im Blick.
               </p>
             </div>
             
             <div className="mt-4 sm:mt-0 flex flex-wrap items-start gap-2">
               <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-700 px-2.5 py-0.5 text-sm font-medium text-slate-700 dark:text-slate-300">
                 <Clock className="mr-1.5 h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                {currentTime.toLocaleString('en-US', { 
+                {currentTime.toLocaleString('de-DE', { 
                   weekday: 'short',
                   month: 'short', 
                   day: 'numeric',
                   hour: 'numeric',
                   minute: '2-digit',
-                  hour12: true
+                  hour12: false
                 })}
               </span>
               <span className="inline-flex items-center rounded-md bg-green-100 dark:bg-green-900/30 px-2.5 py-0.5 text-sm font-medium text-green-700 dark:text-green-300">
                 <Zap className="mr-1.5 h-3.5 w-3.5 text-green-500 dark:text-green-400" />
-                System Status: Operational
+                System: Betriebsbereit
               </span>
             </div>
           </div>

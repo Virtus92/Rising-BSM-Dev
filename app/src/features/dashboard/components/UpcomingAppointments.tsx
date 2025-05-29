@@ -139,15 +139,15 @@ export const UpcomingAppointments = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case AppointmentStatus.CONFIRMED:
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">Confirmed</Badge>;
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">Bestätigt</Badge>;
       case AppointmentStatus.COMPLETED:
-        return <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">Completed</Badge>;
+        return <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">Erledigt</Badge>;
       case AppointmentStatus.CANCELLED:
-        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Cancelled</Badge>;
+        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Abgesagt</Badge>;
       case AppointmentStatus.RESCHEDULED:
-        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300">Rescheduled</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300">Verschoben</Badge>;
       default:
-        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Planned</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Geplant</Badge>;
     }
   };
 
@@ -181,7 +181,7 @@ export const UpcomingAppointments = () => {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Calendar className="mr-2 h-5 w-5 text-blue-500" />
-            Upcoming Appointments
+            Anstehende Termine
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -322,9 +322,9 @@ export const UpcomingAppointments = () => {
           <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-full mb-3">
             <Calendar className="h-6 w-6 text-blue-500" />
           </div>
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">No upcoming appointments</h3>
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">Keine anstehenden Termine</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-md">
-            You don't have any appointments scheduled in the near future.
+            Sie haben keine Termine in nächster Zeit geplant.
           </p>
           <PermissionGuard 
             permission={API_PERMISSIONS.APPOINTMENTS.CREATE}
@@ -332,7 +332,7 @@ export const UpcomingAppointments = () => {
           >
             <Button onClick={handleAddAppointment} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="mr-2 h-4 w-4" />
-              Schedule Appointment
+              Termin planen
             </Button>
           </PermissionGuard>
         </CardContent>
@@ -539,7 +539,7 @@ export const UpcomingAppointments = () => {
             onClick={handleViewAll}
             className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center mx-auto"
           >
-            View all appointments
+            Alle Termine anzeigen
             <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>

@@ -3,26 +3,49 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Users, Calendar, MessageSquare, Github } from 'lucide-react';
+import { ArrowRight, Snowflake, TreePine, Sparkles, Home, Phone, Mail, Truck, Wrench } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 
 /**
- * Modern Hero component for the Landing page
+ * Hero component for Rising BS e.U.
  * 
- * Features a dynamic animation sequence, modern design elements,
- * and clear call-to-action sections.
+ * Features comprehensive facility management services
+ * with focus on quality, innovation and customer satisfaction.
  */
 const Hero = () => {
   const [isVisible, setIsVisible] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  
+  const slides = [
+    {
+      title: "Ihre Zufriedenheit ist unser Maßstab",
+      subtitle: "Professionelle Gebäudebetreuung in Linz und Umgebung",
+      highlight: "RISING BS e.U. - Ihr Partner für alle Fälle"
+    },
+    {
+      title: "Winterdienst rund um die Uhr",
+      subtitle: "Schneeräumung und Streuung für sichere Wege",
+      highlight: "24/7 Bereitschaft bei Schneefall"
+    },
+    {
+      title: "Rundum-Sorglos-Paket",
+      subtitle: "Von Grünflächenpflege bis Hausbetreuung",
+      highlight: "Alles aus einer Hand"
+    }
+  ];
   
   useEffect(() => {
     setIsVisible(true);
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides.length);
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
     <section className="relative pt-28 pb-20 overflow-hidden">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-indigo-50 to-white dark:from-slate-900 dark:to-slate-800 -z-10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-blue-50 to-white dark:from-slate-900 dark:to-slate-800 -z-10" />
       
       <div className="container px-4 mx-auto">
         <div className="flex flex-col lg:flex-row items-center lg:space-x-12">
@@ -32,23 +55,26 @@ const Hero = () => {
               isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
             }`}
           >
-            <div className="inline-block mb-4 px-4 py-1.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-sm font-medium">
-              Open Source Project
+            <div className="inline-block mb-4 px-4 py-1.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full text-sm font-medium">
+              {slides[currentSlide].highlight}
             </div>
             
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 dark:from-indigo-400 dark:via-blue-400 dark:to-cyan-400">
-              AI-Powered Business Management
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-slate-800 dark:text-slate-100">
+              {slides[currentSlide].title}
             </h1>
             
-            <p className="text-lg md:text-xl text-slate-600 dark:text-slate-300 mb-8 max-w-xl">
-              Rising BSM lays the foundation for efficient development of personal AI assistants that handle requests, customers, and appointment management.
+            <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 mb-8 font-medium">
+              {slides[currentSlide].subtitle}
             </p>
             
             <div className="flex flex-wrap gap-4 mb-10">
               {[
-                { icon: <Users className="w-5 h-5 mr-2" />, text: "Customer Management" },
-                { icon: <Calendar className="w-5 h-5 mr-2" />, text: "Appointment Scheduling" },
-                { icon: <MessageSquare className="w-5 h-5 mr-2" />, text: "AI-Powered Assistants" }
+                { icon: <Snowflake className="w-5 h-5 mr-2" />, text: "Winterdienst" },
+                { icon: <TreePine className="w-5 h-5 mr-2" />, text: "Grünflächenbetreuung" },
+                { icon: <Sparkles className="w-5 h-5 mr-2" />, text: "Reinigung" },
+                { icon: <Home className="w-5 h-5 mr-2" />, text: "Hausbetreuung" },
+                { icon: <Truck className="w-5 h-5 mr-2" />, text: "Umzüge & Transporte" },
+                { icon: <Wrench className="w-5 h-5 mr-2" />, text: "Kranführer" }
               ].map((feature, index) => (
                 <div 
                   key={index} 
@@ -76,21 +102,19 @@ const Hero = () => {
               }}
             >
               <Link 
-                href="#features" 
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg shadow-md transition flex items-center justify-center space-x-2 text-lg"
+                href="#services" 
+                className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg shadow-md transition flex items-center justify-center space-x-2 text-lg"
               >
-                <span>Explore Features</span>
+                <span>Unsere Leistungen</span>
                 <ArrowRight size={20} />
               </Link>
               
               <a 
-                href="https://github.com/Virtus92/Rising-BSM" 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white px-6 py-3 rounded-lg shadow-md transition flex items-center justify-center space-x-2 text-lg"
+                href="tel:+4368184030694" 
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition flex items-center justify-center space-x-2 text-lg"
               >
-                <Github size={20} />
-                <span>View on GitHub</span>
+                <Phone size={20} />
+                <span>+43 681 840 30 694</span>
               </a>
             </div>
           </div>
@@ -114,14 +138,15 @@ const Hero = () => {
                   </div>
                   <div className="h-4"></div>
                 </div>
-                <Image
-                  src="/images/screenshots/dashboard/Mainpage.png"
-                  alt="Rising BSM Dashboard Preview"
-                  width={600}
-                  height={400}
-                  className="w-full h-auto"
-                  priority
-                />
+                <div className="bg-gradient-to-br from-orange-50 to-blue-50 dark:from-orange-900/20 dark:to-blue-900/20 p-8 min-h-[400px] flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-32 h-32 mx-auto mb-6 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
+                      <Home className="w-16 h-16 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold mb-4 text-slate-800 dark:text-slate-200">RISING BS e.U.</h3>
+                    <p className="text-slate-600 dark:text-slate-400">Ihr verlässlicher Partner für alle Fälle</p>
+                  </div>
+                </div>
               </div>
               
               {/* Floating elements */}
@@ -137,11 +162,11 @@ const Hero = () => {
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <Phone className="w-5 h-5 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">AI Assistant</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Processing request...</p>
+                    <p className="text-sm font-medium">24/7 Erreichbar</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Schnelle Hilfe garantiert</p>
                   </div>
                 </div>
               </div>
@@ -151,7 +176,7 @@ const Hero = () => {
         
         {/* Stats section */}
         <div 
-          className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8"
+          className="mt-16 grid grid-cols-1 md:grid-cols-4 gap-8"
           style={{ 
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
@@ -160,12 +185,13 @@ const Hero = () => {
           }}
         >
           {[
-            { label: "Open Source", value: "100%" },
-            { label: "Free Forever", value: "✓" },
-            { label: "Built with Next.js", value: "15.x" }
+            { label: "Zufriedene Kunden", value: "96" },
+            { label: "Abgeschlossene Projekte", value: "156" },
+            { label: "Leistungsversprechen", value: "100%" },
+            { label: "Servicebereiche", value: "6+" }
           ].map((stat, index) => (
             <div key={index} className="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border border-slate-100 dark:border-slate-700 text-center hover:shadow-lg transition-shadow">
-              <div className="text-3xl font-bold mb-2 text-indigo-600 dark:text-indigo-400">{stat.value}</div>
+              <div className="text-3xl font-bold mb-2 text-orange-600 dark:text-orange-400">{stat.value}</div>
               <div className="text-slate-600 dark:text-slate-300">{stat.label}</div>
             </div>
           ))}

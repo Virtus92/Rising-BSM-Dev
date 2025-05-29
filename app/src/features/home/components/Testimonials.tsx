@@ -7,8 +7,8 @@ import { Quote } from 'lucide-react';
 /**
  * Testimonials component for the landing page
  * 
- * Showcases user testimonials about Rising BSM with
- * modern design elements and animations.
+ * Showcases customer testimonials about RISING BS e.U.
+ * with modern design elements and animations.
  */
 const Testimonials = () => {
   const testimonialsRef = useRef<HTMLDivElement>(null);
@@ -52,27 +52,27 @@ const Testimonials = () => {
 
   const testimonials = [
     {
-      quote: "Rising BSM has transformed how we handle customer requests. The AI assistant saves us hours every day by handling routine inquiries automatically.",
-      author: "Sarah Johnson",
-      position: "Operations Manager",
+      quote: "Der Winterdienst von RISING BS ist absolut zuverlässig. Wir müssen uns keine Sorgen mehr um glatte Gehwege machen - das Team ist immer pünktlich vor Ort.",
+      author: "Maria Huber",
+      position: "Hausverwaltung",
       avatar: "/images/testimonial-1.jpg",
-      company: "TechSolutions Inc.",
+      company: "Huber Immobilien GmbH",
       logo: "/images/company-logo-1.svg"
     },
     {
-      quote: "As a freelancer, I needed an affordable system to manage client appointments. Rising BSM is not only free, but it's also more powerful than paid alternatives I've tried.",
-      author: "Miguel Rodriguez",
-      position: "Independent Consultant",
+      quote: "Die Grünflächenbetreuung ist erstklassig. Unser Firmengelände sieht das ganze Jahr über gepflegt aus. Besonders die schnelle Reaktion bei Sturmschäden beeindruckt uns.",
+      author: "Thomas Müller",
+      position: "Facility Manager",
       avatar: "/images/testimonial-2.jpg",
-      company: "Rodriguez Consulting",
+      company: "TechPark Linz",
       logo: "/images/company-logo-2.svg"
     },
     {
-      quote: "The open-source nature of Rising BSM allowed us to customize it to our specific needs. We've integrated it with our existing systems seamlessly.",
-      author: "Alex Chen",
-      position: "CTO",
+      quote: "Das Rundum-Sorglos-Paket hält was es verspricht. Ein Ansprechpartner für alle Belange - von der Reinigung bis zum Winterdienst. Das spart uns viel Zeit und Aufwand.",
+      author: "Sandra Wagner",
+      position: "Geschäftsführerin",
       avatar: "/images/testimonial-3.jpg",
-      company: "Innovate Labs",
+      company: "Wagner & Partner",
       logo: "/images/company-logo-3.svg"
     }
   ];
@@ -87,11 +87,11 @@ const Testimonials = () => {
             }`}
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              What People Are <span className="text-indigo-600 dark:text-indigo-400">Saying</span>
+              Das sagen unsere <span className="text-orange-600 dark:text-orange-400">Kunden</span>
             </h2>
             
             <p className="text-lg text-slate-600 dark:text-slate-300">
-              Hear from others who are already using Rising BSM to transform their business operations.
+              Überzeugen Sie sich selbst von der Qualität unserer Dienstleistungen.
             </p>
           </div>
         </div>
@@ -99,7 +99,7 @@ const Testimonials = () => {
         {/* Testimonial display */}
         <div className="relative">
           <div 
-            className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-300 dark:bg-indigo-900/30 rounded-full blur-3xl opacity-20"
+            className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-orange-300 dark:bg-orange-900/30 rounded-full blur-3xl opacity-20"
             style={{
               opacity: isVisible ? 0.2 : 0,
               transition: 'opacity 1.5s ease-in-out',
@@ -123,7 +123,7 @@ const Testimonials = () => {
                 <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
                   <div className="md:w-1/4 flex-shrink-0">
                     <div className="relative mb-4 group">
-                      <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-blue-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-orange-600 to-blue-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
                       <Image
                         src={testimonial.avatar}
                         alt={testimonial.author}
@@ -149,7 +149,7 @@ const Testimonials = () => {
                   
                   <div className="md:w-3/4">
                     <div className="bg-slate-50 dark:bg-slate-700/30 p-6 rounded-xl relative">
-                      <Quote className="absolute top-4 left-4 w-6 h-6 text-indigo-400 opacity-20" />
+                      <Quote className="absolute top-4 left-4 w-6 h-6 text-orange-400 opacity-20" />
                       <p className="text-lg md:text-xl text-slate-700 dark:text-slate-200 italic pl-6">
                         "{testimonial.quote}"
                       </p>
@@ -163,7 +163,7 @@ const Testimonials = () => {
                             onClick={() => setActiveIndex(idx)}
                             className={`w-2.5 h-2.5 rounded-full transition-all ${
                               idx === activeIndex
-                                ? 'bg-indigo-600 dark:bg-indigo-400 w-8'
+                                ? 'bg-orange-600 dark:bg-orange-400 w-8'
                                 : 'bg-slate-300 dark:bg-slate-600'
                             }`}
                             aria-label={`View testimonial ${idx + 1}`}

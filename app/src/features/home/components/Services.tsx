@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, ArrowRight, X } from 'lucide-react';
+import { Check, ArrowRight, X, Snowflake, TreePine, Sparkles, Wrench, Truck, Home } from 'lucide-react';
 import Image from 'next/image';
 
 /**
@@ -36,55 +36,41 @@ const Services = () => {
    * Service-Modal Daten
    */
   const serviceModals: Record<string, ServiceModalData> = {
-    facility: {
-      title: 'Facility Management',
-      subtitle: 'Professionelle Betreuung für Ihre Immobilien',
-      image: '/images/Cleaning.jpg',
+    winterdienst: {
+      title: 'Winterdienst',
+      subtitle: 'Sicherheit bei Schnee und Eis',
+      image: '/images/winterdienst.jpg',
       content: (
         <div className="space-y-6">
           <p className="text-gray-700 dark:text-gray-300">
-            Unser Facility Management umfasst alle Dienstleistungen rund um Ihre Immobilie. Wir kümmern uns um die Werterhaltung und funktionale Optimierung Ihrer Gebäude.
+            Unser professioneller Winterdienst sorgt für sichere Wege und Flächen. Mit modernster Ausrüstung und erfahrenem Personal sind wir rund um die Uhr für Sie im Einsatz.
           </p>
           
           <div className="grid md:grid-cols-2 gap-4">
             <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              <h4 className="font-semibold text-lg mb-3">Hausbetreuung</h4>
+              <h4 className="font-semibold text-lg mb-3">Leistungen</h4>
               <ul className="space-y-2">
                 <li className="flex items-start">
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Schneeräumung</span>
+                  <span>Schneeräumung von Gehwegen und Parkplätzen</span>
                 </li>
                 <li className="flex items-start">
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Streuservice</span>
+                  <span>Professioneller Streuservice</span>
                 </li>
                 <li className="flex items-start">
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Eisbeseitigung</span>
+                  <span>Eisbeseitigung und Prävention</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Dachlawinen-Sicherung</span>
                 </li>
               </ul>
             </div>
             
             <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              <h4 className="font-semibold text-lg mb-3">Baumpflege</h4>
-              <ul className="space-y-2">
-                <li className="flex items-start">
-                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Baumschnitt</span>
-                </li>
-                <li className="flex items-start">
-                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Baumkontrolle</span>
-                </li>
-                <li className="flex items-start">
-                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Sturmschadenbeseitigung</span>
-                </li>
-              </ul>
-            </div>
-            
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              <h4 className="font-semibold text-lg mb-3">Vertragsdienste</h4>
+              <h4 className="font-semibold text-lg mb-3">Service-Garantie</h4>
               <ul className="space-y-2">
                 <li className="flex items-start">
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
@@ -92,11 +78,74 @@ const Services = () => {
                 </li>
                 <li className="flex items-start">
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Wetterwarnservice</span>
+                  <span>Wetterüberwachung</span>
                 </li>
                 <li className="flex items-start">
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Dokumentation</span>
+                  <span>Dokumentation aller Einsätze</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Umweltfreundliche Streumittel</span>
+                </li>
+              </ul>
+            </div>
+            
+          </div>
+        </div>
+      )
+    },
+    gruenflaechenbetreuung: {
+      title: 'Grünflächenbetreuung',
+      subtitle: 'Professionelle Pflege Ihrer Außenanlagen',
+      image: '/images/gruenflaechen.jpg',
+      content: (
+        <div className="space-y-6">
+          <p className="text-gray-700 dark:text-gray-300">
+            Wir kümmern uns um die fachgerechte Pflege Ihrer Grünflächen und Außenanlagen. Von der Rasenpflege bis zum Baumschnitt - alles aus einer Hand.
+          </p>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <h4 className="font-semibold text-lg mb-3">Rasenpflege</h4>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Regelmäßiges Mähen</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Vertikutieren und Düngen</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Unkrautbekämpfung</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Kantenstechen</span>
+                </li>
+              </ul>
+            </div>
+            
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <h4 className="font-semibold text-lg mb-3">Gehölzpflege</h4>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Hecken- und Strauchschnitt</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Baumschnitt und -pflege</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Sturmschadenbeseitigung</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Neupflanzungen</span>
                 </li>
               </ul>
             </div>
@@ -104,14 +153,188 @@ const Services = () => {
         </div>
       )
     },
-    moving: {
-      title: 'Umzüge & Transporte',
-      subtitle: 'Professionelle Transportlösungen',
-      image: '/images/transport.jpg',
+    dienstleistungen: {
+      title: 'Allgemeine Dienstleistungen',
+      subtitle: 'Vielseitige Lösungen für Ihre Bedürfnisse',
+      image: '/images/dienstleistungen.jpg',
       content: (
         <div className="space-y-6">
           <p className="text-gray-700 dark:text-gray-300">
-            Unsere Transport- und Umzugsdienstleistungen bieten Ihnen zuverlässige und effiziente Lösungen für jede Transportaufgabe.
+            Wir bieten Ihnen ein breites Spektrum an Dienstleistungen für Haus, Garten und Gewerbe. Schnell, zuverlässig und professionell.
+          </p>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <h4 className="font-semibold text-lg mb-3">Hausmeisterservice</h4>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Kleinreparaturen</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Kontroll- und Wartungsarbeiten</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Mülltonnenservice</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Urlaubsbetreuung</span>
+                </li>
+              </ul>
+            </div>
+            
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <h4 className="font-semibold text-lg mb-3">Montage & Handwerk</h4>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Möbelmontage</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Regale und Schränke</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Bildaufhängung</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Kleine Renovierungen</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    kranfuehrer: {
+      title: 'Kranführer',
+      subtitle: 'Professionelle Krandienstleistungen',
+      image: '/images/kranfuehrer.jpg',
+      content: (
+        <div className="space-y-6">
+          <p className="text-gray-700 dark:text-gray-300">
+            Unsere zertifizierten Kranführer und moderne Kranausrüstung stehen für Ihre Bau- und Montageprojekte zur Verfügung.
+          </p>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <h4 className="font-semibold text-lg mb-3">Kranarbeiten</h4>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Baukranarbeiten</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Schwerlastmontage</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Baumfällarbeiten</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Industriemontagen</span>
+                </li>
+              </ul>
+            </div>
+            
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <h4 className="font-semibold text-lg mb-3">Service & Sicherheit</h4>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Zertifizierte Kranführer</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Sicherheitskonzepte</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Projektplanung</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>24/7 Notfalleinsatz</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    reinigung: {
+      title: 'Reinigung',
+      subtitle: 'Sauberkeit mit System',
+      image: '/images/reinigung.jpg',
+      content: (
+        <div className="space-y-6">
+          <p className="text-gray-700 dark:text-gray-300">
+            Professionelle Reinigung mit modernster Dampfreinigungstechnologie. Chemiefrei, gründlich und umweltschonend.
+          </p>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <h4 className="font-semibold text-lg mb-3">Reinigungsservice</h4>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Büroreinigung</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Treppenhausreinigung</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Fensterreinigung</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Grundreinigung</span>
+                </li>
+              </ul>
+            </div>
+            
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <h4 className="font-semibold text-lg mb-3">Dampfreinigung</h4>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>99,9% Bakterienentfernung</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Ohne Chemikalien</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Allergikerfreundlich</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Umweltschonend</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    umzuege: {
+      title: 'Umzüge & Transporte',
+      subtitle: 'Stress-freier Umzug garantiert',
+      image: '/images/umzuege.jpg',
+      content: (
+        <div className="space-y-6">
+          <p className="text-gray-700 dark:text-gray-300">
+            Von der Planung bis zur Ausführung - wir kümmern uns um Ihren kompletten Umzug. Schnell, sicher und zuverlässig.
           </p>
           
           <div className="grid md:grid-cols-2 gap-4">
@@ -130,11 +353,15 @@ const Services = () => {
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
                   <span>Ein- und Auspackservice</span>
                 </li>
+                <li className="flex items-start">
+                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
+                  <span>Möbelmontage</span>
+                </li>
               </ul>
             </div>
             
             <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              <h4 className="font-semibold text-lg mb-3">Spezielle Transporte</h4>
+              <h4 className="font-semibold text-lg mb-3">Transportservice</h4>
               <ul className="space-y-2">
                 <li className="flex items-start">
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
@@ -142,61 +369,15 @@ const Services = () => {
                 </li>
                 <li className="flex items-start">
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Klaviertransporte</span>
+                  <span>Schwertransporte</span>
                 </li>
                 <li className="flex items-start">
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Kunsttransporte</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      )
-    },
-    winter: {
-      title: 'Sommer- & Winterdienst',
-      subtitle: 'Ganzjährige Betreuung Ihrer Außenanlagen',
-      image: '/images/Path.webp',
-      content: (
-        <div className="space-y-6">
-          <p className="text-gray-700 dark:text-gray-300">
-            Unser Sommer- und Winterdienst sorgt für die optimale Pflege und Sicherheit Ihrer Außenanlagen zu jeder Jahreszeit.
-          </p>
-          
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              <h4 className="font-semibold text-lg mb-3">Winterdienst</h4>
-              <ul className="space-y-2">
-                <li className="flex items-start">
-                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Schneeräumung</span>
+                  <span>Expresstransporte</span>
                 </li>
                 <li className="flex items-start">
                   <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Streuservice</span>
-                </li>
-                <li className="flex items-start">
-                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Eisbeseitigung</span>
-                </li>
-              </ul>
-            </div>
-            
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              <h4 className="font-semibold text-lg mb-3">Sommerdienst</h4>
-              <ul className="space-y-2">
-                <li className="flex items-start">
-                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Rasenpflege</span>
-                </li>
-                <li className="flex items-start">
-                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Hecken- und Strauchschnitt</span>
-                </li>
-                <li className="flex items-start">
-                  <Check size={20} className="text-green-600 mr-2 mt-0.5" />
-                  <span>Unkrautbeseitigung</span>
+                  <span>Lagerung</span>
                 </li>
               </ul>
             </div>
@@ -210,66 +391,192 @@ const Services = () => {
     <section id="services" className="bg-gray-50 dark:bg-slate-800 section-padding">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Unsere Leistungen</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Unsere Dienstleistungen</h2>
           <p className="text-gray-600 dark:text-gray-300 text-lg max-w-2xl mx-auto">
-            Ganzheitliche Lösungen – effizient, zuverlässig und individuell
+            Rundum-Sorglos-Paket für Ihre Immobilie - Alles aus einer Hand
           </p>
         </div>
         
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* Service Card 1: Facility Management */}
+          {/* Service Card 1: Winterdienst */}
           <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md overflow-hidden card-hover">
-            <div className="relative h-56">
-              <Image 
-                src="/images/Cleaning.jpg"
-                alt="Facility Management"
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="object-cover"
-              />
+            <div className="relative h-56 bg-gradient-to-br from-blue-100 to-slate-100 dark:from-blue-900/20 dark:to-slate-900/20 flex items-center justify-center">
+              <Snowflake className="w-24 h-24 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="p-6">
-              <h3 className="text-xl font-bold mb-3">Facility Management</h3>
+              <h3 className="text-xl font-bold mb-3 flex items-center">
+                <Snowflake className="w-6 h-6 mr-2 text-blue-600 dark:text-blue-400" />
+                Winterdienst
+              </h3>
               <ul className="space-y-2 mb-6">
                 <li className="flex items-start">
                   <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Komplette Hausbetreuung</span>
+                  <span className="text-gray-700 dark:text-gray-300">24/7 Schneeräumung</span>
                 </li>
                 <li className="flex items-start">
                   <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Pflege von Grünflächen & Außenanlagen</span>
+                  <span className="text-gray-700 dark:text-gray-300">Professioneller Streuservice</span>
                 </li>
                 <li className="flex items-start">
                   <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Reinigungs- und Instandhaltungsservice</span>
+                  <span className="text-gray-700 dark:text-gray-300">Eisbeseitigung & Prävention</span>
                 </li>
               </ul>
               <button 
-                onClick={() => openModal(serviceModals.facility)}
-                className="text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400 font-medium inline-flex items-center"
+                onClick={() => openModal(serviceModals.winterdienst)}
+                className="text-orange-600 hover:text-orange-700 dark:text-orange-500 dark:hover:text-orange-400 font-medium inline-flex items-center"
               >
                 Mehr erfahren <ArrowRight size={16} className="ml-1" />
               </button>
             </div>
           </div>
 
-          {/* Service Card 2: Umzüge & Transporte */}
+          {/* Service Card 2: Grünflächenbetreuung */}
           <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md overflow-hidden card-hover">
-            <div className="relative h-56">
-              <Image 
-                src="/images/transport.jpg"
-                alt="Umzüge & Transporte"
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="object-cover"
-              />
+            <div className="relative h-56 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 flex items-center justify-center">
+              <TreePine className="w-24 h-24 text-green-600 dark:text-green-400" />
             </div>
             <div className="p-6">
-              <h3 className="text-xl font-bold mb-3">Umzüge & Transporte</h3>
+              <h3 className="text-xl font-bold mb-3 flex items-center">
+                <TreePine className="w-6 h-6 mr-2 text-green-600 dark:text-green-400" />
+                Grünflächenbetreuung
+              </h3>
               <ul className="space-y-2 mb-6">
                 <li className="flex items-start">
                   <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Privat- & Firmenumzüge</span>
+                  <span className="text-gray-700 dark:text-gray-300">Rasenpflege & Mähen</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Hecken- & Baumschnitt</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Laubentfernung & Unkrautbekämpfung</span>
+                </li>
+              </ul>
+              <button 
+                onClick={() => openModal(serviceModals.gruenflaechenbetreuung)}
+                className="text-orange-600 hover:text-orange-700 dark:text-orange-500 dark:hover:text-orange-400 font-medium inline-flex items-center"
+              >
+                Mehr erfahren <ArrowRight size={16} className="ml-1" />
+              </button>
+            </div>
+          </div>
+
+          {/* Service Card 3: Allgemeine Dienstleistungen */}
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md overflow-hidden card-hover">
+            <div className="relative h-56 bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 flex items-center justify-center">
+              <Wrench className="w-24 h-24 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="p-6">
+              <h3 className="text-xl font-bold mb-3 flex items-center">
+                <Wrench className="w-6 h-6 mr-2 text-amber-600 dark:text-amber-400" />
+                Dienstleistungen
+              </h3>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Hausmeisterservice</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Montage & Kleinreparaturen</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Entrümpelung & Entsorgung</span>
+                </li>
+              </ul>
+              <button 
+                onClick={() => openModal(serviceModals.dienstleistungen)}
+                className="text-orange-600 hover:text-orange-700 dark:text-orange-500 dark:hover:text-orange-400 font-medium inline-flex items-center"
+              >
+                Mehr erfahren <ArrowRight size={16} className="ml-1" />
+              </button>
+            </div>
+          </div>
+
+          {/* Service Card 4: Kranführer */}
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md overflow-hidden card-hover">
+            <div className="relative h-56 bg-gradient-to-br from-slate-100 to-gray-100 dark:from-slate-900/20 dark:to-gray-900/20 flex items-center justify-center">
+              <div className="text-6xl font-bold text-slate-600 dark:text-slate-400">🎢</div>
+            </div>
+            <div className="p-6">
+              <h3 className="text-xl font-bold mb-3 flex items-center">
+                <span className="text-2xl mr-2">🎢</span>
+                Kranführer
+              </h3>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Zertifizierte Kranführer</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Bau- & Industriemontagen</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Schwerlasttransporte</span>
+                </li>
+              </ul>
+              <button 
+                onClick={() => openModal(serviceModals.kranfuehrer)}
+                className="text-orange-600 hover:text-orange-700 dark:text-orange-500 dark:hover:text-orange-400 font-medium inline-flex items-center"
+              >
+                Mehr erfahren <ArrowRight size={16} className="ml-1" />
+              </button>
+            </div>
+          </div>
+
+          {/* Service Card 5: Reinigung */}
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md overflow-hidden card-hover">
+            <div className="relative h-56 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 flex items-center justify-center">
+              <Sparkles className="w-24 h-24 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div className="p-6">
+              <h3 className="text-xl font-bold mb-3 flex items-center">
+                <Sparkles className="w-6 h-6 mr-2 text-purple-600 dark:text-purple-400" />
+                Reinigung
+              </h3>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Dampfreinigung ohne Chemie</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">99,9% Bakterienentfernung</span>
+                </li>
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Allergikerfreundlich</span>
+                </li>
+              </ul>
+              <button 
+                onClick={() => openModal(serviceModals.reinigung)}
+                className="text-orange-600 hover:text-orange-700 dark:text-orange-500 dark:hover:text-orange-400 font-medium inline-flex items-center"
+              >
+                Mehr erfahren <ArrowRight size={16} className="ml-1" />
+              </button>
+            </div>
+          </div>
+
+          {/* Service Card 6: Umzüge & Transporte */}
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md overflow-hidden card-hover">
+            <div className="relative h-56 bg-gradient-to-br from-indigo-100 to-blue-100 dark:from-indigo-900/20 dark:to-blue-900/20 flex items-center justify-center">
+              <Truck className="w-24 h-24 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div className="p-6">
+              <h3 className="text-xl font-bold mb-3 flex items-center">
+                <Truck className="w-6 h-6 mr-2 text-indigo-600 dark:text-indigo-400" />
+                Umzüge & Transporte
+              </h3>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-start">
+                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Komplett-Umzugsservice</span>
                 </li>
                 <li className="flex items-start">
                   <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
@@ -277,48 +584,12 @@ const Services = () => {
                 </li>
                 <li className="flex items-start">
                   <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Express- & Langstreckenlieferungen</span>
+                  <span className="text-gray-700 dark:text-gray-300">Ein- & Auspackservice</span>
                 </li>
               </ul>
               <button 
-                onClick={() => openModal(serviceModals.moving)}
-                className="text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400 font-medium inline-flex items-center"
-              >
-                Mehr erfahren <ArrowRight size={16} className="ml-1" />
-              </button>
-            </div>
-          </div>
-
-          {/* Service Card 3: Sommer- & Winterdienst */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md overflow-hidden card-hover md:col-span-2 lg:col-span-1">
-            <div className="relative h-56">
-              <Image 
-                src="/images/Path.webp"
-                alt="Sommer- & Winterdienst"
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="object-cover"
-              />
-            </div>
-            <div className="p-6">
-              <h3 className="text-xl font-bold mb-3">Sommer- & Winterdienst</h3>
-              <ul className="space-y-2 mb-6">
-                <li className="flex items-start">
-                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Rasenpflege & Baumschnitt</span>
-                </li>
-                <li className="flex items-start">
-                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Schnee- & Eisräumung</span>
-                </li>
-                <li className="flex items-start">
-                  <Check size={18} className="text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300">Streudienst & Präventivmaßnahmen</span>
-                </li>
-              </ul>
-              <button 
-                onClick={() => openModal(serviceModals.winter)}
-                className="text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400 font-medium inline-flex items-center"
+                onClick={() => openModal(serviceModals.umzuege)}
+                className="text-orange-600 hover:text-orange-700 dark:text-orange-500 dark:hover:text-orange-400 font-medium inline-flex items-center"
               >
                 Mehr erfahren <ArrowRight size={16} className="ml-1" />
               </button>

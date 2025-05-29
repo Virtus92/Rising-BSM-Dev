@@ -3,22 +3,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Moon, Sun, ChevronDown, Star, Sparkles, Code, Shield, Users, Calendar, GitBranch, FileText, HeadphonesIcon, BookOpen, MessageSquare, LayoutDashboard, Bell, BarChart3 } from 'lucide-react';
+import { Menu, X, Moon, Sun, LayoutDashboard } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/features/auth/providers/AuthProvider';
 import { useSettings } from '@/shared/contexts/SettingsContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
- * Modern Header component for the landing page
- * Showcases advanced Tailwind features with animations
+ * Header component for RISING BS e.U.
+ * Professional service company header with orange/blue branding
  */
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [showProducts, setShowProducts] = useState(false);
-  const [showResources, setShowResources] = useState(false);
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
   const { isAuthenticated } = useAuth();
@@ -54,8 +52,6 @@ const Header = () => {
   // Close menu and scroll to a section
   const scrollToSection = (id: string) => {
     setIsMenuOpen(false);
-    setShowProducts(false);
-    setShowResources(false);
     
     const element = document.getElementById(id);
     if (element) {
@@ -70,46 +66,6 @@ const Header = () => {
     }
   };
 
-  // Products megamenu data
-  const products = [
-    {
-      icon: <Users className="h-5 w-5 text-blue-500" />,
-      name: "Customer Management",
-      description: "Complete CRM with profiles & history",
-      path: "/#features"
-    },
-    {
-      icon: <Calendar className="h-5 w-5 text-indigo-500" />,
-      name: "Appointment System",
-      description: "Smart scheduling with reminders",
-      path: "/#features"
-    },
-    {
-      icon: <MessageSquare className="h-5 w-5 text-emerald-500" />,
-      name: "Request Handling",
-      description: "Track & manage service requests",
-      path: "/#features"
-    },
-    {
-      icon: <BarChart3 className="h-5 w-5 text-purple-500" />,
-      name: "Analytics Dashboard",
-      description: "Real-time insights & reports",
-      path: "/#features"
-    },
-    {
-      icon: <Bell className="h-5 w-5 text-amber-500" />,
-      name: "Smart Notifications",
-      description: "Automated alerts & updates",
-      path: "/#features"
-    },
-    {
-      icon: <Shield className="h-5 w-5 text-rose-500" />,
-      name: "Security & Permissions",
-      description: "Role-based access control",
-      path: "/#features"
-    }
-  ];
-
   return (
     <header 
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -123,17 +79,16 @@ const Header = () => {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 shrink-0">
             <div className="relative">
-              <div className="relative overflow-hidden rounded-lg w-10 h-10 flex items-center justify-center bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg shadow-indigo-500/20">
-                <LayoutDashboard className="h-5 w-5 text-white" />
+              <div className="relative overflow-hidden rounded-lg w-10 h-10 flex items-center justify-center bg-gradient-to-br from-orange-500 to-blue-500 shadow-lg shadow-orange-500/20">
+                <span className="font-bold text-white text-lg">R</span>
               </div>
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-slate-900"></div>
             </div>
             <span className={`text-xl font-bold transition-colors duration-300 ${
               isScrolled || isMenuOpen || pathname !== '/' 
                 ? 'text-slate-900 dark:text-white' 
                 : 'text-white'
             }`}>
-              {settings?.companyName || 'Rising BSM'}
+              RISING BS
             </span>
           </Link>
 
@@ -142,14 +97,14 @@ const Header = () => {
             <ul className="flex h-full">
               <li>
                 <button 
-                  onClick={() => scrollToSection('features')}
+                  onClick={() => scrollToSection('services')}
                   className={`h-full flex items-center px-4 font-medium transition-colors duration-300 ${
                     isScrolled || pathname !== '/' 
-                      ? 'text-slate-700 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-400' 
+                      ? 'text-slate-700 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-400' 
                       : 'text-white/90 hover:text-white'
                   }`}
                 >
-                  Features
+                  Dienstleistungen
                 </button>
               </li>
               
@@ -158,102 +113,37 @@ const Header = () => {
                   onClick={() => scrollToSection('about')}
                   className={`h-full flex items-center px-4 font-medium transition-colors duration-300 ${
                     isScrolled || pathname !== '/' 
-                      ? 'text-slate-700 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-400' 
+                      ? 'text-slate-700 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-400' 
                       : 'text-white/90 hover:text-white'
                   }`}
                 >
-                  About
+                  Über uns
                 </button>
-              </li>
-              
-              <li className="relative h-full">
-                <button 
-                  onMouseEnter={() => setShowResources(true)}
-                  onMouseLeave={() => setShowResources(false)}
-                  onClick={() => setShowResources(!showResources)}
-                  className={`h-full flex items-center px-4 font-medium transition-colors duration-300 ${
-                    isScrolled || pathname !== '/' 
-                      ? 'text-slate-700 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-400' 
-                      : 'text-white/90 hover:text-white'
-                  }`}
-                >
-                  Resources
-                  <ChevronDown className={`ml-1 h-4 w-4 transition-transform duration-300 ${showResources ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {/* Resources Dropdown */}
-                <AnimatePresence>
-                  {showResources && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      transition={{ duration: 0.2 }}
-                      onMouseEnter={() => setShowResources(true)}
-                      onMouseLeave={() => setShowResources(false)}
-                      className="absolute top-full left-0 w-64 pt-2"
-                    >
-                      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-3">
-                        <div className="space-y-1">
-                          <Link
-                            href="/#faq"
-                            className="flex items-center px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
-                            onClick={() => setShowResources(false)}
-                          >
-                            <BookOpen className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
-                            FAQ
-                          </Link>
-                          <Link
-                            href="/#screenshots"
-                            className="flex items-center px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
-                            onClick={() => setShowResources(false)}
-                          >
-                            <Star className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
-                            Screenshots
-                          </Link>
-                          <Link
-                            href="/#request"
-                            className="flex items-center px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
-                            onClick={() => setShowResources(false)}
-                          >
-                            <FileText className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
-                            Request Demo
-                          </Link>
-                          <Link
-                            href="https://github.com/your-username/Rising-BSM"
-                            target="_blank"
-                            className="flex items-center px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
-                            onClick={() => setShowResources(false)}
-                          >
-                            <GitBranch className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
-                            GitHub Repository
-                          </Link>
-                          <hr className="my-1 border-slate-200 dark:border-slate-700" />
-                          <Link
-                            href="/contact"
-                            className="flex items-center px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg transition-colors duration-300"
-                            onClick={() => setShowResources(false)}
-                          >
-                            <HeadphonesIcon className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
-                            Contact Support
-                          </Link>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </li>
               
               <li>
                 <button 
-                  onClick={() => scrollToSection('request')}
+                  onClick={() => scrollToSection('features')}
                   className={`h-full flex items-center px-4 font-medium transition-colors duration-300 ${
                     isScrolled || pathname !== '/' 
-                      ? 'text-slate-700 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-400' 
+                      ? 'text-slate-700 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-400' 
                       : 'text-white/90 hover:text-white'
                   }`}
                 >
-                  Contact
+                  Unser Konzept
+                </button>
+              </li>
+              
+              <li>
+                <button 
+                  onClick={() => scrollToSection('contact')}
+                  className={`h-full flex items-center px-4 font-medium transition-colors duration-300 ${
+                    isScrolled || pathname !== '/' 
+                      ? 'text-slate-700 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-400' 
+                      : 'text-white/90 hover:text-white'
+                  }`}
+                >
+                  Kontakt
                 </button>
               </li>
             </ul>
@@ -267,7 +157,7 @@ const Header = () => {
                 onClick={toggleTheme}
                 className={`p-2 rounded-full transition-colors duration-300 ${
                   isScrolled || pathname !== '/' 
-                    ? 'text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800' 
+                    ? 'text-slate-600 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 hover:bg-slate-100 dark:hover:bg-slate-800' 
                     : 'text-white/80 hover:text-white hover:bg-white/10'
                 }`}
                 aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
@@ -285,11 +175,11 @@ const Header = () => {
               href={isAuthenticated ? "/dashboard" : "/auth/login"}
               className={`hidden md:flex items-center px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${
                 isScrolled || pathname !== '/' 
-                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg hover:shadow-indigo-500/20' 
+                  ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-md hover:shadow-lg hover:shadow-orange-500/20' 
                   : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 text-white border border-white/25'
               }`}
             >
-              {isAuthenticated ? 'Dashboard' : 'Sign In'}
+              {isAuthenticated ? 'Dashboard' : 'Anmelden'}
             </Link>
             
             {/* Mobile Menu Button */}
@@ -297,7 +187,7 @@ const Header = () => {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className={`lg:hidden p-2 rounded-full transition-colors duration-300 ${
                 isScrolled || pathname !== '/' 
-                  ? 'text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800' 
+                  ? 'text-slate-600 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 hover:bg-slate-100 dark:hover:bg-slate-800' 
                   : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
               aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
@@ -323,155 +213,55 @@ const Header = () => {
             className="lg:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 overflow-hidden"
           >
             <div className="container mx-auto px-4 py-6">
-              <nav className="space-y-6">
-                {/* Mobile Products Section */}
-                <div>
-                  <div 
-                    className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-800 cursor-pointer"
-                    onClick={() => setShowProducts(!showProducts)}
-                  >
-                    <h3 className="text-lg font-medium text-slate-900 dark:text-white">Products</h3>
-                    <ChevronDown className={`h-5 w-5 text-slate-500 dark:text-slate-400 transition-transform duration-300 ${showProducts ? 'rotate-180' : ''}`} />
-                  </div>
-                  
-                  <AnimatePresence>
-                    {showProducts && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="pt-3 pb-2 overflow-hidden"
-                      >
-                        <div className="grid grid-cols-1 gap-2">
-                          {products.map((product, idx) => (
-                            <Link 
-                              key={idx}
-                              href={product.path}
-                              className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200"
-                              onClick={() => setIsMenuOpen(false)}
-                            >
-                              <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3 flex-shrink-0">
-                                {product.icon}
-                              </div>
-                              <div className="min-w-0">
-                                <h4 className="font-medium text-sm text-slate-900 dark:text-white">{product.name}</h4>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{product.description}</p>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+              <nav className="space-y-1">
+                <button 
+                  onClick={() => {
+                    scrollToSection('services');
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium"
+                >
+                  Dienstleistungen
+                </button>
                 
-                {/* Mobile Navigation Links */}
-                <div className="space-y-1">
-                  <button 
-                    onClick={() => {
-                      scrollToSection('features');
-                      setIsMenuOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium"
-                  >
-                    Features
-                  </button>
-                  
-                  <button 
-                    onClick={() => {
-                      scrollToSection('about');
-                      setIsMenuOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium"
-                  >
-                    About
-                  </button>
-                  
-                  {/* Mobile Resources Dropdown */}
-                  <div>
-                    <div 
-                      className="flex items-center justify-between px-4 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium cursor-pointer"
-                      onClick={() => setShowResources(!showResources)}
-                    >
-                      <span>Resources</span>
-                      <ChevronDown className={`h-5 w-5 text-slate-500 transition-transform duration-300 ${showResources ? 'rotate-180' : ''}`} />
-                    </div>
-                    
-                    <AnimatePresence>
-                      {showResources && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="ml-4 pl-4 border-l border-slate-200 dark:border-slate-700 space-y-1 py-2"
-                        >
-                          <Link
-                            href="/#faq"
-                            className="flex items-center px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                            onClick={() => setIsMenuOpen(false)}
-                          >
-                            <BookOpen className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
-                            FAQ
-                          </Link>
-                          <Link
-                            href="/#screenshots"
-                            className="flex items-center px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                            onClick={() => setIsMenuOpen(false)}
-                          >
-                            <Star className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
-                            Screenshots
-                          </Link>
-                          <Link
-                            href="/#request"
-                            className="flex items-center px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                            onClick={() => setIsMenuOpen(false)}
-                          >
-                            <FileText className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
-                            Request Demo
-                          </Link>
-                          <Link
-                            href="https://github.com/your-username/Rising-BSM"
-                            target="_blank"
-                            className="flex items-center px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                            onClick={() => setIsMenuOpen(false)}
-                          >
-                            <GitBranch className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
-                            GitHub Repository
-                          </Link>
-                          <Link
-                            href="/contact"
-                            className="flex items-center px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                            onClick={() => setIsMenuOpen(false)}
-                          >
-                            <HeadphonesIcon className="h-4 w-4 mr-3 text-slate-500 dark:text-slate-400" />
-                            Contact Support
-                          </Link>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                  
-                  <button 
-                    onClick={() => {
-                      scrollToSection('request');
-                      setIsMenuOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium"
-                  >
-                    Contact
-                  </button>
-                </div>
+                <button 
+                  onClick={() => {
+                    scrollToSection('about');
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium"
+                >
+                  Über uns
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    scrollToSection('features');
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium"
+                >
+                  Unser Konzept
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    scrollToSection('contact');
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium"
+                >
+                  Kontakt
+                </button>
                 
                 {/* Mobile Sign In / Dashboard Button */}
-                <div className="pt-2">
+                <div className="pt-4">
                   <Link 
                     href={isAuthenticated ? "/dashboard" : "/auth/login"}
-                    className="block w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-center shadow-md transition-colors duration-300"
+                    className="block w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg text-center shadow-md transition-colors duration-300"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    {isAuthenticated ? 'Dashboard' : 'Sign In'}
+                    {isAuthenticated ? 'Dashboard' : 'Anmelden'}
                   </Link>
                 </div>
               </nav>

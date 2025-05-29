@@ -792,7 +792,7 @@ export const NewRequests = () => {
         <CardHeader>
           <CardTitle className="flex items-center">
             <FileText className="mr-2 h-5 w-5 text-purple-500" />
-            New Requests
+            Neue Anfragen
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -884,16 +884,16 @@ export const NewRequests = () => {
           <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-full mb-3">
             <FileText className="h-6 w-6 text-purple-500" />
           </div>
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">No new requests</h3>
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">Keine neuen Anfragen</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-md">
-            All requests have been processed. When new requests arrive, they will appear here.
+            Alle Anfragen wurden bearbeitet. Neue Anfragen werden hier angezeigt.
           </p>
           <Button 
             variant="outline" 
             onClick={() => router.push('/dashboard/requests')}
             className="flex items-center"
           >
-            View All Requests
+            Alle Anfragen anzeigen
           </Button>
         </CardContent>
       </Card>
@@ -1014,7 +1014,7 @@ export const NewRequests = () => {
               onClick={() => router.push('/dashboard/requests')}
               className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 flex items-center mx-auto"
             >
-              View all requests
+              Alle Anfragen anzeigen
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </div>

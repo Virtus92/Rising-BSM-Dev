@@ -82,14 +82,14 @@ export const ContactForm: React.FC = () => {
       form.reset();
       
       toast({
-        title: 'Success',
-        description: 'Thank you for your inquiry! We will get back to you shortly.',
+        title: 'Erfolgreich gesendet',
+        description: 'Vielen Dank für Ihre Anfrage! Wir melden uns in Kürze bei Ihnen.',
         variant: 'success'
       });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'An error occurred while sending your request. Please try again later.',
+        title: 'Fehler',
+        description: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.',
         variant: 'error'
       });
       console.error('Error submitting contact form:', error);
@@ -104,15 +104,15 @@ export const ContactForm: React.FC = () => {
       <div className="bg-card rounded-lg p-6 shadow-md">
         <div className="text-center space-y-4">
           <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
-          <h3 className="text-xl font-bold">Request sent!</h3>
+          <h3 className="text-xl font-bold">Anfrage gesendet!</h3>
           <p className="text-muted-foreground">
-            Thank you for your inquiry. We have received your message and will get back to you shortly.
+            Vielen Dank für Ihre Anfrage. Wir haben Ihre Nachricht erhalten und melden uns in Kürze bei Ihnen.
           </p>
           <Button 
             onClick={() => setIsSuccess(false)}
             className="mt-4"
           >
-            New Form
+            Neue Anfrage
           </Button>
         </div>
       </div>
@@ -123,7 +123,7 @@ export const ContactForm: React.FC = () => {
 
   return (
     <div className="bg-card rounded-lg p-6 shadow-md">
-      <h2 className="text-2xl font-bold mb-6">Contact Us</h2>
+      <h2 className="text-2xl font-bold mb-6">Kontakt aufnehmen</h2>
       
       <Form {...form as unknown as UseFormReturn<FieldValues>}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -134,7 +134,7 @@ export const ContactForm: React.FC = () => {
               <FormItem>
                 <FormLabel>Name *</FormLabel>
                 <FormControl>
-                  <Input placeholder="Your Name" {...field} />
+                  <Input placeholder="Ihr Name" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -147,9 +147,9 @@ export const ContactForm: React.FC = () => {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email *</FormLabel>
+                  <FormLabel>E-Mail *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Your Email Address" type="email" {...field} />
+                    <Input placeholder="Ihre E-Mail Adresse" type="email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -161,9 +161,9 @@ export const ContactForm: React.FC = () => {
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Phone</FormLabel>
+                  <FormLabel>Telefon</FormLabel>
                   <FormControl>
-                    <Input placeholder="Your Phone Number (optional)" {...field} />
+                    <Input placeholder="Ihre Telefonnummer (optional)" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -176,22 +176,24 @@ export const ContactForm: React.FC = () => {
             name="service"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Desired Service *</FormLabel>
+                <FormLabel>Gewünschte Dienstleistung *</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select Service" />
+                      <SelectValue placeholder="Service auswählen" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="Website Development">Website Development</SelectItem>
-                    <SelectItem value="SEO Optimization">SEO Optimization</SelectItem>
-                    <SelectItem value="Online Marketing">Online Marketing</SelectItem>
-                    <SelectItem value="App Development">App Development</SelectItem>
-                    <SelectItem value="IT Consulting">IT Consulting</SelectItem>
+                    <SelectItem value="Winterdienst">Winterdienst & Streudienst</SelectItem>
+                    <SelectItem value="Gruenflaechen">Grünflächenpflege</SelectItem>
+                    <SelectItem value="Reinigung">Reinigungsservice</SelectItem>
+                    <SelectItem value="Hausbetreuung">Hausbetreuung</SelectItem>
+                    <SelectItem value="Umzug">Umzugsservice</SelectItem>
+                    <SelectItem value="Montage">Montage & Zusammenbau</SelectItem>
+                    <SelectItem value="Entruempelung">Entrümpelung</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -204,16 +206,16 @@ export const ContactForm: React.FC = () => {
             name="message"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Message *</FormLabel>
+                <FormLabel>Nachricht *</FormLabel>
                 <FormControl>
                   <Textarea 
-                    placeholder="Your Message"
+                    placeholder="Ihre Nachricht"
                     rows={5}
                     {...field} 
                   />
                 </FormControl>
                 <FormDescription>
-                  Please describe your request as precisely as possible
+                  Bitte beschreiben Sie Ihre Anfrage so genau wie möglich
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -228,10 +230,10 @@ export const ContactForm: React.FC = () => {
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Sending...
+                Wird gesendet...
               </>
             ) : (
-              'Send Request'
+              'Anfrage senden'
             )}  
           </Button>
         </form>

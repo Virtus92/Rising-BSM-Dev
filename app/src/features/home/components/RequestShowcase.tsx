@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, ArrowRight, CheckCircle, ShieldCheck, Check } from 'lucide-react';
-import { ApiClient } from '@/core/api/ApiClient';
+import { Loader2, ArrowRight, CheckCircle, ShieldCheck, Check, Phone } from 'lucide-react';
 
 /**
- * RequestShowcase Component
+ * RequestShowcase Component für RISING BS e.U.
  * 
- * A clean, functional component that allows users to submit real service requests
- * with proper form validation and API integration.
+ * Kontaktformular für Serviceanfragen mit mehreren Schritten
  */
 const RequestShowcase = () => {
   // Form steps
@@ -32,24 +30,34 @@ const RequestShowcase = () => {
   // Available services
   const services = [
     {
-      id: 'consultation',
-      name: 'Consultation',
-      description: 'Expert advice on your business needs'
+      id: 'winterdienst',
+      name: 'Winterdienst',
+      description: 'Schneeräumung und Streuservice für sichere Wege'
     },
     {
-      id: 'implementation',
-      name: 'Implementation',
-      description: 'Professional setup and configuration'
+      id: 'gruenflaeche',
+      name: 'Grünflächenpflege',
+      description: 'Rasenpflege, Baum- und Heckenschnitt'
     },
     {
-      id: 'development',
-      name: 'Custom Development',
-      description: 'Tailored solutions for specific requirements'
+      id: 'reinigung',
+      name: 'Reinigung',
+      description: 'Dampfreinigung ohne Chemikalien'
     },
     {
-      id: 'support',
-      name: 'Technical Support',
-      description: 'Ongoing assistance and troubleshooting'
+      id: 'umzuege',
+      name: 'Umzüge & Transporte',
+      description: 'Komplettservice für Privat- und Firmenumzüge'
+    },
+    {
+      id: 'kranfuehrer',
+      name: 'Kranführer',
+      description: 'Zertifizierte Kranführer für Bauprojekte'
+    },
+    {
+      id: 'hausbetreuung',
+      name: 'Hausbetreuung',
+      description: 'Umfassende Betreuung und Wartung'
     }
   ];
 
@@ -79,27 +87,27 @@ const RequestShowcase = () => {
     
     if (currentStep === 1) {
       if (!service) {
-        newErrors.service = 'Please select a service';
+        newErrors.service = 'Bitte wählen Sie eine Dienstleistung aus';
       }
     }
     
     if (currentStep === 2) {
       if (!name.trim()) {
-        newErrors.name = 'Name is required';
+        newErrors.name = 'Name ist erforderlich';
       } else if (name.length < 2) {
-        newErrors.name = 'Name must be at least 2 characters';
+        newErrors.name = 'Name muss mindestens 2 Zeichen lang sein';
       }
       
       if (!email.trim()) {
-        newErrors.email = 'Email is required';
+        newErrors.email = 'E-Mail ist erforderlich';
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        newErrors.email = 'Please enter a valid email address';
+        newErrors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
       }
       
       if (!message.trim()) {
-        newErrors.message = 'Please provide details about your request';
+        newErrors.message = 'Bitte beschreiben Sie Ihr Anliegen';
       } else if (message.length < 10) {
-        newErrors.message = 'Message must be at least 10 characters';
+        newErrors.message = 'Nachricht muss mindestens 10 Zeichen lang sein';
       }
     }
     
@@ -107,7 +115,7 @@ const RequestShowcase = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form submission
+  // Handle form submission (simplified - just show success)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -119,37 +127,15 @@ const RequestShowcase = () => {
     
     setIsSubmitting(true);
     
-    try {
-      // Initialize API client
-      await ApiClient.initialize();
-      
-      // Create request payload
-      const requestData = {
-        name,
-        email,
-        phone: phone || undefined,
-        service,
-        message,
-      };
-      
-      // Submit to API
-      const response = await ApiClient.post('/api/requests/public', requestData);
-      
-      if (response.success) {
-        setIsSubmitted(true);
-        // Reset form after 5 seconds
-        setTimeout(() => {
-          resetForm();
-        }, 5000);
-      } else {
-        setError(response.message || 'Failed to submit request. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error submitting request:', error);
-      setError('An unexpected error occurred. Please try again later.');
-    } finally {
+    // Simulate API call
+    setTimeout(() => {
+      setIsSubmitted(true);
       setIsSubmitting(false);
-    }
+      // Reset form after 5 seconds
+      setTimeout(() => {
+        resetForm();
+      }, 5000);
+    }, 2000);
   };
 
   // Reset form to initial state
@@ -182,12 +168,12 @@ const RequestShowcase = () => {
   return (
     <section
       id="request-section"
-      className="py-20 bg-gradient-to-b from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950 relative overflow-hidden"
+      className="py-20 bg-gradient-to-b from-slate-50 to-orange-50 dark:from-slate-900 dark:to-orange-950 relative overflow-hidden"
     >
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-blue-200/30 dark:bg-blue-900/20 blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-indigo-200/30 dark:bg-indigo-900/20 blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-orange-200/30 dark:bg-orange-900/20 blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-blue-200/30 dark:bg-blue-900/20 blur-3xl"></div>
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 relative">
@@ -198,14 +184,14 @@ const RequestShowcase = () => {
           transition={{ duration: 0.6 }}
           className="max-w-3xl mx-auto text-center mb-12"
         >
-          <span className="inline-block py-1.5 px-4 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 text-sm font-medium mb-4">
-            Get Started Today
+          <span className="inline-block py-1.5 px-4 rounded-full bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-300 text-sm font-medium mb-4">
+            Kostenlose Beratung
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">
-            Request a <span className="text-blue-600 dark:text-blue-400">Consultation</span>
+            Anfrage <span className="text-orange-600 dark:text-orange-400">stellen</span>
           </h2>
           <p className="text-lg text-slate-600 dark:text-slate-400">
-            Tell us about your project and we'll get back to you within 24 hours with a personalized plan.
+            Erzählen Sie uns von Ihrem Projekt und wir melden uns innerhalb von 24 Stunden mit einem individuellen Angebot.
           </p>
         </motion.div>
 
@@ -220,7 +206,7 @@ const RequestShowcase = () => {
             {/* Progress bar */}
             <div className="w-full h-2 bg-slate-100 dark:bg-slate-700">
               <div 
-                className="h-full bg-blue-600 dark:bg-blue-500 transition-all duration-300"
+                className="h-full bg-orange-600 dark:bg-orange-500 transition-all duration-300"
                 style={{ width: `${(step / 3) * 100}%` }}
               ></div>
             </div>
@@ -232,7 +218,7 @@ const RequestShowcase = () => {
                   <div 
                     className={`w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm transition-all duration-300 ${
                       step === stepNum 
-                        ? 'bg-blue-600 text-white scale-110 shadow-md shadow-blue-500/20' 
+                        ? 'bg-orange-600 text-white scale-110 shadow-md shadow-orange-500/20' 
                         : step > stepNum 
                           ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400' 
                           : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
@@ -246,12 +232,12 @@ const RequestShowcase = () => {
                   </div>
                   <span className={`text-sm mt-2 font-medium ${
                     step === stepNum 
-                      ? 'text-blue-600 dark:text-blue-400' 
+                      ? 'text-orange-600 dark:text-orange-400' 
                       : step > stepNum 
                         ? 'text-green-600 dark:text-green-400' 
                         : 'text-slate-400'
                   }`}>
-                    {stepNum === 1 ? 'Service' : stepNum === 2 ? 'Details' : 'Review'}
+                    {stepNum === 1 ? 'Service' : stepNum === 2 ? 'Angaben' : 'Prüfung'}
                   </span>
                 </div>
               ))}
@@ -263,18 +249,18 @@ const RequestShowcase = () => {
                 {step === 1 && (
                   <div>
                     <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
-                      What service are you interested in?
+                      Welche Dienstleistung benötigen Sie?
                     </h3>
                     
-                    <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                       {services.map((serviceOption) => (
                         <div 
                           key={serviceOption.id}
                           onClick={() => setService(serviceOption.name)}
                           className={`p-5 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
                             service === serviceOption.name
-                              ? 'border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                              : 'border-slate-200 dark:border-slate-700 hover:border-blue-200 dark:hover:border-blue-700 hover:shadow'
+                              ? 'border-orange-600 dark:border-orange-400 bg-orange-50 dark:bg-orange-900/20 shadow-md'
+                              : 'border-slate-200 dark:border-slate-700 hover:border-orange-200 dark:hover:border-orange-700 hover:shadow'
                           }`}
                         >
                           <div className="flex justify-between items-start mb-2">
@@ -282,8 +268,8 @@ const RequestShowcase = () => {
                               {serviceOption.name}
                             </h4>
                             {service === serviceOption.name && (
-                              <span className="flex items-center justify-center w-6 h-6 bg-blue-100 dark:bg-blue-800 rounded-full">
-                                <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              <span className="flex items-center justify-center w-6 h-6 bg-orange-100 dark:bg-orange-800 rounded-full">
+                                <Check className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                               </span>
                             )}
                           </div>
@@ -306,12 +292,12 @@ const RequestShowcase = () => {
                         onClick={nextStep}
                         className={`inline-flex items-center px-5 py-2.5 rounded-lg font-medium text-white transition-all duration-300 ${
                           service 
-                            ? 'bg-blue-600 hover:bg-blue-700' 
+                            ? 'bg-orange-600 hover:bg-orange-700' 
                             : 'bg-slate-300 dark:bg-slate-700 opacity-70 cursor-not-allowed'
                         }`}
                         disabled={!service}
                       >
-                        Continue <ArrowRight className="ml-2 h-5 w-5" />
+                        Weiter <ArrowRight className="ml-2 h-5 w-5" />
                       </button>
                     </div>
                   </div>
@@ -321,13 +307,13 @@ const RequestShowcase = () => {
                 {step === 2 && (
                   <div>
                     <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-6">
-                      Tell us about yourself
+                      Ihre Kontaktdaten
                     </h3>
                     
                     <div className="space-y-5 mb-6">
                       <div>
                         <label htmlFor="name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                          Full Name <span className="text-red-500">*</span>
+                          Vollständiger Name <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -336,8 +322,8 @@ const RequestShowcase = () => {
                           onChange={(e) => setName(e.target.value)}
                           className={`w-full px-4 py-3 border ${
                             errors.name ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'
-                          } rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-slate-800 dark:focus:ring-blue-500/30 transition-colors`}
-                          placeholder="Your name"
+                          } rounded-lg shadow-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:bg-slate-800 dark:focus:ring-orange-500/30 transition-colors`}
+                          placeholder="Ihr Name"
                         />
                         {errors.name && (
                           <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
@@ -346,7 +332,7 @@ const RequestShowcase = () => {
                       
                       <div>
                         <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                          Email Address <span className="text-red-500">*</span>
+                          E-Mail-Adresse <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="email"
@@ -355,8 +341,8 @@ const RequestShowcase = () => {
                           onChange={(e) => setEmail(e.target.value)}
                           className={`w-full px-4 py-3 border ${
                             errors.email ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'
-                          } rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-slate-800 dark:focus:ring-blue-500/30 transition-colors`}
-                          placeholder="your@email.com"
+                          } rounded-lg shadow-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:bg-slate-800 dark:focus:ring-orange-500/30 transition-colors`}
+                          placeholder="ihre@email.at"
                         />
                         {errors.email && (
                           <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
@@ -365,21 +351,21 @@ const RequestShowcase = () => {
                       
                       <div>
                         <label htmlFor="phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                          Phone Number <span className="text-slate-400 text-xs">(Optional)</span>
+                          Telefonnummer <span className="text-slate-400 text-xs">(Optional)</span>
                         </label>
                         <input
                           type="tel"
                           id="phone"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-slate-800 dark:focus:ring-blue-500/30 transition-colors"
+                          className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:bg-slate-800 dark:focus:ring-orange-500/30 transition-colors"
                           placeholder="+43 123 456789"
                         />
                       </div>
                       
                       <div>
                         <label htmlFor="message" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                          Your Message <span className="text-red-500">*</span>
+                          Ihre Nachricht <span className="text-red-500">*</span>
                         </label>
                         <textarea
                           id="message"
@@ -388,8 +374,8 @@ const RequestShowcase = () => {
                           rows={4}
                           className={`w-full px-4 py-3 border ${
                             errors.message ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'
-                          } rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-slate-800 dark:focus:ring-blue-500/30 transition-colors`}
-                          placeholder="Please provide details about your request..."
+                          } rounded-lg shadow-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:bg-slate-800 dark:focus:ring-orange-500/30 transition-colors`}
+                          placeholder="Bitte beschreiben Sie Ihr Anliegen..."
                         ></textarea>
                         {errors.message && (
                           <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{errors.message}</p>
@@ -403,14 +389,14 @@ const RequestShowcase = () => {
                         onClick={prevStep}
                         className="px-5 py-2.5 rounded-lg font-medium text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-300"
                       >
-                        Back
+                        Zurück
                       </button>
                       <button
                         type="button"
                         onClick={nextStep}
-                        className="inline-flex items-center px-5 py-2.5 rounded-lg font-medium bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300"
+                        className="inline-flex items-center px-5 py-2.5 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white transition-all duration-300"
                       >
-                        Continue <ArrowRight className="ml-2 h-5 w-5" />
+                        Weiter <ArrowRight className="ml-2 h-5 w-5" />
                       </button>
                     </div>
                   </div>
@@ -420,14 +406,14 @@ const RequestShowcase = () => {
                 {step === 3 && !isSubmitted && (
                   <div>
                     <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-6">
-                      Review and Submit
+                      Anfrage überprüfen und absenden
                     </h3>
                     
                     <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-6 border border-slate-200 dark:border-slate-700 mb-6">
                       <div className="space-y-5">
                         <div className="flex items-center">
                           <div className="w-36 flex-shrink-0">
-                            <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Service</span>
+                            <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Dienstleistung</span>
                           </div>
                           <div className="flex-1">
                             <span className="text-slate-900 dark:text-white font-medium">{service}</span>
@@ -446,7 +432,7 @@ const RequestShowcase = () => {
                           
                           <div className="flex items-center mb-3">
                             <div className="w-36 flex-shrink-0">
-                              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Email</span>
+                              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">E-Mail</span>
                             </div>
                             <div className="flex-1">
                               <span className="text-slate-900 dark:text-white font-medium">{email}</span>
@@ -456,7 +442,7 @@ const RequestShowcase = () => {
                           {phone && (
                             <div className="flex items-center">
                               <div className="w-36 flex-shrink-0">
-                                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Phone</span>
+                                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Telefon</span>
                               </div>
                               <div className="flex-1">
                                 <span className="text-slate-900 dark:text-white font-medium">{phone}</span>
@@ -466,7 +452,7 @@ const RequestShowcase = () => {
                         </div>
                         
                         <div className="border-t border-slate-200 dark:border-slate-700 pt-5">
-                          <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 block mb-2">Message</span>
+                          <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 block mb-2">Nachricht</span>
                           <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
                             <p className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap text-sm">{message}</p>
                           </div>
@@ -480,10 +466,10 @@ const RequestShowcase = () => {
                       </div>
                     )}
                     
-                    <div className="flex items-center mb-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
-                      <ShieldCheck className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-3 flex-shrink-0" />
+                    <div className="flex items-center mb-6 bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 border border-orange-100 dark:border-orange-800">
+                      <ShieldCheck className="h-5 w-5 text-orange-600 dark:text-orange-400 mr-3 flex-shrink-0" />
                       <p className="text-sm text-slate-700 dark:text-slate-300">
-                        Your information is secure and will only be used to process your request. We'll respond within 24 hours.
+                        Ihre Daten werden sicher behandelt und nur zur Bearbeitung Ihrer Anfrage verwendet. Wir antworten innerhalb von 24 Stunden.
                       </p>
                     </div>
                     
@@ -493,20 +479,20 @@ const RequestShowcase = () => {
                         onClick={prevStep}
                         className="px-5 py-2.5 rounded-lg font-medium text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-300"
                       >
-                        Back
+                        Zurück
                       </button>
                       <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="inline-flex items-center px-6 py-3 rounded-lg font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 dark:shadow-blue-700/30 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300"
+                        className="inline-flex items-center px-6 py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-500/20 dark:shadow-orange-700/30 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300"
                       >
                         {isSubmitting ? (
                           <>
                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            Submitting...
+                            Wird gesendet...
                           </>
                         ) : (
-                          'Submit Request'
+                          'Anfrage senden'
                         )}
                       </button>
                     </div>
@@ -521,12 +507,11 @@ const RequestShowcase = () => {
                     </div>
                     
                     <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
-                      Request Submitted Successfully!
+                      Anfrage erfolgreich gesendet!
                     </h3>
                     
                     <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-lg mx-auto">
-                      Thank you for your request. A member of our team will review it and get back to you
-                      within 24 hours at <span className="font-semibold text-slate-900 dark:text-white">{email}</span>.
+                      Vielen Dank für Ihre Anfrage. Unser Team wird sie prüfen und sich innerhalb von 24 Stunden bei Ihnen unter <span className="font-semibold text-slate-900 dark:text-white">{email}</span> melden.
                     </p>
                     
                     <div className="relative max-w-xs mx-auto h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -547,18 +532,18 @@ const RequestShowcase = () => {
           <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               { 
-                title: "Fast Response Time", 
-                description: "We respond to all inquiries within 24 hours, ensuring you receive prompt attention to your needs.",
+                title: "Schnelle Antwort", 
+                description: "Wir antworten auf alle Anfragen innerhalb von 24 Stunden und sorgen für prompte Bearbeitung.",
                 icon: "⚡"
               },
               { 
-                title: "Expert Consultation", 
-                description: "Get personalized advice from our team of specialists with years of industry experience.",
-                icon: "🧠"
+                title: "Kostenlose Beratung", 
+                description: "Erhalten Sie unverbindliche Beratung von unserem erfahrenen Team ohne versteckte Kosten.",
+                icon: "💬"
               },
               { 
-                title: "Tailored Solutions", 
-                description: "Every solution we provide is custom-built to address your specific business requirements.",
+                title: "Maßgeschneiderte Lösungen", 
+                description: "Jede Lösung wird individuell auf Ihre spezifischen Anforderungen zugeschnitten.",
                 icon: "🔧"
               }
             ].map((feature, index) => (
@@ -567,13 +552,30 @@ const RequestShowcase = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                 transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
-                className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-200 dark:border-slate-700 hover:shadow-xl hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-300"
+                className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-200 dark:border-slate-700 hover:shadow-xl hover:border-orange-200 dark:hover:border-orange-800 transition-all duration-300"
               >
                 <div className="text-2xl mb-4">{feature.icon}</div>
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">{feature.title}</h3>
                 <p className="text-slate-600 dark:text-slate-400 text-sm">{feature.description}</p>
               </motion.div>
             ))}
+          </div>
+
+          {/* Direct Contact Option */}
+          <div className="mt-12 text-center">
+            <div className="bg-gradient-to-r from-orange-600 to-blue-600 rounded-2xl p-8 text-white">
+              <h3 className="text-2xl font-bold mb-4">Oder rufen Sie uns direkt an</h3>
+              <p className="text-orange-100 mb-6">
+                Für dringende Anfragen sind wir auch telefonisch erreichbar
+              </p>
+              <a 
+                href="tel:+4368184030694"
+                className="inline-flex items-center bg-white text-orange-600 px-6 py-3 rounded-lg font-medium hover:bg-orange-50 transition-colors duration-300"
+              >
+                <Phone className="mr-2 h-5 w-5" />
+                +43 681 840 30 694
+              </a>
+            </div>
           </div>
         </motion.div>
       </div>

@@ -2,13 +2,14 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Users, Calendar, MessageSquare, BarChart3, Settings, Bell, Search, Shield } from 'lucide-react';
+import { Target, Shield, Users, Clock, Award, Lightbulb, Leaf } from 'lucide-react';
+import { Handshake } from 'lucide-react';
 
 /**
- * Features component for the Landing page
+ * Features component for Rising BS e.U.
  * 
- * Displays the main features of the Rising BSM platform with
- * modern design elements and animations.
+ * Displays the key features and values of the company
+ * with modern design elements and animations.
  */
 const Features = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -41,55 +42,55 @@ const Features = () => {
 
   const features = [
     {
-      title: "AI-Powered Assistants",
-      description: "Leverage cutting-edge AI technology to handle customer queries, automate responses, and provide personalized experiences.",
-      icon: <MessageSquare className="w-6 h-6" />,
-      color: "from-blue-600 to-indigo-600",
-      bgColor: "bg-blue-100 dark:bg-blue-900/20",
+      title: "Qualität & Innovation",
+      description: "Wir setzen auf höchste Qualitätsstandards und innovative Lösungen für optimale Ergebnisse.",
+      icon: <Award className="w-6 h-6" />,
+      color: "from-orange-500 to-amber-600",
+      bgColor: "bg-orange-100 dark:bg-orange-900/20",
       points: [
-        "Natural language processing for human-like interactions",
-        "Context-aware responses based on customer history",
-        "Seamless handoff to human agents when needed",
-        "Multi-channel support (web, email, SMS)"
+        "Zertifizierte Mitarbeiter mit regelmäßigen Schulungen",
+        "Moderne Ausrüstung und Technologien",
+        "Kontinuierliche Verbesserung unserer Prozesse",
+        "Qualitätskontrolle bei jedem Auftrag"
       ]
     },
     {
-      title: "Customer Management",
-      description: "Efficiently manage customer relationships with comprehensive profiles, interaction history, and segmentation capabilities.",
-      icon: <Users className="w-6 h-6" />,
+      title: "Kundenzufriedenheit",
+      description: "Ihre Zufriedenheit ist unser Maßstab - wir gehen die Extrameile für unsere Kunden.",
+      icon: <Handshake className="w-6 h-6" />,
+      color: "from-blue-600 to-cyan-600",
+      bgColor: "bg-blue-100 dark:bg-blue-900/20",
+      points: [
+        "Individuelle Beratung und maßgeschneiderte Lösungen",
+        "Transparente Kommunikation und faire Preise",
+        "Schnelle Reaktionszeiten und Flexibilität",
+        "Langfristige Kundenbeziehungen"
+      ]
+    },
+    {
+      title: "Rundum-Sorglos-Paket",
+      description: "Alles aus einer Hand - wir kümmern uns um alle Ihre Anliegen.",
+      icon: <Shield className="w-6 h-6" />,
       color: "from-green-600 to-emerald-600",
       bgColor: "bg-green-100 dark:bg-green-900/20",
       points: [
-        "Unified customer profiles with complete history",
-        "Customer segmentation and tagging",
-        "Customizable fields and attributes",
-        "GDPR-compliant data management"
+        "Komplette Koordination aller Dienstleistungen",
+        "Ein Ansprechpartner für alle Belange",
+        "Regelmäßige Betreuung und Wartung",
+        "Notfallservice bei dringenden Anliegen"
       ]
     },
     {
-      title: "Appointment Scheduling",
-      description: "Streamline your booking process with a flexible, automated scheduling system that integrates with your calendar.",
-      icon: <Calendar className="w-6 h-6" />,
-      color: "from-amber-500 to-orange-600",
-      bgColor: "bg-amber-100 dark:bg-amber-900/20",
+      title: "Nachhaltigkeit",
+      description: "Umweltfreundliche Verfahren und nachhaltige Praktiken für eine bessere Zukunft.",
+      icon: <Leaf className="w-6 h-6" />,
+      color: "from-emerald-600 to-green-600",
+      bgColor: "bg-emerald-100 dark:bg-emerald-900/20",
       points: [
-        "Intelligent time-slot recommendations",
-        "Automated reminders and notifications",
-        "Calendar integrations (Google, Outlook, iCal)",
-        "Self-service booking options"
-      ]
-    },
-    {
-      title: "Analytics & Insights",
-      description: "Gain valuable insights from your data with powerful analytics tools that help you make informed business decisions.",
-      icon: <BarChart3 className="w-6 h-6" />,
-      color: "from-purple-600 to-violet-600",
-      bgColor: "bg-purple-100 dark:bg-purple-900/20",
-      points: [
-        "Real-time performance dashboards",
-        "Custom reports and visualizations",
-        "Trend analysis and forecasting",
-        "Conversion and retention metrics"
+        "Umweltschonende Reinigungsmittel und Verfahren",
+        "Ressourcenschonende Arbeitsweise",
+        "Nachhaltige Entsorgung und Recycling",
+        "Beitrag zum Umweltschutz"
       ]
     }
   ];
@@ -104,11 +105,11 @@ const Features = () => {
             }`}
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              The Complete <span className="text-indigo-600 dark:text-indigo-400">Business Management</span> Platform
+              Was uns <span className="text-orange-600 dark:text-orange-400">auszeichnet</span>
             </h2>
             
             <p className="text-lg text-slate-600 dark:text-slate-300">
-              Rising BSM combines powerful features to create an all-in-one solution for modern businesses. Open source and built to scale.
+              RISING BS e.U. steht für Qualität, Zuverlässigkeit und Innovation in allen Bereichen unserer Dienstleistungen.
             </p>
           </div>
         </div>
@@ -168,7 +169,7 @@ const Features = () => {
                 <div className="absolute bottom-8 left-8 right-8">
                   <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
                     <p className="text-white/90 text-sm">
-                      View real screenshots in our gallery below
+                      Ihre Zufriedenheit ist unser Maßstab
                     </p>
                   </div>
                 </div>
@@ -186,7 +187,7 @@ const Features = () => {
             <h3 className="text-2xl md:text-3xl font-bold mb-4">
               <span className={`bg-clip-text text-transparent bg-gradient-to-r ${features[activeTab].color}`}>
                 {features[activeTab].title}
-              </span> for your business
+              </span>
             </h3>
             
             <p className="text-lg text-slate-600 dark:text-slate-300 mb-6">
@@ -197,7 +198,7 @@ const Features = () => {
               {features[activeTab].points.map((point, idx) => (
                 <li key={idx} className="flex items-start">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 mt-0.5 ${features[activeTab].bgColor}`}>
-                    <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
@@ -208,28 +209,28 @@ const Features = () => {
           </div>
         </div>
         
-        {/* Additional features grid */}
+        {/* Additional values grid */}
         <div className="mt-20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             {
-              icon: <Settings className="w-6 h-6" />,
-              title: "Customizable Workflows",
-              description: "Design your own business processes and workflows tailored to your specific needs."
+              icon: <Clock className="w-6 h-6" />,
+              title: "24/7 Bereitschaft",
+              description: "Rund um die Uhr für Sie da - besonders wichtig beim Winterdienst und Notfällen."
             },
             {
-              icon: <Bell className="w-6 h-6" />,
-              title: "Smart Notifications",
-              description: "Stay informed with real-time alerts for important events and activities."
+              icon: <Target className="w-6 h-6" />,
+              title: "Maßgeschneiderte Lösungen",
+              description: "Individuelle Konzepte, die genau auf Ihre Bedürfnisse zugeschnitten sind."
             },
             {
-              icon: <Search className="w-6 h-6" />,
-              title: "Powerful Search",
-              description: "Find any information instantly with our advanced search capabilities."
+              icon: <Users className="w-6 h-6" />,
+              title: "Professionelles Team",
+              description: "Qualifizierte Mitarbeiter mit langjähriger Erfahrung und regelmäßigen Schulungen."
             },
             {
-              icon: <Shield className="w-6 h-6" />,
-              title: "Enterprise Security",
-              description: "Keep your data safe with best-in-class security practices and protocols."
+              icon: <Lightbulb className="w-6 h-6" />,
+              title: "Innovative Ansätze",
+              description: "Moderne Technologien und Verfahren für effiziente und nachhaltige Ergebnisse."
             }
           ].map((item, index) => (
             <div 
@@ -241,7 +242,7 @@ const Features = () => {
               }`}
               style={{ transitionDelay: `${800 + index * 100}ms` }}
             >
-              <div className="bg-indigo-100 dark:bg-indigo-900/30 w-12 h-12 rounded-lg flex items-center justify-center mb-4 text-indigo-600 dark:text-indigo-400">
+              <div className="bg-orange-100 dark:bg-orange-900/30 w-12 h-12 rounded-lg flex items-center justify-center mb-4 text-orange-600 dark:text-orange-400">
                 {item.icon}
               </div>
               <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
