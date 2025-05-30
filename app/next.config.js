@@ -28,14 +28,17 @@ const nextConfig = {
   // Remove duplicate serverExternalPackages declaration
 
   
-  webpack: (config) => {
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      crypto: require.resolve('crypto-browserify'),
-      stream: require.resolve('stream-browserify'),
-      buffer: require.resolve('buffer'),
-      process: require.resolve('process/browser')
-    };
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Only apply polyfills on client-side
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        crypto: require.resolve('crypto-browserify'),
+        stream: require.resolve('stream-browserify'),
+        buffer: require.resolve('buffer'),
+        process: require.resolve('process/browser')
+      };
+    }
     
     return config;
   }

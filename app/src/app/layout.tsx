@@ -8,6 +8,9 @@ import { QueryProvider } from '@/shared/providers/QueryProvider';
 
 import './globals.css';
 
+// Force Node.js runtime for this route
+export const runtime = 'nodejs';
+
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
