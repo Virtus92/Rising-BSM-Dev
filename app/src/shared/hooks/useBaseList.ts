@@ -702,7 +702,7 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
     // Reset the flag after a short delay
     setTimeout(() => {
       isUrlUpdateInProgress.current = false;
-    }, 300); // Increased delay to prevent race conditions
+    }, 100); // Reduced delay for better responsiveness
   }, [pathname, router, state.filters, syncWithUrl]);
   
   // Fetch when filters change
@@ -741,7 +741,7 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
         fetchData();
       }
       fetchTimeoutRef.current = null;
-    }, 750); // Longer delay to prevent race conditions
+    }, 200); // Reduced delay for better responsiveness
     
     // Cleanup on unmount
     return () => {
@@ -822,22 +822,22 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
     
     // Use a timeout to avoid immediate fetch that might clash with other effects
     initialFetchTimeoutRef.current = setTimeout(() => {
-      // Wrap in try/catch to prevent fetch errors from breaking the app
-      try {
-        fetchData();
-      } catch (error) {
-        console.error('Error during initial fetch:', error as Error);
-        // Reset isLoading on error
-        dispatch({ 
-          type: 'FETCH_ERROR', 
-          payload: { 
-            error: error instanceof Error ? error.message : 'Failed to fetch data', 
-            requestId: state.lastRequestId + 1 
-          } 
-        });
-      }
-      initialFetchTimeoutRef.current = null;
-    }, 200);
+    // Wrap in try/catch to prevent fetch errors from breaking the app
+    try {
+    fetchData();
+    } catch (error) {
+    console.error('Error during initial fetch:', error as Error);
+    // Reset isLoading on error
+    dispatch({ 
+    type: 'FETCH_ERROR', 
+    payload: { 
+    error: error instanceof Error ? error.message : 'Failed to fetch data', 
+    requestId: state.lastRequestId + 1 
+    } 
+    });
+    }
+    initialFetchTimeoutRef.current = null;
+    }, 500); // Increased delay to ensure proper initialization
     
     // Clean up timeout on unmount
     return () => {
@@ -925,16 +925,21 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
   }, [updateFilters, state.filters.sortBy, state.filters.sortDirection]);
   
   const setSearch = useCallback((search: string) => {
+    // Trim the search string
+    const trimmedSearch = search?.trim() || '';
+    
     // Skip if search hasn't changed
-    if ((search || '') === (state.filters.search || '')) {
+    const currentSearch = (state.filters as any).search || '';
+    if (trimmedSearch === currentSearch) {
       return;
     }
     
+    // Update filters immediately
     updateFilters({
-      search: search || undefined,
+      search: trimmedSearch || undefined,
       page: 1
     } as Partial<F>);
-  }, [updateFilters, state.filters.search]);
+  }, [updateFilters, state.filters]);
   
   const setFilter = useCallback(<K extends keyof F>(key: K, value: F[K] | undefined) => {
     // Skip if filter hasn't changed

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, ArrowRight, CheckCircle, ShieldCheck, Check, Phone } from 'lucide-react';
+import { Loader2, ArrowRight, CheckCircle, ShieldCheck, Check, Phone, AlertTriangle } from 'lucide-react';
 
 /**
  * RequestShowcase Component für RISING BS e.U.
@@ -115,7 +115,7 @@ const RequestShowcase = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form submission (simplified - just show success)
+  // Handle form submission - actually send to API
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -127,15 +127,39 @@ const RequestShowcase = () => {
     
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitted(true);
+    try {
+      // Initialize the API client
+      await import('@/core/api/ApiClient').then(async ({ default: ApiClient }) => {
+        await ApiClient.initialize();
+        
+        // Prepare request data
+        const requestData = {
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim() || null,
+          service: service,
+          message: message.trim(),
+        };
+        
+        // Send to API
+        await ApiClient.post('/requests/public', requestData);
+        
+        // Success
+        setIsSubmitted(true);
+        
+        // Reset form after 8 seconds
+        setTimeout(() => {
+          resetForm();
+        }, 8000);
+      });
+    } catch (error) {
+      console.error('Failed to submit request:', error);
+      setError(
+        'Es ist ein Fehler beim Senden Ihrer Anfrage aufgetreten. Bitte versuchen Sie es später erneut oder kontaktieren Sie uns direkt.'
+      );
+    } finally {
       setIsSubmitting(false);
-      // Reset form after 5 seconds
-      setTimeout(() => {
-        resetForm();
-      }, 5000);
-    }, 2000);
+    }
   };
 
   // Reset form to initial state
@@ -462,7 +486,10 @@ const RequestShowcase = () => {
                     
                     {error && (
                       <div className="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800">
-                        <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+                        <div className="flex items-start space-x-3">
+                          <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                          <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+                        </div>
                       </div>
                     )}
                     

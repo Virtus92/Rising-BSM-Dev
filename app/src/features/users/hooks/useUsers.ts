@@ -108,10 +108,35 @@ export function useUsers(initialFilters?: Partial<UserFilterParamsDto>): UseUser
         const apiCall = UserService.getUsers(filters);
         
         // Now await the promise
-        return await apiCall;
+        const response = await apiCall;
+        
+        // Ensure we return the data in the expected format
+        if (response.success && response.data) {
+          return response.data;
+        }
+        
+        // Return empty result on error
+        return {
+          data: [],
+          pagination: {
+            page: filters.page || 1,
+            limit: filters.limit || 10,
+            total: 0,
+            totalPages: 0
+          }
+        };
       } catch (err) {
         console.error('Error in useUsers fetchFunction:', err);
-        throw err;
+        // Return empty result instead of throwing
+        return {
+          data: [],
+          pagination: {
+            page: filters.page || 1,
+            limit: filters.limit || 10,
+            total: 0,
+            totalPages: 0
+          }
+        };
       }
     },
     

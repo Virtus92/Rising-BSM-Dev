@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { useForm, FieldValues, UseFormReturn } from 'react-hook-form';
+import { useForm, FormProvider } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
 import {
-  Form,
   FormControl,
   FormDescription,
   FormField,
@@ -125,7 +124,7 @@ export const ContactForm: React.FC = () => {
     <div className="bg-card rounded-lg p-6 shadow-md">
       <h2 className="text-2xl font-bold mb-6">Kontakt aufnehmen</h2>
       
-      <Form {...form as unknown as UseFormReturn<FieldValues>}>
+      <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
             control={form.control}
@@ -237,7 +236,7 @@ export const ContactForm: React.FC = () => {
             )}  
           </Button>
         </form>
-      </Form>
+      </FormProvider>
     </div>
   );
 };

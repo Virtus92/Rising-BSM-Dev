@@ -83,10 +83,10 @@ const Header = () => {
                 <span className="font-bold text-white text-lg">R</span>
               </div>
             </div>
-            <span className={`text-xl font-bold transition-colors duration-300 ${
+            <span className={`text-xl font-bold transition-all duration-300 ${
               isScrolled || isMenuOpen || pathname !== '/' 
                 ? 'text-slate-900 dark:text-white' 
-                : 'text-white'
+                : 'text-white drop-shadow-lg'
             }`}>
               RISING BS
             </span>
@@ -98,10 +98,10 @@ const Header = () => {
               <li>
                 <button 
                   onClick={() => scrollToSection('services')}
-                  className={`h-full flex items-center px-4 font-medium transition-colors duration-300 ${
+                  className={`h-full flex items-center px-4 font-medium transition-all duration-300 ${
                     isScrolled || pathname !== '/' 
                       ? 'text-slate-700 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-400' 
-                      : 'text-white/90 hover:text-white'
+                      : 'text-white/90 hover:text-white drop-shadow-md'
                   }`}
                 >
                   Dienstleistungen
@@ -111,10 +111,10 @@ const Header = () => {
               <li>
                 <button 
                   onClick={() => scrollToSection('about')}
-                  className={`h-full flex items-center px-4 font-medium transition-colors duration-300 ${
+                  className={`h-full flex items-center px-4 font-medium transition-all duration-300 ${
                     isScrolled || pathname !== '/' 
                       ? 'text-slate-700 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-400' 
-                      : 'text-white/90 hover:text-white'
+                      : 'text-white/90 hover:text-white drop-shadow-md'
                   }`}
                 >
                   Über uns
@@ -124,10 +124,10 @@ const Header = () => {
               <li>
                 <button 
                   onClick={() => scrollToSection('features')}
-                  className={`h-full flex items-center px-4 font-medium transition-colors duration-300 ${
+                  className={`h-full flex items-center px-4 font-medium transition-all duration-300 ${
                     isScrolled || pathname !== '/' 
                       ? 'text-slate-700 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-400' 
-                      : 'text-white/90 hover:text-white'
+                      : 'text-white/90 hover:text-white drop-shadow-md'
                   }`}
                 >
                   Unser Konzept
@@ -137,10 +137,10 @@ const Header = () => {
               <li>
                 <button 
                   onClick={() => scrollToSection('contact')}
-                  className={`h-full flex items-center px-4 font-medium transition-colors duration-300 ${
+                  className={`h-full flex items-center px-4 font-medium transition-all duration-300 ${
                     isScrolled || pathname !== '/' 
                       ? 'text-slate-700 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-400' 
-                      : 'text-white/90 hover:text-white'
+                      : 'text-white/90 hover:text-white drop-shadow-md'
                   }`}
                 >
                   Kontakt
@@ -155,10 +155,10 @@ const Header = () => {
             {mounted && (
               <button 
                 onClick={toggleTheme}
-                className={`p-2 rounded-full transition-colors duration-300 ${
+                className={`p-2 rounded-full transition-all duration-300 ${
                   isScrolled || pathname !== '/' 
                     ? 'text-slate-600 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 hover:bg-slate-100 dark:hover:bg-slate-800' 
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    : 'text-white/80 hover:text-white hover:bg-white/10 drop-shadow-md'
                 }`}
                 aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               >
@@ -176,7 +176,7 @@ const Header = () => {
               className={`hidden md:flex items-center px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${
                 isScrolled || pathname !== '/' 
                   ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-md hover:shadow-lg hover:shadow-orange-500/20' 
-                  : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 text-white border border-white/25'
+                  : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 text-white border border-white/25 drop-shadow-md'
               }`}
             >
               {isAuthenticated ? 'Dashboard' : 'Anmelden'}
@@ -185,10 +185,10 @@ const Header = () => {
             {/* Mobile Menu Button */}
             <button 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`lg:hidden p-2 rounded-full transition-colors duration-300 ${
+              className={`lg:hidden p-2 rounded-full transition-all duration-300 ${
                 isScrolled || pathname !== '/' 
                   ? 'text-slate-600 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 hover:bg-slate-100 dark:hover:bg-slate-800' 
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
+                  : 'text-white/80 hover:text-white hover:bg-white/10 drop-shadow-md'
               }`}
               aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
             >
