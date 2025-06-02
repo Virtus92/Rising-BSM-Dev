@@ -143,8 +143,14 @@ class ApiClientClass {
     try {
       logger.info('Initializing API client');
       
-      // Set base URL
+      // Set base URL - default to empty string for relative URLs
       this.baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      
+      // Log the base URL configuration
+      logger.info('API Client base URL configured', { 
+        baseUrl: this.baseUrl || '(using relative URLs)',
+        environment: process.env.NODE_ENV
+      });
       
       // Initialize TokenManager correctly
       try {
@@ -192,13 +198,35 @@ class ApiClientClass {
     if (path.startsWith('http')) {
       url = path;
     }
-    // Handle paths that already include /api prefix
+    // When baseUrl is empty or not set, use relative URLs
+    else if (!this.baseUrl || this.baseUrl === '') {
+      // Ensure path starts with /api/
+      if (path.startsWith('/api/')) {
+        url = path;
+      } else if (path.startsWith('/')) {
+        url = `/api${path}`;
+      } else {
+        url = `/api/${path}`;
+      }
+    }
+    // Handle paths that already include /api prefix when we have a baseUrl
     else if (path.startsWith('/api/')) {
-      url = path;
+      // If baseUrl already ends with /api, don't duplicate it
+      if (this.baseUrl.endsWith('/api')) {
+        url = this.baseUrl + path.substring(4); // Remove /api from path
+      } else {
+        url = this.baseUrl + path;
+      }
     }
     // Add baseUrl to other paths
     else {
-      url = `${this.baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+      // If baseUrl ends with /api, just append the path
+      if (this.baseUrl.endsWith('/api')) {
+        url = `${this.baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+      } else {
+        // Otherwise, add the full path to baseUrl
+        url = `${this.baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+      }
     }
     
     // Return URL if no params
