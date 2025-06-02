@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Progress } from '@/shared/components/ui/progress';
-import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { 
   Activity, 
   Clock, 
@@ -81,8 +80,11 @@ export function AutomationDashboard() {
 
   if (isInitializing) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <LoadingSpinner size="lg" message="Loading automation data..." />
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mb-4"></div>
+          <p className="text-muted-foreground">Loading automation data...</p>
+        </div>
       </div>
     );
   }

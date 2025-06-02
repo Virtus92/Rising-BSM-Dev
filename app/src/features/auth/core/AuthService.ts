@@ -127,7 +127,7 @@ export class AuthServiceClass implements IAuthService, IRefreshTokenService {
   
   constructor() {
     this.events = new EventEmitter();
-    this.instanceId = this.generateInstanceId();
+    this.instanceId = crypto.randomUUID().substring(0, 8);
     
     if (typeof window !== 'undefined') {
       // Clean up any existing event listeners to prevent duplicates
@@ -141,25 +141,6 @@ export class AuthServiceClass implements IAuthService, IRefreshTokenService {
       // Register this instance globally
       this.registerGlobalInstance();
     }
-  }
-  
-  /**
-   * Generate a unique instance ID with fallback for older Node.js versions
-   */
-  private generateInstanceId(): string {
-    try {
-      // Try to use crypto.randomUUID if available (Node.js 14.17.0+)
-      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID().substring(0, 8);
-      }
-    } catch (e) {
-      // Fallback if crypto.randomUUID is not available
-    }
-    
-    // Fallback implementation using Math.random and Date.now()
-    const timestamp = Date.now().toString(36);
-    const randomStr = Math.random().toString(36).substring(2, 8);
-    return `${timestamp}-${randomStr}`.substring(0, 8);
   }
   
   /**

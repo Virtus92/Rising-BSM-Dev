@@ -104,33 +104,10 @@ export const useCustomers = (initialFilters?: Partial<CustomerFilterParamsDto>):
           console.log('useCustomers: API response:', response);
         }
         
-        // Ensure we return the data in the expected format
-        if (response.success && response.data) {
-          return response.data;
-        }
-        
-        // Return empty result on error
-        return {
-          data: [],
-          pagination: {
-            page: mappedFilters.page || 1,
-            limit: mappedFilters.limit || 10,
-            total: 0,
-            totalPages: 0
-          }
-        };
+        return response;
       } catch (err) {
         console.error('Error in useCustomers fetchFunction:', err);
-        // Return empty result instead of throwing
-        return {
-          data: [],
-          pagination: {
-            page: mappedFilters.page || 1,
-            limit: mappedFilters.limit || 10,
-            total: 0,
-            totalPages: 0
-          }
-        };
+        throw err;
       }
     },
     initialFilters: {

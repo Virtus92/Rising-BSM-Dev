@@ -214,7 +214,6 @@ export function BaseListComponent<T extends {}>({
     if (!onSearchChange) return;
     
     const timer = setTimeout(() => {
-      // Always call onSearchChange, even with empty string
       onSearchChange(searchTerm);
     }, 300);
     
