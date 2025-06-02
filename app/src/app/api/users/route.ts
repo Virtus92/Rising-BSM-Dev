@@ -35,10 +35,11 @@ export const GET = routeHandler(
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
-    const status = searchParams.get('status');
+    const status = searchParams.get('status') || undefined;
+    const role = searchParams.get('role') || undefined;
     const sortBy = searchParams.get('sortBy') || 'name';
     const sortDirection = searchParams.get('sortDirection') || 'asc';
-    const search = searchParams.get('search') || '';
+    const search = searchParams.get('search') || undefined;
     
     // Log request info for debugging
     logger.debug('Processing GET /users request', {
@@ -69,6 +70,7 @@ export const GET = routeHandler(
         page,
         limit,
         status: status as UserStatus || undefined,
+        role: role as UserRole || undefined,
         search,
         sortBy,
         sortDirection: sortDirection as 'asc' | 'desc'
