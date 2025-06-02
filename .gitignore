@@ -9,6 +9,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+PLUGIN_**
 
 # testing
 /coverage
@@ -41,3 +42,26 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .qodo
+
+# Plugin marketplace (managed by dinel.at)
+/app/src/features/plugins/admin/
+/app/src/features/plugins/marketplace/
+/app/src/features/plugins/payments/
+/app/src/app/admin/plugins/
+/app/src/app/api/admin/plugins/
+/app/src/app/api/plugins/admin/
+/app/src/app/api/plugins/marketplace/
+/app/src/app/api/plugins/payments/
+
+# Plugin storage (managed externally)
+/storage/plugins/
+/storage/plugin-bundles/
+/storage/plugin-keys/
+
+# Marketplace configuration
+.marketplace.config.json
+marketplace.env
+
+# Developer portal
+/developer-portal/
+/docs/marketplace/

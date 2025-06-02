@@ -177,6 +177,24 @@ export const formatResponse = {
   },
   
   /**
+   * Format a service unavailable error response
+   * 
+   * @param message Error message
+   * @param errorCode Error code
+   * @param details Additional error details
+   * @returns Formatted service unavailable error response
+   */
+  serviceUnavailable(
+    message: string = 'Service temporarily unavailable', 
+    errorCode: string = 'SERVICE_UNAVAILABLE', 
+    details?: any
+  ): NextResponse {
+    return this.error(
+      new AppError(message, 503, errorCode, details)
+    );
+  },
+  
+  /**
    * Format a paginated response
    * 
    * @param items Array of items

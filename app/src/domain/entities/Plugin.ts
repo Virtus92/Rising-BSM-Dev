@@ -1,5 +1,20 @@
 import { BaseEntity } from './BaseEntity';
 
+export enum PluginType {
+  UI = 'ui',
+  API = 'api',
+  AUTOMATION = 'automation',
+  MIXED = 'mixed'
+}
+
+export enum PluginStatus {
+  PENDING = 'pending',
+  REVIEW = 'review',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  SUSPENDED = 'suspended'
+}
+
 export interface PluginPricing {
   free?: {
     features: string[];
@@ -23,9 +38,9 @@ export interface PluginPricing {
 
 export interface PluginPermission {
   code: string;
-  name: string;
+  name?: string;
   description: string;
-  required: boolean;
+  required?: boolean;
 }
 
 export interface PluginDependency {
@@ -42,7 +57,7 @@ export class Plugin extends BaseEntity {
   version: string;
   author: string;
   authorId: number;
-  status: 'pending' | 'approved' | 'rejected' | 'suspended';
+  status: 'pending' | 'review' | 'approved' | 'rejected' | 'suspended';
   type: 'ui' | 'api' | 'automation' | 'mixed';
   category: string;
   tags: string[];
@@ -67,6 +82,7 @@ export class Plugin extends BaseEntity {
   // Metadata
   downloads: number;
   rating: number;
+  marketplaceId?: string; // ID in dinel.at marketplace
 
   constructor(data: Partial<Plugin>) {
     super(data);
@@ -94,6 +110,7 @@ export class Plugin extends BaseEntity {
     this.maxAppVersion = data.maxAppVersion;
     this.downloads = data.downloads || 0;
     this.rating = data.rating || 0;
+    this.marketplaceId = data.marketplaceId;
   }
 
   static fromPrisma(data: any): Plugin {

@@ -80,8 +80,9 @@ export class PluginService implements IPluginService {
     return pluginToDto(plugin);
   }
 
-  async update(id: number, data: Partial<Plugin>, options?: ServiceOptions): Promise<PluginDto> {
-    const plugin = await this.repository.update(id, data);
+  async update(id: number, data: UpdatePluginDto, options?: ServiceOptions): Promise<PluginDto> {
+    const entityData = this.fromDTO(data);
+    const plugin = await this.repository.update(id, entityData);
     return pluginToDto(plugin);
   }
 
@@ -411,14 +412,16 @@ export class PluginService implements IPluginService {
     return plugins.map(p => pluginToDto(p));
   }
 
-  async validate(data: Partial<Plugin>, isUpdate?: boolean, entityId?: number): Promise<ValidationResultDto> {
+  async validate(data: CreatePluginDto | UpdatePluginDto, isUpdate?: boolean, entityId?: number): Promise<ValidationResultDto> {
     const errors: string[] = [];
     
     if (!isUpdate) {
-      if (!data.name) errors.push('Plugin name is required');
-      if (!data.displayName) errors.push('Display name is required');
-      if (!data.version) errors.push('Version is required');
-      if (!data.type) errors.push('Plugin type is required');
+      // Type guard to ensure we're working with CreatePluginDto for creation validation
+      const createData = data as CreatePluginDto;
+      if (!createData.name) errors.push('Plugin name is required');
+      if (!createData.displayName) errors.push('Display name is required');
+      if (!createData.version) errors.push('Version is required');
+      if (!createData.type) errors.push('Plugin type is required');
     }
     
     // Validate version format
@@ -444,7 +447,7 @@ export class PluginService implements IPluginService {
     return callback(this);
   }
 
-  async bulkUpdate(ids: number[], data: Partial<Plugin>, options?: ServiceOptions): Promise<number> {
+  async bulkUpdate(ids: number[], data: UpdatePluginDto, options?: ServiceOptions): Promise<number> {
     let updated = 0;
     for (const id of ids) {
       try {
@@ -461,8 +464,21 @@ export class PluginService implements IPluginService {
     return pluginToDto(entity);
   }
 
-  fromDTO(dto: Partial<Plugin>): Partial<Plugin> {
-    return dto;
+  fromDTO(dto: CreatePluginDto | UpdatePluginDto): Partial<Plugin> {
+    return {
+      ...dto,
+      permissions: dto.permissions ? dto.permissions.map(p => ({
+        code: p.code,
+        name: p.name || p.code,
+        description: p.description,
+        required: p.required ?? false
+      })) : undefined,
+      dependencies: dto.dependencies ? dto.dependencies.map(d => ({
+        pluginName: d.pluginName || d.name || '',
+        minVersion: d.minVersion || d.version || '',
+        maxVersion: d.maxVersion
+      })) : undefined
+    };
   }
 
   async search(searchText: string, options?: ServiceOptions): Promise<PluginDto[]> {

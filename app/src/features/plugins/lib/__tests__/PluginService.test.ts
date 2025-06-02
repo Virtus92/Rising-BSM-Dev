@@ -151,7 +151,8 @@ describe('PluginService', () => {
       });
 
       mockRepository.findById.mockResolvedValue(plugin);
-      mockRepository.update.mockResolvedValue(new Plugin({ ...plugin, ...updateDto }));
+      const { dependencies, ...updateData } = updateDto;
+      mockRepository.update.mockResolvedValue(new Plugin({ ...plugin, ...updateData }));
 
       const result = await service.updatePlugin(1, updateDto, 1);
 

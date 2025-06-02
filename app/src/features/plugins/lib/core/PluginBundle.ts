@@ -195,7 +195,7 @@ export class PluginBundleUtils {
       
       // Decompress if needed
       if (file.compressed) {
-        content = await gunzip(content);
+        content = Buffer.from(await gunzip(content));
       }
       
       // Verify checksum

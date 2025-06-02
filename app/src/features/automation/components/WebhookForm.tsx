@@ -101,6 +101,12 @@ export function WebhookForm({ webhook, onClose, onSuccess }: WebhookFormProps) {
       AutomationOperation.STATUS_CHANGED,
       AutomationOperation.ASSIGNED,
       AutomationOperation.COMPLETED
+    ],
+    [AutomationEntityType.PLUGIN]: [
+      AutomationOperation.CREATE,
+      AutomationOperation.UPDATE,
+      AutomationOperation.DELETE,
+      AutomationOperation.STATUS_CHANGED
     ]
   };
 

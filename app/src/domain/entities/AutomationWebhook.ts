@@ -7,7 +7,8 @@ export enum AutomationEntityType {
   USER = 'user',
   CUSTOMER = 'customer',
   APPOINTMENT = 'appointment',
-  REQUEST = 'request'
+  REQUEST = 'request',
+  PLUGIN = 'plugin'
 }
 
 /**

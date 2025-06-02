@@ -15,14 +15,17 @@ export interface IPluginLicenseService extends IBaseService<PluginLicense, Parti
     userId: number, 
     type: 'trial' | 'basic' | 'premium' | 'enterprise',
     options?: {
+      licenseKey?: string;
       hardwareId?: string;
       maxInstalls?: number;
       expiresAt?: Date;
       usageLimits?: Record<string, any>;
+      marketplaceLicenseId?: string;
     }
   ): Promise<PluginLicenseDto>;
   
   verifyLicense(data: VerifyLicenseDto): Promise<LicenseVerificationResult>;
+  verifyLicenseForDistribution(licenseKey: string, pluginId: number): Promise<boolean>;
   getLicenseByKey(licenseKey: string): Promise<PluginLicenseDto | null>;
   getUserLicenses(userId: number): Promise<PluginLicenseDto[]>;
   getPluginLicenses(pluginId: number): Promise<PluginLicenseDto[]>;
@@ -35,9 +38,12 @@ export interface IPluginLicenseService extends IBaseService<PluginLicense, Parti
   
   renewLicense(licenseId: number, extensionDays: number): Promise<PluginLicenseDto>;
   upgradeLicense(licenseId: number, newType: 'basic' | 'premium' | 'enterprise'): Promise<PluginLicenseDto>;
-  revokeLicense(licenseId: number, reason?: string): Promise<void>;
+  updateLicense(id: number, data: Partial<PluginLicense>): Promise<PluginLicenseDto>;
+  revokeLicense(licenseKeyOrId: number | string, reason?: string): Promise<void>;
   suspendLicense(licenseId: number, reason?: string): Promise<void>;
   reactivateLicense(licenseId: number): Promise<void>;
+  updateLastVerified(licenseKey: string): Promise<void>;
+  getLicensesByUser(userId: number): Promise<PluginLicenseDto[]>;
   
   bindToHardware(licenseId: number, hardwareId: string): Promise<void>;
   transferLicense(licenseId: number, newUserId: number): Promise<void>;

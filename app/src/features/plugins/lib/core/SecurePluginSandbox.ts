@@ -92,7 +92,23 @@ export class SecurePluginSandbox {
       this.worker.on('message', (message) => {
         if (message.type === 'log') {
           // Forward log messages
-          this.logger[message.level](`[Plugin:${this.plugin.name}]`, ...message.args);
+          const logMessage = `[Plugin:${this.plugin.name}] ${message.args.join(' ')}`;
+          switch (message.level) {
+            case 'debug':
+              this.logger.debug(logMessage);
+              break;
+            case 'info':
+              this.logger.info(logMessage);
+              break;
+            case 'warn':
+              this.logger.warn(logMessage);
+              break;
+            case 'error':
+              this.logger.error(logMessage);
+              break;
+            default:
+              this.logger.info(logMessage);
+          }
         } else if (message.type === 'success') {
           clearTimeout(timeout);
           resolve(message.plugin);
@@ -279,7 +295,7 @@ export class SafeVM {
       version: '1.0.0',
       type: 'api',
       author: 'system',
-      status: 'active'
+      status: 'approved'
     });
 
     this.mockInstallation = new PluginInstallation({

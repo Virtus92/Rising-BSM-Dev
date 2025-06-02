@@ -1,4 +1,4 @@
-import { PluginInstallationWizard } from '@/features/plugins';
+import { PluginInstallationComponent } from '@/features/plugins';
 
 interface PluginInstallPageProps {
   params: Promise<{ id: string }>;
@@ -7,5 +7,5 @@ interface PluginInstallPageProps {
 export default async function PluginInstallPage({ params }: PluginInstallPageProps) {
   const { id } = await params;
   
-  return <PluginInstallationWizard pluginId={id} />;
+  return <PluginInstallationComponent pluginId={id} />;
 }

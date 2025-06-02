@@ -66,10 +66,12 @@ export class PluginLicenseService implements IPluginLicenseService {
     userId: number,
     type: 'trial' | 'basic' | 'premium' | 'enterprise',
     options?: {
+      licenseKey?: string; // Optional pre-generated license key
       hardwareId?: string;
       maxInstalls?: number;
       expiresAt?: Date;
       usageLimits?: Record<string, any>;
+      marketplaceLicenseId?: string; // ID from marketplace
     }
   ): Promise<PluginLicenseDto> {
     // Verify plugin exists and is approved
@@ -87,8 +89,8 @@ export class PluginLicenseService implements IPluginLicenseService {
       throw new AppError('User already has an active license for this plugin', 400);
     }
 
-    // Generate license key
-    const licenseKey = this.encryptionService.generateLicenseKey();
+    // Generate license key or use provided one
+    const licenseKey = options?.licenseKey || this.encryptionService.generateLicenseKey();
 
     // Set default limits based on type
     const usageLimits = options?.usageLimits || this.getDefaultLimits(type);
@@ -121,6 +123,33 @@ export class PluginLicenseService implements IPluginLicenseService {
 
   async verifyLicense(data: VerifyLicenseDto): Promise<LicenseVerificationResult> {
     return this.verificationService.verifyLicense(data);
+  }
+
+  async verifyLicenseForDistribution(licenseKey: string, pluginId: number): Promise<boolean> {
+    try {
+      const license = await this.repository.findByLicenseKey(licenseKey);
+      if (!license) {
+        return false;
+      }
+
+      // Check if license belongs to the requested plugin
+      if (license.pluginId !== pluginId) {
+        return false;
+      }
+
+      // Check if license is active and not expired
+      if (license.status !== 'active') {
+        return false;
+      }
+
+      if (license.expiresAt && license.expiresAt < new Date()) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   async getLicenseByKey(licenseKey: string): Promise<PluginLicenseDto | null> {
@@ -230,7 +259,25 @@ export class PluginLicenseService implements IPluginLicenseService {
     return pluginLicenseToDto(updated);
   }
 
-  async revokeLicense(licenseId: number, reason?: string): Promise<void> {
+  async updateLicense(id: number, data: Partial<PluginLicense>): Promise<PluginLicenseDto> {
+    const license = await this.repository.update(id, data);
+    return pluginLicenseToDto(license);
+  }
+
+  async revokeLicense(licenseKeyOrId: number | string, reason?: string): Promise<void> {
+    let licenseId: number;
+    
+    // Check if we got a license key or ID
+    if (typeof licenseKeyOrId === 'string') {
+      const license = await this.repository.findByLicenseKey(licenseKeyOrId);
+      if (!license) {
+        throw new AppError('License not found', 404);
+      }
+      licenseId = license.id!;
+    } else {
+      licenseId = licenseKeyOrId;
+    }
+    
     await this.repository.revoke(licenseId, reason);
     
     // Clear verification cache
@@ -238,6 +285,18 @@ export class PluginLicenseService implements IPluginLicenseService {
     if (license) {
       this.verificationService.clearLicenseCache(license.licenseKey);
     }
+  }
+
+  async updateLastVerified(licenseKey: string): Promise<void> {
+    const license = await this.repository.findByLicenseKey(licenseKey);
+    if (license) {
+      await this.repository.updateLastVerified(license.id!);
+    }
+  }
+
+  async getLicensesByUser(userId: number): Promise<PluginLicenseDto[]> {
+    const licenses = await this.repository.findByUser(userId);
+    return licenses.map(l => pluginLicenseToDto(l));
   }
 
   async suspendLicense(licenseId: number, reason?: string): Promise<void> {

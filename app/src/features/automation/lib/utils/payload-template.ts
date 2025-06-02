@@ -28,6 +28,12 @@ export const ENTITY_VARIABLES: Record<AutomationEntityType, string[]> = {
     'id', 'name', 'email', 'phone', 'subject', 'message',
     'service', 'budget', 'urgency', 'status', 'source',
     'customerId', 'assignedTo', 'createdAt', 'updatedAt'
+  ],
+  [AutomationEntityType.PLUGIN]: [
+    'id', 'uuid', 'name', 'displayName', 'description', 'version',
+    'author', 'authorId', 'status', 'type', 'category', 'tags',
+    'downloads', 'rating', 'minAppVersion', 'maxAppVersion',
+    'createdAt', 'updatedAt'
   ]
 };
 

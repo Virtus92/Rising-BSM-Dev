@@ -42,6 +42,7 @@ export interface PluginDto extends BaseResponseDto {
   // Metadata
   downloads: number;
   rating: number;
+  marketplaceId?: string;
 }
 
 export interface PluginLicenseDto extends BaseResponseDto {
@@ -136,6 +137,7 @@ export interface CreatePluginDto {
   }>;
   // Support both dependency formats
   dependencies?: PluginDependencyFlexible[];
+  marketplaceId?: string;
 }
 
 export interface UpdatePluginDto {
@@ -255,6 +257,7 @@ export function pluginToDto(plugin: any): PluginDto {
     maxAppVersion: plugin.maxAppVersion,
     downloads: plugin.downloads,
     rating: plugin.rating,
+    marketplaceId: plugin.marketplaceId,
     createdAt: plugin.createdAt.toISOString(),
     updatedAt: plugin.updatedAt.toISOString(),
     createdBy: plugin.createdBy,

@@ -1,98 +1,101 @@
-import { NextRequest, NextResponse } from 'next/server';
+/**
+ * Plugin Installation API Routes
+ * 
+ * GET /api/plugins/installations - List user installations
+ * POST /api/plugins/installations - Install plugin
+ */
+
+import { NextRequest } from 'next/server';
+import { routeHandler } from '@/core/api/server/route-handler';
 import { formatResponse } from '@/core/errors';
-import { withAuth } from '@/features/auth/middleware';
-import { getPluginInstallationService } from '@/core/factories/index.server';
-import { InstallPluginDto } from '@/domain/dtos/PluginDtos';
+import { getPluginInstallationService, getPluginLicenseService } from '@/core/factories/serviceFactory.server';
+import { LoggingService } from '@/core/logging/LoggingService';
 import { z } from 'zod';
-import { getLogger } from '@/core/logging';
 
 export const runtime = 'nodejs';
 
-// GET /api/plugins/installations - Get user's installations
-export const GET = withAuth(
-  async (request: NextRequest) => {
-    const logger = getLogger();
-    try {
-      const userId = (request as any).auth?.userId;
-      if (!userId) {
-        return NextResponse.json(
-          formatResponse.error('User ID not found in auth context', 401),
-          { status: 401 }
-        );
-      }
-      
-      const installationService = getPluginInstallationService();
-      const installations = await installationService.getUserInstallations(userId);
+const logger = new LoggingService();
 
-      return NextResponse.json(
-        formatResponse.success(installations, 'Installations retrieved successfully'),
-        { status: 200 }
-      );
-    } catch (error: any) {
-      logger.error('Error retrieving installations:', error);
-      return NextResponse.json(
-        formatResponse.error(error instanceof Error ? error.message : 'Failed to retrieve installations', 500),
-        { status: 500 }
-      );
+// GET /api/plugins/installations - List user installations
+export const GET = routeHandler(async (req: NextRequest) => {
+  try {
+    logger.info('GET /api/plugins/installations - Getting user installations');
+    
+    const userId = parseInt(req.headers.get('X-Auth-User-ID') || '0');
+    if (!userId) {
+      return formatResponse.unauthorized('User not authenticated');
     }
-  },
-  {
-    requiredPermission: ['plugin.install.view']
+    
+    const service = getPluginInstallationService();
+    const installations = await service.getInstallationsByUser(userId);
+    
+    return formatResponse.success(installations);
+  } catch (error) {
+    logger.error('Error getting installations', { error });
+    const statusCode = error instanceof Error && 'status' in error ? (error as any).status : 500;
+    const message = error instanceof Error ? error.message : 'Failed to get installations';
+    return formatResponse.error(message, statusCode);
   }
-);
-
-// POST /api/plugins/installations - Install a plugin
-const installPluginSchema = z.object({
-  pluginId: z.number().positive(),
-  licenseKey: z.string(),
-  hardwareId: z.string().regex(/^[a-f0-9]{64}$/i)
+}, {
+  requiredPermissions: ['plugin.install']
 });
 
-export const POST = withAuth(
-  async (request: NextRequest) => {
-    const logger = getLogger();
-    try {
-      const body = await request.json();
-      const validatedData = installPluginSchema.parse(body);
-      
-      const installDto: InstallPluginDto = validatedData;
-      const userId = (request as any).auth?.userId;
-      if (!userId) {
-        return NextResponse.json(
-          formatResponse.error('User ID not found in auth context', 401),
-          { status: 401 }
-        );
-      }
-      
-      const installationService = getPluginInstallationService();
-      const result = await installationService.installPlugin(installDto, userId);
+const installPluginSchema = z.object({
+  pluginId: z.number(),
+  licenseKey: z.string(),
+  hardwareId: z.string()
+});
 
-      if (!result.success) {
-        return NextResponse.json(
-          formatResponse.error(result.error || 'Installation failed', 400),
-          { status: 400 }
-        );
-      }
-
-      return NextResponse.json(
-        formatResponse.success(result.installation, 'Plugin installed successfully'),
-        { status: 201 }
-      );
-    } catch (error: any) {
-      logger.error('Error installing plugin:', error);
-      if (error instanceof z.ZodError) {
-        return NextResponse.json(
-          formatResponse.error('Invalid installation data', 400),
-          { status: 400 }
-        );
-      }
-      return NextResponse.json(
-        formatResponse.error(error instanceof Error ? error.message : 'Failed to install plugin', 500),
-        { status: 500 }
-      );
+// POST /api/plugins/installations - Install plugin
+export const POST = routeHandler(async (req: NextRequest) => {
+  try {
+    logger.info('POST /api/plugins/installations - Installing plugin');
+    
+    const userId = parseInt(req.headers.get('X-Auth-User-ID') || '0');
+    if (!userId) {
+      return formatResponse.unauthorized('User not authenticated');
     }
-  },
-  {
-    requiredPermission: ['plugin.install']
+    
+    const body = await req.json();
+    const validated = installPluginSchema.parse(body);
+    
+    // Verify license ownership
+    const licenseService = getPluginLicenseService();
+    const license = await licenseService.getLicenseByKey(validated.licenseKey);
+    
+    if (!license) {
+      return formatResponse.notFound('License not found');
+    }
+    
+    if (license.userId !== userId) {
+      return formatResponse.forbidden('License belongs to another user');
+    }
+    
+    if (license.pluginId !== validated.pluginId) {
+      return formatResponse.badRequest('License is for a different plugin');
+    }
+    
+    // Install plugin
+    const service = getPluginInstallationService();
+    const installation = await service.installPlugin(
+      validated.pluginId,
+      license.id!,
+      userId,
+      validated.hardwareId
+    );
+    
+    return formatResponse.success(installation, 'Plugin installed successfully');
+  } catch (error) {
+    logger.error('Error installing plugin', { error });
+    
+    if (error instanceof z.ZodError) {
+      return formatResponse.validationError(error.flatten().fieldErrors);
+    }
+    
+    const statusCode = error instanceof Error && 'status' in error ? (error as any).status : 500;
+    const message = error instanceof Error ? error.message : 'Failed to install plugin';
+    return formatResponse.error(message, statusCode);
   }
-);
+}, {
+  requiredPermissions: ['plugin.install']
+});

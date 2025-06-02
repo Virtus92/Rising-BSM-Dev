@@ -2,7 +2,7 @@ import { Plugin } from '@/domain/entities/Plugin';
 import { PluginBundle, PluginBundleUtils } from '../core/PluginBundle';
 import { ILoggingService } from '@/core/logging';
 import { PluginEncryptionService } from '../security/PluginEncryptionService';
-import { LicenseVerificationService } from '../security/LicenseVerificationService';
+import { IPluginLicenseService } from '@/domain/services/IPluginLicenseService';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -46,7 +46,7 @@ export class PluginDistributionService {
   constructor(
     private readonly logger: ILoggingService,
     private readonly encryptionService: PluginEncryptionService,
-    private readonly licenseService: LicenseVerificationService,
+    private readonly licenseService: IPluginLicenseService,
     config?: Partial<DistributionConfig>
   ) {
     this.config = {
@@ -85,7 +85,7 @@ export class PluginDistributionService {
 
       // Verify signature if required
       if (this.config.signatureRequired && signature) {
-        const publicKey = await this.getPublicKey(plugin.publisherId);
+        const publicKey = await this.getPublicKey(plugin.authorId);
         const isValid = await PluginBundleUtils.verifyBundleSignature(
           bundle,
           signature,
@@ -131,7 +131,7 @@ export class PluginDistributionService {
 
       return metadata;
     } catch (error) {
-      this.logger.error('Failed to upload plugin bundle', error);
+      this.logger.error('Failed to upload plugin bundle', { error });
       throw error;
     }
   }
@@ -154,10 +154,7 @@ export class PluginDistributionService {
 
       // Verify license if provided
       if (licenseKey) {
-        const isValid = await this.licenseService.verifyLicense(
-          licenseKey,
-          pluginId.toString()
-        );
+        const isValid = await this.licenseService.verifyLicenseForDistribution(licenseKey, pluginId);
         if (!isValid) {
           throw new Error('Invalid license key');
         }
@@ -187,7 +184,7 @@ export class PluginDistributionService {
 
       return bundle;
     } catch (error) {
-      this.logger.error('Failed to download plugin bundle', error);
+      this.logger.error('Failed to download plugin bundle', { error });
       throw error;
     }
   }
@@ -216,7 +213,7 @@ export class PluginDistributionService {
 
       return versions;
     } catch (error) {
-      this.logger.error('Failed to get available versions', error);
+      this.logger.error('Failed to get available versions', { error });
       throw error;
     }
   }
@@ -240,7 +237,7 @@ export class PluginDistributionService {
 
       this.logger.info(`Deleted plugin bundle`, { pluginId, version });
     } catch (error) {
-      this.logger.error('Failed to delete plugin bundle', error);
+      this.logger.error('Failed to delete plugin bundle', { error });
       throw error;
     }
   }
@@ -402,7 +399,7 @@ export class PluginDistributionService {
         deletedVersions: versionsToDelete
       });
     } catch (error) {
-      this.logger.error('Failed to cleanup old versions', error);
+      this.logger.error('Failed to cleanup old versions', { error });
       throw error;
     }
   }
@@ -470,7 +467,7 @@ export class PluginDistributionService {
 
       return stats;
     } catch (error) {
-      this.logger.error('Failed to get storage stats', error);
+      this.logger.error('Failed to get storage stats', { error });
       throw error;
     }
   }

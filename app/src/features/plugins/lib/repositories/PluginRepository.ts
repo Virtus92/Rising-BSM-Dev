@@ -182,6 +182,7 @@ export class PluginRepository extends PrismaRepository<Plugin, number> implement
       maxAppVersion: data.maxAppVersion,
       downloads: data.downloads,
       rating: data.rating,
+      marketplaceId: data.marketplaceId,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt
     });
@@ -195,6 +196,7 @@ export class PluginRepository extends PrismaRepository<Plugin, number> implement
       displayName: entity.displayName,
       description: entity.description,
       version: entity.version,
+      author: entity.author,
       authorId: entity.authorId,
       status: entity.status,
       type: entity.type,
@@ -212,7 +214,8 @@ export class PluginRepository extends PrismaRepository<Plugin, number> implement
       minAppVersion: entity.minAppVersion,
       maxAppVersion: entity.maxAppVersion,
       downloads: entity.downloads,
-      rating: entity.rating
+      rating: entity.rating,
+      marketplaceId: entity.marketplaceId
     };
   }
 

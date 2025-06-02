@@ -6,8 +6,15 @@ export * from './lib';
 // Re-export from hooks
 export * from './hooks';
 
-// Re-export from components
-export * from './components';
+// Re-export from components (explicitly to avoid naming conflicts)
+export { 
+  PluginMarketplace,
+  PluginManager,
+  PluginDetail,
+  PluginInstallation as PluginInstallationComponent,
+  PluginForm,
+  InstalledPlugins
+} from './components';
 
 // Export plugin API types if needed
 export type { 

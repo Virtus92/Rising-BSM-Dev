@@ -312,13 +312,17 @@ export class ServiceFactory implements IServiceFactory {
       const repository = new PluginRepository(prisma);
       const encryptionService = new PluginEncryptionService();
       
+      // Get UserService instance for author information
+      const userService = this.createUserService();
+      
       this.pluginService = new PluginService(
         repository,
         getLogger(),
         getValidationService(),
         this.createActivityLogService(),
         this.createAutomationService(),
-        encryptionService
+        encryptionService,
+        userService
       );
     }
     return this.pluginService!;

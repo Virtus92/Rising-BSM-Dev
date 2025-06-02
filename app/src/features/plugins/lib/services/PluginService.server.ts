@@ -6,22 +6,27 @@ import { ILoggingService } from '@/core/logging';
 import { IValidationService } from '@/core/validation';
 import { IActivityLogService } from '@/domain/services/IActivityLogService';
 import { IAutomationService } from '@/domain/services/IAutomationService';
-import { ServiceError } from '@/core/errors';
-import { Plugin } from '@/domain/entities/Plugin';
+import { IUserService } from '@/domain/services/IUserService';
+import { AppError } from '@/core/errors';
+import { Plugin, PluginStatus } from '@/domain/entities/Plugin';
 import {
   PluginDto,
   CreatePluginDto,
   UpdatePluginDto,
   PluginSearchDto,
+  PluginDependencyFlexible,
   pluginToDto
 } from '@/domain/dtos/PluginDtos';
 import { ValidationResultDto } from '@/domain/dtos/ValidationDto';
+import { ValidationResult, ValidationErrorType } from '@/domain/enums/ValidationResults';
 import { PluginEncryptionService } from '../security/PluginEncryptionService';
 import { ServiceOptions } from '@/domain/services/IBaseService';
 import { PaginationResult } from '@/domain/repositories/IBaseRepository';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { EntityType } from '@/domain/enums/EntityTypes';
+import { AutomationEntityType, AutomationOperation } from '@/domain/entities/AutomationWebhook';
 
 /**
  * Server-side implementation of PluginService
@@ -36,7 +41,8 @@ export class PluginService implements IPluginService {
     private validator: IValidationService,
     private activityLog: IActivityLogService,
     private automationService: IAutomationService,
-    private encryptionService: PluginEncryptionService
+    private encryptionService: PluginEncryptionService,
+    private userService: IUserService
   ) {
     this.pluginStoragePath = process.env.PLUGIN_STORAGE_PATH || '/app/storage/plugins';
   }
@@ -74,26 +80,44 @@ export class PluginService implements IPluginService {
       // Validate plugin data
       const validation = await this.validate(data as any);
       if (!validation.isValid) {
-        throw new ServiceError('Validation failed', 400, validation.errors);
+        throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', validation.errors);
       }
 
       // Check if plugin name already exists
       const existing = await this.repository.findByName(data.name);
       if (existing) {
-        throw new ServiceError('Plugin with this name already exists', 409);
+        throw new AppError('Plugin with this name already exists', 409);
       }
 
       // Generate security keys
       const { publicKey, privateKey } = await this.encryptionService.generateKeyPair();
       const uuid = crypto.randomUUID();
 
+      // Get author information
+      const authorId = options?.context?.userId || 0;
+      let authorName = '';
+      
+      if (authorId) {
+        try {
+          const author = await this.userService.getById(authorId);
+          if (author) {
+            authorName = author.name;
+          } else {
+            this.logger.warn('Author user not found when creating plugin', { authorId });
+          }
+        } catch (error) {
+          this.logger.error('Failed to fetch author information', { error, authorId });
+          // Continue with empty author name rather than failing the plugin creation
+        }
+      }
+
       // Create plugin entity
       const plugin = new Plugin({
         ...data,
         uuid,
-        authorId: options?.context?.userId || 0,
-        author: '',
-        status: 'pending',
+        authorId,
+        author: authorName,
+        status: PluginStatus.PENDING,
         publicKey,
         certificate: '',
         checksum: '',
@@ -102,8 +126,17 @@ export class PluginService implements IPluginService {
         screenshots: data.screenshots || [],
         tags: data.tags || [],
         pricing: data.pricing || {},
-        permissions: data.permissions || [],
-        dependencies: data.dependencies || []
+        permissions: (data.permissions || []).map(p => ({
+          code: p.code,
+          name: p.name || p.code,
+          description: p.description,
+          required: p.required ?? false
+        })),
+        dependencies: (data.dependencies || []).map(d => ({
+          pluginName: d.pluginName || d.name || '',
+          minVersion: d.minVersion || d.version || '',
+          maxVersion: d.maxVersion
+        }))
       });
 
       const created = await this.repository.create(plugin);
@@ -112,20 +145,21 @@ export class PluginService implements IPluginService {
       await this.storePrivateKey(created.id!, privateKey);
 
       // Log activity
-      await this.activityLog.log({
-        userId: options?.context?.userId || 0,
-        action: 'plugin.created',
-        entityType: 'Plugin',
-        entityId: created.id!,
-        metadata: { pluginName: created.name }
-      });
+      await this.activityLog.createLog(
+        EntityType.PLUGIN,
+        created.id!,
+        authorId,
+        'plugin.created',
+        { pluginName: created.name, authorName }
+      );
 
       // Trigger automation
-      await this.automationService.triggerEvent('plugin.created', {
+      await this.automationService.triggerWebhook(AutomationEntityType.PLUGIN, AutomationOperation.CREATE, {
         pluginId: created.id,
         pluginName: created.name,
-        authorId: created.authorId
-      });
+        authorId: created.authorId,
+        authorName
+      }, created.id!);
 
       return pluginToDto(created);
     } catch (error) {
@@ -134,47 +168,63 @@ export class PluginService implements IPluginService {
     }
   }
 
-  async update(id: number, data: Partial<Plugin>, options?: ServiceOptions): Promise<PluginDto> {
+  async update(id: number, data: UpdatePluginDto, options?: ServiceOptions): Promise<PluginDto> {
     try {
       const plugin = await this.repository.findById(id);
       if (!plugin) {
-        throw new ServiceError('Plugin not found', 404);
+        throw new AppError('Plugin not found', 404);
       }
 
       // Check authorization
       const userId = options?.context?.userId || 0;
       if (plugin.authorId !== userId && !options?.context?.isAdmin) {
-        throw new ServiceError('Unauthorized to update this plugin', 403);
+        throw new AppError('Unauthorized to update this plugin', 403);
       }
 
       // Validate update data
       const validation = await this.validate(data, true, id);
       if (!validation.isValid) {
-        throw new ServiceError('Validation failed', 400, validation.errors);
+        throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', validation.errors);
       }
+
+      // Convert DTO to entity format
+      const updateData: Partial<Plugin> = {
+        ...data,
+        permissions: data.permissions ? (data.permissions || []).map(p => ({
+          code: p.code,
+          name: p.name || p.code,
+          description: p.description,
+          required: p.required ?? false
+        })) : undefined,
+        dependencies: data.dependencies ? (data.dependencies || []).map(d => ({
+          pluginName: d.pluginName || d.name || '',
+          minVersion: d.minVersion || d.version || '',
+          maxVersion: d.maxVersion
+        })) : undefined
+      };
 
       // Prevent certain updates based on status
-      if (plugin.status === 'approved' && data.status !== 'suspended') {
-        delete data.displayName; // Can't change name after approval
-        delete data.name;
+      if (plugin.status === 'approved' && updateData.status !== 'suspended') {
+        delete updateData.displayName; // Can't change name after approval
+        delete updateData.name;
       }
 
-      const updated = await this.repository.update(id, data);
+      const updated = await this.repository.update(id, updateData);
 
       // Log activity
-      await this.activityLog.log({
+      await this.activityLog.createLog(
+        EntityType.PLUGIN,
+        id,
         userId,
-        action: 'plugin.updated',
-        entityType: 'Plugin',
-        entityId: id,
-        metadata: { changes: Object.keys(data) }
-      });
+        'plugin.updated',
+        { changes: Object.keys(data) }
+      );
 
       // Trigger automation
-      await this.automationService.triggerEvent('plugin.updated', {
+      await this.automationService.triggerWebhook(AutomationEntityType.PLUGIN, AutomationOperation.UPDATE, {
         pluginId: id,
         changes: data
-      });
+      }, id);
 
       return pluginToDto(updated);
     } catch (error) {
@@ -187,7 +237,7 @@ export class PluginService implements IPluginService {
     try {
       const plugin = await this.repository.findById(id);
       if (!plugin) {
-        throw new ServiceError('Plugin not found', 404);
+        throw new AppError('Plugin not found', 404);
       }
 
       // Delete associated files
@@ -202,19 +252,19 @@ export class PluginService implements IPluginService {
       const result = await this.repository.delete(id);
 
       // Log activity
-      await this.activityLog.log({
-        userId: 0, // System action
-        action: 'plugin.deleted',
-        entityType: 'Plugin',
-        entityId: id,
-        metadata: { pluginName: plugin.name }
-      });
+      await this.activityLog.createLog(
+        EntityType.PLUGIN,
+        id,
+        0, // System action
+        'plugin.deleted',
+        { pluginName: plugin.name }
+      );
 
       // Trigger automation
-      await this.automationService.triggerEvent('plugin.deleted', {
+      await this.automationService.triggerWebhook(AutomationEntityType.PLUGIN, AutomationOperation.DELETE, {
         pluginId: id,
         pluginName: plugin.name
-      });
+      }, id);
 
       return result;
     } catch (error) {
@@ -235,15 +285,15 @@ export class PluginService implements IPluginService {
     try {
       const plugin = await this.repository.findById(pluginId);
       if (!plugin) {
-        throw new ServiceError('Plugin not found', 404);
+        throw new AppError('Plugin not found', 404);
       }
 
       if (plugin.authorId !== userId) {
-        throw new ServiceError('Unauthorized to submit this plugin', 403);
+        throw new AppError('Unauthorized to submit this plugin', 403);
       }
 
       if (plugin.status !== 'pending') {
-        throw new ServiceError('Plugin must be in pending status to submit for review', 400);
+        throw new AppError('Plugin must be in pending status to submit for review', 400);
       }
 
       // Verify plugin bundle exists
@@ -251,18 +301,18 @@ export class PluginService implements IPluginService {
       try {
         await fs.access(bundlePath);
       } catch {
-        throw new ServiceError('Plugin bundle must be uploaded before submission', 400);
+        throw new AppError('Plugin bundle must be uploaded before submission', 400);
       }
 
-      await this.repository.update(pluginId, { status: 'review' });
+      await this.repository.update(pluginId, { status: PluginStatus.REVIEW });
 
       // Log activity
-      await this.activityLog.log({
+      await this.activityLog.createLog(
+        EntityType.PLUGIN,
+        pluginId,
         userId,
-        action: 'plugin.submitted_for_review',
-        entityType: 'Plugin',
-        entityId: pluginId
-      });
+        'plugin.submitted_for_review'
+      );
     } catch (error) {
       this.logger.error('Failed to submit plugin for review', { error, pluginId });
       throw error;
@@ -273,31 +323,32 @@ export class PluginService implements IPluginService {
     try {
       const plugin = await this.repository.findById(pluginId);
       if (!plugin) {
-        throw new ServiceError('Plugin not found', 404);
+        throw new AppError('Plugin not found', 404);
       }
 
       // Generate certificate
       const certificate = await this.generatePluginCertificate(plugin);
 
       await this.repository.update(pluginId, {
-        status: 'approved',
+        status: PluginStatus.APPROVED,
         certificate
       });
 
       // Log activity
-      await this.activityLog.log({
-        userId: reviewerId,
-        action: 'plugin.approved',
-        entityType: 'Plugin',
-        entityId: pluginId
-      });
+      await this.activityLog.createLog(
+        EntityType.PLUGIN,
+        pluginId,
+        reviewerId,
+        'plugin.approved'
+      );
 
       // Trigger automation
-      await this.automationService.triggerEvent('plugin.approved', {
+      await this.automationService.triggerWebhook(AutomationEntityType.PLUGIN, AutomationOperation.STATUS_CHANGED, {
         pluginId,
         pluginName: plugin.name,
-        authorId: plugin.authorId
-      });
+        authorId: plugin.authorId,
+        newStatus: 'approved'
+      }, pluginId);
     } catch (error) {
       this.logger.error('Failed to approve plugin', { error, pluginId });
       throw error;
@@ -308,30 +359,31 @@ export class PluginService implements IPluginService {
     try {
       const plugin = await this.repository.findById(pluginId);
       if (!plugin) {
-        throw new ServiceError('Plugin not found', 404);
+        throw new AppError('Plugin not found', 404);
       }
 
       await this.repository.update(pluginId, {
-        status: 'rejected',
+        status: PluginStatus.REJECTED,
         description: plugin.description ? `${plugin.description}\n\nRejection reason: ${reason}` : `Rejection reason: ${reason}`
       });
 
       // Log activity
-      await this.activityLog.log({
-        userId: reviewerId,
-        action: 'plugin.rejected',
-        entityType: 'Plugin',
-        entityId: pluginId,
-        metadata: { reason }
-      });
+      await this.activityLog.createLog(
+        EntityType.PLUGIN,
+        pluginId,
+        reviewerId,
+        'plugin.rejected',
+        { reason }
+      );
 
       // Trigger automation
-      await this.automationService.triggerEvent('plugin.rejected', {
+      await this.automationService.triggerWebhook(AutomationEntityType.PLUGIN, AutomationOperation.STATUS_CHANGED, {
         pluginId,
         pluginName: plugin.name,
         authorId: plugin.authorId,
-        reason
-      });
+        reason,
+        newStatus: 'rejected'
+      }, pluginId);
     } catch (error) {
       this.logger.error('Failed to reject plugin', { error, pluginId });
       throw error;
@@ -342,28 +394,29 @@ export class PluginService implements IPluginService {
     try {
       const plugin = await this.repository.findById(pluginId);
       if (!plugin) {
-        throw new ServiceError('Plugin not found', 404);
+        throw new AppError('Plugin not found', 404);
       }
 
       await this.repository.update(pluginId, {
-        status: 'suspended'
+        status: PluginStatus.SUSPENDED
       });
 
       // Log activity
-      await this.activityLog.log({
-        userId: reviewerId,
-        action: 'plugin.suspended',
-        entityType: 'Plugin',
-        entityId: pluginId,
-        metadata: { reason }
-      });
+      await this.activityLog.createLog(
+        EntityType.PLUGIN,
+        pluginId,
+        reviewerId,
+        'plugin.suspended',
+        { reason }
+      );
 
       // Trigger automation
-      await this.automationService.triggerEvent('plugin.suspended', {
+      await this.automationService.triggerWebhook(AutomationEntityType.PLUGIN, AutomationOperation.STATUS_CHANGED, {
         pluginId,
         pluginName: plugin.name,
-        reason
-      });
+        reason,
+        newStatus: 'suspended'
+      }, pluginId);
     } catch (error) {
       this.logger.error('Failed to suspend plugin', { error, pluginId });
       throw error;
@@ -454,11 +507,11 @@ export class PluginService implements IPluginService {
     try {
       const plugin = await this.repository.findById(pluginId);
       if (!plugin) {
-        throw new ServiceError('Plugin not found', 404);
+        throw new AppError('Plugin not found', 404);
       }
 
       if (plugin.authorId !== userId) {
-        throw new ServiceError('Unauthorized to upload bundle for this plugin', 403);
+        throw new AppError('Unauthorized to upload bundle for this plugin', 403);
       }
 
       // Calculate checksum
@@ -477,13 +530,13 @@ export class PluginService implements IPluginService {
       await this.repository.update(pluginId, { checksum });
 
       // Log activity
-      await this.activityLog.log({
+      await this.activityLog.createLog(
+        EntityType.PLUGIN,
+        pluginId,
         userId,
-        action: 'plugin.bundle_uploaded',
-        entityType: 'Plugin',
-        entityId: pluginId,
-        metadata: { checksum, size: bundle.length }
-      });
+        'plugin.bundle_uploaded',
+        { checksum, size: bundle.length }
+      );
 
       return signature;
     } catch (error) {
@@ -496,7 +549,7 @@ export class PluginService implements IPluginService {
     try {
       const plugin = await this.repository.findById(pluginId);
       if (!plugin) {
-        throw new ServiceError('Plugin not found', 404);
+        throw new AppError('Plugin not found', 404);
       }
 
       const data = Buffer.from(JSON.stringify({
@@ -517,7 +570,7 @@ export class PluginService implements IPluginService {
     try {
       const plugin = await this.repository.findById(pluginId);
       if (!plugin) {
-        throw new ServiceError('Plugin not found', 404);
+        throw new AppError('Plugin not found', 404);
       }
 
       const data = Buffer.from(JSON.stringify({
@@ -554,7 +607,7 @@ export class PluginService implements IPluginService {
     }
   }
 
-  async validate(data: Partial<Plugin>, isUpdate?: boolean, entityId?: number): Promise<ValidationResultDto> {
+  async validate(data: CreatePluginDto | UpdatePluginDto, isUpdate?: boolean, entityId?: number): Promise<ValidationResultDto> {
     const validationData = {
       ...data,
       __entity: 'plugin',
@@ -562,7 +615,19 @@ export class PluginService implements IPluginService {
       __entityId: entityId
     };
 
-    return await this.validator.validate(validationData, 'plugin');
+    const validationResult = await this.validator.validate(validationData, 'plugin');
+    
+    // Convert ValidationResult to ValidationResultDto
+    return {
+      result: validationResult.isValid ? ValidationResult.SUCCESS : ValidationResult.ERROR,
+      isValid: validationResult.isValid,
+      errors: validationResult.errors?.map(error => ({
+        type: ValidationErrorType.INVALID,
+        field: 'unknown',
+        message: error,
+        data: {}
+      }))
+    };
   }
 
   async transaction<R>(callback: (service: IPluginService) => Promise<R>): Promise<R> {
@@ -570,7 +635,7 @@ export class PluginService implements IPluginService {
     return callback(this);
   }
 
-  async bulkUpdate(ids: number[], data: Partial<Plugin>, options?: ServiceOptions): Promise<number> {
+  async bulkUpdate(ids: number[], data: UpdatePluginDto, options?: ServiceOptions): Promise<number> {
     let updated = 0;
     for (const id of ids) {
       try {
@@ -587,8 +652,21 @@ export class PluginService implements IPluginService {
     return pluginToDto(entity);
   }
 
-  fromDTO(dto: Partial<Plugin>): Partial<Plugin> {
-    return dto;
+  fromDTO(dto: CreatePluginDto | UpdatePluginDto): Partial<Plugin> {
+    return {
+      ...dto,
+      permissions: dto.permissions ? dto.permissions.map(p => ({
+        code: p.code,
+        name: p.name || p.code,
+        description: p.description,
+        required: p.required ?? false
+      })) : undefined,
+      dependencies: dto.dependencies ? dto.dependencies.map(d => ({
+        pluginName: d.pluginName || d.name || '',
+        minVersion: d.minVersion || d.version || '',
+        maxVersion: d.maxVersion
+      })) : undefined
+    };
   }
 
   async search(searchText: string, options?: ServiceOptions): Promise<PluginDto[]> {
@@ -657,7 +735,7 @@ export class PluginService implements IPluginService {
     try {
       return await fs.readFile(keyPath, 'utf-8');
     } catch (error) {
-      throw new ServiceError('Private key not found for plugin', 404);
+      throw new AppError('Private key not found for plugin', 404);
     }
   }
 
