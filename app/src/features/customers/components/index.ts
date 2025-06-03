@@ -6,7 +6,7 @@
 
 export * from './CustomerAppointmentsTab';
 export * from './CustomerDetail';
-export * from './CustomerFilterPanel';
+export * from '@/shared/components/filters/CustomerFilterPanel';
 export * from './CustomerForm';
 export * from './CustomerList';
 export * from './CustomerListItem';

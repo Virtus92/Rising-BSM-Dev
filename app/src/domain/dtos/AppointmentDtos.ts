@@ -342,6 +342,16 @@ export interface AppointmentFilterParamsDto extends BaseFilterParamsDto {
   createdById?: number;
   
   /**
+   * Start date for filtering appointments
+   */
+  startDate?: string | Date;
+  
+  /**
+   * End date for filtering appointments
+   */
+  endDate?: string | Date;
+  
+  /**
    * Nur heutige Termine
    */
   today?: boolean;

@@ -23,34 +23,45 @@ export function useSearch() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Get data from entity hooks
-  const { customers, isLoading: isLoadingCustomers, refetch: refetchCustomers } = useCustomers({
-    search: searchTerm,
+  // Get data from entity hooks - don't pass initial search term
+  const customersHook = useCustomers({
     limit: 5
   });
   
-  const { appointments, isLoading: isLoadingAppointments, refetch: refetchAppointments } = useAppointments({
-    search: searchTerm,
+  const appointmentsHook = useAppointments({
     limit: 5
   });
 
-  const { requests, isLoading: isLoadingRequests, refetch: refetchRequests } = useRequests({
-    search: searchTerm,
+  const requestsHook = useRequests({
     limit: 5
   });
+  
+  // Extract what we need
+  const { items: customers = [], isLoading: isLoadingCustomers, setSearch: setCustomerSearch, refetch: refetchCustomers } = customersHook;
+  const { items: appointments = [], isLoading: isLoadingAppointments, setSearch: setAppointmentSearch, refetch: refetchAppointments } = appointmentsHook;
+  const { items: requests = [], isLoading: isLoadingRequests, setSearch: setRequestSearch, refetch: refetchRequests } = requestsHook;
 
-  // Perform search across entities - removed data dependencies to prevent infinite loop
+  // Perform search across entities
   const search = useCallback(async (term: string) => {
     if (!term) {
       setSearchResults([]);
+      // Clear search in all hooks
+      setCustomerSearch('');
+      setAppointmentSearch('');
+      setRequestSearch('');
       return;
     }
 
     setIsSearching(true);
     
     try {
-      // Refetch data with the search term
-      await Promise.all([
+      // Update search term in all hooks before refetching
+      setCustomerSearch(term);
+      setAppointmentSearch(term);
+      setRequestSearch(term);
+      
+      // Refetch data with the new search term
+      await Promise.allSettled([
         refetchCustomers(),
         refetchAppointments(),
         refetchRequests()
@@ -60,36 +71,44 @@ export function useSearch() {
     } finally {
       setIsSearching(false);
     }
-  }, [refetchCustomers, refetchAppointments, refetchRequests]);
+  }, [setCustomerSearch, setAppointmentSearch, setRequestSearch, refetchCustomers, refetchAppointments, refetchRequests]);
 
   // Combine results whenever data changes
   useEffect(() => {
     if (searchTerm && !isSearching) {
-      // Combine results
+      // Combine results - ensure arrays are defined
+      const customerResults = Array.isArray(customers) ? customers : [];
+      const appointmentResults = Array.isArray(appointments) ? appointments : [];
+      const requestResults = Array.isArray(requests) ? requests : [];
+      
       const results: SearchResult[] = [
-        ...customers.map(customer => ({
+        ...customerResults.map(customer => ({
           id: customer.id,
           name: customer.name,
           email: customer.email,
           type: 'customer' as const
         })),
-        ...appointments.map(appointment => ({
+        ...appointmentResults.map(appointment => ({
           id: appointment.id,
           title: appointment.title,
           customerName: appointment.customerName,
           date: appointment.appointmentDate,
           type: 'appointment' as const
         })),
-        ...requests.map(request => ({
+        ...requestResults.map(request => ({
           id: request.id,
           name: request.name,
           title: request.service || request.name,
           email: request.email,
+          service: request.service,
+          createdAt: request.createdAt,
           type: 'request' as const
         }))
       ];
       
       setSearchResults(results);
+    } else if (!searchTerm) {
+      setSearchResults([]);
     }
   }, [customers, appointments, requests, searchTerm, isSearching]);
   

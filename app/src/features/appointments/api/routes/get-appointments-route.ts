@@ -8,6 +8,8 @@ import { getLogger } from '@/core/logging';
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
+import { AppointmentStatus } from '@/domain/enums/CommonEnums';
+import { AppointmentFilterParamsDto } from '@/domain/dtos/AppointmentDtos';
 
 /**
  * Handles GET /api/appointments - List appointments
@@ -37,37 +39,84 @@ export async function getAppointmentsHandler(
       );
     }
     
-    // Parse query parameters
-    const page = parseInt(request.nextUrl.searchParams.get('page') || '1', 10);
-    const limit = parseInt(request.nextUrl.searchParams.get('limit') || '10', 10);
-    const search = request.nextUrl.searchParams.get('search') || undefined;
-    const sortBy = request.nextUrl.searchParams.get('sortBy') || undefined;
-    const sortDirection = (request.nextUrl.searchParams.get('sortDirection') as 'asc' | 'desc') || undefined;
-  
-    // Extract customerId parameter if present
-    const customerId = request.nextUrl.searchParams.get('customerId') 
-      ? parseInt(request.nextUrl.searchParams.get('customerId') || '0', 10) 
-      : undefined;
+    // Extract filter parameters from query - COMPREHENSIVE PARAMETER EXTRACTION
+    const { searchParams } = new URL(request.url);
+    
+    // Check for permitted sort fields to prevent errors
+    const requestedSortBy = searchParams.get('sortBy') || 'appointmentDate';
+    const permittedSortFields = ['appointmentDate', 'appointmentTime', 'title', 'status', 'customerId', 'createdAt', 'updatedAt'];
+    const sortBy = permittedSortFields.includes(requestedSortBy) ? requestedSortBy : 'appointmentDate';
+    
+    // Ensure sort direction is valid
+    const requestedSortDirection = searchParams.get('sortDirection') || 'asc';
+    const sortDirection = ['asc', 'desc'].includes(requestedSortDirection) ? requestedSortDirection as 'asc' | 'desc' : 'asc';
+    
+    // Build comprehensive filter object
+    const filters: AppointmentFilterParamsDto = {
+      search: searchParams.get('search') || undefined,
+      status: searchParams.get('status') as AppointmentStatus || undefined,
+      customerId: searchParams.has('customerId') 
+        ? parseInt(searchParams.get('customerId') as string, 10)
+        : undefined,
+      createdById: searchParams.has('createdById')
+        ? parseInt(searchParams.get('createdById') as string, 10)
+        : undefined,
+      // Date filtering
+      startDate: searchParams.get('startDate') || undefined,
+      endDate: searchParams.get('endDate') || undefined,
+      // Special date filters
+      today: searchParams.has('today') 
+        ? searchParams.get('today') === 'true'
+        : undefined,
+      upcoming: searchParams.has('upcoming')
+        ? searchParams.get('upcoming') === 'true'
+        : undefined,
+      past: searchParams.has('past')
+        ? searchParams.get('past') === 'true'
+        : undefined,
+      // Pagination
+      page: searchParams.has('page') 
+        ? parseInt(searchParams.get('page') as string, 10)
+        : 1,
+      limit: searchParams.has('limit') 
+        ? parseInt(searchParams.get('limit') as string, 10)
+        : 10,
+      // Sorting
+      sortBy: sortBy,
+      sortDirection: sortDirection
+    };
+    
+    logger.debug('Appointment filters:', filters);
     
     // Get appointment service
     const appointmentService = serviceFactory.createAppointmentService();
     
-    // CRITICAL FIX: Always include customer relations for complete appointment data
+    // Get user from headers (set by auth middleware)
+    const userId = parseInt(request.headers.get('X-User-Id') || '0');
+    const context = { userId };
+    
+    // Use the service for getting data with comprehensive filters
     const result = await appointmentService.getAll({
-      page,
-      limit,
+      context,
+      page: filters.page,
+      limit: filters.limit,
       filters: {
-        search,
-        sortBy,
-        sortDirection,
-        customerId // Add customerId to filters
+        status: filters.status,
+        customerId: filters.customerId,
+        createdById: filters.createdById,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        today: filters.today,
+        upcoming: filters.upcoming,
+        past: filters.past,
+        search: filters.search // CRITICAL: Include search in filters
+      },
+      sort: {
+        field: filters.sortBy || 'appointmentDate',
+        direction: (filters.sortDirection || 'asc') as 'asc' | 'desc'
       },
       // Always include customer relation for complete data
-      relations: ['customer'],
-      context: {
-        userId: request.auth.userId,
-        ipAddress: request.headers.get('x-forwarded-for') || 'unknown'
-      }
+      relations: ['customer']
     });
     
     return formatResponse.success(result, 'Appointments retrieved successfully');

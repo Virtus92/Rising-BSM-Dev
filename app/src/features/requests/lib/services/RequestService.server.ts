@@ -1634,7 +1634,7 @@ export class RequestServiceImpl implements IRequestService {
       updatedAt: entity.updatedAt.toISOString(),
       createdBy: entity.createdBy,
       updatedBy: entity.updatedBy,
-      service: entity.service || entity.source || 'web',
+      service: entity.service || 'Unknown Service',
       statusLabel,
       statusClass
     };

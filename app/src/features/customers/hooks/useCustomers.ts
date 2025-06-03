@@ -133,6 +133,31 @@ export const useCustomers = (initialFilters?: Partial<CustomerFilterParamsDto>):
         };
       }
     },
+    
+    // Add response adapter to properly extract data from API response
+    responseAdapter: (response) => {
+      // Handle the API response structure
+      const data = response?.data || response;
+      
+      // Extract items - API returns data.data for success responses
+      let items: CustomerDto[] = [];
+      if (data && data.data && Array.isArray(data.data)) {
+        items = data.data;
+      } else if (Array.isArray(data)) {
+        items = data;
+      }
+      
+      // Extract pagination
+      const pagination = data?.pagination || {
+        page: 1,
+        limit: 10,
+        total: items.length,
+        totalPages: 1
+      };
+      
+      return { items, pagination };
+    },
+    
     initialFilters: {
       page: 1,
       limit: 10,

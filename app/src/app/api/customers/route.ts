@@ -42,6 +42,7 @@ export const GET = routeHandler(
           status: searchParams.get('status') as CommonStatus || undefined,
           type: searchParams.get('type') as CustomerType|| undefined,
           city: searchParams.get('city') || undefined,
+          country: searchParams.get('country') || undefined, // FIX: Added missing country filter
           postalCode: searchParams.get('postalCode') || undefined,
           newsletter: searchParams.has('newsletter') 
             ? searchParams.get('newsletter') === 'true'
@@ -74,6 +75,7 @@ export const GET = routeHandler(
             status: filters.status,
             type: filters.type,
             city: filters.city,
+            country: filters.country, // FIX: Added missing country filter
             postalCode: filters.postalCode,
             newsletter: filters.newsletter,
             search: filters.search

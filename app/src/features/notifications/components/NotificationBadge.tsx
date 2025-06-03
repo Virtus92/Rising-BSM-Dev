@@ -36,8 +36,8 @@ export default function NotificationBadge({ className = '', iconOnly = false }: 
   // Always create the notifications hook - never conditionally render hooks
   // Control data fetching with the autoFetch parameter instead
   const notifications = useNotifications({
-    limit: dropdownOpen ? 5 : 1,
-    unreadOnly: !dropdownOpen,
+    limit: dropdownOpen ? 10 : 10, // Always fetch 10 to get accurate count
+    unreadOnly: false, // Always fetch all to see both read and unread
     autoFetch: shouldFetch,
     pollInterval: 300000 // 5 minutes
   });
@@ -129,7 +129,7 @@ export default function NotificationBadge({ className = '', iconOnly = false }: 
 
       {/* Dropdown notification list */}
       {dropdownOpen && isAuthenticated && (
-        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-md shadow-lg z-50 overflow-hidden">
+        <div className="absolute md:right-0 right-1/2 md:transform-none transform translate-x-1/2 mt-2 w-80 bg-white dark:bg-slate-800 rounded-md shadow-lg z-50 overflow-hidden">
           <NotificationDropdown 
             notifications={notifications}
             onClose={() => setDropdownOpen(false)}

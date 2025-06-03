@@ -125,7 +125,7 @@ export const useNotifications = ({
   unreadOnly = false,
   page = 1,
   autoFetch = true,
-  pollInterval = 315
+  pollInterval = 300000 // Default to 5 minutes in milliseconds
 }: UseNotificationsProps = {}): UseNotificationsResult => {
   // Always call hooks in the same order
   const { toast } = useToast();
@@ -139,7 +139,6 @@ export const useNotifications = ({
   const authReadyRef = useRef(false);
   const instanceId = useRef(`notification-instance-${Date.now()}-${Math.random().toString(36).substring(7)}`);
   const baseListRef = useRef<BaseListUtility<NotificationResponseDto, NotificationFilterParamsDto> | null>(null);
-  const effectiveIntervalRef = useRef<number>(pollInterval);
   
   // Store the authentication state in a ref to avoid dependency issues
   const authStateRef = useRef({ isAuthenticated, user });
@@ -241,9 +240,19 @@ export const useNotifications = ({
         
         // If successful, update cached unread count
         if (result.success) {
-          // Extract data correctly whether it's in data.data or directly in data
-          const notifications = Array.isArray(result.data) ? result.data : 
-                           result.data?.data && Array.isArray(result.data.data) ? result.data.data : [];
+          // Extract notifications from the response structure
+          let notifications: NotificationResponseDto[] = [];
+          
+          if (result.data) {
+            // Check for nested data structure
+            if ('items' in result.data && Array.isArray(result.data.items)) {
+              notifications = result.data.items;
+            } else if ('data' in result.data && Array.isArray(result.data.data)) {
+              notifications = result.data.data;
+            } else if (Array.isArray(result.data)) {
+              notifications = result.data;
+            }
+          }
           
           // Count unread items
           const unreadCount = notifications.filter((item: NotificationResponseDto) => !item.isRead).length;
@@ -325,10 +334,8 @@ export const useNotifications = ({
   // This follows React's Rules of Hooks
   const baseList = createBaseListUtility<NotificationResponseDto, NotificationFilterParamsDto>(listConfig);
   
-  // Store the list reference for other functions to use
-  useEffect(() => {
-    baseListRef.current = baseList;
-  }, [baseList]);
+  // Store the list reference immediately
+  baseListRef.current = baseList;
   
   // Calculate unread count using useMemo to avoid direct property access
   const unreadCount = useMemo(() => {
@@ -343,48 +350,36 @@ export const useNotifications = ({
     return count || notificationsState.getCachedUnreadCount();
   }, [baseList?.items]);
   
-  // Handle auto-fetch based on authentication status with improved reliability
+  // Handle auto-fetch based on authentication status - simplified version
   useEffect(() => {
-    // Skip if auth not ready
-    if (!authReadyRef.current) return;
-    
-    // Clear any polling interval when authentication changes
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    
-    // Don't set up fetching if not authenticated
-    if (!isAuthenticated || !user) {
-      didInitialFetchRef.current = false;
+    // Skip if auth not ready or not authenticated
+    if (!authReadyRef.current || !isAuthenticated || !user || !autoFetch) {
       return;
     }
     
     // Register this instance in the global state
     notificationsState.addInstance(instanceId.current);
     
-    // Always do an initial fetch when authenticated and auto-fetch is enabled
-    if (autoFetch && !didInitialFetchRef.current) {
-      // Delay initial fetch to avoid too many simultaneous requests
-      const offset = Math.min(1000 + (notificationsState.getInstanceCount() * 300), 5000);
-      
+    // Do initial fetch after a short delay
+    if (!didInitialFetchRef.current && baseListRef.current) {
       const initialFetchTimer = setTimeout(() => {
         if (authStateRef.current.isAuthenticated && authStateRef.current.user && baseListRef.current) {
-          logger.debug(`[Notifications] Initial fetch for ${instanceId.current}`);
-          
-          // Set this flag before the fetch to prevent duplicates
           didInitialFetchRef.current = true;
-          
-          // Perform the fetch
           baseListRef.current.refetch().catch(err => {
-            logger.error('[Notifications] Initial fetch error:', err as Error);
+            logger.error('[Notifications] Initial fetch error:', err);
           });
         }
-      }, offset);
+      }, 1000);
       
-      // Only set up polling for the main instance
-      if (notificationsState.isMainInstance(instanceId.current)) {
-        setupPolling();
+      // Set up polling only for the main instance
+      if (pollInterval > 0 && notificationsState.isMainInstance(instanceId.current)) {
+        intervalRef.current = setInterval(() => {
+          if (authStateRef.current.isAuthenticated && authStateRef.current.user && baseListRef.current) {
+            baseListRef.current.refetch().catch(err => {
+              logger.error('[Notifications] Poll refetch error:', err);
+            });
+          }
+        }, pollInterval);
       }
       
       return () => {
@@ -393,100 +388,21 @@ export const useNotifications = ({
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
-        
-        // Unregister this instance
-        notificationsState.removeInstance(instanceId.current);
-      };
-    }
-    // Just set up polling without initial fetch if needed
-    else if (notificationsState.isMainInstance(instanceId.current)) {
-      setupPolling();
-      
-      return () => {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-        
-        // Unregister this instance
         notificationsState.removeInstance(instanceId.current);
       };
     }
     
     return () => {
-      // Unregister this instance
       notificationsState.removeInstance(instanceId.current);
     };
-    
-    // Function to set up polling with improved reliability
-    function setupPolling() {
-      // Clear any existing interval
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      
-      // Set a minimum poll interval of 60 seconds
-      const effectivePollInterval = Math.max(pollInterval * 1000, 60000); 
-      effectiveIntervalRef.current = effectivePollInterval;
-      
-      logger.debug(`[Notifications] Setting up poll interval: ${Math.round(effectivePollInterval / 1000)}s for ${instanceId.current}`);
-      
-      intervalRef.current = setInterval(() => {
-        const { isAuthenticated, user } = authStateRef.current;
-        if (isAuthenticated && user && baseListRef.current) {
-          // Only refetch if no request is in progress and we've waited at least 5 seconds
-          const now = Date.now();
-          const timeSinceLastFetch = now - notificationsState.getLastFetchTime();
-          
-          if (!notificationsState.isRequestInProgress() && timeSinceLastFetch >= 5000) {
-            logger.debug(`[Notifications] Poll interval triggered for ${instanceId.current} after ${Math.round(timeSinceLastFetch/1000)}s`);
-            
-            // Use a try-catch to prevent errors from stopping the polling
-            try {
-              baseListRef.current.refetch().catch(err => {
-                logger.error('[Notifications] Poll refetch error:', err as Error);
-              });
-            } catch (error) {
-              logger.error('[Notifications] Error in polling interval:', error as Error);
-            }
-          }
-        }
-      }, effectivePollInterval);
-    }
   }, [isAuthenticated, user, autoFetch, pollInterval]);
   
-  // Track this hook instance for debugging with improved HMR handling
+  // Cleanup effect - simplified
   useEffect(() => {
-    // Register this instance when mounted
-    logger.debug(`[Notifications] Instance ${instanceId.current} mounted. Total: ${notificationsState.getInstanceCount() + 1}`);
-    
-    // Handle HMR scenario - set up custom event listeners
-    const handleHmrEvent = () => {
-      logger.debug(`[Notifications] HMR event detected for ${instanceId.current}, refreshing state`);
-      
-      // Reset state when HMR occurs
-      notificationsState.reset();
-      notificationsState.incrementHmrCount();
-      
-      // Trigger a refresh if component is still mounted
-      if (baseListRef.current) {
-        baseListRef.current.refetch().catch(err => {
-          logger.error('[Notifications] HMR refetch error:', err as Error);
-        });
-      }
-    };
-    
-    // Listen for both HMR event types
-    window.addEventListener('hmr-reload', handleHmrEvent);
-    window.addEventListener('fast-refresh-reload', handleHmrEvent);
-    
     return () => {
-      // Cleanup event listeners and instance tracking
-      window.removeEventListener('hmr-reload', handleHmrEvent);
-      window.removeEventListener('fast-refresh-reload', handleHmrEvent);
-      
-      logger.debug(`[Notifications] Instance ${instanceId.current} unmounted. Remaining: ${notificationsState.getInstanceCount() - 1}`);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     };
   }, []);
   
@@ -668,76 +584,16 @@ export const useNotifications = ({
     }
   }, []);  // No dependencies - auth state accessed via ref
   
-  // Create the result object to return - use useMemo to avoid recreating on every render
-  const notificationResult = useMemo((): UseNotificationsResult => {
-    // Create a safe default value
-    const defaultValue: UseNotificationsResult = {
-      items: [],
-      notifications: [],
-      unreadCount: notificationsState.getCachedUnreadCount(),
-      filters: {
-        page,
-        limit,
-        unreadOnly,
-        sortBy: 'createdAt',
-        sortDirection: 'desc'
-      },
-      pagination: {
-        page,
-        limit,
-        total: 0,
-        totalPages: 0
-      },
-      isLoading: false, // Changed from loading to isLoading to match the BaseListUtility interface
-      error: null,
-      refetch: async () => { /* Return void instead of object */ },
-      setFilters: () => {},
-      setItems: () => {},
-      markAsRead,
-      markAllAsRead,
-      deleteNotification,
-      fetchUnreadCount,
-      // Add missing methods required by BaseListUtility
-      updateFilters: () => {},
-      setPage: () => {},
-      setLimit: () => {},
-      setPageSize: () => {},
-      resetFilters: () => {},
-      setSort: () => {},
-      setSearch: () => {},
-      setFilter: () => {},
-      clearFilter: () => {},
-      clearAllFilters: () => {},
-      data: []
-    };
-    
-    // Use baseListRef if it exists
-    if (!baseListRef.current) return defaultValue;
-    
-    return {
-      ...baseListRef.current,
-      notifications: baseListRef.current.items || [],
-      unreadCount,
-      markAsRead,
-      markAllAsRead,
-      deleteNotification,
-      fetchUnreadCount
-    };
-  }, [
+  // Return the combined result
+  return {
+    ...baseList,
+    notifications: baseList.items || [],
+    unreadCount,
     markAsRead,
     markAllAsRead,
-    deleteNotification, 
-    fetchUnreadCount,
-    unreadCount,
-    page,
-    limit,
-    unreadOnly,
-    baseListRef.current?.items,
-    baseListRef.current?.isLoading,
-    baseListRef.current?.error,
-  ]);
-
-  return notificationResult;
+    deleteNotification,
+    fetchUnreadCount
+  };
 };
 
 // Register HMR handler

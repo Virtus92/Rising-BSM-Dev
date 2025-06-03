@@ -460,29 +460,61 @@ export class CustomerRepository extends PrismaRepository<Customer> implements IC
   protected processCriteria(criteria: Record<string, any>): any {
     const processedCriteria: any = {};
     
-    // Handle specific fields that need special processing
-    if (criteria.name !== undefined) {
-      processedCriteria.name = { contains: criteria.name, mode: 'insensitive' };
+    // CRITICAL FIX: Handle search parameter - search across multiple fields
+    if (criteria.search !== undefined && criteria.search !== '') {
+      processedCriteria.OR = [
+        { name: { contains: criteria.search, mode: 'insensitive' } },
+        { company: { contains: criteria.search, mode: 'insensitive' } },
+        { email: { contains: criteria.search, mode: 'insensitive' } },
+        { phone: { contains: criteria.search, mode: 'insensitive' } },
+        { city: { contains: criteria.search, mode: 'insensitive' } },
+        { address: { contains: criteria.search, mode: 'insensitive' } },
+        { country: { contains: criteria.search, mode: 'insensitive' } }
+      ];
+      
+      this.logger.debug(`Processing search criteria: "${criteria.search}"`);
     }
     
-    if (criteria.email !== undefined) {
-      processedCriteria.email = { contains: criteria.email, mode: 'insensitive' };
+    // Handle specific field filters (these are AND conditions)
+    // Only apply specific field filters if not searching
+    if (!criteria.search) {
+      if (criteria.name !== undefined) {
+        processedCriteria.name = { contains: criteria.name, mode: 'insensitive' };
+      }
+      
+      if (criteria.email !== undefined) {
+        processedCriteria.email = { contains: criteria.email, mode: 'insensitive' };
+      }
+      
+      if (criteria.company !== undefined) {
+        processedCriteria.company = { contains: criteria.company, mode: 'insensitive' };
+      }
     }
     
-    if (criteria.company !== undefined) {
-      processedCriteria.company = { contains: criteria.company, mode: 'insensitive' };
-    }
-    
+    // Always apply these filters regardless of search
     if (criteria.city !== undefined) {
       processedCriteria.city = { contains: criteria.city, mode: 'insensitive' };
     }
     
-    // Pass through other criteria directly
-    ['id', 'status', 'type', 'newsletter', 'createdBy', 'updatedBy', 'postalCode'].forEach(key => {
+    if (criteria.country !== undefined) {
+      processedCriteria.country = { contains: criteria.country, mode: 'insensitive' };
+    }
+    
+    if (criteria.postalCode !== undefined) {
+      processedCriteria.postalCode = { contains: criteria.postalCode, mode: 'insensitive' };
+    }
+    
+    // Pass through exact match criteria directly
+    ['id', 'status', 'type', 'newsletter', 'createdBy', 'updatedBy'].forEach(key => {
       if (criteria[key] !== undefined) {
         processedCriteria[key] = criteria[key];
       }
     });
+    
+    // Filter out deleted customers by default
+    if (!criteria.includeDeleted) {
+      processedCriteria.NOT = { status: CommonStatus.DELETED };
+    }
     
     return processedCriteria;
   }

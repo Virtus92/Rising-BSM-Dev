@@ -10,6 +10,7 @@ import { DeleteConfirmationDialog } from '@/shared/components/DeleteConfirmation
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { useToast } from '@/shared/hooks/useToast';
+import { AppointmentFilterPanel } from '@/shared/components/filters';
 import { Edit, Trash2, Eye, Calendar, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -328,6 +329,15 @@ export const AppointmentList: React.FC<AppointmentListProps> = ({
     });
   }, [updateFilters]);
   
+  // Filter panel using the standardized component
+  const filterPanel = (
+    <AppointmentFilterPanel
+      filters={filters}
+      onFilterChange={updateFilters}
+      onClose={() => setShowFilters(false)}
+    />
+  );
+  
   return (
     <>
       <BaseListComponent<AppointmentDto>
@@ -372,6 +382,10 @@ export const AppointmentList: React.FC<AppointmentListProps> = ({
           });
         }}
         onActionClick={handleCardAction}
+        
+        // Filter panel
+        filterPanel={filterPanel}
+        showFilters={showFilters}
         
         // Sort state
         sortColumn={filters.sortBy}

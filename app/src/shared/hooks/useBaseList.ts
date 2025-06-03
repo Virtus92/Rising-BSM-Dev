@@ -542,86 +542,34 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
     }
   }, []);
   
-  // Fetch data with the current filters
+  // Fetch data with the current filters - SIMPLIFIED VERSION
   const fetchData = useCallback(async () => {
+    console.log('🔄 fetchData called with filters:', state.filters);
+    
     // Skip if not initialized
     if (!state.isInitialized || !isApiInitialized) {
+      console.log('⏭️ Skipping fetch - not initialized');
       return;
     }
     
-    // Clear any pending fetch timeout
-    if (fetchTimeoutRef.current) {
-      clearTimeout(fetchTimeoutRef.current);
-      fetchTimeoutRef.current = null;
-    }
-    
-    // Check if we've had too many consecutive errors
-    if (fetchAttemptsRef.current >= MAX_FETCH_ATTEMPTS) {
-      console.warn(`Too many fetch attempts (${fetchAttemptsRef.current}), stopping retries`);
-      
-      // Check if we should attempt redirect to login
-      const now = Date.now();
-      if (now - LAST_REDIRECT_TIME > REDIRECT_ATTEMPT_TIMEOUT) {
-        GLOBAL_REDIRECT_ATTEMPTS++;
-        LAST_REDIRECT_TIME = now;
-        
-        if (GLOBAL_REDIRECT_ATTEMPTS <= MAX_REDIRECT_ATTEMPTS && 
-            typeof window !== 'undefined' && 
-            window.location.pathname !== '/auth/login') {
-          console.warn(`Redirecting to login after ${GLOBAL_REDIRECT_ATTEMPTS} redirect attempts`);
-          
-          // Reset counters
-          fetchAttemptsRef.current = 0;
-          
-          // Small delay before redirect
-          setTimeout(() => {
-            window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
-          }, 500);
-        } else {
-          console.warn('Maximum redirect attempts reached, stopping redirects');
-        }
-      }
-      
-      return;
-    }
-    
-    // Check for network connectivity to prevent fetch loops
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      dispatch({
-        type: 'FETCH_ERROR',
-        payload: { 
-          error: 'Network connection unavailable. Please check your internet connection.', 
-          requestId: state.lastRequestId + 1 
-        }
-      });
-      return;
-    }
-    
-    // Create a request ID to track this request
     const requestId = state.lastRequestId + 1;
     
     try {
-      // Increment fetch attempt counter
-      fetchAttemptsRef.current++;
-      
+      console.log('📡 Making API call with filters:', state.filters);
       dispatch({ type: 'SET_LOADING', payload: true });
       
       const response = await fetchFunction(state.filters);
-      
-      // Reset fetch attempt counter on success
-      fetchAttemptsRef.current = 0;
+      console.log('✅ API response received:', response);
       
       // Parse the response
       let items: T[];
       let pagination: PaginationMeta;
       
       if (responseAdapter) {
-        // Use custom adapter if provided
         const adaptedResponse = responseAdapter(response);
         items = adaptedResponse.items;
         pagination = adaptedResponse.pagination;
       } else {
-        // Use default extraction
         const data = response.data || response;
         items = extractItems<T>(data);
         pagination = extractPaginationMeta(
@@ -631,45 +579,27 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
         );
       }
       
-      // Update state with the results
+      console.log('📊 Extracted items:', items.length, 'pagination:', pagination);
+      
       dispatch({
         type: 'FETCH_SUCCESS',
         payload: { items, pagination, requestId }
       });
     } catch (error) {
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'An error occurred while fetching data';
-        
+      console.error('❌ Fetch error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while fetching data';
       dispatch({
         type: 'FETCH_ERROR',
         payload: { error: errorMessage, requestId }
       });
     }
-  }, [
-    fetchFunction, 
-    state.filters, 
-    state.lastRequestId, 
-    state.isInitialized,
-    isApiInitialized,
-    defaultPage, 
-    defaultLimit, 
-    responseAdapter
-  ]);
+  }, [fetchFunction, responseAdapter, state.filters, state.isInitialized, state.lastRequestId, isApiInitialized, defaultPage, defaultLimit]);
   
   // Sync URL with current filters
   const syncFiltersToUrl = useCallback(() => {
     if (!syncWithUrl || !pathname || !router || isUrlUpdateInProgress.current) {
       return;
     }
-    
-    // Compare with previous filters to avoid unnecessary updates
-    if (isEqual(state.filters, prevFiltersRef.current)) {
-      return;
-    }
-    
-    // Update previous filters reference
-    prevFiltersRef.current = state.filters;
     
     // Mark URL update as in progress
     isUrlUpdateInProgress.current = true;
@@ -697,60 +627,59 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
     const url = queryString ? `${pathname}?${queryString}` : pathname;
     
     // Update URL without triggering a navigation
-    router.replace(url, { scroll: false });
+    try {
+      router.replace(url, { scroll: false });
+    } catch (error) {
+      console.warn('Failed to update URL:', error);
+    }
     
     // Reset the flag after a short delay
     setTimeout(() => {
       isUrlUpdateInProgress.current = false;
-    }, 100); // Reduced delay for better responsiveness
+    }, 100); // Reduced delay
   }, [pathname, router, state.filters, syncWithUrl]);
   
-  // Fetch when filters change
+  // AUTO-FETCH when filters change - SIMPLIFIED AND FIXED
   useEffect(() => {
-    // Skip if initialization is not complete
+    console.log('🔍 Filter change detected:', {
+      isInitialized: state.isInitialized,
+      isApiInitialized,
+      currentFilters: state.filters,
+      previousFilters: prevFiltersRef.current
+    });
+    
+    // Skip if not ready
     if (!state.isInitialized || !isApiInitialized) {
+      console.log('⚠️ Not ready for fetch');
       return;
     }
     
-    // Deep comparison for filters to avoid unnecessary fetches
-    // This is critical to prevent infinite loops
-    if (isEqual(state.filters, prevFiltersRef.current)) {
-      return;
-    }
+    // Always fetch on filter changes - no complex comparisons
+    const hasFilterChange = JSON.stringify(state.filters) !== JSON.stringify(prevFiltersRef.current);
     
-    // Update previous filters reference with a deep copy to ensure full separation
-    prevFiltersRef.current = JSON.parse(JSON.stringify(state.filters));
-    
-    // Track request ID to avoid race conditions
-    const currentRequestId = state.lastRequestId;
-    
-    // Sync with URL first - but only if it's a user-initiated change
-    // We'll use a timer to delay this operation to avoid UI jank
-    syncFiltersToUrl();
-    
-    // Cancel existing fetch timeout to prevent duplicate requests
-    if (fetchTimeoutRef.current) {
-      clearTimeout(fetchTimeoutRef.current);
-      fetchTimeoutRef.current = null;
-    }
-    
-    // Debounce the fetch to prevent multiple rapid calls
-    fetchTimeoutRef.current = setTimeout(() => {
-      // Verify the request is still valid before executing
-      if (currentRequestId === state.lastRequestId && !isUrlUpdateInProgress.current) {
-        fetchData();
+    if (hasFilterChange) {
+      console.log('🔄 Filters changed - triggering fetch');
+      prevFiltersRef.current = { ...state.filters };
+      
+      // Cancel any pending fetch
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
       }
-      fetchTimeoutRef.current = null;
-    }, 200); // Reduced delay for better responsiveness
+      
+      // Small delay to batch rapid changes
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchData();
+        fetchTimeoutRef.current = null;
+      }, 100);
+    }
     
-    // Cleanup on unmount
     return () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
         fetchTimeoutRef.current = null;
       }
     };
-  }, [state.filters, state.isInitialized, isApiInitialized, fetchData, syncFiltersToUrl, state.lastRequestId]);
+  }, [state.filters, state.isInitialized, isApiInitialized, fetchData]);
   
   // Limit how often we update from URL to avoid loops
   const lastUrlUpdateTimeRef = useRef(0);
@@ -771,29 +700,13 @@ export function useBaseList<T, F extends BaseFilterParamsDto>({
     
     const urlFilters = getFiltersFromUrl<F>(searchParams, urlFilterConfig);
     
-    // Deep comparison to avoid false positives
-    let hasSignificantChanges = false;
+    // Simple comparison to check if URL filters are different
+    const currentFiltersJson = JSON.stringify(state.filters);
+    const newFiltersJson = JSON.stringify({ ...state.filters, ...urlFilters });
+    const hasChanges = currentFiltersJson !== newFiltersJson;
     
-    for (const [key, value] of Object.entries(urlFilters)) {
-      const currentValue = state.filters[key as keyof F];
-      // Skip comparison for complex objects like Date
-      if (value instanceof Date || currentValue instanceof Date) {
-        continue;
-      }
-      // Don't consider null/undefined/empty differences as significant
-      if ((value === null || value === undefined || value === '') &&
-          (currentValue === null || currentValue === undefined || currentValue === '')) {
-        continue;
-      }
-      // Check for actual different values
-      if (!isEqual(currentValue, value)) {
-        hasSignificantChanges = true;
-        break;
-      }
-    }
-    
-    // Only update if there are URL filters that differ from current state
-    if (Object.keys(urlFilters).length > 0 && hasSignificantChanges) {
+    // Only update if there are significant changes
+    if (Object.keys(urlFilters).length > 0 && hasChanges) {
       // Update timestamp
       lastUrlUpdateTimeRef.current = now;
       

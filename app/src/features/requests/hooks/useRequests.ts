@@ -19,6 +19,9 @@ export interface UseRequestsResult extends BaseListUtility<RequestDto, RequestFi
   deleteRequest: (id: number) => Promise<boolean>;
   filterByStatus: (status: RequestStatus | undefined) => void;
   filterByDateRange: (startDate?: Date, endDate?: Date) => void;
+  
+  // Add setPageSize method for consistency
+  setPageSize: (pageSize: number) => void;
 }
 
 /**
@@ -97,6 +100,31 @@ export const useRequests = (initialFilters?: Partial<RequestFilterParamsDto>): U
         };
       }
     },
+    
+    // Add response adapter to properly extract data from API response
+    responseAdapter: (response) => {
+      // Handle the API response structure
+      const data = response?.data || response;
+      
+      // Extract items - API returns data.data for success responses
+      let items: RequestDto[] = [];
+      if (data && data.data && Array.isArray(data.data)) {
+        items = data.data;
+      } else if (Array.isArray(data)) {
+        items = data;
+      }
+      
+      // Extract pagination
+      const pagination = data?.pagination || {
+        page: 1,
+        limit: 10,
+        total: items.length,
+        totalPages: 1
+      };
+      
+      return { items, pagination };
+    },
+    
     initialFilters: initialFilters as RequestFilterParamsDto,
     defaultSortField: 'createdAt' as keyof RequestFilterParamsDto,
     defaultSortDirection: 'desc',

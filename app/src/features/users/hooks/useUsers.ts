@@ -31,6 +31,7 @@ export interface UseUsersResult {
   updateFilters: (newFilters: Partial<UserFilterParamsDto>) => void;
   setPage: (page: number) => void;
   setLimit: (limit: number) => void;
+  setPageSize: (pageSize: number) => void;
   setSort: (field: string, direction: 'asc' | 'desc') => void;
   setSearch: (search: string) => void;
   clearFilter: <K extends keyof UserFilterParamsDto>(key: K) => void;
@@ -140,6 +141,30 @@ export function useUsers(initialFilters?: Partial<UserFilterParamsDto>): UseUser
       }
     },
     
+    // Add response adapter to properly extract data from API response
+    responseAdapter: (response) => {
+      // Handle the API response structure
+      const data = response?.data || response;
+      
+      // Extract items - API returns data.data for success responses
+      let items: UserResponseDto[] = [];
+      if (data && data.data && Array.isArray(data.data)) {
+        items = data.data;
+      } else if (Array.isArray(data)) {
+        items = data;
+      }
+      
+      // Extract pagination
+      const pagination = data?.pagination || {
+        page: 1,
+        limit: 10,
+        total: items.length,
+        totalPages: 1
+      };
+      
+      return { items, pagination };
+    },
+    
     // Initial filters with defaults
     initialFilters: {
       sortBy: 'name',
@@ -242,6 +267,11 @@ export function useUsers(initialFilters?: Partial<UserFilterParamsDto>): UseUser
     baseList.setFilter('status', status);
   }, [baseList]);
   
+  // Add updateFilters method for consistency with other hooks
+  const updateFilters = useCallback((newFilters: Partial<UserFilterParamsDto>) => {
+    baseList.updateFilters(newFilters);
+  }, [baseList]);
+  
   // Generate active filters for UI display
   const activeFilters = createActiveFilters(
     baseList.filters,
@@ -265,9 +295,10 @@ export function useUsers(initialFilters?: Partial<UserFilterParamsDto>): UseUser
     filters: baseList.filters,
     
     // Core list actions
-    updateFilters: baseList.updateFilters,
+    updateFilters,
     setPage: baseList.setPage,
     setLimit: baseList.setLimit,
+    setPageSize: baseList.setPageSize || baseList.setLimit,
     setSort: baseList.setSort,
     setSearch: baseList.setSearch,
     clearFilter: baseList.clearFilter,

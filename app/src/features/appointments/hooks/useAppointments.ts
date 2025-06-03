@@ -19,6 +19,9 @@ export interface UseAppointmentsResult extends BaseListUtility<AppointmentDto, A
   deleteAppointment: (id: number) => Promise<boolean>;
   filterByStatus: (status: AppointmentStatus | undefined) => void;
   filterByDateRange: (startDate?: Date, endDate?: Date) => void;
+  
+  // Add setPageSize method for consistency
+  setPageSize: (pageSize: number) => void;
 }
 
 /**
@@ -46,44 +49,53 @@ export const useAppointments = (initialFilters?: Partial<AppointmentFilterParams
   // Use the base list utility
   const baseList = createBaseListUtility<AppointmentDto, AppointmentFilterParamsDto>({
     fetchFunction: async (filters) => {
+      // Log filters for debugging (only in development)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('useAppointments: Processing filters:', filters);
+      }
+      
       // Map the sortBy field to an actual database column before sending to API
       const mappedFilters = {...filters};
       // Handle special case for sortBy field
       if (typeof mappedFilters.sortBy === 'string' && mappedFilters.sortBy.toLowerCase() === 'sortby') {
         mappedFilters.sortBy = 'appointmentDate';
       } else if (mappedFilters.sortBy) {
+        const originalSortBy = mappedFilters.sortBy;
         mappedFilters.sortBy = mapSortFieldToColumn(mappedFilters.sortBy as string);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`useAppointments: Mapped sortBy from '${originalSortBy}' to '${mappedFilters.sortBy}'`);
+        }
       }
       
-      // Ensure we don't modify the sort direction
-      // This is critical - client and server must agree on direction
+      // Ensure we have valid sort direction
+      if (mappedFilters.sortDirection && !['asc', 'desc'].includes(mappedFilters.sortDirection)) {
+        mappedFilters.sortDirection = 'asc';
+      }
+      
+      // Validate and fix pagination
+      if (mappedFilters.page && mappedFilters.page < 1) {
+        mappedFilters.page = 1;
+      }
+      if (mappedFilters.limit && (mappedFilters.limit < 1 || mappedFilters.limit > 100)) {
+        mappedFilters.limit = 10;
+      }
+      
+      // Log the final mapped filters
       if (process.env.NODE_ENV === 'development') {
-        console.log('Mapped appointment filters:', mappedFilters);
+        console.log('useAppointments: Final mapped filters:', mappedFilters);
       }
       
       try {
-        // Create the API call promise first but don't await it yet
-        // This prevents Function.prototype.apply errors on Promise objects
+        // Make the API call
         const apiCall = AppointmentClient.getAppointments(mappedFilters);
-        
-        // Now await the promise
         const response = await apiCall;
         
-        // Ensure we return the data in the expected format
-        if (response.success && response.data) {
-          return response.data;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('useAppointments: API response:', response);
         }
         
-        // Return empty result on error
-        return {
-          data: [],
-          pagination: {
-            page: mappedFilters.page || 1,
-            limit: mappedFilters.limit || 10,
-            total: 0,
-            totalPages: 0
-          }
-        };
+        return response;
       } catch (err) {
         console.error('Error in useAppointments fetchFunction:', err);
         // Return empty result instead of throwing
@@ -98,12 +110,44 @@ export const useAppointments = (initialFilters?: Partial<AppointmentFilterParams
         };
       }
     },
-    initialFilters: initialFilters as AppointmentFilterParamsDto,
-    defaultSortField: 'appointmentDate' as keyof AppointmentFilterParamsDto,
+    
+    // Add response adapter to properly extract data from API response
+    responseAdapter: (response) => {
+      // Handle the API response structure
+      const data = response?.data || response;
+      
+      // Extract items - API returns data.data for success responses
+      let items: AppointmentDto[] = [];
+      if (data && data.data && Array.isArray(data.data)) {
+        items = data.data;
+      } else if (Array.isArray(data)) {
+        items = data;
+      }
+      
+      // Extract pagination
+      const pagination = data?.pagination || {
+        page: 1,
+        limit: 10,
+        total: items.length,
+        totalPages: 1
+      };
+      
+      return { items, pagination };
+    },
+    
+    initialFilters: {
+      page: 1,
+      limit: 10,
+      sortBy: 'appointmentDate',
+      sortDirection: 'asc',
+      ...initialFilters
+    } as AppointmentFilterParamsDto,
+    defaultSortField: 'appointmentDate',
     defaultSortDirection: 'asc',
     syncWithUrl: true,
     urlFilterConfig: {
-      numeric: ['page', 'limit'] as Array<keyof AppointmentFilterParamsDto>,
+      numeric: ['page', 'limit', 'customerId', 'createdById'] as Array<keyof AppointmentFilterParamsDto>,
+      boolean: ['today', 'upcoming', 'past'] as Array<keyof AppointmentFilterParamsDto>,
       enum: {
         status: Object.values(AppointmentStatus),
         sortDirection: ['asc', 'desc']
