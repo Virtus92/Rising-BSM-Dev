@@ -10,7 +10,8 @@ import { DeleteConfirmationDialog } from '@/shared/components/DeleteConfirmation
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { useToast } from '@/shared/hooks/useToast';
-import { Edit, Trash2, Eye, Calendar, Mail, User, FileText, Filter as FilterIcon } from 'lucide-react';
+import { RequestFilterPanel } from '@/shared/components/filters';
+import { Edit, Trash2, Eye, Calendar, Mail, User, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 
 // Import components directly to avoid Symbol export errors
@@ -276,6 +277,15 @@ export const RequestList: React.FC<RequestListProps> = ({
     });
   }, [updateFilters]);
   
+  // Filter panel using the standardized component
+  const filterPanel = (
+    <RequestFilterPanel
+      filters={filters}
+      onFilterChange={updateFilters}
+      onClose={() => setShowFilters(false)}
+    />
+  );
+  
   return (
     <>
       <BaseListComponent<EnhancedRequestDto>
@@ -319,6 +329,10 @@ export const RequestList: React.FC<RequestListProps> = ({
         createButtonLabel={showCreateButton ? "New Request" : undefined}
         onCreateClick={showCreateButton && onCreateClick ? onCreateClick : undefined}
         
+        
+        // Filter panel
+        filterPanel={filterPanel}
+        showFilters={showFilters}
         
         // Sort state
         sortColumn={filters.sortBy}

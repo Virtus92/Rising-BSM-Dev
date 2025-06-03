@@ -17,6 +17,7 @@ import { API_PERMISSIONS } from '@/features/permissions/constants/permissionCons
 import { Transition, Dialog, Popover } from '@headlessui/react';
 import { motion } from 'framer-motion';
 import { useSearch } from '@/shared/hooks/useSearch';
+import { useGlobalSearch } from '@/shared/hooks/useGlobalSearch';
 import { getLogger } from '@/core/logging';
 import { setItem } from '@/shared/utils/storage/cookieStorage';
 
@@ -57,11 +58,21 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
   // Add permission checks
   const { hasPermission } = usePermissions();
   const { search, setSearchTerm, searchResults, isSearching } = useSearch();
+  const { performGlobalSearch, getCurrentSearchTerm } = useGlobalSearch();
   
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Trigger search when searchQuery changes
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setSearchTerm(searchQuery);
+    } else {
+      setSearchTerm('');
+    }
+  }, [searchQuery, setSearchTerm]);
   
   // Update theme when settings change
   useEffect(() => {
@@ -186,8 +197,21 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       setIsSearchOpen(false);
-      // Perform search
-      setSearchTerm(searchQuery);
+      
+      // Check if we're on a list page that supports search
+      const listPages = ['/dashboard/customers', '/dashboard/appointments', '/dashboard/requests', '/dashboard/users'];
+      const isOnListPage = listPages.some(page => pathname.startsWith(page));
+      
+      if (isOnListPage) {
+        // Use global search to update the current page's filters
+        console.log('Header search: Using global search for list page', { pathname, searchQuery });
+        performGlobalSearch(searchQuery);
+      } else {
+        // Use the standard search for navigation
+        console.log('Header search: Using standard search for non-list page', { pathname, searchQuery });
+        setSearchTerm(searchQuery);
+      }
+      setSearchQuery('');
     }
   };
 
@@ -341,7 +365,7 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
                     leaveFrom="opacity-100 translate-y-0"
                     leaveTo="opacity-0 translate-y-1"
                   >
-                    <Popover.Panel className="absolute right-0 z-10 mt-2.5 w-72 rounded-xl bg-white dark:bg-slate-800 shadow-lg ring-1 ring-slate-200 dark:ring-slate-700 p-3">
+                    <Popover.Panel className="absolute md:right-0 right-1/2 md:transform-none transform translate-x-1/2 z-10 mt-2.5 w-72 rounded-xl bg-white dark:bg-slate-800 shadow-lg ring-1 ring-slate-200 dark:ring-slate-700 p-3">
                       <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
                         <h3 className="text-sm font-medium text-slate-900 dark:text-white">Quick Actions</h3>
                       </div>
@@ -572,9 +596,17 @@ const DashboardHeader = ({ setSidebarOpen }: DashboardHeaderProps) => {
                                 <Mail className="h-4 w-4 mr-2 text-violet-500" />
                               )}
                               <div className="flex-1 text-left">
-                                <div className="font-medium">{result.title || result.name}</div>
+                                <div className="font-medium">
+                                  {result.type === 'request' ? 
+                                    `${result.service || 'Service'} - ${result.name}` : 
+                                    result.title || result.name
+                                  }
+                                </div>
                                 <div className="text-xs text-slate-500 dark:text-slate-400">
-                                  {result.type.charAt(0).toUpperCase() + result.type.slice(1)}
+                                  {result.type === 'request' && result.createdAt ? 
+                                    new Date(result.createdAt).toLocaleDateString() : 
+                                    result.type.charAt(0).toUpperCase() + result.type.slice(1)
+                                  }
                                 </div>
                               </div>
                             </button>

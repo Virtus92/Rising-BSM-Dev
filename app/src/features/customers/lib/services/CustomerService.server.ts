@@ -23,6 +23,7 @@ import { CommonStatus, CustomerType } from '@/domain/enums/CommonEnums';
 import { LogActionType } from '@/domain/enums/CommonEnums';
 import { EntityType } from '@/domain/enums/EntityTypes';
 import { createCustomerResponseDto } from '@/domain/utils/dtoFactory';
+import { mapFiltersToRepositoryCriteria as mapFiltersUtil, COMMON_FIELD_MAPPINGS } from '@/shared/utils/filter-mapping';
 
 /**
  * Server-side implementation of the CustomerService
@@ -235,21 +236,34 @@ export class CustomerService implements ICustomerService {
     try {
       this.logger.debug('Getting all customers with options:', { options });
       
+      // Map filters to repository criteria
+      const criteria = this.mapFiltersToRepositoryCriteria(options?.filters);
+      
       // Use the repository's findAll method with a properly typed QueryOptions object
-      const queryOptions: QueryOptions & { criteria?: Record<string, any> } = {
+      const queryOptions: QueryOptions = {
         page: options?.page || 1,
         limit: options?.limit || 10,
         relations: options?.relations || [],
-        sort: options?.sort,
-        criteria: {} // Initialize with empty criteria
+        sort: options?.sort
       };
       
-      // Process and add filters to criteria if they exist
-      if (options?.filters) {
-        queryOptions.criteria = this.mapFiltersToRepositoryCriteria(options.filters);
+      // If we have search criteria, use findByCriteria for better search support
+      if (Object.keys(criteria).length > 0) {
+        const customers = await this.repository.findByCriteria(criteria, queryOptions);
+        const total = await this.repository.count(criteria);
+        
+        return {
+          data: customers.map(customer => this.toDTO(customer)),
+          pagination: {
+            page: queryOptions.page || 1,
+            limit: queryOptions.limit || 10,
+            total,
+            totalPages: Math.ceil(total / (queryOptions.limit || 10))
+          }
+        };
       }
       
-      // Get customers with options
+      // For no filters, use standard findAll
       const result = await this.repository.findAll(queryOptions);
       
       // Map entities to DTOs
@@ -1136,27 +1150,29 @@ export class CustomerService implements ICustomerService {
    * @returns Repository criteria
    */
   private mapFiltersToRepositoryCriteria(filters?: Record<string, any>): Record<string, any> {
-    if (!filters) {
-      return {};
-    }
+    if (!filters) return {};
     
     const criteria: Record<string, any> = {};
     
-    // Map filters to criteria
+    // Map all filter fields to repository criteria
+    if (filters.search) criteria.search = filters.search;
     if (filters.status) criteria.status = filters.status;
+    if (filters.type) criteria.type = filters.type;
+    if (filters.city) criteria.city = filters.city;
+    if (filters.country) criteria.country = filters.country; // FIX: Added country mapping
+    if (filters.postalCode) criteria.postalCode = filters.postalCode;
+    if (filters.newsletter !== undefined) criteria.newsletter = filters.newsletter;
     
-    // Handle date-based filters
+    // Handle date filters
     if (filters.createdAfter) {
-      criteria.createdAfter = new Date(filters.createdAfter);
+      criteria.createdAfter = filters.createdAfter instanceof Date 
+        ? filters.createdAfter 
+        : new Date(filters.createdAfter);
     }
-    
     if (filters.createdBefore) {
-      criteria.createdBefore = new Date(filters.createdBefore);
-    }
-    
-    // Handle search
-    if (filters.search) {
-      criteria.search = filters.search;
+      criteria.createdBefore = filters.createdBefore instanceof Date 
+        ? filters.createdBefore 
+        : new Date(filters.createdBefore);
     }
     
     return criteria;

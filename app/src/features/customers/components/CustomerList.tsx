@@ -14,8 +14,9 @@ import { DeleteConfirmationDialog } from '@/shared/components/DeleteConfirmation
 import { formatPhoneNumber } from '@/core/validation/userValidation';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
-import { Edit, Trash2, Eye, Phone, Mail, Building2, MapPin, Filter, Check, X } from 'lucide-react';
+import { Edit, Trash2, Eye, Phone, Mail, Building2, MapPin, Check, X } from 'lucide-react';
 import { useToast } from '@/shared/hooks/useToast';
+import { CustomerFilterPanel } from '@/shared/components/filters/CustomerFilterPanel';
 
 // Extended customer type with permission data
 interface EnhancedCustomerDto extends CustomerDto {
@@ -419,113 +420,13 @@ export const CustomerList: React.FC<CustomerListProps> = ({
     setSort(column, direction);
   }, [setSort]);
   
-  // Enhanced filter panel with better styling and customer-themed colors
+  // Filter panel using the standardized component
   const filterPanel = (
-    <div className="p-6 border rounded-lg mb-6 space-y-6 bg-white dark:bg-gray-800 shadow-sm border-green-200 dark:border-green-800">
-      <div className="flex items-center gap-2 mb-4">
-        <Filter className="h-5 w-5 text-green-600" />
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Filter Customers</h3>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="space-y-2">
-          <label className="text-sm font-medium flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-green-600" />
-            Type
-          </label>
-          <select 
-            className="w-full border rounded-md p-3 focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
-            value={filters.type || ''} 
-            onChange={(e) => handleFilterChange({ type: e.target.value ? e.target.value as CustomerType : undefined })}
-          >
-            <option value="">All Types</option>
-            {Object.values(CustomerType).map(type => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="space-y-2">
-          <label className="text-sm font-medium flex items-center gap-2">
-            <Filter className="h-4 w-4 text-green-600" />
-            Status
-          </label>
-          <select 
-            className="w-full border rounded-md p-3 focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
-            value={filters.status || ''} 
-            onChange={(e) => handleFilterChange({ status: e.target.value ? e.target.value as CommonStatus : undefined })}
-          >
-            <option value="">All Statuses</option>
-            {Object.values(CommonStatus).map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="space-y-2">
-          <label className="text-sm font-medium flex items-center gap-2">
-            <Mail className="h-4 w-4 text-green-600" />
-            Newsletter
-          </label>
-          <select 
-            className="w-full border rounded-md p-3 focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
-            value={filters.newsletter === undefined ? '' : filters.newsletter ? 'true' : 'false'} 
-            onChange={(e) => handleFilterChange({ 
-              newsletter: e.target.value === '' ? undefined : e.target.value === 'true' 
-            })}
-          >
-            <option value="">All Customers</option>
-            <option value="true">Subscribed</option>
-            <option value="false">Not Subscribed</option>
-          </select>
-        </div>
-        
-        <div className="space-y-2">
-          <label className="text-sm font-medium flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-green-600" />
-            City
-          </label>
-          <input
-            type="text"
-            placeholder="Enter city..."
-            className="w-full border rounded-md p-3 focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
-            value={filters.city || ''}
-            onChange={(e) => handleFilterChange({ city: e.target.value || undefined })}
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <label className="text-sm font-medium flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-green-600" />
-            Country
-          </label>
-          <input
-            type="text"
-            placeholder="Enter country..."
-            className="w-full border rounded-md p-3 focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
-            value={filters.country || ''}
-            onChange={(e) => handleFilterChange({ country: e.target.value || undefined })}
-          />
-        </div>
-      </div>
-      
-      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <Button 
-          variant="outline" 
-          className="text-green-600 border-green-200 hover:bg-green-50 dark:hover:bg-green-950/10"
-          onClick={clearAllFilters}
-        >
-          Reset Filters
-        </Button>
-        
-        <Button 
-          className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
-          onClick={() => setShowFilters(false)}
-        >
-          Apply Filters
-        </Button>
-      </div>
-    </div>
+    <CustomerFilterPanel
+      filters={filters}
+      onFilterChange={updateFilters}
+      onClose={() => setShowFilters(false)}
+    />
   );
 
   return (

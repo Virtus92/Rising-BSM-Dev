@@ -42,32 +42,7 @@ export class NotificationClient {
         signal: options.signal
       });
       
-      // Normalize response to ensure consistent structure
-      if (response.success && response.data) {
-        // Check if data is nested in a data property
-        if (typeof response.data === 'object' && response.data !== null && 'data' in response.data) {
-          // Extract the nested data and pagination
-          const normalizedData = Array.isArray(response.data.data) ? response.data.data : [];
-          const pagination = response.data.pagination || {
-            page: params.page || 1,
-            limit: params.limit || 10,
-            total: normalizedData.length,
-            totalPages: Math.ceil(normalizedData.length / (params.limit || 10))
-          };
-          
-          // Return normalized response
-          return {
-            success: true,
-            data: {
-              items: normalizedData,
-              pagination
-            },
-            error: null
-          };
-        }
-      }
-      
-      // Return original response if not normalized
+      // Return the response as-is, the baseListUtility will handle the structure
       return response;
     } catch (error: unknown) {
       // Don't throw for aborted requests
@@ -164,7 +139,7 @@ export class NotificationClient {
    */
   static async markAllAsRead(): Promise<ApiResponse<void>> {
     try {
-      return await ApiClient.put(`${NOTIFICATIONS_API_URL}/mark-all-read`, {});
+      return await ApiClient.put(`${NOTIFICATIONS_API_URL}/read-all`, {});
     } catch (error: unknown) {
       throw new ApiRequestError(
         error instanceof Error ? error.message : 'Failed to mark all notifications as read',

@@ -16,6 +16,7 @@ import { EntityCreateModal, useEntityModal } from '@/shared/components/EntityCre
 import { UserForm, UserFormData } from '@/features/users/components/UserForm';
 import { UserService } from '@/features/users/lib/services/UserService';
 import { useToast } from '@/shared/hooks/useToast';
+import { UserFilterPanel } from '@/shared/components/filters';
 import { 
   Edit, 
   Trash2, 
@@ -25,8 +26,6 @@ import {
   XCircle,
   AlertTriangle,
   User as UserIcon,
-  Users as UsersIcon,
-  Filter as FilterIcon,
   Plus,
   UserPlus
 } from 'lucide-react';
@@ -229,6 +228,7 @@ export const UserList: React.FC<UserListProps> = ({
     pagination, 
     activeFilters,
     filters,
+    updateFilters,
     setPage,
     setSearch,
     setSort,
@@ -447,67 +447,13 @@ export const UserList: React.FC<UserListProps> = ({
     );
   }, [handleCardAction, canEditUsers, canDeleteUsers]);
   
-  // Enhanced filter panel with better styling and user-themed colors
+  // Filter panel using the standardized component
   const filterPanel = (
-    <div className="p-6 border rounded-lg mb-6 space-y-6 bg-white dark:bg-gray-800 shadow-sm border-purple-200 dark:border-purple-800">
-      <div className="flex items-center gap-2 mb-4">
-        <FilterIcon className="h-5 w-5 text-purple-600" />
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Filter Users</h3>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <label className="text-sm font-medium flex items-center gap-2">
-            <UsersIcon className="h-4 w-4 text-purple-600" />
-            Role
-          </label>
-          <select 
-            className="w-full border rounded-md p-3 focus:border-purple-500 focus:ring focus:ring-purple-200 focus:ring-opacity-50 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
-            value={filters.role || ''} 
-            onChange={(e) => setRoleFilter(e.target.value ? e.target.value as UserRole : undefined)}
-          >
-            <option value="">All Roles</option>
-            {Object.values(UserRole).map(role => (
-              <option key={role} value={role}>{role}</option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="space-y-2">
-          <label className="text-sm font-medium flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-purple-600" />
-            Status
-          </label>
-          <select 
-            className="w-full border rounded-md p-3 focus:border-purple-500 focus:ring focus:ring-purple-200 focus:ring-opacity-50 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
-            value={filters.status || ''} 
-            onChange={(e) => setStatusFilter(e.target.value ? e.target.value as UserStatus : undefined)}
-          >
-            <option value="">All Statuses</option>
-            {Object.values(UserStatus).map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      
-      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <Button 
-          variant="outline" 
-          className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/10"
-          onClick={clearAllFilters}
-        >
-          Reset Filters
-        </Button>
-        
-        <Button 
-          className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
-          onClick={() => setShowFilters(false)}
-        >
-          Apply Filters
-        </Button>
-      </div>
-    </div>
+    <UserFilterPanel
+      filters={filters}
+      onFilterChange={updateFilters}
+      onClose={() => setShowFilters(false)}
+    />
   );
 
   return (

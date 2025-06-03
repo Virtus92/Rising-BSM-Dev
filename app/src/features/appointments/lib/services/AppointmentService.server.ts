@@ -22,6 +22,7 @@ import { ValidationResultDto, ValidationErrorDto } from '@/domain/dtos/Validatio
 import { ValidationResult } from '@/domain/enums/ValidationResults';
 import { AppointmentNote } from '@/domain/entities/AppointmentNote';
 import { AppointmentStatus } from '@/domain/enums/CommonEnums';
+import { mapFiltersToRepositoryCriteria as mapFiltersUtil, COMMON_FIELD_MAPPINGS } from '@/shared/utils/filter-mapping';
 
 /**
  * Server-side implementation of the AppointmentService
@@ -124,7 +125,9 @@ export class AppointmentService implements IAppointmentService {
     try {
       this.logger.debug('Getting all appointments with options:', { options });
       
-      // Use the repository's findAll method
+      // Map filters to repository criteria
+      const criteria = this.mapFiltersToRepositoryCriteria(options?.filters);
+      
       // Create proper QueryOptions object
       const queryOptions = {
         page: options?.page || 1,
@@ -133,24 +136,24 @@ export class AppointmentService implements IAppointmentService {
         sort: options?.sort
       };
       
-      // Process filters separately
-      const criteria = this.mapFiltersToRepositoryCriteria(options?.filters);
-      
-      // Create repository query parameters
-      // We need to work around the TypeScript error by using a more compatible approach
-      const queryParams: any = {
-        ...queryOptions
-      };
-      
-      // Instead of directly adding 'criteria', we'll add the individual criteria properties
-      if (criteria) {
-        Object.keys(criteria).forEach(key => {
-          queryParams[key] = criteria[key];
-        });
+      // If we have search criteria, use findByCriteria for better search support
+      if (Object.keys(criteria).length > 0) {
+        const appointments = await this.repository.findByCriteria(criteria, queryOptions);
+        const total = await this.repository.count(criteria);
+        
+        return {
+          data: appointments.map(appointment => this.toDTO(appointment)),
+          pagination: {
+            page: queryOptions.page || 1,
+            limit: queryOptions.limit || 10,
+            total,
+            totalPages: Math.ceil(total / (queryOptions.limit || 10))
+          }
+        };
       }
       
-      // Get appointments with criteria and options
-      const result = await this.repository.findAll(queryParams);
+      // For no filters, use standard findAll
+      const result = await this.repository.findAll(queryOptions);
       
       // Map entities to DTOs
       return {
@@ -1077,38 +1080,45 @@ export class AppointmentService implements IAppointmentService {
    * @returns Repository criteria
    */
   private mapFiltersToRepositoryCriteria(filters?: Record<string, any>): Record<string, any> {
-    if (!filters) {
-      return {};
-    }
+    if (!filters) return {};
     
     const criteria: Record<string, any> = {};
     
-    // Map filters to criteria
+    // Map all filter fields to repository criteria - COMPREHENSIVE MAPPING
+    if (filters.search) criteria.search = filters.search; // CRITICAL: Search mapping
     if (filters.status) criteria.status = filters.status;
     if (filters.customerId) criteria.customerId = filters.customerId;
+    if (filters.createdById) criteria.createdById = filters.createdById;
     
-    // Handle date-based filters
+    // Date range filters need special handling for appointments
     if (filters.startDate) {
-      criteria.appointmentDateAfter = new Date(filters.startDate);
+      criteria.appointmentDateAfter = filters.startDate instanceof Date 
+        ? filters.startDate 
+        : new Date(filters.startDate);
     }
     
     if (filters.endDate) {
-      criteria.appointmentDateBefore = new Date(filters.endDate);
+      criteria.appointmentDateBefore = filters.endDate instanceof Date 
+        ? filters.endDate 
+        : new Date(filters.endDate);
     }
     
-    // Handle search
-    if (filters.search) {
-      criteria.search = filters.search;
-    }
-    // Handle special flags
+    // Special appointment flags
     if (filters.today) criteria.today = true;
     if (filters.upcoming) criteria.upcoming = true;
     if (filters.past) criteria.past = true;
-    if (filters.search) criteria.search = filters.search;
-    if (filters.sortBy) criteria.sortBy = filters.sortBy;
-    if (filters.sortDirection) criteria.sortDirection = filters.sortDirection;
-    if (filters.page) criteria.page = filters.page;
-    if (filters.limit) criteria.limit = filters.limit;
+    
+    // Handle generic date filters (for compatibility)
+    if (filters.createdAfter) {
+      criteria.createdAfter = filters.createdAfter instanceof Date 
+        ? filters.createdAfter 
+        : new Date(filters.createdAfter);
+    }
+    if (filters.createdBefore) {
+      criteria.createdBefore = filters.createdBefore instanceof Date 
+        ? filters.createdBefore 
+        : new Date(filters.createdBefore);
+    }
     
     return criteria;
   }
