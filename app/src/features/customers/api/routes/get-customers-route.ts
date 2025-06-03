@@ -32,10 +32,11 @@ export async function getCustomersHandler(request: NextRequest): Promise<NextRes
       );
     }
     
-    // Check permission
+    // Check permission with role
     if (!await permissionMiddleware.hasPermission(
       request.auth.userId, 
-      SystemPermission.CUSTOMERS_VIEW
+      SystemPermission.CUSTOMERS_VIEW,
+      request.auth.role
     )) {
       logger.warn(`Permission denied: User ${request.auth.userId} does not have permission ${SystemPermission.CUSTOMERS_VIEW}`);
       return NextResponse.json(

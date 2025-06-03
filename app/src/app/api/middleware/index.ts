@@ -28,27 +28,6 @@ export type {
   AuthHandler
 } from '@/features/auth/api/middleware/authMiddleware';
 
-// Import and export permission middleware with types properly
-import { PermissionCheckResult } from './permission-middleware';
-export type { PermissionCheckResult };
-
-// Import and export permission middleware functions
-import { 
-  withPermission, 
-  hasPermission, 
-  checkMultiplePermissions,
-  API_PERMISSIONS
-} from './permission-middleware';
-
-export { 
-  withPermission, 
-  hasPermission, 
-  checkMultiplePermissions,
-  // Alias for backward compatibility
-  checkMultiplePermissions as checkPermission, 
-  API_PERMISSIONS
-};
-
 // Import and export permissionMiddleware properly
 import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 export { permissionMiddleware };
@@ -76,11 +55,6 @@ export default {
     getUserFromRequest
   },
   permission: { 
-    withPermission, 
-    hasPermission, 
-    checkPermission: checkMultiplePermissions,
-    checkMultiplePermissions,
-    API_PERMISSIONS,
     permissionMiddleware
   }
 };

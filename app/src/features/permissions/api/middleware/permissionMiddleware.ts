@@ -126,7 +126,7 @@ export async function hasPermission(userId: number | undefined, permission: stri
   
   // Early admin role bypass - admins have all permissions
   if (role && role.toLowerCase() === 'admin') {
-    logger.debug(`Admin user ${userId} granted permission: ${permission}`, { userId, role });
+    logger.info(`Admin user ${userId} granted permission: ${permission}`, { userId, role, permission });
     return true;
   }
 
@@ -410,160 +410,6 @@ export async function checkPermission(
 }
 
 /**
- * Middleware to check if a user has a specific permission
- * With improved error handling and fallbacks
- * 
- * @param handler Route handler function
- * @param permission Required permission or array of permissions
- * @returns Wrapped handler function with permission check
- */
-export function withPermission(
-  handler: (request: NextRequest, user: any, context?: any) => Promise<NextResponse>,
-  permission: string | string[]
-) {
-  // Return a direct function, not a Promise of a function
-  return async function permissionHandler(request: NextRequest, context?: any): Promise<NextResponse> {
-    try {
-      // Get user ID from auth
-      const userId = request.auth?.userId;
-      const userRole = request.auth?.role;
-      
-      if (!userId) {
-        logger.warn('Authentication required for protected route', {
-          url: request.url,
-          requiredPermission: permission
-        });
-        
-        return formatResponse.unauthorized('Authentication required', {
-          details: {
-            missingUserId: true,
-            requiredPermission: permission
-          }
-        }.toString());
-      }
-      
-      // Special case for admin users - they always have permission
-      if (userRole && userRole.toLowerCase() === 'admin') {
-        // Admin bypass - proceed to handler directly
-        logger.debug(`Admin user ${userId} automatically granted permission: ${permission}`, { 
-          userId, 
-          userRole, 
-          url: request.url 
-        });
-        return await handler(request, request.auth, context);
-      }
-      
-      // If permission is an array, check each permission
-      if (Array.isArray(permission)) {
-        // Check each permission individually without throwing
-        for (const perm of permission) {
-          try {
-            const hasPermResult = await hasPermission(userId, perm, request.auth?.role);
-            
-            if (hasPermResult) {
-              // Permission granted, proceed to handler
-              logger.debug(`Permission check passed for ${perm}`, { userId });
-              return await handler(request, request.auth, context);
-            }
-          } catch (error) {
-            // This should never happen with our improved hasPermission,
-            // but log just in case and continue checking other permissions
-            logger.warn(`Unexpected error checking permission ${perm}:`, {
-              error: error instanceof Error ? error.message : String(error),
-              userId,
-              permission: perm
-            });
-          }
-        }
-        
-        // No permissions matched, return error
-        const permissionLabel = permission.join(' or ');
-        
-        logger.info(`Permission denied (${permissionLabel}) for user ${userId}`, {
-          url: request.url,
-          permissions: permission
-        });
-        
-        return formatResponse.forbidden(`You don't have permission to perform this action (requires ${permissionLabel})`, {
-          details: {
-            userId,
-            requiredPermissions: permission
-          }
-        }.toString());
-      } else {
-        // Check single permission without throwing
-        try {
-          const hasPermResult = await hasPermission(userId, permission, request.auth?.role);
-          
-          if (!hasPermResult) {
-            logger.info(`Permission denied (${permission}) for user ${userId}`, {
-              url: request.url
-            });
-            
-            return formatResponse.forbidden(`You don't have permission to perform this action (requires ${permission})`, {
-              details: {
-                userId,
-                requiredPermission: permission
-              }
-            }.toString());
-          }
-          
-          // User has permission, proceed to handler
-          logger.debug(`Permission check passed for ${permission}`, { userId });
-          return await handler(request, request.auth, context);
-        } catch (permError) {
-          // This should never happen with our improved hasPermission,
-          // but handle it gracefully just in case
-          logger.error(`Unexpected error in permission check for ${permission}`, {
-            error: permError instanceof Error ? permError.message : String(permError),
-            userId,
-            stack: permError instanceof Error ? permError.stack : undefined
-          });
-          
-          // Fail closed for security - deny access on errors
-          return formatResponse.forbidden(`Permission check failed, access denied`, {
-            details: {
-              userId,
-              requiredPermission: permission,
-              error: 'Permission check failed'
-            }
-          }.toString());
-        }
-      }
-    } catch (error) {
-      // Log error with context
-      logger.error('Unhandled error in permission middleware', { 
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        requiredPermission: permission,
-        url: request.url
-      });
-      
-      // Format error response based on error type
-      if (error instanceof PermissionError) {
-        return formatResponse.forbidden(error.message, {
-          details: {
-            permission,
-            errorType: error.errorCode
-          }
-        }.toString());
-      }
-      
-      // Fail closed for security - return error but don't expose details
-      return formatResponse.error(
-        'An error occurred while checking permissions',
-        500,
-        {
-          details: {
-            permission
-          }
-        }.toString()
-      );
-    }
-  };
-}
-
-/**
  * Checks if a permission is included in a role's defined permissions
  * Direct database check with no fallbacks
  * 
@@ -639,7 +485,6 @@ export async function getPermissionCacheStats(): Promise<any> {
 export const permissionMiddleware = {
   hasPermission,
   checkPermission,
-  withPermission,
   isPermissionIncludedInRole,
   invalidatePermissionCache,
   getPermissionCacheStats,

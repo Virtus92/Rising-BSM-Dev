@@ -1,6 +1,6 @@
 import { PermissionService } from '@/features/permissions/lib/services/PermissionService';
 import { IPermissionRepository } from '@/domain/repositories/IPermissionRepository';
-import { CreatePermissionDto, UpdatePermissionDto } from '@/domain/dtos';
+import { CreatePermissionDto, UpdatePermissionDto } from '@/domain/dtos/PermissionDtos';
 import { AppError } from '@/core/errors';
 
 describe('PermissionService', () => {
@@ -235,10 +235,10 @@ describe('PermissionService', () => {
   describe('updateUserPermissions', () => {
     it('should validate input parameters', async () => {
       const dto = { userId: '', permissions: [] };
-      await expect(service.updateUserPermissions(dto)).rejects.toThrow(AppError);
+      await expect(service.updateUserPermissions(dto as any)).rejects.toThrow(AppError);
       
       const dto2 = { userId: 'user123', permissions: null as any };
-      await expect(service.updateUserPermissions(dto2)).rejects.toThrow(AppError);
+      await expect(service.updateUserPermissions(dto2 as any)).rejects.toThrow(AppError);
     });
   });
 });

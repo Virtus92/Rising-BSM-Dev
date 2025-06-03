@@ -19,11 +19,13 @@ import { permissionMiddleware } from '@/features/permissions/api/middleware/perm
  * 
  * @param userId - User ID to check permissions for
  * @param permission - Permission code to check
+ * @param userRole - Optional user role (if not provided, will be fetched)
  * @returns Promise resolving to boolean indicating if user has permission
  */
 export async function checkUserPermission(
   userId: number,
-  permission: SystemPermission | string
+  permission: SystemPermission | string,
+  userRole?: string
 ): Promise<boolean> {
   const logger = getLogger();
   
@@ -42,16 +44,16 @@ export async function checkUserPermission(
     // Normalize permission code
     const normalizedPermission = permission.trim().toLowerCase();
     
-    // Check if user is admin (admin has all permissions)
-    const userRepository = (await import('@/core/factories/repositoryFactory')).getRepositoryFactory().createUserRepository();
-    const user = await userRepository.findById(userId);
-    
-    if (user?.role?.toLowerCase() === 'admin') {
-      return true; // Admin has all permissions
+    // Get user role if not provided
+    let role = userRole;
+    if (!role) {
+      const userRepository = (await import('@/core/factories/repositoryFactory')).getRepositoryFactory().createUserRepository();
+      const user = await userRepository.findById(userId);
+      role = user?.role;
     }
     
-    // Check permission directly with middleware
-    return await permissionMiddleware.hasPermission(userId, normalizedPermission);
+    // 🔑 FIX: Pass the role parameter to enable admin bypass
+    return await permissionMiddleware.hasPermission(userId, normalizedPermission, role);
   } catch (error) {
     logger.error('Error checking user permission:', {
       error: error instanceof Error ? error.message : String(error),
@@ -67,11 +69,13 @@ export async function checkUserPermission(
  * 
  * @param userId - User ID to check permissions for
  * @param permissions - Array of permission codes
+ * @param userRole - Optional user role (if not provided, will be fetched)
  * @returns Promise resolving to boolean indicating if user has any permission
  */
 export async function checkUserHasAnyPermission(
   userId: number,
-  permissions: (SystemPermission | string)[]
+  permissions: (SystemPermission | string)[],
+  userRole?: string
 ): Promise<boolean> {
   const logger = getLogger();
   
@@ -87,26 +91,33 @@ export async function checkUserHasAnyPermission(
   }
   
   try {
-    // Check if user role is admin (admin has all permissions)
-    const userRepository = (await import('@/core/factories/repositoryFactory')).getRepositoryFactory().createUserRepository();
-    const user = await userRepository.findById(userId);
-    
-    if (user?.role?.toLowerCase() === 'admin') {
-      return true; // Admin has all permissions
+    // Get user role if not provided
+    let role = userRole;
+    if (!role) {
+      const userRepository = (await import('@/core/factories/repositoryFactory')).getRepositoryFactory().createUserRepository();
+      const user = await userRepository.findById(userId);
+      role = user?.role;
     }
     
-    // Get all user permissions
-    const serviceFactory = getServiceFactory();
-    const permissionService = serviceFactory.createPermissionService();
-    const userPermissionsResponse = await permissionService.getUserPermissions(userId);
-    
-    if (!userPermissionsResponse || !userPermissionsResponse.permissions) {
-      return false;
+    // 🔑 FIX: Admin bypass - if user is admin, they have all permissions
+    if (role && role.toLowerCase() === 'admin') {
+      logger.info(`Admin user ${userId} granted any permission from: ${permissions.join(', ')}`, { userId, role, permissions });
+      return true;
     }
     
-    // Check if user has any of the specified permissions
-    const userPermissions = userPermissionsResponse.permissions;
-    return permissions.some(permission => userPermissions.includes(permission));
+    // Check each permission individually using the permission middleware
+    for (const permission of permissions) {
+      const normalizedPermission = permission.toString().trim().toLowerCase();
+      
+      // 🔑 FIX: Pass the role parameter to enable admin bypass
+      const hasPermission = await permissionMiddleware.hasPermission(userId, normalizedPermission, role);
+      
+      if (hasPermission) {
+        return true; // User has at least one of the required permissions
+      }
+    }
+    
+    return false; // User doesn't have any of the required permissions
   } catch (error) {
     logger.error('Error checking user permissions:', {
       error: error instanceof Error ? error.message : String(error),
@@ -122,11 +133,13 @@ export async function checkUserHasAnyPermission(
  * 
  * @param userId - User ID to check permissions for
  * @param permissions - Array of permission codes
+ * @param userRole - Optional user role (if not provided, will be fetched)
  * @returns Promise resolving to boolean indicating if user has all permissions
  */
 export async function checkUserHasAllPermissions(
   userId: number,
-  permissions: (SystemPermission | string)[]
+  permissions: (SystemPermission | string)[],
+  userRole?: string
 ): Promise<boolean> {
   const logger = getLogger();
   
@@ -136,18 +149,33 @@ export async function checkUserHasAllPermissions(
   }
   
   try {
-    // Get all user permissions
-    const serviceFactory = getServiceFactory();
-    const permissionService = serviceFactory.createPermissionService();
-    const userPermissionsResponse = await permissionService.getUserPermissions(userId);
-    
-    if (!userPermissionsResponse || !userPermissionsResponse.permissions) {
-      return false;
+    // Get user role if not provided
+    let role = userRole;
+    if (!role) {
+      const userRepository = (await import('@/core/factories/repositoryFactory')).getRepositoryFactory().createUserRepository();
+      const user = await userRepository.findById(userId);
+      role = user?.role;
     }
     
-    // Check if user has all of the specified permissions
-    const userPermissions = userPermissionsResponse.permissions;
-    return permissions.every(permission => userPermissions.includes(permission));
+    // 🔑 FIX: Admin bypass - if user is admin, they have all permissions
+    if (role && role.toLowerCase() === 'admin') {
+      logger.info(`Admin user ${userId} granted all permissions: ${permissions.join(', ')}`, { userId, role, permissions });
+      return true;
+    }
+    
+    // Check each permission individually using the permission middleware
+    for (const permission of permissions) {
+      const normalizedPermission = permission.toString().trim().toLowerCase();
+      
+      // 🔑 FIX: Pass the role parameter to enable admin bypass
+      const hasPermission = await permissionMiddleware.hasPermission(userId, normalizedPermission, role);
+      
+      if (!hasPermission) {
+        return false; // User is missing at least one required permission
+      }
+    }
+    
+    return true; // User has all required permissions
   } catch (error) {
     logger.error('Error checking user permissions:', {
       error: error instanceof Error ? error.message : String(error),

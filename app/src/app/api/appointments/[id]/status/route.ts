@@ -9,8 +9,6 @@ import { formatSuccess, formatError, formatNotFound, formatValidationError } fro
 import { getAppointmentService } from '@/core/factories/serviceFactory.server';
 import { UpdateAppointmentStatusDto } from '@/domain/dtos/AppointmentDtos';
 import { getLogger } from '@/core/logging';
-import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 
@@ -21,18 +19,6 @@ async function handleStatusUpdate(req: NextRequest, params: { id: string }) {
   const logger = getLogger();
   
   try {
-    // Check permission - moved inside handler for better authentication flow
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.APPOINTMENTS_EDIT
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_EDIT}`);
-      return formatError(
-        `You don't have permission to perform this action (requires ${SystemPermission.APPOINTMENTS_EDIT})`, 
-        403
-      );
-    }
-    
     const id = params.id;
     
     if (!id) {
@@ -111,7 +97,8 @@ export const PUT = routeHandler(async (req: NextRequest, { params }) => {
   // Reuse the handler function for both PUT and PATCH
   return handleStatusUpdate(req, { id });
 }, {
-  requiresAuth: true
+  requiresAuth: true,
+  requiredPermission: [SystemPermission.APPOINTMENTS_EDIT]
 });
 
 /**
@@ -127,5 +114,6 @@ export const PATCH = routeHandler(async (req: NextRequest, { params }) => {
   // Reuse the handler function for both PUT and PATCH
   return handleStatusUpdate(req, { id });
 }, {
-  requiresAuth: true
+  requiresAuth: true,
+  requiredPermission: [SystemPermission.APPOINTMENTS_EDIT]
 });

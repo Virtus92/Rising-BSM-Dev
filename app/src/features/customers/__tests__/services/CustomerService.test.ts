@@ -191,7 +191,7 @@ describe('CustomerService', () => {
       mockValidationService.validate.mockResolvedValue({
         result: ValidationResult.SUCCESS,
         isValid: true,
-        errors: undefined,
+        errors: [],
       });
 
       mockRepository.create.mockResolvedValue(customer);
@@ -254,7 +254,7 @@ describe('CustomerService', () => {
       mockValidationService.validate.mockResolvedValue({
         result: ValidationResult.SUCCESS,
         isValid: true,
-        errors: undefined,
+        errors: [],
       });
       mockRepository.update.mockResolvedValue(updatedCustomer);
 
@@ -273,7 +273,7 @@ describe('CustomerService', () => {
       mockValidationService.validate.mockResolvedValue({
         result: ValidationResult.SUCCESS,
         isValid: true,
-        errors: undefined,
+        errors: [],
       });
 
       await expect(service.update(999, { name: 'Updated' })).rejects.toThrow();

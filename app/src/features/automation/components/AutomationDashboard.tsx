@@ -15,7 +15,8 @@ import {
   Webhook, 
   Calendar,
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  Key
 } from 'lucide-react';
 import { useAutomation } from '../hooks/useAutomation';
 import { WebhookForm } from './WebhookForm';
@@ -223,10 +224,11 @@ export function AutomationDashboard() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
           <TabsTrigger value="schedules">Schedules</TabsTrigger>
+          <TabsTrigger value="api-keys">API Keys</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -296,6 +298,30 @@ export function AutomationDashboard() {
             items={schedules}
             onRefresh={fetchSchedules}
           />
+        </TabsContent>
+
+        <TabsContent value="api-keys">
+          <Card>
+            <CardHeader>
+              <CardTitle>API Key Management</CardTitle>
+              <CardDescription>
+                Manage API keys for programmatic access to automation endpoints
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Key className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">API Key Management</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create and manage API keys to access automation features programmatically.
+                </p>
+                <Button onClick={() => window.location.href = '/dashboard/api-keys'}>
+                  <Key className="w-4 h-4 mr-2" />
+                  Manage API Keys
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

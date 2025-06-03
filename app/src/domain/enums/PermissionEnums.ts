@@ -89,6 +89,13 @@ export enum SystemPermission {
   AUTOMATION_DELETE = "automation.delete",
   AUTOMATION_MANAGE = "automation.manage",
   
+  // API Key permissions
+  API_KEYS_VIEW = "api_keys.view",
+  API_KEYS_CREATE = "api_keys.create",
+  API_KEYS_EDIT = "api_keys.edit",
+  API_KEYS_DELETE = "api_keys.delete",
+  API_KEYS_MANAGE = "api_keys.manage",
+  
   // IMPORTANT: This is added to fix references in code
   // This permission is used in routes, so must be defined here
   SYSTEM_ADMIN = "system.admin"
@@ -157,7 +164,13 @@ export function getPermissionsForRole(role: string): string[] {
         SystemPermission.AUTOMATION_VIEW,
         SystemPermission.AUTOMATION_CREATE,
         SystemPermission.AUTOMATION_EDIT,
-        SystemPermission.AUTOMATION_DELETE
+        SystemPermission.AUTOMATION_DELETE,
+        // API Key management
+        SystemPermission.API_KEYS_VIEW,
+        SystemPermission.API_KEYS_CREATE,
+        SystemPermission.API_KEYS_EDIT,
+        SystemPermission.API_KEYS_DELETE,
+        SystemPermission.API_KEYS_MANAGE
       ];
       
     case 'staff':

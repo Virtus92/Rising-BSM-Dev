@@ -2,6 +2,9 @@
  * Security module exports
  */
 
+// Export API key utilities
+export { ApiKeyGenerator } from './api-key-utils';
+
 // Export password utilities
 export { 
   hashPassword,
@@ -34,11 +37,22 @@ export {
   publicRateLimiter
 } from './rate-limiter';
 
+// Export API key rate limiting
+export {
+  ApiKeyRateLimiter,
+  checkApiKeyRateLimit,
+  createApiKeyRateLimitMiddleware,
+  getRateLimiter
+} from './rate-limiting';
+
+export type {
+  ApiKeyRateLimit,
+  RateLimitResult
+} from './rate-limiting';
+
 // Export security monitoring
 export { 
   securityMonitor,
   type SecurityEvent,
   type ThreatAnalysis
 } from './monitoring';
-
-// Export other security utilities as they're added

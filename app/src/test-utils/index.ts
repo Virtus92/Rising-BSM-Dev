@@ -215,6 +215,11 @@ export function mockAuthContext(user?: any) {
 }
 
 /**
+ * Import polyfills for test environment
+ */
+import './polyfills';
+
+/**
  * Setup MSW for API mocking
  */
 export { setupServer } from 'msw/node';

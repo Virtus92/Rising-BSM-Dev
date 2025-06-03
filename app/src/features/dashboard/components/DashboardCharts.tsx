@@ -20,8 +20,8 @@ import {
 import { useDashboardCharts, TimeFrame } from '../hooks/useDashboardCharts';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { 
-  BarChart2, 
-  LineChart as LineChartIcon,
+  BarChart3, 
+  TrendingUp,
   RefreshCw,
   AlertCircle
 } from 'lucide-react';
@@ -481,13 +481,13 @@ export const DashboardCharts = () => {
           >
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="bar" className="flex items-center">
-                <BarChart2 className="h-4 w-4 mr-2" /> Bar
+                <BarChart3 className="h-4 w-4 mr-2" /> Bar
               </TabsTrigger>
               <TabsTrigger value="line" className="flex items-center">
-                <LineChartIcon className="h-4 w-4 mr-2" /> Line
+                <TrendingUp className="h-4 w-4 mr-2" /> Line
               </TabsTrigger>
               <TabsTrigger value="area" className="flex items-center">
-                <LineChartIcon className="h-4 w-4 mr-2" /> Area
+                <TrendingUp className="h-4 w-4 mr-2" /> Area
               </TabsTrigger>
             </TabsList>
           </Tabs>

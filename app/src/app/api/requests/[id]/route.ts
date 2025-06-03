@@ -4,7 +4,7 @@ import { formatSuccess, formatError, formatNotFound, formatValidationError } fro
 
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 

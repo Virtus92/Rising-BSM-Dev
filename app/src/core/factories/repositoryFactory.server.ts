@@ -24,6 +24,7 @@ import { RequestDataRepository } from '@/features/requests/lib/repositories/Requ
 import { AutomationWebhookRepository } from '@/features/automation/lib/repositories/AutomationWebhookRepository';
 import { AutomationScheduleRepository } from '@/features/automation/lib/repositories/AutomationScheduleRepository';
 import { AutomationExecutionRepository } from '@/features/automation/lib/repositories/AutomationExecutionRepository';
+import { ApiKeyRepository } from '@/features/api-keys/lib/repositories/ApiKeyRepository';
 
 // Interfaces
 import { IUserRepository } from '@/domain/repositories/IUserRepository';
@@ -40,6 +41,7 @@ import {
   IAutomationScheduleRepository,
   IAutomationExecutionRepository
 } from '@/domain/repositories/IAutomationRepository';
+import { IApiKeyRepository } from '@/domain/repositories/IApiKeyRepository';
 
 /**
  * RepositoryFactory class for uniform creation of repositories
@@ -60,6 +62,7 @@ export class RepositoryFactory {
   private automationWebhookRepository?: AutomationWebhookRepository;
   private automationScheduleRepository?: AutomationScheduleRepository;
   private automationExecutionRepository?: AutomationExecutionRepository;
+  private apiKeyRepository?: ApiKeyRepository;
 
   /**
    * Private constructor for singleton pattern
@@ -257,6 +260,16 @@ export class RepositoryFactory {
   }
 
   /**
+   * Creates an instance of ApiKeyRepository
+   */
+  public createApiKeyRepository(): IApiKeyRepository {
+    if (!this.apiKeyRepository) {
+      this.apiKeyRepository = new ApiKeyRepository();
+    }
+    return this.apiKeyRepository;
+  }
+
+  /**
    * Resets all repository instances
    */
   public resetRepositories(): void {
@@ -272,6 +285,7 @@ export class RepositoryFactory {
     this.automationWebhookRepository = undefined;
     this.automationScheduleRepository = undefined;
     this.automationExecutionRepository = undefined;
+    this.apiKeyRepository = undefined;
   }
 }
 
@@ -329,6 +343,10 @@ export function getAutomationScheduleRepository(): IAutomationScheduleRepository
 
 export function getAutomationExecutionRepository(): IAutomationExecutionRepository {
   return getRepositoryFactory().createAutomationExecutionRepository();
+}
+
+export function getApiKeyRepository(): IApiKeyRepository {
+  return getRepositoryFactory().createApiKeyRepository();
 }
 
 export function resetRepositories(): void {

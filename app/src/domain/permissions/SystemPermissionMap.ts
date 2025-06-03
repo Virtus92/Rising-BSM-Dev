@@ -276,6 +276,43 @@ export const SystemPermissionMap: Record<string, PermissionDefinition> = {
     action: PermissionAction.MANAGE
   },
   
+  // API Key permissions
+  [SystemPermission.API_KEYS_VIEW]: {
+    code: SystemPermission.API_KEYS_VIEW,
+    name: 'View API Keys',
+    description: 'Can view API keys and their basic information',
+    category: 'API Keys',
+    action: PermissionAction.VIEW
+  },
+  [SystemPermission.API_KEYS_CREATE]: {
+    code: SystemPermission.API_KEYS_CREATE,
+    name: 'Create API Keys',
+    description: 'Can create new API keys',
+    category: 'API Keys',
+    action: PermissionAction.CREATE
+  },
+  [SystemPermission.API_KEYS_EDIT]: {
+    code: SystemPermission.API_KEYS_EDIT,
+    name: 'Edit API Keys',
+    description: 'Can edit existing API keys',
+    category: 'API Keys',
+    action: PermissionAction.EDIT
+  },
+  [SystemPermission.API_KEYS_DELETE]: {
+    code: SystemPermission.API_KEYS_DELETE,
+    name: 'Delete API Keys',
+    description: 'Can delete API keys',
+    category: 'API Keys',
+    action: PermissionAction.DELETE
+  },
+  [SystemPermission.API_KEYS_MANAGE]: {
+    code: SystemPermission.API_KEYS_MANAGE,
+    name: 'Manage API Keys',
+    description: 'Can manage all API key features including permissions',
+    category: 'API Keys',
+    action: PermissionAction.MANAGE
+  },
+  
   // System administration
   [SystemPermission.SYSTEM_ADMIN]: {
     code: SystemPermission.SYSTEM_ADMIN,
@@ -421,6 +458,16 @@ export function getDefaultPermissionsForRole(role: string): string[] {
         SystemPermission.APPOINTMENTS_CREATE,
         SystemPermission.APPOINTMENTS_EDIT,
         SystemPermission.APPOINTMENTS_DELETE,
+        SystemPermission.AUTOMATION_VIEW,
+        SystemPermission.AUTOMATION_CREATE,
+        SystemPermission.AUTOMATION_EDIT,
+        SystemPermission.AUTOMATION_DELETE,
+        SystemPermission.AUTOMATION_MANAGE,
+        SystemPermission.API_KEYS_VIEW,
+        SystemPermission.API_KEYS_CREATE,
+        SystemPermission.API_KEYS_EDIT,
+        SystemPermission.API_KEYS_DELETE,
+        SystemPermission.API_KEYS_MANAGE,
         SystemPermission.NOTIFICATIONS_VIEW,
         SystemPermission.SETTINGS_VIEW,
         SystemPermission.SETTINGS_EDIT,
@@ -442,6 +489,12 @@ export function getDefaultPermissionsForRole(role: string): string[] {
         SystemPermission.APPOINTMENTS_VIEW,
         SystemPermission.APPOINTMENTS_CREATE,
         SystemPermission.APPOINTMENTS_EDIT,
+        SystemPermission.AUTOMATION_VIEW,
+        SystemPermission.AUTOMATION_CREATE,
+        SystemPermission.AUTOMATION_EDIT,
+        SystemPermission.API_KEYS_VIEW,
+        SystemPermission.API_KEYS_CREATE,
+        SystemPermission.API_KEYS_EDIT,
         SystemPermission.NOTIFICATIONS_VIEW,
         SystemPermission.SETTINGS_VIEW
       ];

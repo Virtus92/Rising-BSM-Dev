@@ -8,7 +8,7 @@ import { AppError, ValidationError, PermissionError } from '@/core/errors/types/
 import { getLogger } from '@/core/logging';
 import { ErrorResponse, SuccessResponse } from '@/core/errors/types/ApiTypes';
 import { errorHandler } from '@/core/errors/error-handler';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { authErrorHandler, AuthErrorType } from '@/features/auth/utils/AuthErrorHandler';
 import { AuthInfo as AuthInfoType } from '@/types/types/auth';
 

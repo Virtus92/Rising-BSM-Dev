@@ -16,6 +16,7 @@ import {
   ChevronDown,
   BarChart2,
   Zap,
+  Key,
 } from 'lucide-react';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { PermissionGuard } from '@/shared/components/PermissionGuard';
@@ -91,6 +92,12 @@ export const DashboardSidebar = () => {
       icon: Zap,
       href: '/dashboard/automation',
       permission: SystemPermission.AUTOMATION_VIEW
+    },
+    { 
+      label: 'API Keys',
+      icon: Key,
+      href: '/dashboard/api-keys',
+      permission: SystemPermission.API_KEYS_VIEW
     },
     { 
       label: 'My Profile',

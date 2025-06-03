@@ -12,7 +12,7 @@ import { routeHandler } from '@/core/api/route-handler';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { RequestStatus } from '@/domain/enums/CommonEnums';
 import { authenticateRequest } from '@/features/auth/api/middleware/authMiddleware';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 
 const logger = getLogger();
 

@@ -10,7 +10,7 @@ import { updateUserHandler } from '@/features/users/api/routes/update-user-route
 import { deleteUserHandler } from '@/features/users/api/routes/delete-user-route';
 import { formatSuccess, formatError, formatNotFound } from '@/core/errors/index';
 import { getLogger } from '@/core/logging';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 import { AuthErrorType } from '@/types/types/auth';
