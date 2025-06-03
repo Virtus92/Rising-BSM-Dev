@@ -30,12 +30,12 @@ export interface BaseFilterParamsDto {
   /**
    * Start date for filtering date ranges
    */
-  startDate?: Date;
+  startDate?: Date | string;
   
   /**
    * End date for filtering date ranges
    */
-  endDate?: Date;
+  endDate?: Date | string;
   
   /**
    * Related entities to include in the response

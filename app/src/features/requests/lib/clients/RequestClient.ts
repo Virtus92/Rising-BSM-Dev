@@ -222,8 +222,8 @@ function buildQueryParams(filters?: RequestFilterParamsDto): string {
   if (filters.processorId) params.append('processorId', filters.processorId.toString());
   if (filters.unassigned) params.append('unassigned', 'true');
   if (filters.notConverted) params.append('notConverted', 'true');
-  if (filters.startDate) params.append('startDate', filters.startDate.toISOString());
-  if (filters.endDate) params.append('endDate', filters.endDate.toISOString());
+  if (filters.startDate) params.append('startDate', filters.startDate.toString());
+  if (filters.endDate) params.append('endDate', filters.endDate.toString());
   if (filters.page) params.append('page', filters.page.toString());
   if (filters.limit) params.append('limit', filters.limit.toString());
   if (filters.sortBy) params.append('sortBy', filters.sortBy);
