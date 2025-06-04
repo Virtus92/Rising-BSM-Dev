@@ -91,15 +91,34 @@ export class ApiKeyService extends BaseService<ApiKey, CreateApiKeyDto, UpdateAp
 
       // Set permissions for standard keys
       if (data.type === ApiKeyType.STANDARD && data.permissions && data.permissions.length > 0) {
-        await this.apiKeyRepository.updateApiKeyPermissions(
+        const permissionsUpdated = await this.apiKeyRepository.updateApiKeyPermissions(
           savedApiKey.id!,
           data.permissions,
           options?.userId
         );
+        
+        if (!permissionsUpdated) {
+          throw new AppError('Failed to assign permissions to API key');
+        }
+        
+        // Verify permissions were actually saved
+        const savedPermissions = await this.apiKeyRepository.getApiKeyPermissions(savedApiKey.id!);
+        logger.debug('Verified saved permissions after creation', { 
+          apiKeyId: savedApiKey.id, 
+          requestedPermissions: data.permissions,
+          savedPermissions,
+          permissionCount: savedPermissions.length
+        });
+      }
+
+      // Re-fetch the API key to ensure we have the complete data with permissions
+      const apiKeyWithPermissions = await this.apiKeyRepository.findById(savedApiKey.id!);
+      if (!apiKeyWithPermissions) {
+        throw new AppError('API key was created but could not be retrieved');
       }
 
       // Get the saved key with permissions
-      const responseDto = await this.mapToResponseDto(savedApiKey);
+      const responseDto = await this.mapToResponseDto(apiKeyWithPermissions);
 
       return {
         apiKey: responseDto,
@@ -633,8 +652,29 @@ export class ApiKeyService extends BaseService<ApiKey, CreateApiKeyDto, UpdateAp
   }
 
   async findById(id: number, options?: ServiceOptions): Promise<ApiKeyResponseDto | null> {
-    const apiKey = await this.apiKeyRepository.findById(id);
-    return apiKey ? this.mapToResponseDto(apiKey) : null;
+    try {
+      logger.debug('Finding API key by ID', { id, options });
+      const apiKey = await this.apiKeyRepository.findById(id);
+      
+      if (!apiKey) {
+        logger.debug('API key not found', { id });
+        return null;
+      }
+      
+      logger.debug('Found API key, mapping to response DTO', { id, name: apiKey.name, type: apiKey.type });
+      const result = await this.mapToResponseDto(apiKey);
+      
+      logger.debug('Mapped API key to response DTO', { 
+        id, 
+        hasPermissions: !!result.permissions,
+        permissionCount: result.permissions?.length || 0
+      });
+      
+      return result;
+    } catch (error) {
+      logger.error('Error finding API key by ID', { error, id });
+      throw error instanceof AppError ? error : new AppError(`Failed to find API key: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async delete(id: number, options?: ServiceOptions): Promise<boolean> {
@@ -718,20 +758,36 @@ export class ApiKeyService extends BaseService<ApiKey, CreateApiKeyDto, UpdateAp
    * Map API key entity to response DTO with permissions
    */
   private async mapToResponseDto(apiKey: ApiKey): Promise<ApiKeyResponseDto> {
-    // Get permissions if it's a standard key
+    const baseDto = this.toDTO(apiKey);
+    
+    // Get permissions for standard keys only
     let permissions: string[] = [];
     if (apiKey.type === ApiKeyType.STANDARD && apiKey.id) {
       try {
         permissions = await this.apiKeyRepository.getApiKeyPermissions(apiKey.id);
+        logger.debug('Retrieved permissions for API key', { apiKeyId: apiKey.id, permissions, permissionCount: permissions.length });
       } catch (error) {
         logger.warn('Failed to get permissions for API key', { error, apiKeyId: apiKey.id });
+        permissions = [];
       }
+    } else if (apiKey.type === ApiKeyType.ADMIN) {
+      // Admin keys have all permissions by design, but we don't include them in the response
+      // The frontend should handle admin keys separately
+      logger.debug('Admin API key - no explicit permissions returned', { apiKeyId: apiKey.id });
     }
 
-    const baseDto = this.toDTO(apiKey);
-    return {
+    const result = {
       ...baseDto,
       permissions: apiKey.type === ApiKeyType.STANDARD ? permissions : undefined
     };
+    
+    logger.debug('Mapped API key to response DTO', { 
+      apiKeyId: apiKey.id, 
+      type: apiKey.type, 
+      hasPermissions: !!result.permissions,
+      permissionCount: result.permissions?.length || 0
+    });
+    
+    return result;
   }
 }

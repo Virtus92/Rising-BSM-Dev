@@ -53,37 +53,50 @@ export async function apiKeyMiddleware(req: NextRequest): Promise<ApiKeyAuthResu
 
     // Support Bearer and ApiKey schemes
     let apiKey: string | null = null;
+    let isJwtToken = false;
     
     if (authHeader.startsWith('Bearer ')) {
-      apiKey = authHeader.substring(7);
+      const token = authHeader.substring(7);
+      
+      // Check if this looks like an API key (starts with rk_live_ or rk_test_)
+      if (token.startsWith('rk_live_') || token.startsWith('rk_test_')) {
+        apiKey = token;
+      } else {
+        // This is likely a JWT token, not an API key - fail silently
+        isJwtToken = true;
+      }
     } else if (authHeader.startsWith('ApiKey ')) {
       apiKey = authHeader.substring(7);
-    } else {
+    }
+    
+    // If this is a JWT token, fail silently without warnings
+    if (isJwtToken) {
+      return {
+        success: false,
+        message: 'Not an API key'
+      };
+    }
+    
+    // If no API key scheme detected, return error
+    if (!apiKey) {
       return {
         success: false,
         message: 'Invalid Authorization header format. Use "Bearer <api_key>" or "ApiKey <api_key>"'
       };
     }
 
-    if (!apiKey) {
-      return {
-        success: false,
-        message: 'Empty API key in Authorization header'
-      };
-    }
-
-    // Validate API key format
+    // Validate API key format (only log warnings for actual API key attempts)
     if (!ApiKeyGenerator.isValidFormat(apiKey)) {
       logger.warn('Invalid API key format attempted', {
         requestId,
         keyPreview: ApiKeyGenerator.maskForLogging(apiKey),
         userAgent: req.headers.get('user-agent'),
-        ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip')
+        ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '::1'
       });
       
       return {
         success: false,
-        message: 'Invalid token format'
+        message: 'Invalid API key format'
       };
     }
 
@@ -214,7 +227,11 @@ export function extractApiKeyInfo(req: NextRequest): {
   
   if (authHeader.startsWith('Bearer ')) {
     authScheme = 'Bearer';
-    apiKey = authHeader.substring(7);
+    const potentialKey = authHeader.substring(7);
+    // Only consider it an API key if it has the right format
+    if (ApiKeyGenerator.isValidFormat(potentialKey)) {
+      apiKey = potentialKey;
+    }
   } else if (authHeader.startsWith('ApiKey ')) {
     authScheme = 'ApiKey';
     apiKey = authHeader.substring(7);

@@ -3,7 +3,6 @@ import { routeHandler } from '@/core/api/server/route-handler';
 import { getApiKeyService } from '@/core/factories/serviceFactory.server';
 import { formatResponse } from '@/core/errors';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
-import { RevokeApiKeyDto } from '@/domain/dtos/ApiKeyDtos';
 
 /**
  * POST /api/api-keys/[id]/revoke
@@ -19,13 +18,10 @@ export const POST = routeHandler(
     }
 
     const body = await req.json();
-    
-    const revokeData: RevokeApiKeyDto = {
-      reason: body.reason
-    };
+    const reason = body.reason || 'Revoked by user';
 
     const apiKeyService = getApiKeyService();
-    const success = await apiKeyService.revokeApiKey(apiKeyId, revokeData, { userId: req.auth?.userId });
+    const success = await apiKeyService.revokeApiKey(apiKeyId, { reason }, { userId: req.auth?.userId });
 
     if (!success) {
       return formatResponse.error('Failed to revoke API key', 500);

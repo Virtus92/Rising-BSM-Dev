@@ -13,6 +13,7 @@ import {
   UpdateApiKeyPermissionsDto
 } from '@/domain/dtos/ApiKeyDtos';
 import { formatResponse } from '@/core/errors';
+import ApiKeyPermissionsDebugger from '../utils/ApiKeyPermissionsDebugger';
 
 export function useApiKeys() {
   const [apiKeys, setApiKeys] = useState<ApiKeyResponseDto[]>([]);
@@ -36,8 +37,13 @@ export function useApiKeys() {
 
       const response = await ApiClient.get(`/api/api-keys?${params}`);
       
+      console.log('📞 API Response for fetchApiKeys:', response);
+      
       if (response.success) {
-        setApiKeys(response.data?.data || []);
+        const apiKeysData = response.data?.data || [];
+        console.log('🔍 Raw API keys data from server:', apiKeysData);
+        ApiKeyPermissionsDebugger.debugApiKeysList(apiKeysData, 'useApiKeys.fetchApiKeys');
+        setApiKeys(apiKeysData);
       } else {
         throw new Error(response.message || 'Failed to fetch API keys');
       }

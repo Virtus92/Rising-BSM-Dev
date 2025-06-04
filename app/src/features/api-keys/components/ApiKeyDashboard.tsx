@@ -20,6 +20,7 @@ import { useApiKeys } from '../hooks/useApiKeys';
 import { ApiKeyList } from './ApiKeyList';
 import { ApiKeyForm } from './ApiKeyForm';
 import { ApiKeyStats } from './ApiKeyStats';
+import ApiKeyPermissionsDebugger from '../utils/ApiKeyPermissionsDebugger';
 
 export function ApiKeyDashboard() {
   const { 
@@ -44,6 +45,10 @@ export function ApiKeyDashboard() {
           fetchApiKeys(),
           fetchStats()
         ]);
+        
+        // Debug API keys after loading
+        console.log('🔍 API Keys Dashboard: Data loaded, debugging...');
+        ApiKeyPermissionsDebugger.debugApiKeysList(apiKeys, 'Dashboard Load');
       } catch (error) {
         console.error('Error loading API key data:', error);
       } finally {
@@ -53,6 +58,13 @@ export function ApiKeyDashboard() {
     
     loadData();
   }, [fetchApiKeys, fetchStats]);
+  
+  // Debug API keys whenever they change
+  useEffect(() => {
+    if (apiKeys.length > 0) {
+      ApiKeyPermissionsDebugger.debugApiKeysList(apiKeys, 'API Keys State Update');
+    }
+  }, [apiKeys]);
 
   const handleCreateSuccess = () => {
     setShowCreateForm(false);

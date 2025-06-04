@@ -30,6 +30,10 @@ import { ApiKeyType, ApiKeyStatus, ApiKeyEnvironment } from '@/domain/entities/A
 import { cn } from '@/shared/utils/cn';
 import { useApiKeys } from '../hooks/useApiKeys';
 import { useToast } from '@/shared/hooks/useToast';
+import { ApiKeyDetailsModal } from './ApiKeyDetailsModal';
+import { ApiKeyEditModal } from './ApiKeyEditModal';
+import { ApiKeyPermissionsModal } from './ApiKeyPermissionsModal';
+import ApiKeyPermissionsDebugger from '../utils/ApiKeyPermissionsDebugger';
 
 interface ApiKeyListProps {
   apiKeys: ApiKeyResponseDto[];
@@ -53,6 +57,11 @@ export function ApiKeyList({ apiKeys, onRefresh }: ApiKeyListProps) {
   const [environmentFilter, setEnvironmentFilter] = useState<string>('all');
   const [revokeReason, setRevokeReason] = useState('');
   const [selectedKeyForRevoke, setSelectedKeyForRevoke] = useState<ApiKeyResponseDto | null>(null);
+  
+  // Modal states
+  const [selectedKeyForDetails, setSelectedKeyForDetails] = useState<ApiKeyResponseDto | null>(null);
+  const [selectedKeyForEdit, setSelectedKeyForEdit] = useState<ApiKeyResponseDto | null>(null);
+  const [selectedKeyForPermissions, setSelectedKeyForPermissions] = useState<ApiKeyResponseDto | null>(null);
 
   // Filter API keys based on search and filters
   const filteredKeys = apiKeys.filter(key => {
@@ -342,18 +351,24 @@ export function ApiKeyList({ apiKeys, onRefresh }: ApiKeyListProps) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => console.log('View details for', key.name)}>
+                          <DropdownMenuItem onClick={() => setSelectedKeyForDetails(key)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => console.log('Edit', key.name)}>
+                          <DropdownMenuItem onClick={() => setSelectedKeyForEdit(key)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => console.log('Manage permissions for', key.name)}>
-                            <Shield className="mr-2 h-4 w-4" />
-                            Manage Permissions
-                          </DropdownMenuItem>
+                          {key.type === ApiKeyType.STANDARD && (
+                            <DropdownMenuItem onClick={() => {
+                              console.log('🔍 Opening permissions modal for API key:', key.name);
+                              ApiKeyPermissionsDebugger.debugApiKey(key, 'Before Opening Permissions Modal');
+                              setSelectedKeyForPermissions(key);
+                            }}>
+                              <Shield className="mr-2 h-4 w-4" />
+                              Manage Permissions
+                            </DropdownMenuItem>
+                          )}
                           {key.isActive ? (
                             <DropdownMenuItem onClick={() => handleDeactivate(key)} disabled={loading}>
                               <EyeOff className="mr-2 h-4 w-4" />
@@ -468,6 +483,32 @@ export function ApiKeyList({ apiKeys, onRefresh }: ApiKeyListProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* View Details Modal */}
+      <ApiKeyDetailsModal
+        apiKey={selectedKeyForDetails}
+        onClose={() => setSelectedKeyForDetails(null)}
+      />
+
+      {/* Edit Modal */}
+      <ApiKeyEditModal
+        apiKey={selectedKeyForEdit}
+        onClose={() => setSelectedKeyForEdit(null)}
+        onSuccess={() => {
+          setSelectedKeyForEdit(null);
+          onRefresh();
+        }}
+      />
+
+      {/* Permissions Modal */}
+      <ApiKeyPermissionsModal
+        apiKey={selectedKeyForPermissions}
+        onClose={() => setSelectedKeyForPermissions(null)}
+        onSuccess={() => {
+          setSelectedKeyForPermissions(null);
+          onRefresh();
+        }}
+      />
     </div>
   );
 }

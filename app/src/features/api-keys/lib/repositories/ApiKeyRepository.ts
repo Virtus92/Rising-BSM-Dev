@@ -132,6 +132,8 @@ export class ApiKeyRepository extends PrismaRepository<ApiKey, number> implement
     try {
       const prismaClient = this.prisma;
       
+      logger.debug('Finding API key by hash', { keyHash: keyHash.substring(0, 8) + '...' });
+      
       const apiKey = await prismaClient.apiKey.findUnique({
         where: { keyHash },
         include: {
@@ -142,6 +144,17 @@ export class ApiKeyRepository extends PrismaRepository<ApiKey, number> implement
           }
         }
       });
+      
+      if (apiKey) {
+        logger.debug('Found API key by hash', { 
+          id: apiKey.id, 
+          name: apiKey.name, 
+          type: apiKey.type,
+          permissionsCount: apiKey.permissions?.length || 0
+        });
+      } else {
+        logger.debug('API key not found by hash');
+      }
 
       return apiKey ? this.mapToDomainEntity(apiKey) : null;
     } catch (error) {
@@ -156,6 +169,8 @@ export class ApiKeyRepository extends PrismaRepository<ApiKey, number> implement
   async findApiKeys(filters: ApiKeyFilterParamsDto): Promise<PaginationResult<ApiKey>> {
     try {
       const prismaClient = this.prisma;
+      
+      logger.debug('Finding API keys with filters', { filters });
       
       // Build where clause
       const where: any = {};
@@ -217,6 +232,8 @@ export class ApiKeyRepository extends PrismaRepository<ApiKey, number> implement
       const limit = Math.min(filters.limit || 10, 100); // Max 100 items per page
       const skip = (page - 1) * limit;
 
+      logger.debug('Executing API key query', { where, orderBy, page, limit, skip });
+
       // Execute queries
       const [items, total] = await Promise.all([
         prismaClient.apiKey.findMany({
@@ -238,7 +255,22 @@ export class ApiKeyRepository extends PrismaRepository<ApiKey, number> implement
         prismaClient.apiKey.count({ where })
       ]);
 
-      const domainEntities = items.map((item: any) => this.mapToDomainEntity(item));
+      logger.debug('API key query results', { 
+        itemCount: items.length, 
+        total, 
+        itemsWithPermissions: items.filter(item => item.permissions && item.permissions.length > 0).length
+      });
+
+      const domainEntities = items.map((item: any) => {
+        logger.debug('Mapping API key item', { 
+          id: item.id, 
+          name: item.name, 
+          type: item.type,
+          permissionsCount: item.permissions?.length || 0,
+          permissions: item.permissions?.map((p: any) => p.permission?.code) || []
+        });
+        return this.mapToDomainEntity(item);
+      });
 
       return {
         data: domainEntities,
@@ -452,14 +484,25 @@ export class ApiKeyRepository extends PrismaRepository<ApiKey, number> implement
     try {
       const prismaClient = this.prisma;
       
+      logger.debug('Fetching permissions for API key', { apiKeyId });
+      
       const permissions = await prismaClient.apiKeyPermission.findMany({
         where: { apiKeyId },
         include: {
           permission: true
         }
       });
+      
+      const permissionCodes = permissions.map((p: any) => p.permission.code);
+      
+      logger.debug('Retrieved API key permissions from database', { 
+        apiKeyId, 
+        rawCount: permissions.length,
+        permissionCodes,
+        rawPermissions: permissions.map(p => ({ id: p.id, permissionId: p.permissionId, code: p.permission.code }))
+      });
 
-      return permissions.map((p: any) => p.permission.code);
+      return permissionCodes;
     } catch (error) {
       logger.error('Error getting API key permissions', { error, apiKeyId });
       throw new AppError(`Failed to get API key permissions: ${error instanceof Error ? error.message : String(error)}`);
@@ -473,16 +516,25 @@ export class ApiKeyRepository extends PrismaRepository<ApiKey, number> implement
     try {
       const prismaClient = this.prisma;
       
+      logger.debug('Updating API key permissions', { apiKeyId, permissions, grantedBy });
+      
       await prismaClient.$transaction(async (tx: any) => {
         // Remove existing permissions
-        await tx.apiKeyPermission.deleteMany({
+        const deleteResult = await tx.apiKeyPermission.deleteMany({
           where: { apiKeyId }
         });
+        logger.debug('Deleted existing permissions', { apiKeyId, deletedCount: deleteResult.count });
         
         // Get permission IDs
         const permissionRecords = await tx.permission.findMany({
           where: { code: { in: permissions } },
           select: { id: true, code: true }
+        });
+        
+        logger.debug('Found permission records', { 
+          requestedPermissions: permissions,
+          foundPermissions: permissionRecords.map(p => p.code),
+          missingPermissions: permissions.filter(p => !permissionRecords.some(pr => pr.code === p))
         });
         
         // Create new permissions
@@ -493,12 +545,15 @@ export class ApiKeyRepository extends PrismaRepository<ApiKey, number> implement
             grantedBy
           }));
           
-          await tx.apiKeyPermission.createMany({
+          const createResult = await tx.apiKeyPermission.createMany({
             data: permissionData
           });
+          
+          logger.debug('Created new permissions', { apiKeyId, createdCount: createResult.count, permissionData });
         }
       });
 
+      logger.debug('Successfully updated API key permissions', { apiKeyId, permissions });
       return true;
     } catch (error) {
       logger.error('Error updating API key permissions', { error, apiKeyId, permissions });
