@@ -83,7 +83,7 @@ export async function apiKeyMiddleware(req: NextRequest): Promise<ApiKeyAuthResu
       
       return {
         success: false,
-        message: 'Invalid API key format'
+        message: 'Invalid token format'
       };
     }
 

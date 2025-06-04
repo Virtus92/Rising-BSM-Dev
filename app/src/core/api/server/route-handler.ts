@@ -61,9 +61,8 @@ export type MiddlewareFunction = (
  */
 export interface RouteHandlerOptions {
   // Authentication requirements
-  requiresAuth?: boolean;
-  allowApiKeyAuth?: boolean;
-  allowBothAuth?: boolean; // Allow either JWT or API key
+  requiresAuth?: boolean;        // Accepts both JWT and API key
+  allowApiKeyAuth?: boolean;     // API key only (no JWT)
   
   // Authorization requirements
   requiredRole?: UserRole | UserRole[];
@@ -107,6 +106,11 @@ function formatErrorResponse(error: unknown): ApiResponse<null> {
 /**
  * Enhanced route handler with comprehensive authentication and authorization
  * 
+ * Authentication Options:
+ * - requiresAuth: true     → Accepts both JWT tokens and API keys
+ * - allowApiKeyAuth: true  → Accepts API keys only (no JWT)
+ * - (none)                 → No authentication required
+ * 
  * @param handler - Route handler function
  * @param options - Configuration options
  * @returns Configured route handler
@@ -130,11 +134,15 @@ export function routeHandler(
       };
       
       // Handle authentication if required
-      if (options.requiresAuth || options.allowApiKeyAuth || options.allowBothAuth) {
+      if (options.requiresAuth || options.allowApiKeyAuth) {
         let hasValidAuth = false;
         
+        // Clean logic: requiresAuth = both, allowApiKeyAuth = API key only
+        const enableApiKeyAuth = options.requiresAuth || options.allowApiKeyAuth;
+        const enableJwtAuth = options.requiresAuth; // Only requiresAuth enables JWT
+        
         // Try API key authentication if enabled
-        if (options.allowApiKeyAuth || options.allowBothAuth) {
+        if (enableApiKeyAuth) {
           const apiKeyResult = await apiKeyMiddleware(request);
           
           if (apiKeyResult.success && apiKeyResult.apiKeyId) {
@@ -225,8 +233,8 @@ export function routeHandler(
           }
         }
         
-        // Try JWT authentication if not authenticated via API key or both allowed
-        if (!hasValidAuth || options.allowBothAuth) {
+        // Try JWT authentication if enabled
+        if (enableJwtAuth && !hasValidAuth) {
           const jwtResult = await authenticateRequest(request);
           
           if (jwtResult.success && jwtResult.user) {
@@ -241,7 +249,6 @@ export function routeHandler(
                 const { checkUserHasAnyPermission } = await import('@/app/api/helpers/permissionUtils');
                 
                 // Check if user has any of the required permissions
-                // 🔑 FIX: Pass the user role to enable admin bypass
                 const hasRequiredPermissions = await checkUserHasAnyPermission(
                   jwtResult.user.id,
                   requiredPermissions,
@@ -301,18 +308,22 @@ export function routeHandler(
               role: jwtResult.user.role as UserRole,
               name: jwtResult.user.name
             };
-            authContext.authMethod = hasValidAuth ? 'both' : 'jwt';
+            authContext.authMethod = enableApiKeyAuth && hasValidAuth ? 'both' : 'jwt';
             hasValidAuth = true;
           }
         }
         
         // Check if authentication was successful
-        if ((options.requiresAuth || options.allowApiKeyAuth) && !hasValidAuth) {
+        if ((enableApiKeyAuth || enableJwtAuth) && !hasValidAuth) {
+          const authMethods = [];
+          if (enableApiKeyAuth) authMethods.push('API key');
+          if (enableJwtAuth) authMethods.push('JWT token');
+          
           return NextResponse.json({
             success: false,
             error: 'Authentication required',
             code: 'AUTHENTICATION_REQUIRED',
-            message: 'Valid JWT token or API key required',
+            message: `Valid ${authMethods.join(' or ')} required`,
             statusCode: 401
           }, { status: 401 });
         }

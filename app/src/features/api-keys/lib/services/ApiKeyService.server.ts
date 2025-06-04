@@ -29,6 +29,7 @@ import { getValidationService } from '@/core/validation';
 import { getPermissionService } from '@/core/factories/serviceFactory.server';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { ApiKeyGenerator } from '@/core/security/api-key-utils';
 
 const logger = getLogger();
 const errorHandler = getErrorHandler();
@@ -514,52 +515,24 @@ export class ApiKeyService extends BaseService<ApiKey, CreateApiKeyDto, UpdateAp
     keyPrefix: string;
     keyPreview: string;
   } {
-    // Generate prefix based on environment
-    const prefix = environment === 'production' ? 'rk_live_' : 'rk_test_';
-    
-    // Generate random key part (32 characters)
-    const keyPart = crypto.randomBytes(24).toString('base64url');
-    
-    // Combine prefix and key
-    const plainTextKey = prefix + keyPart;
-    
-    // Hash the key for secure storage
-    const keyHash = this.hashApiKey(plainTextKey);
-    
-    // Create preview (first 8 chars + last 4 chars)
-    const keyPreview = plainTextKey.substring(0, 8) + '...' + plainTextKey.substring(plainTextKey.length - 4);
-
-    return {
-      plainTextKey,
-      keyHash,
-      keyPrefix: prefix,
-      keyPreview
-    };
+    // Use the standardized ApiKeyGenerator from core security
+    return ApiKeyGenerator.generateApiKey(environment);
   }
 
   /**
    * Validate API key format
    */
   validateKeyFormat(apiKey: string): boolean {
-    // Check if it starts with valid prefix
-    const validPrefixes = ['rk_live_', 'rk_test_'];
-    const hasValidPrefix = validPrefixes.some(prefix => apiKey.startsWith(prefix));
-    
-    if (!hasValidPrefix) return false;
-    
-    // Check minimum length (prefix + key should be at least 40 characters)
-    if (apiKey.length < 40) return false;
-    
-    // Check that it only contains valid characters (alphanumeric, dash, underscore)
-    const validChars = /^[a-zA-Z0-9_-]+$/;
-    return validChars.test(apiKey);
+    // Use the standardized ApiKeyGenerator validation
+    return ApiKeyGenerator.isValidFormat(apiKey);
   }
 
   /**
    * Hash an API key for secure storage
    */
   hashApiKey(plainTextKey: string): string {
-    return bcrypt.hashSync(plainTextKey, 12);
+    // Use the standardized ApiKeyGenerator hashing
+    return ApiKeyGenerator.hashApiKey(plainTextKey);
   }
 
   /**
