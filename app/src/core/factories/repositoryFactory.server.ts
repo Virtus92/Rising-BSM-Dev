@@ -264,6 +264,7 @@ export class RepositoryFactory {
    */
   public createApiKeyRepository(): IApiKeyRepository {
     if (!this.apiKeyRepository) {
+      const prisma = getPrismaClient();
       this.apiKeyRepository = new ApiKeyRepository();
     }
     return this.apiKeyRepository;

@@ -8,6 +8,9 @@ import { Input } from '@/shared/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/shared/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
+import { Textarea } from '@/shared/components/ui/textarea';
 import { 
   MoreVertical, 
   Edit, 
@@ -25,6 +28,8 @@ import {
 import { ApiKeyResponseDto } from '@/domain/dtos/ApiKeyDtos';
 import { ApiKeyType, ApiKeyStatus, ApiKeyEnvironment } from '@/domain/entities/ApiKey';
 import { cn } from '@/shared/utils/cn';
+import { useApiKeys } from '../hooks/useApiKeys';
+import { useToast } from '@/shared/hooks/useToast';
 
 interface ApiKeyListProps {
   apiKeys: ApiKeyResponseDto[];
@@ -32,10 +37,22 @@ interface ApiKeyListProps {
 }
 
 export function ApiKeyList({ apiKeys, onRefresh }: ApiKeyListProps) {
+  const { 
+    deleteApiKey, 
+    activateApiKey, 
+    deactivateApiKey, 
+    revokeApiKey,
+    loading 
+  } = useApiKeys();
+  
+  const { toast } = useToast();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [environmentFilter, setEnvironmentFilter] = useState<string>('all');
+  const [revokeReason, setRevokeReason] = useState('');
+  const [selectedKeyForRevoke, setSelectedKeyForRevoke] = useState<ApiKeyResponseDto | null>(null);
 
   // Filter API keys based on search and filters
   const filteredKeys = apiKeys.filter(key => {
@@ -104,6 +121,78 @@ export function ApiKeyList({ apiKeys, onRefresh }: ApiKeyListProps) {
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
     return formatDate(lastUsedAt);
+  };
+
+  // Handle API key activation
+  const handleActivate = async (apiKey: ApiKeyResponseDto) => {
+    try {
+      await activateApiKey(apiKey.id);
+      toast({ 
+        title: 'Success', 
+        description: `API key "${apiKey.name}" has been activated` 
+      });
+      onRefresh();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: `Failed to activate API key: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      });
+    }
+  };
+
+  // Handle API key deactivation
+  const handleDeactivate = async (apiKey: ApiKeyResponseDto) => {
+    try {
+      await deactivateApiKey(apiKey.id);
+      toast({ 
+        title: 'Success', 
+        description: `API key "${apiKey.name}" has been deactivated` 
+      });
+      onRefresh();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: `Failed to deactivate API key: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      });
+    }
+  };
+
+  // Handle API key deletion
+  const handleDelete = async (apiKey: ApiKeyResponseDto) => {
+    try {
+      await deleteApiKey(apiKey.id);
+      toast({ 
+        title: 'Success', 
+        description: `API key "${apiKey.name}" has been deleted` 
+      });
+      onRefresh();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: `Failed to delete API key: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      });
+    }
+  };
+
+  // Handle API key revocation
+  const handleRevoke = async () => {
+    if (!selectedKeyForRevoke) return;
+
+    try {
+      await revokeApiKey(selectedKeyForRevoke.id, { reason: revokeReason });
+      toast({ 
+        title: 'Success', 
+        description: `API key "${selectedKeyForRevoke.name}" has been revoked` 
+      });
+      setSelectedKeyForRevoke(null);
+      setRevokeReason('');
+      onRefresh();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: `Failed to revoke API key: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      });
+    }
   };
 
   return (
@@ -248,38 +337,80 @@ export function ApiKeyList({ apiKeys, onRefresh }: ApiKeyListProps) {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" className="h-8 w-8 p-0" disabled={loading}>
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => console.log('View details for', key.name)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => console.log('Edit', key.name)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => console.log('Manage permissions for', key.name)}>
                             <Shield className="mr-2 h-4 w-4" />
                             Manage Permissions
                           </DropdownMenuItem>
                           {key.isActive ? (
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeactivate(key)} disabled={loading}>
                               <EyeOff className="mr-2 h-4 w-4" />
                               Deactivate
                             </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem>
+                          ) : key.status !== 'revoked' ? (
+                            <DropdownMenuItem onClick={() => handleActivate(key)} disabled={loading}>
                               <CheckCircle className="mr-2 h-4 w-4" />
                               Activate
                             </DropdownMenuItem>
+                          ) : null}
+                          
+                          {/* Revoke Option */}
+                          {key.status !== 'revoked' && (
+                            <DropdownMenuItem 
+                              className="text-orange-600"
+                              onClick={() => {
+                                setSelectedKeyForRevoke(key);
+                                setRevokeReason('');
+                              }}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Revoke
+                            </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Revoke
-                          </DropdownMenuItem>
+
+                          {/* Delete Dialog */}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={(e) => e.preventDefault()}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete API Key</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to permanently delete the API key "{key.name}"? 
+                                  This action cannot be undone and will remove all traces of this key from the system.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(key)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                  disabled={loading}
+                                >
+                                  {loading ? 'Deleting...' : 'Delete Key'}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -290,6 +421,53 @@ export function ApiKeyList({ apiKeys, onRefresh }: ApiKeyListProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Revoke Confirmation Dialog */}
+      <Dialog open={!!selectedKeyForRevoke} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedKeyForRevoke(null);
+          setRevokeReason('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke API Key</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to revoke the API key "{selectedKeyForRevoke?.name}"? 
+              This action cannot be undone and will immediately prevent all access using this key.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Reason for revocation (optional)</label>
+              <Textarea
+                placeholder="Enter a reason for revoking this API key..."
+                value={revokeReason}
+                onChange={(e) => setRevokeReason(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setSelectedKeyForRevoke(null);
+                setRevokeReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleRevoke}
+              disabled={loading}
+            >
+              {loading ? 'Revoking...' : 'Revoke Key'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

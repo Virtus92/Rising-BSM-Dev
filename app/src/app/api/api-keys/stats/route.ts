@@ -9,9 +9,9 @@ import { SystemPermission } from '@/domain/enums/PermissionEnums';
  * Get API key usage statistics
  */
 export const GET = routeHandler(
-  async (req: NextRequest, user) => {
+  async (req: NextRequest) => {
     const apiKeyService = getApiKeyService();
-    const stats = await apiKeyService.getUsageStats({ userId: user.id });
+    const stats = await apiKeyService.getUsageStats({ userId: req.auth?.userId });
 
     return formatResponse.success(stats);
   },
