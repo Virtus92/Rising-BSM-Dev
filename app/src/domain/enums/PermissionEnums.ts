@@ -122,13 +122,8 @@ export function getPermissionsForRole(role: string): string[] {
   // Role-specific permissions
   switch (normalizedRole) {
     case 'admin':
-      // Admin has all permissions - ensure SYSTEM_ADMIN is included
-      const adminPermissions = Object.values(SystemPermission);
-      // Verify SYSTEM_ADMIN is included (it should be since we added it to the enum)
-      if (!adminPermissions.includes(SystemPermission.SYSTEM_ADMIN)) {
-        adminPermissions.push(SystemPermission.SYSTEM_ADMIN);
-      }
-      return adminPermissions;
+      // Admin should have ALL permissions - return all available system permissions
+      return Object.values(SystemPermission);
       
     case 'manager':
       return [

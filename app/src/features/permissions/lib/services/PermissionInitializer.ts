@@ -34,7 +34,7 @@ async function ensureRolePermissions(): Promise<void> {
   
   // Define default permissions for each role
   const rolePermissions: Record<string, string[]> = {
-    admin: Object.values(SystemPermission), // All permissions for admin
+    admin: Object.values(SystemPermission), // Admin gets ALL permissions
     manager: [
       // Basic permissions
       SystemPermission.DASHBOARD_ACCESS,

@@ -218,13 +218,20 @@ export class PermissionRepository implements IPermissionRepository {
         return [];
       }
       
-      // Special case: if user is admin, they implicitly have all permissions
+      // Special case: if user is admin, they get all permissions in the system
       if (user.role.toLowerCase() === 'admin') {
         this.logger.info(`User ${userId} is an admin, getting all available permissions`);
         // For admins, get all permissions in the system
         const allPermissions = await this.prisma.permission.findMany({
           select: { code: true }
         });
+        
+        // If no permissions in database, return default admin permissions
+        if (allPermissions.length === 0) {
+          this.logger.warn(`No permissions found in database for admin user ${userId}, using default permissions`);
+          return this.getDefaultPermissionsForRole('admin');
+        }
+        
         return allPermissions.map((p: any) => p.code);
       }
       
@@ -247,8 +254,7 @@ export class PermissionRepository implements IPermissionRepository {
         .map((p: any) => p.permission!.code as string);
       
       // Get role-based permissions from the database using the correct model reference
-      const rolePermissionModel = this.prisma.RolePermission;
-      const rolePermissions = await rolePermissionModel.findMany({
+      const rolePermissions = await this.prisma.rolePermission.findMany({
         where: { role: normalizedRole },
         include: {
           permission: {
@@ -304,28 +310,55 @@ export class PermissionRepository implements IPermissionRepository {
     
     switch(role) {
       case 'admin':
+        // Admin gets ALL available permissions in the system
         return [
           ...basicPermissions,
+          // User permissions
           'users.view',
           'users.create',
           'users.edit',
           'users.delete',
+          // Permission management
           'permissions.view',
           'permissions.manage',
+          // Customer permissions
           'customers.view',
           'customers.create',
           'customers.edit',
           'customers.delete',
+          // Request permissions
           'requests.view',
           'requests.create',
           'requests.edit',
           'requests.delete',
+          'requests.approve',
+          'requests.reject',
+          'requests.assign',
+          'requests.convert',
+          // Appointment permissions
           'appointments.view',
           'appointments.create',
           'appointments.edit',
           'appointments.delete',
+          // Settings permissions
           'settings.view',
-          'settings.edit'
+          'settings.edit',
+          // API Key permissions
+          'api_keys.view',
+          'api_keys.create',
+          'api_keys.edit',
+          'api_keys.delete',
+          'api_keys.manage',
+          // Automation permissions
+          'automation.view',
+          'automation.create',
+          'automation.edit',
+          'automation.delete',
+          'automation.manage',
+          // Notification permissions
+          'notifications.view',
+          // System permissions
+          'system.admin'
         ];
       case 'manager':
         return [
@@ -584,8 +617,7 @@ export class PermissionRepository implements IPermissionRepository {
     }
     
     // Check if user has this permission through their role - use proper join through the correct model
-    const rolePermissionModel = this.prisma.RolePermission;
-    const hasRolePermission = await rolePermissionModel.count({
+    const hasRolePermission = await this.prisma.rolePermission.count({
       where: {
         role: user.role.toLowerCase(),
         permission: {
@@ -852,8 +884,7 @@ export class PermissionRepository implements IPermissionRepository {
       const normalizedRole = role.toLowerCase();
       
       // Get role permissions through the correct model reference
-      const rolePermissionModel = this.prisma.RolePermission;
-      const rolePermissions = await rolePermissionModel.findMany({
+      const rolePermissions = await this.prisma.rolePermission.findMany({
         where: { role: normalizedRole },
         include: {
           permission: {
@@ -931,8 +962,7 @@ export class PermissionRepository implements IPermissionRepository {
     // Run in a transaction
     await this.prisma.$transaction(async (tx: any) => {
       // First delete all existing role permissions for this role
-      const rolePermissionModel = tx.rolePermission || tx.RolePermission;
-      await rolePermissionModel.deleteMany({
+      await tx.rolePermission.deleteMany({
         where: {
           role: normalizedRole
         }
@@ -953,8 +983,7 @@ export class PermissionRepository implements IPermissionRepository {
       
       // Use createMany for more efficiency
       if (rolePermissions.length > 0) {
-        const rolePermissionModel = tx.rolePermission || tx.RolePermission;
-        await rolePermissionModel.createMany({
+        await tx.rolePermission.createMany({
           data: rolePermissions,
           skipDuplicates: true
         });
