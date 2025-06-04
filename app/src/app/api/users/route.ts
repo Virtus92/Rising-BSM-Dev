@@ -88,7 +88,6 @@ export const GET = routeHandler(
   {
     requiresAuth: true,
     allowApiKeyAuth: true,
-    allowBothAuth: true,
     requiredPermission: [SystemPermission.USERS_VIEW],
     allowedApiKeyTypes: ['admin', 'standard'],
     allowedApiKeyEnvironments: ['production', 'development']
@@ -153,7 +152,6 @@ export const POST = routeHandler(
   {
     requiresAuth: true,
     allowApiKeyAuth: true,
-    allowBothAuth: true,
     requiredPermission: [SystemPermission.USERS_CREATE],
     allowedApiKeyTypes: ['admin'], // Only admin API keys can create users
     allowedApiKeyEnvironments: ['production', 'development']
@@ -238,7 +236,6 @@ export const DELETE = routeHandler(
   {
     requiresAuth: true,
     allowApiKeyAuth: true,
-    allowBothAuth: true,
     requiredPermission: [SystemPermission.USERS_DELETE],
     allowedApiKeyTypes: ['admin'], // Only admin API keys can delete users
     allowedApiKeyEnvironments: ['production', 'development']
