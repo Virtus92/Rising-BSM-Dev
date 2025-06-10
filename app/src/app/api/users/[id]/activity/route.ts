@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { formatResponse } from '@/core/errors';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { getUserService } from '@/core/factories/serviceFactory.server';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { getLogger } from '@/core/logging';
 

@@ -74,7 +74,7 @@ export function createCustomerResponseDto(partial: Partial<CustomerResponseDto> 
     createdBy: partial.createdBy ?? 0,
     updatedBy: partial.updatedBy ?? 0,
 
-    type: partial.type ?? CustomerType.INDIVIDUAL,
+    type: partial.type ?? CustomerType.PRIVATE,
     // Optional fields
     notes: partial.notes ?? [],
     appointments: partial.appointments ?? []

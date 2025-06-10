@@ -8,7 +8,7 @@ import { routeHandler } from '@/core/api/server/route-handler';
 import { formatSuccess, formatError, formatNotFound, formatValidationError } from '@/core/errors/index';
 import { getAppointmentService } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 
@@ -24,10 +24,11 @@ export const GET = routeHandler(async (req: NextRequest) => {
   const params = { id: req.nextUrl.pathname.split('/').slice(-2)[0] };
   
   try {
-    // Check permission - moved inside handler for better authentication flow
+    // Check permission - moved inside handler for better authentication flow with role
     if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
-      SystemPermission.APPOINTMENTS_VIEW
+      SystemPermission.APPOINTMENTS_VIEW,
+      req.auth?.role
     )) {
       logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_VIEW}`);
       return formatError(
@@ -97,10 +98,11 @@ export const POST = routeHandler(async (req: NextRequest) => {
   const params = { id: req.nextUrl.pathname.split('/').slice(-2)[0] };
   
   try {
-    // Check permission - moved inside handler for better authentication flow
+    // Check permission - moved inside handler for better authentication flow with role
     if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
-      SystemPermission.APPOINTMENTS_EDIT
+      SystemPermission.APPOINTMENTS_EDIT,
+      req.auth?.role
     )) {
       logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_EDIT}`);
       return formatError(

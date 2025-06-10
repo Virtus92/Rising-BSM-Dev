@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { routeHandler } from '@/core/api/route-handler';
 import { apiAuth } from '@/features/auth/api/middleware';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { formatResponse } from '@/core/errors';
 
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';

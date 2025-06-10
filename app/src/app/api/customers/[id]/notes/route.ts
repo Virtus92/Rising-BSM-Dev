@@ -4,8 +4,6 @@ import { formatSuccess, formatError, formatNotFound, formatValidationError } fro
 
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
-import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 
@@ -21,18 +19,6 @@ export const POST = routeHandler(async (req: NextRequest) => {
   const params = { id: req.nextUrl.pathname.split('/').slice(-2)[0] };
   
   try {
-    // Check permission
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.CUSTOMERS_EDIT
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_EDIT}`);
-      return formatError(
-        `You don't have permission to add notes to customers`, 
-        403
-      );
-    }
-    
     const id = params.id;
     
     if (!id) {
@@ -106,7 +92,8 @@ export const POST = routeHandler(async (req: NextRequest) => {
     );
   }
 }, {
-  requiresAuth: true
+  requiresAuth: true,
+  requiredPermission: [SystemPermission.CUSTOMERS_EDIT]
 });
 
 /**
@@ -121,18 +108,6 @@ export const GET = routeHandler(async (req: NextRequest) => {
   const params = { id: req.nextUrl.pathname.split('/').slice(-2)[0] };
   
   try {
-    // Check permission
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.CUSTOMERS_VIEW
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_VIEW}`);
-      return formatError(
-        `You don't have permission to view customer notes`, 
-        403
-      );
-    }
-    
     const id = params.id;
     
     if (!id) {
@@ -189,5 +164,6 @@ export const GET = routeHandler(async (req: NextRequest) => {
     );
   }
 }, {
-  requiresAuth: true
+  requiresAuth: true,
+  requiredPermission: [SystemPermission.CUSTOMERS_VIEW]
 });

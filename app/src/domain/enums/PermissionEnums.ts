@@ -89,6 +89,13 @@ export enum SystemPermission {
   AUTOMATION_DELETE = "automation.delete",
   AUTOMATION_MANAGE = "automation.manage",
   
+  // API Key permissions
+  API_KEYS_VIEW = "api_keys.view",
+  API_KEYS_CREATE = "api_keys.create",
+  API_KEYS_EDIT = "api_keys.edit",
+  API_KEYS_DELETE = "api_keys.delete",
+  API_KEYS_MANAGE = "api_keys.manage",
+  
   // IMPORTANT: This is added to fix references in code
   // This permission is used in routes, so must be defined here
   SYSTEM_ADMIN = "system.admin"
@@ -115,13 +122,8 @@ export function getPermissionsForRole(role: string): string[] {
   // Role-specific permissions
   switch (normalizedRole) {
     case 'admin':
-      // Admin has all permissions - ensure SYSTEM_ADMIN is included
-      const adminPermissions = Object.values(SystemPermission);
-      // Verify SYSTEM_ADMIN is included (it should be since we added it to the enum)
-      if (!adminPermissions.includes(SystemPermission.SYSTEM_ADMIN)) {
-        adminPermissions.push(SystemPermission.SYSTEM_ADMIN);
-      }
-      return adminPermissions;
+      // Admin should have ALL permissions - return all available system permissions
+      return Object.values(SystemPermission);
       
     case 'manager':
       return [
@@ -157,7 +159,13 @@ export function getPermissionsForRole(role: string): string[] {
         SystemPermission.AUTOMATION_VIEW,
         SystemPermission.AUTOMATION_CREATE,
         SystemPermission.AUTOMATION_EDIT,
-        SystemPermission.AUTOMATION_DELETE
+        SystemPermission.AUTOMATION_DELETE,
+        // API Key management
+        SystemPermission.API_KEYS_VIEW,
+        SystemPermission.API_KEYS_CREATE,
+        SystemPermission.API_KEYS_EDIT,
+        SystemPermission.API_KEYS_DELETE,
+        SystemPermission.API_KEYS_MANAGE
       ];
       
     case 'staff':

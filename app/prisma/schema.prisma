@@ -50,6 +50,12 @@ model User {
   updatedWebhooks   AutomationWebhook[] @relation("WebhookUpdater")
   createdSchedules  AutomationSchedule[] @relation("ScheduleCreator")
   updatedSchedules  AutomationSchedule[] @relation("ScheduleUpdater")
+  
+  // API Key relations
+  createdApiKeys    ApiKey[]  @relation("ApiKeyCreator")
+  updatedApiKeys    ApiKey[]  @relation("ApiKeyUpdater")
+  revokedApiKeys    ApiKey[]  @relation("ApiKeyRevoker")
+  grantedApiKeyPermissions ApiKeyPermission[] @relation("ApiKeyPermissionGranter")
 
   @@index([email])
   @@index([name])
@@ -101,7 +107,8 @@ model Permission {
   createdBy   Int?
   updatedBy   Int?
   users       UserPermission[]
-  roles       RolePermission[] 
+  roles       RolePermission[]
+  apiKeys     ApiKeyPermission[] @relation("ApiKeyPermissions") 
 
   @@index([code])
   @@index([category])
@@ -475,6 +482,64 @@ model AutomationExecution {
   @@index([status])
   @@index([executedAt])
   @@index([entityType, entityId])
+}
+
+//==============================================================================
+// API KEY MANAGEMENT
+//==============================================================================
+
+model ApiKey {
+  id              Int               @id @default(autoincrement())
+  name            String            @db.VarChar(100)
+  description     String?           @db.Text
+  keyPrefix       String            @db.VarChar(10)   // e.g., "rk_live_", "rk_test_"
+  keyHash         String            @unique @db.VarChar(128) // Hashed key for security
+  keyPreview      String            @db.VarChar(20)   // First/last few chars for display
+  type            String            @default("standard") @db.VarChar(20) // "admin", "standard"
+  status          String            @default("active") @db.VarChar(20)  // "active", "inactive", "revoked"
+  environment     String            @default("production") @db.VarChar(20) // "production", "development"
+  expiresAt       DateTime?         // Optional expiration
+  lastUsedAt      DateTime?         // Track usage
+  lastUsedIp      String?           @db.VarChar(45)
+  usageCount      Int               @default(0)
+  revokedAt       DateTime?
+  revokedBy       Int?
+  revokedReason   String?           @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  createdBy       Int
+  updatedBy       Int?
+  
+  // Relations
+  creator         User              @relation("ApiKeyCreator", fields: [createdBy], references: [id])
+  updater         User?             @relation("ApiKeyUpdater", fields: [updatedBy], references: [id])
+  revoker         User?             @relation("ApiKeyRevoker", fields: [revokedBy], references: [id])
+  permissions     ApiKeyPermission[]
+  
+  @@index([keyHash])
+  @@index([keyPrefix])
+  @@index([status])
+  @@index([type])
+  @@index([createdBy])
+  @@index([expiresAt])
+  @@index([environment])
+}
+
+model ApiKeyPermission {
+  id            Int         @id @default(autoincrement())
+  apiKeyId      Int
+  permissionId  Int
+  grantedAt     DateTime    @default(now())
+  grantedBy     Int?
+  
+  // Relations
+  apiKey        ApiKey      @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  permission    Permission  @relation("ApiKeyPermissions", fields: [permissionId], references: [id], onDelete: Cascade)
+  granter       User?       @relation("ApiKeyPermissionGranter", fields: [grantedBy], references: [id])
+  
+  @@unique([apiKeyId, permissionId])
+  @@index([apiKeyId])
+  @@index([permissionId])
 }
 
 //==============================================================================

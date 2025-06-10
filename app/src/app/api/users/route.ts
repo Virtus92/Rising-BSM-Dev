@@ -3,11 +3,13 @@
  * 
  * This endpoint handles user listing, creation, and bulk deletion
  * with proper authentication and permission checks.
+ * Supports both JWT and API key authentication.
  */
 
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { routeHandler } from '@/core/api/server/route-handler';
 import { UserRole, UserStatus } from '@/domain';
+import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { getLogger } from '@/core/logging';
 import { formatResponse } from '@/core/errors';
 
@@ -17,54 +19,36 @@ const logger = getLogger();
  * GET /api/users
  * 
  * Get all users with proper auth and error handling
+ * Supports both JWT and API key authentication
  */
 export const GET = routeHandler(
-  async (request: NextRequest, context) => {
-    // Get authenticated user ID from request.auth
-    const userId = request.auth?.userId;
-    
-    if (!userId) {
-      logger.error('Authentication required for /api/users', {
-        requestId: request.headers.get('X-Request-ID') || crypto.randomUUID().substring(0, 8)
-      });
-      
-      return formatResponse.unauthorized('Authentication required', 'AUTHENTICATION_REQUIRED');
-    }
-    
-    // Get query parameters for pagination and filtering
-    const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const status = searchParams.get('status') || undefined;
-    const role = searchParams.get('role') || undefined;
-    const sortBy = searchParams.get('sortBy') || 'name';
-    const sortDirection = searchParams.get('sortDirection') || 'asc';
-      const search = searchParams.get('search') || undefined;
-    
-    // Log request info for debugging
-    logger.debug('Processing GET /users request', {
-      userId,
-      params: {
-        page,
-        limit,
-        status: status || 'undefined',
-        sortBy,
-        sortDirection,
-        search: search || 'none'
-      }
-    });
-    
-    // Get service using dynamic import to prevent circular dependencies
-    const { getServiceFactory } = await import('@/core/factories/serviceFactory.server');
-    const serviceFactory = getServiceFactory();
-    
-    // Permission check is now handled by the middleware
-    // The handler will only execute if the user has the required permission
-    
-    // Get user service and request data
-    const userService = serviceFactory.createUserService();
-    
+  async (req: NextRequest) => {
     try {
+      // Get user context from auth
+      const auth = (req as any).auth;
+      const userId = auth?.userId || auth?.user?.id;
+      
+      logger.debug('Processing GET /users request', {
+        authMethod: auth?.authMethod,
+        userId: userId,
+        userRole: auth?.role
+      });
+
+      // Get query parameters for pagination and filtering
+      const searchParams = req.nextUrl.searchParams;
+      const page = parseInt(searchParams.get('page') || '1');
+      const limit = parseInt(searchParams.get('limit') || '10');
+      const status = searchParams.get('status') || undefined;
+      const role = searchParams.get('role') || undefined;
+      const sortBy = searchParams.get('sortBy') || 'name';
+      const sortDirection = searchParams.get('sortDirection') || 'asc';
+      const search = searchParams.get('search') || undefined;
+
+      // Get service using dynamic import to prevent circular dependencies
+      const { getServiceFactory } = await import('@/core/factories/serviceFactory.server');
+      const serviceFactory = getServiceFactory();
+      const userService = serviceFactory.createUserService();
+
       // Get users with pagination and filtering
       const result = await userService.findUsers({
         page,
@@ -75,167 +59,185 @@ export const GET = routeHandler(
         sortBy,
         sortDirection: sortDirection as 'asc' | 'desc'
       }, {
-        userId, // Pass the authenticated user ID
+        userId: userId
       });
-      
-      // Log success details for debugging
+
       logger.debug('Successfully retrieved users', {
         count: result.data.length,
         total: result.pagination.total,
         page: result.pagination.page,
         limit: result.pagination.limit
       });
-      
-      // Return success
-      return formatResponse.success(result, 'Users retrieved successfully');
+
+      return NextResponse.json(formatResponse.success(result, 'Users retrieved successfully'));
     } catch (error) {
       logger.error('Error fetching users:', {
         error: error instanceof Error ? error.message : String(error),
-        userId,
-        page,
-        limit
+        stack: error instanceof Error ? error.stack : undefined
       });
-      
-      return formatResponse.error(
-        error instanceof Error ? error.message : 'Failed to fetch users',
-        500
+
+      return NextResponse.json(
+        formatResponse.error(
+          error instanceof Error ? error.message : 'Failed to fetch users',
+          500
+        ),
+        { status: 500 }
       );
     }
   },
   {
-    // Use the routeHandler authentication middleware
     requiresAuth: true,
-    
-    // Require specific permissions
-    requiredPermission: ['users.view']
+    allowApiKeyAuth: true,
+    requiredPermission: [SystemPermission.USERS_VIEW],
+    allowedApiKeyTypes: ['admin', 'standard'],
+    allowedApiKeyEnvironments: ['production', 'development']
   }
 );
 
 /**
  * POST /api/users
  * 
- * Create a new user
+ * Create a new user with API key or JWT authentication
  */
 export const POST = routeHandler(
-  async (request: NextRequest, context) => {
-    // Get authenticated user ID directly from request.auth
-    const userId = request.auth?.userId;
-    const userRole = request.auth?.role;
-    
-    if (!userId) {
-      logger.error('Authentication required for POST /api/users', {
-        requestId: request.headers.get('X-Request-ID') || crypto.randomUUID().substring(0, 8)
-      });
-      return formatResponse.unauthorized('Authentication required', 'AUTHENTICATION_REQUIRED');
-    }
-    
-    // Parse request body
-    const data = await request.json();
-    
-    // Remove confirmPassword field if it exists to prevent Prisma errors
-    const { confirmPassword, ...cleanData } = data;
-    
-    // Get service using dynamic import to prevent circular dependencies
-    const { getServiceFactory } = await import('@/core/factories/serviceFactory.server');
-    const serviceFactory = getServiceFactory();
-    const userService = serviceFactory.createUserService();
-    
+  async (req: NextRequest) => {
     try {
+      // Get user context from auth
+      const auth = (req as any).auth;
+      const userId = auth?.userId || auth?.user?.id;
+      const userRole = auth?.role || auth?.user?.role;
+
+      logger.debug('Processing POST /users request', {
+        authMethod: auth?.authMethod,
+        userId: userId,
+        userRole: userRole
+      });
+
+      // Parse request body
+      const data = await req.json();
+      
+      // Remove confirmPassword field if it exists to prevent Prisma errors
+      const { confirmPassword, ...cleanData } = data;
+
+      // Get service using dynamic import to prevent circular dependencies
+      const { getServiceFactory } = await import('@/core/factories/serviceFactory.server');
+      const serviceFactory = getServiceFactory();
+      const userService = serviceFactory.createUserService();
+
       // Create user
       const newUser = await userService.create(cleanData, {
-        userId: userId,  // Proper context for audit
-        role: userRole,
+        userId: userId,
+        role: userRole
       });
-      
-      // Return formatted success response
-      return formatResponse.success(newUser, 'User created successfully', 201);
+
+      return NextResponse.json(
+        formatResponse.success(newUser, 'User created successfully', 201),
+        { status: 201 }
+      );
     } catch (error) {
       logger.error('Error creating user:', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
       });
-      
-      return formatResponse.error(
-        error instanceof Error ? error.message : 'Failed to create user',
-        500
+
+      return NextResponse.json(
+        formatResponse.error(
+          error instanceof Error ? error.message : 'Failed to create user',
+          500
+        ),
+        { status: 500 }
       );
     }
   },
   {
-    // Authentication is required
     requiresAuth: true,
-    
-    // Only admins can create users
-    requiredRole: UserRole.ADMIN,
-    
-    // Require specific permissions
-    requiredPermission: ['users.create'],
+    allowApiKeyAuth: true,
+    requiredPermission: [SystemPermission.USERS_CREATE],
+    allowedApiKeyTypes: ['admin'], // Only admin API keys can create users
+    allowedApiKeyEnvironments: ['production', 'development']
   }
 );
 
 /**
  * DELETE /api/users
  * 
- * Bulk delete users
+ * Bulk delete users with API key or JWT authentication
  */
 export const DELETE = routeHandler(
-  async (request: NextRequest, context) => {
-    // Parse request body
-    const data = await request.json();
-    const { ids } = data;
-    
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      throw new Error('Invalid request: missing or empty ids array');
-    }
-    
-    // Get authenticated user ID directly from request.auth
-    const userId = request.auth?.userId;
-    const userRole = request.auth?.role;
-    
-    if (!userId) {
-      logger.error('Authentication required for DELETE /api/users');
-      return formatResponse.unauthorized('Authentication required', 'AUTHENTICATION_REQUIRED');
-    }
-    
-    // Get service using dynamic import to prevent circular dependencies
-    const { getServiceFactory } = await import('@/core/factories/serviceFactory.server');
-    const serviceFactory = getServiceFactory();
-    const userService = serviceFactory.createUserService();
-    
-    // Delete users
-    const result = {
-      success: true,
-      deletedCount: 0,
-      errors: [] as { id: number; error: string }[]
-    };
-    
-    // Process each ID
-    for (const id of ids) {
-      try {
-        await userService.delete(Number(id), {
-          userId: userId,
-          role: userRole
-        });
-        result.deletedCount++;
-      } catch (error) {
-        result.errors.push({
-          id: Number(id),
-          error: error instanceof Error ? error.message : String(error)
-        });
+  async (req: NextRequest) => {
+    try {
+      // Parse request body
+      const data = await req.json();
+      const { ids } = data;
+
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return NextResponse.json(
+          formatResponse.error('Invalid request: missing or empty ids array', 400),
+          { status: 400 }
+        );
       }
+
+      // Get user context from auth
+      const auth = (req as any).auth;
+      const userId = auth?.userId || auth?.user?.id;
+      const userRole = auth?.role || auth?.user?.role;
+
+      logger.debug('Processing DELETE /users request', {
+        authMethod: auth?.authMethod,
+        userId: userId,
+        userRole: userRole,
+        idsToDelete: ids
+      });
+
+      // Get service using dynamic import to prevent circular dependencies
+      const { getServiceFactory } = await import('@/core/factories/serviceFactory.server');
+      const serviceFactory = getServiceFactory();
+      const userService = serviceFactory.createUserService();
+
+      // Delete users
+      const result = {
+        success: true,
+        deletedCount: 0,
+        errors: [] as { id: number; error: string }[]
+      };
+
+      // Process each ID
+      for (const id of ids) {
+        try {
+          await userService.delete(Number(id), {
+            userId: userId,
+            role: userRole
+          });
+          result.deletedCount++;
+        } catch (error) {
+          result.errors.push({
+            id: Number(id),
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+
+      return NextResponse.json(formatResponse.success(result, 'Bulk delete completed'));
+    } catch (error) {
+      logger.error('Error in bulk delete:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+
+      return NextResponse.json(
+        formatResponse.error(
+          error instanceof Error ? error.message : 'Failed to delete users',
+          500
+        ),
+        { status: 500 }
+      );
     }
-    
-    // Return result
-    return result;
   },
   {
-    // Authentication is required
     requiresAuth: true,
-    
-    // Only admins can delete users
-    requiredRole: UserRole.ADMIN,
-    
-    // Require specific permissions
-    requiredPermission: ['users.delete'],
+    allowApiKeyAuth: true,
+    requiredPermission: [SystemPermission.USERS_DELETE],
+    allowedApiKeyTypes: ['admin'], // Only admin API keys can delete users
+    allowedApiKeyEnvironments: ['production', 'development']
   }
 );

@@ -14,12 +14,12 @@ import { Button } from '@/shared/components/ui/button';
 import { 
   CalendarClock, 
   User, 
-  Edit, 
+  SquarePen, 
   TrashIcon, 
   LogIn, 
   LogOut, 
   Key, 
-  AlertCircle, 
+  CircleAlert, 
   Info, 
   Activity, 
   FileText,
@@ -33,14 +33,14 @@ import { format, parseISO, isValid } from 'date-fns';
 // Define activity type with icon and color
 const activityTypes: Record<string, { icon: React.ReactNode, color: string }> = {
   'create': { icon: <FileText className="h-5 w-5" />, color: 'bg-green-50 text-green-600' },
-  'update': { icon: <Edit className="h-5 w-5" />, color: 'bg-blue-50 text-blue-600' },
+  'update': { icon: <SquarePen className="h-5 w-5" />, color: 'bg-blue-50 text-blue-600' },
   'delete': { icon: <TrashIcon className="h-5 w-5" />, color: 'bg-red-50 text-red-600' },
   'login': { icon: <LogIn className="h-5 w-5" />, color: 'bg-purple-50 text-purple-600' },
   'logout': { icon: <LogOut className="h-5 w-5" />, color: 'bg-gray-50 text-gray-600' },
   'change_password': { icon: <Key className="h-5 w-5" />, color: 'bg-amber-50 text-amber-600' },
   'reset_password': { icon: <Key className="h-5 w-5" />, color: 'bg-amber-50 text-amber-600' },
   'activate': { icon: <Activity className="h-5 w-5" />, color: 'bg-green-50 text-green-600' },
-  'deactivate': { icon: <AlertCircle className="h-5 w-5" />, color: 'bg-gray-50 text-gray-600' },
+  'deactivate': { icon: <CircleAlert className="h-5 w-5" />, color: 'bg-gray-50 text-gray-600' },
   'system': { icon: <Settings className="h-5 w-5" />, color: 'bg-gray-50 text-gray-600' },
   'default': { icon: <Info className="h-5 w-5" />, color: 'bg-gray-50 text-gray-600' }
 };

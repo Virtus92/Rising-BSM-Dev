@@ -9,7 +9,7 @@ import { formatSuccess, formatError, formatNotFound, formatValidationError } fro
 
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { getLogger } from '@/core/logging';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { getAppointmentHandler } from '@/features/appointments/api';
 import { validateId } from '@/shared/utils/validation-utils';
@@ -27,10 +27,11 @@ export const GET = routeHandler(async (req: NextRequest) => {
   const serviceFactory = getServiceFactory();
   
   try {
-    // Check permission using consistent pattern
+    // Check permission using consistent pattern with role
     if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
-      SystemPermission.APPOINTMENTS_VIEW
+      SystemPermission.APPOINTMENTS_VIEW,
+      req.auth?.role
     )) {
       logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_VIEW}`);
       return formatError(
@@ -84,10 +85,11 @@ export const PUT = routeHandler(async (req: NextRequest) => {
   const serviceFactory = getServiceFactory();
   
   try {
-    // Check permission using consistent pattern
+    // Check permission using consistent pattern with role
     if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
-      SystemPermission.APPOINTMENTS_EDIT
+      SystemPermission.APPOINTMENTS_EDIT,
+      req.auth?.role
     )) {
       logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_EDIT}`);
       return formatError(
@@ -179,10 +181,11 @@ export const DELETE = routeHandler(async (req: NextRequest) => {
   const serviceFactory = getServiceFactory();
   
   try {
-    // Check permission using consistent pattern
+    // Check permission using consistent pattern with role
     if (!await permissionMiddleware.hasPermission(
       req.auth?.userId as number, 
-      SystemPermission.APPOINTMENTS_DELETE
+      SystemPermission.APPOINTMENTS_DELETE,
+      req.auth?.role
     )) {
       logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.APPOINTMENTS_DELETE}`);
       return formatError(

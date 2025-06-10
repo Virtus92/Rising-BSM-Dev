@@ -1,29 +1,41 @@
 /**
  * Permissions Middleware exports
- * This file conditionally exports the server or client implementation based on context
+ * This file exports all permission middleware functionality
  */
-import { API_PERMISSIONS } from './client';
 
-// Export the API permissions constants directly from client module
-// This ensures they're always available in both client and server contexts
-export { API_PERMISSIONS };
+// Import the actual implementation
+import { 
+  permissionMiddleware as permissionMiddlewareImpl,
+  hasPermission,
+  checkPermission,
+  isPermissionIncludedInRole,
+  invalidatePermissionCache,
+  getPermissionCacheStats,
+  API_PERMISSIONS,
+  type PermissionCheckResult
+} from './permissionMiddleware';
 
-// Conditional exports for server vs client
-// By checking for process.env.__NEXT_PRIVATE_PREBUNDLED_REACT, we can determine if we're in a server context
-// This is a Next.js internal environment variable that's present in server contexts
-let permissionMiddleware: any; 
+// Export the main permission middleware object
+export const permissionMiddleware = permissionMiddlewareImpl;
 
-if (typeof window === 'undefined') {
-  // Server context - import server implementation
-  permissionMiddleware = require('./permissionMiddleware').permissionMiddleware;
-} else {
-  // Client context - use client-safe implementation
-  permissionMiddleware = require('./client').permissionMiddleware;
-}
+// Export individual functions for direct use
+export {
+  hasPermission,
+  checkPermission,
+  isPermissionIncludedInRole,
+  invalidatePermissionCache,
+  getPermissionCacheStats,
+  API_PERMISSIONS,
+  type PermissionCheckResult
+};
 
-// Export the appropriate middleware implementation
-export { permissionMiddleware };
+// Export client middleware for browser usage
+export {
+  API_PERMISSIONS as CLIENT_API_PERMISSIONS
+} from './client';
+
+// Re-export types
+export type { PermissionCheckResult as ClientPermissionCheckResult } from './client';
+
+// Default export for convenience
 export default permissionMiddleware;
-
-// Types
-export type { PermissionCheckResult } from './client';

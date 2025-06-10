@@ -53,6 +53,37 @@ export interface BaseFilterParamsDto {
 /**
  * Base DTO for entity responses
  */
+export interface BaseDto {
+  /**
+   * Entity ID
+   */
+  id: number;
+  
+  /**
+   * Creation timestamp
+   */
+  createdAt: string;
+  
+  /**
+   * Last update timestamp
+   */
+  updatedAt: string;
+  
+  /**
+   * ID of the user who created this entity
+   */
+  createdBy?: number;
+  
+  /**
+   * ID of the user who last updated this entity
+   */
+  updatedBy?: number;
+}
+
+/**
+ * Base DTO for entity responses
+ * @deprecated Use BaseDto instead
+ */
 export interface BaseResponseDto {
   /**
    * Entity ID

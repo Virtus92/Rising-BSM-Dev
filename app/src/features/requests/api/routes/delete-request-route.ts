@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/features/auth/api/middleware/authMiddleware';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
+import { permissionMiddleware } from '@/features/permissions/api/middleware/permissionMiddleware';
 
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';

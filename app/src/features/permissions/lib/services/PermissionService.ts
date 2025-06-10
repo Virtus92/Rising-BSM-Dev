@@ -324,43 +324,24 @@ export class PermissionService implements IPermissionService {
       let permissions: string[] = [];
       
       try {
-      // Direct attempt to get user permissions
-      permissions = await this.repository.getUserPermissions(userId);
-      logger.info(`Successfully retrieved ${permissions.length} permissions for user ${userId}`);
+        // Direct attempt to get user permissions
+        permissions = await this.repository.getUserPermissions(userId);
+        logger.info(`Successfully retrieved ${permissions.length} permissions for user ${userId}`);
       } catch (permError) {
-      // Check if this is the specific error about rolePermission model
-      const errorMessage = permError instanceof Error ? permError.message : String(permError);
-      
-      if (errorMessage.includes('RolePermission model not available')) {
-        logger.error(`RolePermission model access error for user ${userId}:`, {
-          error: errorMessage,
-          stack: permError instanceof Error ? permError.stack : undefined,
-        solution: 'Using system default permissions as fallback'
-      });
+        // Log the error and propagate it - no fallbacks
+        const errorMessage = permError instanceof Error ? permError.message : String(permError);
         
-          // Use system defaults as a fallback when database model is inaccessible
-        if (userRole) {
-          logger.warn(`Falling back to system default permissions for role ${userRole}`);
-          permissions = await this.getSystemDefaultPermissions(userRole);
-        } else {
-          // If no role is known, we can only provide minimal permissions
-          logger.warn('No user role available, providing minimal permissions');
-          permissions = ['profile.view', 'dashboard.access'];
-        }
-      } else {
-        // For other errors, propagate normally
         logger.error(`Error getting permissions from repository for user ${userId}:`, {
           error: errorMessage,
           stack: permError instanceof Error ? permError.stack : undefined
         });
         
-        // Propagate the error properly
+        // Propagate the error properly - this forces proper system initialization
         throw permError instanceof AppError ? permError : new AppError(
           `Failed to get user permissions: ${errorMessage}`,
           500
         );
       }
-    }
       
       // Ensure we have a valid permissions array
       if (!Array.isArray(permissions)) {
@@ -550,28 +531,55 @@ export class PermissionService implements IPermissionService {
     
     switch(normalizedRole) {
       case 'admin':
+        // Admin gets ALL available permissions in the system
         return [
           ...basicPermissions,
+          // User permissions
           'users.view',
           'users.create',
           'users.edit',
           'users.delete',
+          // Permission management
           'permissions.view',
           'permissions.manage',
+          // Customer permissions
           'customers.view',
           'customers.create',
           'customers.edit',
           'customers.delete',
+          // Request permissions
           'requests.view',
           'requests.create',
           'requests.edit',
           'requests.delete',
+          'requests.approve',
+          'requests.reject',
+          'requests.assign',
+          'requests.convert',
+          // Appointment permissions
           'appointments.view',
           'appointments.create',
           'appointments.edit',
           'appointments.delete',
+          // Settings permissions
           'settings.view',
-          'settings.edit'
+          'settings.edit',
+          // API Key permissions
+          'api_keys.view',
+          'api_keys.create',
+          'api_keys.edit',
+          'api_keys.delete',
+          'api_keys.manage',
+          // Automation permissions
+          'automation.view',
+          'automation.create',
+          'automation.edit',
+          'automation.delete',
+          'automation.manage',
+          // Notification permissions
+          'notifications.view',
+          // System permissions
+          'system.admin'
         ];
       case 'manager':
         return [

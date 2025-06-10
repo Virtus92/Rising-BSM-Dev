@@ -1,46 +1,86 @@
 /**
- * Route Handler - Standardized Route Handler for Next.js App Router
+ * Enhanced Route Handler - Production-Ready Route Handler for Next.js App Router
  * 
- * Provides consistent error handling, authentication, and logging
- * for all API routes with the standardized ApiResponse structure.
+ * Provides comprehensive authentication (JWT + API Key), authorization, error handling,
+ * rate limiting, and audit logging for all API routes with consistent response format.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getLogger } from '@/core/logging';
 import { ApiResponse } from '@/core/api/types';
-import { auth, authenticateRequest } from '@/features/auth/api/middleware/authMiddleware';
+import { authenticateRequest } from '@/features/auth/api/middleware/authMiddleware';
+import { apiKeyMiddleware, ApiKeyAuthResult } from '@/features/auth/api/middleware/apiKeyMiddleware';
 import { AppError } from '@/core/errors/types/AppError';
 import { UserRole } from '@/domain';
 
 const logger = getLogger();
 
-// Handler types
+/**
+ * Authentication context for route handlers
+ */
+export interface AuthContext {
+  // JWT authentication
+  user?: {
+    id: number;
+    email: string;
+    role: UserRole;
+    name?: string;
+  };
+  
+  // API key authentication
+  apiKey?: {
+    id: number;
+    type: 'admin' | 'standard';
+    environment: 'production' | 'development';
+    permissions?: string[];
+    keyPreview: string;
+  };
+  
+  // Authentication method used
+  authMethod: 'jwt' | 'apikey' | 'both' | 'none';
+}
+
+/**
+ * Route handler function type
+ */
 export type RouteHandler = (
   req: NextRequest,
   context?: any
 ) => Promise<NextResponse | Response | any>;
 
+/**
+ * Middleware function type
+ */
 export type MiddlewareFunction = (
   req: NextRequest,
   next: () => Promise<NextResponse>
 ) => Promise<NextResponse>;
 
-// Route handler options
+/**
+ * Route handler configuration options
+ */
 export interface RouteHandlerOptions {
-  // Authentication options
-  requiresAuth?: boolean;
+  // Authentication requirements
+  requiresAuth?: boolean;        // Accepts both JWT and API key
+  allowApiKeyAuth?: boolean;     // API key only (no JWT)
+  
+  // Authorization requirements
   requiredRole?: UserRole | UserRole[];
   requiredPermission?: string | string[];
   
-  // Cache control
+  // API key specific restrictions
+  allowedApiKeyTypes?: ('admin' | 'standard')[];
+  allowedApiKeyEnvironments?: ('production' | 'development')[];
+  
+  // HTTP options
   cacheControl?: string;
   
-  // Middleware
+  // Custom middleware
   middleware?: MiddlewareFunction[];
 }
 
 /**
- * Format error to standardized ApiResponse structure
+ * Format error response to standardized ApiResponse structure
  */
 function formatErrorResponse(error: unknown): ApiResponse<null> {
   let errorMessage = 'An unexpected error occurred';
@@ -64,10 +104,16 @@ function formatErrorResponse(error: unknown): ApiResponse<null> {
 }
 
 /**
- * Standard route handler with proper error handling, authentication, and logging
+ * Enhanced route handler with comprehensive authentication and authorization
  * 
- * @param handler Route handler function
- * @param options Options for authentication and middleware
+ * Authentication Options:
+ * - requiresAuth: true     → Accepts both JWT tokens and API keys
+ * - allowApiKeyAuth: true  → Accepts API keys only (no JWT)
+ * - (none)                 → No authentication required
+ * 
+ * @param handler - Route handler function
+ * @param options - Configuration options
+ * @returns Configured route handler
  */
 export function routeHandler(
   handler: RouteHandler,
@@ -82,144 +128,268 @@ export function routeHandler(
     logger.info(`API Request started: ${method} ${url}`, { requestId, method, url });
     
     try {
-      // Apply auth middleware if required
-      if (options.requiresAuth !== false) {
-        try {
-          // Get authentication result directly
-          const authResult = await authenticateRequest(request);
+      // Initialize authentication context
+      const authContext: AuthContext = {
+        authMethod: 'none'
+      };
+      
+      // Handle authentication if required
+      if (options.requiresAuth || options.allowApiKeyAuth) {
+        let hasValidAuth = false;
+        
+        // Clean logic: requiresAuth = both, allowApiKeyAuth = API key only
+        const enableApiKeyAuth = options.requiresAuth || options.allowApiKeyAuth;
+        const enableJwtAuth = options.requiresAuth; // Only requiresAuth enables JWT
+        
+        // Try API key authentication if enabled
+        if (enableApiKeyAuth) {
+          const apiKeyResult = await apiKeyMiddleware(request);
           
-          // If auth failed, return the error response
-          if (!authResult.success) {
-            const duration = Date.now() - startTime;
-            logger.info(`API Auth rejected: ${method} ${url}`, {
-              requestId,
-              method,
-              url,
-              status: authResult.statusCode || 401,
-              duration: `${duration}ms`
-            });
+          if (apiKeyResult.success && apiKeyResult.apiKeyId) {
+            // Validate API key constraints
+            if (options.allowedApiKeyTypes?.length && apiKeyResult.type) {
+              if (!options.allowedApiKeyTypes.includes(apiKeyResult.type)) {
+                return NextResponse.json({
+                  success: false,
+                  error: `API key type '${apiKeyResult.type}' not allowed for this endpoint`,
+                  code: 'INVALID_API_KEY_TYPE',
+                  statusCode: 403
+                }, { status: 403 });
+              }
+            }
             
-            // Return consistent error response
-            return NextResponse.json({
-              success: false,
-              error: authResult.error || 'Authentication required',
-              code: 'AUTHENTICATION_REQUIRED',
-              message: authResult.message || 'Authentication required',
-              statusCode: authResult.statusCode || 401
-            }, { status: authResult.statusCode || 401 });
-          }
-          
-          // Authentication successful - attach user info to request
-          if (authResult.user) {
-            // Explicitly set auth properties on request object
-            if (!request.auth) {
-              // Create auth object if it doesn't exist
-              Object.defineProperty(request, 'auth', {
-                value: {
-                  userId: authResult.user.id,
-                  role: authResult.user.role,
-                  user: authResult.user
-                },
-                writable: true,
-                enumerable: true
+            if (options.allowedApiKeyEnvironments?.length && apiKeyResult.environment) {
+              if (!options.allowedApiKeyEnvironments.includes(apiKeyResult.environment)) {
+                return NextResponse.json({
+                  success: false,
+                  error: `API key environment '${apiKeyResult.environment}' not allowed`,
+                  code: 'INVALID_API_KEY_ENVIRONMENT',
+                  statusCode: 403
+                }, { status: 403 });
+              }
+            }
+            
+            // Handle rate limiting
+            if (apiKeyResult.rateLimitExceeded) {
+              return NextResponse.json({
+                success: false,
+                error: 'Rate limit exceeded',
+                code: 'RATE_LIMIT_EXCEEDED',
+                message: apiKeyResult.message,
+                statusCode: 429,
+                rateLimit: {
+                  exceeded: true,
+                  resetTime: apiKeyResult.rateLimit?.resetTime,
+                  remainingRequests: apiKeyResult.rateLimit?.remainingRequests
+                }
+              }, { 
+                status: 429,
+                headers: {
+                  'X-RateLimit-Limit': apiKeyResult.rateLimit?.currentRequests.toString() || '0',
+                  'X-RateLimit-Remaining': apiKeyResult.rateLimit?.remainingRequests.toString() || '0',
+                  'X-RateLimit-Reset': apiKeyResult.rateLimit?.resetTime?.toISOString() || ''
+                }
               });
-            } else {
-              // Update existing auth object
-              request.auth.userId = authResult.user.id;
-              request.auth.role = authResult.user.role;
-              request.auth.user = authResult.user;
             }
             
-            // Also set headers for backup authentication propagation
-            request.headers.set('X-Auth-User-ID', authResult.user.id.toString());
-            if (authResult.user.role) {
-              request.headers.set('X-Auth-User-Role', authResult.user.role);
+            // Check API key permissions
+            if (options.requiredPermission) {
+              const requiredPermissions = Array.isArray(options.requiredPermission) 
+                ? options.requiredPermission 
+                : [options.requiredPermission];
+              
+              const hasPermissions = requiredPermissions.every(permission => {
+                // Admin keys have all permissions
+                if (apiKeyResult.type === 'admin') return true;
+                // Standard keys need explicit permissions
+                return apiKeyResult.permissions?.includes(permission) || false;
+              });
+              
+              if (!hasPermissions) {
+                const missingPermissions = requiredPermissions.filter(permission => 
+                  apiKeyResult.type !== 'admin' && !apiKeyResult.permissions?.includes(permission)
+                );
+                
+                return NextResponse.json({
+                  success: false,
+                  error: 'Insufficient API key permissions',
+                  code: 'INSUFFICIENT_PERMISSIONS',
+                  message: `Missing permissions: ${missingPermissions.join(', ')}`,
+                  statusCode: 403
+                }, { status: 403 });
+              }
             }
+            
+            // Set API key authentication context
+            authContext.apiKey = {
+              id: apiKeyResult.apiKeyId,
+              type: apiKeyResult.type!,
+              environment: apiKeyResult.environment!,
+              permissions: apiKeyResult.permissions,
+              keyPreview: apiKeyResult.keyPreview!
+            };
+            authContext.authMethod = 'apikey';
+            hasValidAuth = true;
           }
-        } catch (authError) {
-          // Handle auth errors gracefully
-          logger.error(`Auth middleware error: ${method} ${url}`, {
-            error: authError instanceof Error ? authError.message : String(authError),
-            stack: authError instanceof Error ? authError.stack : undefined,
-            requestId
-          });
+        }
+        
+        // Try JWT authentication if enabled
+        if (enableJwtAuth && !hasValidAuth) {
+          const jwtResult = await authenticateRequest(request);
+          
+          if (jwtResult.success && jwtResult.user) {
+            // Check JWT permissions using the permission service
+            if (options.requiredPermission) {
+              const requiredPermissions = Array.isArray(options.requiredPermission)
+                ? options.requiredPermission
+                : [options.requiredPermission];
+              
+              try {
+                // Import permission utilities for proper permission checking
+                const { checkUserHasAnyPermission } = await import('@/app/api/helpers/permissionUtils');
+                
+                // Check if user has any of the required permissions
+                const hasRequiredPermissions = await checkUserHasAnyPermission(
+                  jwtResult.user.id,
+                  requiredPermissions,
+                  jwtResult.user.role // Pass role for admin bypass
+                );
+                
+                if (!hasRequiredPermissions) {
+                  return NextResponse.json({
+                    success: false,
+                    error: 'Insufficient user permissions',
+                    code: 'INSUFFICIENT_PERMISSIONS',
+                    message: `Missing permissions: ${requiredPermissions.join(', ')}`,
+                    statusCode: 403
+                  }, { status: 403 });
+                }
+              } catch (permissionError) {
+                logger.error('Error checking user permissions', {
+                  error: permissionError instanceof Error ? permissionError.message : String(permissionError),
+                  userId: jwtResult.user.id,
+                  requiredPermissions
+                });
+                
+                return NextResponse.json({
+                  success: false,
+                  error: 'Permission check failed',
+                  code: 'PERMISSION_CHECK_ERROR',
+                  message: 'Unable to verify user permissions',
+                  statusCode: 500
+                }, { status: 500 });
+              }
+            }
+            
+            // Check role requirements
+            if (options.requiredRole) {
+              const requiredRoles = Array.isArray(options.requiredRole)
+                ? options.requiredRole
+                : [options.requiredRole];
+              
+              // Ensure user.role is properly typed as UserRole
+              const userRole = jwtResult.user.role as UserRole;
+              
+              if (!requiredRoles.includes(userRole)) {
+                return NextResponse.json({
+                  success: false,
+                  error: 'Insufficient role permissions',
+                  code: 'INSUFFICIENT_ROLE',
+                  message: `Required role: ${requiredRoles.join(' or ')}, current: ${userRole}`,
+                  statusCode: 403
+                }, { status: 403 });
+              }
+            }
+            
+            // Set JWT authentication context with proper typing
+            authContext.user = {
+              id: jwtResult.user.id,
+              email: jwtResult.user.email,
+              role: jwtResult.user.role as UserRole,
+              name: jwtResult.user.name
+            };
+            authContext.authMethod = enableApiKeyAuth && hasValidAuth ? 'both' : 'jwt';
+            hasValidAuth = true;
+          }
+        }
+        
+        // Check if authentication was successful
+        if ((enableApiKeyAuth || enableJwtAuth) && !hasValidAuth) {
+          const authMethods = [];
+          if (enableApiKeyAuth) authMethods.push('API key');
+          if (enableJwtAuth) authMethods.push('JWT token');
           
           return NextResponse.json({
             success: false,
-            error: 'Authentication error',
-            code: 'AUTHENTICATION_ERROR',
-            message: authError instanceof Error ? authError.message : 'Authentication error occurred',
-            statusCode: 500
-          }, { status: 500 });
+            error: 'Authentication required',
+            code: 'AUTHENTICATION_REQUIRED',
+            message: `Valid ${authMethods.join(' or ')} required`,
+            statusCode: 401
+          }, { status: 401 });
         }
+        
+        // Attach auth context to request with proper typing
+        Object.defineProperty(request, 'auth', {
+          value: {
+            userId: authContext.user?.id || authContext.apiKey?.id,
+            role: authContext.user?.role,
+            user: authContext.user,
+            apiKey: authContext.apiKey,
+            authMethod: authContext.authMethod
+          },
+          writable: true,
+          enumerable: true,
+          configurable: true
+        });
       }
       
       // Apply custom middleware if provided
-      if (options.middleware && options.middleware.length > 0) {
-        // Chain middleware
+      if (options.middleware?.length) {
         const executeMiddleware = async (index: number): Promise<NextResponse> => {
-          if (index >= (options.middleware?.length || 0)) {
-            // All middleware executed, call handler
-            return executeHandler(request, context);
+          if (index >= options.middleware!.length) {
+            return executeHandler();
           }
           
-          // Execute middleware
           const middleware = options.middleware![index];
-          return middleware(request, async () => {
-            return executeMiddleware(index + 1);
-          });
+          return middleware(request, async () => executeMiddleware(index + 1));
         };
         
-        // Start middleware chain
         return executeMiddleware(0);
       }
       
-      // No middleware, just execute handler
-      return executeHandler(request, context);
+      // Execute main handler
+      return executeHandler();
       
-      // Helper function to execute the main handler with proper response formatting
-      async function executeHandler(req: NextRequest, ctx: any): Promise<NextResponse> {
+      // Helper function to execute the main handler
+      async function executeHandler(): Promise<NextResponse> {
         try {
-          const result = await handler(req, ctx);
+          const result = await handler(request, context);
           
           // Handle different return types
-          if (result instanceof NextResponse) {
-            // Already a NextResponse, return it
-            const duration = Date.now() - startTime;
-            logger.info(`API Request completed: ${method} ${url}`, {
-              requestId,
-              method,
-              url,
-              status: result.status,
-              duration: `${duration}ms`
-            });
-            return result;
-          }
+          let response: NextResponse;
           
-          if (result instanceof Response) {
-            // Convert Response to NextResponse
-            const nextResponse = NextResponse.json(
+          if (result instanceof NextResponse) {
+            response = result;
+          } else if (result instanceof Response) {
+            response = NextResponse.json(
               await result.json(),
               { status: result.status, headers: result.headers }
             );
-            
-            const duration = Date.now() - startTime;
-            logger.info(`API Request completed: ${method} ${url}`, {
-              requestId,
-              method,
-              url,
-              status: nextResponse.status,
-              duration: `${duration}ms`
-            });
-            
-            return nextResponse;
+          } else {
+            // Format as ApiResponse
+            response = NextResponse.json(
+              { success: true, data: result, error: null },
+              { status: 200 }
+            );
           }
           
-          // Format direct return values in ApiResponse format
-          const response = NextResponse.json(
-            { success: true, data: result, error: null },
-            { status: 200 }
-          );
+          // Add cache control headers if specified
+          if (options.cacheControl) {
+            response.headers.set('Cache-Control', options.cacheControl);
+          }
+          
+          // Add request ID header
+          response.headers.set('X-Request-ID', requestId);
           
           const duration = Date.now() - startTime;
           logger.info(`API Request completed: ${method} ${url}`, {
@@ -227,6 +397,7 @@ export function routeHandler(
             method,
             url,
             status: response.status,
+            authMethod: authContext.authMethod,
             duration: `${duration}ms`
           });
           
@@ -243,17 +414,19 @@ export function routeHandler(
             url
           });
           
-          // Format error in standardized ApiResponse structure
           const errorResponse = formatErrorResponse(error);
           
           return NextResponse.json(
             errorResponse,
-            { status: errorResponse.statusCode || 500 }
+            { 
+              status: errorResponse.statusCode || 500,
+              headers: { 'X-Request-ID': requestId }
+            }
           );
         }
       }
     } catch (error) {
-      // Log error
+      // Top-level error handling
       logger.error(`API Request failed: ${method} ${url}`, {
         error: error instanceof Error ? {
           name: error.name,
@@ -265,12 +438,14 @@ export function routeHandler(
         url
       });
       
-      // Format error in standardized ApiResponse structure
       const errorResponse = formatErrorResponse(error);
       
       return NextResponse.json(
         errorResponse,
-        { status: errorResponse.statusCode || 500 }
+        { 
+          status: errorResponse.statusCode || 500,
+          headers: { 'X-Request-ID': requestId }
+        }
       );
     }
   };

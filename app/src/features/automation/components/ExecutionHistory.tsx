@@ -23,10 +23,10 @@ import {
   DropdownMenuTrigger 
 } from '@/shared/components/ui/dropdown-menu';
 import { 
-  CheckCircle, 
-  XCircle, 
+  CircleCheckBig, 
+  CircleX, 
   Clock, 
-  MoreHorizontal, 
+  Ellipsis, 
   RefreshCw, 
   Search,
   Filter,
@@ -77,9 +77,9 @@ export function ExecutionHistory({ executions: propExecutions, compact = false }
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'success':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CircleCheckBig className="w-4 h-4 text-green-500" />;
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <CircleX className="w-4 h-4 text-red-500" />;
       case 'running':
         return <Clock className="w-4 h-4 text-blue-500 animate-pulse" />;
       default:
@@ -317,7 +317,7 @@ export function ExecutionHistory({ executions: propExecutions, compact = false }
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
+                          <Ellipsis className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">

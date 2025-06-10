@@ -5,8 +5,6 @@ import { formatSuccess, formatError, formatNotFound, formatValidationError } fro
 import { getServiceFactory } from '@/core/factories/serviceFactory.server';
 import { UpdateCustomerDto } from '@/domain/dtos/CustomerDtos';
 import { getLogger } from '@/core/logging';
-import { withPermission } from '@/features/permissions/api/middleware/permissionMiddleware';
-import { permissionMiddleware } from '@/features/permissions/api/middleware';
 import { SystemPermission } from '@/domain/enums/PermissionEnums';
 import { validateId } from '@/shared/utils/validation-utils';
 
@@ -22,18 +20,6 @@ export const GET = routeHandler(async (req: NextRequest) => {
   const serviceFactory = getServiceFactory();
   
   try {
-    // Check permission using consistent pattern
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.CUSTOMERS_VIEW
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_VIEW}`);
-      return formatError(
-        `You don't have permission to view customer details`, 
-        403
-      );
-    }
-    
     if (!id) {
       logger.error('No customer ID provided');
       return formatError('No customer ID provided', 400);
@@ -92,7 +78,8 @@ export const GET = routeHandler(async (req: NextRequest) => {
     );
   }
 }, {
-  requiresAuth: true
+  requiresAuth: true,
+  requiredPermission: [SystemPermission.CUSTOMERS_VIEW]
 });
 
 /**
@@ -107,18 +94,6 @@ export const PUT = routeHandler(async (req: NextRequest) => {
   const serviceFactory = getServiceFactory();
   
   try {
-    // Check permission using consistent pattern
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.CUSTOMERS_EDIT
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_EDIT}`);
-      return formatError(
-        `You don't have permission to edit customer information`, 
-        403
-      );
-    }
-    
     if (!id) {
       logger.error('No customer ID provided');
       return formatError('No customer ID provided', 400);
@@ -178,7 +153,8 @@ export const PUT = routeHandler(async (req: NextRequest) => {
     );
   }
 }, {
-  requiresAuth: true
+  requiresAuth: true,
+  requiredPermission: [SystemPermission.CUSTOMERS_EDIT]
 });
 
 /**
@@ -193,18 +169,6 @@ export const DELETE = routeHandler(async (req: NextRequest) => {
   const serviceFactory = getServiceFactory();
   
   try {
-    // Check permission using consistent pattern
-    if (!await permissionMiddleware.hasPermission(
-      req.auth?.userId as number, 
-      SystemPermission.CUSTOMERS_DELETE
-    )) {
-      logger.warn(`Permission denied: User ${req.auth?.userId} does not have permission ${SystemPermission.CUSTOMERS_DELETE}`);
-      return formatError(
-        `You don't have permission to delete customers`, 
-        403
-      );
-    }
-    
     if (!id) {
       logger.error('No customer ID provided');
       return formatError('No customer ID provided', 400);
@@ -260,5 +224,6 @@ export const DELETE = routeHandler(async (req: NextRequest) => {
     );
   }
 }, {
-  requiresAuth: true
+  requiresAuth: true,
+  requiredPermission: [SystemPermission.CUSTOMERS_DELETE]
 });

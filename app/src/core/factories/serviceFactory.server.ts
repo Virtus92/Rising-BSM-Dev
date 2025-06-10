@@ -25,7 +25,8 @@ import {
   getRequestDataRepository,
   getAutomationWebhookRepository,
   getAutomationScheduleRepository,
-  getAutomationExecutionRepository
+  getAutomationExecutionRepository,
+  getApiKeyRepository
 } from './repositoryFactory.server';
 
 // Services
@@ -40,6 +41,7 @@ import { UserService } from '@/features/users/lib/services/UserService.server';
 import { NotificationService } from '@/features/notifications/lib/services/NotificationService.server';
 import { RefreshTokenServiceServer } from '@/features/auth/lib/services/RefreshTokenService.server';
 import { AutomationService } from '@/features/automation/lib/services/AutomationService.server';
+import { ApiKeyService } from '@/features/api-keys/lib/services/ApiKeyService.server';
 // Use dynamic import for NotificationService to avoid circular dependencies
 
 // Interfaces
@@ -55,6 +57,7 @@ import { IPermissionService } from '@/domain/services/IPermissionService';
 import { IRequestDataService } from '@/domain/services/IRequestDataService';
 
 import { IAutomationService } from '@/domain/services/IAutomationService';
+import { IApiKeyService } from '@/domain/services/IApiKeyService';
 import { RefreshToken } from '@/domain/entities/RefreshToken';
 import { PermissionRepository } from '@/features/permissions/lib';
 
@@ -77,6 +80,7 @@ export class ServiceFactory implements IServiceFactory {
 
   private refreshTokenService?: RefreshTokenServiceServer;
   private automationService?: AutomationService;
+  private apiKeyService?: ApiKeyService;
 
   /**
    * Private constructor for singleton pattern
@@ -250,6 +254,18 @@ export class ServiceFactory implements IServiceFactory {
   }
 
   /**
+   * Creates an instance of ApiKeyService
+   */
+  public createApiKeyService(): IApiKeyService {
+    if (!this.apiKeyService) {
+      this.apiKeyService = new ApiKeyService(
+        getApiKeyRepository()
+      );
+    }
+    return this.apiKeyService as IApiKeyService;
+  }
+
+  /**
    * Creates a Permission Service instance
    */
   public createPermissionService(): IPermissionService {
@@ -287,6 +303,7 @@ export class ServiceFactory implements IServiceFactory {
     this.requestDataService = undefined;
 
     this.automationService = undefined;
+    this.apiKeyService = undefined;
   }
   
   /**
@@ -349,6 +366,10 @@ export function getPermissionService(): IPermissionService {
 
 export function getAutomationService(): IAutomationService {
   return getServiceFactory().createAutomationService();
+}
+
+export function getApiKeyService(): IApiKeyService {
+  return getServiceFactory().createApiKeyService();
 }
 
 export function resetServices(): void {
