@@ -451,7 +451,9 @@ export function ApiKeyPermissionsModal({ apiKey, onClose, onSuccess }: ApiKeyPer
                           <Checkbox
                             checked={allSelected}
                             ref={(ref) => {
-                              if (ref) ref.indeterminate = someSelected;
+                              if (ref && 'indeterminate' in ref) {
+                                (ref as any).indeterminate = someSelected;
+                              }
                             }}
                             onCheckedChange={() => handleCategoryToggle(categoryPermissions, allSelected)}
                           />

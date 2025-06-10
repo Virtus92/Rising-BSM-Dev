@@ -533,8 +533,8 @@ export class ApiKeyRepository extends PrismaRepository<ApiKey, number> implement
         
         logger.debug('Found permission records', { 
           requestedPermissions: permissions,
-          foundPermissions: permissionRecords.map(p => p.code),
-          missingPermissions: permissions.filter(p => !permissionRecords.some(pr => pr.code === p))
+          foundPermissions: permissionRecords.map((p: { id: number; code: string }) => p.code),
+          missingPermissions: permissions.filter((p: string) => !permissionRecords.some((pr: { id: number; code: string }) => pr.code === p))
         });
         
         // Create new permissions
