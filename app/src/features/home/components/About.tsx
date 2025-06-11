@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Award, Heart, Shield, Users, Target, Leaf } from 'lucide-react';
+import { Code, Heart, Zap } from 'lucide-react';
 
 /**
- * About component for Rising BS e.U.
+ * About component for the Landing page
  * 
- * Explains the company values, mission and philosophy
- * with focus on quality, innovation and customer satisfaction.
+ * Explains the purpose and philosophy behind the Rising BSM project
+ * with modern design elements and animations.
  */
 const About = () => {
   const aboutRef = useRef<HTMLDivElement>(null);
@@ -54,28 +54,28 @@ const About = () => {
               
               <div className="relative bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-100 dark:border-slate-700">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold">Unsere Werte</h3>
-                  <div className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-sm font-medium px-3 py-1 rounded-full">
-                    RISING BS e.U.
+                  <h3 className="text-xl font-bold">Our Values</h3>
+                  <div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-sm font-medium px-3 py-1 rounded-full">
+                    Open Source
                   </div>
                 </div>
                 
                 <div className="space-y-6">
                   {[
                     {
-                      icon: <Shield className="w-5 h-5" />,
-                      title: "Qualität & Innovation",
-                      description: "Höchste Qualitätsstandards und innovative Lösungen für optimale Ergebnisse in allen Bereichen."
+                      icon: <Code className="w-5 h-5" />,
+                      title: "Open Source Philosophy",
+                      description: "We believe fundamental software should be free and accessible to everyone. Our code is open for transparency, collaboration, and innovation."
                     },
                     {
                       icon: <Heart className="w-5 h-5" />,
-                      title: "Kundenzufriedenheit",
-                      description: "Ihre Zufriedenheit ist unser Maßstab - individuelle Betreuung und maßgeschneiderte Lösungen."
+                      title: "Built With Passion",
+                      description: "Rising BSM is crafted with attention to detail and a commitment to quality that shows in every feature."
                     },
                     {
-                      icon: <Leaf className="w-5 h-5" />,
-                      title: "Nachhaltigkeit",
-                      description: "Umweltfreundliche Verfahren und nachhaltige Praktiken für eine bessere Zukunft."
+                      icon: <Zap className="w-5 h-5" />,
+                      title: "Efficiency First",
+                      description: "Our platform is designed for maximum efficiency, so you can focus on what matters: growing your business."
                     }
                   ].map((value, index) => (
                     <div 
@@ -88,7 +88,7 @@ const About = () => {
                         transition: 'opacity 0.5s ease, transform 0.5s ease'
                       }}
                     >
-                      <div className="bg-gradient-to-br from-orange-500 to-blue-600 p-3 rounded-lg text-white mr-4 flex-shrink-0">
+                      <div className="bg-gradient-to-br from-indigo-500 to-blue-600 p-3 rounded-lg text-white mr-4 flex-shrink-0">
                         {value.icon}
                       </div>
                       <div>
@@ -99,12 +99,14 @@ const About = () => {
                   ))}
                 </div>
                 
-                <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center justify-between">
-                    <Users className="w-8 h-8 text-orange-600 dark:text-orange-400" />
-                    <Award className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                    <Target className="w-8 h-8 text-green-600 dark:text-green-400" />
-                  </div>
+                <div className="mt-8 flex justify-center">
+                  <Image
+                    src="/images/Logo_vu.png"
+                    alt="Open Source"
+                    width={120}
+                    height={40}
+                    className="opacity-70 dark:opacity-40"
+                  />
                 </div>
               </div>
             </div>
@@ -118,28 +120,28 @@ const About = () => {
           >
             <div className="mb-8">
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Über <span className="text-orange-600 dark:text-orange-400">RISING BS e.U.</span>
+                Why We Built <span className="text-indigo-600 dark:text-indigo-400">Rising BSM</span>
               </h2>
               
               <p className="text-lg text-slate-600 dark:text-slate-300 mb-6">
-                RISING BS e.U. ist Ihr kompetenter Partner für professionelle Dienstleistungen in Linz und Umgebung. Mit unserem umfassenden Leistungsspektrum bieten wir Ihnen alles aus einer Hand.
+                Rising BSM was created with a clear mission: to provide a free, open-source foundation for efficient development of personal AI assistants that handle business operations, customer management, and appointment scheduling.
               </p>
               
               <p className="text-lg text-slate-600 dark:text-slate-300 mb-6">
-                Unser Unternehmen steht für Qualität, Zuverlässigkeit und Innovation. Wir sind stolz darauf, unseren Kunden maßgeschneiderte Lösungen anzubieten, die genau auf ihre Bedürfnisse zugeschnitten sind.
+                We believe that powerful business management software should be accessible to everyone, not just large corporations with big budgets. By making Rising BSM open source, we're democratizing access to cutting-edge AI-powered tools.
               </p>
               
               <p className="text-lg text-slate-600 dark:text-slate-300">
-                Mit dem "Rundum-Sorglos-Paket" kümmern wir uns um alle Ihre Anliegen - von der Gebäudebetreuung über Grünflächenpflege bis hin zu Spezialdienstleistungen. Ihre Zufriedenheit ist unser Maßstab!
+                Our platform is built on modern technologies like Next.js and Prisma, following best practices to create a scalable, maintainable, and extensible system that grows with your business.
               </p>
             </div>
             
             <div className="grid grid-cols-2 gap-4 mb-8">
               {[
-                { number: "96", label: "Zufriedene Kunden" },
-                { number: "156", label: "Abgeschlossene Projekte" },
-                { number: "100%", label: "Leistungsversprechen" },
-                { number: "24/7", label: "Bereitschaft" }
+                { number: "100%", label: "Open Source" },
+                { number: "10+", label: "Integrated Features" },
+                { number: "24/7", label: "AI Availability" },
+                { number: "0€", label: "Cost to Use" }
               ].map((stat, index) => (
                 <div 
                   key={index}
@@ -151,41 +153,27 @@ const About = () => {
                     transition: 'opacity 0.5s ease, transform 0.5s ease'
                   }}
                 >
-                  <div className="text-2xl md:text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">{stat.number}</div>
+                  <div className="text-2xl md:text-3xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">{stat.number}</div>
                   <div className="text-sm text-slate-500 dark:text-slate-400">{stat.label}</div>
                 </div>
               ))}
             </div>
             
-            <div className="flex flex-wrap gap-4">
-              <a 
-                href="#contact"
-                className="inline-flex items-center px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg shadow-md transition-all"
-                style={{ 
-                  transitionDelay: '1000ms',
-                  opacity: isVisible ? 1 : 0,
-                  transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-                  transition: 'opacity 0.5s ease, transform 0.5s ease'
-                }}
-              >
-                <Target className="mr-2 w-5 h-5" />
-                <span>Kostenlose Beratung</span>
-              </a>
-              
-              <a 
-                href="tel:+4368184030694"
-                className="inline-flex items-center px-6 py-3 bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white rounded-lg shadow-md transition-all"
-                style={{ 
-                  transitionDelay: '1100ms',
-                  opacity: isVisible ? 1 : 0,
-                  transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-                  transition: 'opacity 0.5s ease, transform 0.5s ease'
-                }}
-              >
-                <Users className="mr-2 w-5 h-5" />
-                <span>Jetzt anrufen</span>
-              </a>
-            </div>
+            <a 
+              href="https://github.com/Virtus92/Rising-BSM"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center px-6 py-3 bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white rounded-lg shadow-md transition-all"
+              style={{ 
+                transitionDelay: '1000ms',
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+                transition: 'opacity 0.5s ease, transform 0.5s ease'
+              }}
+            >
+              <Code className="mr-2 w-5 h-5" />
+              <span>View Source Code</span>
+            </a>
           </div>
         </div>
       </div>

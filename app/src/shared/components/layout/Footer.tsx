@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import Link from 'next/link';
-import { Instagram, Youtube, ArrowUp, Mail, Phone, MapPin, Heart, MessageCircle, Clock } from 'lucide-react';
+import { Facebook, Instagram, Twitter, Linkedin, ArrowUp, Mail, Phone, MapPin, Github, Heart, Users, Calendar, MessageSquare, BarChart3, BookOpen, FileText, Shield, Headphones, ExternalLink, Star, ChevronRight, LayoutDashboard } from 'lucide-react';
 import { useSettings } from '@/shared/contexts/SettingsContext';
 
 /**
@@ -20,14 +20,14 @@ const Footer = () => {
   }, []);
 
   return (
-    <footer className="bg-gradient-to-br from-slate-900 via-slate-900 to-orange-950 text-white overflow-hidden relative">
+    <footer className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-white overflow-hidden relative">
       {/* Background gradient decorations */}
       <div 
-        className="absolute top-0 left-0 w-64 h-64 rounded-full bg-orange-500 opacity-10 blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+        className="absolute top-0 left-0 w-64 h-64 rounded-full bg-indigo-500 opacity-10 blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none"
         aria-hidden="true"
       ></div>
       <div 
-        className="absolute bottom-0 right-0 w-64 h-64 rounded-full bg-blue-500 opacity-10 blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none"
+        className="absolute bottom-0 right-0 w-64 h-64 rounded-full bg-green-500 opacity-10 blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none"
         aria-hidden="true"
       ></div>
       
@@ -44,155 +44,149 @@ const Footer = () => {
           {/* Company Information */}
           <div className="space-y-6">
             <div className="flex items-center space-x-2">
-              <div className="relative overflow-hidden rounded-full w-10 h-10 flex items-center justify-center bg-gradient-to-br from-orange-500 to-blue-500">
+              <div className="relative overflow-hidden rounded-full w-10 h-10 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-green-400">
                 <span className="font-bold text-white text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-orange-200">
-                RISING BS e.U.
+              <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-indigo-200">
+                {settings?.companyName || 'Rising BSM'}
               </span>
             </div>
             
             <p className="text-slate-300 leading-relaxed">
-              Ihr zuverlässiger Partner für Gebäudebetreuung, Winterdienst, Grünflächenpflege und vieles mehr in Linz und Umgebung.
+              Open source platform for business service management with AI-powered assistants handling requests, customer management, and appointments.
             </p>
             
             <div className="flex space-x-4">
               <a 
-                href="https://www.instagram.com/bsrising" 
+                href={settings?.socialLinks?.github || "https://github.com"} 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-slate-400 hover:text-white transition-colors duration-300 hover:scale-110 transform"
-                aria-label="Instagram"
+                aria-label="GitHub"
               >
-                <Instagram size={20} />
-                <span className="sr-only">Instagram</span>
+                <Github size={20} />
+                <span className="sr-only">GitHub</span>
               </a>
               <a 
-                href="https://wa.me/4368184030694" 
+                href={settings?.socialLinks?.twitter || "https://twitter.com"} 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-slate-400 hover:text-white transition-colors duration-300 hover:scale-110 transform"
-                aria-label="WhatsApp"
+                aria-label="Twitter"
               >
-                <MessageCircle size={20} />
-                <span className="sr-only">WhatsApp</span>
+                <Twitter size={20} />
+                <span className="sr-only">Twitter</span>
               </a>
               <a 
-                href="https://www.youtube.com/@risingbs" 
+                href={settings?.socialLinks?.linkedin || "https://linkedin.com"} 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-slate-400 hover:text-white transition-colors duration-300 hover:scale-110 transform"
-                aria-label="YouTube"
+                aria-label="LinkedIn"
               >
-                <Youtube size={20} />
-                <span className="sr-only">YouTube</span>
+                <Linkedin size={20} />
+                <span className="sr-only">LinkedIn</span>
               </a>
             </div>
           </div>
 
-          {/* Dienstleistungen */}
+          {/* Products */}
           <div>
             <h3 className="text-xl font-bold mb-6 relative">
-              <span className="relative z-10">Dienstleistungen</span>
-              <span className="absolute bottom-0 left-0 w-12 h-1 bg-orange-500 rounded-full"></span>
+              <span className="relative z-10">Products</span>
+              <span className="absolute bottom-0 left-0 w-12 h-1 bg-indigo-500 rounded-full"></span>
             </h3>
             <ul className="space-y-4">
               <li>
-                <Link href="/#services" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                  Winterdienst
+                <Link href="/#features" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  Customer Management
                 </Link>
               </li>
               <li>
-                <Link href="/#services" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                  Grünflächenbetreuung
+                <Link href="/#features" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  Request Handling
                 </Link>
               </li>
               <li>
-                <Link href="/#services" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                  Reinigung
+                <Link href="/#features" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  Appointment Scheduling
                 </Link>
               </li>
               <li>
-                <Link href="/#services" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                  Umzüge & Transporte
-                </Link>
-              </li>
-              <li>
-                <Link href="/#services" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                  Kranführer
+                <Link href="/#features" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  Analytics & Reporting
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Unternehmen */}
+          {/* Resources */}
           <div>
             <h3 className="text-xl font-bold mb-6 relative">
-              <span className="relative z-10">Unternehmen</span>
-              <span className="absolute bottom-0 left-0 w-12 h-1 bg-orange-500 rounded-full"></span>
+              <span className="relative z-10">Resources</span>
+              <span className="absolute bottom-0 left-0 w-12 h-1 bg-indigo-500 rounded-full"></span>
             </h3>
             <ul className="space-y-4">
               <li>
-                <Link href="/#about" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                  Über uns
-                </Link>
-              </li>
-              <li>
-                <Link href="/#team" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                  Team
+                <Link href="/" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  Documentation
                 </Link>
               </li>
               <li>
                 <Link href="/#faq" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                   FAQ
                 </Link>
               </li>
               <li>
-                <Link href="/agb" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                  AGB
+                <Link href="/#request" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  Request Demo
                 </Link>
               </li>
               <li>
                 <Link href="/impressum" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                   Impressum
+                </Link>
+              </li>
+              <li>
+                <Link href="/datenschutz" className="group flex items-center text-slate-300 hover:text-white transition-colors duration-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  Datenschutz
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Kontakt */}
+          {/* Contact */}
           <div>
             <h3 className="text-xl font-bold mb-6 relative">
-              <span className="relative z-10">Kontakt</span>
-              <span className="absolute bottom-0 left-0 w-12 h-1 bg-orange-500 rounded-full"></span>
+              <span className="relative z-10">Contact</span>
+              <span className="absolute bottom-0 left-0 w-12 h-1 bg-indigo-500 rounded-full"></span>
             </h3>
             <address className="not-italic space-y-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0 mt-1">
-                  <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                    <MapPin size={16} className="text-orange-400" />
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                    <MapPin size={16} className="text-indigo-400" />
                   </div>
                 </div>
                 <div className="ml-4 text-slate-300">
                   <p>Waldmüllergang 10a</p>
-                  <p>4020 Linz, Österreich</p>
+                  <p>4020 Linz, Austria</p>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                    <Phone size={16} className="text-orange-400" />
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                    <Phone size={16} className="text-indigo-400" />
                   </div>
                 </div>
                 <div className="ml-4">
@@ -204,13 +198,13 @@ const Footer = () => {
               
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                    <Mail size={16} className="text-orange-400" />
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                    <Mail size={16} className="text-indigo-400" />
                   </div>
                 </div>
                 <div className="ml-4">
-                  <a href="mailto:info.risingbs@gmail.com" className="text-slate-300 hover:text-white transition-colors duration-300">
-                    info.risingbs@gmail.com
+                  <a href="mailto:info@rising-bsm.at" className="text-slate-300 hover:text-white transition-colors duration-300">
+                    info@rising-bsm.at
                   </a>
                 </div>
               </div>
@@ -218,44 +212,45 @@ const Footer = () => {
           </div>
         </div>
 
-        {/* Öffnungszeiten */}
+        {/* Newsletter (optional) */}
         <div className="mt-16 lg:mt-20 py-8 border-t border-slate-800 grid md:grid-cols-2 gap-8 items-center">
           <div>
-            <h4 className="text-xl font-bold mb-3 flex items-center">
-              <Clock className="mr-2" size={24} />
-              Öffnungszeiten
-            </h4>
-            <p className="text-slate-400">Montag - Freitag: 09:00 - 18:00 Uhr</p>
-            <p className="text-slate-400">Samstag & Sonntag: Nach Vereinbarung</p>
-            <p className="text-orange-400 mt-2">24/7 Notfallservice verfügbar</p>
+            <h4 className="text-xl font-bold mb-3">Stay up to date</h4>
+            <p className="text-slate-400">Get updates on new features and releases</p>
           </div>
-          <div className="text-right">
-            <p className="text-xl font-bold mb-2">Kostenlose Beratung</p>
-            <p className="text-slate-400 mb-4">Lassen Sie sich unverbindlich beraten</p>
-            <a
-              href="tel:+4368184030694"
-              className="inline-flex items-center bg-orange-600 hover:bg-orange-700 px-6 py-3 rounded-lg font-medium transition-colors duration-300"
-            >
-              <Phone className="mr-2" size={18} />
-              Jetzt anrufen
-            </a>
+          <div>
+            <form className="flex">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                className="flex-1 px-4 py-3 bg-slate-800/50 border border-slate-700 focus:border-indigo-500 rounded-l-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                required
+              />
+              <button
+                type="submit"
+                className="bg-indigo-600 hover:bg-indigo-700 px-6 py-3 rounded-r-lg font-medium transition-colors duration-300"
+              >
+                Subscribe
+              </button>
+            </form>
           </div>
         </div>
 
         {/* Bottom bar */}
         <div className="mt-12 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
           <div className="text-slate-400 text-sm">
-            © {new Date().getFullYear()} RISING BS e.U. Alle Rechte vorbehalten.
+            © {new Date().getFullYear()} {settings?.companyName || 'Rising BSM'}. All rights reserved.
           </div>
           
           <div className="flex items-center text-slate-400 text-sm">
-            <span>Ihre Zufriedenheit ist unser Maßstab </span>
+            <span>Made with </span>
             <Heart size={14} className="mx-1 text-rose-500" />
+            <span> for open source</span>
           </div>
           
           <button
             onClick={scrollToTop}
-            className="md:self-auto self-end group p-3 rounded-full bg-slate-800 hover:bg-orange-600 text-white transition-colors duration-300"
+            className="md:self-auto self-end group p-3 rounded-full bg-slate-800 hover:bg-indigo-600 text-white transition-colors duration-300"
             aria-label="Scroll to top"
           >
             <ArrowUp size={18} className="group-hover:animate-bounce" />

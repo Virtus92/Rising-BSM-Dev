@@ -44,28 +44,28 @@ const FAQ = () => {
 
   const faqs = [
     {
-      question: "Welche Dienstleistungen bietet RISING BS an?",
-      answer: "RISING BS bietet ein umfassendes Spektrum an Dienstleistungen: Winterdienst (Schneeräumung & Streuung), Grünflächenbetreuung (Rasenpflege, Baum- & Heckenschnitt), Reinigung (Dampfreinigung ohne Chemie), Hausbetreuung, Umzüge & Transporte sowie Kranführerdienstleistungen."
+      question: "What exactly is Rising BSM?",
+      answer: "Rising BSM is an open-source platform for developing AI-powered business service management solutions. It provides core functionality for customer relationship management, appointment scheduling, and request handling, all integrated with AI assistants to automate routine tasks."
     },
     {
-      question: "In welchen Gebieten ist RISING BS tätig?",
-      answer: "Wir sind hauptsächlich in Linz und Umgebung tätig. Je nach Auftragslage und Projekt können wir aber auch in anderen Regionen Oberösterreichs unsere Dienstleistungen anbieten. Kontaktieren Sie uns für individuelle Anfragen!"
+      question: "Is Rising BSM really free to use?",
+      answer: "Yes, Rising BSM is 100% free and open-source. You can use it for personal or commercial projects without any licensing fees. The code is available on GitHub under an open-source license, allowing you to modify, extend, and customize it to your needs."
     },
     {
-      question: "Wie funktioniert der Winterdienst?",
-      answer: "Unser Winterdienst ist 24/7 einsatzbereit. Bei Schneefall oder Glatteis sind wir automatisch vor Ort, ohne dass Sie uns extra rufen müssen. Wir räumen Schnee, streuen Gehwege und Parkplätze und sorgen für sichere Wege. Alle Einsätze werden dokumentiert."
+      question: "What technologies does Rising BSM use?",
+      answer: "Rising BSM is built with modern, production-ready technologies including Next.js 15 for the frontend and server components, Prisma as the ORM for database operations, and Tailwind CSS for styling. It follows best practices for performance, accessibility, and maintainability."
     },
     {
-      question: "Was ist das Besondere an der Dampfreinigung?",
-      answer: "Unsere Dampfreinigung arbeitet komplett ohne Chemikalien und entfernt 99,9% aller Bakterien. Das Verfahren ist besonders umweltfreundlich, allergikerfreundlich und ideal für Haushalte mit Kindern und Haustieren. Trotzdem erreichen wir eine gründliche Tiefenreinigung."
+      question: "Do I need coding knowledge to use Rising BSM?",
+      answer: "Basic knowledge of JavaScript/TypeScript and React is helpful for customizing Rising BSM to your specific needs. However, many users can deploy and use the platform with minimal technical knowledge, especially if you're using it as-is without custom modifications."
     },
     {
-      question: "Bieten Sie auch Notfalldienste an?",
-      answer: "Ja, wir bieten einen 24/7 Notfalldienst für dringende Situationen wie Sturmschäden, Wasserschäden oder andere unvorhergesehene Ereignisse. Sie erreichen uns jederzeit unter unserer Notfallnummer +43 681 840 30 694."
+      question: "Can I integrate Rising BSM with other tools?",
+      answer: "Absolutely! Rising BSM is designed with extensibility in mind. It provides APIs for integration with third-party services and tools. The modular architecture makes it straightforward to add new features or connect to external systems like payment processors, calendaring services, or marketing platforms."
     },
     {
-      question: "Wie erhalte ich ein Angebot?",
-      answer: "Ein unverbindliches Angebot erhalten Sie ganz einfach: Kontaktieren Sie uns telefonisch, per E-Mail oder über unser Kontaktformular. Wir besprechen Ihre Anforderungen, besichtigen bei Bedarf das Objekt und erstellen Ihnen ein maßgeschneidertes Angebot - transparent und fair kalkuliert."
+      question: "How can I contribute to the project?",
+      answer: "We welcome contributions of all kinds! You can contribute by reporting bugs, suggesting features, improving documentation, or submitting code improvements. Check out our GitHub repository for contribution guidelines and open issues."
     }
   ];
 
@@ -79,11 +79,11 @@ const FAQ = () => {
             }`}
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Häufig gestellte <span className="text-orange-600 dark:text-orange-400">Fragen</span>
+              Frequently Asked <span className="text-indigo-600 dark:text-indigo-400">Questions</span>
             </h2>
             
             <p className="text-lg text-slate-600 dark:text-slate-300">
-              Hier finden Sie Antworten auf die wichtigsten Fragen zu unseren Dienstleistungen.
+              Find answers to common questions about Rising BSM and how it can help your business.
             </p>
           </div>
           
@@ -106,7 +106,7 @@ const FAQ = () => {
                   <span className="font-semibold text-lg text-slate-800 dark:text-slate-200">
                     {faq.question}
                   </span>
-                  <span className={`text-orange-600 dark:text-orange-400 transition-transform duration-300 ${
+                  <span className={`text-indigo-600 dark:text-indigo-400 transition-transform duration-300 ${
                     openIndex === index ? 'rotate-180' : ''
                   }`}>
                     {openIndex === index ? 
@@ -135,14 +135,16 @@ const FAQ = () => {
             }`}
           >
             <p className="text-slate-600 dark:text-slate-300 mb-4">
-              Haben Sie weitere Fragen? Wir sind gerne für Sie da!
+              Have more questions? We're here to help!
             </p>
             <a 
-              href="#contact"
-              className="inline-flex items-center px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg shadow-md transition-all"
+              href="https://github.com/Virtus92/Rising-BSM/discussions"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-md transition-all"
             >
               <ChevronDown className="mr-2 w-5 h-5" />
-              <span>Kontaktieren Sie uns</span>
+              <span>Visit Our Community</span>
             </a>
           </div>
         </div>
